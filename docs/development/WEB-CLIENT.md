@@ -882,8 +882,10 @@ leaves readiness and cannot continue using its old policy.
 
 ## Account data portability
 
-**My Account → Your data** downloads the signed-in account as a private ZIP with
-JSON and CSV. A reviewed restore shows record and link counts, then adds work with remapped
+**My Account → Your data** separates **Prepare archive** from **Download archive**.
+Preparation fetches a private ZIP with JSON and CSV for the signed-in account; only
+the explicit download action saves it, using the server’s dated filename. A new
+preparation or leaving the page releases the previous browser copy. A reviewed restore shows record and link counts, then adds work with remapped
 relationships and an optional time-zone change; it preserves the target account’s identity,
 permissions and credentials. Interrupted uploads resume after file reselection,
 and an uncertain restore can be reconciled without duplicating records.

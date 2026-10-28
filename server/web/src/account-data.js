@@ -11,13 +11,16 @@ export async function renderAccountData(view, zone) {
   let currentZone = zone,pendingRequest = 0,historyRequest = 0;
   const api = view.session,urls = new Set();let worker = null,cancelWorker = null,selected = null,fingerprint = null,createKey = null,uploadId = null,review = null,uncertain = false,historyAfter = null,historyItems = [];
   const downloadCard = section(view, i18nText("ui.download_my_data")),downloadFeedback = node('p', '', 'form-feedback');downloadFeedback.setAttribute('role', 'status');
-  downloadCard.append(node('p', i18nText("ui.a_private_zip_with_json_for_restoring_your_work_and_csv_files_for_other_tools_include")));
-  const download = button(i18nText("ui.download_my_data"), () => void view.run(async () => {
+  downloadCard.append(node('p', i18nText("ui.a_private_zip_with_json_for_restoring_your_work_and_csv_files_for_other_tools_include")+' '+i18nText("ui.prepare_archive_help")));
+  const download = button(i18nText("ui.prepare_archive"), () => void view.run(async () => {
     download.disabled = true;
+    // A newly prepared snapshot replaces the prior private browser copy.
+    for (const url of urls) URL.revokeObjectURL(url);urls.clear();
+    downloadFeedback.textContent = i18nText("ui.preparing_archive");
     try {
       const reply = await api.request(base + '/export', { binary: true, timeout: 300000 });if (!view.valid()) return;
-      const url = URL.createObjectURL(reply.data);urls.add(url);const link = node('a', i18nText("ui.save_archive"), 'btn btn-outline-secondary');link.href = url;link.download = 'timekeeper-account.zip';
-      downloadFeedback.replaceChildren(node('span', i18nText("ui.your_private_archive_is_ready")), link);link.click();
+      const url = URL.createObjectURL(reply.data);urls.add(url);const link = node('a', i18nText("ui.download_archive"), 'btn btn-outline-secondary');link.href = url;link.download = reply.fileName || `timekeeper-account-${new Date().toISOString().slice(0,10)}.zip`;
+      downloadFeedback.replaceChildren(node('span', i18nText("ui.your_private_archive_is_ready")), link);
     } finally {if (view.valid()) download.disabled = false;}
   }, { feedback: downloadFeedback }), "btn btn-primary");downloadCard.append(download, downloadFeedback);
 

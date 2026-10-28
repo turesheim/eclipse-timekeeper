@@ -106,7 +106,10 @@ export class Api {
       if (data?.items?.some((row) => row.ownerId !== undefined && row.ownerId !== owner)) throw new ApiError('OWNER_CHANGED', 401);
       const undoId = response.headers.get("X-Timekeeper-Undo-Id"),seconds = Number(response.headers.get("X-Timekeeper-Undo-Seconds"));
       const offer = undoId && /^[a-f0-9-]{36}$/.test(undoId) && seconds > 0 && seconds <= 600 ? { id: undoId, seconds } : null;
-      return { data, etag: response.headers.get('ETag'), ...(offer ? { undo: offer } : {}) };
+      // Only accept the server's dated account-archive filename. Never pass
+      // arbitrary Content-Disposition paths or header text to a browser save.
+      const archiveName = binaryType === 'application/zip' ? (response.headers.get('Content-Disposition') || '').trim().match(/^attachment;\s*filename="(timekeeper-account-\d{4}-\d{2}-\d{2}\.zip)"$/i)?.[1] : null;
+      return { data, etag: response.headers.get('ETag'), ...(archiveName ? { fileName: archiveName } : {}), ...(offer ? { undo: offer } : {}) };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       // Never expose response bodies, URLs, tokens or fetch exception details.
