@@ -15,14 +15,14 @@ class InstanceDatabaseImageTest {
     @TempDir Path directory;
     private static final String TASK="11111111-1111-1111-1111-111111111111",ACTIVITY="22222222-2222-2222-2222-222222222222",TOKEN="33333333-3333-3333-3333-333333333333",PASSKEY="44444444-4444-4444-4444-444444444444";
     private static final String NOW="2026-10-28T04:15:16.123456789Z";
-    private Connection database() throws Exception {
+    static Connection database() throws Exception {
         var connection=DriverManager.getConnection("jdbc:h2:mem:instance_"+UUID.randomUUID());ServerSchema.initializeOrValidate(connection);
         connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setAutoCommit(false);return connection;
     }
     private Path snapshot(Connection connection,String name) throws Exception {
         Path image=directory.resolve(name);try(var output=Files.newOutputStream(image)){InstanceDatabaseImage.write(connection,output);}return image;
     }
-    private void seed(Connection c) throws SQLException {
+    static void seed(Connection c) throws SQLException {
         boolean postgres=c.getMetaData().getDatabaseProductName().equals("PostgreSQL");Object timestamp=postgres?NOW:OffsetDateTime.parse(NOW);
         for(String owner:List.of("a","b")) {
             execute(c,"INSERT INTO tk_owner VALUES(?,'Europe/Oslo',7,9,?)",owner,"cursor-secret-"+owner);

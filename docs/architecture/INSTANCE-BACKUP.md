@@ -1,8 +1,9 @@
 # Full-instance backup implementation
 
 This feature is being implemented for [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
-The internal encryption and database-image primitives exist. There is no
-administrator backup endpoint or restore UI yet. The acceptance criteria in the
+The internal encrypted archive, configuration inventory, database-image and
+administrator-authority components exist. There is no administrator backup
+endpoint or restore UI yet. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
 ## Encryption envelope
@@ -27,6 +28,61 @@ Staging currently uses POSIX directories with mode 0700 and files with mode
 0600. ACL-backed staging needs verification before claiming support for a
 non-POSIX filesystem. The caller owns completed files and passphrase arrays and
 must delete the files and clear the arrays at the end of their lifetime.
+
+## Complete archive and configuration inventory
+
+`InstanceBackupArchive` creates `timekeeper-instance-v1`. The encrypted ZIP
+contains `database.json`, `configuration.json`, numbered configuration inputs
+and `manifest.json`. The manifest records a canonical archive UUID, UTC creation
+time, logical schema, source build/deployment identity, and every file's byte
+count and SHA-256. All metadata is inside the authenticated encryption envelope.
+
+Opening an archive authenticates the complete ciphertext before parsing the
+ZIP. It rejects duplicate names, directories, unsafe/unexpected paths, missing
+or extra files, duplicate JSON fields, unsupported versions, integer overflow,
+length/hash mismatches and configuration references that do not match the file
+index. A caller-supplied budget limits both the decrypted ZIP and the total
+uncompressed contents, including the manifest. Every indexed byte is verified
+before disposable-database preflight. Checksummed but incomplete databases are
+still rejected. Source paths are metadata; opening an archive never reads or
+writes those paths on the destination.
+
+`InstanceConfiguration` captures resolved `timekeeper.*`, `quarkus.*` and
+`smallrye.config.*` values, including applicable DB/SMTP credentials and
+configuration encryption keys. It does not collect unrelated host environment
+variables. Its file inventory covers token/setup files, external configuration
+files and [Quarkus 3.40 TLS inputs](https://quarkus.io/version/3.40/guides/tls-registry-reference/),
+including named PEM pairs, keystores, certificate lists and flat trust directories.
+Classpath inputs are supported; input paths are never silently omitted when
+missing, unreadable, oversized or unsupported. Unknown application file inputs
+fail coverage, and a source-level test checks newly declared application
+configuration properties. Files changing while being read are rejected. The archive service captures the
+inventory again before publication and rejects a changed result.
+
+There are at most 64 input files, 20,000,000 bytes per file and 64,000,000 bytes
+in aggregate; the configuration JSON is limited to 4,000,000 bytes. These limits
+reject the operation instead of producing a partial archive. Known output
+locations, such as logs, remain metadata rather than being recursively copied.
+Binary configuration buffers are cleared when their internal snapshot closes.
+These secret-bearing snapshots must never become JSON API replies.
+
+## Administrator authority
+
+`InstanceAdministrator` accepts only current administrator browser-account
+sessions with write permission. It rejects managed/legacy bearer tokens,
+read-only users and sessions exchanged from API tokens. Password proof is
+required, expires after five minutes before starting an operation, and is
+rate-limited after five failed attempts in five minutes. A successful proof
+resets its own failure counter. Proof objects are internal and cannot be
+constructed from request data.
+
+`InstanceBackupService` checks fresh proof before accessing the complete
+installation, creates one encrypted archive from a repeatable-read transaction,
+then rechecks the original session and administrator role before publishing the
+result. Logout, password revocation or demotion prevents publication. Its
+passphrase array is cleared on success and failure. HTTP authorization, CSRF,
+operation receipts, download grants and audit handling still need integration;
+these service checks do not substitute for testing those routes.
 
 ## Complete database image
 
@@ -62,20 +118,21 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 305 application tests and the shared
-module suites. The new checks include randomized multi-segment encryption,
+The current local server reactor passes 326 application tests and the shared
+module suites. The new checks include real-runtime configuration capture, complete archive integrity,
+unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
+proof, revocation/configuration-change publication guards, randomized multi-segment encryption,
 failure cleanup, all-table credential fidelity, missing-state detection,
 concurrent snapshot consistency and damage after validation with destination
 rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires the complete archive and configuration inventory,
-checksummed manifest, administrator session and fresh-proof checks, protected
-operation storage, upload/download and validation APIs, Administration UI,
-exclusive restart-safe activation, deployment and hostname remapping,
+Delivery still requires protected durable operation storage and audit,
+HTTP upload/download and validation APIs, Administration UI,
+exclusive restart-safe activation, semantic authentication/configuration validation,
+deployment and hostname remapping,
 Synology/Docker/standalone integration, full restored-access tests and operator
-documentation. In particular, a database image is not a complete installation
-backup: external configuration and applicable security material must also be
-covered. No privileged host credentials may be granted to the web process to
+documentation. Deployment integration must still audit all recoverable inputs and applicable
+security material, including native maintenance backup coverage after a restore. No privileged host credentials may be granted to the web process to
 make that integration work.
