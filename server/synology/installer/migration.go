@@ -27,6 +27,9 @@ func migrationTablesFor(schema int) []string {
 	if schema >= 6 {
 		tables = append(tables, "tk_locale")
 	}
+	if schema >= 9 {
+		tables = append(tables, "tk_instance")
+	}
 	return tables
 }
 
@@ -186,6 +189,9 @@ func importPostgreSQL18(root, path, resources string) error {
 	}
 	if manifest.ServerSchema < 4 && s.Release.Schema >= 4 {
 		after += "DELETE FROM public.tk_auth_session;\n"
+	}
+	if manifest.ServerSchema < 9 && s.Release.Schema >= 9 {
+		after += "INSERT INTO public.tk_instance VALUES('00000000-0000-0000-0000-000000000000','CONTROL',1,NULL,NULL,'1970-01-01T00:00:00Z','{}');\n"
 	}
 	after += fmt.Sprintf("UPDATE public.tk_schema SET schema_version=%d WHERE id=1;\n", s.Release.Schema)
 	guard, err := schemaGuard(resources, s.Release.Schema)

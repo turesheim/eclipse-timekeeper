@@ -18,6 +18,7 @@ final class InstanceDatabaseImage {
     // instead of silently disappearing from disaster-recovery archives.
     private static final List<Table> TABLES=List.of(
         table("tk_schema","id schema_version state"),
+        table("tk_instance","id kind version operation_id actor_owner occurred_at payload"),
         table("tk_owner","id zone_id version revision cursor_secret"),
         table("tk_auth_control","id bootstrap_completed"),
         table("tk_recovery_control","id origin epoch"),

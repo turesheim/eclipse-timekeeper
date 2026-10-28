@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify schema-6/7 -> schema-8 label separation and prospective history across actual packaged H2 JVMs.
+"""Verify schema-6/7 -> schema-9 label separation and prospective history across actual packaged H2 JVMs.
 
 Both distributions and all credentials/data are local disposable fixtures.
 No request is made to a user's server. Supply a checksum-verified older package.
@@ -36,7 +36,7 @@ def main():
                 identities[key]=json.loads(archive.read('timekeeper-server/timekeeper-release.json'))
                 archive.extractall(target)
             packages[key]=target/'timekeeper-server/quarkus-run.jar'
-        if identities['old']['serverSchema'] not in (6,7) or identities['new']['serverSchema']!=8:raise AssertionError('Expected schema-6/7 and schema-8 packages')
+        if identities['old']['serverSchema'] not in (6,7) or identities['new']['serverSchema']!=9:raise AssertionError('Expected schema-6/7 and schema-9 packages')
         token=secrets.token_urlsafe(32);registry=root/'tokens.json'
         registry.write_text(json.dumps([{'ownerId':'label-upgrade','sha256':hashlib.sha256(token.encode()).hexdigest(),'permissions':['read','write']}]))
         registry.chmod(0o600)
@@ -107,7 +107,7 @@ def main():
             if request(history_path)[0]['items']!=history_before['items']:raise AssertionError('Restart changed diagnostic events')
             if after!=changed or not request(content)[0]['deleted']:raise AssertionError('Restart changed independent state')
             start('old',blocked=True)
-            print(json.dumps({'oldCommit':identities['old']['commit'],'newCommit':identities['new']['commit'],'sourceSchema':identities['old']['serverSchema'],'targetSchema':8,'upgradeRequiresAuthorization':True,'oldBinaryRejected':True,'historyDoesNotFabricateLegacyEvents':True,'historySurvivesRestart':True,'labelAndNotePreservedDuringMigration':True,'canonicalMarkdownPreserved':True,'independentEtags':True,'bodyClearAndNoteDeleteRetainLabel':True,'restartPreservesState':True,'passed':True}))
+            print(json.dumps({'oldCommit':identities['old']['commit'],'newCommit':identities['new']['commit'],'sourceSchema':identities['old']['serverSchema'],'targetSchema':9,'upgradeRequiresAuthorization':True,'oldBinaryRejected':True,'historyDoesNotFabricateLegacyEvents':True,'historySurvivesRestart':True,'labelAndNotePreservedDuringMigration':True,'canonicalMarkdownPreserved':True,'independentEtags':True,'bodyClearAndNoteDeleteRetainLabel':True,'restartPreservesState':True,'passed':True}))
         finally:stop()
 
 

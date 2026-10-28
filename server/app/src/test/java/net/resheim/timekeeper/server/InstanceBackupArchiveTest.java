@@ -29,7 +29,7 @@ class InstanceBackupArchiveTest {
         byte[] ciphertext=Files.readAllBytes(encrypted);assertEquals("TKIBK001",new String(ciphertext,0,8,StandardCharsets.US_ASCII));
         assertFalse(new String(ciphertext,StandardCharsets.ISO_8859_1).contains("private DB password"));
         try(var verified=InstanceBackupArchive.open(encrypted,passphrase,directory,10_000_000)) {
-            assertEquals(22,verified.counts().size());assertTrue(verified.counts().values().stream().allMatch(count->count>0));
+            assertEquals(23,verified.counts().size());assertTrue(verified.counts().values().stream().allMatch(count->count>0));
             assertEquals("private DB password",verified.configuration().document().path("properties").path("quarkus.datasource.password").asText());
             assertEquals("private SMTP password",verified.configuration().document().path("properties").path("quarkus.mailer.password").asText());
             String entry=verified.configuration().document().path("files").path("timekeeper.auth.tokens-file").get(0).asText();
@@ -59,7 +59,7 @@ class InstanceBackupArchiveTest {
             try {var configuration=(ObjectNode)MAPPER.readTree(entries.get("configuration.json"));configuration.withObject("properties").put("timekeeper.auth.tokens-file","/source-package-that-does-not-exist/tokens.json");entries.put("configuration.json",MAPPER.writeValueAsBytes(configuration));}
             catch(IOException failure){throw new AssertionError(failure);}
         },true);
-        try(var verified=InstanceBackupArchive.open(changed,passphrase,directory,10_000_000)) {assertEquals(22,verified.counts().size());}
+        try(var verified=InstanceBackupArchive.open(changed,passphrase,directory,10_000_000)) {assertEquals(23,verified.counts().size());}
         assertEquals("host data retained",Files.readString(sentry));
         Path unsafe=mutate(encrypted,entries->{
             try {var configuration=(ObjectNode)MAPPER.readTree(entries.get("configuration.json"));configuration.withObject("properties").put("timekeeper.new-security-file",sentry.toString());entries.put("configuration.json",MAPPER.writeValueAsBytes(configuration));}

@@ -26,7 +26,7 @@ class InstanceBackupRuntimeTest {
             var source=object().put("serverVersion","2.0.0-SNAPSHOT").put("commit","unknown").put("databaseType","h2").put("packageId","standalone").putNull("publicOrigin");
             Path encrypted=InstanceBackupArchive.create(database,configuration,source,passphrase,directory);database.commit();
             try(var verified=InstanceBackupArchive.open(encrypted,passphrase,directory,100_000_000)) {
-                assertEquals(22,verified.counts().size());assertTrue(verified.counts().get("tk_owner")>=2);assertEquals(1,verified.counts().get("tk_service_settings"));
+                assertEquals(23,verified.counts().size());assertTrue(verified.counts().get("tk_owner")>=2);assertEquals(1,verified.counts().get("tk_service_settings"));
                 assertEquals(configuration.document(),verified.configuration().document());
             }
         }finally{java.util.Arrays.fill(passphrase,'\0');}

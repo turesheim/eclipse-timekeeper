@@ -23,6 +23,8 @@ class InstanceDatabaseImageTest {
         Path image=directory.resolve(name);try(var output=Files.newOutputStream(image)){InstanceDatabaseImage.write(connection,output);}return image;
     }
     static void seed(Connection c) throws SQLException {
+        var operation=InstanceOperations.begin(c,"former-administrator",InstanceOperations.Type.BACKUP,java.time.Instant.parse(NOW));
+        InstanceOperations.advance(c,operation,InstanceOperations.State.PREPARING,InstanceOperations.State.READY,java.time.Instant.parse(NOW));
         boolean postgres=c.getMetaData().getDatabaseProductName().equals("PostgreSQL");Object timestamp=postgres?NOW:OffsetDateTime.parse(NOW);
         for(String owner:List.of("a","b")) {
             execute(c,"INSERT INTO tk_owner VALUES(?,'Europe/Oslo',7,9,?)",owner,"cursor-secret-"+owner);
@@ -77,7 +79,7 @@ class InstanceDatabaseImageTest {
     @Test void allTablesIncludingCredentialsOtherOwnersAndNanosecondsSurviveWithOriginalIdentities() throws Exception {
         try(var source=database();var target=database()) {
             seed(source);Path image=snapshot(source,"source.json");var counts=InstanceDatabaseImage.validate(image);
-            assertEquals(22,counts.size());assertTrue(counts.values().stream().allMatch(count->count>0));
+            assertEquals(23,counts.size());assertTrue(counts.values().stream().allMatch(count->count>0));
             assertEquals(counts,InstanceDatabaseImage.preflight(image,directory));
             InstanceDatabaseImage.replace(target,image);target.commit();
             assertEquals(-1,Files.mismatch(image,snapshot(target,"restored.json")));

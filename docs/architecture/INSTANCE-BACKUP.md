@@ -84,12 +84,36 @@ passphrase array is cleared on success and failure. HTTP authorization, CSRF,
 operation receipts, download grants and audit handling still need integration;
 these service checks do not substitute for testing those routes.
 
+## Durable operation records and schema 9
+
+`tk_instance` contains the installation control row, operation receipts and
+append-only audit records. Actor references intentionally have no owner foreign
+key: replacing a destination's bootstrap account must not erase the evidence of
+who authorized its restore. These rows are installation-private and must never
+appear in personal exports or owner-scoped resource lists. Full-instance images
+include them without filtering. The new physical table requires the explicitly
+authorized schema-9 upgrade with older replicas stopped. PostgreSQL upgrades in
+one transaction. H2 can resume an interrupted table creation/seed only with
+explicit authorization, the exact canonical shape, and a `MIGRATING` marker.
+Normal startup requires the unique control row.
+
+`InstanceOperations` serializes work starts through that control row. Ten-minute
+worker leases support renewal. An expired worker cannot renew or publish a
+result; recovery records `INTERRUPTED` and permits a new operation. A restore
+review has no worker lease and requires explicit discard before another job can
+start. State transitions and their audit records commit or roll back together.
+Audit payloads contain only the operation type and state, not exception strings,
+credentials, archive contents or paths. This remains an internal transaction
+component: artifact cleanup, administrator routing and offline restore activation
+are still being integrated. Its interrupted status never claims to have repaired
+application data or completed a restore.
+
 ## Complete database image
 
 `InstanceDatabaseImage` writes `timekeeper-instance-database-v1`. Its header
 names the exact supported logical server schema. Every table has an explicit
 column list and rows of nullable strings; numeric values therefore retain their
-full precision independently of JSON consumers. All 22 current tables are
+full precision independently of JSON consumers. All 23 current tables are
 included, without owner or resource-type filtering. This includes password
 hashes, tokens, passkeys, sessions, recovery state, both stored SMTP passwords,
 private resource payloads, relationships, receipts and change history.
@@ -121,17 +145,18 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 326 application tests and the shared
+The current local server reactor passes 335 application tests and the shared
 module suites. The new checks include real-runtime configuration capture, complete archive integrity,
 unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
 proof, revocation/configuration-change publication guards, randomized multi-segment encryption,
 failure cleanup, all-table credential fidelity, missing-state detection,
-concurrent snapshot consistency and damage after validation with destination
+concurrent snapshot consistency, operation leases and audit rollback, interrupted
+schema-9 upgrade recovery, and damage after validation with destination
 rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires protected durable operation storage and audit,
+Delivery still requires protected durable artifact storage and audit integration,
 HTTP upload/download and validation APIs, Administration UI,
 exclusive restart-safe activation, semantic authentication/configuration validation,
 deployment and hostname remapping,

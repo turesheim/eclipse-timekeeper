@@ -183,9 +183,9 @@ earlier pending codes; it never reopens completed account setup.
 Provisioning records an installation ID on its dedicated role/database so an
 interrupted operation can resume without taking over an unrelated object.
 Same-schema upgrades replace the pinned application image and record deployment
-time. Supported schema-2/3/4/5/6/7 → schema-8 upgrades run while the package is stopped:
+time. Supported schema-2/3/4/5/6/7/8 → schema-9 upgrades run while the package is stopped:
 the incoming installer validates the canonical schema, saves a native pre-upgrade
-backup, and adds the required recovery/passkey/settings/locale tables in one transaction. Pre-schema-4 browser sessions are ended; account passwords, API tokens and private data remain.
+backup, and adds the required recovery/passkey/settings/locale/instance-operation tables in one transaction. Pre-schema-4 browser sessions are ended; account passwords, API tokens and private data remain.
 An interruption keeps
 the backup and a maintenance marker; startup stays blocked until retry completes.
 After database commit, retry publishes the new configuration without rerunning
@@ -273,7 +273,7 @@ databases or the shared PostgreSQL package.
 ## Migrating from containerized PostgreSQL 18
 
 The supported logical transfer is **PostgreSQL 18.6 → 17.11, canonical Timekeeper
-schema 2, 3, 4, 5, 6, 7 or 8** into a schema-8 package. Upgrade an older source using the explicit schema-upgrade procedure in
+schema 2, 3, 4, 5, 6, 7, 8 or 9** into a schema-9 package. Upgrade an older source using the explicit schema-upgrade procedure in
 [account operations](ACCOUNTS.md) and complete its first-administrator setup before
 exporting. Existing owners must be claimed by their explicit IDs. The exporter
 refuses an older/custom schema, unfinished account setup or connected API clients.

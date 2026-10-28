@@ -792,12 +792,12 @@ label version, while the response `version` still describes the note. Legacy
 the independent routes. Range summaries contain labels and `hasBody`, never
 body content; label-only days remain visible after a note is deleted.
 
-Schema 8 is the current compatibility fence; it includes label separation introduced in schema 7 and prospective diagnostics, without adding a physical SQL table.
+Schema 9 is the current compatibility fence. It includes the schema-7 label separation and schema-8 prospective diagnostics, and adds the installation-wide operation/audit table described in [instance backup architecture](INSTANCE-BACKUP.md).
 After an authorized offline upgrade, the server copies old label projections
 into `DAY_LABEL` records in owner-scoped transactions before serving requests.
 Old note versions, deletion markers and existing Markdown bytes are preserved;
 virtual legacy documents are materialized without changing their note version.
-Older server binaries must remain stopped and cannot reopen schema 8.
+Older server binaries must remain stopped and cannot reopen schema 9.
 
 New Markdown documents contain no managed day label. An existing
 `timekeeper-label` property is now inert legacy metadata: byte-exact reads and

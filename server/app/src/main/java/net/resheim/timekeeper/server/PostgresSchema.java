@@ -26,7 +26,7 @@ public final class PostgresSchema {
                 // Two server replicas may start against the same new database at once.
                 statement.execute("SELECT pg_advisory_xact_lock(92751638246)");
                 if (shape(connection).isEmpty()) {
-                    statement.execute(resource("schema-v1-postgresql.sql"));statement.execute(resource("auth-v2.sql"));statement.execute(resource("recovery-v3.sql"));statement.execute(resource("passkeys-v4.sql"));statement.execute(resource("settings-v5.sql"));statement.execute(resource("locale-v6.sql"));
+                    statement.execute(resource("schema-v1-postgresql.sql"));statement.execute(resource("auth-v2.sql"));statement.execute(resource("recovery-v3.sql"));statement.execute(resource("passkeys-v4.sql"));statement.execute(resource("settings-v5.sql"));statement.execute(resource("locale-v6.sql"));statement.execute(resource("instance-v9.sql"));
                     validateShape(connection);
                     statement.executeUpdate("UPDATE tk_schema SET schema_version="+ServerSchema.CURRENT+",state='READY' WHERE id=1");
                 }
@@ -67,14 +67,14 @@ public final class PostgresSchema {
                 try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
                     if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=5 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported settings PostgreSQL schema");
                 }
-                try(var statement=connection.createStatement()) {statement.execute(resource("locale-v6.sql"));statement.executeUpdate("UPDATE tk_schema SET schema_version="+ServerSchema.CURRENT+" WHERE id=1");}
+                try(var statement=connection.createStatement()) {statement.execute(resource("locale-v6.sql"));statement.executeUpdate("UPDATE tk_schema SET schema_version=6 WHERE id=1");}
             }
-            validateShape(connection);
-            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema WHERE id=1")){
-                if(rows.next()&&rows.getInt(1)>=6&&rows.getInt(1)<ServerSchema.CURRENT&&"READY".equals(rows.getString(2))){
-                    if(!allowUpgrade)throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
-                    try(var update=connection.createStatement()){update.executeUpdate("UPDATE tk_schema SET schema_version="+ServerSchema.CURRENT+" WHERE id=1 AND schema_version="+rows.getInt(1)+" AND state='READY'");}
+            if(shape(connection).equals(resource("schema-v8-postgresql.shape").lines().toList())) {
+                if(!allowUpgrade)throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
+                try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
+                    if(!rows.next()||rows.getInt(1)!=1||rows.getInt(2)<6||rows.getInt(2)>8||!"READY".equals(rows.getString(3))||rows.next())throw new SQLException("Unsupported prior instance schema");
                 }
+                try(var statement=connection.createStatement()) {statement.execute(resource("instance-v9.sql"));statement.executeUpdate("UPDATE tk_schema SET schema_version="+ServerSchema.CURRENT+" WHERE id=1");}
             }
             validate(connection);
             connection.commit();
@@ -86,6 +86,7 @@ public final class PostgresSchema {
 
     public static void validate(Connection connection) throws SQLException {
         validateShape(connection);
+        ServerSchema.validateInstanceControl(connection);
         try (var statement = connection.createStatement();
                 var rows = statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
             if (!rows.next() || rows.getInt(1) != 1 || rows.getInt(2) != ServerSchema.CURRENT
@@ -95,7 +96,7 @@ public final class PostgresSchema {
     }
 
     private static void validateShape(Connection connection) throws SQLException {
-        if (!shape(connection).equals(resource("schema-v8-postgresql.shape").lines().toList()))
+        if (!shape(connection).equals(resource("schema-v9-postgresql.shape").lines().toList()))
             throw new SQLException("Unsupported or incomplete PostgreSQL server schema");
     }
 

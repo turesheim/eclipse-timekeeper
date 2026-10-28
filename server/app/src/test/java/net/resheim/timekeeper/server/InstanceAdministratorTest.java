@@ -49,7 +49,7 @@ class InstanceAdministratorTest {
         char[] phrase="private backup creation passphrase".toCharArray(),copy=phrase.clone();Path encrypted=backups.create(proof,phrase,output);
         assertTrue(allCleared(phrase));
         try(var archive=InstanceBackupArchive.open(encrypted,copy,output,100_000_000)) {
-            assertEquals(22,archive.counts().size());assertEquals(1,archive.counts().get("tk_account"));assertEquals(1,archive.counts().get("tk_auth_session"));
+            assertEquals(23,archive.counts().size());assertEquals(1,archive.counts().get("tk_account"));assertEquals(1,archive.counts().get("tk_auth_session"));
         }finally{Arrays.fill(copy,'\0');}
     }
     @Test void normalReadonlyManagedLegacyAndTokenExchangedSessionsCannotGainInstanceAuthority() {

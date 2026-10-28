@@ -27,7 +27,7 @@ class ServerSchemaTest {
     @Test void logicalLabelModelUpgradeRequiresOfflineAuthorization() throws Exception {
         try(var connection=DriverManager.getConnection(url())){
             ServerSchema.initializeOrValidate(connection);
-            try(var statement=connection.createStatement()){statement.executeUpdate("UPDATE tk_schema SET schema_version=6 WHERE id=1");}
+            try(var statement=connection.createStatement()){statement.execute("DROP TABLE tk_instance");statement.executeUpdate("UPDATE tk_schema SET schema_version=6 WHERE id=1");}
             assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
             ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
             try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version FROM tk_schema WHERE id=1")){rows.next();assertEquals(ServerSchema.CURRENT,rows.getInt(1));}
@@ -36,9 +36,27 @@ class ServerSchemaTest {
     @Test void diagnosticHistoryModelRequiresCoordinatedUpgrade() throws Exception {
         try(var connection=DriverManager.getConnection(url())){
             ServerSchema.initializeOrValidate(connection);
-            try(var statement=connection.createStatement()){statement.executeUpdate("UPDATE tk_schema SET schema_version=7 WHERE id=1");}
+            try(var statement=connection.createStatement()){statement.execute("DROP TABLE tk_instance");statement.executeUpdate("UPDATE tk_schema SET schema_version=7 WHERE id=1");}
             var before=snapshot(connection);assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));assertEquals(before,snapshot(connection));
             ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
+        }
+    }
+    @ParameterizedTest @ValueSource(strings={"before-ddl","after-ddl","before-seed"})
+    void resumesInterruptedInstanceUpgradeOnlyWithExplicitAuthorization(String interruption) throws Exception {
+        try(var connection=DriverManager.getConnection(url());var statement=connection.createStatement()) {
+            ServerSchema.initializeOrValidate(connection);
+            statement.executeUpdate("UPDATE tk_schema SET schema_version=8,state='MIGRATING'");
+            if(interruption.equals("before-ddl"))statement.execute("DROP TABLE tk_instance");
+            if(interruption.equals("before-seed"))statement.executeUpdate("DELETE FROM tk_instance");
+            var before=snapshot(connection);assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));assertEquals(before,snapshot(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
+            var stable=snapshot(connection);ServerSchema.initializeOrValidate(connection,true);assertEquals(stable,snapshot(connection));
+        }
+    }
+    @Test void instanceControlIsRequiredAndNewPhysicalShapeCannotMasqueradeAsOlderReadySchema() throws Exception {
+        try(var c=DriverManager.getConnection(url());var statement=c.createStatement()) {
+            ServerSchema.initializeOrValidate(c);statement.execute("DELETE FROM tk_instance");
+            var before=snapshot(c);assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(c,true));assertEquals(before,snapshot(c));
         }
     }
     @ParameterizedTest @ValueSource(strings={

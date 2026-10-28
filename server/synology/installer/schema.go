@@ -46,10 +46,14 @@ func schemaGuard(resources string, version int) (string, error) {
 		return "", err
 	}
 	literal := "'" + strings.ReplaceAll(expected, "'", "''") + "'"
+	control := ""
+	if version >= 9 {
+		control = "IF (SELECT count(*) FROM public.tk_instance WHERE kind='CONTROL')<>1 THEN RAISE EXCEPTION 'Missing instance-operation control'; END IF; "
+	}
 	// pg_dump clears search_path. Normalize it so catalog-rendered foreign keys
 	// have the same representation as the committed canonical shape.
 	return "\nSET search_path=public;\nDO $timekeeper_schema$ BEGIN IF (SELECT COALESCE(string_agg(definition,E'\\n' ORDER BY definition COLLATE \"C\"),'') FROM (" + query + ") canonical) <> " + literal + " THEN RAISE EXCEPTION 'Noncanonical Timekeeper schema'; END IF; " +
-		fmt.Sprintf("IF (SELECT count(*) FROM public.tk_schema WHERE id=1 AND schema_version=%d AND state='READY')<>1 OR (SELECT count(*) FROM public.tk_schema)<>1 THEN RAISE EXCEPTION 'Incomplete Timekeeper schema'; END IF; ", version) + "END $timekeeper_schema$;\n", nil
+		fmt.Sprintf("IF (SELECT count(*) FROM public.tk_schema WHERE id=1 AND schema_version=%d AND state='READY')<>1 OR (SELECT count(*) FROM public.tk_schema)<>1 THEN RAISE EXCEPTION 'Incomplete Timekeeper schema'; END IF; ", version) + control + "END $timekeeper_schema$;\n", nil
 }
 
 func pendingSchemaUpgrade(root string) (maintenancePending, bool, error) {

@@ -37,7 +37,7 @@ def package(output, commit, root=ROOT):
                 raise ValueError('Missing or unexpected deployment input: ' + name)
             archive.add(source, arcname=name, recursive=False)
         archive.add(root / 'server/scripts/configure_accounts.py', arcname='configure_accounts.py', recursive=False)
-        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql'):
+        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','schema-v9-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql','instance-v9.sql'):
             archive.add(root / 'server/app/src/main/resources/db' / name, arcname='migration/'+name,recursive=False)
         for source, destination in GUIDES.items():
             content = render_document(root, source, GUIDES, commit).encode()
