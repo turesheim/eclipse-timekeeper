@@ -16,6 +16,8 @@ import tarfile
 import tempfile
 
 HERE = Path(__file__).resolve().parent
+# Let transient backend teardown/background maintenance finish; never ignore or terminate a backend.
+OFFLINE_DRAIN_SQL = "DO $timekeeper_offline$ DECLARE deadline timestamptz:=clock_timestamp()+interval '8 seconds'; BEGIN LOOP PERFORM pg_stat_clear_snapshot(); EXIT WHEN NOT EXISTS(SELECT 1 FROM pg_catalog.pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()); IF clock_timestamp()>=deadline THEN RAISE EXCEPTION 'Stop all other database clients before maintenance'; END IF; PERFORM pg_sleep(0.05); END LOOP; END $timekeeper_offline$;\n"
 FORMAT = 'timekeeper-instance-material-v1'
 UUID = re.compile(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\Z')
 SHA = re.compile(r'[a-f0-9]{64}\Z')

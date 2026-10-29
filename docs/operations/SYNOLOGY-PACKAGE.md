@@ -255,6 +255,9 @@ for stable publication.
 Stop Timekeeper in Package Center before backing up or restoring. The maintenance
 helper refuses an active HTTP listener, other database clients, an incompatible
 schema or a PostgreSQL major version other than 17. PostgreSQL itself stays running.
+The database check allows a bounded eight-second drain for closing connections
+and transient background maintenance before refusing. It never disconnects a
+client or ignores an unclassified backend.
 
 A DSM administrator can use **Control Panel → Task Scheduler → Create → Scheduled
 Task → User-defined script**, run as root, to invoke the package account without

@@ -8,7 +8,7 @@ import tempfile
 
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE))
-from instance_material import guard_sql, read_archive, ARCHIVE
+from instance_material import guard_sql, read_archive, ARCHIVE, OFFLINE_DRAIN_SQL
 
 CURRENT=9
 SUPPORTED=(2,3,4,5,6,7,8,9)
@@ -60,8 +60,7 @@ def restore(dump,client=compose_client,db_resources=None,material=None):
     elif query("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','S','f');")!='0':
         raise ValueError('Refusing a nonempty target without Timekeeper schema metadata')
     with tempfile.TemporaryFile() as sql:
-        before=("SET standard_conforming_strings=on; SELECT pg_advisory_xact_lock(92751638246);\n"
-            "DO $timekeeper_offline$ BEGIN IF EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()) THEN RAISE EXCEPTION 'Stop all other database clients before maintenance'; END IF; END $timekeeper_offline$;\n")
+        before="SET standard_conforming_strings=on; SELECT pg_advisory_xact_lock(92751638246);\n"+OFFLINE_DRAIN_SQL
         if current is not None:
             before+=schema_guard(directory,current)
             if current>=9 and incoming<9:

@@ -165,6 +165,11 @@ access, applies the verified image transactionally, publishes recovered material
 and completes the restore. Other connected clients cause refusal rather than
 forced disconnection. Do not bypass this refusal or manually clear the gate.
 
+PostgreSQL checks allow up to eight seconds for closing connections or transient
+background maintenance to drain. They still require every other backend to leave;
+no connection is ignored or terminated, and no additional statistics privileges
+are needed. Keep all API processes stopped throughout activation.
+
 Once healthy, use a **source account's** password to sign in at the reviewed
 destination origin. The disposable destination bootstrap account is replaced.
 Verify clients/projects, sessions, journals, labels, attachments and account access
