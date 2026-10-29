@@ -459,6 +459,14 @@ content, and optional provider/remote identity. Content is verified before
 storage, and deleting the task cascades attachment deletion. Portable transfer
 and account archives retain the verified bytes and remap the parent task ID.
 
+Portable/account import remaps the normalized Timekeeper IDs in external task
+baselines after creating the complete task graph. Historical IDs absent from
+the imported graph invalidate only their paired comparison group; other fields,
+provider payload IDs and the original observation time remain. Such omitted
+baseline fields require reconciliation before synchronization. Parent/child
+trees may be unassigned to a project when both sides are unassigned; cycles and
+cross-project parents are rejected.
+
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
 `RESCAN_REQUIRED`; only incremental mode carries an opaque cursor. A cursor

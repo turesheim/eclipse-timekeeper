@@ -26,6 +26,26 @@ connection's tasks. Keep Google/Microsoft OAuth tokens in the connector's
 credential store and Apple authorization on the Mac. Never put credentials in
 `providerData`, task notes, baselines, or cursors.
 
+## Restored baseline identities
+
+Portable and account imports allocate new Timekeeper IDs. They remap normalized
+`parentTaskId`, `taskListId`, and `sectionId` inside last-common baselines as well
+as the task's current relationships. Task IDs are resolved after the entire
+imported task graph exists, including historical parents created later in the
+import order. The baseline version and provider observation time remain unchanged.
+Provider reference keys, provider-data payloads, URLs, text and other opaque
+values are not rewritten, even when a value looks like a Timekeeper UUID.
+
+If a baseline refers to a historical task/list/section absent from the archive,
+that comparison cannot be carried into the new graph. Import removes only the
+paired baseline group (`parentTaskId`/`siblingOrder` or
+`taskListId`/`sectionId`), retaining all other observations. Current task data
+and provider identities remain intact. These fields are then unbased:
+`NO_BASELINE` and incomplete-group checks require explicit reconciliation before
+export. A fresh provider scan must not silently treat the current local value
+as the missing common ancestor. Imported record versions can advance while the
+baseline is finalized; clients must use returned ETags rather than assume zero.
+
 ## Provider list and section metadata
 
 Store only observed, otherwise unnormalized list/section fields in their

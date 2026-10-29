@@ -1047,6 +1047,63 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual(mappings[connection['id']],restored['connectionId'])
         self.assertFalse(restored['present'])
 
+    def test_portable_import_remaps_sync_baselines_and_unassigned_subtasks(self):
+        connection=self.create('task-connections',{'providerId':'fixture','remoteAccountId':str(uuid4()),
+                    'name':'Baseline transfer','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Baseline list','kind':'STANDARD','readable':True,'writable':True,'shared':False,'owner':True,'present':True,'position':0})
+        section=self.create('task-list-sections',{'taskListId':task_list['id'],'remoteSectionId':str(uuid4()),
+                    'name':'Section','kind':'STANDARD','position':0,'present':True,'writable':True})
+        cp='/task-connections/'+connection['id']
+        field={'readable':True,'writable':True,'deletable':True,'note':None}
+        self.call('PUT',cp+'/capabilities',body={'version':1,'providerApiVersion':'test-v1',
+                  'fields':{name:field for name in ('parentTaskId','siblingOrder','taskListId','sectionId')}},
+                  headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        child=self.create('tasks',{'summary':'Child with baseline','projectId':self.project['id'],'parentTaskId':self.task['id'],'url':None,'siblingOrder':4})
+        later=self.create('tasks',{'summary':'Earlier historical parent','projectId':self.project['id'],'parentTaskId':None,'url':None})
+        unassigned=self.create('tasks',{'summary':'Unassigned parent','projectId':None,'parentTaskId':None,'url':None})
+        unassigned_child=self.create('tasks',{'summary':'Unassigned child','projectId':None,'parentTaskId':unassigned['id'],'url':None})
+        fields={'parentTaskId':self.task['id'],'siblingOrder':4,'taskListId':task_list['id'],'sectionId':section['id']}
+        opaque={'namespace':'fixture.tasks','version':2,'payload':copy.deepcopy(fields)}
+        key={'providerId':'fixture','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],'externalId':'current'}
+        reference={**key,'externalUrl':None,'taskListId':task_list['id'],'sectionId':section['id'],'providerData':opaque,
+                   'baseline':{'version':1,'capturedAt':'2026-10-28T10:00:00Z','fields':fields}}
+        path='/tasks/'+child['id']
+        _,headers=self.call('PUT',path+'/external-references',body=reference,headers={'If-Match':self.call('GET',path)[1]['ETag']})
+        forward=copy.deepcopy(reference);forward['externalId']='forward';forward['baseline']['fields']['parentTaskId']=later['id']
+        _,headers=self.call('PUT',path+'/external-references',body=forward,headers={'If-Match':headers['ETag']})
+        missing=copy.deepcopy(reference);missing['externalId']='missing';missing['baseline']['fields'].update(
+                parentTaskId=str(uuid4()),taskListId=str(uuid4()),summary='Keep historical summary')
+        missing['baseline']['fields']['body']={'format':'TEXT','content':self.task['id']}
+        self.call('PUT',path+'/external-references',body=missing,headers={'If-Match':headers['ETag']})
+        exported,_=self.call('GET','/data/export')
+        order={t['id']:i for i,t in enumerate((self.task,child,later,unassigned,unassigned_child))}
+        exported['tasks'].sort(key=lambda t:order.get(t['id'],100))
+        receipt=self.key()
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=receipt,status=201)
+        replay,_=self.call('POST','/data/import',owner='b',body=exported,headers=receipt,status=201)
+        self.assertEqual(imported,replay)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions',
+                   'TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists','TASK_SECTION':'task-list-sections'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in resources:self.created.append(('b',resources[item['entityType']],item['id']))
+        copied,_=self.call('GET','/tasks/'+mappings[child['id']],owner='b')
+        refs={r['externalId']:r for r in copied['externalReferences']}
+        expected={**fields,'parentTaskId':mappings[self.task['id']],'taskListId':mappings[task_list['id']],'sectionId':mappings[section['id']]}
+        self.assertEqual(expected,refs['current']['baseline']['fields'])
+        self.assertEqual(mappings[later['id']],refs['forward']['baseline']['fields']['parentTaskId'])
+        self.assertEqual({k:missing['baseline']['fields'][k] for k in ('summary','body')},refs['missing']['baseline']['fields'])
+        for ref in refs.values():
+            self.assertEqual(opaque,ref['providerData'])
+            self.assertEqual(reference['baseline']['capturedAt'],ref['baseline']['capturedAt'])
+        copied_child,_=self.call('GET','/tasks/'+mappings[unassigned_child['id']],owner='b')
+        self.assertEqual(mappings[unassigned['id']],copied_child['parentTaskId']);self.assertIsNone(copied_child['projectId'])
+        outward,_=self.call('POST','/task-sync/export-preview',owner='b',body={**key,'taskId':mappings[child['id']],
+                            'connectionId':mappings[connection['id']],'listId':mappings[task_list['id']]})
+        self.assertEqual({},outward['writeFields'])
+        self.assertNotIn('IDENTITY_RECONCILIATION_REQUIRED',[warning['reason'] for warning in outward['warnings']])
+
     def test_provider_list_and_section_envelopes_survive_transfer(self):
         connection=self.create('task-connections',{'providerId':'icloud','remoteAccountId':str(uuid4()),
                     'name':'List metadata','readable':True,'writable':True,'enabled':True})

@@ -481,8 +481,14 @@ preserves an explicit empty envelope in a mixed export. Earlier headers remain
 readable; envelope objects retain unknown nested keys.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
-updates existing records. Source IDs are correlation keys only. A failure leaves
-no partial records, command receipt or events. External identity collisions are
+updates existing records. Normalized baseline task/list/section IDs are remapped
+after all imported tasks exist. If a historical ID is absent, its paired comparison group is omitted
+from the baseline and requires reconciliation; other observations and their
+capture time remain. Provider payload IDs and other opaque strings are retained.
+Unassigned parent/child task trees are valid when both have no project; cycles
+and mismatched project relationships remain invalid. Baseline finalization may
+advance a newly imported task's version. Source IDs are correlation keys only.
+A failure leaves no partial records, command receipt or events. External identity collisions are
 409; invalid graphs are 422. Open imported intervals must respect the existing
 owner's active interval. Import does not implicitly change the configured zone.
 The result maps every source ID to its new ID. Transfer limits are 10,000 records
