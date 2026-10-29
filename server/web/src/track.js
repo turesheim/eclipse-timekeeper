@@ -6,6 +6,7 @@ import { iconButton, projectIcon, isProjectIcon } from './icons.js';
 import { MonthPicker } from './month-picker.js';
 import {TrackHolidays} from './track-holidays.js';
 import {TrackDayNotes} from './track-day-notes.js';
+import {workSummaryCard} from './work-summary-card.js';
 
 const node = (tag, text, className) => {const value = document.createElement(tag);if (text !== undefined) value.textContent = text;if (className) value.className = className;return value;};
 function compactTime(value) {
@@ -154,30 +155,27 @@ export class MonthTrack {
         });
         for (const entry of entries) {
           const client = clientsById.get(entry.clientId);
-          const summary = node(this.writable ? 'button' : 'div', undefined, 'calendar-summary-card track-client-day');summary.dataset.trackDailyClient = entry.clientId;
+          const {card:summary,line,duration}=workSummaryCard({tag:this.writable?'button':'div',className:'track-client-day',title:client?.name||i18nText('ui.client'),color:client?.color});summary.dataset.trackDailyClient = entry.clientId;
           if (this.writable) {summary.type = 'button';summary.setAttribute('aria-haspopup', 'dialog');summary.addEventListener('click', () => this.open(day.date, entry.clientId));} else
           summary.setAttribute('role', 'group');
           summary.setAttribute('aria-label', `${client?.name || i18nText("ui.client")} · ${day.date}`);
-          if (/^#[0-9a-f]{6}$/i.test(client?.color)) summary.style.setProperty('--client-color', client.color);
-          const duration = node('span', undefined, 'calendar-summary-time track-client-day-time'),short = node('span', undefined, 'track-client-day-time-short');short.setAttribute('aria-hidden', 'true');
+          duration.classList.add('track-client-day-time');const short = node('span', undefined, 'calendar-summary-time track-client-day-time-short');short.setAttribute('aria-hidden', 'true');
           this.dailyTimes.set(day.date + '/' + entry.clientId, { duration, short, summary, name: client?.name || i18nText("ui.client"), details: this.details(day.date, entry.clientId) });
-          const line = node('span', undefined, 'calendar-summary-total track-client-day-total'),icons = node('span', undefined, 'track-project-icons'),projects = new Map();
+          line.classList.add('track-client-day-total');const icons = node('span', undefined, 'track-project-icons'),projects = new Map();
           for (const session of this.sessions(day.date, entry.clientId)) {
             const project = projectsById.get(session.projectId);
             if (isProjectIcon(project?.icon)) {const names = projects.get(project.icon) || new Set();names.add(project.name);projects.set(project.icon, names);}
           }
           for (const [id, names] of projects) icons.append(projectIcon({ icon: id, name: [...names].join(', ') }));
-          icons.setAttribute('aria-hidden', 'true');line.append(duration, short, icons);summary.append(node('strong', client?.name || i18nText("ui.client")), ' ', line);
+          icons.setAttribute('aria-hidden', 'true');line.append(short, icons);
           if (entry.running) summary.append(node('span', i18nText("ui.running"), 'visually-hidden'));
           cell.append(summary);
         }
       }
       const clients = this.snapshot.clients.filter((client) => result.clients.has(client.id)).sort((a, b) => a.name.localeCompare(b.name,getLocale()));
       for (const client of clients) {
-        const card = node('div', undefined, 'card track-client'),label = node('span', undefined, 'client-color'),total = node('strong');
-        if (/^#[0-9a-f]{6}$/i.test(client.color)) label.style.setProperty('--client-color', client.color);
-        label.append(node('span', client.name, 'client-color-text'));label.title=client.name;
-        card.dataset.trackClient = client.id;card.append(label, total);this.totals.append(card);this.clientTimes.set(client.id, total);
+        const {card,duration}=workSummaryCard({className:'card track-client',title:client.name,color:client.color,swatch:true});
+        card.dataset.trackClient = client.id;this.totals.append(card);this.clientTimes.set(client.id, duration);
       }
       if (!clients.length) this.totals.append(node('p', i18nText("ui.no_work_sessions_this_month"), 'hint'));
       if (focused) this.dailyTimes.get(focused.date + '/' + focused.client)?.summary.focus();

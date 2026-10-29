@@ -138,7 +138,7 @@ test('Track updates running session hours without stealing focus and reconciles 
     session=await (await api(request,'POST','/work-sessions',{clientId:client.id,summary:'Live month overview',start:new Date(Date.now()-120000).toISOString(),end:null})).json();
     await signIn(page);await page.locator('[data-tab=track]').click();await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
     const card=page.locator(`[data-track-daily-client="${client.id}"]`).last(),duration=card.locator('.track-client-day-time'),focus=page.getByLabel('Month',{exact:true});
-    const total=page.locator(`[data-track-client="${client.id}"] strong`);
+    const total=page.locator(`[data-track-client="${client.id}"] .calendar-summary-time`);
     await focus.focus();const before=await duration.textContent(),monthBefore=await total.textContent();
     await expect.poll(()=>duration.textContent()).not.toBe(before);await expect(focus).toBeFocused();await expect.poll(()=>total.textContent()).not.toBe(monthBefore);
     const current=await api(request,'GET','/work-sessions/'+session.id);
@@ -162,22 +162,34 @@ test('Track updates running session hours without stealing focus and reconciles 
   }
 });
 
-test('Calendar monthly summaries share the daily entry height at desktop and mobile widths',async({page,request})=>{
+test('Calendar and Today work summaries share bold titles, regular times and a fixed height at every width',async({page,request})=>{
   let client,session;
   try {
     client=await(await api(request,'POST','/clients',{name:'A deliberately long calendar summary client '+randomUUID(),color:'#176653'})).json();
     session=await(await api(request,'POST','/work-sessions',{clientId:client.id,summary:'Summary sizing',start:'2025-10-15T08:00:00Z',end:'2025-10-15T18:00:00Z'})).json();
     await signIn(page);await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
-    for(const width of [1440,390]) {
+    for(const width of [1440,1000,767,390]) {
       await page.setViewportSize({width,height:1000});
       const summary=page.locator(`[data-track-client="${client.id}"]`),entry=page.locator(`[data-track-date="2025-10-15"] [data-track-daily-client="${client.id}"]`);
       await expect(summary).toBeVisible();await expect(entry).toBeVisible();
       const a=await summary.boundingBox(),b=await entry.boundingBox();expect(Math.abs(a.height-b.height)).toBeLessThan(1);
-      await expect(summary).toHaveCSS('font-size',width===390?'12px':'12.8px');
-      if(width===390)expect(await summary.locator('.client-color-text').evaluate(label=>label.scrollWidth>label.clientWidth)).toBe(true);
+      expect(a.height).toBe(50);
+      await expect(summary).toHaveCSS('font-size',width<=767?'12px':'12.8px');
+      for(const card of [summary,entry]) {
+        await expect(card.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');
+        for(const time of await card.locator('.calendar-summary-time').all())await expect(time).toHaveCSS('font-weight','400');
+        await expect(card.locator('.calendar-summary-title')).toHaveAttribute('title',client.name);
+      }
+      if(width===390)expect(await summary.locator('.calendar-summary-title-text').evaluate(label=>label.scrollWidth>label.clientWidth)).toBe(true);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
     await captureScreenshot(page,{path:'test-results/calendar-summary-height-mobile.png',fullPage:true});
+    await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/calendar-summary-formatting-desktop.png',fullPage:true});
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2025-10-15');
+    const today=page.locator(`[data-today-client="${client.id}"]`);await expect(today).toBeVisible();
+    expect((await today.boundingBox()).height).toBe(50);
+    await expect(today.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');
+    await expect(today.locator('.calendar-summary-time')).toHaveCSS('font-weight','400');
   } finally {
     for(const [kind,value] of [['work-sessions',session],['clients',client]])if(value){const current=await api(request,'GET','/'+kind+'/'+value.id);await api(request,'DELETE','/'+kind+'/'+value.id,undefined,{'If-Match':current.headers().etag});}
   }

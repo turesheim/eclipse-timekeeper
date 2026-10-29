@@ -19,6 +19,7 @@
   --calendar-card-line-height: 1.5;
   --calendar-card-padding: .3rem .4rem;
   --calendar-card-min-height: 2.75rem;
+  --calendar-work-card-height: 3.125rem;
   --calendar-card-border-radius: .3rem;
   --calendar-client-border-width: 4px;
   --workspace-content-gap: .5rem;
@@ -246,10 +247,7 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-total strong { color: var(--bs-body-color); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
 .track-clients { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
 .track-client { container-type: inline-size; min-width: 0; flex: 1 1 12rem; gap: 0; }
-.track-client strong { font-size: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.track-client .client-color { min-width: 0; white-space: nowrap; overflow: hidden; }
-.track-client .client-color-text { overflow: hidden; text-overflow: ellipsis; }
-.track-client .client-color::before { width: 1em; height: 1em; }
+.track-clients .track-client { margin-bottom: 0; }
 .track-month { width: 100%; table-layout: fixed; border-collapse: collapse; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .track-month th { text-align: center; padding: .65rem .25rem; color: var(--muted); font-size: .85rem; }
 .track-day { height: 8rem; vertical-align: top; border: 1px solid var(--line); padding: .35rem; }
@@ -284,10 +282,17 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-holiday-status { margin-top: .75rem; }
 .track-holiday-status a { color: var(--accent); }
 .calendar-summary-card, .calendar-session, .calendar-planned, .calendar-all-day-event { border: 1px solid var(--line); border-inline-start: var(--calendar-client-border-width) solid var(--client-color, var(--accent)); border-radius: var(--calendar-card-border-radius); background: var(--bs-body-bg); color: var(--bs-body-color); }
-.calendar-summary-card, .track-client { min-height: var(--calendar-card-min-height); padding: var(--calendar-card-padding); font-size: var(--calendar-card-font-size); line-height: var(--calendar-card-line-height); }
+.calendar-summary-card { min-height: var(--calendar-card-min-height); padding: var(--calendar-card-padding); font-size: var(--calendar-card-font-size); line-height: var(--calendar-card-line-height); }
 .calendar-summary-card { display: flex; flex-direction: column; width: 100%; text-align: left; margin-bottom: .3rem; }
 .calendar-summary-card > * { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.calendar-summary-time { font-variant-numeric: tabular-nums; }
+.calendar-work-summary { height: var(--calendar-work-card-height); min-height: var(--calendar-work-card-height); max-height: var(--calendar-work-card-height); overflow: hidden; }
+.calendar-summary-title { font-size: inherit; font-weight: 700; }
+.calendar-summary-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-summary-swatch { border-inline-start: 1px solid var(--line); }
+.calendar-summary-swatch .client-color { display: flex; }
+.calendar-summary-swatch .client-color::before { width: 1em; height: 1em; }
+.calendar-summary-time { font-weight: 400; font-variant-numeric: tabular-nums; }
+.calendar-work-summary .track-project-icons { flex-wrap: nowrap; overflow: hidden; }
 button.calendar-summary-card:hover, .calendar-session:hover, .calendar-planned:hover, .calendar-all-day-event:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border-color: var(--line); border-inline-start-color: var(--client-color, var(--accent)); }
 button.calendar-summary-card:disabled { opacity: .65; }
 .track-client-day-time-short { display: none; font-variant-numeric: tabular-nums; }
