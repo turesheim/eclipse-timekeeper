@@ -23,8 +23,11 @@
   --calendar-card-border-radius: .3rem;
   --calendar-client-border-width: 4px;
   --workspace-content-gap: .5rem;
-  --workspace-nav-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+  --workspace-nav-bottom-inset: 0px;
+  --workspace-nav-height: calc(4rem + var(--workspace-nav-bottom-inset));
 }
+/* Touch and hybrid devices retain their home-indicator clearance at any width. */
+@media (any-pointer: coarse) { :root { --workspace-nav-bottom-inset: env(safe-area-inset-bottom, 0px); } }
 html { scroll-padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 body { background: #f3f6f5; }
 [hidden] { display: none !important; }
@@ -98,7 +101,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 #active-details { color: var(--muted); font-size: .9rem; }
 #stop { display: inline-flex; align-items: center; gap: .6rem; white-space: nowrap; }
 #workspace { padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
-.workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -.25rem 1rem #233b380d; }
+.workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + var(--workspace-nav-bottom-inset)); box-shadow: 0 -.25rem 1rem #233b380d; }
 .workspace-nav .container-fluid { max-width: 1332px; }
 .workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
 /* Switching text and background colors together must not pass through low contrast. */
