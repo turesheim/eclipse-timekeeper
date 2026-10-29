@@ -1156,5 +1156,10 @@
   "backups.pending_recovery": "If startup is interrupted, start the server again to resume. Before the database is replaced, an operator can cancel offline using the original destination administrator password. After replacement, resume recovery. Keep the encrypted archive and its passphrase.",
   "backups.pending_destination": "Restored public origin: {{origin}}",
   "backups.check_restored": "Open restored server",
-  "journal.webdav.client": "Obsidian with MySync 3.0.7 has verified bidirectional journal support. Use its Nextcloud backend with this server’s origin, remote path / and a dedicated journal vault. Edited text uploads use LF. See the guide for setup and limitations."
+  "journal.webdav.client": "Obsidian with MySync 3.0.7 has verified bidirectional journal support. Use its Nextcloud backend with this server’s origin, remote path / and a dedicated journal vault. Edited text uploads use LF. See the guide for setup and limitations.",
+  "event_notes.open": "Open event note",
+  "event_notes.add": "Add event note",
+  "event_notes.title": "Event note · {{title}}",
+  "event_notes.delete_confirm": "Delete this event note?",
+  "event_notes.count": "Event notes"
 }

@@ -100,13 +100,18 @@ final class CalendarSubscriptions {
                 .put("clientId",client.path("id").asText()).put("clientName",client.path("name").asText()).put("color",client.path("color").asText());
             node.remove("eventVersion");node.put("eventVersion",hash(canonical(node).toString()));return node;}).toList();
     }
+    ObjectNode noteEvent(UUID subscription,String key,String first,String last){
+        var dates=window(first,last);
+        try{return occurrences(required(subscription),dates[0],dates[1]).stream().filter(value->value.path("key").asText().equals(key)).findFirst().orElseThrow(ApiFailure::notFound);}
+        catch(CalendarFailure failure){throw new ApiFailure(409,"CALENDAR_EVENT_CHANGED");}
+    }
     ObjectNode events(String first,String last){
-        var dates=window(first,last);var result=object();var items=result.putArray("items");var errors=result.putObject("errors");var links=links();
+        var dates=window(first,last);var result=object();var items=result.putArray("items");var errors=result.putObject("errors");var links=links();var notes=new EventNotes(store).presentKeys();
         for(var subscription:store.list(SUB))if(subscription.path("visible").asBoolean())try {
             var values=occurrences(subscription,dates[0],dates[1]);if(items.size()+values.size()>5000)throw CalendarFailure.complex();
             for(var event:values) {
                 var link=links.get(subscription.path("id").asText()+"/"+event.path("key").asText());
-                event.set("activityIds",link==null?array():link.path("activityIds"));items.add(event);
+                event.set("activityIds",link==null?array():link.path("activityIds"));event.put("hasNote",notes.contains(subscription.path("id").asText()+"/"+event.path("key").asText()));items.add(event);
             }
         }catch(CalendarFailure failure){errors.put(subscription.path("id").asText(),failure.code);}
         var sources=result.putObject("activitySources");

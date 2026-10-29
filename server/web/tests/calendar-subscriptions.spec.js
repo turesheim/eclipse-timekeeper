@@ -213,3 +213,32 @@ test('My Account calendars supports direct links, visibility changes and safe na
     await expect(page.locator('#calendar-subscription-editor')).toHaveCount(0);await manage(page);await expect(page.locator('#calendar-subscription-editor')).toBeHidden();
   }finally{release();await context.close();}
 });
+
+test('calendar event notes share the guarded editor in Week and Today and round-trip Markdown',async({browser,request})=>{
+  const {context,page,client,api}=await setup(browser,request);
+  try{
+    const feed=await provider(request);await calendar(page);const subscription=await subscribe(page,client,feed);
+    await planned(page,subscription).click();const details=page.locator('#calendar-event-details');
+    const add=details.getByRole('button',{name:'Add event note',exact:true});await expect(add.locator('.bi-journal-plus')).toHaveCount(1);await add.click();
+    const editor=page.locator('#week-event-note-editor');await expect(editor).toBeVisible();await expect(editor).toContainText('Planned meeting');
+    await editor.getByRole('button',{name:'Markdown source',exact:true}).click();
+    const markdown='# Minutes\n\n- [ ] Follow up\n\n<https://example.org/a?q=1>\n\n---\n';
+    await editor.locator('textarea').fill(markdown);await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).toContainText('Saved');
+    const events=await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-11')).json(),event=events.items.find(value=>value.subscriptionId===subscription.id);
+    expect(event.hasNote).toBe(true);const path='/event-notes/'+subscription.id+'/'+event.key;
+    expect((await(await api('GET',path)).json()).body).toBe(markdown);
+    const download=await api('GET',path+'/markdown');expect(download.headers()['content-disposition']).toMatch(/filename="event-[a-f0-9-]{36}-[a-f0-9]{64}\.md"/);expect((await download.text()).endsWith(markdown)).toBe(true);
+    await expect(editor.getByRole('button',{name:'Download Markdown'})).toHaveCount(0);
+    expect((await new AxeBuilder({page}).include('#week-event-note-editor').analyze()).violations).toEqual([]);
+    await editor.getByRole('button',{name:'Close',exact:true}).click();await details.getByRole('button',{name:'Close',exact:true}).click();
+    await expect(planned(page,subscription).locator('.bi-journal-text')).toHaveCount(1);
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    const today=page.locator('#today-events [data-today-event="'+event.key+'"]');await expect(today.locator('.bi-journal-text')).toHaveCount(1);await today.click();
+    await page.locator('#today-event-details').getByRole('button',{name:'Open event note',exact:true}).click();
+    const todayEditor=page.locator('#today-event-note-editor');await expect(todayEditor).toBeVisible();await todayEditor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(todayEditor.locator('textarea')).toHaveValue(markdown);
+    await captureScreenshot(page,{path:'test-results/calendar-event-note-editor.png',fullPage:false});
+    page.once('dialog',dialog=>dialog.accept());await todayEditor.getByRole('button',{name:'Delete note',exact:true}).click();await expect(todayEditor).toBeHidden();
+    expect((await(await api('GET',path)).json()).deleted).toBe(true);
+    await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();await expect(today.locator('.bi-journal-text')).toHaveCount(0);
+  }finally{await context.close();}
+});

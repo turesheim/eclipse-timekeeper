@@ -131,3 +131,17 @@ used. The default run cleans up its containers, private network and secrets and
 writes a credential-free receipt to `server/target/acceptance/mysync.json` only
 when every assertion succeeds. `--keep-fixture` retains only that run's private
 fixture for diagnosis; remove its containers, network and directory afterwards.
+
+## Calendar-event notes
+
+Event notes appear in the same collection as
+`event-<subscription UUID>-<64-character occurrence key>.md`. Keep the
+`timekeeper-event` frontmatter line intact; edit the Markdown below it. Filenames
+remain stable when an event is renamed or rescheduled, and separate recurring
+occurrences have separate files. Both `If-Match` overwrite/delete protection and
+owner isolation apply. Account archives also export/import these documents.
+Notes outlive removed subscriptions and remain available through WebDAV and
+`GET /api/v1/event-notes`; importing does not recreate private calendar-feed URLs
+or attach notes to unrelated subscriptions. Existing real-client certification
+above predates event notes; protocol-level event-note round trips have separate
+coverage.

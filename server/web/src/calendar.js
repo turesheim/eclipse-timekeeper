@@ -1,3 +1,4 @@
+import {eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
@@ -39,7 +40,7 @@ export class WeekCalendar {
     root.querySelector('#calendar-date').addEventListener('change', (event) => callbacks.onDate(event.target.value));
     root.addEventListener('keydown', (event) => this.key(event));
     this.subscriptions=new CalendarSubscriptions(root,{
-      canWrite:()=>callbacks.canWrite(),onUnauthorized:callbacks.onUnauthorized,onConvert:callbacks.onConvertEvent,
+      canWrite:()=>callbacks.canWrite(),onUnauthorized:callbacks.onUnauthorized,onConvert:callbacks.onConvertEvent,onNotesChanged:callbacks.onNotesChanged,
       onEvents:plans=>{this.plans=plans;if(this.data&&!root.hidden&&!this.drag&&!this.busy)this.render();}
     });
   }
@@ -235,7 +236,7 @@ export class WeekCalendar {
     value.dataset.calendarEventKey=event.key;value.dataset.calendarSubscriptionId=event.subscriptionId;value.dataset.date=piece.date;
     styleCalendarEvent(value,event);
     value.setAttribute('aria-haspopup','dialog');value.setAttribute('aria-label',i18nText('calendar.event_label',{title:event.title||i18nText('calendar.untitled'),calendar:event.calendarName,client:event.clientName,interval:this.subscriptions.eventDate(event)}));
-    value.title=value.getAttribute('aria-label');value.append(node('small',i18nText(event.activityIds?.length?'calendar.recorded':'calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
+    const marker=eventNoteIndicator(event);if(marker)value.append(marker);value.title=value.getAttribute('aria-label');value.append(node('small',i18nText(event.activityIds?.length?'calendar.recorded':'calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
   }
   select(date, row) {this.selection = { date, row };this.paintSelection();this.buttons();}
   selectSession(session, date, row) {this.selectedId = session.id;this.select(date, row);this.text('');}

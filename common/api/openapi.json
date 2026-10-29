@@ -1680,7 +1680,7 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1828,7 +1828,7 @@
             }
           }
         },
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1894,7 +1894,7 @@
     "/activities/active": {
       "get": {
         "operationId": "getActiveActivity",
-        "summary": "Read the authenticated owner\u2019s current interval",
+        "summary": "Read the authenticated owner’s current interval",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -1959,7 +1959,7 @@
     "/activities/start": {
       "post": {
         "operationId": "startActivity",
-        "summary": "Atomically activate or switch the owner\u2019s task",
+        "summary": "Atomically activate or switch the owner’s task",
         "x-required-permission": "write",
         "responses": {
           "201": {
@@ -2140,7 +2140,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2210,7 +2210,7 @@
       },
       "put": {
         "operationId": "updateProfile",
-        "summary": "Set the owner\u2019s reporting time zone",
+        "summary": "Set the owner’s reporting time zone",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -2340,7 +2340,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Use the owner\u2019s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
+        "description": "Use the owner’s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
         "parameters": [
           {
             "name": "from",
@@ -2440,7 +2440,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner\u2019s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
+        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner’s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
         "parameters": [
           {
             "name": "after",
@@ -3452,7 +3452,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -7566,7 +7566,7 @@
       },
       "get": {
         "operationId": "listPendingAccountArchives",
-        "summary": "List this account\u2019s resumable archive uploads",
+        "summary": "List this account’s resumable archive uploads",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -8050,7 +8050,7 @@
     "/data/account/imports": {
       "get": {
         "operationId": "listAccountArchiveRestores",
-        "summary": "List this account\u2019s completed archive restores",
+        "summary": "List this account’s completed archive restores",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -10589,7 +10589,7 @@
             }
           }
         },
-        "description": "Conditional replacement or explicit clearing of one linked identity\u2019s provider-data envelope. Legacy link and source updates preserve the envelope."
+        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
       }
     },
     "/task-connections": {
@@ -12834,7 +12834,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "Matches a deleted task\u2019s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
+        "description": "Matches a deleted task’s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
       }
     },
     "/task-list-sections": {
@@ -15598,7 +15598,7 @@
     "/admin/instance/uploads/{id}/staging": {
       "get": {
         "operationId": "getInstanceRestoreStage",
-        "summary": "Read the initiating session\u2019s restore preparation status",
+        "summary": "Read the initiating session’s restore preparation status",
         "tags": [
           "Accounts"
         ],
@@ -16059,6 +16059,372 @@
           }
         },
         "description": "Owner-scoped conditional whole-envelope replacement. Preserves payload keys during ordinary edits and transfers. Provider namespace must match the owning connection; credentials are forbidden. Null explicitly clears the envelope."
+      }
+    },
+    "/event-notes/{subscriptionId}/{key}": {
+      "parameters": [
+        {
+          "name": "subscriptionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getEventNote",
+        "summary": "Read a private calendar-event Markdown note",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "The event note, including an empty version-zero note for an untouched occurrence.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveEventNote",
+        "summary": "Conditionally save a private calendar-event Markdown note",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "The event note, including an empty version-zero note for an untouched occurrence.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventNoteInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEventNote",
+        "summary": "Conditionally delete a private calendar-event Markdown note",
+        "x-required-permission": "write",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "204": {
+            "description": "The note is empty. Its retained ETag prevents stale recreation; an already empty note is unchanged.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Retain a versioned tombstone distinct from clearing content. Repeated deletion with its current ETag is a no-op; a later conditional save deliberately restores the note."
+      }
+    },
+    "/event-notes/{subscriptionId}/{key}/markdown": {
+      "parameters": [
+        {
+          "name": "subscriptionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "downloadEventNote",
+        "summary": "Download an occurrence note with its stable filesystem-safe identity filename",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "UTF-8 Markdown attachment",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename YYYY-Www.md",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Current note version",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/event-notes": {
+      "get": {
+        "operationId": "listEventNotes",
+        "summary": "List all private event-note identities, including notes whose subscription was removed",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Present calendar-event notes in the inclusive ISO week range, without Markdown bodies.",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "revision",
+                    "items"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "$ref": "#/components/schemas/Version"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventNoteSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     }
   },
@@ -21176,6 +21542,11 @@
           "dayLabels": {
             "type": "integer",
             "minimum": 0
+          },
+          "eventNotes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 250000
           }
         },
         "required": [
@@ -23981,6 +24352,10 @@
               "$ref": "#/components/schemas/Id"
             },
             "uniqueItems": true
+          },
+          "hasNote": {
+            "type": "boolean",
+            "description": "This occurrence has a nonempty account-private note."
           }
         },
         "required": [
@@ -26649,7 +27024,7 @@
           "baseline"
         ],
         "additionalProperties": false,
-        "description": "Atomically replace a linked identity\u2019s source revision and last-common field snapshot. Null baseline clears the snapshot."
+        "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
       },
       "TaskTombstone": {
         "type": "object",
@@ -28370,7 +28745,7 @@
           },
           "journalFiles": {
             "type": "array",
-            "maxItems": 760000,
+            "maxItems": 1010000,
             "items": {
               "$ref": "#/components/schemas/ArchiveJournalFile"
             },
@@ -28446,7 +28821,7 @@
           },
           "journalFiles": {
             "type": "array",
-            "maxItems": 760000,
+            "maxItems": 1010000,
             "items": {
               "$ref": "#/components/schemas/ArchiveJournalFile"
             },
@@ -28475,7 +28850,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md|[0-9]{4}-W[0-9]{2}\\.md|assets/[A-Za-z0-9][A-Za-z0-9._-]{0,127}|assets/task attachments/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin)$"
+            "pattern": "^(?:event-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-[a-f0-9]{64}\\.md|[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md|[0-9]{4}-W[0-9]{2}\\.md|assets/[A-Za-z0-9][A-Za-z0-9._-]{0,127}|assets/task attachments/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin)$"
           },
           "bytes": {
             "type": "integer",
@@ -28487,7 +28862,7 @@
             "pattern": "^[a-f0-9]{64}$"
           }
         },
-        "description": "Daily notes allow 220,000 bytes including frontmatter; weekly notes 200,000 bytes; journal assets 5 MB; task attachments 1 MiB. Paths, exact lengths, checksums and UTF-8 Markdown are verified before preview or restore."
+        "description": "Daily notes allow 220,000 bytes including frontmatter; weekly notes 200,000 bytes; journal assets 5 MB; task attachments 1 MiB. Paths, exact lengths, checksums and UTF-8 Markdown are verified before preview or restore. Calendar-event notes allow 232,768 bytes including a bounded identity header, with a 200,000-byte Markdown body."
       },
       "ArchiveWorkFiles": {
         "type": "object",
@@ -29782,6 +30157,155 @@
         "maxLength": 1024,
         "pattern": "\\S",
         "description": "Task title, allowing the full Google Tasks v1 limit. Other resource names retain their own limit."
+      },
+      "EventNoteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown; at most 200,000 encoded bytes."
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "description": "fromDate/toDate are required when creating a note, to resolve a cached occurrence (exclusive end, at most 31 days). Existing notes can be edited after a feed or subscription is removed."
+      },
+      "EventNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "body",
+          "version",
+          "hasBody",
+          "subscriptionId",
+          "eventKey"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown; at most 200,000 encoded bytes."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "hasBody": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "eventKey": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "recurrenceId",
+              "title"
+            ],
+            "properties": {
+              "uid": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "recurrenceId": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            }
+          }
+        }
+      },
+      "EventNoteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "hasBody",
+          "subscriptionId",
+          "eventKey"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "hasBody": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "eventKey": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "recurrenceId",
+              "title"
+            ],
+            "properties": {
+              "uid": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "recurrenceId": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            }
+          }
+        }
       }
     },
     "parameters": {
@@ -30130,7 +30654,7 @@
     },
     {
       "name": "Accounts",
-      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user\u2019s business data."
+      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user’s business data."
     }
   ]
 }

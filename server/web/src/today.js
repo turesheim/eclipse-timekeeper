@@ -1,3 +1,4 @@
+import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {addDays,dateInZone,instantNanos,instantText,nanosText,taskPresentation} from './model.js';
@@ -19,6 +20,7 @@ export class TodayView {
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
+    this.eventNoteEditor=new EventNoteEditor(root,{...callbacks,onNotesChanged:()=>{void this.loadEvents();callbacks.onNotesChanged();}},'today');
     this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();this.noteDates=new Set();this.noteWeeks=new Set();this.noteGeneration=0;this.monthNoteKey=null;
     this.picker=node('dialog',undefined,'app-dialog shadow-lg');this.picker.id='today-session-picker';
     const pickerTitle=node('h2',t('ui.choose_work_session'));pickerTitle.id='today-session-picker-title';this.picker.setAttribute('aria-labelledby',pickerTitle.id);
@@ -41,9 +43,9 @@ export class TodayView {
     window.addEventListener('resize',()=>this.sizeEditor());
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.eventNoteEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   show(){this.visible=true;this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
-  hide(){this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();}
+  hide(){this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;}
     this.data=data;this.connected=connected;
@@ -161,7 +163,7 @@ export class TodayView {
     const list=node('ul',undefined,'today-list');for(const event of events){
       const item=node('li',undefined,'today-plan'),action=node('button',undefined,'calendar-summary-card today-event-action');action.type='button';action.dataset.todayEvent=event.key;
       const client=this.data.clients.find(value=>value.id===event.clientId);action.style.setProperty('--client-color',clientColors(client?.color||event.color).background);
-      action.append(node('strong',event.title||t('calendar.untitled')));
+      const title=node('strong',event.title||t('calendar.untitled')),marker=eventNoteIndicator(event);if(marker)title.append(' ',marker);action.append(title);
       action.append(node('span',event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,'calendar-summary-time'));
       action.append(node('span',client?.name||event.clientName));
       action.title=[event.title||t('calendar.untitled'),event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,client?.name||event.clientName].join('\n');
@@ -179,7 +181,7 @@ export class TodayView {
     details.append(title,node('p',when),node('p',[client?.name||event.clientName,event.calendarName].filter(Boolean).join(' · '),'hint'));
     if(event.location)details.append(node('p',t('calendar.location',{location:event.location})));
     if(event.description)details.append(node('p',event.description,'calendar-description'));
-    const actions=node('div',undefined,'dialog-actions'),close=node('button',t('ui.close'),'btn btn-outline-secondary');close.type='button';close.addEventListener('click',()=>details.close());actions.append(close);details.append(actions);
+    const actions=node('div',undefined,'dialog-actions'),close=node('button',t('ui.close'),'btn btn-outline-secondary');close.type='button';close.addEventListener('click',()=>details.close());actions.append(eventNoteButton(event,()=>void this.eventNoteEditor.open(event,this.scope,this.connected&&this.callbacks.canWrite(),this.data.profile.data.zoneId)),close);details.append(actions);
     details.showModal();close.focus();
   }
   paintTasks(){

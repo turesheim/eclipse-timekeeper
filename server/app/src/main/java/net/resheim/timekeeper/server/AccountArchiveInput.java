@@ -41,7 +41,7 @@ final class AccountArchiveInput {
                     var entry=entries.nextElement();
                     if(entry.isDirectory() || !seen.add(entry.getName())) throw ApiFailure.validation();
                     if(!FILES.contains(entry.getName())){ArchiveJournalFiles.kind(entry.getName());journalPaths.add(entry.getName());}
-                    if(seen.size()>760000+FILES.size())throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
+                    if(seen.size()>1010000+FILES.size())throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                     if(entry.getSize()<0 || entry.getSize()>AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                     declared+=entry.getSize();if(declared>3*AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                 }
@@ -98,8 +98,8 @@ final class AccountArchiveInput {
         if(archive.has("weekNotes"))result.put("weekNotes",archive.path("weekNotes").size());
         if(archive.has("journalAssets"))result.put("journalAssets",archive.path("journalAssets").size());
         if(archive.has("journalFiles")){
-            int days=0,weeks=0,assets=0;for(var file:archive.path("journalFiles"))switch(ArchiveJournalFiles.kind(file.path("path").asText())){case DAY->days++;case WEEK->weeks++;case ASSET->assets++;case TASK_ASSET->{}}
-            if(days>0)result.put("dayNotes",days);if(weeks>0)result.put("weekNotes",weeks);if(assets>0)result.put("journalAssets",assets);
+            int days=0,weeks=0,events=0,assets=0;for(var file:archive.path("journalFiles"))switch(ArchiveJournalFiles.kind(file.path("path").asText())){case DAY->days++;case WEEK->weeks++;case EVENT->events++;case ASSET->assets++;case TASK_ASSET->{}}
+            if(days>0)result.put("dayNotes",days);if(weeks>0)result.put("weekNotes",weeks);if(events>0)result.put("eventNotes",events);if(assets>0)result.put("journalAssets",assets);
         }
         return result;
     }

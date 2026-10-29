@@ -1,3 +1,4 @@
+import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {addDays,instantText} from './model.js';
@@ -19,6 +20,7 @@ export function styleCalendarEvent(element,event) {
 export class CalendarSubscriptions {
   constructor(root,callbacks) {
     this.root=root;this.callbacks=callbacks;this.generation=0;this.rows=[];this.events=[];this.sources={};this.managementGeneration=0;this.busy=new Set();
+    this.eventNoteEditor=new EventNoteEditor(root,{...callbacks,onNotesChanged:()=>{void this.load();callbacks.onNotesChanged?.();}},'week');
     this.panel=node('section',undefined,'card account-card calendar-subscriptions');this.panel.setAttribute('aria-labelledby','calendar-subscriptions-title');
     const heading=node('div',undefined,'calendar-subscriptions-heading');this.title=node('h2',t('calendar.subscriptions'));this.title.id='calendar-subscriptions-title';
     this.add=button(t('calendar.add'),()=>this.run(()=>this.edit()),'btn btn-primary');this.add.id='calendar-subscription-add';this.add.dataset.calendarAction='add';this.add.prepend(icon('calendar-plus'),' ');
@@ -67,7 +69,7 @@ export class CalendarSubscriptions {
   show(){if(!this.scope||!this.data)return;this.poll();void this.load();}
   hide(){if(!this.managementView){clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);}this.details.close();}
   reset(){
-    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
+    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.close(true);this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
     this.dialog.close();this.details.close();this.fields.replaceChildren();this.details.replaceChildren();this.list.replaceChildren();this.allDay.replaceChildren();this.allDay.hidden=true;this.message.textContent='';
   }
   async load() {
@@ -164,7 +166,7 @@ export class CalendarSubscriptions {
   paintAllDay() {
     const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay);this.allDay.replaceChildren();this.allDay.hidden=!values.length;
     if(!values.length)return;const title=node('h3',t('calendar.all_day_plans'));title.id='calendar-all-day-title';this.allDay.append(title);
-    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);pick.append(node('strong',value.title||t('calendar.untitled')),node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
+    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);const title=node('strong',value.title||t('calendar.untitled')),marker=eventNoteIndicator(value);if(marker)title.append(' ',marker);pick.append(title,node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
     if(key&&document.activeElement===document.body)this.allDay.querySelector(`[data-calendar-event-key="${key}"]`)?.focus();
   }
   openEvent(event,date=null) {
@@ -174,7 +176,7 @@ export class CalendarSubscriptions {
     this.convert=button(t('calendar.create_activity'),()=>{const selected=this.selected;if(!selected||!this.writable||selected.activityIds?.length)return;const range={fromDate:this.data.dates.first,toDate:addDays(this.data.dates.first,7)};this.details.close();this.callbacks.onConvert(selected,range);},'btn btn-primary');
     this.convert.disabled=!this.writable||!!event.activityIds?.length;
     if(event.activityIds?.length)this.detailNotice.textContent=t('calendar.already_recorded');else if(!this.writable)this.detailNotice.textContent=t('calendar.read_only');
-    const actions=node('div',undefined,'dialog-actions');actions.append(button(t('ui.close'),()=>this.details.close()),this.convert);
+    const actions=node('div',undefined,'dialog-actions');actions.append(eventNoteButton(event,()=>void this.eventNoteEditor.open(event,this.scope,this.writable,this.data.profile.data.zoneId)),button(t('ui.close'),()=>this.details.close()),this.convert);
     this.details.append(title,node('p',this.eventDate(event)),node('p',event.clientName+' · '+event.calendarName,'hint'));
     if(event.location)this.details.append(node('p',t('calendar.location',{location:event.location})));
     if(event.description)this.details.append(node('p',event.description,'calendar-description'));

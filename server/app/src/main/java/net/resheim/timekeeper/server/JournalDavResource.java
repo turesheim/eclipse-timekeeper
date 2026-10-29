@@ -67,6 +67,18 @@ public class JournalDavResource {
                 public ObjectNode delete(String match){return notes.delete(week,match);}
             };
         }
+        if(filename!=null&&filename.startsWith("event-")){
+            final EventNotes.Key key;try{key=EventNotes.filename(filename);}catch(ApiFailure invalid){throw ApiFailure.notFound();}
+            var notes=new EventNotes(store);
+            return new NoteFile(){
+                public String filename(){return filename;}
+                public ObjectNode get(){return notes.get(key);}
+                public byte[] document(){return notes.document(key);}
+                public Instant modifiedAt(){return notes.modifiedAt(key);}
+                public ObjectNode save(String match,byte[] bytes){return notes.saveDocument(key,match,bytes);}
+                public ObjectNode delete(String match){return notes.delete(key,match);}
+            };
+        }
         throw ApiFailure.notFound();
     }
     private static Response missing(){throw ApiFailure.notFound();}
@@ -90,6 +102,7 @@ public class JournalDavResource {
                         .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
                 var notes=new DayNotes(store);for(var date:notes.presentDates())file(xml,file(date+".md"));
                 var weeks=new WeekNotes(store);for(var week:weeks.presentWeeks())file(xml,file(week.filename()));
+                for(var event:new EventNotes(store).presentFiles())file(xml,file(event.filename()));
             }
             xml.append("</D:multistatus>");return Response.status(207).type("application/xml; charset=utf-8").entity(xml.toString()).header("DAV",DAV).build();
         });
