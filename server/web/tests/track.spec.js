@@ -161,3 +161,24 @@ test('Track updates running session hours without stealing focus and reconciles 
     const current=await api(request,'GET','/clients/'+client.id);await api(request,'DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});
   }
 });
+
+test('Calendar monthly summaries share the daily entry height at desktop and mobile widths',async({page,request})=>{
+  let client,session;
+  try {
+    client=await(await api(request,'POST','/clients',{name:'A deliberately long calendar summary client '+randomUUID(),color:'#176653'})).json();
+    session=await(await api(request,'POST','/work-sessions',{clientId:client.id,summary:'Summary sizing',start:'2025-10-15T08:00:00Z',end:'2025-10-15T18:00:00Z'})).json();
+    await signIn(page);await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+    for(const width of [1440,390]) {
+      await page.setViewportSize({width,height:1000});
+      const summary=page.locator(`[data-track-client="${client.id}"]`),entry=page.locator(`[data-track-date="2025-10-15"] [data-track-daily-client="${client.id}"]`);
+      await expect(summary).toBeVisible();await expect(entry).toBeVisible();
+      const a=await summary.boundingBox(),b=await entry.boundingBox();expect(Math.abs(a.height-b.height)).toBeLessThan(1);
+      await expect(summary).toHaveCSS('font-size',width===390?'12px':'12.8px');
+      if(width===390)expect(await summary.locator('.client-color-text').evaluate(label=>label.scrollWidth>label.clientWidth)).toBe(true);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
+    await captureScreenshot(page,{path:'test-results/calendar-summary-height-mobile.png',fullPage:true});
+  } finally {
+    for(const [kind,value] of [['work-sessions',session],['clients',client]])if(value){const current=await api(request,'GET','/'+kind+'/'+value.id);await api(request,'DELETE','/'+kind+'/'+value.id,undefined,{'If-Match':current.headers().etag});}
+  }
+});

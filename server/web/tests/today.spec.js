@@ -171,3 +171,28 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
   }
 });
+
+test('Today editor stays above navigation with long Markdown in either mode',async({page,request})=>{
+  const date='2025-04-13',body=Array.from({length:100},(_,i)=>`Paragraph ${i}: long journal content.`).join('\n\n');
+  const existing=await api(request,'GET','/day-notes/'+date);
+  await api(request,'PUT','/day-notes/'+date,{text:'',body},{'If-Match':existing.headers().etag});
+  try {
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
+    await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.getByLabel('Date',{exact:true}).fill(date);
+    for(const [width,height] of [[1440,1000],[1440,720],[390,844]]) {
+      await page.setViewportSize({width,height});await page.evaluate(()=>window.scrollTo(0,0));
+      if(width===1440)expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1)).toBe(true);
+      for(const mode of ['Formatted','Markdown source']) {
+        await page.locator('#today-note-editor').getByRole('button',{name:mode,exact:true}).click();
+        const editor=page.locator('#today-note-editor');
+        await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();return Math.abs(nav.y-(a.y+a.height)-8);}).toBeLessThan(2);
+        const content=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');
+        await expect(content).toBeVisible();expect(await content.evaluate(value=>value.scrollHeight>value.clientHeight)).toBe(true);
+        const actions=await editor.locator('.dialog-actions').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(actions.y+actions.height).toBeLessThanOrEqual(nav.y);
+      }
+    }
+    await captureScreenshot(page,{path:'test-results/today-bounded-editor-mobile.png'});
+  } finally {
+    const note=await api(request,'GET','/day-notes/'+date);await api(request,'PUT','/day-notes/'+date,{text:'',body:''},{'If-Match':note.headers().etag});
+  }
+});
