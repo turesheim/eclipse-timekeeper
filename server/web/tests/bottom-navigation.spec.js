@@ -68,11 +68,14 @@ test('bottom navigation uses compact desktop spacing while preserving touch safe
       const bounds=await bar.boundingBox(),target=await bar.getByRole('button',{name:'Today',exact:true}).boundingBox();
       expect(bounds.height).toBeCloseTo(64+(touch?inset:0),0);expect(bounds.y+bounds.height).toBeCloseTo(900,0);
       const above=target.y-bounds.y,below=bounds.y+bounds.height-target.y-target.height;
-      expect(below-above).toBeCloseTo(touch?inset:0,0);expect(target.height).toBeGreaterThanOrEqual(44);
+      const borders=await bar.evaluate(value=>{const style=getComputedStyle(value);return parseFloat(style.borderTopWidth)-parseFloat(style.borderBottomWidth);});
+      expect(below-above).toBeCloseTo((touch?inset:0)-borders,0);expect(target.height).toBeGreaterThanOrEqual(44);
       for(const name of ['Today','Calendar','Week','Workweek','Activities','Clients','Projects'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
       if(width>=1024){
         await bar.getByRole('button',{name:'Today',exact:true}).click();
         await expect.poll(async()=>{const note=await page.locator('#today-note-editor').boundingBox(),nav=await bar.boundingBox();return Math.abs(nav.y-note.y-note.height-8);}).toBeLessThan(2);
+        await bar.getByRole('button',{name:'Week',exact:true}).click();
+        await expect.poll(async()=>{const calendar=await page.locator('#calendar-panel .calendar-scroll').boundingBox(),nav=await bar.boundingBox();return Math.abs(nav.y-calendar.y-calendar.height-8);}).toBeLessThan(2);
       }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }finally{await context.close();}
