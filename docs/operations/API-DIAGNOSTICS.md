@@ -16,6 +16,12 @@ alongside the generated request ID, route template and timing in the existing
 step when reporting intermittent failures; a later successful run does not
 establish the cause of an earlier HTTP 503.
 
+Browser acceptance artifacts retain each invocation's JVM log under
+`server-logs/`, including the full HTTP suite before later HTTPS checks run.
+Names use hashes and random suffixes rather than raw selectors or filesystem
+paths. The latest invocation remains available as `server.log`; earlier logs
+survive Playwright's normal output-directory cleanup.
+
 ## Read-only inspection
 
 Use a separate personal token under **My Account → API tokens**, with
