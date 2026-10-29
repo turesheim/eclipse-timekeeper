@@ -494,7 +494,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   if (collection === 'projects') {clientField(value.clientId);$('fields').append(createProjectIconPicker(value.icon));}
   if (collection === 'labels') field(i18nText("ui.color_optional"), 'color', value.color, { hint: i18nText("ui.hex_color_for_example_176653") });
   if (collection === 'tasks') {
-    field(i18nText("ui.summary"), 'summary', value.summary, { required: true, max: 1000 });
+    field(i18nText("ui.summary"), 'summary', value.summary, { required: true, max: 1024 });
     field(i18nText("ui.project"), 'projectId', value.projectId, { choices: [['', i18nText("ui.unassigned")], ...snapshot.projects.map((v) => [v.id, v.name])] });
     field(i18nText("ui.parent_task"), 'parentTaskId', value.parentTaskId, { choices: [['', i18nText("ui.no_parent")], ...snapshot.tasks.filter((v) => v.id !== id).map((v) => [v.id, taskPresentation(v).title])] });
     field(i18nText('record.url_optional'), 'url', value.url, { type: 'url', max: 4096 });

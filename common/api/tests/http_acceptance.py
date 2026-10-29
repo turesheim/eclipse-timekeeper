@@ -1463,6 +1463,87 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual('INCOMPLETE',preview['items'][0]['status']);self.assertEqual('RECURRENCE_SERIES_REQUIRED',preview['items'][0]['reason'])
         self.call('POST','/task-sync/import',body={**base,'item':no_rule},status=422,code='VALIDATION')
 
+    def test_full_provider_title_survives_sync_legacy_edits_and_transfer(self):
+        title='Google title '+('T'*1011) # Exactly 1,024 characters; no truncation.
+        self.assertEqual(1024,len(title))
+        connection=self.create('task-connections',{'providerId':'fixture','remoteAccountId':str(uuid4()),
+                    'name':'Long titles','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':'list',
+                    'name':'Long titles','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        cp='/task-connections/'+connection['id']
+        self.call('PUT',cp+'/capabilities',body={'version':1,'providerApiVersion':'fixture-v1',
+                  'fields':{'summary':{'readable':True,'writable':True,'deletable':False,'note':None}}},
+                  headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        key={'providerId':'fixture','repositoryId':connection['remoteAccountId']+'/list','externalId':str(uuid4())}
+        item={**key,'operationId':str(uuid4()),'deleted':False,'fields':{'summary':title}}
+        base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+        task,headers=self.call('POST','/task-sync/import',body={**base,'item':item},status=201)
+        self.created.append(('a','tasks',task['id']))
+        self.assertEqual(title,task['summary'])
+        path='/tasks/'+task['id']
+        revised='R'+title[1:]
+        replacement={'projectId':None,'parentTaskId':None,'summary':revised,'url':None}
+        task,headers=self.call('PUT',path,body=replacement,headers={'If-Match':headers['ETag']})
+        self.assertEqual(revised,task['summary'])
+        self.call('PUT',path,body={**replacement,'summary':revised+'X'},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        proposal,_=self.call('POST','/task-sync/export-preview',body={'connectionId':connection['id'],'listId':task_list['id'],'taskId':task['id'],**key})
+        self.assertEqual({'summary':revised},proposal['writeFields'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={row['sourceId']:row['id'] for row in imported['ids']}
+        for row in imported['ids']:
+            if row['entityType'] in kinds:
+                self.created.append(('b',kinds[row['entityType']],row['id']))
+        copied,_=self.call('GET','/tasks/'+mappings[task['id']],owner='b')
+        self.assertEqual(revised,copied['summary'])
+        self.assertEqual(title,copied['externalReferences'][0]['baseline']['fields']['summary'])
+
+    def test_read_only_source_links_preserve_other_accounts_and_local_resources(self):
+        accounts=[]
+        links=[{'id':str(uuid4()),'kind':'LOCAL','url':'https://example.test/local',
+                'title':'Local link','providerId':None,'remoteId':None}]
+        for index in range(2):
+            connection=self.create('task-connections',{'providerId':'fixture','remoteAccountId':str(uuid4()),
+                        'name':'Source account','readable':True,'writable':True,'enabled':True})
+            task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':'list',
+                        'name':'Source list','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                        'owner':True,'present':True,'position':0})
+            cp='/task-connections/'+connection['id']
+            self.call('PUT',cp+'/capabilities',body={'version':1,'providerApiVersion':'fixture-v1',
+                      'fields':{'metadata.links':{'readable':True,'writable':False,'deletable':False,'note':'Output-only source'}}},
+                      headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+            key={'providerId':'fixture','repositoryId':connection['remoteAccountId']+'/list','externalId':'same-task-id'}
+            accounts.append((connection,task_list,key))
+            links.append({'id':str(uuid4()),'kind':'PROVIDER_SOURCE','url':'https://example.test/account-'+str(index),
+                          'title':'Source','providerId':'fixture','remoteId':'same-source-id'})
+        path='/tasks/'+self.task['id']
+        self.call('PUT',path+'/metadata',body={'tags':[],'categories':[],'links':links},
+                  headers={'If-Match':self.call('GET',path)[1]['ETag']})
+        for index,(connection,task_list,key) in enumerate(accounts):
+            reference={**key,'externalUrl':None,'taskListId':task_list['id'],
+                       'baseline':{'version':1,'capturedAt':'2026-10-29T02:00:00Z',
+                                   'fields':{'metadata':{'links':[links[index+1]]}}}}
+            self.call('PUT',path+'/external-references',body=reference,headers={'If-Match':self.call('GET',path)[1]['ETag']})
+        before,headers=self.call('GET',path)
+        for index,(connection,task_list,key) in enumerate(accounts):
+            base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+            item={**key,'operationId':str(uuid4()),'deleted':False,'fields':{'metadata':{'links':[links[index+1]]}}}
+            preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':False,'items':[item]})
+            self.assertEqual('KEEP_LOCAL',preview['items'][0]['status'])
+            item={**item,'fields':{'metadata':{'links':[{**links[index+1],'title':'Changed source'}]}}}
+            preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':False,'items':[item]})
+            self.assertEqual('CONFLICT',preview['items'][0]['status'])
+            self.call('POST','/task-sync/apply',body={**base,'item':item},headers={'If-Match':headers['ETag']},status=409,code='CONFLICT')
+            outward,_=self.call('POST','/task-sync/export-preview',body={'connectionId':connection['id'],'listId':task_list['id'],'taskId':self.task['id'],**key})
+            self.assertNotIn('links',outward['writeFields'].get('metadata',{}))
+            self.assertIn({'field':'metadata.links','reason':'NOT_WRITABLE'},outward['warnings'])
+            after,after_headers=self.call('GET',path)
+            self.assertEqual(before,after)
+            self.assertEqual(headers['ETag'],after_headers['ETag'])
+
     def test_provider_metadata_components_preserve_unobserved_values(self):
         connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
                     'name':'Partial metadata','readable':True,'writable':True,'enabled':True})

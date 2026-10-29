@@ -22,6 +22,19 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_task_titles_accept_google_limit_without_widening_other_names(self):
+        title='T'*1024
+        value={'projectId':None,'parentTaskId':None,'summary':title,'url':None}
+        for name in ('TaskInput','TaskCreateInput'):
+            self.assertTrue(validator(name).is_valid(value),name)
+            self.assertFalse(validator(name).is_valid({**value,'summary':title+'T'}),name)
+        self.assertTrue(validator('TaskSyncFields').is_valid({'summary':title}))
+        self.assertFalse(validator('TaskSyncFields').is_valid({'summary':title+'T'}))
+        for name in ('Task','TransferTask'):
+            self.assertEqual('#/components/schemas/TaskSummary',CONTRACT['components']['schemas'][name]['properties']['summary']['$ref'])
+        self.assertTrue(validator('Name').is_valid('N'*1000))
+        self.assertFalse(validator('Name').is_valid('N'*1001))
+
     def test_reminder_observation_masks_are_typed_and_ordinary_writes_stay_arrays(self):
         absolute={'id':ID,'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-29','time':'09:00','timeZone':'Europe/Oslo'}}
         for reminders in ({}, {'ABSOLUTE':[]}, {'ABSOLUTE':[absolute]}, [], [absolute]):

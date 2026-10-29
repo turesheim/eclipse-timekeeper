@@ -16240,7 +16240,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -16612,7 +16612,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -17230,7 +17230,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -17820,7 +17820,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -27539,7 +27539,7 @@
         "description": "Presence is the field mask; explicit null clears nullable fields. Unobserved fields are omitted.",
         "properties": {
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -29775,6 +29775,13 @@
         },
         "additionalProperties": false,
         "description": "Partial recurrence observation mask. Omitted series or occurrences are unobserved. Null series and empty occurrences are explicit clears. Nonempty occurrences require a known series; preserve unobserved history."
+      },
+      "TaskSummary": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "pattern": "\\S",
+        "description": "Task title, allowing the full Google Tasks v1 limit. Other resource names retain their own limit."
       }
     },
     "parameters": {

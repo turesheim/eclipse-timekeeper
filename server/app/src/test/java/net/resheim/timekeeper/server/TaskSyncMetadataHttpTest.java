@@ -113,4 +113,58 @@ class TaskSyncMetadataHttpTest {
         assertEquals("Aggregate fallback",json(compatible.asString()).path("metadata").path("categories").get(0).asText());
         assertEquals(localMetadata.path("tags"),json(compatible.asString()).path("metadata").path("tags"));
     }
+    @Test void readOnlySourceLinksFromTwoAccountsRequireReconciliationWithoutLosingLocalLinks() {
+        var connections=new ObjectNode[2];var lists=new ObjectNode[2];var references=new ObjectNode[2];
+        var links=JsonValues.array();
+        links.add(json("{\"kind\":\"LOCAL\",\"url\":\"https://example.test/local\",\"title\":\"Local\",\"providerId\":null,\"remoteId\":null}").put("id",UUID.randomUUID().toString()));
+        for(int index=0;index<2;index++) {
+            var connectionInput=json("{\"providerId\":\"fixture\",\"name\":\"Read-only links\",\"readable\":true,\"writable\":true,\"enabled\":true}")
+                    .put("remoteAccountId",UUID.randomUUID().toString());
+            connections[index]=create("/task-connections",connectionInput);
+            String connectionPath="/task-connections/"+connections[index].path("id").asText();
+            var caps=json("{\"version\":1,\"providerApiVersion\":\"fixture-v1\",\"fields\":{\"metadata.links\":{\"readable\":true,\"writable\":false,\"deletable\":false,\"note\":\"Output-only source context\"}}}");
+            var setCaps=call("PUT",connectionPath+"/capabilities",caps,call("GET",connectionPath,null,null).header("ETag"));assertEquals(200,setCaps.statusCode(),setCaps.asString());
+            var listInput=json("{\"remoteListId\":\"list\",\"name\":\"Links\",\"kind\":\"STANDARD\",\"readable\":true,\"writable\":true,\"shared\":false,\"owner\":true,\"present\":true,\"position\":0}");
+            listInput.set("connectionId",connections[index].get("id"));lists[index]=create("/task-lists",listInput);
+            // Identical provider and remote IDs in different accounts are not
+            // evidence that the source links refer to the same object.
+            links.add(json("{\"kind\":\"PROVIDER_SOURCE\",\"title\":\"Source\",\"providerId\":\"fixture\",\"remoteId\":\"same-source-id\"}")
+                    .put("id",UUID.randomUUID().toString()).put("url","https://example.test/account-"+index));
+        }
+        var taskInput=json("{\"projectId\":null,\"parentTaskId\":null,\"summary\":\"Two source accounts\",\"url\":\"https://example.test/primary\",\"metadata\":{\"tags\":[],\"categories\":[]}}");
+        ((ObjectNode)taskInput.get("metadata")).set("links",links);
+        var task=create("/tasks",taskInput);String path="/tasks/"+task.path("id").asText();
+        for(int index=0;index<2;index++) {
+            var ref=json("{\"providerId\":\"fixture\",\"externalId\":\"same-task-id\",\"externalUrl\":null}")
+                    .put("repositoryId",connections[index].path("remoteAccountId").asText()+"/list");
+            ref.set("taskListId",lists[index].get("id"));
+            var baseline=json("{\"version\":1,\"capturedAt\":\"2026-10-29T02:00:00Z\",\"fields\":{\"metadata\":{}}}");
+            ((ObjectNode)baseline.path("fields").path("metadata")).putArray("links").add(links.get(index+1));ref.set("baseline",baseline);references[index]=ref;
+            var linked=call("PUT",path+"/external-references",ref,call("GET",path,null,null).header("ETag"));assertEquals(200,linked.statusCode(),linked.asString());
+        }
+        var before=call("GET",path,null,null);var original=json(before.asString());
+        for(int index=0;index<2;index++) {
+            var item=JsonValues.object().put("operationId",UUID.randomUUID().toString()).put("deleted",false);
+            for(String key:java.util.List.of("providerId","repositoryId","externalId"))item.set(key,references[index].get(key));
+            var observed=item.putObject("fields").putObject("metadata").putArray("links");observed.add(links.get(index+1));
+            var input=JsonValues.object().put("sourceState","HEALTHY").put("scanComplete",false);
+            input.set("connectionId",connections[index].get("id"));input.set("listId",lists[index].get("id"));input.putArray("items").add(item);
+            var unchanged=call("POST","/task-sync/preview",input,null);assertEquals(200,unchanged.statusCode(),unchanged.asString());
+            assertEquals("KEEP_LOCAL",json(unchanged.asString()).path("items").get(0).path("status").asText());
+            ((ObjectNode)observed.get(0)).put("title","Changed source title");
+            var conflict=call("POST","/task-sync/preview",input,null);assertEquals(200,conflict.statusCode(),conflict.asString());
+            assertEquals("CONFLICT",json(conflict.asString()).path("items").get(0).path("status").asText());
+            input.remove("items");input.remove("scanComplete");input.set("item",item);
+            assertEquals(409,call("POST","/task-sync/apply",input,before.header("ETag")).statusCode());
+            // A read-only component never exports other account/local resources.
+            var outbound=JsonValues.object();outbound.set("connectionId",connections[index].get("id"));outbound.set("listId",lists[index].get("id"));outbound.set("taskId",task.get("id"));
+            for(String key:java.util.List.of("providerId","repositoryId","externalId"))outbound.set(key,references[index].get(key));
+            var export=call("POST","/task-sync/export-preview",outbound,null);assertEquals(200,export.statusCode(),export.asString());
+            var exported=json(export.asString());assertFalse(exported.path("writeFields").path("metadata").has("links"));
+            assertTrue(java.util.stream.StreamSupport.stream(exported.path("warnings").spliterator(),false)
+                    .anyMatch(w -> w.path("field").asText().equals("metadata.links") && w.path("reason").asText().equals("NOT_WRITABLE")));
+            var after=call("GET",path,null,null);assertEquals(before.header("ETag"),after.header("ETag"));assertEquals(original,json(after.asString()));
+        }
+    }
+
 }

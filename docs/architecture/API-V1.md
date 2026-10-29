@@ -510,6 +510,13 @@ Eclipse CSV and report-template adapters translate domain snapshots locally;
 server API operations must not expose or write embedded persistence tables.
 This is current-model interchange, not historical migration or database backup.
 
+
+Task titles (`TaskSummary`) accept up to 1,024 characters, including the complete
+Google Tasks v1 title limit. Task create/update, sync observation, response and
+portable transfer use this same schema. Other resource names remain limited by
+`Name`; this change does not widen client, project or label names. The web task
+editor uses the same title limit and does not truncate imported titles.
+
 ## Versions and atomic tracking
 
 GET and successful create/update/command responses include a strong opaque

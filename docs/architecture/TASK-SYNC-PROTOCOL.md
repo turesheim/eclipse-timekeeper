@@ -184,7 +184,14 @@ Do not declare the aggregate `metadata` capability unless the connector can
 read the whole value. Explicit component declarations take precedence over
 that compatibility fallback. Link arrays remain one metadata component; a
 connector must preserve resources it cannot read or reconcile before replacing
-that component.
+that component. A provider-only link observation can therefore report
+`KEEP_LOCAL` or `CONFLICT` when the local array also contains local/other-account
+resources. A conflict returns `409` from apply without changing the task or any
+reference baseline. Do not infer account ownership from `providerId`, a remote
+link ID, title or URL. Output-only source links must have a non-writable link
+capability, so they cannot export the unrelated resources. See the
+[item-level representation checks](TASK-SYNC-CAPABILITIES.md#item-level-representation-checks)
+for rich bodies, alert counts and linked resources without browser URLs.
 
 ### Partial recurrence observations
 
