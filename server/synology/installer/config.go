@@ -17,10 +17,20 @@ import (
 	"strings"
 )
 
-const packageID = "timekeeper"
-const packageTarget = "/var/packages/timekeeper/target"
+// Set by the package builder, never inferred from the installation environment.
+var packageID = "timekeeper"
+
+func packageTarget() string { return filepath.Join("/var/packages", packageID, "target") }
+func applicationID() string { return "net.resheim." + packageID }
+func packageDisplayName() string {
+	if packageID == "dagsverk" {
+		return "Dagsverk"
+	}
+	return "Timekeeper"
+}
+
 const nativePSQL = "/var/packages/postgresql/target/bin/psql"
-const currentSchema = 8
+const currentSchema = 9
 
 func supportedSchema(version int) bool { return version >= 2 && version <= currentSchema }
 func supportedUpgrade(from, to int) bool {

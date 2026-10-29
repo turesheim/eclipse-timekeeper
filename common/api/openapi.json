@@ -14565,6 +14565,1311 @@
           }
         ]
       }
+    },
+    "/admin/instance/backups": {
+      "post": {
+        "operationId": "createInstanceBackup",
+        "summary": "Start an encrypted full-instance backup",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser account with write access only. API tokens, token-exchanged sessions and regular users are forbidden. Credential-bearing inputs are never stored in command receipts. Requires current password proof, same-origin browser CSRF protection and no automatic retries. Creation returns the durable receipt before snapshot completion; poll its status URL.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Status URL for the accepted operation."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceOperation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceBackupCreateInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/operations/{id}": {
+      "get": {
+        "operationId": "getInstanceOperation",
+        "summary": "Read instance operation status",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser account with write access only. API tokens, token-exchanged sessions and regular users are forbidden. Credential-bearing inputs are never stored in command receipts. Returns metadata only; no credentials, paths, archive contents or worker capabilities.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceOperation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/admin/instance/operations/{id}/discard": {
+      "post": {
+        "operationId": "discardInstanceArtifact",
+        "summary": "Discard a completed private instance artifact",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser account with write access only. API tokens, token-exchanged sessions and regular users are forbidden. Credential-bearing inputs are never stored in command receipts. Requires current password proof, same-origin browser CSRF protection and no automatic retries. Creation returns the durable receipt before snapshot completion; poll its status URL.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceOperation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceOperationProofInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/operations/{id}/download-grant": {
+      "post": {
+        "operationId": "authorizeInstanceDownload",
+        "summary": "Authorize one native browser download",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Current administrator password proof mints one two-minute HttpOnly Secure SameSite=Strict cookie grant bound to this job and the current account session. The raw grant is never returned in JSON or included in a URL.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "One-use __Host-timekeeper-instance-download cookie; Secure, HttpOnly, SameSite=Strict, Path=/, Max-Age=120."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceDownload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceOperationProofInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/operations/{id}/content": {
+      "get": {
+        "operationId": "downloadInstanceBackup",
+        "summary": "Stream an encrypted full-instance archive",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": [],
+            "instanceDownloadGrant": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Consumes a previously issued one-use cookie grant for this exact job and browser session before streaming. Expired, reused, wrong-session or wrong-job grants are rejected. A failed or interrupted transfer requires fresh authorization. DOWNLOAD_STARTED audit means a stream was authorized to start, not that the browser saved it.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Attachment with server-generated UUID filename and .tkbackup extension."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Clears the consumed download grant cookie."
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads": {
+      "post": {
+        "operationId": "createInstanceRestoreUpload",
+        "summary": "Create a session-bound encrypted backup upload",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "201": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Upload progress/review URL."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRestoreUploadInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}": {
+      "get": {
+        "operationId": "getInstanceRestoreUpload",
+        "summary": "Read upload progress and archive-only review",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/content": {
+      "put": {
+        "operationId": "appendInstanceRestoreUpload",
+        "summary": "Append or retry at most 1 MiB of ciphertext",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/validate": {
+      "post": {
+        "operationId": "validateInstanceRestoreUpload",
+        "summary": "Authenticate the complete archive and prepare a safe review",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "202": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Upload progress/review URL."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceBackupCreateInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance": {
+      "get": {
+        "operationId": "getInstanceBackupSummary",
+        "summary": "Read backup limits and recent instance operations",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only. Returns up to 50 recent operations, ordered newest first, with a flag allowing upload access only in its initiating session. Reveals no paths, credentials, worker capabilities or archive contents. Storage configuration does not guarantee filesystem readiness.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceBackupSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/target": {
+      "post": {
+        "operationId": "checkInstanceRestoreTarget",
+        "summary": "Inspect whether the target database contains only bootstrap data",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Fresh administrator password proof and the initiating upload session are required. The archive must already be in REVIEW. Uses a consistent, read-only inspection; reports other accounts, business records, API tokens and business history as blockers. Unmodified built-in labels are bootstrap data. This advisory result is not a restore authorization: activation must recheck under an exclusive fence. No data is replaced.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Advisory database eligibility and blockers; no activation authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceOperationProofInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/staging": {
+      "get": {
+        "operationId": "getInstanceRestoreStage",
+        "summary": "Read the initiating session’s restore preparation status",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session with write access and original upload session required. No secrets, file paths or consent capabilities are returned.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "200": {
+            "description": "Prepare private restore files and review destination mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreStage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "stageInstanceRestore",
+        "summary": "Prepare private restore files and review destination mapping",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Requires fresh administrator password proof, browser CSRF/owner binding and the original upload session. Staging validates and copies private data without applying it. Confirmation rechecks the empty target and exact staged version/generation, commits maintenance consent, and requires all target processes to be stopped and one restarted for exclusive preboot recovery. Other API calls remain gated while pending; no privileged host restart is performed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "202": {
+            "description": "Prepare private restore files and review destination mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreStage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRestoreStageInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/confirm": {
+      "post": {
+        "operationId": "confirmInstanceRestore",
+        "summary": "Commit explicit restore consent and enter maintenance until restart",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Requires fresh administrator password proof, browser CSRF/owner binding and the original upload session. Staging validates and copies private data without applying it. Confirmation rechecks the empty target and exact staged version/generation, commits maintenance consent, and requires all target processes to be stopped and one restarted for exclusive preboot recovery. Other API calls remain gated while pending; no privileged host restart is performed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "202": {
+            "description": "Commit explicit restore consent and enter maintenance until restart",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreConfirmation"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRestoreConfirmInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14579,6 +15884,12 @@
         "in": "cookie",
         "name": "__Host-timekeeper-session",
         "description": "Opaque HttpOnly; Secure; SameSite=Lax cookie. Configured HTTPS browser requests require the exact canonical Origin, or a matching Referer origin on reads. Unsafe cookie requests also require X-CSRF-Token. A separate host-only HttpOnly browser-binding cookie is issued by same-origin GET /auth/status and refreshed on sign-in. Bearer API/Eclipse requests remain origin-independent; /auth/token-login explicitly exchanges a bearer token for a bound browser session."
+      },
+      "instanceDownloadGrant": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-timekeeper-instance-download",
+        "description": "Short-lived one-use grant from the password-verified download-grant POST, bound to the same browser account session and operation. Never send this in a URL."
       }
     },
     "schemas": {
@@ -27505,6 +28816,579 @@
           "recordingStartedAt"
         ],
         "additionalProperties": false
+      },
+      "InstanceOperationProofInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          }
+        }
+      },
+      "InstanceBackupCreateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "passphrase"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "passphrase": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password",
+            "description": "Encryption passphrase; never retained in an operation receipt."
+          }
+        }
+      },
+      "InstanceOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "state",
+          "version",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BACKUP",
+              "RESTORE"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PREPARING",
+              "UPLOADING",
+              "VALIDATING",
+              "REVIEW",
+              "READY",
+              "FAILED",
+              "INTERRUPTED",
+              "EXPIRED",
+              "RESTORED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InstanceDownload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "downloadUrl",
+          "expiresAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "downloadUrl": {
+            "type": "string",
+            "pattern": "^/api/v1/admin/instance/operations/[a-f0-9-]{36}/content$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InstanceRestoreUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 40,
+            "maximum": 9007199254740991
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "InstanceArchiveReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "archiveVerified",
+          "restoreReady",
+          "archiveId",
+          "createdAt",
+          "schema",
+          "source",
+          "counts",
+          "requiredSteps"
+        ],
+        "properties": {
+          "archiveVerified": {
+            "const": true
+          },
+          "restoreReady": {
+            "const": false
+          },
+          "archiveId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "serverVersion",
+              "commit",
+              "databaseType",
+              "packageId",
+              "publicOrigin"
+            ],
+            "properties": {
+              "serverVersion": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "databaseType": {
+                "enum": [
+                  "h2",
+                  "postgresql"
+                ]
+              },
+              "packageId": {
+                "type": "string"
+              },
+              "publicOrigin": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "counts": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^tk_[a-z_]+$"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "requiredSteps": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "TARGET_READINESS",
+                "AUTHENTICATION_CONFIGURATION",
+                "DEPLOYMENT_MAPPING",
+                "OFFLINE_ACTIVATION"
+              ]
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "InstanceRestoreUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "bytes",
+          "received",
+          "complete",
+          "chunkBytes",
+          "sha256"
+        ],
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/InstanceOperation"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 40,
+            "maximum": 9007199254740991
+          },
+          "received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "All declared ciphertext bytes have been received. This does not claim checksum, archive authentication, or destination readiness."
+          },
+          "chunkBytes": {
+            "const": 1048576
+          },
+          "validationCode": {
+            "type": "string",
+            "enum": [
+              "INVALID_INSTANCE_BACKUP",
+              "INVALID_INSTANCE_AUTHENTICATION"
+            ]
+          },
+          "review": {
+            "$ref": "#/components/schemas/InstanceArchiveReview"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "InstanceBackupSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "storageConfigured",
+          "maximumArchiveBytes",
+          "chunkBytes",
+          "items"
+        ],
+        "properties": {
+          "storageConfigured": {
+            "type": "boolean"
+          },
+          "maximumArchiveBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "chunkBytes": {
+            "const": 1048576
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation",
+                "canAccessUpload"
+              ],
+              "properties": {
+                "operation": {
+                  "$ref": "#/components/schemas/InstanceOperation"
+                },
+                "canAccessUpload": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "restoreStorageConfigured": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InstanceRestoreTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "databaseEligible",
+          "restoreReady",
+          "checkedAt",
+          "blockers",
+          "requiredSteps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "databaseEligible": {
+            "type": "boolean"
+          },
+          "restoreReady": {
+            "const": false
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "blockers": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "enum": [
+                "TARGET_OTHER_ACCOUNTS",
+                "TARGET_BUSINESS_DATA",
+                "TARGET_API_TOKENS",
+                "TARGET_BUSINESS_HISTORY"
+              ]
+            }
+          },
+          "requiredSteps": {
+            "const": [
+              "OFFLINE_TARGET_RECHECK",
+              "AUTHENTICATION_CONFIGURATION",
+              "DEPLOYMENT_MAPPING",
+              "OFFLINE_ACTIVATION"
+            ]
+          }
+        }
+      },
+      "InstanceRestoreStageInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "passphrase",
+          "operationVersion",
+          "publicOrigin",
+          "passkeyRpId",
+          "passkeysEnabled"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "passphrase": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password",
+            "description": "Encryption passphrase; never retained in an operation receipt."
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740986
+          },
+          "publicOrigin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "passkeyRpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InstanceRestoreConfirmInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "operationVersion",
+          "generation",
+          "confirmation"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740986
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirmation": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^RESTORE [a-z][a-z0-9_-]{0,63}$"
+          }
+        }
+      },
+      "InstanceRestoreDeployment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "packageId",
+          "publicOrigin",
+          "passkeyRpId",
+          "passkeysEnabled",
+          "databaseType",
+          "httpHost",
+          "httpPort",
+          "httpsPort"
+        ],
+        "properties": {
+          "packageId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "publicOrigin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "passkeyRpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          },
+          "databaseType": {
+            "enum": [
+              "h2",
+              "postgresql"
+            ]
+          },
+          "httpHost": {
+            "type": "string"
+          },
+          "httpPort": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "httpsPort": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          }
+        }
+      },
+      "InstanceRestoreStage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "phase"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "phase": {
+            "enum": [
+              "NONE",
+              "PREPARING",
+              "READY",
+              "FAILED"
+            ]
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/InstanceRestoreDeployment"
+          }
+        }
+      },
+      "InstanceRestoreConfirmation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "generation",
+          "operationVersion",
+          "phase",
+          "publicOrigin"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "phase": {
+            "const": "PENDING_RESTART"
+          },
+          "publicOrigin": {
+            "type": "string"
+          }
+        }
       }
     },
     "parameters": {

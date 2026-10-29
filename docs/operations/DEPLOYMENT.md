@@ -153,7 +153,7 @@ sh restore.sh /volume1/docker/timekeeper/state/backups/<backup-directory>
 ```
 
 The script stops both API replicas, validates and restores schema-2/3/4/5/6/7 backups
-into PostgreSQL in one transaction, upgrades supported older schemas to schema 8,
+into PostgreSQL in one transaction, upgrades supported older schemas to schema 9,
 atomically restores the token registry and starts the replicas. A database restore failure
 leaves the API stopped for inspection. It replaces current application data.
 For a fresh NAS, first restore the original secrets and start the database,
@@ -188,7 +188,7 @@ If a task was forcibly killed and left `state/update.lock`, verify that no updat
 is running before removing that empty lock directory and rerunning the task.
 
 Automatic API updates require backward-compatible database schemas. Current
-startup can upgrade canonical schema 1, 2, 3, 4, 5, 6 or 7 to schema 8 when explicitly enabled.
+startup can upgrade canonical schema 1, 2, 3, 4, 5, 6, 7 or 8 to schema 9 when explicitly enabled.
 Stop both replicas and back up before this upgrade; follow the [account migration guide](ACCOUNTS.md).
 Subsequent incompatible migrations must be coordinated separately with a restore plan;
 rolling back an image alone cannot undo a migration.
@@ -199,7 +199,7 @@ replicas. Confirm that both replicas run the accepted Work Session build before
 resuming writes. This first transition must not serve writes through a mixture
 of old and new domain models. The generic SQL layout remains server schema 1;
 its version marker alone does not prove that an older binary understands new
-resource types or activity associations. Current builds use schema 8. Once sessions or taskless activities
+resource types or activity associations. Current builds use schema 9. Once sessions or taskless activities
 have been recorded, use only server builds supporting them. Returning to a
 pre-Work-Session build requires stopping client access and restoring a verified
 backup from before those records existed; an image rollback alone is unsupported.

@@ -17,6 +17,8 @@ class ComposeBackupTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         shutil.copy(BACKUP_SCRIPT, self.root / 'backup.sh')
+        for name in ('instance_material.py', 'restore-database.py'):
+            shutil.copy(ROOT / 'server/deploy' / name, self.root / name)
         self.state = self.root / 'state with spaces'
         for name, content in {'config/tokens.json': '[]',
                               'config/mail.properties': '# mail fixture\n',
@@ -34,6 +36,16 @@ import sys
 
 args = sys.argv[1:]
 if args[:2] == ['compose', 'run']:
+    if '--user' in args:
+        if any('flock -n 9' in arg for arg in args):
+            print('LOCKED', flush=True); sys.stdin.read(); sys.exit(0)
+        sys.exit(3)
+    if '--table=tk_schema' in args:
+        print('COPY public.tk_schema (id, schema_version, state) FROM stdin;\\n1\\t9\\tREADY\\n\\\\.\\n-- dump done')
+        sys.exit(0)
+    if '--table=tk_instance' in args:
+        print('COPY public.tk_instance (id, kind, version, operation_id, actor_owner, occurred_at, payload) FROM stdin;\\n00000000-0000-0000-0000-000000000000\\tCONTROL\\t1\\t\\\\N\\t\\\\N\\t1970-01-01T00:00:00Z\\t{}\\n\\\\.')
+        sys.exit(0)
     if os.environ.get('FAIL_DUMP'):
         sys.exit('Database backup failed')
     print('PGDMP fixture')

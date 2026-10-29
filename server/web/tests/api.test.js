@@ -171,3 +171,17 @@ test('the snapshot deadline aborts outstanding reads together without signing ou
   assert.equal(signals.length,9);assert.ok(signals.every(signal=>signal.aborted));stalled=false;
   assert.equal((await api.snapshot(snapshotDates)).revision,1);
 });
+test('binary upload bodies retain CSRF, owner binding and exact bytes',async()=>{
+  const bytes=new Uint8Array([0,255,128,13,10]);let calls=0;
+  const api=new Api(null,async(url,options)=>{
+    calls++;assert.equal(url,'/api/v1/admin/instance/uploads/id/content?offset=0');
+    assert.equal(options.headers['Content-Type'],'application/octet-stream');assert.equal(options.headers.Accept,'application/json');
+    assert.equal(options.headers['X-CSRF-Token'],'csrf-fixture');assert.equal(options.headers['X-Timekeeper-Owner'],'b3duZXItYQ');
+    assert.equal(options.credentials,'same-origin');assert.equal(options.redirect,'error');assert.equal(options.body,bytes);return reply({received:5});
+  },{ownerId:'owner-a',csrf:'csrf-fixture'});
+  assert.equal((await api.request('/admin/instance/uploads/id/content?offset=0',{method:'PUT',rawBody:bytes})).data.received,5);
+  await assert.rejects(api.request('/anything',{method:'PUT',rawBody:bytes,body:{}}),TypeError);
+  await assert.rejects(api.request('/anything',{method:'PUT',rawBody:'not binary'}),TypeError);assert.equal(calls,1);
+  const foreign=new Api(null,async()=>reply({received:5},'b3duZXItYg'),{ownerId:'owner-a',csrf:'csrf-fixture'});
+  await assert.rejects(foreign.request('/anything',{method:'PUT',rawBody:bytes}),error=>error.code==='OWNER_CHANGED');
+});

@@ -74,6 +74,8 @@ jobs:
       run: ./mvnw -B -ntp -f server/pom.xml clean verify
     - name: Package candidate server distribution
       run: python server/scripts/package_server.py --output server/target/distribution --commit "$GITHUB_SHA"
+    - name: Verify shipped offline instance recovery and completed retry
+      run: python server/scripts/instance_restore_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify packaged HTTP server, durable restart and authorization
       run: python server/scripts/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Upload server reports and acceptance evidence
@@ -128,8 +130,10 @@ jobs:
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify email recovery through HTTPS and actual SMTP delivery
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
-    - name: Verify Journal WebDAV account help through HTTPS
-      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection'
+    - name: Verify Journal WebDAV help and instance backups through HTTPS
+      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection|instance backup Administration'
+    - name: Verify explicit instance restore preparation and confirmation through HTTPS
+      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --restore --grep 'instance restore preparation'
     - name: Upload browser acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1

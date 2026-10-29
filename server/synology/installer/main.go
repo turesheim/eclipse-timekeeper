@@ -115,14 +115,15 @@ func ready(root string) error {
 	return nil
 }
 func run(action, root, target, releasePath string, env func(string) string, argument string) error {
+	if env("SYNOPKG_PKGNAME") != packageID {
+		return errors.New("Run this helper through DSM Package Center")
+	}
+
 	if action == "wizard" {
 		return wizard(os.Stdout, root)
 	}
 	if action == "uninstall-wizard" {
 		return uninstallWizard(os.Stdout, root)
-	}
-	if env("SYNOPKG_PKGNAME") != packageID {
-		return errors.New("Run this helper through DSM Package Center")
 	}
 	switch action {
 	case "backup":
@@ -200,7 +201,13 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			if err := containerManagerAt("/var/packages/ContainerManager/INFO"); err != nil {
 				return err
 			}
-			return validate(root, w, release, filepath.Join(releasePath, "migration"))
+			if err := validate(root, w, release, filepath.Join(releasePath, "migration")); err != nil {
+				return err
+			}
+			if incoming := env("SYNOPKG_PKGINST_TEMP_DIR"); incoming != "" {
+				return prepareInstanceProject(incoming, root)
+			}
+			return nil
 		}
 		if err := install(root, target, w, release, filepath.Join(releasePath, "migration")); err != nil {
 			return err
@@ -211,6 +218,10 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 	}
 }
 func main() {
+	if packageID != "timekeeper" && packageID != "dagsverk" {
+		fmt.Fprintln(os.Stderr, "Invalid package build identity")
+		os.Exit(1)
+	}
 	if len(os.Args) < 2 || len(os.Args) > 3 || (len(os.Args) == 3 && os.Args[1] != "restore" && os.Args[1] != "import-postgresql18") {
 		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop, status, backup, restore /absolute/backup.tar, import-postgresql18 /absolute/migration.tar or cancel-empty-import")
 		os.Exit(2)

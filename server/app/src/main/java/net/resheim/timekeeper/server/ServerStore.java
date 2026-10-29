@@ -34,6 +34,7 @@ public class ServerStore {
     @Inject TokenRegistry tokens;
     @Inject BackendClock clock;
     @Inject AccountStore accounts;
+    @Inject InstanceRestoreFence restoreFence;
     @Inject RecoveryMail recoveryMail;
     @Inject PasskeyRealm passkeyRealm;
     @Inject ServiceSettings serviceSettings;
@@ -53,6 +54,7 @@ public class ServerStore {
         DatabaseConfiguration.validate(jdbcUrl);
         try (var connection = datasource.getConnection()) {
             ServerSchema.initializeOrValidate(connection,allowSchemaUpgrade);
+            restoreFence.initialize(connection);
             // Apply only after validation: an acknowledged commit must survive process kill.
             if (!postgres()) {
                 try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}
@@ -81,13 +83,15 @@ public class ServerStore {
     private void maintainDays() {
         try {
             var owners=new java.util.HashMap<String,String>();
-            try(var connection=datasource.getConnection();var statement=connection.createStatement();
+            try(var connection=datasource.getConnection();var held=restoreFence.enter(connection);var statement=connection.createStatement();
                 var rows=statement.executeQuery("SELECT id,zone_id FROM tk_owner")) {
                 while(rows.next()) owners.put(rows.getString(1),rows.getString(2));
             }
             Instant now=clock.now();
             for(var entry:owners.entrySet()) if(!partitionDate(entry.getValue(),now).equals(partitionDates.get(entry.getKey())))
                 transaction(entry.getKey(),()->null);
+        } catch(ApiFailure failure) {
+            if(!InstanceRestoreFence.expected(failure))System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Could not maintain daily activity boundaries",failure);
         } catch(RuntimeException | SQLException failure) {
             System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Could not maintain daily activity boundaries",failure);
         }
@@ -95,7 +99,7 @@ public class ServerStore {
     void initializeConfiguredOwners() {
         var owners=new java.util.HashSet<String>();
         tokens.load().forEach(token -> owners.add(token.owner()));
-        try(var connection=datasource.getConnection();var query=connection.createStatement();var rows=query.executeQuery("SELECT id FROM tk_owner")) {
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection);var query=connection.createStatement();var rows=query.executeQuery("SELECT id FROM tk_owner")) {
             while(rows.next()) owners.add(rows.getString(1));
         } catch(SQLException failure) {throw databaseFailure(failure);}
         for (String owner : owners) {
@@ -117,7 +121,7 @@ public class ServerStore {
             return work.get();
         }
         long started=System.nanoTime(),acquired=0,locked=0,worked=0;String phase="pool",outcome="failed";
-        try (var connection = datasource.getConnection()) {
+        try (var connection = datasource.getConnection();var held=restoreFence.enter(connection)) {
             acquired=System.nanoTime();phase="owner-lock";
             connection.setAutoCommit(false);
             try {

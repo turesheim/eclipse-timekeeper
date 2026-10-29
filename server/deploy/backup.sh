@@ -1,9 +1,13 @@
 #!/bin/sh
 # Consistent logical backup plus the token registry.
 set -eu
+umask 077
 cd "$(dirname "$0")"
 # shellcheck source=/dev/null
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
+if [ "${TIMEKEEPER_COMPOSE_LOCK_HELD:-}" != 1 ]; then
+  exec python3 ./instance_material.py locked "$0" "$@"
+fi
 state_dir=${TIMEKEEPER_STATE_DIR:-./state}
 backup_dir="$state_dir/backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 mkdir -p "$backup_dir"
@@ -13,6 +17,7 @@ docker compose run --rm --no-deps -T --entrypoint sh maintenance -ec '
   exec pg_dump -h postgres -U timekeeper -d timekeeper --format=custom
 ' > "$backup_dir/database.dump.tmp"
 mv "$backup_dir/database.dump.tmp" "$backup_dir/database.dump"
+python3 ./instance_material.py backup "$backup_dir"
 cp "$state_dir/config/tokens.json" "$backup_dir/tokens.json"
 cp "$state_dir/config/mail.properties" "$backup_dir/mail.properties"
 cp "$state_dir/secrets/timekeeper_smtp_password" "$backup_dir/smtp_password"

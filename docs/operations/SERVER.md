@@ -199,3 +199,7 @@ explicitly marked as candidates.
 Release publication must build this from the accepted tag and publish the server
 archive alongside the tested Eclipse/web deliverables. A CI artifact is a
 candidate, not a published 2.0 release. See the repository's release checkpoint.
+
+## Full-instance recovery
+
+[Full-instance backup and restore](INSTANCE-BACKUP.md) describes encrypted administrator backups, private preparation, explicit confirmation, exclusive startup recovery and interrupted-operation cancellation. Keep the active restore material as part of the deployment after a successful restore.

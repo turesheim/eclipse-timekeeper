@@ -10,7 +10,8 @@ RUN mvn -B -ntp -f server/pom.xml package -DskipTests -Dquarkus.profile=postgres
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 10001 timekeeper && useradd --uid 10001 --gid 10001 --no-create-home timekeeper
+    && groupadd --gid 10001 timekeeper && useradd --uid 10001 --gid 10001 --no-create-home timekeeper \
+    && install -d -m 0700 -o 10001 -g 10001 /instance
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /source/server/app/target/quarkus-app/ /app/
 COPY --chmod=755 server/deploy/server-entrypoint.sh /app/entrypoint.sh

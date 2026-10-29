@@ -1,0 +1,7 @@
+Google Tink Java 1.23.0
+https://github.com/tink-crypto/tink-java/tree/v1.23.0
+Copyright Google LLC and contributors.
+Licensed under the Apache License, Version 2.0; see tink-LICENSE.txt.
+
+The full-instance backup encryption layer uses Tink streaming AEAD.
+This distribution retains dependency license notices supplied in bundled JARs.

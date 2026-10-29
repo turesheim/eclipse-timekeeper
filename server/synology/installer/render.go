@@ -19,7 +19,7 @@ func render(root, target string, s Settings) error {
 	if err := os.MkdirAll(filepath.Join(target, "ui"), 0755); err != nil {
 		return err
 	}
-	launch := map[string]any{".url": map[string]any{"net.resheim.timekeeper": map[string]any{"type": "url", "title": "Timekeeper", "desc": "Timekeeper web client", "allUsers": true, "icon": "images/timekeeper_{0}.png", "url": s.PublicOrigin + "/web/"}}}
+	launch := map[string]any{".url": map[string]any{applicationID(): map[string]any{"type": "url", "title": packageDisplayName(), "desc": packageDisplayName() + " web client", "allUsers": true, "icon": "images/timekeeper_{0}.png", "url": s.PublicOrigin + "/web/"}}}
 	return writeJSON(filepath.Join(target, "ui", "config"), launch, 0644)
 }
 func writeChallenge(root string, w Wizard) error {
@@ -235,6 +235,7 @@ func publishConfiguration(root, target string, s Settings) error {
 	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\nquarkus.http.host-validation.require-localhost=false\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, s.PublicOrigin, s.DeployedAt)
 	// SYNOPKG_PKGDEST can be /volumeN/@appstore/timekeeper, so its parent is
 	// not the package metadata directory. DSM always keeps INFO at this alias.
+	properties += "timekeeper.package-id=" + packageID + "\n"
 	properties += "timekeeper.spk-version=" + spkVersionAt("/var/packages/"+packageID+"/INFO") + "\n"
 	if err := atomic(filepath.Join(private, "config/runtime.properties"), []byte(properties), 0644); err != nil {
 		return err
@@ -263,11 +264,11 @@ func syncMaintenanceMarker(root, target string) error {
 	return atomic(filepath.Join(target, "private", marker), content, 0644)
 }
 func finishMaintenance(root string, s Settings) error {
-	if err := publishConfiguration(root, packageTarget, s); err != nil {
+	if err := publishConfiguration(root, packageTarget(), s); err != nil {
 		return err
 	}
 	if err := os.Remove(filepath.Join(root, "config/maintenance-pending.json")); err != nil {
 		return err
 	}
-	return syncMaintenanceMarker(root, packageTarget)
+	return syncMaintenanceMarker(root, packageTarget())
 }

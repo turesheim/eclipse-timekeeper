@@ -83,7 +83,7 @@ jobs:
       group: containers-pg18-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-java@v6.0.1
@@ -107,6 +107,9 @@ jobs:
       - name: Test PostgreSQL schema and concurrent bootstrap
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/postgres
+          TIMEKEEPER_INSTANCE_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/postgres
+          TIMEKEEPER_INSTANCE_TEST_PG_PASSWORD: isolated-ci-test
+          TIMEKEEPER_TEST_INSTANCE_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_instance
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_passkeys
           TIMEKEEPER_TEST_CALENDAR_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_calendars
@@ -121,13 +124,15 @@ jobs:
             echo "Waiting for isolated PostgreSQL (attempt $attempt)"
             sleep 1
           done
-          docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
+          docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_instance' -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,InstanceRestoreFenceTest,InstanceRestoreDatabaseTest,InstanceRestoreIntentTest,InstanceRestoreMaterialTest,InstanceRestoreRecoveryTest,InstanceOperationsTest,InstanceAdministratorTest,InstanceBackupArchiveTest,InstanceConfigurationTest,InstanceDatabaseImageTest,InstanceBackupEncryptionTest,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f timekeeper-pg-test
       - name: Verify HTTP contracts, rolling updates, backups and durable restart
         run: |
           python -m pip install -r common/api/tests/requirements.txt
           python server/scripts/compose_acceptance.py
+      - name: Verify full instance migration and Compose material disaster recovery
+        run: python server/scripts/compose_instance_restore_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA"
       - name: Verify email recovery across actual replicas and hostname cutover
         run: python server/scripts/email_replica_acceptance.py --server-image timekeeper-server:test
       - name: Verify signed passkeys across replicas, revocation and origin migration
@@ -146,6 +151,7 @@ jobs:
           path: |
             server/**/target/surefire-reports/
             server/target/compose-acceptance/
+            server/target/acceptance/instance-compose.json
             server/target/toggl-replica-acceptance.json
             server/target/toggl-replica-acceptance.failure.log
             server/target/passkey-replica-acceptance.json
@@ -158,7 +164,7 @@ jobs:
       group: containers-pg17-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-java@v6.0.1
@@ -194,11 +200,17 @@ jobs:
           python server/synology/tests/migration_acceptance.py --source-schema 3
           python server/synology/tests/migration_acceptance.py --source-schema 4
           python server/synology/tests/migration_acceptance.py --source-schema 5
+          python server/synology/tests/migration_acceptance.py --source-schema 6
+          python server/synology/tests/migration_acceptance.py --source-schema 7
+          python server/synology/tests/migration_acceptance.py --source-schema 8
           python server/synology/tests/migration_acceptance.py
           python server/synology/tests/migration_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA"
       - name: Verify PostgreSQL 17 schema and concurrent bootstrap
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres
+          TIMEKEEPER_INSTANCE_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres
+          TIMEKEEPER_INSTANCE_TEST_PG_PASSWORD: isolated-ci-test
+          TIMEKEEPER_TEST_INSTANCE_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_instance
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_passkeys
           TIMEKEEPER_TEST_CALENDAR_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_calendars
@@ -213,8 +225,8 @@ jobs:
             echo "Waiting for isolated PostgreSQL 17 (attempt $attempt)"
             sleep 1
           done
-          docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
+          docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_instance' -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,InstanceRestoreFenceTest,InstanceRestoreDatabaseTest,InstanceRestoreIntentTest,InstanceRestoreMaterialTest,InstanceRestoreRecoveryTest,InstanceOperationsTest,InstanceAdministratorTest,InstanceBackupArchiveTest,InstanceConfigurationTest,InstanceDatabaseImageTest,InstanceBackupEncryptionTest,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f -v timekeeper-pg17-test
       - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
         run: |
@@ -228,6 +240,10 @@ jobs:
         run: python server/scripts/archive_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --expected-commit "$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/archive-pg17-acceptance.json
       - name: Build and validate the self-contained preview package
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
+      - name: Build the independent Dagsverk migration destination
+        run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --package-id dagsverk --output server/target/synology-migration
+      - name: Verify full-instance migration between independent native packages
+        run: python server/synology/tests/instance_migration_acceptance.py --timekeeper-package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --dagsverk-package "server/target/synology-migration/dagsverk-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --expected-commit "$GITHUB_SHA" --output server/target/synology-acceptance/instance-packages.json
       - name: Generate preview discovery metadata for NAS acceptance
         run: |
           python server/scripts/synology_catalog.py --package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --base-url "https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/"
@@ -242,6 +258,9 @@ jobs:
             server/target/synology/*.spk.sha256
             server/target/synology/*.json
             server/target/synology/*.png
+            server/target/synology-migration/*.spk
+            server/target/synology-migration/*.spk.sha256
+            server/target/synology-migration/*.json
       - name: Upload Synology test results
         uses: actions/upload-artifact@v7.0.1
         if: always()

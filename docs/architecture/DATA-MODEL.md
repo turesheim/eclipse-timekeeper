@@ -630,3 +630,15 @@ kept as inert, provenance-tagged `ARCHIVE_AUDIT` copies. New local restore event
 record the actual importer, independently of any source claims. Full database
 backups retain local history unchanged. Schema 8 gates older binaries to prevent
 writes that bypass prospective recording; the physical table shape is unchanged.
+
+### Installation operation state (schema 9)
+
+`tk_instance` is separate from owner-scoped resources. Its `CONTROL` row
+serializes instance operations; `OPERATION` rows hold type, state and worker
+leases; `AUDIT` rows retain safe lifecycle events. Every row has an ID, version,
+UTC timestamp and JSON payload. Operation/audit rows also retain their operation
+ID and actor owner ID. Actor references have no owner foreign key so replacing a
+bootstrap account during an instance restore can preserve its audit evidence.
+These records are included in full-instance images and excluded from personal
+portability. See [full-instance backup architecture](INSTANCE-BACKUP.md) for
+implementation status and the remaining restore integration.

@@ -97,6 +97,14 @@ def main():
     try:
         compose('up', '-d', '--wait', '--wait-timeout', '180')
         wait_ready()
+        # The image initializes the shared volume as the unprivileged app UID,
+        # with private permissions. A second replica sees the same durable data.
+        for member in ('api-1', 'api-2'):
+            client.assertEqual('700:10001:10001', compose('exec', '-T', member, 'stat', '-c', '%a:%u:%g', '/instance').strip())
+            client.assertEqual('10001', compose('exec', '-T', member, 'id', '-u').strip())
+        compose('exec', '-T', 'api-1', 'sh', '-ec', 'umask 077; mkdir -p /instance/acceptance; cat > /instance/acceptance/shared', input='Disposable shared storage receipt\n')
+        client.assertEqual('Disposable shared storage receipt\n', compose('exec', '-T', 'api-2', 'cat', '/instance/acceptance/shared'))
+        receipt['privateSharedInstanceStorage'] = True
         def server_information(member):
             return json.loads(compose('exec', '-T', member, 'curl', '-fsS', '-H', '@-',
                                      'http://localhost:8080/api/v1/server',
@@ -363,13 +371,16 @@ def main():
         wait_ready()
         actual, _ = client.call('GET', '/data/export')
         client.assertEqual(expected, actual)
+        client.assertEqual('Disposable shared storage receipt\n', compose('exec', '-T', 'api-1', 'cat', '/instance/acceptance/shared'))
+        compose('exec', '-T', 'api-1', 'rm', '-rf', '/instance/acceptance')
+        receipt['instanceStorageSurvivesContainerReplacement'] = True
         receipt['durableRestart'] = True
         (output / 'acceptance.json').write_text(json.dumps(receipt, indent=2) + '\n')
         print(json.dumps(receipt, indent=2))
     finally:
         try: (output / 'compose.log').write_text(compose('logs', '--no-color'))
         finally:
-            compose('down')
+            compose('down', '--volumes')
             if registry_started:
                 subprocess.run(['docker', 'rm', '-f', registry_container], check=True, capture_output=True)
             # Container data may be owned by root/postgres. Cleanup through Docker below.

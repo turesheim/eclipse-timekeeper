@@ -22,8 +22,12 @@ x-api: &api
     TIMEKEEPER_SERVER_DB_USER: timekeeper
     TIMEKEEPER_SERVER_DB_PASSWORD_FILE: /run/secrets/timekeeper_database_password
     TIMEKEEPER_SERVER_TOKENS_FILE: /config/tokens.json
+    TIMEKEEPER_INSTANCE_BACKUP_STORAGE: /instance/backups
+    TIMEKEEPER_INSTANCE_RESTORE_STORAGE: /instance/restore
+    TIMEKEEPER_MAINTENANCE_FILE: /instance/maintenance.pending
     TIMEKEEPER_ALLOW_SCHEMA_UPGRADE: ${TIMEKEEPER_ALLOW_SCHEMA_UPGRADE:-false}
     TIMEKEEPER_SERVER_SETUP_FILE: ${TIMEKEEPER_SERVER_SETUP_FILE:-NONE}
+    TIMEKEEPER_PACKAGE_ID: ${TIMEKEEPER_PACKAGE_ID:-timekeeper}
     TIMEKEEPER_PUBLIC_ORIGIN: ${TIMEKEEPER_PUBLIC_ORIGIN:-NONE}
     TIMEKEEPER_SETTINGS_RECOVERY: ${TIMEKEEPER_SETTINGS_RECOVERY:-false}
     TIMEKEEPER_AUTH_ORIGIN_EPOCH: ${TIMEKEEPER_AUTH_ORIGIN_EPOCH:-1}
@@ -40,6 +44,7 @@ x-api: &api
   secrets: [timekeeper_database_password, timekeeper_smtp_password]
   volumes:
     - ${TIMEKEEPER_STATE_DIR:-./state}/config:/config:ro
+    - instance-state:/instance
   depends_on:
     postgres: {condition: service_healthy}
 
@@ -87,7 +92,11 @@ services:
     profiles: [tools]
     networks: [database]
     secrets: [timekeeper_database_password]
+    volumes: [instance-state:/instance]
     logging: *logging
+
+volumes:
+  instance-state: {}
 
 networks:
   application: {}

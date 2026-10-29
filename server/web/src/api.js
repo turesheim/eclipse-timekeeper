@@ -3,6 +3,21 @@ import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
+  INSTANCE_RESTORE_MATERIAL_REQUIRED: 'backups.error_material_required',
+  INSTANCE_RESTORE_PENDING: 'backups.error_restore_pending',
+  INSTANCE_RESTART_REQUIRED: 'backups.error_restart_required',
+  INSTANCE_MAINTENANCE_ACTIVE: 'backups.error_maintenance',
+  INSTANCE_FENCE_UNAVAILABLE: 'backups.error_fence',
+  INSTANCE_UPLOAD_FILE_MISMATCH: 'backups.error_file_mismatch',
+  INSTANCE_UPLOAD_PROGRESS_INVALID: 'backups.error_progress',
+  INSTANCE_OPERATION_IN_PROGRESS: 'backups.error_in_progress',
+  INSTANCE_OPERATION_BUSY: 'backups.error_in_progress',
+  INSTANCE_ARCHIVE_TOO_LARGE: 'backups.error_size',
+  INSTANCE_STORAGE_REQUIRED: 'backups.storage_required',
+  INSTANCE_UPLOAD_CONFLICT: 'backups.error_conflict',
+  INSTANCE_OPERATION_STATE: 'backups.error_state',
+  INSTANCE_OPERATION_LEASE_LOST: 'backups.error_state',
+  INSTANCE_DOWNLOAD_REQUIRED: 'backups.error_download',
   JOURNAL_HTTPS_REQUIRED: "journal.webdav.error.https_required",
   RATE_LIMITED: "api.error.rate_limited",
   CALENDAR_FUTURE_ACTIVITY: "calendar.error.CALENDAR_FUTURE_ACTIVITY",
@@ -76,8 +91,9 @@ export class Api {
   constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) {this.#token = token?.trim() ?? null;this.#csrf = context.csrf;this.#owner = context.ownerId ?? null;this.fetcher = fetcher;}
   get owner() {return this.#owner;}
   close() {this.#closed = true;this.#token = '';this.#csrf = null;for (const request of this.#requests) request.abort();}
-  async request(path, { method = 'GET', body, etag, noneMatch, key, timeout = 15000, binary = false, emptyResponse = false, undo = false, signal } = {}) {
+  async request(path, { method = 'GET', body, rawBody, etag, noneMatch, key, timeout = 15000, binary = false, emptyResponse = false, undo = false, signal } = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
+    if (rawBody !== undefined && (body !== undefined || !(rawBody instanceof Uint8Array || rawBody instanceof Blob))) throw new TypeError('Use one JSON or binary request body');
     if (this.#token && (this.#token.length > 4096 || !/^[A-Za-z0-9._~+/-]+=*$/.test(this.#token))) throw new ApiError('INVALID_TOKEN', 401);
     const controller = new AbortController();this.#requests.add(controller);
     const abort=()=>controller.abort();
@@ -90,11 +106,12 @@ export class Api {
       if (this.#csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = this.#csrf;
       if (this.#owner !== null) headers['X-Timekeeper-Owner'] = ownerHeader(this.#owner);
       if (body !== undefined) headers['Content-Type'] = 'application/json';
+      if (rawBody !== undefined) headers['Content-Type'] = 'application/octet-stream';
       if (etag) headers["If-Match"] = etag;
       if (noneMatch) headers["If-None-Match"] = noneMatch;
       if (key) headers["Idempotency-Key"] = key;
       if (undo) headers["X-Timekeeper-Undo"] = 'true';
-      const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
+      const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
       if (binary && response.ok && (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase()!==binaryType) throw new ApiError('UNAVAILABLE');
       const data = response.status === 204 || emptyResponse && response.ok ? null : binary && response.ok ? await response.blob() : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);

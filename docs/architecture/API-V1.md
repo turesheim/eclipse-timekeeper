@@ -792,12 +792,12 @@ label version, while the response `version` still describes the note. Legacy
 the independent routes. Range summaries contain labels and `hasBody`, never
 body content; label-only days remain visible after a note is deleted.
 
-Schema 8 is the current compatibility fence; it includes label separation introduced in schema 7 and prospective diagnostics, without adding a physical SQL table.
+Schema 9 is the current compatibility fence. It includes the schema-7 label separation and schema-8 prospective diagnostics, and adds the installation-wide operation/audit table described in [instance backup architecture](INSTANCE-BACKUP.md).
 After an authorized offline upgrade, the server copies old label projections
 into `DAY_LABEL` records in owner-scoped transactions before serving requests.
 Old note versions, deletion markers and existing Markdown bytes are preserved;
 virtual legacy documents are materialized without changing their note version.
-Older server binaries must remain stopped and cannot reopen schema 8.
+Older server binaries must remain stopped and cannot reopen schema 9.
 
 New Markdown documents contain no managed day label. An existing
 `timekeeper-label` property is now inert legacy metadata: byte-exact reads and
@@ -866,3 +866,117 @@ recorded mutations. Source diagnostics in account archives remain inert audit
 copies on import; actual local restoration emits new `ARCHIVE_RESTORE` events.
 See [API diagnostics](../operations/API-DIAGNOSTICS.md) for a read-only workflow,
 privacy boundaries, portability and the coordinated schema-8 upgrade.
+
+### Administrator instance backup operations (in progress)
+
+An instance operation can report terminal `RESTORED` after the offline coordinator
+has committed its database and material phases. It retains its audit receipt and
+is not an upload that can be resumed or downloaded. The public confirmation and
+automatic restart workflow are still under implementation; current archive review
+continues to return `restoreReady: false`. Completed-generation startup requires
+the verified recovered material, or fails with `INSTANCE_RESTORE_MATERIAL_REQUIRED`.
+
+Issue [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473) is still
+being implemented. The current draft adds these routes under the separate
+`/api/v1/admin/instance` namespace:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/` | Read configured archive limits and up to 50 recent operation receipts for page-reload recovery; `canAccessUpload` is true only in the initiating session. No archive storage is opened. |
+| POST | `/backups` | Verify `currentPassword`, consume an encryption `passphrase`, and return `202` with a durable operation receipt and its `Location`. |
+| GET | `/operations/{id}` | Return the operation's ID, type, state, version and UTC update time. |
+| POST | `/operations/{id}/download-grant` | Verify `currentPassword` and issue one private, session-bound download cookie lasting two minutes. |
+| GET | `/operations/{id}/content` | Consume that cookie and stream the encrypted archive as a native attachment. |
+| POST | `/operations/{id}/discard` | Verify `currentPassword`, expire a completed artifact, pending upload, failed job or review, and remove its private files. |
+| POST | `/uploads` | Verify `currentPassword`, declare ciphertext `bytes` and `sha256`, and reserve a session-bound upload. |
+| GET | `/uploads/{id}` | Read transfer progress, validation result and a safe archive review. |
+| PUT | `/uploads/{id}/content?offset=…` | Append at most 1 MiB of binary ciphertext, or retry an acknowledged range with identical bytes. |
+| POST | `/uploads/{id}/target` | Re-verify `currentPassword` and inspect the target database for existing accounts, business data, tokens and history. Requires archive REVIEW and the initiating session; returns advisory `databaseEligible`, blockers and `restoreReady: false`. Activation must recheck under an exclusive fence. |
+| POST | `/uploads/{id}/validate` | Re-verify `currentPassword`, consume `passphrase`, and return `202` before full-file verification. |
+
+The Administration **Backup & Restore** page uses these routes. It polls recent
+operation metadata so a reload or lost start response does not require replaying
+a creation request. Upload files are hashed in a worker with locally bundled
+SHA-256, reading at most 1 MiB at a time. The encryption passphrase is requested
+separately for archive verification; it is never sent to the hashing worker.
+Resuming requires selecting the original file again. Its size and checksum must
+match the server receipt before another chunk is sent. A lost acknowledgement
+stops the transfer; a new resume reads the durable offset before continuing.
+Downloads use a native attachment navigation after a password-authorized cookie
+grant, without retaining a complete archive Blob in browser memory. The browser's
+download manager is the authority for transfer completion. Archive review is not
+a restore activation; the page lists the remaining target and offline checks.
+
+Only current administrator browser-account sessions with write permission are
+authorized. Managed or legacy API tokens, token-exchanged browser sessions,
+regular users and read-only sessions cannot use these routes. Browser mutations
+require the normal same-origin and CSRF checks. Credential input schemas reject
+unknown fields; operation replies contain no contents, credentials, worker
+capabilities or filesystem paths. Replies use `Cache-Control: no-store`.
+
+Uploaded-archive validation also checks source authentication in a disposable
+database. Unsupported password hashes, malformed passkey public keys or credential
+indexes, invalid token records, invalid saved/effective service settings and an
+inconsistent effective recovery origin/epoch cannot reach `REVIEW`, even when
+archive encryption and file checksums are correct. Older-hostname passkeys remain
+preserved for explicit deployment review. These source checks do not complete the
+destination authentication, mapping or offline activation steps.
+`INVALID_INSTANCE_AUTHENTICATION` distinguishes unsupported stored credentials or
+service settings from a wrong passphrase or damaged archive
+(`INVALID_INSTANCE_BACKUP`). Both retain encrypted upload bytes and remove private
+plaintext working files; neither publishes a review.
+
+The start call returns before snapshot completion. Its bounded background
+worker renews a ten-minute lease; concurrent starts are rejected. `READY` means
+the complete encrypted file is durably staged and the original administrator
+session has been checked again. Wrong or missing current credentials cannot
+create files. Revocation prevents publication. Failures retain a safe operation
+receipt and audit; a later authorized start removes abandoned working files.
+
+Encryption passphrases are not stored in operation or command receipts. These
+POST actions do not support automatic replay using `Idempotency-Key`; use the
+returned status URL instead of automatically resubmitting creation. A repeated
+discard can finish filesystem cleanup after its database receipt was committed.
+Native downloads require both the account session and the separate
+`__Host-timekeeper-instance-download` cookie. The grant is bound to the exact
+operation and session, stored only as a digest, expires after two minutes and is
+consumed atomically before streaming. It is sent with `Secure`, `HttpOnly`,
+`SameSite=Strict` and `Path=/`. The grant POST returns only `id`, `downloadUrl` and
+`expiresAt`; its secret never appears in JSON, a query or a URL. Navigate the
+browser to that returned URL to download the attachment without buffering the
+archive in a JavaScript Blob. A replay, wrong job/session, expired grant or logged
+out session is rejected. A replacement grant invalidates the earlier one.
+Interrupted transfers require a new password-verified grant.
+
+The audit records `DOWNLOAD_AUTHORIZED` and `DOWNLOAD_STARTED` without cookies,
+digests, passwords or paths. The started event records consumption of authority,
+not a claim that a browser saved the file. Upload and archive-only review are implemented. Restore activation and the
+Administration UI remain unfinished parts of #473.
+
+Uploads are bound to their initiating administrator account session. The status
+reply includes the original ciphertext checksum for safe resume. Chunk writes use
+an explicit offset and immutable byte comparison rather than a resource ETag;
+a changed retry returns `409 INSTANCE_UPLOAD_CONFLICT`. Gaps and malformed ranges
+are rejected. Accepted chunks renew the ten-minute inactivity lease. Reloading
+the page can resume through the status URL while that session and lease remain
+valid. A new sign-in cannot take over the old upload. A freshly verified
+administrator can discard a pending upload; the audit records the actual actor.
+
+`complete` means all declared ciphertext bytes have arrived. It does not claim
+checksum verification, decryption, or restore readiness. Once all bytes arrive,
+validation accepts fresh password proof and the backup passphrase. The background
+worker verifies the full ciphertext checksum, authenticated encryption, manifest,
+format and relational image before publishing a review. Plaintext stays in the
+private job working area and is removed before `REVIEW`. Wrong passphrases,
+invalid archives and expansion-budget rejection return to `UPLOADING` with
+`validationCode: INVALID_INSTANCE_BACKUP`; the same encrypted upload can be
+validated again without retransmission. The passphrase is never retained.
+
+Reviews expose only source deployment/build metadata, archive identity, time,
+schema and per-table counts. `archiveVerified: true` describes those archive
+checks. `restoreReady: false` remains explicit until target readiness,
+authentication/configuration semantics, deployment mapping and offline activation
+are implemented and checked. No restore endpoint currently applies this image to
+the active database. The expanded-data budget defaults to 16 GiB and can be set
+with `timekeeper.instance-backup.maximum-expanded-bytes`; raising it requires
+corresponding private staging capacity.

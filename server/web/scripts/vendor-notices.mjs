@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 const root=new URL('../',import.meta.url),check=process.argv.includes('--check');
 const manifest=JSON.parse(await readFile(new URL('package.json',root)));
 const components=[
+  {id:'@noble/hashes',name:'noble-hashes',homepage:'https://github.com/paulmillr/noble-hashes',license:'MIT',directory:'noble-hashes'},
   {id:'@milkdown/kit',name:'Milkdown',homepage:'https://milkdown.dev/',license:'MIT',directory:'milkdown',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
   {id:'mermaid',name:'Mermaid',homepage:'https://mermaid.js.org/',license:'MIT',directory:'mermaid',notices:'/web/assets/mermaid/THIRD-PARTY-LICENSES.txt'},
   {id:'bootstrap',name:'Bootstrap',homepage:'https://getbootstrap.com/',license:'MIT',directory:'bootstrap'},

@@ -13,11 +13,12 @@ import org.h2.tools.RunScript;
 public final class ServerSchema {
     private ServerSchema() { }
     private static final Set<String> LEGACY_TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
-    public static final int CURRENT=8;
+    public static final int CURRENT=9;
     private static final Set<String> AUTH_TABLES;
     private static final Set<String> RECOVERY_TABLES;
     private static final Set<String> PASSKEY_TABLES;
     private static final Set<String> SETTINGS_TABLES;
+    private static final Set<String> LOCALE_TABLES;
     private static final Set<String> TABLES;
     static {
         var tables=new HashSet<>(LEGACY_TABLES);
@@ -30,13 +31,15 @@ public final class ServerSchema {
         tables.add("TK_SERVICE_SETTINGS");
         SETTINGS_TABLES=Set.copyOf(tables);
         tables.add("TK_LOCALE");
+        LOCALE_TABLES=Set.copyOf(tables);
+        tables.add("TK_INSTANCE");
         TABLES=Set.copyOf(tables);
     }
     private static class Reference {
         static final List<String> SHAPE=referenceShape();
         private static List<String> referenceShape() {
             try(var connection=DriverManager.getConnection("jdbc:h2:mem:schema_reference_"+UUID.randomUUID())) {
-                create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);applySettings(connection);applyLocale(connection);return shape(connection,TABLES);
+                create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);applySettings(connection);applyLocale(connection);applyInstance(connection);return shape(connection,TABLES);
             } catch(Exception e) {throw new ExceptionInInitializerError(e);}
         }
     }
@@ -76,9 +79,15 @@ public final class ServerSchema {
             RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
         }
     }
+    static void applyInstance(Connection connection) throws Exception {
+        try(var input=ServerSchema.class.getResourceAsStream("/db/instance-v9.sql")) {
+            if(input==null)throw new SQLException("Missing instance-operation schema resource");
+            RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
+        }
+    }
     private static List<String> priorShape(int version,Set<String> tables) throws Exception {
         try(var connection=DriverManager.getConnection("jdbc:h2:mem:prior_reference_"+UUID.randomUUID())) {
-            create(connection);if(version>=2) applyAuth(connection);if(version>=3) applyRecovery(connection);if(version>=4) applyPasskeys(connection);if(version>=5) applySettings(connection);return shape(connection,tables);
+            create(connection);if(version>=2) applyAuth(connection);if(version>=3) applyRecovery(connection);if(version>=4) applyPasskeys(connection);if(version>=5) applySettings(connection);if(version>=6) applyLocale(connection);return shape(connection,tables);
         }
     }
     public static void initializeOrValidate(Connection connection) throws Exception {initializeOrValidate(connection,false);}
@@ -89,27 +98,32 @@ public final class ServerSchema {
         }
         var existing=tables(connection);
         if(existing.isEmpty()) {
-            create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);applySettings(connection);applyLocale(connection);validateShape(connection);
+            create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);applySettings(connection);applyLocale(connection);applyInstance(connection);validateShape(connection);
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         } else if(!existing.equals(TABLES)) {
-            int version=existing.equals(LEGACY_TABLES) ? 1 : existing.equals(AUTH_TABLES) ? 2 : existing.equals(RECOVERY_TABLES) ? 3 : existing.equals(PASSKEY_TABLES) ? 4 : existing.equals(SETTINGS_TABLES) ? 5 : 0;
+            int version=existing.equals(LEGACY_TABLES) ? 1 : existing.equals(AUTH_TABLES) ? 2 : existing.equals(RECOVERY_TABLES) ? 3 : existing.equals(PASSKEY_TABLES) ? 4 : existing.equals(SETTINGS_TABLES) ? 5 : existing.equals(LOCALE_TABLES) ? 6 : 0;
             if(version==0) throw new SQLException("Unsupported or incomplete server schema");
             if(!allowUpgrade) throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
             if(!shape(connection,existing).equals(priorShape(version,existing))) throw new SQLException("Unsupported prior server schema");
             try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
-                if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=version || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete prior schema");
+                if(!rows.next() || rows.getInt(1)!=1 || (version==6 ? rows.getInt(2)<6||rows.getInt(2)>8 : rows.getInt(2)!=version) || !("READY".equals(rows.getString(3))||version==6&&"MIGRATING".equals(rows.getString(3))) || rows.next()) throw new SQLException("Unsupported or incomplete prior schema");
             }
             // H2 commits DDL. An interruption remains explicitly MIGRATING.
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET state='MIGRATING' WHERE id=1");}
-            if(version<2) applyAuth(connection);if(version<3) applyRecovery(connection);if(version<4) applyPasskeys(connection);if(version<5) applySettings(connection);applyLocale(connection);validateShape(connection);
+            if(version<2) applyAuth(connection);if(version<3) applyRecovery(connection);if(version<4) applyPasskeys(connection);if(version<5) applySettings(connection);if(version<6) applyLocale(connection);applyInstance(connection);validateShape(connection);
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         }
-        // Fence older label/history models; the physical table shape is unchanged.
         validateShape(connection);
-        try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema WHERE id=1")){
-            if(rows.next()&&rows.getInt(1)>=6&&rows.getInt(1)<CURRENT&&"READY".equals(rows.getString(2))){
-                if(!allowUpgrade)throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
-                try(var update=connection.createStatement()){update.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+" WHERE id=1 AND schema_version="+rows.getInt(1)+" AND state='READY'");}
+        try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema WHERE id=1")) {
+            if(rows.next()&&rows.getInt(1)<CURRENT&&"MIGRATING".equals(rows.getString(2))) {
+                if(!allowUpgrade)throw new SQLException("Schema upgrade requires explicit operator authorization");
+                // CREATE TABLE commits in H2. A crash after DDL but before its
+                // seed INSERT can resume only from the exact new table shape.
+                if(rows.getInt(1)<1||rows.getInt(1)>8)throw new SQLException("Unsupported interrupted schema upgrade");
+                try(var update=connection.createStatement()) {
+                    update.executeUpdate("INSERT INTO tk_instance SELECT '00000000-0000-0000-0000-000000000000','CONTROL',1,NULL,NULL,'1970-01-01T00:00:00Z','{}' WHERE NOT EXISTS(SELECT 1 FROM tk_instance WHERE kind='CONTROL')");
+                    update.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");
+                }
             }
         }
         validate(connection);
@@ -138,8 +152,14 @@ public final class ServerSchema {
             return;
         }
         validateShape(connection);
+        validateInstanceControl(connection);
         try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
             if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=CURRENT || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete server schema version");
+        }
+    }
+    static void validateInstanceControl(Connection connection) throws SQLException {
+        try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,version FROM tk_instance WHERE kind='CONTROL'")) {
+            if(!rows.next()||!rows.getString(1).equals("00000000-0000-0000-0000-000000000000")||rows.getLong(2)<1||rows.next())throw new SQLException("Missing instance-operation control");
         }
     }
     private static void validateShape(Connection connection) throws SQLException {

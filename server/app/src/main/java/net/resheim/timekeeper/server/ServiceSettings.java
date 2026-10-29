@@ -75,6 +75,10 @@ class ServiceSettings {
             return new Stored(rows.getLong(1),rows.getLong(2),saved,effective,savedPassword,effectivePassword);
         }catch(SQLException failure) {throw databaseFailure(failure);}
     }
+    /** Reuse startup's complete settings validation in a private restore preflight. */
+    static Stored forRestore(Connection connection) {
+        var value=read(connection,false);if(value==null)throw new ApiFailure(503,"UNAVAILABLE");return value;
+    }
     private static long nextEpoch(Connection c,long previous) {
         try(var statement=query(c,"SELECT epoch FROM tk_recovery_control WHERE id=1 FOR UPDATE");var rows=statement.executeQuery()) {
             if(!rows.next()) throw new SQLException("Missing authentication origin control");

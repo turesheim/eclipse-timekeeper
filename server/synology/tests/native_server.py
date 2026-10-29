@@ -4,6 +4,7 @@ A shared Linux network namespace stands in for DSM host networking. It does not
 emulate Package Center or the Container Manager resource worker.
 """
 import json
+from http.cookies import SimpleCookie
 import re
 from pathlib import Path
 import shutil
@@ -26,8 +27,16 @@ def verify(command,database_container,folder,image):
     # Only adapt the fixture's image, host namespace and bind sources. The static
     # service environment, health check and all container restrictions stay intact.
     service['image']=image;service['network_mode']='container:'+database_container;service['container_name']=name
+    state_volume=database_container+'-instance-state'
+    identity=service.get('user','10001:10001')
+    if not re.fullmatch(r'[1-9][0-9]*:[1-9][0-9]*',identity):raise AssertionError('Native container needs an explicit non-root package identity')
+    command('docker','volume','create',state_volume)
+    command('docker','run','--rm','--network','none','--user','0:0','--entrypoint','sh','-v',state_volume+':/state',image,'-ec','mkdir -p /state/server; chown -R '+identity+' /state; chmod 700 /state/server')
     for volume in service['volumes']:
-        volume['source']=str(config if volume['target']=='/config' else secrets)
+        if volume['target']=='/state':
+            volume['type']='volume';volume['source']=state_volume
+        else:volume['source']=str(config if volume['target']=='/config' else secrets)
+    definition['volumes']={state_volume:{'external':True}}
     project.write_text(json.dumps(definition))
     compose=['docker','compose','-p',database_container+'-app','-f',str(project)]
     def create():command(*compose,'create','--no-build')
@@ -74,14 +83,40 @@ def verify(command,database_container,folder,image):
             status=command('docker','exec',name,'curl','-fsS','-D','-','-o','/dev/null','-H','Origin: '+origin,endpoint+'/api/v1/auth/status')
             binding=re.search(r'(?im)^set-cookie:\s*(__Host-timekeeper-browser=[^;\r\n]+)',status.stdout)
             if not binding:raise AssertionError('Configured native server did not establish the browser binding')
-            response=command('docker','exec','-i',name,'curl','-fsS','-H','Content-Type: application/json','-H','Origin: '+origin,'-H','Cookie: '+binding.group(1),
+            response=command('docker','exec','-i',name,'curl','-fsS','-D','-','-H','Content-Type: application/json','-H','Origin: '+origin,'-H','Cookie: '+binding.group(1),
                 '--data-binary','@-',endpoint+'/api/v1/auth/login',
                 input=json.dumps({'username':username,'password':'migration password fixture','remember':False}))
-            if json.loads(response.stdout)['ownerId']!=owner:raise AssertionError('Migrated login changed data ownership')
+            headers,separator,body=response.stdout.partition('\n\n')
+            if not separator:raise AssertionError('Missing native login response headers')
+            account=json.loads(body)
+            if account['ownerId']!=owner:raise AssertionError('Migrated login changed data ownership')
+            if username=='account0':
+                jar=SimpleCookie();jar.load(binding.group(1))
+                for line in headers.splitlines():
+                    if line.lower().startswith('set-cookie:'):jar.load(line.split(':',1)[1].strip())
+                cookie='; '.join(key+'='+value.value for key,value in jar.items())
+                owner_binding=re.search(r'(?im)^x-timekeeper-owner:\s*([^\r\n]+)',headers)
+                if not owner_binding:raise AssertionError('Missing native owner binding')
+                def api(method,path,data=None):
+                    arguments=['docker','exec','-i',name,'curl','-fsS','-X',method,'-H','Origin: '+origin,'-H','Cookie: '+cookie,
+                               '-H','X-CSRF-Token: '+account['csrf'],'-H','X-Timekeeper-Owner: '+owner_binding.group(1).strip()]
+                    if data is not None:arguments+=['-H','Content-Type: application/json','--data-binary','@-']
+                    return json.loads(command(*arguments,endpoint+'/api/v1'+path,input=json.dumps(data) if data is not None else None).stdout)
+                summary=api('GET','/admin/instance')
+                if not summary['storageConfigured'] or not summary['restoreStorageConfigured']:raise AssertionError('Native persistent instance roots are not configured')
+                operation=api('POST','/admin/instance/backups',{'currentPassword':'migration password fixture','passphrase':'Separate native integration backup phrase'})
+                for _ in range(120):
+                    operation=api('GET','/admin/instance/operations/'+operation['id'])
+                    if operation['state']!='PREPARING':break
+                    time.sleep(.25)
+                if operation['state']!='READY':raise AssertionError('Native encrypted backup did not become ready: '+operation['state'])
+                actual=command('docker','exec',name,'stat','-c','%a:%u','/state/server/instance-backup').stdout.strip()
+                if actual!='700:'+identity.split(':')[0]:raise AssertionError('Native backup storage has the wrong owner or mode')
         status=json.loads(command('docker','exec',name,'curl','-fsS',endpoint+'/api/v1/auth/status').stdout)
         if status['setupRequired']:raise AssertionError('Restored server reopened administrator setup')
-        return {'projectCreatedBeforeRuntimeConfiguration':True,'renderedNativeServerReady':True,'selectedRuntimePortHealthcheck':True,
+        return {'projectCreatedBeforeRuntimeConfiguration':True,'renderedNativeServerReady':True,'packageAccountContainerIdentity':identity,'nativeEncryptedBackupReady':True,'selectedRuntimePortHealthcheck':True,
                 'migratedPasswordsAuthenticateAsOriginalOwners':True,'actualContainerRefusesPendingMaintenance':True,
                 'publicReverseProxyHostServesWebClient':True,'unconfiguredHostsRejected':True}
     finally:
         command(*compose,'down',check=False)
+        command('docker','volume','rm',state_volume,check=False)

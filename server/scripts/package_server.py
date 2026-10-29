@@ -26,6 +26,26 @@ def verify_build_identity(app, commit):
         raise ValueError('Packaged server build identity must match the exact clean source commit; rebuild before packaging')
 
 
+def verify_preboot(app):
+    """Every distribution must retain the recovery hook produced by Maven."""
+    entry = 'net/resheim/timekeeper/server/InstancePreboot.class'
+    try:
+        with zipfile.ZipFile(app / 'quarkus-run.jar') as runner:
+            manifest = runner.read('META-INF/MANIFEST.MF').decode().replace('\r\n ', '')
+            if 'Main-Class: net.resheim.timekeeper.server.InstancePreboot' not in manifest.splitlines():
+                raise ValueError('Packaged server must run restore recovery before framework startup')
+            bootstrap = runner.read(entry)
+        copies = []
+        for jar in (app / 'app').glob('*.jar'):
+            with zipfile.ZipFile(jar) as archive:
+                if entry in archive.namelist():
+                    copies.append(archive.read(entry))
+        if copies != [bootstrap]:
+            raise ValueError('Packaged startup recovery class differs from application build')
+    except (OSError, KeyError, zipfile.BadZipFile) as failure:
+        raise ValueError('Packaged startup recovery is missing or invalid') from failure
+
+
 def package(output, tag, commit):
     if tag is not None and not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?', tag):
         raise ValueError('Expected a semantic release/candidate tag')
@@ -43,10 +63,11 @@ def package(output, tag, commit):
         if not path.exists():
             raise ValueError('Build the complete Quarkus JVM distribution before packaging')
     verify_build_identity(app, commit)
+    verify_preboot(app)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
-                'quarkus': '3.40.1', 'h2': '2.4.240', 'apiMajor': 1, 'serverSchema': 8}
+                'quarkus': '3.40.1', 'h2': '2.4.240', 'apiMajor': 1, 'serverSchema': 9}
     files = [(p, 'timekeeper-server/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
     guides = {'docs/operations/SERVER.md': 'README.md',
               'docs/architecture/API-V1.md': 'API-POLICY.md',
@@ -55,6 +76,7 @@ def package(output, tag, commit):
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
+              'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/operations/JOURNAL-WEBDAV.md': 'JOURNAL-WEBDAV.md',

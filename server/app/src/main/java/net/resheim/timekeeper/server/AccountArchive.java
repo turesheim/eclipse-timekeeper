@@ -26,6 +26,7 @@ class AccountArchive {
     static final Map<String,String> WORK=DomainTransfer.TYPES;
     private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK","DAY_NOTE_HISTORY");
     @Inject AgroalDataSource datasource;
+    @Inject InstanceRestoreFence restoreFence;
     @Inject AccountStore accounts;
     @Inject TokenRegistry tokens;
 
@@ -61,7 +62,7 @@ class AccountArchive {
         Path folder=null,file=null;
         try {
             folder=privateDirectory();file=folder.resolve("timekeeper-account.zip");
-            try(var connection=datasource.getConnection()) {
+            try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
                 // Account/profile changes do not all acquire the business-owner lock.
                 // MVCC gives every file the same snapshot, including management metadata.
                 connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);

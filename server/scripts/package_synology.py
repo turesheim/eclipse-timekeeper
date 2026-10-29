@@ -15,12 +15,14 @@ import tempfile
 from documentation import render_document
 from package_server import verify_build_identity
 from validate_synology import validate
+from synology_identity import PACKAGES, require_identity, application_id, package_guide
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = {'preview': '1.99.0', 'stable': '2.0.0'}
 GUIDES = {'docs/operations/SYNOLOGY-PACKAGE.md': 'README.md',
           'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
           'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
+          'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
           'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
           'docs/operations/TAILSCALE.md': 'TAILSCALE.md'}
@@ -70,7 +72,8 @@ def verify_image(image, commit, directory):
     return inspected['Id']
 
 
-def build(output, commit, image, revision, channel):
+def build(output, commit, image, revision, channel, package_id="timekeeper"):
+    require_identity(package_id)
     check_source(ROOT, commit)
     if channel not in VERSION or not 1 <= revision <= 2147483647:
         raise ValueError('Choose preview/stable and a positive package revision')
@@ -87,20 +90,33 @@ def build(output, commit, image, revision, channel):
         package = ROOT/'server/synology'
         shutil.copytree(package/'ui', payload/'ui')
         (payload/'project').mkdir()
-        (payload/'project/compose.yaml').write_text((package/'project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',image))
+        project=json.loads((package/'project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',image))
+        project['services']['server']['container_name']=package_id+'-server'
+        for mount in project['services']['server']['volumes']:
+            mount['source']=mount['source'].replace('/var/packages/timekeeper/','/var/packages/'+package_id+'/')
+        (payload/'project/compose.yaml').write_text(json.dumps(project,indent=2)+'\n')
+        launch=json.loads((payload/'ui/config').read_text())['.url']['net.resheim.timekeeper']
+        launch['title']=PACKAGES[package_id]
+        (payload/'ui/config').write_text(json.dumps({'.url':{application_id(package_id):launch}},indent=2)+'\n')
         (payload/'private').mkdir(mode=0o700)
         for name in ('config','secrets'):(payload/'private'/name).mkdir(mode=0o755)
         (outer/'scripts').mkdir()
         shutil.copytree(package/'conf', outer/'conf')
+        privilege=json.loads((outer/'conf/privilege').read_text())
+        privilege.update(username=package_id,groupname=package_id)
+        (outer/'conf/privilege').write_text(json.dumps(privilege,indent=2)+'\n')
+        resource=json.loads((outer/'conf/resource').read_text())
+        resource['docker-project']['projects'][0]['name']=package_id+'-server'
+        (outer/'conf/resource').write_text(json.dumps(resource,indent=2)+'\n')
         shutil.copytree(package/'WIZARD_UIFILES', outer/'WIZARD_UIFILES')
         for source in (package/'scripts').iterdir():
             if source.is_file():
                 shutil.copyfile(source, outer/'scripts'/source.name)
                 (outer/'scripts'/source.name).chmod(0o755)
         (outer/'scripts/migration').mkdir()
-        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql'):
+        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','schema-v9-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql','instance-v9.sql'):
             shutil.copyfile(ROOT/'server/app/src/main/resources/db'/name,outer/'scripts/migration'/name)
-        release = {'commit':commit,'image':image,'serverSchema':8}
+        release = {'commit':commit,'image':image,'serverSchema':9}
         release_json = json.dumps(release, indent=2)+'\n'
         (outer/'scripts/release.json').write_text(release_json)
         # SYNOPKG_PKGINST_TEMP_DIR contains the extracted package.tgz payload,
@@ -114,7 +130,7 @@ def build(output, commit, image, revision, channel):
         shutil.copytree(outer/'scripts/migration', payload/'scripts/migration')
         environment = {**os.environ, 'GOOS':'linux', 'GOARCH':'amd64', 'GOAMD64':'v1', 'CGO_ENABLED':'0',
                        'GOCACHE':str(ROOT/'server/target/synology-go-cache')}
-        subprocess.run(['go','build','-trimpath','-ldflags=-s -w','-o',str(outer/'scripts/timekeeper-dsm'),'.'],
+        subprocess.run(['go','build','-trimpath','-ldflags=-s -w -X main.packageID='+package_id,'-o',str(outer/'scripts/timekeeper-dsm'),'.'],
                        cwd=package/'installer', env=environment, check=True)
         (outer/'scripts/timekeeper-dsm').chmod(0o755)
         # Preloading the tested image makes the candidate installable without an
@@ -129,23 +145,23 @@ def build(output, commit, image, revision, channel):
             if process.wait():
                 raise ValueError('Unable to save the verified application image')
         for source,destination in GUIDES.items():
-            (payload/destination).write_text(render_document(ROOT, source, GUIDES, commit))
+            (payload/destination).write_text(package_guide(render_document(ROOT, source, GUIDES, commit),package_id))
         shutil.copyfile(ROOT/'LICENSE', outer/'LICENSE')
         shutil.copyfile(package/'ui/images/timekeeper_64.png', outer/'PACKAGE_ICON.PNG')
         shutil.copyfile(package/'ui/images/timekeeper_256.png', outer/'PACKAGE_ICON_256.PNG')
         archive_tree(payload, outer/'package.tgz', epoch, compressed=True)
         checksum = hashlib.md5((outer/'package.tgz').read_bytes(), usedforsecurity=False).hexdigest()
         version = VERSION[channel]+'-'+str(revision)
-        info = {'package':'timekeeper', 'displayname':'Timekeeper', 'version':version,
+        info = {'package':package_id, 'displayname':PACKAGES[package_id], 'version':version,
                 'os_min_ver':'7.2.2-72806', 'arch':'r1000', 'maintainer':'Timekeeper contributors',
                 'maintainer_url':'https://github.com/turesheim/eclipse-timekeeper',
                 'description':'Private time tracking with a bundled web client and SynoCommunity PostgreSQL.',
                 'thirdparty':'yes', 'startable':'yes', 'precheckstartstop':'yes', 'silent_install':'no', 'silent_upgrade':'no',
-                'dsmuidir':'ui', 'dsmappname':'net.resheim.timekeeper',
+                'dsmuidir':'ui', 'dsmappname':application_id(package_id),
                 'install_dep_packages':'ContainerManager:postgresql>=17.11-6',
                 'checksum':checksum}
         (outer/'INFO').write_text(''.join(key+'='+json.dumps(value)+'\n' for key,value in info.items()))
-        name='timekeeper-'+version+'-r1000.spk'
+        name=package_id+'-'+version+'-r1000.spk'
         destination=output/name
         archive_tree(outer,destination,epoch)
         # Docker's containerd store reports a manifest ID from image inspect;
@@ -153,9 +169,9 @@ def build(output, commit, image, revision, channel):
         checked=validate(destination)
         digest=checked['sha256']
         destination.with_suffix('.spk.sha256').write_text(digest+'  '+name+'\n')
-        manifest={'format':1,'channel':channel,'package':'timekeeper','version':version,'commit':commit,
+        manifest={'format':1,'channel':channel,'package':package_id,'version':version,'commit':commit,
                   'architecture':'r1000','image':image,'imageId':checked['imageId'],'sha256':digest,
-                  'serverSchema':8,'nativePostgreSQLMajor':17,'realDsmAcceptance':'required'}
+                  'serverSchema':9,'nativePostgreSQLMajor':17,'realDsmAcceptance':'required'}
         destination.with_suffix('.json').write_text(json.dumps(manifest,indent=2)+'\n')
         return destination
 
@@ -167,8 +183,9 @@ def main():
     parser.add_argument('--image',required=True)
     parser.add_argument('--revision',type=int,required=True)
     parser.add_argument('--channel',choices=VERSION,default='preview')
+    parser.add_argument('--package-id',choices=PACKAGES,default='timekeeper',help='Build a separately installable destination package')
     args=parser.parse_args()
-    print(build(args.output,args.commit,args.image,args.revision,args.channel))
+    print(build(args.output,args.commit,args.image,args.revision,args.channel,args.package_id))
 
 
 if __name__=='__main__':

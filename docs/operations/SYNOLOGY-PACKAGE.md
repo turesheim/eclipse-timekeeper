@@ -14,6 +14,29 @@ they are not acceptance gates for this implementation. Publication tooling
 described below is prepared for future use. Preview publication remains off by
 default.
 
+## Independent migration package
+
+The SPK builder accepts `--package-id timekeeper` (the default) or
+`--package-id dagsverk`. The latter produces a separately installable Dagsverk
+package, with its own package account, appdata, container, launcher, database/role
+defaults and runtime identity. Both use the same verified application image.
+Use separate output directories and keep the original installation intact.
+A Dagsverk package is a migration destination; installing it never renames or
+reuses the original Timekeeper package's state.
+
+Choose a different dedicated database/role and a distinct local port and public
+HTTPS origin/proxy route for the destination. Do not overwrite the source's
+reverse-proxy or Tailscale forwarding route. Complete the destination's disposable
+administrator setup, then use the encrypted
+[full-instance workflow](INSTANCE-BACKUP.md) to migrate. The confirmation must show
+`dagsverk` as the actual destination identity. The original package can remain
+installed and running; only stop/restart the destination during activation.
+
+These builds are preview packages until the required real-NAS acceptance is
+recorded. Changing identity does not bypass image provenance, native dependency,
+archive compatibility or stable-promotion checks. The bundled guides identify the
+package they address and use that package's operational paths.
+
 ## Installation flow
 
 Install SynoCommunity PostgreSQL and Synology Container Manager first. Native
@@ -51,8 +74,11 @@ required for browser sign-in. The selected HTTP port is also used by the contain
 health check. The installer allows the public origin's hostname in Quarkus's HTTP
 Host validation, alongside localhost for health checks. Other hostnames remain
 blocked; forwarding through Tailscale Serve does not require trusting forwarded
-headers or disabling Host validation. The application runs as UID 10001 with a
-read-only filesystem.
+headers or disabling Host validation. The application runs as the dedicated DSM package account's numeric UID/GID
+with a read-only image filesystem. During incoming-payload validation, the
+unprivileged installer records that identity and the permanent appdata path in
+the project before Container Manager creates it. No Docker socket or host
+administrator credentials are exposed to the application.
 
 When moving from an earlier preview that generated the container name
 `timekeeper-server-server-1`, uninstall the old Timekeeper package before manually
@@ -69,7 +95,10 @@ The complete Compose project and empty bind directories ship in `package.tgz`:
 DSM acquires the project **before** `postinst`. The installer then copies retained
 configuration into those existing directories under a mode-0700 package-private
 parent. Quarkus reads runtime properties after container start, so project creation
-needs neither database credentials nor install-time environment substitution.
+needs no database credentials. The incoming project's `/state` bind uses
+permanent appdata, independent of temporary package links and replacement of the
+installed payload. The server creates private instance backup and restore roots
+under `/state/server`; these survive package upgrades.
 `prestart` synchronizes retained files and checks maintenance state before startup;
 `start` waits for application readiness after the worker starts the container.
 Stopped status uses DSM exit code 3. See Synology's [resource timing](https://help.synology.com/developer-guide/resource_acquisition/timing.html)
@@ -183,9 +212,9 @@ earlier pending codes; it never reopens completed account setup.
 Provisioning records an installation ID on its dedicated role/database so an
 interrupted operation can resume without taking over an unrelated object.
 Same-schema upgrades replace the pinned application image and record deployment
-time. Supported schema-2/3/4/5/6/7 → schema-8 upgrades run while the package is stopped:
+time. Supported schema-2/3/4/5/6/7/8 → schema-9 upgrades run while the package is stopped:
 the incoming installer validates the canonical schema, saves a native pre-upgrade
-backup, and adds the required recovery/passkey/settings/locale tables in one transaction. Pre-schema-4 browser sessions are ended; account passwords, API tokens and private data remain.
+backup, and adds the required recovery/passkey/settings/locale/instance-operation tables in one transaction. Pre-schema-4 browser sessions are ended; account passwords, API tokens and private data remain.
 An interruption keeps
 the backup and a maintenance marker; startup stays blocked until retry completes.
 After database commit, retry publishes the new configuration without rerunning
@@ -241,6 +270,23 @@ configuration, retained settings and the database service credential. Keep the
 archive private and copy it to your normal backup destination. The manifest records
 SHA-256 for every member. No PostgreSQL administrator credential is included.
 
+After a full-instance restore, native archive format 2 additionally preserves the
+active pointer and its complete immutable security-material generation. Every
+file is checked against the material inventory and the database's generation,
+operation and digest bindings. Uncommitted stages, temporary plaintext and upload
+files are excluded. Backups without active recovered material retain format 1
+compatibility. Native restore verifies material before replacement and checks its
+binding inside the same SQL transaction; a missing or mismatched inventory rolls
+the transaction back. Immutable files are installed before commit and the active
+pointer is published afterwards, while the maintenance marker blocks startup.
+Keep the package stopped until recovery succeeds. If existing material is damaged,
+retain that directory separately before restoring a verified native archive;
+recovery refuses to overwrite a conflicting immutable generation.
+
+For encrypted portable archives and migration to another installation/package,
+use [Full-instance backup and restore](INSTANCE-BACKUP.md). The native maintenance
+archive above is a private host recovery artifact and is not a web download.
+
 To restore, keep Timekeeper stopped and run a task with the absolute backup path:
 
 ```sh
@@ -273,7 +319,7 @@ databases or the shared PostgreSQL package.
 ## Migrating from containerized PostgreSQL 18
 
 The supported logical transfer is **PostgreSQL 18.6 → 17.11, canonical Timekeeper
-schema 2, 3, 4, 5, 6, 7 or 8** into a schema-8 package. Upgrade an older source using the explicit schema-upgrade procedure in
+schema 2, 3, 4, 5, 6, 7, 8 or 9** into a schema-9 package. Upgrade an older source using the explicit schema-upgrade procedure in
 [account operations](ACCOUNTS.md) and complete its first-administrator setup before
 exporting. Existing owners must be claimed by their explicit IDs. The exporter
 refuses an older/custom schema, unfinished account setup or connected API clients.

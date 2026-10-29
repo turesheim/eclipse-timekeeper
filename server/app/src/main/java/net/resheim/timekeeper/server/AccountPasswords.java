@@ -23,15 +23,30 @@ final class AccountPasswords {
         // Long passphrases and Unicode are supported; no silent trimming or truncation.
         if(password==null || password.codePointCount(0,password.length())<15 || password.getBytes(StandardCharsets.UTF_8).length>1024) throw ApiFailure.validation();
     }
-    static boolean matches(String password,String encoded) {
-        if(password==null || password.getBytes(StandardCharsets.UTF_8).length>1024) return false;
+    private record Encoded(int rounds,byte[] salt,byte[] expected) implements AutoCloseable {
+        @Override public void close(){Arrays.fill(salt,(byte)0);Arrays.fill(expected,(byte)0);}
+        @Override public String toString(){return "Private password hash";}
+    }
+    private static Encoded decode(String encoded) {
+        var parts=encoded.split("\\$",-1);if(parts.length!=4||!parts[0].equals("pbkdf2-sha256"))throw new IllegalArgumentException();
+        int rounds=Integer.parseInt(parts[1]);if(rounds<ITERATIONS||rounds>2_000_000)throw new IllegalArgumentException();
+        byte[] salt=null,expected=null;boolean valid=false;
         try {
-            var parts=encoded.split("\\$",-1);if(parts.length!=4 || !parts[0].equals("pbkdf2-sha256")) return false;
-            int rounds=Integer.parseInt(parts[1]);if(rounds<ITERATIONS || rounds>2_000_000) return false;
-            byte[] salt=Base64.getUrlDecoder().decode(parts[2]),expected=Base64.getUrlDecoder().decode(parts[3]);
-            if(salt.length!=16 || expected.length!=32) return false;
-            return MessageDigest.isEqual(expected,derive(password,salt,rounds));
-        } catch(RuntimeException invalid) {return false;}
+            salt=Base64.getUrlDecoder().decode(parts[2]);expected=Base64.getUrlDecoder().decode(parts[3]);
+            if(salt.length!=16||expected.length!=32)throw new IllegalArgumentException();
+            valid=true;return new Encoded(rounds,salt,expected);
+        }finally{if(!valid){if(salt!=null)Arrays.fill(salt,(byte)0);if(expected!=null)Arrays.fill(expected,(byte)0);}}
+    }
+    /** Check supported parameters without needing or guessing a plaintext password. */
+    static boolean supported(String encoded) {
+        try(var value=decode(encoded)){return true;}catch(RuntimeException invalid){return false;}
+    }
+    static boolean matches(String password,String encoded) {
+        if(password==null||password.getBytes(StandardCharsets.UTF_8).length>1024)return false;
+        try(var value=decode(encoded)) {
+            byte[] actual=derive(password,value.salt(),value.rounds());
+            try{return MessageDigest.isEqual(value.expected(),actual);}finally{Arrays.fill(actual,(byte)0);}
+        }catch(RuntimeException invalid){return false;}
     }
     private static byte[] derive(String password,byte[] salt,int rounds) {
         char[] chars=password.toCharArray();var key=new PBEKeySpec(chars,salt,rounds,256);

@@ -245,7 +245,7 @@ func checkManualForwarding(config map[string]any, host string, httpsPort, httpPo
 func tailscaleSetupCommand() string {
 	// Both files contain validated decimal ports. Reading them after installation
 	// handles automatic HTTP-port selection and edits to the HTTPS port field.
-	return tailscaleCLI + ` serve --bg --https="$(cat /var/packages/timekeeper/target/private/config/tailscale-https-port)" "http://127.0.0.1:$(cat /var/packages/timekeeper/target/private/config/http-port)"`
+	return tailscaleCLI + ` serve --bg --https="$(cat ` + packageTarget() + `/private/config/tailscale-https-port)" "http://127.0.0.1:$(cat ` + packageTarget() + `/private/config/http-port)"`
 }
 func tailscaleRemoveCommand(port int) string {
 	return fmt.Sprintf("%s serve --bg --https=%d --set-path=/ off", tailscaleCLI, port)

@@ -4,6 +4,7 @@ import { node, link, button } from '/web/account-ui.js';
 import { settingsView } from '/web/settings-view.js';
 import { renderUsers } from '/web/users.js';
 import { renderServiceSettings } from './service-settings.js';
+import { renderInstanceBackups } from './instance-backups.js';
 
 const $ = (id) => document.getElementById(id);
 let session = null,account = null,view = null,generation = 0,acceptedHash = '';
@@ -29,9 +30,9 @@ async function show(hash, ask = true) {
   dispose();acceptedHash = hash;const current = generation,active = session;
   const valid = () => generation === current && session === active;
   $('account-content').replaceChildren();$('account-error').replaceChildren();$('account-navigation').replaceChildren();
-  const users = hash === '#users' || hash.startsWith('#users/');
-  for (const [key, title] of [['settings', i18nText("ui.general_settings")], ['users', i18nText("ui.users")]]) {
-    const item = link(title, '#' + key, 'nav-link');if ((users ? 'users' : 'settings') === key) {item.classList.add('active');item.setAttribute('aria-current', 'page');}$('account-navigation').append(item);
+  const users = hash === '#users' || hash.startsWith('#users/'),backups=hash==='#backups';
+  for (const [key, title] of [['settings', i18nText("ui.general_settings")], ['users', i18nText("ui.users")], ['backups', i18nText('backups.title')]]) {
+    const item = link(title, '#' + key, 'nav-link');if ((users ? 'users' : backups ? 'backups' : 'settings') === key) {item.classList.add('active');item.setAttribute('aria-current', 'page');}$('account-navigation').append(item);
   }
   $('account-heading').focus();
   view = settingsView({ root: $('account-content'), session: active, account, valid, feedback: $('account-error'),
@@ -40,7 +41,7 @@ async function show(hash, ask = true) {
     reload: () => {if (acceptedHash === '#users/new') location.hash = '#users';else void show(acceptedHash);}
   });
   const currentView = view;
-  await view.run(() => users ? renderUsers(currentView, hash.split('/')[1] || '') : renderServiceSettings(currentView));
+  await view.run(() => users ? renderUsers(currentView, hash.split('/')[1] || '') : backups ? renderInstanceBackups(currentView) : renderServiceSettings(currentView));
   if (valid()) $('status').textContent = i18nText("ui.administration_ready");
 }
 async function initialize() {

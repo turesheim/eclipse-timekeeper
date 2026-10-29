@@ -27,7 +27,42 @@ class ContractTest(unittest.TestCase):
         for schema in CONTRACT['components']['schemas'].values():
             Draft202012Validator.check_schema(schema)
 
-    def test_all_private_operations_require_token_and_permission(self):
+    def test_instance_operations_require_browser_proof_and_expose_only_status(self):
+        value = {'currentPassword':'current private credential','passphrase':'private encrypted backup phrase'}
+        self.assertTrue(validator('InstanceBackupCreateInput').is_valid(value))
+        self.assertFalse(validator('InstanceBackupCreateInput').is_valid({**value,'path':'/private/source'}))
+        self.assertFalse(validator('InstanceBackupCreateInput').is_valid({'passphrase':value['passphrase']}))
+        self.assertTrue(CONTRACT['components']['schemas']['InstanceBackupCreateInput']['properties']['passphrase']['writeOnly'])
+        self.assertEqual({'id','type','state','version','updatedAt'},set(CONTRACT['components']['schemas']['InstanceOperation']['properties']))
+        operation = CONTRACT['paths']['/admin/instance/backups']['post']
+        self.assertIn('202',operation['responses'])
+        self.assertIn({'$ref':'#/components/parameters/Csrf'},operation['parameters'])
+
+    def test_instance_download_grant_is_a_cookie_not_a_url_credential(self):
+        operation = CONTRACT['paths']['/admin/instance/operations/{id}/content']['get']
+        self.assertEqual([{'browserSession': [],'instanceDownloadGrant': []}],operation['security'])
+        self.assertIn('application/octet-stream',operation['responses']['200']['content'])
+        self.assertEqual('cookie',CONTRACT['components']['securitySchemes']['instanceDownloadGrant']['in'])
+        self.assertEqual({'id','downloadUrl','expiresAt'},set(CONTRACT['components']['schemas']['InstanceDownload']['properties']))
+
+    def test_instance_upload_has_bounded_immutable_chunks_and_cannot_claim_restore_readiness(self):
+        op=CONTRACT['paths']['/admin/instance/uploads/{id}/content']['put']
+        self.assertTrue(any(p.get('name')=='offset' and p.get('required') for p in op['parameters']))
+        self.assertEqual(1048576,op['requestBody']['content']['application/octet-stream']['schema']['maxLength'])
+        self.assertIn('409',op['responses'])
+        self.assertFalse(CONTRACT['components']['schemas']['InstanceArchiveReview']['properties']['restoreReady']['const'])
+        self.assertEqual({'INVALID_INSTANCE_BACKUP','INVALID_INSTANCE_AUTHENTICATION'},set(CONTRACT['components']['schemas']['InstanceRestoreUpload']['properties']['validationCode']['enum']))
+        self.assertTrue(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64}))
+        self.assertFalse(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64,'path':'/outside'}))
+
+    def test_target_review_is_advisory_and_requires_password_proof(self):
+        operation=CONTRACT['paths']['/admin/instance/uploads/{id}/target']['post']
+        self.assertEqual([{'browserSession':[]}],operation['security'])
+        self.assertEqual({'$ref':'#/components/schemas/InstanceOperationProofInput'},operation['requestBody']['content']['application/json']['schema'])
+        self.assertFalse(CONTRACT['components']['schemas']['InstanceRestoreTarget']['properties']['restoreReady']['const'])
+        self.assertTrue(CONTRACT['components']['schemas']['InstanceRestoreTarget']['properties']['blockers']['uniqueItems'])
+
+    def test_all_private_operations_require_authentication_and_permission(self):
         self.assertEqual([{'bearerAuth': []}, {'browserSession': []}], CONTRACT['security'])
         ids = []
         for path, item in CONTRACT['paths'].items():
@@ -41,7 +76,10 @@ class ContractTest(unittest.TestCase):
                             '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
-                self.assertNotIn('security', operation)
+                if path == '/admin/instance' or path.startswith('/admin/instance/'):
+                    self.assertEqual([{'browserSession': [], 'instanceDownloadGrant': []}] if path == '/admin/instance/operations/{id}/content' else [{'browserSession': []}], operation['security'])
+                else:
+                    self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
@@ -378,7 +416,7 @@ class ContractTest(unittest.TestCase):
             for method in ('put', 'delete'):
                 # Chunks are immutable: index plus exact content identifies a
                 # write, and conflicting bytes return 409 instead of overwriting.
-                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}'):
+                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}', '/admin/instance/uploads/{id}/content'):
                     op = item[method]
                     if path == '/journal-assets/{filename}' and method == 'put':
                         self.assertIn({'$ref': '#/components/parameters/IfMatchOptional'}, op['parameters'])
@@ -533,6 +571,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
+            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
