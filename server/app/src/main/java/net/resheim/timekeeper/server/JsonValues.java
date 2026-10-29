@@ -300,11 +300,14 @@ public final class JsonValues {
             var series=value.series().get();var entry=node.putObject("series");entry.put("rule",series.rule());entry.put("end",series.end().name());
             moment(entry,"until",series.until());if(series.count().isPresent())entry.put("count",series.count().get());else entry.putNull("count");
         } else node.putNull("series");
-        var occurrences=node.putArray("occurrences");
-        value.occurrences().forEach(item -> {
+        node.set("occurrences",occurrences(value.occurrences()));return node;
+    }
+    public static ArrayNode occurrences(java.util.List<TaskOccurrence> values) {
+        var occurrences=array();
+        values.forEach(item -> {
             var entry=object();moment(entry,"original",Optional.of(item.original()));moment(entry,"movedTo",item.movedTo());
             entry.put("state",item.state().name());nullable(entry,"completedAt",item.completedAt());occurrences.add(entry);
-        });return node;
+        });return occurrences;
     }
     public static TaskRecurrence recurrence(JsonNode value) {
         if(value==null || value.isNull())return TaskRecurrence.empty();

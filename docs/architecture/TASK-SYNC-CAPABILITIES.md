@@ -83,6 +83,13 @@ Graph documents the [todoTask resource](https://learn.microsoft.com/en-us/graph/
 [file attachments](https://learn.microsoft.com/en-us/graph/api/resources/taskfileattachment?view=graph-rest-1.0),
 and [task delta](https://learn.microsoft.com/en-us/graph/api/todotask-delta?view=graph-rest-1.0).
 
+Recurrence capabilities use `recurrence.series` and `recurrence.occurrences`.
+A connector that can read only the rule omits occurrence observations, keeping
+local completion/exception history. Explicit component entries override the
+legacy aggregate `recurrence` declaration. Clears and exception exports must
+satisfy the [recurrence dependency gate](TASK-SYNC-PROTOCOL.md#partial-recurrence-observations);
+capability flags alone do not establish knowledge of unobserved history.
+
 ## Capability declaration and export gate
 
 Connectors write a complete declaration with `PUT

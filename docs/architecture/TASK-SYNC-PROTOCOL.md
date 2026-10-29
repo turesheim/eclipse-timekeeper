@@ -186,6 +186,51 @@ that compatibility fallback. Link arrays remain one metadata component; a
 connector must preserve resources it cannot read or reconcile before replacing
 that component.
 
+### Partial recurrence observations
+
+Declare `recurrence.series` and `recurrence.occurrences` independently. A
+connector that observes the rule but cannot read completed instances sends:
+
+```json
+{"fields":{"recurrence":{"series":{"rule":"FREQ=WEEKLY;BYDAY=MO","end":"COUNT","until":null,"count":8}}}}
+```
+
+Omitted occurrences remain local and retain their baseline. Independent rule
+and exception edits can merge; competing changes to the same component still
+require a conflict decision. `{}` observes nothing. Explicit `series:null`
+requests a rule clear, and `occurrences:[]` requests an exception-history clear.
+A rule cannot be cleared while unobserved nonempty local history depends on
+it. Preview reports `INCOMPLETE_GROUP`, and apply returns `409 CONFLICT` with
+the task and baseline unchanged. An unreadable occurrence clear cannot satisfy
+that dependency. Nonempty occurrences also require an existing or observed
+series. First-import preview reports `INCOMPLETE` with
+`RECURRENCE_SERIES_REQUIRED` if no readable rule accompanies them; import rejects
+that incomplete task with `422 VALIDATION`.
+
+A series-only initial import creates an empty local occurrence list, but its
+baseline contains only the observed series. That local default is not evidence
+that provider history is empty. Export blocks a series clear until the last
+common history is known empty or an eligible history clear is included. An
+outbound nonempty occurrence list requires a known baseline series or a series
+write in the same proposal. Empty occurrence clears remain independent. Show
+`INCOMPLETE_GROUP` warnings and reconcile missing observations before writing.
+
+Complete legacy recurrence observations and nested baselines remain readable.
+Explicit component capabilities override the aggregate `recurrence` fallback.
+Export retains the complete object for a legacy aggregate declaration with a
+complete baseline and no component overrides, provided every included change
+is eligible. A blocked component prevents that compatibility write. Other
+exports contain only eligible changed components. Ordinary task responses and
+`PUT /tasks/{id}/recurrence` retain the complete recurrence object.
+
+Comparison uses the task recurrence codecs to normalize equivalent time
+representations, retaining civil dates, wall times, and zones. Older loosely
+typed baseline components that cannot be decoded remain stored but are treated
+as unbased; a null occurrence value cannot establish an observed empty history.
+A new valid provider observation can establish a common value through normal
+convergence or explicit conflict reconciliation. Unsupported provider rules and
+unreadable instances follow the capability gate and provider-data policy.
+
 ### Partial reminder observations
 
 Declare capabilities by exact trigger kind: `reminders.ABSOLUTE`,

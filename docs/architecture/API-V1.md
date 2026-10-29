@@ -410,6 +410,19 @@ model and ordinary reminder endpoint remain arrays. See the
 [connector protocol](TASK-SYNC-PROTOCOL.md#partial-reminder-observations) for
 baseline migration, conflict, collection limits, and provider restrictions.
 
+Task sync recurrence observations use a partial `recurrence` object with
+optional `series` and `occurrences`. Presence is the observation mask, with
+independent capabilities and decisions at `recurrence.series` and
+`recurrence.occurrences`. Missing history is preserved; `series:null` and
+`occurrences:[]` are explicit clears. Preview/apply reject a rule clear that
+would leave dependent unobserved history, and export blocks inconsistent or
+unbased recurrence proposals with `INCOMPLETE_GROUP`. First import cannot infer
+a rule from exceptions alone. Series-only imports retain sparse baselines, so
+the local empty-list default is not mistaken for provider knowledge. Complete
+legacy declarations and baselines remain readable; ordinary recurrence CRUD
+retains its full object. See the [connector protocol](TASK-SYNC-PROTOCOL.md#partial-recurrence-observations)
+for dependencies, compatibility export, normalization and legacy baseline policy.
+
 Task `metadata` stores `tags`, `categories`, and `links` separately. Tags can
 represent Apple Reminders tags; categories can represent Outlook categories.
 Links have stable IDs and `LOCAL`, `PROVIDER_SOURCE`, or `PROVIDER_LINKED` kinds.

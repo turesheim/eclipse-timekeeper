@@ -27640,7 +27640,7 @@
             "description": "Ordered checklist items distinct from parentTaskId subtasks."
           },
           "recurrence": {
-            "$ref": "#/components/schemas/TaskRecurrence"
+            "$ref": "#/components/schemas/TaskSyncRecurrenceFields"
           },
           "reminders": {
             "oneOf": [
@@ -27805,6 +27805,8 @@
               "siblingOrder",
               "checklistItems",
               "recurrence",
+              "recurrence.series",
+              "recurrence.occurrences",
               "reminders",
               "reminders.ABSOLUTE",
               "reminders.RELATIVE",
@@ -28079,6 +28081,8 @@
               "siblingOrder",
               "checklistItems",
               "recurrence",
+              "recurrence.series",
+              "recurrence.occurrences",
               "reminders",
               "reminders.ABSOLUTE",
               "reminders.RELATIVE",
@@ -29747,6 +29751,30 @@
         ],
         "additionalProperties": false,
         "description": "Explicit whole-envelope replacement or null to clear; namespace must match the list connection provider or its dotted subnamespace. Does not write to the provider or grant access."
+      },
+      "TaskSyncRecurrenceFields": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSeries"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskOccurrence"
+            },
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false,
+        "description": "Partial recurrence observation mask. Omitted series or occurrences are unobserved. Null series and empty occurrences are explicit clears. Nonempty occurrences require a known series; preserve unobserved history."
       }
     },
     "parameters": {

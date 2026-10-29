@@ -1396,6 +1396,73 @@ class HttpAcceptance(unittest.TestCase):
         self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},
                   status=409,code='CONFLICT')
 
+    def test_provider_recurrence_masks_preserve_unobserved_history(self):
+        connection=self.create('task-connections',{'providerId':'fixture','remoteAccountId':str(uuid4()),
+                    'name':'Series-only provider','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Series list',
+                    'kind':'STANDARD','readable':True,'writable':True,'shared':False,'owner':True,'present':True,'position':0})
+        cp='/task-connections/'+connection['id'];field={'readable':True,'writable':True,'deletable':True,'note':None}
+        caps={'version':1,'providerApiVersion':'fixture-v1','fields':{'summary':field,'recurrence.series':field}}
+        self.call('PUT',cp+'/capabilities',body=caps,headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        series={'rule':'FREQ=WEEKLY;BYDAY=MO','end':'COUNT','until':None,'count':8}
+        history={'original':{'kind':'DATE','date':'2026-10-26'},'movedTo':None,'state':'COMPLETED','completedAt':'2026-10-26T12:00:00Z'}
+        path='/tasks/'+self.task['id'];original={'series':series,'occurrences':[history]}
+        _,headers=self.call('PUT',path+'/recurrence',body=original,headers={'If-Match':self.call('GET',path)[1]['ETag']})
+        key={'providerId':'fixture','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],'externalId':str(uuid4())}
+        reference={**key,'externalUrl':None,'taskListId':task_list['id'],
+                   'baseline':{'version':1,'capturedAt':'2026-10-28T10:00:00Z','fields':{'recurrence':original}}}
+        _,headers=self.call('PUT',path+'/external-references',body=reference,headers={'If-Match':headers['ETag']})
+        skipped={'original':{'kind':'DATE','date':'2026-11-02'},'movedTo':None,'state':'SKIPPED','completedAt':None}
+        _,headers=self.call('PUT',path+'/occurrences',body={'occurrences':[history,skipped]},headers={'If-Match':headers['ETag']})
+        base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+        item={**key,'operationId':str(uuid4()),'deleted':False,'fields':{'recurrence':{'series':{**series,'count':12}}}}
+        preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':False,'items':[item]})
+        self.assertEqual('UPDATE',preview['items'][0]['status']);self.assertEqual('recurrence.series',preview['items'][0]['decisions'][0]['field'])
+        request={**base,'item':item}
+        self.call('POST','/task-sync/apply',owner='b',body=request,headers={'If-Match':headers['ETag']},status=404,code='NOT_FOUND')
+        self.call('POST','/task-sync/apply',owner='read',body=request,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,updated_headers=self.call('POST','/task-sync/apply',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual({'series':{**series,'count':12},'occurrences':[history,skipped]},updated['recurrence'])
+        replay,_=self.call('POST','/task-sync/apply',body=request,headers={'If-Match':headers['ETag']});self.assertEqual(updated['version'],replay['version'])
+        changed={**updated['recurrence'],'series':{**series,'count':20}}
+        _,current_headers=self.call('PUT',path+'/recurrence',body=changed,headers={'If-Match':updated_headers['ETag']})
+        outbound={'connectionId':connection['id'],'listId':task_list['id'],'taskId':self.task['id'],**key}
+        exported,_=self.call('POST','/task-sync/export-preview',body=outbound)
+        self.assertEqual({'recurrence':{'series':changed['series']}},exported['writeFields'])
+        conflict={**item,'operationId':str(uuid4()),'fields':{'recurrence':{'series':{**series,'count':24}}}}
+        self.call('POST','/task-sync/apply',body={**base,'item':conflict},headers={'If-Match':current_headers['ETag']},status=409,code='CONFLICT')
+        _,headers=self.call('PUT',path+'/recurrence',body={'series':{**series,'count':12},'occurrences':[history]},headers={'If-Match':current_headers['ETag']})
+        clear={**item,'operationId':str(uuid4()),'fields':{'recurrence':{'series':None,'occurrences':[]}}}
+        preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':False,'items':[clear]})
+        self.assertEqual('CONFLICT',preview['items'][0]['status']);self.assertIn('INCOMPLETE_GROUP',[d['outcome'] for d in preview['items'][0]['decisions']])
+        self.call('POST','/task-sync/apply',body={**base,'item':clear},headers={'If-Match':headers['ETag']},status=409,code='CONFLICT')
+        empty={'series':None,'occurrences':[]}
+        _,headers=self.call('PUT',path+'/recurrence',body=empty,headers={'If-Match':headers['ETag']})
+        exported,_=self.call('POST','/task-sync/export-preview',body=outbound)
+        self.assertEqual({},exported['writeFields']);self.assertIn('INCOMPLETE_GROUP',[w['reason'] for w in exported['warnings']])
+        # A complete aggregate declaration can explicitly observe and clear both fields.
+        caps['fields']={'summary':field,'recurrence':field}
+        self.call('PUT',cp+'/capabilities',body=caps,headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        _,headers=self.call('PUT',path+'/recurrence',body={'series':{**series,'count':12},'occurrences':[history]},headers={'If-Match':headers['ETag']})
+        cleared,_=self.call('POST','/task-sync/apply',body={**base,'item':{**clear,'operationId':str(uuid4())}},headers={'If-Match':headers['ETag']})
+        self.assertEqual(empty,cleared['recurrence'])
+        initial={**item,'externalId':str(uuid4()),'operationId':str(uuid4()),'fields':{'summary':'Series import','recurrence':{'series':series}}}
+        created,created_headers=self.call('POST','/task-sync/import',body={**base,'item':initial},status=201);self.created.append(('a','tasks',created['id']))
+        self.assertEqual({'series':series},created['externalReferences'][0]['baseline']['fields']['recurrence'])
+        # Older loosely typed snapshots remain stored, but null history is never an observed empty array.
+        legacy={**key,'externalId':initial['externalId'],'externalUrl':None,'taskListId':task_list['id'],
+                'baseline':{'version':1,'capturedAt':'2026-10-28T10:00:00Z','fields':{'recurrence':{'series':series,'occurrences':None}}}}
+        created_path='/tasks/'+created['id']
+        _,created_headers=self.call('PUT',created_path+'/external-references',body=legacy,headers={'If-Match':created_headers['ETag']})
+        self.call('PUT',created_path+'/recurrence',body=empty,headers={'If-Match':created_headers['ETag']})
+        exported,_=self.call('POST','/task-sync/export-preview',body={**outbound,'taskId':created['id'],'externalId':initial['externalId']})
+        self.assertEqual({},exported['writeFields']);self.assertIn('INCOMPLETE_GROUP',[w['reason'] for w in exported['warnings']])
+        self.assertIsNone(self.call('GET',created_path)[0]['externalReferences'][0]['baseline']['fields']['recurrence']['occurrences'])
+        no_rule={**item,'externalId':str(uuid4()),'operationId':str(uuid4()),'fields':{'summary':'Missing rule','recurrence':{'occurrences':[history]}}}
+        preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':False,'items':[no_rule]})
+        self.assertEqual('INCOMPLETE',preview['items'][0]['status']);self.assertEqual('RECURRENCE_SERIES_REQUIRED',preview['items'][0]['reason'])
+        self.call('POST','/task-sync/import',body={**base,'item':no_rule},status=422,code='VALIDATION')
+
     def test_provider_metadata_components_preserve_unobserved_values(self):
         connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
                     'name':'Partial metadata','readable':True,'writable':True,'enabled':True})

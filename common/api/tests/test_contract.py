@@ -43,6 +43,18 @@ class ContractTest(unittest.TestCase):
             self.assertIn('providerData',CONTRACT['components']['schemas'][name]['properties'])
             self.assertNotIn('providerData',CONTRACT['components']['schemas'][name]['required'])
 
+    def test_sync_recurrence_uses_a_partial_mask_but_ordinary_edits_remain_complete(self):
+        rule={'rule':'FREQ=WEEKLY;BYDAY=MO','end':'COUNT','until':None,'count':8}
+        for value in ({}, {'series':rule}, {'series':None}, {'occurrences':[]}, {'series':None,'occurrences':[]}):
+            self.assertTrue(validator('TaskSyncFields').is_valid({'recurrence':value}))
+        for value in (None, {'unknown':[]}, {'occurrences':None}, {'series':{}}, {'series':rule,'extra':True}):
+            self.assertFalse(validator('TaskSyncFields').is_valid({'recurrence':value}))
+        self.assertFalse(validator('TaskRecurrence').is_valid({'series':rule}))
+        self.assertTrue(validator('TaskRecurrence').is_valid({'series':rule,'occurrences':[]}))
+        for field in ('recurrence.series','recurrence.occurrences'):
+            self.assertTrue(validator('TaskSyncFieldDecision').is_valid({'field':field,'outcome':'INCOMPLETE_GROUP'}))
+            self.assertTrue(validator('TaskSyncExportWarning').is_valid({'field':field,'reason':'INCOMPLETE_GROUP'}))
+
     def test_complete_openapi_document(self):
         validate(CONTRACT)
         for schema in CONTRACT['components']['schemas'].values():
