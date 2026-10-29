@@ -146,6 +146,43 @@ that compatibility fallback. Link arrays remain one metadata component; a
 connector must preserve resources it cannot read or reconcile before replacing
 that component.
 
+### Partial reminder observations
+
+Declare capabilities by exact trigger kind: `reminders.ABSOLUTE`,
+`reminders.RELATIVE`, `reminders.LOCATION`, `reminders.CAR`, and
+`reminders.MESSAGE`. For example, a connector that observes timed reminders
+but cannot read geofences sends:
+
+```json
+{"fields":{"reminders":{"ABSOLUTE":[]}}}
+```
+
+This clears only absolute reminders. Omitted kinds remain untouched; `{}`
+observes nothing. Each group's entries must have its matching `kind`. Null,
+unknown kinds, duplicate IDs across the merged task, and a resulting total
+above 100 are invalid. A group's baseline and conflict decisions are separate
+from other kinds. Concurrent changes to the same kind require reconciliation.
+IDs remain stable; order within a kind is retained, and unaffected task entries
+retain their relative order. Numeric and time representations are normalized
+through the task reminder codec before comparison.
+
+Legacy full-array observations and baselines remain accepted: an array observes
+all five kinds, including an empty group for each absent kind. An explicit
+kind capability overrides the legacy aggregate `reminders` declaration.
+Baselines may migrate from arrays to nested per-kind objects during apply;
+clients storing accepted last-common fields must retain this presence mask.
+Export emits only eligible changed groups. For a legacy aggregate capability
+with a complete baseline and no explicit kind declarations, export retains the
+full-array representation. If a blocked change would be included in that whole
+array, export omits it and reports `INCOMPLETE_GROUP` alongside the specific
+blocked-kind warning. Task responses and `PUT /tasks/{id}/reminders`
+continue using arrays.
+
+A writable absolute group does not certify a provider's support for arbitrary
+counts of timed alerts. The connector must check its effective per-item limits
+before export; it must retain extra alerts locally and report the restriction,
+never silently select one, or convert an unsupported kind to a timed reminder.
+
 ## Remote absence and deletion
 
 A failed provider request, expired credentials, changed permissions, or a

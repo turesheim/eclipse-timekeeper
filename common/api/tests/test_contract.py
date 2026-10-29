@@ -22,6 +22,17 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_reminder_observation_masks_are_typed_and_ordinary_writes_stay_arrays(self):
+        absolute={'id':ID,'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-29','time':'09:00','timeZone':'Europe/Oslo'}}
+        for reminders in ({}, {'ABSOLUTE':[]}, {'ABSOLUTE':[absolute]}, [], [absolute]):
+            self.assertTrue(validator('TaskSyncFields').is_valid({'reminders':reminders}))
+        for reminders in (None, {'absolute':[]}, {'ABSOLUTE':None}, {'CAR':[absolute]}, {'UNKNOWN':[]}, {'ABSOLUTE':[absolute]*101}):
+            self.assertFalse(validator('TaskSyncFields').is_valid({'reminders':reminders}))
+        self.assertFalse(validator('TaskRemindersInput').is_valid({'reminders':{'ABSOLUTE':[]}}))
+        for kind in ('ABSOLUTE','RELATIVE','LOCATION','CAR','MESSAGE'):
+            self.assertTrue(validator('TaskSyncFieldDecision').is_valid({'field':'reminders.'+kind,'outcome':'REMOTE_ONLY'}))
+            self.assertTrue(validator('TaskSyncExportWarning').is_valid({'field':'reminders.'+kind,'reason':'NOT_WRITABLE'}))
+
     def test_complete_openapi_document(self):
         validate(CONTRACT)
         for schema in CONTRACT['components']['schemas'].values():

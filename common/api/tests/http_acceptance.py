@@ -1201,7 +1201,7 @@ class HttpAcceptance(unittest.TestCase):
         result,_=self.call('POST','/task-sync/preview',body=request)
         self.assertEqual(['CONFLICT','CREATE'],[item['status'] for item in result['items']])
         self.assertEqual({'summary':'CONFLICT','status':'REMOTE_ONLY','completedAt':'REMOTE_ONLY',
-                          'reminders':'UNSUPPORTED'},
+                          **{'reminders.'+kind:'UNSUPPORTED' for kind in ('ABSOLUTE','RELATIVE','LOCATION','CAR','MESSAGE')}},
                          {item['field']:item['outcome'] for item in result['items'][0]['decisions']})
         self.assertEqual(self.task['id'],result['items'][0]['taskId'])
         deleted={**observed,'deleted':True,'fields':{}}
@@ -1349,6 +1349,69 @@ class HttpAcceptance(unittest.TestCase):
         same,_=self.call('POST','/task-sync/import',body={**base,'item':{**imported_item,
                   'operationId':str(uuid4()),'fields':{'summary':'New metadata task','metadata':{'categories':['A','Z']}}}})
         self.assertEqual(created['id'],same['id'])
+
+    def test_provider_reminder_kinds_preserve_unobserved_triggers(self):
+        connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
+                    'name':'Partial alerts','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Partial alerts','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        cp='/task-connections/'+connection['id']
+        field={'readable':True,'writable':True,'deletable':True,'note':None}
+        caps={'version':1,'providerApiVersion':'graph-v1.0','fields':{'summary':field,'reminders.ABSOLUTE':field}}
+        self.call('PUT',cp+'/capabilities',body=caps,headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        path='/tasks/'+self.task['id']
+        absolute={'id':str(uuid4()),'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-29','time':'09:00','timeZone':'Europe/Oslo'}}
+        retained=[{'id':str(uuid4()),'kind':'LOCATION','latitude':63,'longitude':10,'radiusMeters':100,'transition':'ARRIVE'},
+                  {'id':str(uuid4()),'kind':'RELATIVE','anchor':'DUE','offsetMinutes':-30},
+                  {'id':str(uuid4()),'kind':'CAR','event':'CONNECT'},
+                  {'id':str(uuid4()),'kind':'MESSAGE','contactKey':'local-contact'}]
+        _,headers=self.call('PUT',path+'/reminders',body={'reminders':[absolute,*retained]},headers={'If-Match':self.call('GET',path)[1]['ETag']})
+        key={'providerId':'microsoft','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],'externalId':str(uuid4())}
+        reference={**key,'externalUrl':None,'taskListId':task_list['id'],
+                   'baseline':{'version':1,'capturedAt':'2026-10-28T10:00:00Z','fields':{'reminders':[absolute,*retained]}}}
+        _,headers=self.call('PUT',path+'/external-references',body=reference,headers={'If-Match':headers['ETag']})
+        base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+        item={**key,'operationId':str(uuid4()),'deleted':False,'fields':{'reminders':{'ABSOLUTE':[],'LOCATION':[]}}}
+        preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':False,'items':[item]})
+        self.assertEqual('UPDATE',preview['items'][0]['status'])
+        self.assertEqual({'reminders.ABSOLUTE':'REMOTE_ONLY','reminders.LOCATION':'UNSUPPORTED'},
+                         {row['field']:row['outcome'] for row in preview['items'][0]['decisions']})
+        request={**base,'item':item}
+        self.call('POST','/task-sync/apply',body=request,owner='b',headers={'If-Match':headers['ETag']},status=404,code='NOT_FOUND')
+        self.call('POST','/task-sync/apply',body=request,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,updated_headers=self.call('POST','/task-sync/apply',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual(retained,updated['reminders'])
+        replay,_=self.call('POST','/task-sync/apply',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual(updated['version'],replay['version'])
+        baseline=updated['externalReferences'][0]['baseline']['fields']['reminders']
+        self.assertEqual([],baseline['ABSOLUTE'])
+        self.assertEqual([retained[0]],baseline['LOCATION'])
+        _,current_headers=self.call('PUT',path+'/reminders',body={'reminders':[absolute,*retained]},headers={'If-Match':updated_headers['ETag']})
+        export={'connectionId':connection['id'],'listId':task_list['id'],'taskId':self.task['id'],**key}
+        outward,_=self.call('POST','/task-sync/export-preview',body=export)
+        self.assertEqual({'reminders':{'ABSOLUTE':[absolute]}},outward['writeFields'])
+        conflicting={**absolute,'at':{**absolute['at'],'time':'10:00'}}
+        conflict={**item,'operationId':str(uuid4()),'fields':{'reminders':{'ABSOLUTE':[conflicting]}}}
+        self.call('POST','/task-sync/apply',body={**base,'item':conflict},headers={'If-Match':current_headers['ETag']},status=409,code='CONFLICT')
+        # Initial partial import creates only readable trigger kinds, with a sparse baseline.
+        imported_item={**key,'externalId':str(uuid4()),'operationId':str(uuid4()),'deleted':False,
+                       'fields':{'summary':'Timed reminder import','reminders':{'ABSOLUTE':[absolute],'CAR':[retained[2]]}}}
+        created,_=self.call('POST','/task-sync/import',body={**base,'item':imported_item},status=201)
+        self.created.append(('a','tasks',created['id']))
+        self.assertEqual([absolute],created['reminders'])
+        self.assertEqual({'ABSOLUTE':[absolute]},created['externalReferences'][0]['baseline']['fields']['reminders'])
+        same,_=self.call('POST','/task-sync/import',body={**base,'item':{**imported_item,'operationId':str(uuid4())}})
+        self.assertEqual(created['id'],same['id'])
+        # Aggregate capabilities continue accepting full arrays. Explicit kind-level
+        # declarations override that fallback, even for an empty full-array input.
+        caps['fields']={'reminders':field,'reminders.CAR':{**field,'readable':False,'writable':False,'deletable':False}}
+        self.call('PUT',cp+'/capabilities',body=caps,headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        # Restore local absolute state to its baseline before clearing all readable kinds.
+        _,reset_headers=self.call('PUT',path+'/reminders',body={'reminders':retained},headers={'If-Match':current_headers['ETag']})
+        clear={**item,'operationId':str(uuid4()),'fields':{'reminders':[]}}
+        cleared,_=self.call('POST','/task-sync/apply',body={**base,'item':clear},headers={'If-Match':reset_headers['ETag']})
+        self.assertEqual([retained[2]],cleared['reminders'])
 
     def test_provider_subtasks_import_under_an_unassigned_parent(self):
         connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),

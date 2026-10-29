@@ -373,6 +373,18 @@ kinds locally and warn on attempted export; they must never convert them to a
 timed alert or treat a due date as an alert. Apple companion authorization and
 contact resolution remain outside task payloads.
 
+Task sync accepts a partial reminder observation such as
+`{"reminders":{"ABSOLUTE":[]}}`. Omitted kinds are unobserved and preserved;
+empty groups clear only that kind. Capabilities and decisions use the exact
+paths `reminders.ABSOLUTE`, `.RELATIVE`, `.LOCATION`, `.CAR`, and `.MESSAGE`.
+Explicit kind declarations override the older aggregate `reminders` capability.
+Full-array sync input and baselines remain readable as observations of all
+kinds. Partial export returns only eligible changed groups; a complete legacy
+aggregate declaration and baseline retain full-array export. The task read
+model and ordinary reminder endpoint remain arrays. See the
+[connector protocol](TASK-SYNC-PROTOCOL.md#partial-reminder-observations) for
+baseline migration, conflict, collection limits, and provider restrictions.
+
 Task `metadata` stores `tags`, `categories`, and `links` separately. Tags can
 represent Apple Reminders tags; categories can represent Outlook categories.
 Links have stable IDs and `LOCAL`, `PROVIDER_SOURCE`, or `PROVIDER_LINKED` kinds.

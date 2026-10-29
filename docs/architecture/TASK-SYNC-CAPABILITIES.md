@@ -27,10 +27,10 @@ provider to approximate an unsupported Timekeeper value.
 | Start and due | `startDateComponents`, `dueDateComponents` | `start`, `due` | RW | Keep all-day and floating-date semantics. |
 | Priority | `EKReminder.priority` | `priority` | RW | Keep separate from `flagged` and `urgent`. |
 | Recurrence | `EKRecurrenceRule` | `recurrence.series` | RW | EventKit exposes only the first incomplete reminder in a recurring set; preserve unseen occurrences. |
-| Time and location alerts | `EKAlarm` absolute/relative date, structured location and proximity | `reminders.absolute`, `.relative`, `.location` | RW | Never turn a geofence into a timed alert. |
+| Time and location alerts | `EKAlarm` absolute/relative date, structured location and proximity | `reminders.ABSOLUTE`, `.RELATIVE`, `.LOCATION` | RW | Never turn a geofence into a timed alert. |
 | List | Reminder calendar | `taskListId` | RW | Timekeeper project remains independent. |
 | Tags, sections, grocery, attachments, shared assignment | Reminders UI / companion-specific bridge | `metadata.tags`, `section`, `attachments`, `assignment` | ? | Preserve in Reminders; declare only fields actually exposed by the companion. |
-| Car and messaging triggers | Reminders UI / companion-specific bridge | `reminders.car`, `.message` | ? | Preserve in Reminders until the companion proves read and write support. |
+| Car and messaging triggers | Reminders UI / companion-specific bridge | `reminders.CAR`, `.MESSAGE` | ? | Preserve in Reminders until the companion proves read and write support. |
 | Stable identity | EventKit calendar item identifier | External reference and aliases | R | A full sync can change local IDs; replace identity while retaining an alias. |
 
 Apple documents [date components](https://developer.apple.com/documentation/eventkit/ekreminder/duedatecomponents),
@@ -69,7 +69,7 @@ polling and periodic full reconciliation.
 | Start and due | `startDateTime`, `dueDateTime` | `start`, `due` | RW | Retain Graph zone and wall time; do not collapse to UTC. |
 | Importance | `importance` | `priority` | RW | Do not turn a flagged-email list into task `flagged`. |
 | Recurrence | `patternedRecurrence` | `recurrence.series` | RW | Retain provider-only pattern/range details in provider data. |
-| Timed reminder | `isReminderOn`, `reminderDateTime` | one timed reminder | RW | Multiple, location, car, and message triggers remain local. |
+| Timed reminder | `isReminderOn`, `reminderDateTime` | `reminders.ABSOLUTE` (one alert) | RW | Multiple, location, car, and message triggers remain local. |
 | Categories | `categories` | `metadata.categories` | RW | Keep Outlook category identity distinct from Apple tags. |
 | Checklist | `checklistItems` collection | `checklistItems` | RWD | A checklist item is not a child `todoTask`. |
 | Attachments | `taskFileAttachment` collection | attachments | RWD | Apply size/content limits; use upload sessions for large files. |
