@@ -66,7 +66,10 @@ public class TokenRegistry {
                 tokens.add(new Token(owner,HexFormat.of().parseHex(hash),Set.copyOf(permissions),expiry));
             }
             return List.copyOf(tokens);
-        } catch (Exception e) { throw new IllegalStateException("Invalid token registry configuration"); }
+        } catch (Exception e) {
+            org.jboss.logging.Logger.getLogger(TokenRegistry.class).warnf("Token registry load failed %s",ProblemMapper.diagnostic("TOKEN_REGISTRY_UNAVAILABLE",e));
+            throw new IllegalStateException("Invalid token registry configuration");
+        }
     }
     public Principal authenticate(String authorization) {
         if (authorization==null || authorization.length()>4096 || !authorization.regionMatches(true,0,"Bearer ",0,7)) throw ApiFailure.unauthorized(true);
