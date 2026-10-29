@@ -75,3 +75,12 @@
 .journal-inline textarea { font-family: var(--bs-font-monospace); resize: vertical; }
 .journal-inline .dialog-actions { position: sticky; bottom: var(--workspace-nav-height); z-index: 1; flex-wrap: wrap; padding-block: .75rem; margin-top: .75rem; background: var(--bs-body-bg); border-top: 0; }
 .journal-inline .dialog-actions [role="status"] { margin-inline-end: auto; }
+
+/* Today uses a bounded editing viewport above the fixed workspace navigation. */
+.today-journal .journal-inline form { min-height: 0; }
+.today-journal .journal-content { min-height: 0; overflow: hidden; }
+.today-journal .markdown-editor > :not(.journal-formatted,.journal-source) { flex-shrink: 0; }
+.today-journal :is(.journal-formatted,.journal-source):not([hidden]) { min-height: 0; overflow: hidden; }
+.today-journal .journal-formatted :is(.milkdown), .today-journal .journal-formatted > div { min-height: 0; }
+.today-journal .journal-inline :is(.ProseMirror,textarea) { min-height: 0; overflow-y: auto; resize: none; }
+.today-journal .journal-inline .dialog-actions { position: static; flex-shrink: 0; margin-top: 0; padding-bottom: 0; }

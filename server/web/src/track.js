@@ -174,8 +174,9 @@ export class MonthTrack {
       }
       const clients = this.snapshot.clients.filter((client) => result.clients.has(client.id)).sort((a, b) => a.name.localeCompare(b.name,getLocale()));
       for (const client of clients) {
-        const card = node('div', undefined, 'card track-client'),label = node('span', client.name, 'client-color'),total = node('strong');
+        const card = node('div', undefined, 'card track-client'),label = node('span', undefined, 'client-color'),total = node('strong');
         if (/^#[0-9a-f]{6}$/i.test(client.color)) label.style.setProperty('--client-color', client.color);
+        label.append(node('span', client.name, 'client-color-text'));label.title=client.name;
         card.dataset.trackClient = client.id;card.append(label, total);this.totals.append(card);this.clientTimes.set(client.id, total);
       }
       if (!clients.length) this.totals.append(node('p', i18nText("ui.no_work_sessions_this_month"), 'hint'));

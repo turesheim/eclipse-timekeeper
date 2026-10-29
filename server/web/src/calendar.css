@@ -1,9 +1,9 @@
 /* Calendar lanes share wall-clock rows; shaded cells represent DST gaps. */
 /* Fill the space above navigation; short windows can still scroll the page. */
-body:has(#workspace[data-view=calendar]:not([hidden])) {
+body:has(#workspace:is([data-view=calendar],[data-view=today]):not([hidden])) {
   display:flex;flex-direction:column;height:100dvh;
   & > .app-header { flex-shrink:0; }
-  & > main { display:flex;flex-direction:column;flex:1;width:100%;margin-block:0;padding-bottom:calc(var(--workspace-nav-height) + .5rem); }
+  & > main { display:flex;flex-direction:column;flex:1;width:100%;margin-block:0;padding-bottom:calc(var(--workspace-nav-height) + var(--workspace-content-gap)); }
   & #workspace { display:flex;flex-direction:column;flex:1;padding-bottom:0; }
   & #work-session { flex-shrink:0; }
   & #calendar-panel { display:flex;flex-direction:column;flex:1; }

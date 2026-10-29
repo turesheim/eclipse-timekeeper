@@ -65,7 +65,7 @@ export class TodayView {
   sizeEditor(){
     if(!this.visible||!this.root.offsetParent)return;
     const top=this.journalRoot.getBoundingClientRect().top+scrollY,navHeight=byId('workspace-navigation').getBoundingClientRect().height;
-    this.journalRoot.style.setProperty('--today-editor-min-height',Math.max(0,innerHeight-top-navHeight-16)+'px');
+    this.root.style.setProperty('--today-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');
   }
   paintMonth(){
     if(!this.data||!this.month)return;
