@@ -19,6 +19,12 @@ final class DomainTransfer {
             Map.entry("activities","ACTIVITY"),Map.entry("workSessions","WORK_SESSION"),Map.entry("taskConnections","TASK_CONNECTION"),
             Map.entry("taskLists","TASK_LIST"),Map.entry("taskListSections","TASK_SECTION"),Map.entry("taskTombstones","TASK_TOMBSTONE"),
             Map.entry("taskAttachments","TASK_ATTACHMENT"));
+    private static Optional<ExternalTaskProviderData> listProviderData(JsonNode item,String provider) {
+        return optionalProviderData(item.get("providerData")).map(value -> {
+            if(!value.namespace().equals(provider) && !value.namespace().startsWith(provider+".")) throw ApiFailure.validation();
+            return value;
+        });
+    }
     ApiReplies importRecords(JsonNode input) {
         return importRecords(input,item->item.get("data").asText());
     }
@@ -72,7 +78,7 @@ final class DomainTransfer {
             while(!current.get("parentTaskId").isNull()) {
                 UUID parentId=uuid(current.get("parentTaskId"));if(!seen.add(parentId)) throw ApiFailure.validation();
                 JsonNode ancestor=sourceTasks.get(parentId);
-                if(ancestor==null || project.isEmpty() || !optionalText(ancestor.get("projectId")).map(UUID::fromString).equals(project)) throw ApiFailure.validation();
+                if(ancestor==null || !optionalText(ancestor.get("projectId")).map(UUID::fromString).equals(project)) throw ApiFailure.validation();
                 current=ancestor;
             }
         }
@@ -112,7 +118,7 @@ final class DomainTransfer {
             var created=new TaskList(UUID.randomUUID(),required(connections,sourceConnection),item.get("remoteListId").asText(),
                     item.get("name").asText(),TaskListKind.valueOf(item.get("kind").asText()),item.get("readable").asBoolean(),
                     item.get("writable").asBoolean(),item.get("shared").asBoolean(),item.get("owner").asBoolean(),
-                    item.get("present").asBoolean(),item.get("position").asInt(),sharing(item.get("sharing")),0);
+                    item.get("present").asBoolean(),item.get("position").asInt(),sharing(item.get("sharing")),listProviderData(item,sourceConnectionRecords.get(sourceConnection).path("providerId").asText()),0);
             store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
             lists.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_LIST",item,created.id());
@@ -123,7 +129,8 @@ final class DomainTransfer {
             if(!sectionKeys.add(key)) throw ApiFailure.validation();
             var created=new TaskListSection(UUID.randomUUID(),required(lists,sourceList),item.get("remoteSectionId").asText(),
                     item.get("name").asText(),TaskListSectionKind.valueOf(item.get("kind").asText()),item.get("position").asInt(),
-                    item.get("present").asBoolean(),item.get("writable").asBoolean(),0);
+                    item.get("present").asBoolean(),item.get("writable").asBoolean(),
+                    listProviderData(item,sourceConnectionRecords.get(uuid(sourceLists.get(sourceList).get("connectionId"))).path("providerId").asText()),0);
             store.save("TASK_SECTION",created);store.change("TASK_SECTION","CREATED",created.id().toString());
             sections.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_SECTION",item,created.id());
@@ -181,6 +188,17 @@ final class DomainTransfer {
             }
             if(!progressed) throw ApiFailure.validation();
         }
+        // A historical baseline parent may be created later in the graph. Finish
+        // baseline remapping only after every imported task has its new owned ID.
+        Map<UUID,UUID> taskIds=new HashMap<>();tasks.forEach((source,target) -> taskIds.put(source,target.value()));
+        for(TaskId id:tasks.values()) {
+            var task=service.task(id).orElseThrow(ApiFailure::notFound);
+            for(var reference:task.externalReferences()) {
+                var remapped=remapBaseline(reference.baseline(),taskIds,lists,sections);
+                if(!remapped.equals(reference.baseline()))
+                    task=service.updateExternalTaskSyncState(new UpdateExternalTaskSyncState(task.id(),task.version(),reference.key(),reference.source(),remapped));
+            }
+        }
         for(JsonNode item:input.path("taskAttachments")) {
             UUID targetTask=required(tasks,uuid(item.get("taskId"))).value();
             var created=new TaskAttachment(UUID.randomUUID(),targetTask,item.get("fileName").asText(),
@@ -214,6 +232,27 @@ final class DomainTransfer {
         if(!fields.isEmpty()) store.clientDetails(type,id,fields);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
+    private static Optional<ExternalTaskBaseline> remapBaseline(Optional<ExternalTaskBaseline> baseline,
+            Map<UUID,UUID> tasks,Map<UUID,UUID> lists,Map<UUID,UUID> sections) {
+        return baseline.map(previous -> {
+            var fields=(ObjectNode)parse(previous.json()).deepCopy();
+            if(!remapBaselineId(fields,"parentTaskId",tasks)) fields.remove(List.of("parentTaskId","siblingOrder"));
+            boolean listKnown=remapBaselineId(fields,"taskListId",lists);
+            boolean sectionKnown=remapBaselineId(fields,"sectionId",sections);
+            if(!listKnown || !sectionKnown) fields.remove(List.of("taskListId","sectionId"));
+            if(fields.equals(parse(previous.json()))) return previous;
+            return new ExternalTaskBaseline(previous.version(),previous.capturedAt(),canonical(fields).toString());
+        });
+    }
+    /** Unknown historical IDs invalidate only their comparison group, never provider payloads. */
+    private static boolean remapBaselineId(ObjectNode fields,String field,Map<UUID,UUID> ids) {
+        var value=fields.get(field);if(value==null || value.isNull()) return true;
+        if(!value.isTextual()) return false;
+        try {
+            var target=ids.get(UUID.fromString(value.asText()));if(target==null) return false;
+            fields.put(field,target.toString());return true;
+        } catch(IllegalArgumentException invalid) {return false;}
+    }
     private static Set<ExternalTaskReference> remapReferences(JsonNode values,Map<UUID,UUID> lists,Map<UUID,UUID> sections) {
         Set<ExternalTaskReference> result=new LinkedHashSet<>();
         for(var reference:references(values)) result.add(reference.withLocation(reference.taskListId().map(id -> required(lists,id)),reference.sectionId().map(id -> required(sections,id))));

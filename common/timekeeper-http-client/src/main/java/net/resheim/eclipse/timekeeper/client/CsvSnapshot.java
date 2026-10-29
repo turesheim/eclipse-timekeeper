@@ -92,6 +92,8 @@ public final class CsvSnapshot {
                 for(var item:items) if(item.getAsJsonObject().has("capabilities")) {names.add("capabilities");break;}
             if(table.getKey().equals("taskLists"))
                 for(var item:items) if(item.getAsJsonObject().has("sharing")) {names.add("sharing");break;}
+            if(List.of("taskLists","taskListSections").contains(table.getKey()))
+                for(var item:items) if(item.getAsJsonObject().has("providerData")) {names.add("providerData");break;}
             if(table.getKey().equals("tasks"))
                 for(var item:items) if(TASK_EXTRAS.stream().anyMatch(item.getAsJsonObject()::has)) {names.add("taskExtras");break;}
             StringBuilder csv = new StringBuilder();row(csv, names);
@@ -99,6 +101,9 @@ public final class CsvSnapshot {
                 List<String> fields = new ArrayList<>();
                 for (String column : names) {
                     JsonElement value = item.getAsJsonObject().get(column);
+                    if(column.equals("providerData")) {
+                        fields.add(value==null?null:value.toString());continue;
+                    }
                     if(column.equals("taskExtras")) {
                         var extras=new JsonObject();for(String field:TASK_EXTRAS) if(item.getAsJsonObject().has(field)) extras.add(field,item.getAsJsonObject().get(field));
                         value=extras;
@@ -168,6 +173,7 @@ public final class CsvSnapshot {
                 if(table.getKey().equals("projects") && names.contains("icon")) expected.add("icon");
                 if(table.getKey().equals("taskConnections") && names.contains("capabilities")) expected.add("capabilities");
                 if(table.getKey().equals("taskLists") && names.contains("sharing")) expected.add("sharing");
+                if(List.of("taskLists","taskListSections").contains(table.getKey()) && names.contains("providerData")) expected.add("providerData");
                 if(table.getKey().equals("tasks") && names.contains("taskExtras")) expected.add("taskExtras");
                 if(table.getKey().equals("tasks") && (metadata.has("taskExtras") != names.contains("taskExtras")
                         || metadata.has("taskExtras") && (!metadata.get("taskExtras").isJsonPrimitive()
@@ -181,7 +187,7 @@ public final class CsvSnapshot {
                     JsonObject item = new JsonObject();
                     for (int i = 0; i < fields.size(); i++) {
                         String column = names.get(i), value = fields.get(i);
-                        if ((column.equals("title") || column.equals("icon") || column.equals("capabilities") || column.equals("sharing")
+                        if ((column.equals("title") || column.equals("icon") || column.equals("capabilities") || column.equals("sharing") || column.equals("providerData")
                                 || table.getKey().equals("taskAttachments") && List.of("providerId","remoteId").contains(column)) && value == null) continue; // Optional metadata in mixed exports.
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("taskExtras")) {
@@ -192,6 +198,8 @@ public final class CsvSnapshot {
                             }
                         } else if(column.equals("capabilities")) {
                             JsonElement data=JsonParser.parseString(value);if(!data.isJsonObject()) throw invalid();item.add(column,data);
+                        } else if(column.equals("providerData")) {
+                            JsonElement data=JsonParser.parseString(value);if(!data.isJsonNull() && !data.isJsonObject()) throw invalid();item.add(column,data);
                         } else if(column.equals("sharing")) {
                             JsonElement data=JsonParser.parseString(value);if(!data.isJsonObject()) throw invalid();item.add(column,data);
                         } else if (column.equals("externalReferences") || column.equals("labelIds")) {

@@ -20,7 +20,8 @@ import jakarta.ws.rs.core.Response;
 /** Account-scoped WebDAV view of daily and ISO-week Markdown documents. */
 @Path("/dav/journal") @Blocking
 public class JournalDavResource {
-    private static final String ROOT="/dav/journal/";
+    @jakarta.ws.rs.core.Context jakarta.ws.rs.core.UriInfo uri;
+    private String root(){return JournalDavPaths.root(uri);}
     private static final String DAV="1";
     private static final String FILE_ALLOW="OPTIONS, PROPFIND, GET, HEAD, PUT, DELETE";
     private static final String ROOT_ALLOW="OPTIONS, PROPFIND";
@@ -84,7 +85,7 @@ public class JournalDavResource {
             int level=depth(depth);var xml=new StringBuilder("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\">");
             collection(xml);
             if(level!=0){
-                xml.append("<D:response><D:href>").append(ROOT).append("assets/</D:href><D:propstat><D:prop>")
+                xml.append("<D:response><D:href>").append(root()).append("assets/</D:href><D:propstat><D:prop>")
                         .append("<D:displayname>assets</D:displayname><D:resourcetype><D:collection/></D:resourcetype>")
                         .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
                 var notes=new DayNotes(store);for(var date:notes.presentDates())file(xml,file(date+".md"));
@@ -107,15 +108,15 @@ public class JournalDavResource {
         if(depth.equals("0"))return 0;
         throw ApiFailure.badRequest();
     }
-    private static void collection(StringBuilder xml){
-        xml.append("<D:response><D:href>").append(ROOT).append("</D:href><D:propstat><D:prop>")
+    private void collection(StringBuilder xml){
+        xml.append("<D:response><D:href>").append(root()).append("</D:href><D:propstat><D:prop>")
                 .append("<D:displayname>journal</D:displayname><D:resourcetype><D:collection/></D:resourcetype>")
                 .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
     }
-    private static void file(StringBuilder xml,NoteFile file){
+    private void file(StringBuilder xml,NoteFile file){
         byte[] bytes=file.document();if(bytes==null)return;
         Instant modified=file.modifiedAt();
-        xml.append("<D:response><D:href>").append(ROOT).append(file.filename()).append("</D:href><D:propstat><D:prop>")
+        xml.append("<D:response><D:href>").append(root()).append(file.filename()).append("</D:href><D:propstat><D:prop>")
                 .append("<D:displayname>").append(file.filename()).append("</D:displayname><D:resourcetype/>")
                 .append("<D:getcontenttype>text/markdown</D:getcontenttype><D:getcontentlength>").append(bytes.length).append("</D:getcontentlength>")
                 .append("<D:getetag>").append(etag(file.get())).append("</D:getetag>")
@@ -164,7 +165,7 @@ public class JournalDavResource {
             }
             var value=file.save(current,bytes);
             var response=Response.status(existed?204:201).header("ETag",etag(value));
-            if(!existed)response.header("Location",ROOT+filename);
+            if(!existed)response.header("Location",root()+filename);
             return response.build();
         });
     }

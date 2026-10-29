@@ -161,6 +161,15 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
     @Override public List<TaskConnection> taskConnections() {return page("task-connections",Map.of()).items().stream().map(WireValues::taskConnection).toList();}
     @Override public TaskList createTaskList(CreateTaskList command) {var body=object();body.addProperty("connectionId",command.connectionId().toString());body.addProperty("remoteListId",command.remoteListId());taskListFields(body,command.name(),command.kind(),command.readable(),command.writable(),command.shared(),command.owner(),command.present(),command.position());return WireValues.taskList(create("task-lists",body));}
     @Override public TaskList updateTaskList(UpdateTaskList command) {var body=object();taskListFields(body,command.name(),command.kind(),command.readable(),command.writable(),command.shared(),command.owner(),command.present(),command.position());return WireValues.taskList(put("/task-lists/"+command.id(),command.expectedVersion(),body));}
+    @Override public TaskList updateTaskListProviderData(UpdateTaskListProviderData command) {
+        String path="/task-lists/"+command.id();return WireValues.taskList(remember(path,request("PUT",path+"/provider-data",listProviderData(command.providerData()),Map.of("If-Match",match(path,command.expectedVersion())))));
+    }
+    @Override public TaskListSection updateTaskListSectionProviderData(UpdateTaskListSectionProviderData command) {
+        String path="/task-list-sections/"+command.id();return WireValues.taskListSection(remember(path,request("PUT",path+"/provider-data",listProviderData(command.providerData()),Map.of("If-Match",match(path,command.expectedVersion())))));
+    }
+    private static JsonObject listProviderData(Optional<ExternalTaskProviderData> value) {
+        var body=object();body.add("providerData",value.<JsonElement>map(WireValues::providerData).orElse(JsonNull.INSTANCE));return body;
+    }
     @Override public TaskList updateTaskListSharing(UpdateTaskListSharing command) {String path="/task-lists/"+command.id();return WireValues.taskList(remember(path,
             request("PUT",path+"/sharing",WireValues.sharing(command.sharing()),Map.of("If-Match",match(path,command.expectedVersion())))));}
     @Override public void deleteTaskList(UUID id,long expectedVersion) {delete("/task-lists/"+id,expectedVersion);}

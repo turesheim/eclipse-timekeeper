@@ -1680,7 +1680,7 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1828,7 +1828,7 @@
             }
           }
         },
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1894,7 +1894,7 @@
     "/activities/active": {
       "get": {
         "operationId": "getActiveActivity",
-        "summary": "Read the authenticated owner’s current interval",
+        "summary": "Read the authenticated owner\u2019s current interval",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -1959,7 +1959,7 @@
     "/activities/start": {
       "post": {
         "operationId": "startActivity",
-        "summary": "Atomically activate or switch the owner’s task",
+        "summary": "Atomically activate or switch the owner\u2019s task",
         "x-required-permission": "write",
         "responses": {
           "201": {
@@ -2140,7 +2140,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2210,7 +2210,7 @@
       },
       "put": {
         "operationId": "updateProfile",
-        "summary": "Set the owner’s reporting time zone",
+        "summary": "Set the owner\u2019s reporting time zone",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -2340,7 +2340,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Use the owner’s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
+        "description": "Use the owner\u2019s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
         "parameters": [
           {
             "name": "from",
@@ -2440,7 +2440,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner’s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
+        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner\u2019s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
         "parameters": [
           {
             "name": "after",
@@ -3452,7 +3452,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -7566,7 +7566,7 @@
       },
       "get": {
         "operationId": "listPendingAccountArchives",
-        "summary": "List this account’s resumable archive uploads",
+        "summary": "List this account\u2019s resumable archive uploads",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -8050,7 +8050,7 @@
     "/data/account/imports": {
       "get": {
         "operationId": "listAccountArchiveRestores",
-        "summary": "List this account’s completed archive restores",
+        "summary": "List this account\u2019s completed archive restores",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -10589,7 +10589,7 @@
             }
           }
         },
-        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
+        "description": "Conditional replacement or explicit clearing of one linked identity\u2019s provider-data envelope. Legacy link and source updates preserve the envelope."
       }
     },
     "/task-connections": {
@@ -12834,7 +12834,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "Matches a deleted task’s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
+        "description": "Matches a deleted task\u2019s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
       }
     },
     "/task-list-sections": {
@@ -15598,7 +15598,7 @@
     "/admin/instance/uploads/{id}/staging": {
       "get": {
         "operationId": "getInstanceRestoreStage",
-        "summary": "Read the initiating session’s restore preparation status",
+        "summary": "Read the initiating session\u2019s restore preparation status",
         "tags": [
           "Accounts"
         ],
@@ -15870,6 +15870,196 @@
           }
         }
       }
+    },
+    "/task-lists/{id}/provider-data": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskListProviderData",
+        "summary": "Replace provider-observed list metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListProviderDataInput"
+              }
+            }
+          }
+        },
+        "description": "Owner-scoped conditional whole-envelope replacement. Preserves payload keys during ordinary edits and transfers. Provider namespace must match the owning connection; credentials are forbidden. Null explicitly clears the envelope."
+      }
+    },
+    "/task-list-sections/{id}/provider-data": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskListSectionProviderData",
+        "summary": "Replace provider-observed section metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListSection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListProviderDataInput"
+              }
+            }
+          }
+        },
+        "description": "Owner-scoped conditional whole-envelope replacement. Preserves payload keys during ordinary edits and transfers. Provider namespace must match the owning connection; credentials are forbidden. Null explicitly clears the envelope."
+      }
     }
   },
   "components": {
@@ -16050,7 +16240,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -16422,7 +16612,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -17040,7 +17230,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -17630,7 +17820,7 @@
             ]
           },
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -25320,6 +25510,17 @@
           "sharing": {
             "$ref": "#/components/schemas/TaskListSharing",
             "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
+          },
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-observed list or section metadata. Omitted legacy values read as null. Ordinary edits preserve the envelope, including unknown payload keys."
           }
         },
         "required": [
@@ -25700,6 +25901,17 @@
           "sharing": {
             "$ref": "#/components/schemas/TaskListSharing",
             "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
+          },
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-observed list or section metadata. Omitted legacy values read as null. Ordinary edits preserve the envelope, including unknown payload keys."
           }
         },
         "required": [
@@ -26437,7 +26649,7 @@
           "baseline"
         ],
         "additionalProperties": false,
-        "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
+        "description": "Atomically replace a linked identity\u2019s source revision and last-common field snapshot. Null baseline clears the snapshot."
       },
       "TaskTombstone": {
         "type": "object",
@@ -26708,6 +26920,17 @@
           },
           "writable": {
             "type": "boolean"
+          },
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-observed list or section metadata. Omitted legacy values read as null. Ordinary edits preserve the envelope, including unknown payload keys."
           }
         },
         "required": [
@@ -26785,6 +27008,17 @@
           },
           "writable": {
             "type": "boolean"
+          },
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-observed list or section metadata. Omitted legacy values read as null. Ordinary edits preserve the envelope, including unknown payload keys."
           }
         },
         "required": [
@@ -27305,7 +27539,7 @@
         "description": "Presence is the field mask; explicit null clears nullable fields. Unobserved fields are omitted.",
         "properties": {
           "summary": {
-            "$ref": "#/components/schemas/Name"
+            "$ref": "#/components/schemas/TaskSummary"
           },
           "url": {
             "anyOf": [
@@ -27406,18 +27640,26 @@
             "description": "Ordered checklist items distinct from parentTaskId subtasks."
           },
           "recurrence": {
-            "$ref": "#/components/schemas/TaskRecurrence"
+            "$ref": "#/components/schemas/TaskSyncRecurrenceFields"
           },
           "reminders": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaskReminder"
-            },
-            "maxItems": 100,
-            "default": []
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TaskReminder"
+                },
+                "maxItems": 100,
+                "default": []
+              },
+              {
+                "$ref": "#/components/schemas/TaskSyncReminderFields"
+              }
+            ],
+            "description": "Prefer a per-kind mask. Legacy arrays observe all five kinds, including empty groups. Task resources and ordinary reminder writes remain arrays."
           },
           "metadata": {
-            "$ref": "#/components/schemas/TaskMetadata"
+            "$ref": "#/components/schemas/TaskSyncMetadataFields"
           },
           "taskListId": {
             "anyOf": [
@@ -27563,8 +27805,18 @@
               "siblingOrder",
               "checklistItems",
               "recurrence",
+              "recurrence.series",
+              "recurrence.occurrences",
               "reminders",
+              "reminders.ABSOLUTE",
+              "reminders.RELATIVE",
+              "reminders.LOCATION",
+              "reminders.CAR",
+              "reminders.MESSAGE",
               "metadata",
+              "metadata.tags",
+              "metadata.categories",
+              "metadata.links",
               "taskListId",
               "sectionId",
               "assignment"
@@ -27829,8 +28081,18 @@
               "siblingOrder",
               "checklistItems",
               "recurrence",
+              "recurrence.series",
+              "recurrence.occurrences",
               "reminders",
+              "reminders.ABSOLUTE",
+              "reminders.RELATIVE",
+              "reminders.LOCATION",
+              "reminders.CAR",
+              "reminders.MESSAGE",
               "metadata",
+              "metadata.tags",
+              "metadata.categories",
+              "metadata.links",
               "taskListId",
               "sectionId",
               "assignment"
@@ -29389,6 +29651,137 @@
             "type": "string"
           }
         }
+      },
+      "TaskSyncMetadataFields": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskLink"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "Observed metadata components. Omission means unobserved; an empty array explicitly clears only that component."
+      },
+      "TaskSyncReminderFields": {
+        "type": "object",
+        "description": "Per-kind observation mask. Omit unobserved kinds; an empty array clears only that kind. Total reminders after merging must be at most 100 with unique IDs across all kinds.",
+        "properties": {
+          "ABSOLUTE": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminderAbsolute"
+            },
+            "maxItems": 100
+          },
+          "RELATIVE": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminderRelative"
+            },
+            "maxItems": 100
+          },
+          "LOCATION": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminderLocation"
+            },
+            "maxItems": 100
+          },
+          "CAR": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminderCar"
+            },
+            "maxItems": 100
+          },
+          "MESSAGE": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminderMessage"
+            },
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskListProviderDataInput": {
+        "type": "object",
+        "properties": {
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-observed list or section metadata. Omitted legacy values read as null. Ordinary edits preserve the envelope, including unknown payload keys."
+          }
+        },
+        "required": [
+          "providerData"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit whole-envelope replacement or null to clear; namespace must match the list connection provider or its dotted subnamespace. Does not write to the provider or grant access."
+      },
+      "TaskSyncRecurrenceFields": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSeries"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskOccurrence"
+            },
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false,
+        "description": "Partial recurrence observation mask. Omitted series or occurrences are unobserved. Null series and empty occurrences are explicit clears. Nonempty occurrences require a known series; preserve unobserved history."
+      },
+      "TaskSummary": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "pattern": "\\S",
+        "description": "Task title, allowing the full Google Tasks v1 limit. Other resource names retain their own limit."
       }
     },
     "parameters": {
@@ -29737,7 +30130,7 @@
     },
     {
       "name": "Accounts",
-      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user’s business data."
+      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user\u2019s business data."
     }
   ]
 }

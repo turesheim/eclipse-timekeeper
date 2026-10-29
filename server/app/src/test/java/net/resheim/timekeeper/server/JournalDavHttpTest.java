@@ -22,6 +22,48 @@ class JournalDavHttpTest {
         String basic=Base64.getEncoder().encodeToString(("any-user:"+token).getBytes(StandardCharsets.UTF_8));
         return given().header("Authorization","Basic "+basic);
     }
+    @Test void legacyCollectionAliasSharesAuthenticationDocumentsAndConditionalVersions(){
+        String alias="/remote.php/webdav/",filename="2026-08-14.md",source="---\r\ncustom: retained\r\n---\r\n# Journal æ\r\n";
+        var unauthenticated=given().request("PROPFIND",alias);
+        assertEquals(401,unauthenticated.statusCode());
+        assertEquals("Basic realm=\"Timekeeper journal\"",unauthenticated.header("WWW-Authenticate"));
+        assertEquals("Basic realm=\"Timekeeper journal\"",given().request("PROPFIND",alias+"assets/").header("WWW-Authenticate"));
+        var invalid=client("not-a-valid-token").get(alias+filename);
+        assertEquals(401,invalid.statusCode());
+        assertEquals("Basic realm=\"Timekeeper journal\"",invalid.header("WWW-Authenticate"));
+        assertEquals(401,given().header("Authorization","Bearer test-a").get(alias+filename).statusCode());
+        var created=client("test-a").header("If-None-Match","*").body(source.getBytes(StandardCharsets.UTF_8)).put(alias+filename);
+        assertEquals(201,created.statusCode());String first=created.header("ETag");
+        assertEquals(alias+filename,java.net.URI.create(created.header("Location")).getPath());
+        assertEquals(source,client("test-a").get(ROOT+filename).asString());
+        assertEquals(first,client("test-a").head(ROOT+filename).header("ETag"));
+        var listing=client("test-a").header("Depth","1").request("PROPFIND",alias);
+        assertEquals(207,listing.statusCode());assertTrue(listing.asString().contains(alias+filename));
+        assertTrue(listing.asString().contains(alias+"assets/"));assertFalse(listing.asString().contains(ROOT));
+        assertEquals(207,client("test-read").header("Depth","0").request("PROPFIND",alias).statusCode());
+        assertEquals(403,client("test-read").header("If-Match",first).body("denied").put(alias+filename).statusCode());
+        assertEquals(404,client("test-b").get(alias+filename).statusCode());
+        assertEquals(428,client("test-a").body("unguarded").put(alias+filename).statusCode());
+        assertEquals(428,client("test-a").delete(alias+filename).statusCode());
+        var changed=client("test-a").header("If-Match",first).body((source+"changed\n").getBytes(StandardCharsets.UTF_8)).put(ROOT+filename);
+        assertEquals(204,changed.statusCode());
+        assertEquals(412,client("test-a").header("If-Match",first).delete(alias+filename).statusCode());
+        assertEquals(204,client("test-a").header("If-Match",changed.header("ETag")).delete(alias+filename).statusCode());
+        assertEquals(404,client("test-a").get(ROOT+filename).statusCode());
+        assertEquals(405,client("test-a").delete(alias).statusCode());
+        String asset="assets/alias-proof.txt";
+        var uploaded=client("test-a").header("If-None-Match","*").body("attachment æ".getBytes(StandardCharsets.UTF_8)).put(alias+asset);
+        assertEquals(201,uploaded.statusCode());String assetTag=uploaded.header("ETag");
+        assertArrayEquals("attachment æ".getBytes(StandardCharsets.UTF_8),client("test-a").get(ROOT+asset).asByteArray());
+        var assets=client("test-a").header("Depth","1").request("PROPFIND",alias+"assets/");
+        assertEquals(207,assets.statusCode());assertTrue(assets.asString().contains(alias+asset));
+        assertFalse(assets.asString().contains(ROOT));
+        assertEquals(404,client("test-b").get(alias+asset).statusCode());
+        assertEquals(428,client("test-a").delete(alias+asset).statusCode());
+        assertEquals(204,client("test-a").header("If-Match",assetTag).delete(alias+asset).statusCode());
+        assertEquals(404,client("test-a").get(ROOT+asset).statusCode());
+
+    }
     @Test void weeklyDocumentsUseIsoFilenamesAndConditionalWebDavWrites(){
         String file=ROOT+"2026-W44.md",body="# Weekly plan\r\n- [ ] Ship  \r\n";
         assertEquals(404,client("test-a").body("bad").put(ROOT+"2025-W53.md").statusCode());

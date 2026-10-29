@@ -300,6 +300,31 @@ using the proposed fields.
 The [connector protocol](TASK-SYNC-PROTOCOL.md) documents page commits,
 stable retries, authorization, recovery, and reviewed deletion.
 
+Provider lists and sections can retain an optional `providerData` envelope,
+using the same `namespace`, positive `version`, and object `payload` contract as
+external task references. This holds observed list type, grocery/list grouping,
+icons, colors, pinning, or future provider fields without pretending every
+provider exposes those concepts. It is independent of list permissions and
+Timekeeper projects. A namespace must equal the owning connection's provider ID
+or start with that ID plus a dot. Payload credentials remain forbidden; the
+serialized payload is limited to 65,536 characters.
+
+`PUT /task-lists/{id}/provider-data` and
+`PUT /task-list-sections/{id}/provider-data` take a required `providerData`
+property containing the complete envelope or explicit `null` to clear it. Both
+require owner write permission and the record's `If-Match` ETag. Omitting that
+property is invalid. A replacement deliberately replaces the entire envelope:
+a connector must first preserve payload keys it does not understand and retry
+from a fresh ETag on conflict. Ordinary list, sharing, and section updates
+preserve the envelope. These endpoints store observations locally; they do not
+write to a provider or imply provider capabilities.
+
+Older stored records and exports may omit the field; domain/HTTP clients treat
+that as no envelope. Account ZIPs and portable JSON/CSV transfers retain unknown
+nested payload values while remapping Timekeeper list/section IDs. Provider
+payload identifiers stay opaque and are not rewritten. The existing H2 and
+PostgreSQL owner-scoped JSON resource storage needs no SQL layout change.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish
@@ -373,6 +398,31 @@ kinds locally and warn on attempted export; they must never convert them to a
 timed alert or treat a due date as an alert. Apple companion authorization and
 contact resolution remain outside task payloads.
 
+Task sync accepts a partial reminder observation such as
+`{"reminders":{"ABSOLUTE":[]}}`. Omitted kinds are unobserved and preserved;
+empty groups clear only that kind. Capabilities and decisions use the exact
+paths `reminders.ABSOLUTE`, `.RELATIVE`, `.LOCATION`, `.CAR`, and `.MESSAGE`.
+Explicit kind declarations override the older aggregate `reminders` capability.
+Full-array sync input and baselines remain readable as observations of all
+kinds. Partial export returns only eligible changed groups; a complete legacy
+aggregate declaration and baseline retain full-array export. The task read
+model and ordinary reminder endpoint remain arrays. See the
+[connector protocol](TASK-SYNC-PROTOCOL.md#partial-reminder-observations) for
+baseline migration, conflict, collection limits, and provider restrictions.
+
+Task sync recurrence observations use a partial `recurrence` object with
+optional `series` and `occurrences`. Presence is the observation mask, with
+independent capabilities and decisions at `recurrence.series` and
+`recurrence.occurrences`. Missing history is preserved; `series:null` and
+`occurrences:[]` are explicit clears. Preview/apply reject a rule clear that
+would leave dependent unobserved history, and export blocks inconsistent or
+unbased recurrence proposals with `INCOMPLETE_GROUP`. First import cannot infer
+a rule from exceptions alone. Series-only imports retain sparse baselines, so
+the local empty-list default is not mistaken for provider knowledge. Complete
+legacy declarations and baselines remain readable; ordinary recurrence CRUD
+retains its full object. See the [connector protocol](TASK-SYNC-PROTOCOL.md#partial-recurrence-observations)
+for dependencies, compatibility export, normalization and legacy baseline policy.
+
 Task `metadata` stores `tags`, `categories`, and `links` separately. Tags can
 represent Apple Reminders tags; categories can represent Outlook categories.
 Links have stable IDs and `LOCAL`, `PROVIDER_SOURCE`, or `PROVIDER_LINKED` kinds.
@@ -381,6 +431,18 @@ from the editable primary task `url`. Provider links carry a provider ID and
 linked resources can carry a remote ID. `PUT /tasks/{id}/metadata` conditionally
 replaces the full metadata value. Legacy task writes retain it, and connectors
 must use their declared field capabilities before exporting any change.
+
+Task sync observations can supply only the `metadata` components they actually
+read, for example `{"metadata":{"categories":["Work"]}}`. Omitted `tags` or
+`links` are unobserved and remain unchanged; an empty array clears only its own
+component. Capabilities and field decisions use `metadata.tags`,
+`metadata.categories`, and `metadata.links`. An explicit component declaration
+overrides the older aggregate `metadata` capability; the aggregate remains a
+fallback for connectors that can read the complete metadata value. Baselines
+retain their nested JSON representation, including older complete values, and
+set-valued tags/categories compare independently of array order. Export preview
+returns only eligible changed components in its partial `metadata` object.
+The ordinary `PUT /tasks/{id}/metadata` still requires all three components.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
@@ -426,10 +488,20 @@ Portable task CSV adds a `taskExtras` JSON object column when tasks contain
 planning, timing, importance, notes, or sibling order. This preserves optional
 fields, including absent fields in mixed older and newer rows. Its descriptor
 marks the column as required, so an incomplete export is rejected.
+List and section CSV files add an optional `providerData` JSON column when any
+row contains the field. A blank cell preserves absence, while JSON `null`
+preserves an explicit empty envelope in a mixed export. Earlier headers remain
+readable; envelope objects retain unknown nested keys.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
-updates existing records. Source IDs are correlation keys only. A failure leaves
-no partial records, command receipt or events. External identity collisions are
+updates existing records. Normalized baseline task/list/section IDs are remapped
+after all imported tasks exist. If a historical ID is absent, its paired comparison group is omitted
+from the baseline and requires reconciliation; other observations and their
+capture time remain. Provider payload IDs and other opaque strings are retained.
+Unassigned parent/child task trees are valid when both have no project; cycles
+and mismatched project relationships remain invalid. Baseline finalization may
+advance a newly imported task's version. Source IDs are correlation keys only.
+A failure leaves no partial records, command receipt or events. External identity collisions are
 409; invalid graphs are 422. Open imported intervals must respect the existing
 owner's active interval. Import does not implicitly change the configured zone.
 The result maps every source ID to its new ID. Transfer limits are 10,000 records
@@ -437,6 +509,13 @@ per type and 20 MiB; oversized import/export returns 413 without partial data.
 Eclipse CSV and report-template adapters translate domain snapshots locally;
 server API operations must not expose or write embedded persistence tables.
 This is current-model interchange, not historical migration or database backup.
+
+
+Task titles (`TaskSummary`) accept up to 1,024 characters, including the complete
+Google Tasks v1 title limit. Task create/update, sync observation, response and
+portable transfer use this same schema. Other resource names remain limited by
+`Name`; this change does not widen client, project or label names. The web task
+editor uses the same title limit and does not truncate imported titles.
 
 ## Versions and atomic tracking
 
@@ -840,7 +919,11 @@ See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
 authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
-the same owner, authorization and conditional-write rules.
+the same owner, authorization and conditional-write rules. Its finite
+`/remote.php/webdav/` alias exposes the same journal and asset resources for
+MySync; both prefixes require HTTP Basic with the existing API token as password
+and HTTPS outside loopback development. The alias adds no REST API variants or
+independent document state.
 
 ### Private day-label and note diagnostics
 

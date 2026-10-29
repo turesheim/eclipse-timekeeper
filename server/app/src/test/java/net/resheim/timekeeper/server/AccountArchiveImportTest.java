@@ -234,11 +234,22 @@ class AccountArchiveImportTest {
             store.save("TASK_CONNECTION",new TaskConnection(sourceConnection,"microsoft","account-1","Personal",true,true,true,0));
             store.save("TASK_LIST",new TaskList(sourceList,sourceConnection,"remote-list","Flagged emails",TaskListKind.BUILT_IN,
                     true,false,false,true,true,0,new TaskListSharing(Optional.of("owner-1"),List.of(
-                    new TaskListParticipant("owner-1",Optional.of("Alex"),TaskListMemberRole.OWNER))),0));
-            store.save("TASK_SECTION",new TaskListSection(sourceSection,sourceList,"produce","Produce",TaskListSectionKind.GROCERY_CATEGORY,1,true,false,0));return null;
+                    new TaskListParticipant("owner-1",Optional.of("Alex"),TaskListMemberRole.OWNER))),
+                    Optional.of(new ExternalTaskProviderData("microsoft.todo",1,"{\"wellknownListName\":\"flaggedEmails\",\"future\":{\"keep\":[1,null,\"opaque\"]}}")),0));
+            store.save("TASK_SECTION",new TaskListSection(sourceSection,sourceList,"produce","Produce",TaskListSectionKind.GROCERY_CATEGORY,1,true,false,
+                    Optional.of(new ExternalTaskProviderData("microsoft.todo",2,"{\"futureSection\":true}")),0));return null;
         });
         store.transaction("a",()->{store.save("TASK_ATTACHMENT",new TaskAttachment(sourceAttachment,sourceTask,"note.txt","text/plain",4,
                 "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","dGVzdA==",Optional.empty(),Optional.empty(),0));return null;});
+        store.transaction("a",()->{
+            var taskId=new TaskId(sourceTask);var current=store.service().task(taskId).orElseThrow();
+            var fields=object().put("taskListId",sourceList.toString()).put("sectionId",sourceSection.toString());
+            var baseline=new ExternalTaskBaseline(1,Instant.parse("2026-10-28T10:00:00Z"),fields.toString());
+            var opaque=new ExternalTaskProviderData("microsoft.todo",1,fields.toString());
+            var reference=new ExternalTaskReference("microsoft","account-1/remote-list","archive-task",Optional.empty())
+                    .withLocation(Optional.of(sourceList),Optional.of(sourceSection)).withBaseline(Optional.of(baseline)).withProviderData(Optional.of(opaque));
+            store.service().linkExternalReference(new LinkExternalReference(taskId,current.version(),reference));return null;
+        });
         ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=legacySnapshot(file.file());}
         assertEquals(1,archive.path("work").path("taskConnections").size());
         assertEquals(1,archive.path("work").path("taskLists").size());
@@ -253,12 +264,19 @@ class AccountArchiveImportTest {
             assertNotEquals(sourceList.toString(),list.path("id").asText());
             assertEquals(connection.path("id"),list.path("connectionId"));
             assertEquals("Flagged emails",list.path("name").asText());
+            assertEquals(archive.path("work").path("taskLists").get(0).path("providerData"),list.path("providerData"));
+            assertEquals(archive.path("work").path("taskListSections").get(0).path("providerData"),section.path("providerData"));
             assertEquals("owner-1",list.path("sharing").path("remoteOwnerId").asText());
             assertEquals("Alex",list.path("sharing").path("participants").get(0).path("displayName").asText());
             assertNotEquals(sourceSection.toString(),section.path("id").asText());assertEquals(list.path("id"),section.path("taskListId"));
             assertEquals("GROCERY_CATEGORY",section.path("kind").asText());
             assertNotEquals(sourceAttachment.toString(),attachment.path("id").asText());
             assertEquals(store.list("TASK").getFirst().path("id"),attachment.path("taskId"));
+            var task=store.list("TASK").getFirst();var reference=task.path("externalReferences").get(0);
+            assertEquals(list.path("id"),reference.path("baseline").path("fields").path("taskListId"));
+            assertEquals(section.path("id"),reference.path("baseline").path("fields").path("sectionId"));
+            assertEquals(sourceList.toString(),reference.path("providerData").path("payload").path("taskListId").asText());
+            assertEquals(sourceSection.toString(),reference.path("providerData").path("payload").path("sectionId").asText());
             assertEquals("dGVzdA==",attachment.path("data").asText());return null;
         });
     }

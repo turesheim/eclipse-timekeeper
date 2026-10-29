@@ -639,3 +639,19 @@ test('peer session edits preserve an open draft and reject a stale save', async 
   await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Unsaved session draft');await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await removeSessionFixture(request,[session.id]);
 });
+
+test('full provider task titles remain editable without truncation',async({page,request})=>{
+  const title='T'.repeat(1024),task=await createTask(request,title);
+  try {
+    await signIn(page);const row=await openTaskHistory(page,task,request);
+    await row.getByRole('button',{name:'Edit task',exact:true}).click();
+    const summary=page.getByLabel('Summary',{exact:true});
+    await expect(summary).toHaveAttribute('maxlength','1024');await expect(summary).toHaveValue(title);
+    const edited='R'+title.slice(1);await summary.fill(edited);await save(page);
+    expect((await (await api(request,'GET','/tasks/'+task.id)).json()).summary).toBe(edited);
+  } finally {
+    await clearTaskHistory(request);
+    const current=await api(request,'GET','/tasks/'+task.id);
+    await api(request,'DELETE','/tasks/'+task.id,undefined,{'If-Match':current.headers().etag});
+  }
+});

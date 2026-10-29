@@ -28,7 +28,7 @@ public class ProblemMapper implements ExceptionMapper<Exception> {
         var problem=JsonValues.object(); problem.put("type","urn:timekeeper:problem:"+code.toLowerCase(Locale.ROOT).replace('_','-'));
         problem.put("title",code.replace('_',' ')); problem.put("status",status); problem.put("code",code);
         var response=Response.status(status).type("application/problem+json").entity(problem).header("Cache-Control","no-store");
-        if (status==401) response.header("WWW-Authenticate",uri!=null&&uri.getPath().replaceFirst("^/","").startsWith("dav/journal")
+        if (status==401) response.header("WWW-Authenticate",uri!=null&&JournalDavPaths.accepts(uri.getPath().replaceFirst("^/",""))
                 ?"Basic realm=\"Timekeeper journal\"":"Bearer realm=\"timekeeper\""+(error instanceof ApiFailure failure && failure.invalidToken ? ", error=\"invalid_token\"" : ""));
         return response.build();
     }

@@ -22,6 +22,52 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_task_titles_accept_google_limit_without_widening_other_names(self):
+        title='T'*1024
+        value={'projectId':None,'parentTaskId':None,'summary':title,'url':None}
+        for name in ('TaskInput','TaskCreateInput'):
+            self.assertTrue(validator(name).is_valid(value),name)
+            self.assertFalse(validator(name).is_valid({**value,'summary':title+'T'}),name)
+        self.assertTrue(validator('TaskSyncFields').is_valid({'summary':title}))
+        self.assertFalse(validator('TaskSyncFields').is_valid({'summary':title+'T'}))
+        for name in ('Task','TransferTask'):
+            self.assertEqual('#/components/schemas/TaskSummary',CONTRACT['components']['schemas'][name]['properties']['summary']['$ref'])
+        self.assertTrue(validator('Name').is_valid('N'*1000))
+        self.assertFalse(validator('Name').is_valid('N'*1001))
+
+    def test_reminder_observation_masks_are_typed_and_ordinary_writes_stay_arrays(self):
+        absolute={'id':ID,'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-29','time':'09:00','timeZone':'Europe/Oslo'}}
+        for reminders in ({}, {'ABSOLUTE':[]}, {'ABSOLUTE':[absolute]}, [], [absolute]):
+            self.assertTrue(validator('TaskSyncFields').is_valid({'reminders':reminders}))
+        for reminders in (None, {'absolute':[]}, {'ABSOLUTE':None}, {'CAR':[absolute]}, {'UNKNOWN':[]}, {'ABSOLUTE':[absolute]*101}):
+            self.assertFalse(validator('TaskSyncFields').is_valid({'reminders':reminders}))
+        self.assertFalse(validator('TaskRemindersInput').is_valid({'reminders':{'ABSOLUTE':[]}}))
+        for kind in ('ABSOLUTE','RELATIVE','LOCATION','CAR','MESSAGE'):
+            self.assertTrue(validator('TaskSyncFieldDecision').is_valid({'field':'reminders.'+kind,'outcome':'REMOTE_ONLY'}))
+            self.assertTrue(validator('TaskSyncExportWarning').is_valid({'field':'reminders.'+kind,'reason':'NOT_WRITABLE'}))
+
+    def test_provider_list_envelopes_are_optional_and_explicitly_cleared(self):
+        envelope={'namespace':'icloud.reminders','version':1,'payload':{'future':{'unknown':[1,None,'retain']}}}
+        for value in (envelope,None):
+            self.assertTrue(validator('TaskListProviderDataInput').is_valid({'providerData':value}))
+        for value in ({}, {'providerData':{'namespace':'icloud','version':0,'payload':{}}}, {'providerData':{**envelope,'payload':[]}}, {'providerData':envelope,'ownerId':ID}):
+            self.assertFalse(validator('TaskListProviderDataInput').is_valid(value))
+        for name in ('TaskList','TaskListSection','TransferTaskList','TransferTaskListSection'):
+            self.assertIn('providerData',CONTRACT['components']['schemas'][name]['properties'])
+            self.assertNotIn('providerData',CONTRACT['components']['schemas'][name]['required'])
+
+    def test_sync_recurrence_uses_a_partial_mask_but_ordinary_edits_remain_complete(self):
+        rule={'rule':'FREQ=WEEKLY;BYDAY=MO','end':'COUNT','until':None,'count':8}
+        for value in ({}, {'series':rule}, {'series':None}, {'occurrences':[]}, {'series':None,'occurrences':[]}):
+            self.assertTrue(validator('TaskSyncFields').is_valid({'recurrence':value}))
+        for value in (None, {'unknown':[]}, {'occurrences':None}, {'series':{}}, {'series':rule,'extra':True}):
+            self.assertFalse(validator('TaskSyncFields').is_valid({'recurrence':value}))
+        self.assertFalse(validator('TaskRecurrence').is_valid({'series':rule}))
+        self.assertTrue(validator('TaskRecurrence').is_valid({'series':rule,'occurrences':[]}))
+        for field in ('recurrence.series','recurrence.occurrences'):
+            self.assertTrue(validator('TaskSyncFieldDecision').is_valid({'field':field,'outcome':'INCOMPLETE_GROUP'}))
+            self.assertTrue(validator('TaskSyncExportWarning').is_valid({'field':field,'reason':'INCOMPLETE_GROUP'}))
+
     def test_complete_openapi_document(self):
         validate(CONTRACT)
         for schema in CONTRACT['components']['schemas'].values():
@@ -219,6 +265,16 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskMetadata').is_valid({**body,'tags':['Personal','Personal']}))
         self.assertFalse(validator('TaskLink').is_valid({**link,'url':'javascript:alert(1)'}))
         self.assertEqual('updateTaskMetadata',CONTRACT['paths']['/tasks/{id}/metadata']['put']['operationId'])
+
+    def test_task_sync_metadata_uses_component_presence_without_weakening_full_metadata_writes(self):
+        for value in ({'categories':['Work']},{'tags':[]},{'links':[]},{}):
+            validator('TaskSyncFields').validate({'metadata':value})
+        for value in ({'categories':None},{'unknown':[]},{'tags':['Duplicate','Duplicate']}):
+            self.assertFalse(validator('TaskSyncFields').is_valid({'metadata':value}))
+        self.assertFalse(validator('TaskMetadata').is_valid({'categories':['Work']}))
+        for field in ('metadata.tags','metadata.categories','metadata.links'):
+            validator('TaskSyncFieldDecision').validate({'field':field,'outcome':'REMOTE_ONLY'})
+            validator('TaskSyncExportWarning').validate({'field':field,'reason':'NOT_WRITABLE'})
 
     def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
         body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
@@ -553,8 +609,8 @@ class ContractTest(unittest.TestCase):
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
-            'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
-            'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
+            'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskListSection', 'updateTaskListSection', 'updateTaskListSectionProviderData', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync', 'importTaskSyncItem', 'applyTaskSyncItem', 'previewTaskSyncExport',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',

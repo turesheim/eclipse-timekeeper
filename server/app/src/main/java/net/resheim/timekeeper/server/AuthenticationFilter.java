@@ -24,7 +24,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     @Context io.vertx.core.http.HttpServerRequest serverRequest;
     @Override public void filter(ContainerRequestContext request) {
         String path=request.getUriInfo().getPath();if(path.startsWith("/")) path=path.substring(1);
-        if(path.equals("dav/journal")||path.equals("dav/journal/")||path.startsWith("dav/journal/")){
+        if(JournalDavPaths.accepts(path)){
             dav(request);return;
         }
         if (!(path.equals("api/v1") || path.startsWith("api/v1/")) || path.equals("api/v1/openapi.json")) return;

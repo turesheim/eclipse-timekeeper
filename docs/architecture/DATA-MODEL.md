@@ -429,6 +429,17 @@ deleting a list while sections remain. The section catalog does not change
 Timekeeper projects or infer sections for providers that lack them. Archive and
 portable transfer include sections and remap their list IDs; older snapshots
 without sections remain valid.
+Both `TaskList` and `TaskListSection` carry optional `providerData` using the
+namespaced, versioned `ExternalTaskProviderData` envelope. It stores only
+provider-observed metadata without a normalized field, including future list
+and grocery metadata. Namespace ownership follows the connection through the
+list; it is checked on API writes and portable/account import. Missing legacy
+fields decode to an empty Optional. Ordinary updates retain the envelope;
+conditional dedicated updates replace it or explicitly clear it. Unknown JSON
+keys survive account ZIP and portable JSON/CSV transfers. Payload IDs remain
+opaque, while Timekeeper parent IDs are remapped. Storage remains in the
+existing owner-scoped JSON resource on both H2 and PostgreSQL, with no new SQL
+columns or invented metadata for existing rows.
 An external task reference may include the stable Timekeeper `taskListId`.
 Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's
@@ -447,6 +458,14 @@ relation. It stores file name, media type, byte count, SHA-256, bounded Base64
 content, and optional provider/remote identity. Content is verified before
 storage, and deleting the task cascades attachment deletion. Portable transfer
 and account archives retain the verified bytes and remap the parent task ID.
+
+Portable/account import remaps the normalized Timekeeper IDs in external task
+baselines after creating the complete task graph. Historical IDs absent from
+the imported graph invalidate only their paired comparison group; other fields,
+provider payload IDs and the original observation time remain. Such omitted
+baseline fields require reconciliation before synchronization. Parent/child
+trees may be unassigned to a project when both sides are unassigned; cycles and
+cross-project parents are rejected.
 
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
@@ -556,8 +575,12 @@ The time-overlap calculation does not create a persistent association.
 
 ## Server day notes and WebDAV
 
+The canonical HTTP collection `/dav/journal/` and its MySync-compatible
+`/remote.php/webdav/` alias address these same owner-scoped resources, including
+`assets/`. They share token authorization, data, ETags and guarded mutations.
+
 The server has a separate physical schema from embedded Eclipse storage
-(`ServerSchema.CURRENT` is 7). Day notes and their deletion markers reuse
+(`ServerSchema.CURRENT` is 9). Day notes and their deletion markers reuse
 `tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
 PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
 These are logical row types, not extra SQL tables or Eclipse JPA entities.

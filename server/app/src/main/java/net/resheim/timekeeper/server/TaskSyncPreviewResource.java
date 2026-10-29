@@ -23,12 +23,31 @@ import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.*;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
 
-/** Read-only, field-level reconciliation preview for one provider list page. */
+/** Owner-scoped, guarded field-level reconciliation for provider task observations. */
 @Path("/api/v1/task-sync") @Blocking @Consumes("application/json") @Produces("application/json")
 public class TaskSyncPreviewResource {
+    private static final String METADATA = "metadata";
+    private static final String TAGS = "tags";
+    private static final String CATEGORIES = "categories";
+    private static final String LINKS = "links";
+    private static final String METADATA_PREFIX = METADATA + ".";
+    private static final String METADATA_TAGS = METADATA_PREFIX + TAGS;
+    private static final String METADATA_CATEGORIES = METADATA_PREFIX + CATEGORIES;
+    private static final String METADATA_LINKS = METADATA_PREFIX + LINKS;
+    private static final Set<String> METADATA_SET_COMPONENTS = Set.of(TAGS, CATEGORIES);
+    private static final String RECURRENCE = "recurrence";
+    private static final String SERIES = "series";
+    private static final String OCCURRENCES = "occurrences";
+    private static final String RECURRENCE_PREFIX = RECURRENCE + ".";
+    private static final String RECURRENCE_SERIES = RECURRENCE_PREFIX + SERIES;
+    private static final String RECURRENCE_OCCURRENCES = RECURRENCE_PREFIX + OCCURRENCES;
+    private static final String REMINDERS = "reminders";
+    private static final String REMINDERS_PREFIX = REMINDERS + ".";
+    private static final java.util.List<String> REMINDER_KINDS = java.util.List.of("ABSOLUTE", "RELATIVE", "LOCATION", "CAR", "MESSAGE");
     private static final Set<String> FIELDS=Set.of("summary","url","body","status","scheduledDate","completedAt",
             "start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems",
-            "recurrence","reminders","metadata","taskListId","sectionId","assignment");
+            RECURRENCE_SERIES,RECURRENCE_OCCURRENCES,REMINDERS_PREFIX+"ABSOLUTE",REMINDERS_PREFIX+"RELATIVE",REMINDERS_PREFIX+"LOCATION",
+            REMINDERS_PREFIX+"CAR",REMINDERS_PREFIX+"MESSAGE",METADATA_TAGS,METADATA_CATEGORIES,METADATA_LINKS,"taskListId","sectionId","assignment");
     private static final String[][] GROUPS={{"status","completedAt"},{"parentTaskId","siblingOrder"},{"taskListId","sectionId"}};
     @Inject ServerStore store;
     @Inject RequestIdentity identity;
@@ -49,10 +68,10 @@ public class TaskSyncPreviewResource {
                     || !list.path("readable").asBoolean()) throw ApiFailure.conflict();
             var key=new ExternalTaskReferenceKey(observed.path("providerId").asText(),observed.path("repositoryId").asText(),observed.path("externalId").asText());
             if(!key.providerId().equals(connection.path("providerId").asText()) || observed.path("deleted").asBoolean()) throw ApiFailure.validation();
-            var accepted=object();var remote=observed.get("fields");
+            var accepted=object();var remote=fields(observed.get("fields"));
             remote.fields().forEachRemaining(field -> {
-                if(connection.path("capabilities").path("fields").path(field.getKey()).path("readable").asBoolean())
-                    accepted.set(field.getKey(),field.getValue());
+                if(capability(connection,field.getKey()).path("readable").asBoolean())
+                    setField(accepted,field.getKey(),field.getValue());
             });
             if(!accepted.hasNonNull("summary")) throw ApiFailure.validation();
             for(var group:GROUPS) if(accepted.has(group[0])!=accepted.has(group[1])) throw ApiFailure.validation();
@@ -83,7 +102,7 @@ public class TaskSyncPreviewResource {
             var created=store.service().createTask(new CreateTask(projectId,parentId.map(TaskId::new),accepted.path("summary").asText(),
                     optionalText(accepted.get("url")),Set.of(ref),planning,checklist(accepted.get("checklistItems")),timing(accepted),
                     importance(accepted),JsonValues.body(accepted),accepted.path("siblingOrder").asInt(0),Set.of(),
-                    recurrence(accepted.get("recurrence")),reminders(accepted.get("reminders")),metadata(accepted.get("metadata"))));
+                    recurrence(accepted.get("recurrence")),reminders(reminderArray(accepted.get(REMINDERS))),metadata(accepted.get(METADATA))));
             var value=snapshot(store.owner(),created);
             return ApiReplies.resource(201,value,"/api/v1/tasks/"+value.path("id").asText());
         }).response());
@@ -114,18 +133,19 @@ public class TaskSyncPreviewResource {
             if(reference==null) throw ApiFailure.conflict();
             var baseline=reference.path("baseline").path("fields").isObject()
                     ? ((ObjectNode)reference.path("baseline").path("fields")).deepCopy() : object();
+            var observedFields=fields(observed.path("fields"));
             boolean changed=false;
             for(var decision:preview.path("decisions")) {
                 String field=decision.path("field").asText(),outcome=decision.path("outcome").asText();
-                var remote=observed.path("fields").get(field);
+                var remote=observedFields.get(field);
                 if(outcome.equals("REMOTE_ONLY")) {
                     if(field.equals("parentTaskId") && remote.isTextual()) validateParent(current,key,list.path("id").asText(),remote.asText());
                     if(Set.of("taskListId","sectionId","assignment").contains(field)) reference.set(field,remote.deepCopy());
-                    else candidate.set(field,remote.deepCopy());
+                    else setTaskField(candidate,field,remote.deepCopy());
                     changed=true;
                 }
                 if(outcome.equals("REMOTE_ONLY") || outcome.equals("CONVERGED")) {
-                    baseline.set(field,remote.deepCopy());changed=true;
+                    setField(baseline,field,remote.deepCopy());changed=true;
                 }
             }
             if(!changed) return ApiReplies.resource(200,current,null);
@@ -178,7 +198,7 @@ public class TaskSyncPreviewResource {
                     && value.path("repositoryId").asText().equals(key.repositoryId())
                     && value.path("externalId").asText().equals(key.externalId())) {reference=value;break;}
             if(reference==null || !reference.path("taskListId").asText().equals(list.path("id").asText())) throw ApiFailure.notFound();
-            var baseline=reference.path("baseline").path("fields");var writes=object();var warnings=array();
+            var baseline=baselineFields(reference.path("baseline").path("fields"));var writes=object();var warnings=array();
             for(var field:FIELDS.stream().sorted().toList()) {
                 var local=local(task,reference,field);
                 if(!baseline.has(field)) {
@@ -186,7 +206,7 @@ public class TaskSyncPreviewResource {
                     continue;
                 }
                 if(local.equals(baseline.get(field))) continue;
-                var cap=connection.path("capabilities").path("fields").path(field);
+                var cap=capability(connection,field);
                 if(!cap.path("readable").asBoolean() || !cap.path("writable").asBoolean()) {
                     warning(warnings,field,"NOT_WRITABLE");continue;
                 }
@@ -194,7 +214,7 @@ public class TaskSyncPreviewResource {
                 if(clearing(field,local) && !cap.path("deletable").asBoolean()) {
                     warning(warnings,field,"CLEAR_UNSUPPORTED");continue;
                 }
-                writes.set(field,local.deepCopy());
+                setField(writes,field,local.deepCopy());
             }
             for(var group:GROUPS) if(writes.has(group[0]) || writes.has(group[1])) {
                 if(!baseline.has(group[0]) || !baseline.has(group[1])
@@ -210,10 +230,50 @@ public class TaskSyncPreviewResource {
                     writes.set(group[1],local(task,reference,group[1]).deepCopy());
                 }
             }
+            guardRecurrenceExport(baseline,writes,warnings);
+            if(writes.has(RECURRENCE) && connection.path("capabilities").path("fields").has(RECURRENCE)
+                    && !connection.path("capabilities").path("fields").has(RECURRENCE_SERIES)
+                    && !connection.path("capabilities").path("fields").has(RECURRENCE_OCCURRENCES)
+                    && baseline.has(RECURRENCE_SERIES) && baseline.has(RECURRENCE_OCCURRENCES)) {
+                boolean blocked=java.util.stream.StreamSupport.stream(warnings.spliterator(),false)
+                        .anyMatch(row -> row.path("field").asText().startsWith(RECURRENCE_PREFIX));
+                if(blocked) {writes.remove(RECURRENCE);warning(warnings,RECURRENCE,"INCOMPLETE_GROUP");}
+                else writes.set(RECURRENCE,task.path(RECURRENCE).deepCopy());
+            }
+            if(writes.has(REMINDERS) && connection.path("capabilities").path("fields").has(REMINDERS)
+                    && REMINDER_KINDS.stream().noneMatch(kind -> connection.path("capabilities").path("fields").has(REMINDERS_PREFIX+kind))
+                    && REMINDER_KINDS.stream().allMatch(kind -> baseline.has(REMINDERS_PREFIX+kind))) {
+                boolean blocked=java.util.stream.StreamSupport.stream(warnings.spliterator(),false)
+                        .anyMatch(row -> row.path("field").asText().startsWith(REMINDERS_PREFIX));
+                if(blocked) {writes.remove(REMINDERS);warning(warnings,REMINDERS,"INCOMPLETE_GROUP");}
+                else writes.set(REMINDERS,task.path(REMINDERS).deepCopy());
+            }
             var result=object();result.put("taskId",task.path("id").asText());result.put("taskEtag",etag(task));
             result.set("writeFields",writes);result.set("warnings",warnings);
             return new ApiReplies(200,result,null,null).response();
         });
+    }
+    private static void guardRecurrenceExport(JsonNode baseline,ObjectNode writes,ArrayNode warnings) {
+        var proposed=writes.path(RECURRENCE);
+        if(proposed.has(SERIES) && proposed.path(SERIES).isNull()) {
+            boolean empty=proposed.has(OCCURRENCES)?proposed.path(OCCURRENCES).isEmpty()
+                    :baseline.has(RECURRENCE_OCCURRENCES) && baseline.path(RECURRENCE_OCCURRENCES).isEmpty();
+            if(!empty) removeRecurrenceWrite(writes,warnings,SERIES);
+        }
+        proposed=writes.path(RECURRENCE);
+        if(proposed.has(OCCURRENCES) && !proposed.path(OCCURRENCES).isEmpty()) {
+            boolean known=proposed.has(SERIES)?!proposed.path(SERIES).isNull()
+                    :baseline.hasNonNull(RECURRENCE_SERIES);
+            if(!known) removeRecurrenceWrite(writes,warnings,OCCURRENCES);
+        }
+    }
+    private static void removeRecurrenceWrite(ObjectNode writes,ArrayNode warnings,String component) {
+        var value=(ObjectNode)writes.get(RECURRENCE);value.remove(component);
+        if(value.isEmpty()) writes.remove(RECURRENCE);
+        warning(warnings,RECURRENCE_PREFIX+component,"INCOMPLETE_GROUP");
+    }
+    private static boolean incompleteRecurrence(JsonNode recurrence) {
+        return !recurrence.hasNonNull(SERIES) && !recurrence.path(OCCURRENCES).isEmpty();
     }
     private static boolean meaningful(String field,JsonNode value) {
         if(value.isNull() || value.isMissingNode() || value.isContainerNode() && value.isEmpty() || value.isBoolean() && !value.asBoolean()
@@ -221,7 +281,7 @@ public class TaskSyncPreviewResource {
         if(field.equals("priority") && value.asText().equals("UNSPECIFIED") || field.equals("status") && value.asText().equals("NOT_STARTED")) return false;
         if(field.equals("body") && value.path("content").asText().isEmpty()) return false;
         if(field.equals("recurrence") && value.path("series").isNull() && value.path("occurrences").isEmpty()) return false;
-        if(field.equals("metadata") && value.path("tags").isEmpty() && value.path("categories").isEmpty() && value.path("links").isEmpty()) return false;
+        if(field.equals(METADATA) && value.path(TAGS).isEmpty() && value.path(CATEGORIES).isEmpty() && value.path(LINKS).isEmpty()) return false;
         return true;
     }
     private static boolean clearing(String field,JsonNode value) {
@@ -278,7 +338,14 @@ public class TaskSyncPreviewResource {
             if(item.path("deleted").asBoolean()) row.put("status","IGNORE_DELETED");
             else if(!connection.path("capabilities").path("fields").path("summary").path("readable").asBoolean()) {
                 row.put("status","UNSUPPORTED");row.put("reason","SUMMARY_UNSUPPORTED");
-            } else if(item.path("fields").hasNonNull("summary")) row.put("status","CREATE");
+            } else if(item.path("fields").hasNonNull("summary")) {
+                var accepted=object();fields(item.path("fields")).fields().forEachRemaining(field -> {
+                    if(capability(connection,field.getKey()).path("readable").asBoolean())setField(accepted,field.getKey(),field.getValue());
+                });
+                if(accepted.has(RECURRENCE) && incompleteRecurrence(accepted.path(RECURRENCE))) {
+                    row.put("status","INCOMPLETE");row.put("reason","RECURRENCE_SERIES_REQUIRED");
+                } else row.put("status","CREATE");
+            }
             else {row.put("status","INCOMPLETE");row.put("reason","SUMMARY_REQUIRED");}
             return row;
         }
@@ -296,12 +363,12 @@ public class TaskSyncPreviewResource {
             if(localChanged(task,reference)) {row.put("status","DELETE_CONFLICT");row.put("reason","LOCAL_CHANGES");return row;}
             row.put("status","DELETE_REVIEW");row.put("reason",task.path("externalReferences").size()>1?"OTHER_PROVIDER_LINKS":"EXPLICIT_REVIEW_REQUIRED");return row;
         }
-        var remote=item.path("fields");var baseline=reference.path("baseline").path("fields");
+        var remote=fields(item.path("fields"));var baseline=baselineFields(reference.path("baseline").path("fields"));
         boolean conflict=false,update=false,unsupported=false,localOnly=false;
         for(var entry=remote.fields();entry.hasNext();) {
             var field=entry.next();String name=field.getKey();if(!FIELDS.contains(name)) throw ApiFailure.validation();
             String outcome;
-            if(!connection.path("capabilities").path("fields").path(name).path("readable").asBoolean()) outcome="UNSUPPORTED";
+            if(!capability(connection,name).path("readable").asBoolean()) outcome="UNSUPPORTED";
             else if(incompleteGroup(remote,name)) outcome="INCOMPLETE_GROUP";
             else if(name.equals("taskListId") && field.getValue().isTextual() && !field.getValue().asText().equals(list.path("id").asText())) outcome="OTHER_LIST";
             else if(name.equals("sectionId") && field.getValue().isTextual() && !sectionInList(field.getValue().asText(),list.path("id").asText())) outcome="OTHER_LIST";
@@ -330,6 +397,16 @@ public class TaskSyncPreviewResource {
                 first.put("outcome","CONFLICT");second.put("outcome","CONFLICT");conflict=true;
             }
         }
+        var candidate=((ObjectNode)task).deepCopy();
+        for(var decision:decisions) if(decision.path("field").asText().startsWith(RECURRENCE_PREFIX)
+                && decision.path("outcome").asText().equals("REMOTE_ONLY"))
+            setField(candidate,decision.path("field").asText(),remote.get(decision.path("field").asText()).deepCopy());
+        if(incompleteRecurrence(candidate.path(RECURRENCE))) {
+            for(var decision:decisions) if(decision.path("field").asText().startsWith(RECURRENCE_PREFIX)
+                    && decision.path("outcome").asText().equals("REMOTE_ONLY")) {
+                ((ObjectNode)decision).put("outcome","INCOMPLETE_GROUP");conflict=true;
+            }
+        }
         row.put("status",conflict?"CONFLICT":update?"UPDATE":unsupported?"UNSUPPORTED":localOnly?"KEEP_LOCAL":"UNCHANGED");
         return row;
     }
@@ -341,12 +418,118 @@ public class TaskSyncPreviewResource {
         for(var group:GROUPS) if(field.equals(group[0]) || field.equals(group[1])) return values.has(group[0])!=values.has(group[1]);
         return false;
     }
+    private static ObjectNode fields(JsonNode values) {return fields(values,false);}
+    private static ObjectNode baselineFields(JsonNode values) {return fields(values,true);}
+    private static ObjectNode fields(JsonNode values,boolean baseline) {
+        var result=object();
+        if(values==null || !values.isObject()) return result;
+        values.fields().forEachRemaining(entry->{
+            if(entry.getKey().equals(RECURRENCE)) {
+                if(!entry.getValue().isObject()) {if(baseline)return;throw ApiFailure.validation();}
+                entry.getValue().fields().forEachRemaining(component -> {
+                    JsonNode value=component.getValue();
+                    try {
+                        if(component.getKey().equals(SERIES) && !value.isNull()) {
+                            var wrapper=object();wrapper.set(SERIES,value);wrapper.putArray(OCCURRENCES);
+                            value=JsonValues.recurrence(JsonValues.recurrence(wrapper)).get(SERIES);
+                        } else if(component.getKey().equals(OCCURRENCES)) {
+                            if(!value.isArray())throw ApiFailure.validation();
+                            value=JsonValues.occurrences(JsonValues.occurrences(value));
+                        }
+                    } catch(RuntimeException invalid) {
+                        // Older baselines were loosely typed. Keep their stored
+                        // payload, but never mistake an unreadable value for empty history.
+                        if(baseline)return;throw invalid;
+                    }
+                    result.set(RECURRENCE_PREFIX+component.getKey(),value);
+                });
+            } else if(entry.getKey().equals(METADATA) && entry.getValue().isObject())
+                entry.getValue().fields().forEachRemaining(component->{
+                    JsonNode value=component.getValue();
+                    if(METADATA_SET_COMPONENTS.contains(component.getKey()) && value.isArray()
+                            && java.util.stream.StreamSupport.stream(value.spliterator(),false).allMatch(JsonNode::isTextual)) {
+                        var ordered=array();java.util.stream.StreamSupport.stream(value.spliterator(),false)
+                                .map(JsonNode::asText).sorted().forEach(ordered::add);value=ordered;
+                    }
+                    result.set(METADATA_PREFIX+component.getKey(),value);
+                });
+            else if(entry.getKey().equals(REMINDERS) && (entry.getValue().isArray() || entry.getValue().isObject())) {
+                var groups=reminderGroups(entry.getValue());
+                groups.fields().forEachRemaining(group -> result.set(REMINDERS_PREFIX+group.getKey(),
+                        JsonValues.reminders(JsonValues.reminders(group.getValue()))));
+            } else result.set(entry.getKey(),entry.getValue());
+        });
+        return result;
+    }
+    private static JsonNode capability(JsonNode connection,String field) {
+        var declarations=connection.path("capabilities").path("fields");
+        // An explicit component overrides an older aggregate declaration.
+        if(declarations.has(field)) return declarations.path(field);
+        if(field.startsWith(METADATA_PREFIX)) return declarations.path(METADATA);
+        if(field.startsWith(RECURRENCE_PREFIX)) return declarations.path(RECURRENCE);
+        if(field.startsWith(REMINDERS_PREFIX)) return declarations.path(REMINDERS);
+        return declarations.path(field);
+    }
+    private static void setField(ObjectNode target,String field,JsonNode value) {
+        if(field.startsWith(RECURRENCE_PREFIX)) {
+            if(!target.path(RECURRENCE).isObject())target.set(RECURRENCE,object());
+            ((ObjectNode)target.get(RECURRENCE)).set(field.substring(RECURRENCE_PREFIX.length()),value);
+        } else if(field.startsWith(METADATA_PREFIX)) {
+            if(!target.path(METADATA).isObject())target.set(METADATA,object());
+            ((ObjectNode)target.get(METADATA)).set(field.substring(METADATA_PREFIX.length()),value);
+        } else if(field.startsWith(REMINDERS_PREFIX)) {
+            var groups=reminderGroups(target.get(REMINDERS));
+            groups.set(field.substring(REMINDERS_PREFIX.length()),value);
+            target.set(REMINDERS,groups);
+        } else target.set(field,value);
+    }
     private static JsonNode local(JsonNode task,JsonNode reference,String field) {
-        var value=Set.of("taskListId","sectionId","assignment").contains(field)?reference.get(field):task.get(field);
+        if(field.startsWith(REMINDERS_PREFIX))
+            return JsonValues.reminders(JsonValues.reminders(reminderGroups(task.path(REMINDERS)).path(field.substring(REMINDERS_PREFIX.length()))));
+        if(field.startsWith(RECURRENCE_PREFIX)) {
+            var value=task.path(RECURRENCE).get(field.substring(RECURRENCE_PREFIX.length()));
+            return value==null?NullNode.instance:value;
+        }
+        var value=field.startsWith(METADATA_PREFIX)?task.path(METADATA).get(field.substring(METADATA_PREFIX.length()))
+                :Set.of("taskListId","sectionId","assignment").contains(field)?reference.get(field):task.get(field);
         return value==null?NullNode.instance:value;
     }
+    /** Arrays are legacy complete observations; objects retain only observed groups. */
+    private static ObjectNode reminderGroups(JsonNode value) {
+        if(value!=null && value.isObject()) return ((ObjectNode)value).deepCopy();
+        var groups=object();
+        if(value!=null && value.isArray()) {
+            for(var kind:REMINDER_KINDS) groups.putArray(kind);
+            for(var reminder:value) {
+                var group=groups.get(reminder.path("kind").asText());
+                if(group==null) throw ApiFailure.validation();
+                ((ArrayNode)group).add(reminder.deepCopy());
+            }
+        }
+        return groups;
+    }
+    private static ArrayNode reminderArray(JsonNode value) {
+        if(value!=null && value.isArray()) return ((ArrayNode)value).deepCopy();
+        var result=array();
+        if(value!=null && value.isObject()) for(var kind:REMINDER_KINDS)
+            for(var reminder:value.path(kind)) result.add(reminder.deepCopy());
+        return result;
+    }
+    /** Task snapshots remain arrays; merge only the observed kind, retaining other entries. */
+    private static void setTaskField(ObjectNode target,String field,JsonNode value) {
+        if(!field.startsWith(REMINDERS_PREFIX)) {setField(target,field,value);return;}
+        String kind=field.substring(REMINDERS_PREFIX.length());
+        var merged=array();boolean inserted=false;
+        for(var reminder:target.path(REMINDERS)) {
+            if(reminder.path("kind").asText().equals(kind)) {
+                if(!inserted) {for(var replacement:value) merged.add(replacement.deepCopy());inserted=true;}
+            } else merged.add(reminder.deepCopy());
+        }
+        if(!inserted) for(var replacement:value) merged.add(replacement.deepCopy());
+        target.set(REMINDERS,merged);
+    }
     private static boolean localChanged(JsonNode task,JsonNode reference) {
-        var baseline=reference.path("baseline").path("fields");if(!baseline.isObject() || baseline.isEmpty()) return true;
+        var baseline=baselineFields(reference.path("baseline").path("fields"));if(baseline.isEmpty()) return true;
         for(var field=baseline.fieldNames();field.hasNext();) {
             String name=field.next();if(!FIELDS.contains(name) || !local(task,reference,name).equals(baseline.get(name))) return true;
         }
