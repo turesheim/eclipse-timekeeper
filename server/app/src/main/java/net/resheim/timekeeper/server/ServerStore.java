@@ -41,6 +41,7 @@ public class ServerStore {
     @Inject ServerInfo serverInfo;
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
+    private Connection h2SchemaSession;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.diagnostics.slow-transaction-ms",defaultValue="1000") long slowTransactionMillis;
     private static final org.jboss.logging.Logger TIMINGS=org.jboss.logging.Logger.getLogger(ServerStore.class);
@@ -52,30 +53,52 @@ public class ServerStore {
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
         DatabaseConfiguration.validate(jdbcUrl);
-        try (var connection = datasource.getConnection()) {
-            ServerSchema.initializeOrValidate(connection,allowSchemaUpgrade);
-            restoreFence.initialize(connection);
-            // Apply only after validation: an acknowledged commit must survive process kill.
-            if (!postgres()) {
-                try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}
+        try {
+            if(postgres()) {
+                try(var connection=datasource.getConnection()){initializeSchema(connection);}
+            } else {
+                // H2 2.4.240 IN-check comparators retain the DDL session. Pool
+                // retirement must not close it while other connections are live
+                // (h2database/h2database#4308). Keep this unpooled session until
+                // runtime shutdown, without consuming a business-pool slot.
+                var config=org.eclipse.microprofile.config.ConfigProvider.getConfig();
+                var properties=new java.util.Properties();
+                properties.putAll(datasource.getConfiguration().connectionPoolConfiguration().connectionFactoryConfiguration().jdbcProperties());
+                properties.setProperty("user",config.getOptionalValue("quarkus.datasource.username",String.class).orElse("sa"));
+                properties.setProperty("password",config.getOptionalValue("quarkus.datasource.password",String.class).orElse(""));
+                h2SchemaSession=java.sql.DriverManager.getConnection(jdbcUrl,properties);
+                initializeSchema(h2SchemaSession);
             }
-        }
-        accounts.initialize();
-        serviceSettings.initialize();
-        passkeyRealm.initialize();
-        recoveryMail.initialize();
-        initializeConfiguredOwners();
-        maintenance=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(work -> {
-            var thread=new Thread(work,"Timekeeper day boundaries");thread.setDaemon(true);return thread;
-        });
-        maintenance.scheduleWithFixedDelay(this::maintainDays,1,1,java.util.concurrent.TimeUnit.SECONDS);
+            accounts.initialize();
+            serviceSettings.initialize();
+            passkeyRealm.initialize();
+            recoveryMail.initialize();
+            initializeConfiguredOwners();
+            maintenance=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(work -> {
+                var thread=new Thread(work,"Timekeeper day boundaries");thread.setDaemon(true);return thread;
+            });
+            maintenance.scheduleWithFixedDelay(this::maintainDays,1,1,java.util.concurrent.TimeUnit.SECONDS);
+        }catch(Exception|Error failure){closeSchemaSession();throw failure;}
     }
-    @jakarta.annotation.PreDestroy void stopMaintenance() {
-        if(maintenance==null) return;
+    private void initializeSchema(Connection connection) throws Exception {
+        ServerSchema.initializeOrValidate(connection,allowSchemaUpgrade);
+        restoreFence.initialize(connection);
+        // Apply only after validation: an acknowledged commit must survive process kill.
+        if(!postgres())try(var statement=connection.createStatement()){statement.execute("SET WRITE_DELAY 0");}
+    }
+    @jakarta.annotation.PreDestroy void stopRuntime() {
+        try{stopMaintenance();}finally{closeSchemaSession();}
+    }
+    void stopMaintenance() {
+        if(maintenance==null)return;
         maintenance.shutdownNow();
         try {if(!maintenance.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS))
             System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Day-boundary maintenance did not stop within the shutdown deadline");}
         catch(InterruptedException stopped) {Thread.currentThread().interrupt();}
+    }
+    private void closeSchemaSession(){
+        var session=h2SchemaSession;h2SchemaSession=null;
+        if(session!=null)try{session.close();}catch(SQLException failure){TIMINGS.warn("Could not close the H2 schema session during runtime shutdown");}
     }
     private static String partitionDate(String zone,Instant now) {
         return zone+":"+now.atZone(java.time.ZoneId.of(zone)).toLocalDate();

@@ -22,6 +22,17 @@ Names use hashes and random suffixes rather than raw selectors or filesystem
 paths. The latest invocation remains available as `server.log`; earlier logs
 survive Playwright's normal output-directory cleanup.
 
+### H2 closed-session diagnosis
+
+A `JdbcSQLNonTransientConnectionException` with SQL state `90098` can be the
+H2 2.4.240 check-constraint session bug, rather than closure of the entire
+database. After the DDL connection retires, a retained `IN` comparator can
+fail writes (including account provisioning during authenticated reads).
+The connection-retirement regression reproduces that API 503 and verifies
+that the lifetime-managed H2 schema session prevents it. See the
+[H2 lifecycle workaround](SERVER.md#h2-schema-session-lifetime). Classify other
+503s from their own retained diagnostics rather than assuming the same cause.
+
 ## Read-only inspection
 
 Use a separate personal token under **My Account → API tokens**, with
