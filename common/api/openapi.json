@@ -27417,7 +27417,7 @@
             "default": []
           },
           "metadata": {
-            "$ref": "#/components/schemas/TaskMetadata"
+            "$ref": "#/components/schemas/TaskSyncMetadataFields"
           },
           "taskListId": {
             "anyOf": [
@@ -27565,6 +27565,9 @@
               "recurrence",
               "reminders",
               "metadata",
+              "metadata.tags",
+              "metadata.categories",
+              "metadata.links",
               "taskListId",
               "sectionId",
               "assignment"
@@ -27831,6 +27834,9 @@
               "recurrence",
               "reminders",
               "metadata",
+              "metadata.tags",
+              "metadata.categories",
+              "metadata.links",
               "taskListId",
               "sectionId",
               "assignment"
@@ -29389,6 +29395,43 @@
             "type": "string"
           }
         }
+      },
+      "TaskSyncMetadataFields": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskLink"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "Observed metadata components. Omission means unobserved; an empty array explicitly clears only that component."
       }
     },
     "parameters": {

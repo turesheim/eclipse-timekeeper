@@ -126,6 +126,26 @@ conditional external-reference sync-state API. Never advance a baseline on a
 failed or uncertain provider write. A Timekeeper `If-Match` value must not be
 used as a provider ETag.
 
+### Partial metadata observations
+
+A connector that reads categories but cannot read tags declares
+`metadata.categories` readable and supplies only that component:
+
+```json
+{"fields":{"metadata":{"categories":["Work"]}}}
+```
+
+A category-only pull never clears tags or links. Use an empty categories array
+for an observed category clear; omission means the provider did not supply it.
+Preview reports component paths such as `metadata.categories`, so independent
+tag and category changes can merge while two changes to the same component
+still conflict. Export preview likewise emits only writable changed components.
+Do not declare the aggregate `metadata` capability unless the connector can
+read the whole value. Explicit component declarations take precedence over
+that compatibility fallback. Link arrays remain one metadata component; a
+connector must preserve resources it cannot read or reconcile before replacing
+that component.
+
 ## Remote absence and deletion
 
 A failed provider request, expired credentials, changed permissions, or a

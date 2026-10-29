@@ -220,6 +220,16 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskLink').is_valid({**link,'url':'javascript:alert(1)'}))
         self.assertEqual('updateTaskMetadata',CONTRACT['paths']['/tasks/{id}/metadata']['put']['operationId'])
 
+    def test_task_sync_metadata_uses_component_presence_without_weakening_full_metadata_writes(self):
+        for value in ({'categories':['Work']},{'tags':[]},{'links':[]},{}):
+            validator('TaskSyncFields').validate({'metadata':value})
+        for value in ({'categories':None},{'unknown':[]},{'tags':['Duplicate','Duplicate']}):
+            self.assertFalse(validator('TaskSyncFields').is_valid({'metadata':value}))
+        self.assertFalse(validator('TaskMetadata').is_valid({'categories':['Work']}))
+        for field in ('metadata.tags','metadata.categories','metadata.links'):
+            validator('TaskSyncFieldDecision').validate({'field':field,'outcome':'REMOTE_ONLY'})
+            validator('TaskSyncExportWarning').validate({'field':field,'reason':'NOT_WRITABLE'})
+
     def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
         body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
                 'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}

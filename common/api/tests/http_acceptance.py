@@ -1298,6 +1298,58 @@ class HttpAcceptance(unittest.TestCase):
         self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},
                   status=409,code='CONFLICT')
 
+    def test_provider_metadata_components_preserve_unobserved_values(self):
+        connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
+                    'name':'Partial metadata','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Partial metadata','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        cp='/task-connections/'+connection['id']
+        field={'readable':True,'writable':True,'deletable':True,'note':None}
+        self.call('PUT',cp+'/capabilities',body={'version':1,'providerApiVersion':'graph-v1.0',
+                  'fields':{'summary':field,'metadata.categories':field}},
+                  headers={'If-Match':self.call('GET',cp)[1]['ETag']})
+        path='/tasks/'+self.task['id']
+        metadata={'tags':['Keep Apple tag'],'categories':['Before'],'links':[
+                  {'id':str(uuid4()),'kind':'LOCAL','url':'https://example.test/local',
+                   'title':'Keep local link','providerId':None,'remoteId':None}]}
+        _,headers=self.call('PUT',path+'/metadata',body=metadata,
+                            headers={'If-Match':self.call('GET',path)[1]['ETag']})
+        key={'providerId':'microsoft','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],
+             'externalId':str(uuid4())}
+        reference={**key,'externalUrl':None,'taskListId':task_list['id'],
+                   'baseline':{'version':1,'capturedAt':'2026-10-28T10:00:00Z',
+                               'fields':{'metadata':{'categories':['Before']}}}}
+        _,headers=self.call('PUT',path+'/external-references',body=reference,headers={'If-Match':headers['ETag']})
+        item={**key,'operationId':str(uuid4()),'deleted':False,'fields':{'metadata':{'categories':['After'],'tags':[]}}}
+        base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+        preview,_=self.call('POST','/task-sync/preview',body={**base,'scanComplete':True,'items':[item]})
+        self.assertEqual('UPDATE',preview['items'][0]['status'])
+        self.assertEqual({'metadata.categories':'REMOTE_ONLY','metadata.tags':'UNSUPPORTED'},
+                         {row['field']:row['outcome'] for row in preview['items'][0]['decisions']})
+        request={**base,'item':item}
+        self.call('POST','/task-sync/apply',body=request,owner='b',headers={'If-Match':headers['ETag']},status=404,code='NOT_FOUND')
+        self.call('POST','/task-sync/apply',body=request,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,updated_headers=self.call('POST','/task-sync/apply',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual({**metadata,'categories':['After']},updated['metadata'])
+        replay,_=self.call('POST','/task-sync/apply',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual(updated['version'],replay['version'])
+        changed={**updated['metadata'],'categories':['Local category']}
+        _,current_headers=self.call('PUT',path+'/metadata',body=changed,headers={'If-Match':updated_headers['ETag']})
+        outward,_=self.call('POST','/task-sync/export-preview',body={'connectionId':connection['id'],'listId':task_list['id'],'taskId':self.task['id'],**key})
+        self.assertEqual({'metadata':{'categories':['Local category']}},outward['writeFields'])
+        conflict={**item,'operationId':str(uuid4()),'fields':{'metadata':{'categories':['Competing remote category']}}}
+        self.call('POST','/task-sync/apply',body={**base,'item':conflict},headers={'If-Match':current_headers['ETag']},status=409,code='CONFLICT')
+        self.assertEqual(changed,self.call('GET',path)[0]['metadata'])
+        imported_item={**key,'externalId':str(uuid4()),'operationId':str(uuid4()),'deleted':False,
+                       'fields':{'summary':'New metadata task','metadata':{'categories':['Z','A']}}}
+        created,_=self.call('POST','/task-sync/import',body={**base,'item':imported_item},status=201)
+        self.created.append(('a','tasks',created['id']))
+        self.assertEqual({'tags':[],'categories':['A','Z'],'links':[]},created['metadata'])
+        same,_=self.call('POST','/task-sync/import',body={**base,'item':{**imported_item,
+                  'operationId':str(uuid4()),'fields':{'summary':'New metadata task','metadata':{'categories':['A','Z']}}}})
+        self.assertEqual(created['id'],same['id'])
+
     def test_provider_subtasks_import_under_an_unassigned_parent(self):
         connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
                     'name':'Hierarchy','readable':True,'writable':True,'enabled':True})

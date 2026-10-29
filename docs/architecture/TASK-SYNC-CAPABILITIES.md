@@ -29,7 +29,7 @@ provider to approximate an unsupported Timekeeper value.
 | Recurrence | `EKRecurrenceRule` | `recurrence.series` | RW | EventKit exposes only the first incomplete reminder in a recurring set; preserve unseen occurrences. |
 | Time and location alerts | `EKAlarm` absolute/relative date, structured location and proximity | `reminders.absolute`, `.relative`, `.location` | RW | Never turn a geofence into a timed alert. |
 | List | Reminder calendar | `taskListId` | RW | Timekeeper project remains independent. |
-| Tags, sections, grocery, attachments, shared assignment | Reminders UI / companion-specific bridge | `tags`, `section`, `attachments`, `assignment` | ? | Preserve in Reminders; declare only fields actually exposed by the companion. |
+| Tags, sections, grocery, attachments, shared assignment | Reminders UI / companion-specific bridge | `metadata.tags`, `section`, `attachments`, `assignment` | ? | Preserve in Reminders; declare only fields actually exposed by the companion. |
 | Car and messaging triggers | Reminders UI / companion-specific bridge | `reminders.car`, `.message` | ? | Preserve in Reminders until the companion proves read and write support. |
 | Stable identity | EventKit calendar item identifier | External reference and aliases | R | A full sync can change local IDs; replace identity while retaining an alias. |
 
@@ -70,7 +70,7 @@ polling and periodic full reconciliation.
 | Importance | `importance` | `priority` | RW | Do not turn a flagged-email list into task `flagged`. |
 | Recurrence | `patternedRecurrence` | `recurrence.series` | RW | Retain provider-only pattern/range details in provider data. |
 | Timed reminder | `isReminderOn`, `reminderDateTime` | one timed reminder | RW | Multiple, location, car, and message triggers remain local. |
-| Categories | `categories` | categories/tags | RW | Keep Outlook category identity distinct from Apple tags. |
+| Categories | `categories` | `metadata.categories` | RW | Keep Outlook category identity distinct from Apple tags. |
 | Checklist | `checklistItems` collection | `checklistItems` | RWD | A checklist item is not a child `todoTask`. |
 | Attachments | `taskFileAttachment` collection | attachments | RWD | Apply size/content limits; use upload sessions for large files. |
 | Linked resources | `linkedResources` collection | links | RW | Verify delete support and permissions before declaring D. |
@@ -99,3 +99,10 @@ writable. For unavailable or unknown fields, it keeps the value locally and
 reports the field and reason to the user. Before clearing a remote field, it
 requires `deletable=true`. The capability map is a safety gate, not a substitute
 for per-item restrictions or remote API error handling.
+
+Metadata capabilities can be declared independently as `metadata.tags`,
+`metadata.categories`, and `metadata.links`. Category observations and exports
+therefore do not need to include Apple tags or unrelated links. Omitted
+components remain local; an empty array clears only the observed component.
+An explicit component entry overrides the legacy aggregate `metadata` entry.
+Do not claim the aggregate is readable merely because one component is exposed.

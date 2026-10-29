@@ -382,6 +382,18 @@ linked resources can carry a remote ID. `PUT /tasks/{id}/metadata` conditionally
 replaces the full metadata value. Legacy task writes retain it, and connectors
 must use their declared field capabilities before exporting any change.
 
+Task sync observations can supply only the `metadata` components they actually
+read, for example `{"metadata":{"categories":["Work"]}}`. Omitted `tags` or
+`links` are unobserved and remain unchanged; an empty array clears only its own
+component. Capabilities and field decisions use `metadata.tags`,
+`metadata.categories`, and `metadata.links`. An explicit component declaration
+overrides the older aggregate `metadata` capability; the aggregate remains a
+fallback for connectors that can read the complete metadata value. Baselines
+retain their nested JSON representation, including older complete values, and
+set-valued tags/categories compare independently of array order. Export preview
+returns only eligible changed components in its partial `metadata` object.
+The ordinary `PUT /tasks/{id}/metadata` still requires all three components.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,

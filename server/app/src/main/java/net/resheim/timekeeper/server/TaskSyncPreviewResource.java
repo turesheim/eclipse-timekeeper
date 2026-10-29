@@ -23,12 +23,12 @@ import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.*;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
 
-/** Read-only, field-level reconciliation preview for one provider list page. */
+/** Owner-scoped, guarded field-level reconciliation for provider task observations. */
 @Path("/api/v1/task-sync") @Blocking @Consumes("application/json") @Produces("application/json")
 public class TaskSyncPreviewResource {
     private static final Set<String> FIELDS=Set.of("summary","url","body","status","scheduledDate","completedAt",
             "start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems",
-            "recurrence","reminders","metadata","taskListId","sectionId","assignment");
+            "recurrence","reminders","metadata.tags","metadata.categories","metadata.links","taskListId","sectionId","assignment");
     private static final String[][] GROUPS={{"status","completedAt"},{"parentTaskId","siblingOrder"},{"taskListId","sectionId"}};
     @Inject ServerStore store;
     @Inject RequestIdentity identity;
@@ -49,10 +49,10 @@ public class TaskSyncPreviewResource {
                     || !list.path("readable").asBoolean()) throw ApiFailure.conflict();
             var key=new ExternalTaskReferenceKey(observed.path("providerId").asText(),observed.path("repositoryId").asText(),observed.path("externalId").asText());
             if(!key.providerId().equals(connection.path("providerId").asText()) || observed.path("deleted").asBoolean()) throw ApiFailure.validation();
-            var accepted=object();var remote=observed.get("fields");
+            var accepted=object();var remote=fields(observed.get("fields"));
             remote.fields().forEachRemaining(field -> {
-                if(connection.path("capabilities").path("fields").path(field.getKey()).path("readable").asBoolean())
-                    accepted.set(field.getKey(),field.getValue());
+                if(capability(connection,field.getKey()).path("readable").asBoolean())
+                    setField(accepted,field.getKey(),field.getValue());
             });
             if(!accepted.hasNonNull("summary")) throw ApiFailure.validation();
             for(var group:GROUPS) if(accepted.has(group[0])!=accepted.has(group[1])) throw ApiFailure.validation();
@@ -114,18 +114,19 @@ public class TaskSyncPreviewResource {
             if(reference==null) throw ApiFailure.conflict();
             var baseline=reference.path("baseline").path("fields").isObject()
                     ? ((ObjectNode)reference.path("baseline").path("fields")).deepCopy() : object();
+            var observedFields=fields(observed.path("fields"));
             boolean changed=false;
             for(var decision:preview.path("decisions")) {
                 String field=decision.path("field").asText(),outcome=decision.path("outcome").asText();
-                var remote=observed.path("fields").get(field);
+                var remote=observedFields.get(field);
                 if(outcome.equals("REMOTE_ONLY")) {
                     if(field.equals("parentTaskId") && remote.isTextual()) validateParent(current,key,list.path("id").asText(),remote.asText());
                     if(Set.of("taskListId","sectionId","assignment").contains(field)) reference.set(field,remote.deepCopy());
-                    else candidate.set(field,remote.deepCopy());
+                    else setField(candidate,field,remote.deepCopy());
                     changed=true;
                 }
                 if(outcome.equals("REMOTE_ONLY") || outcome.equals("CONVERGED")) {
-                    baseline.set(field,remote.deepCopy());changed=true;
+                    setField(baseline,field,remote.deepCopy());changed=true;
                 }
             }
             if(!changed) return ApiReplies.resource(200,current,null);
@@ -178,7 +179,7 @@ public class TaskSyncPreviewResource {
                     && value.path("repositoryId").asText().equals(key.repositoryId())
                     && value.path("externalId").asText().equals(key.externalId())) {reference=value;break;}
             if(reference==null || !reference.path("taskListId").asText().equals(list.path("id").asText())) throw ApiFailure.notFound();
-            var baseline=reference.path("baseline").path("fields");var writes=object();var warnings=array();
+            var baseline=fields(reference.path("baseline").path("fields"));var writes=object();var warnings=array();
             for(var field:FIELDS.stream().sorted().toList()) {
                 var local=local(task,reference,field);
                 if(!baseline.has(field)) {
@@ -186,7 +187,7 @@ public class TaskSyncPreviewResource {
                     continue;
                 }
                 if(local.equals(baseline.get(field))) continue;
-                var cap=connection.path("capabilities").path("fields").path(field);
+                var cap=capability(connection,field);
                 if(!cap.path("readable").asBoolean() || !cap.path("writable").asBoolean()) {
                     warning(warnings,field,"NOT_WRITABLE");continue;
                 }
@@ -194,7 +195,7 @@ public class TaskSyncPreviewResource {
                 if(clearing(field,local) && !cap.path("deletable").asBoolean()) {
                     warning(warnings,field,"CLEAR_UNSUPPORTED");continue;
                 }
-                writes.set(field,local.deepCopy());
+                setField(writes,field,local.deepCopy());
             }
             for(var group:GROUPS) if(writes.has(group[0]) || writes.has(group[1])) {
                 if(!baseline.has(group[0]) || !baseline.has(group[1])
@@ -296,12 +297,12 @@ public class TaskSyncPreviewResource {
             if(localChanged(task,reference)) {row.put("status","DELETE_CONFLICT");row.put("reason","LOCAL_CHANGES");return row;}
             row.put("status","DELETE_REVIEW");row.put("reason",task.path("externalReferences").size()>1?"OTHER_PROVIDER_LINKS":"EXPLICIT_REVIEW_REQUIRED");return row;
         }
-        var remote=item.path("fields");var baseline=reference.path("baseline").path("fields");
+        var remote=fields(item.path("fields"));var baseline=fields(reference.path("baseline").path("fields"));
         boolean conflict=false,update=false,unsupported=false,localOnly=false;
         for(var entry=remote.fields();entry.hasNext();) {
             var field=entry.next();String name=field.getKey();if(!FIELDS.contains(name)) throw ApiFailure.validation();
             String outcome;
-            if(!connection.path("capabilities").path("fields").path(name).path("readable").asBoolean()) outcome="UNSUPPORTED";
+            if(!capability(connection,name).path("readable").asBoolean()) outcome="UNSUPPORTED";
             else if(incompleteGroup(remote,name)) outcome="INCOMPLETE_GROUP";
             else if(name.equals("taskListId") && field.getValue().isTextual() && !field.getValue().asText().equals(list.path("id").asText())) outcome="OTHER_LIST";
             else if(name.equals("sectionId") && field.getValue().isTextual() && !sectionInList(field.getValue().asText(),list.path("id").asText())) outcome="OTHER_LIST";
@@ -341,12 +342,43 @@ public class TaskSyncPreviewResource {
         for(var group:GROUPS) if(field.equals(group[0]) || field.equals(group[1])) return values.has(group[0])!=values.has(group[1]);
         return false;
     }
+    private static ObjectNode fields(JsonNode values) {
+        var result=object();
+        if(values==null || !values.isObject()) return result;
+        values.fields().forEachRemaining(entry->{
+            if(entry.getKey().equals("metadata") && entry.getValue().isObject())
+                entry.getValue().fields().forEachRemaining(component->{
+                    JsonNode value=component.getValue();
+                    if(Set.of("tags","categories").contains(component.getKey()) && value.isArray()
+                            && java.util.stream.StreamSupport.stream(value.spliterator(),false).allMatch(JsonNode::isTextual)) {
+                        var ordered=array();java.util.stream.StreamSupport.stream(value.spliterator(),false)
+                                .map(JsonNode::asText).sorted().forEach(ordered::add);value=ordered;
+                    }
+                    result.set("metadata."+component.getKey(),value);
+                });
+            else result.set(entry.getKey(),entry.getValue());
+        });
+        return result;
+    }
+    private static JsonNode capability(JsonNode connection,String field) {
+        var declarations=connection.path("capabilities").path("fields");
+        // An explicit component overrides an older aggregate declaration.
+        if(declarations.has(field) || !field.startsWith("metadata.")) return declarations.path(field);
+        return declarations.path("metadata");
+    }
+    private static void setField(ObjectNode target,String field,JsonNode value) {
+        if(field.startsWith("metadata.")) {
+            if(!target.path("metadata").isObject())target.set("metadata",object());
+            ((ObjectNode)target.get("metadata")).set(field.substring("metadata.".length()),value);
+        } else target.set(field,value);
+    }
     private static JsonNode local(JsonNode task,JsonNode reference,String field) {
-        var value=Set.of("taskListId","sectionId","assignment").contains(field)?reference.get(field):task.get(field);
+        var value=field.startsWith("metadata.")?task.path("metadata").get(field.substring("metadata.".length()))
+                :Set.of("taskListId","sectionId","assignment").contains(field)?reference.get(field):task.get(field);
         return value==null?NullNode.instance:value;
     }
     private static boolean localChanged(JsonNode task,JsonNode reference) {
-        var baseline=reference.path("baseline").path("fields");if(!baseline.isObject() || baseline.isEmpty()) return true;
+        var baseline=fields(reference.path("baseline").path("fields"));if(baseline.isEmpty()) return true;
         for(var field=baseline.fieldNames();field.hasNext();) {
             String name=field.next();if(!FIELDS.contains(name) || !local(task,reference,name).equals(baseline.get(name))) return true;
         }
