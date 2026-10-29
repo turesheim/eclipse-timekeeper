@@ -181,7 +181,7 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
     await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.getByLabel('Date',{exact:true}).fill(date);
     for(const [width,height] of [[1440,1000],[1440,720],[390,844]]) {
       await page.setViewportSize({width,height});await page.evaluate(()=>window.scrollTo(0,0));
-      if(width===1440)expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1)).toBe(true);
+      if(width===1440)await expect.poll(()=>page.evaluate(()=>Math.max(0,document.documentElement.scrollHeight-innerHeight)),{message:'Today fits after the viewport resize is laid out'}).toBeLessThanOrEqual(1);
       for(const mode of ['Formatted','Markdown source']) {
         await page.locator('#today-note-editor').getByRole('button',{name:mode,exact:true}).click();
         const editor=page.locator('#today-note-editor');
