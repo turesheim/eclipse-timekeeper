@@ -300,6 +300,31 @@ using the proposed fields.
 The [connector protocol](TASK-SYNC-PROTOCOL.md) documents page commits,
 stable retries, authorization, recovery, and reviewed deletion.
 
+Provider lists and sections can retain an optional `providerData` envelope,
+using the same `namespace`, positive `version`, and object `payload` contract as
+external task references. This holds observed list type, grocery/list grouping,
+icons, colors, pinning, or future provider fields without pretending every
+provider exposes those concepts. It is independent of list permissions and
+Timekeeper projects. A namespace must equal the owning connection's provider ID
+or start with that ID plus a dot. Payload credentials remain forbidden; the
+serialized payload is limited to 65,536 characters.
+
+`PUT /task-lists/{id}/provider-data` and
+`PUT /task-list-sections/{id}/provider-data` take a required `providerData`
+property containing the complete envelope or explicit `null` to clear it. Both
+require owner write permission and the record's `If-Match` ETag. Omitting that
+property is invalid. A replacement deliberately replaces the entire envelope:
+a connector must first preserve payload keys it does not understand and retry
+from a fresh ETag on conflict. Ordinary list, sharing, and section updates
+preserve the envelope. These endpoints store observations locally; they do not
+write to a provider or imply provider capabilities.
+
+Older stored records and exports may omit the field; domain/HTTP clients treat
+that as no envelope. Account ZIPs and portable JSON/CSV transfers retain unknown
+nested payload values while remapping Timekeeper list/section IDs. Provider
+payload identifiers stay opaque and are not rewritten. The existing H2 and
+PostgreSQL owner-scoped JSON resource storage needs no SQL layout change.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish
@@ -450,6 +475,10 @@ Portable task CSV adds a `taskExtras` JSON object column when tasks contain
 planning, timing, importance, notes, or sibling order. This preserves optional
 fields, including absent fields in mixed older and newer rows. Its descriptor
 marks the column as required, so an incomplete export is rejected.
+List and section CSV files add an optional `providerData` JSON column when any
+row contains the field. A blank cell preserves absence, while JSON `null`
+preserves an explicit empty envelope in a mixed export. Earlier headers remain
+readable; envelope objects retain unknown nested keys.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
 updates existing records. Source IDs are correlation keys only. A failure leaves

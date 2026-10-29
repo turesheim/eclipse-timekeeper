@@ -175,6 +175,26 @@ public class TimekeeperResource {
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
     }
+    @PUT @Path("/task-lists/{id}/provider-data") public Response updateTaskListProviderData(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        return updateListProviderData("TASK_LIST",id,match,body);
+    }
+    @PUT @Path("/task-list-sections/{id}/provider-data") public Response updateTaskListSectionProviderData(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        return updateListProviderData("TASK_SECTION",id,match,body);
+    }
+    private Response updateListProviderData(String type,String id,String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskListProviderDataInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {
+            var before=required(type,key);ApiReplies.match(before,match);
+            var list=type.equals("TASK_LIST")?before:required("TASK_LIST",uuid(before.get("taskListId")));
+            var connection=required("TASK_CONNECTION",uuid(list.get("connectionId")));
+            var data=optionalProviderData(input.get("providerData"))
+                    .map(value -> checkedProviderData(connection.path("providerId").asText(),value));
+            Object updated=type.equals("TASK_LIST")?((TaskList)decode(type,before)).withProviderData(data)
+                    :((TaskListSection)decode(type,before)).withProviderData(data);
+            store.save(type,updated);store.change(type,"UPDATED",key.toString());
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
     @PUT @Path("/tasks/{id}/planning") public Response planTask(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskPlanningInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);

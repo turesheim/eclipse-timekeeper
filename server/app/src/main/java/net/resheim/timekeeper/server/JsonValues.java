@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import net.resheim.eclipse.timekeeper.domain.*;
 
 /** Explicit immutable wire snapshots and persistence codecs, without JPA objects. */
@@ -62,12 +63,12 @@ public final class JsonValues {
             node.put("connectionId",list.connectionId().toString());node.put("remoteListId",list.remoteListId());node.put("name",list.name());
             node.put("kind",list.kind().name());node.put("readable",list.readable());node.put("writable",list.writable());
             node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());
-            node.set("sharing",sharing(list.sharing()));return node;
+            node.set("sharing",sharing(list.sharing()));node.set("providerData",list.providerData().<JsonNode>map(JsonValues::providerData).orElse(NullNode.instance));return node;
         }
         if (value instanceof TaskListSection section) {
             var node=base(owner,section.id(),section.version());node.put("taskListId",section.taskListId().toString());
             node.put("remoteSectionId",section.remoteSectionId());node.put("name",section.name());node.put("kind",section.kind().name());
-            node.put("position",section.position());node.put("present",section.present());node.put("writable",section.writable());return node;
+            node.put("position",section.position());node.put("present",section.present());node.put("writable",section.writable());node.set("providerData",section.providerData().<JsonNode>map(JsonValues::providerData).orElse(NullNode.instance));return node;
         }
         if (value instanceof TaskAttachment attachment) {
             var node=base(owner,attachment.id(),attachment.version());node.put("taskId",attachment.taskId().toString());
@@ -149,9 +150,9 @@ public final class JsonValues {
                     node.get("readable").asBoolean(),node.get("writable").asBoolean(),node.get("enabled").asBoolean(),capabilities(node.get("capabilities")),version);
             case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
                     TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
-                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),sharing(node.get("sharing")),version);
+                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),sharing(node.get("sharing")),optionalProviderData(node.get("providerData")),version);
             case "TASK_SECTION" -> new TaskListSection(id,uuid(node.get("taskListId")),node.get("remoteSectionId").asText(),node.get("name").asText(),
-                    TaskListSectionKind.valueOf(node.get("kind").asText()),node.get("position").asInt(),node.get("present").asBoolean(),node.get("writable").asBoolean(),version);
+                    TaskListSectionKind.valueOf(node.get("kind").asText()),node.get("position").asInt(),node.get("present").asBoolean(),node.get("writable").asBoolean(),optionalProviderData(node.get("providerData")),version);
             case "TASK_ATTACHMENT" -> new TaskAttachment(id,uuid(node.get("taskId")),node.get("fileName").asText(),node.get("contentType").asText(),
                     node.get("bytes").asInt(),node.get("sha256").asText(),node.get("data").asText(),optionalText(node.get("providerId")),optionalText(node.get("remoteId")),version);
             case "TASK_SYNC_CURSOR" -> new TaskSyncCursor(id,uuid(node.get("connectionId")),optionalText(node.get("listId")).map(UUID::fromString),
@@ -204,6 +205,12 @@ public final class JsonValues {
         value.sourceId().ifPresent(text -> node.put("sourceId",text));
         value.sourceUrl().ifPresent(text -> node.put("sourceUrl",text));
         node.put("writable",value.writable());return node;
+    }
+    public static Optional<ExternalTaskProviderData> optionalProviderData(JsonNode value) {
+        return Optional.ofNullable(value).filter(node -> !node.isNull()).map(JsonValues::providerData);
+    }
+    public static ObjectNode providerData(ExternalTaskProviderData value) {
+        var node=object();node.put("namespace",value.namespace());node.put("version",value.version());node.set("payload",parse(value.json()));return node;
     }
     public static ExternalTaskProviderData providerData(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("payload").isObject()) throw ApiFailure.validation();

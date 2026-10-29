@@ -15,6 +15,16 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
+    @Test void listEnvelopesRetainUnknownJsonAndDistinguishAbsentFromNullInMixedCsv() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
+             "taskConnections":[],"taskLists":[{"id":"list","connectionId":"connection","remoteListId":"remote","name":"Groceries","kind":"STANDARD","readable":true,"writable":false,"shared":false,"owner":true,"present":true,"position":0,
+               "providerData":{"namespace":"icloud.reminders","version":2,"payload":{"future":{"opaque":[1,null,"retain"]}}}}],
+             "taskListSections":[{"id":"section","taskListId":"list","remoteSectionId":"produce","name":"Produce","kind":"GROCERY_CATEGORY","position":0,"present":true,"writable":false,"providerData":null}]}
+            """).getAsJsonObject();
+        var legacy=data.getAsJsonArray("taskLists").get(0).getAsJsonObject().deepCopy();legacy.addProperty("id","legacy");legacy.remove("providerData");data.getAsJsonArray("taskLists").add(legacy);
+        var folder=temporary.resolve("list-envelopes");CsvSnapshot.write(data,folder);assertEquals(data,CsvSnapshot.read(folder));
+    }
     @Test void taskExtrasPreservePlanningTimingNotesOrderAliasesRecurrenceRemindersAndMetadata() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"labels":[],"activities":[],"workSessions":[],

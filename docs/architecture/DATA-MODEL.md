@@ -429,6 +429,17 @@ deleting a list while sections remain. The section catalog does not change
 Timekeeper projects or infer sections for providers that lack them. Archive and
 portable transfer include sections and remap their list IDs; older snapshots
 without sections remain valid.
+Both `TaskList` and `TaskListSection` carry optional `providerData` using the
+namespaced, versioned `ExternalTaskProviderData` envelope. It stores only
+provider-observed metadata without a normalized field, including future list
+and grocery metadata. Namespace ownership follows the connection through the
+list; it is checked on API writes and portable/account import. Missing legacy
+fields decode to an empty Optional. Ordinary updates retain the envelope;
+conditional dedicated updates replace it or explicitly clear it. Unknown JSON
+keys survive account ZIP and portable JSON/CSV transfers. Payload IDs remain
+opaque, while Timekeeper parent IDs are remapped. Storage remains in the
+existing owner-scoped JSON resource on both H2 and PostgreSQL, with no new SQL
+columns or invented metadata for existing rows.
 An external task reference may include the stable Timekeeper `taskListId`.
 Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's

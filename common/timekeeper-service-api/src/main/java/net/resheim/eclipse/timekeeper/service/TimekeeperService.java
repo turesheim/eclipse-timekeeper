@@ -77,6 +77,8 @@ public interface TimekeeperService {
 	default List<TaskConnection> taskConnections() { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default TaskList createTaskList(CreateTaskList command) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default TaskList updateTaskList(UpdateTaskList command) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+    default TaskList updateTaskListProviderData(Commands.UpdateTaskListProviderData command) { throw new UnsupportedOperationException("Provider list data is not supported"); }
+    default TaskListSection updateTaskListSectionProviderData(Commands.UpdateTaskListSectionProviderData command) { throw new UnsupportedOperationException("Provider section data is not supported"); }
 	default TaskList updateTaskListSharing(UpdateTaskListSharing command) { throw new UnsupportedOperationException("Provider task list sharing is not supported"); }
 	default void deleteTaskList(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default Optional<TaskList> taskList(java.util.UUID id) { throw new UnsupportedOperationException("Provider task lists are not supported"); }

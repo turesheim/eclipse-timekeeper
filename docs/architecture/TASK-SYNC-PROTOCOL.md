@@ -26,6 +26,26 @@ connection's tasks. Keep Google/Microsoft OAuth tokens in the connector's
 credential store and Apple authorization on the Mac. Never put credentials in
 `providerData`, task notes, baselines, or cursors.
 
+## Provider list and section metadata
+
+Store only observed, otherwise unnormalized list/section fields in their
+`providerData` envelopes. For example, an `icloud.reminders` envelope may contain
+a grocery list type or grouping information when a companion can actually read
+it. A namespace belongs to the list's connection provider; section ownership
+is derived through its parent list. Do not manufacture metadata from a UI
+screenshot or claim to preserve fields that EventKit or the bridge cannot read.
+
+Read the existing envelope and preserve unknown payload keys before explicitly
+replacing it with `PUT /task-lists/{id}/provider-data` or
+`PUT /task-list-sections/{id}/provider-data`. Send `{"providerData":null}` only
+for an intentional clear. Both operations require the current record ETag and
+Timekeeper write permission. A stale ETag requires re-reading and reconciling;
+these operations do not call the provider. Ordinary list/sharing/section edits
+retain the envelope. Keep credentials outside it, and publish only capabilities
+that the connector has tested. Archives and portable transfers retain the
+payload verbatim as JSON values, including unknown nested fields; they remap
+Timekeeper parent IDs and leave provider payload IDs opaque.
+
 ## Initial scan and page commit
 
 1. Discover the remote account and lists, create or update the Timekeeper

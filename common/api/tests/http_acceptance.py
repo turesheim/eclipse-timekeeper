@@ -6,6 +6,7 @@ No mock server is included; missing configuration is an error, not a skipped tes
 """
 import argparse
 import base64
+import copy
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
@@ -1045,6 +1046,46 @@ class HttpAcceptance(unittest.TestCase):
         restored, _=self.call('GET','/task-lists/'+mappings[linked['id']],owner='b')
         self.assertEqual(mappings[connection['id']],restored['connectionId'])
         self.assertFalse(restored['present'])
+
+    def test_provider_list_and_section_envelopes_survive_transfer(self):
+        connection=self.create('task-connections',{'providerId':'icloud','remoteAccountId':str(uuid4()),
+                    'name':'List metadata','readable':True,'writable':True,'enabled':True})
+        list_fields={'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Groceries',
+                     'kind':'STANDARD','readable':True,'writable':True,'shared':False,'owner':True,'present':True,'position':0}
+        task_list=self.create('task-lists',list_fields)
+        section_fields={'taskListId':task_list['id'],'remoteSectionId':str(uuid4()),'name':'Produce',
+                        'kind':'GROCERY_CATEGORY','position':0,'present':True,'writable':True}
+        section=self.create('task-list-sections',section_fields)
+        envelope={'namespace':'icloud.reminders','version':2,'payload':{'listType':'grocery','future':{'opaque':[1,None,'keep']}}}
+        for collection,record,fields in (('task-lists',task_list,list_fields),('task-list-sections',section,section_fields)):
+            path='/'+collection+'/'+record['id']
+            self.assertIsNone(record['providerData'])
+            headers=self.call('GET',path)[1]
+            self.call('PUT',path+'/provider-data',owner='b',body={'providerData':envelope},headers={'If-Match':headers['ETag']},status=404,code='NOT_FOUND')
+            self.call('PUT',path+'/provider-data',owner='read',body={'providerData':envelope},headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+            updated,updated_headers=self.call('PUT',path+'/provider-data',body={'providerData':envelope},headers={'If-Match':headers['ETag']})
+            self.assertEqual(envelope,updated['providerData'])
+            self.call('PUT',path+'/provider-data',body={'providerData':None},headers={'If-Match':headers['ETag']},status=412,code='STALE_VERSION')
+            self.call('PUT',path+'/provider-data',body={'providerData':{**envelope,'namespace':'microsoft.todo'}},headers={'If-Match':updated_headers['ETag']},status=422,code='VALIDATION')
+            legacy={k:v for k,v in fields.items() if k not in ('connectionId','remoteListId','taskListId','remoteSectionId')}
+            renamed,_=self.call('PUT',path,body={**legacy,'name':'Renamed'},headers={'If-Match':updated_headers['ETag']})
+            self.assertEqual(envelope,renamed['providerData'])
+        exported,_=self.call('GET','/data/export')
+        bad=copy.deepcopy(exported)
+        next(item for item in bad['taskListSections'] if item['id']==section['id'])['providerData']['namespace']='microsoft.todo'
+        self.call('POST','/data/import',owner='b',body=bad,headers=self.key(),status=422,code='VALIDATION')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions',
+                   'TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists','TASK_SECTION':'task-list-sections'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in resources:self.created.append(('b',resources[item['entityType']],item['id']))
+        for collection,record in (('task-lists',task_list),('task-list-sections',section)):
+            copied,_=self.call('GET','/'+collection+'/'+mappings[record['id']],owner='b')
+            self.assertEqual(envelope,copied['providerData'])
+            path='/'+collection+'/'+record['id']
+            cleared,_=self.call('PUT',path+'/provider-data',body={'providerData':None},headers={'If-Match':self.call('GET',path)[1]['ETag']})
+            self.assertIsNone(cleared['providerData'])
 
     def test_provider_list_sharing_survives_legacy_writes_and_transfer(self):
         connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),

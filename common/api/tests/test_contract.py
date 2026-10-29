@@ -33,6 +33,16 @@ class ContractTest(unittest.TestCase):
             self.assertTrue(validator('TaskSyncFieldDecision').is_valid({'field':'reminders.'+kind,'outcome':'REMOTE_ONLY'}))
             self.assertTrue(validator('TaskSyncExportWarning').is_valid({'field':'reminders.'+kind,'reason':'NOT_WRITABLE'}))
 
+    def test_provider_list_envelopes_are_optional_and_explicitly_cleared(self):
+        envelope={'namespace':'icloud.reminders','version':1,'payload':{'future':{'unknown':[1,None,'retain']}}}
+        for value in (envelope,None):
+            self.assertTrue(validator('TaskListProviderDataInput').is_valid({'providerData':value}))
+        for value in ({}, {'providerData':{'namespace':'icloud','version':0,'payload':{}}}, {'providerData':{**envelope,'payload':[]}}, {'providerData':envelope,'ownerId':ID}):
+            self.assertFalse(validator('TaskListProviderDataInput').is_valid(value))
+        for name in ('TaskList','TaskListSection','TransferTaskList','TransferTaskListSection'):
+            self.assertIn('providerData',CONTRACT['components']['schemas'][name]['properties'])
+            self.assertNotIn('providerData',CONTRACT['components']['schemas'][name]['required'])
+
     def test_complete_openapi_document(self):
         validate(CONTRACT)
         for schema in CONTRACT['components']['schemas'].values():
@@ -574,8 +584,8 @@ class ContractTest(unittest.TestCase):
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
-            'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
-            'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
+            'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskListSection', 'updateTaskListSection', 'updateTaskListSectionProviderData', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync', 'importTaskSyncItem', 'applyTaskSyncItem', 'previewTaskSyncExport',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',

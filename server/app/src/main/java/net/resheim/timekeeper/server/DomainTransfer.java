@@ -19,6 +19,12 @@ final class DomainTransfer {
             Map.entry("activities","ACTIVITY"),Map.entry("workSessions","WORK_SESSION"),Map.entry("taskConnections","TASK_CONNECTION"),
             Map.entry("taskLists","TASK_LIST"),Map.entry("taskListSections","TASK_SECTION"),Map.entry("taskTombstones","TASK_TOMBSTONE"),
             Map.entry("taskAttachments","TASK_ATTACHMENT"));
+    private static Optional<ExternalTaskProviderData> listProviderData(JsonNode item,String provider) {
+        return optionalProviderData(item.get("providerData")).map(value -> {
+            if(!value.namespace().equals(provider) && !value.namespace().startsWith(provider+".")) throw ApiFailure.validation();
+            return value;
+        });
+    }
     ApiReplies importRecords(JsonNode input) {
         return importRecords(input,item->item.get("data").asText());
     }
@@ -112,7 +118,7 @@ final class DomainTransfer {
             var created=new TaskList(UUID.randomUUID(),required(connections,sourceConnection),item.get("remoteListId").asText(),
                     item.get("name").asText(),TaskListKind.valueOf(item.get("kind").asText()),item.get("readable").asBoolean(),
                     item.get("writable").asBoolean(),item.get("shared").asBoolean(),item.get("owner").asBoolean(),
-                    item.get("present").asBoolean(),item.get("position").asInt(),sharing(item.get("sharing")),0);
+                    item.get("present").asBoolean(),item.get("position").asInt(),sharing(item.get("sharing")),listProviderData(item,sourceConnectionRecords.get(sourceConnection).path("providerId").asText()),0);
             store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
             lists.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_LIST",item,created.id());
@@ -123,7 +129,8 @@ final class DomainTransfer {
             if(!sectionKeys.add(key)) throw ApiFailure.validation();
             var created=new TaskListSection(UUID.randomUUID(),required(lists,sourceList),item.get("remoteSectionId").asText(),
                     item.get("name").asText(),TaskListSectionKind.valueOf(item.get("kind").asText()),item.get("position").asInt(),
-                    item.get("present").asBoolean(),item.get("writable").asBoolean(),0);
+                    item.get("present").asBoolean(),item.get("writable").asBoolean(),
+                    listProviderData(item,sourceConnectionRecords.get(uuid(sourceLists.get(sourceList).get("connectionId"))).path("providerId").asText()),0);
             store.save("TASK_SECTION",created);store.change("TASK_SECTION","CREATED",created.id().toString());
             sections.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_SECTION",item,created.id());

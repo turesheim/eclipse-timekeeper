@@ -29,7 +29,7 @@ provider to approximate an unsupported Timekeeper value.
 | Recurrence | `EKRecurrenceRule` | `recurrence.series` | RW | EventKit exposes only the first incomplete reminder in a recurring set; preserve unseen occurrences. |
 | Time and location alerts | `EKAlarm` absolute/relative date, structured location and proximity | `reminders.ABSOLUTE`, `.RELATIVE`, `.LOCATION` | RW | Never turn a geofence into a timed alert. |
 | List | Reminder calendar | `taskListId` | RW | Timekeeper project remains independent. |
-| Tags, sections, grocery, attachments, shared assignment | Reminders UI / companion-specific bridge | `metadata.tags`, `section`, `attachments`, `assignment` | ? | Preserve in Reminders; declare only fields actually exposed by the companion. |
+| Tags, sections, grocery, attachments, shared assignment | Reminders UI / companion-specific bridge | `metadata.tags`, list/section `providerData`, `sectionId`, attachments, `assignment` | ? | Preserve in Reminders; declare only fields actually exposed by the companion. |
 | Car and messaging triggers | Reminders UI / companion-specific bridge | `reminders.CAR`, `.MESSAGE` | ? | Preserve in Reminders until the companion proves read and write support. |
 | Stable identity | EventKit calendar item identifier | External reference and aliases | R | A full sync can change local IDs; replace identity while retaining an alias. |
 
