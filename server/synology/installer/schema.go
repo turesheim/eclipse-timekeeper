@@ -9,8 +9,11 @@ import (
 	"strings"
 )
 
-const offlineSchemaSQL = "SET standard_conforming_strings=on; SELECT pg_advisory_xact_lock(92751638246);\n" +
-	"DO $timekeeper_offline$ BEGIN IF EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()) THEN RAISE EXCEPTION 'Stop all other database clients before maintenance'; END IF; END $timekeeper_offline$;\n"
+// Background maintenance and closing sessions can briefly remain after clients stop.
+// Require every other backend to drain; do not identify them by privileged statistics.
+const offlineDrainSQL = "DO $timekeeper_offline$ DECLARE deadline timestamptz:=clock_timestamp()+interval '8 seconds'; BEGIN LOOP PERFORM pg_stat_clear_snapshot(); EXIT WHEN NOT EXISTS(SELECT 1 FROM pg_catalog.pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()); IF clock_timestamp()>=deadline THEN RAISE EXCEPTION 'Stop all other database clients before maintenance'; END IF; PERFORM pg_sleep(0.05); END LOOP; END $timekeeper_offline$;\n"
+
+const offlineSchemaSQL = "SET standard_conforming_strings=on; SELECT pg_advisory_xact_lock(92751638246);\n" + offlineDrainSQL
 
 func schemaResources(resources string, version int) (string, string, error) {
 	if !supportedSchema(version) {

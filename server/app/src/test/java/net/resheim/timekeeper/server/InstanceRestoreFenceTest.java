@@ -133,6 +133,24 @@ class InstanceRestoreFenceTest {
             }
         });
     }
+    @Test void postgresOfflineFenceWaitsForAClosingClientWithoutLosingItsCommit() throws Exception {
+        postgres((url,password,owner)->{
+            try(var offline=DriverManager.getConnection(url,"postgres",password);var peer=DriverManager.getConnection(url,"postgres",password)) {
+                execute(offline,"SET ROLE "+owner);ServerSchema.initializeOrValidate(offline);
+                peer.setAutoCommit(false);execute(peer,"INSERT INTO tk_owner VALUES('draining','UTC',0,7,?)","a".repeat(64));
+                var worker=Executors.newSingleThreadExecutor();var entered=new CountDownLatch(1);
+                try {
+                    var waiting=worker.submit(()->{entered.countDown();return InstanceRestoreFence.exclusive(offline);});
+                    assertTrue(entered.await(5,TimeUnit.SECONDS));
+                    assertThrows(TimeoutException.class,()->waiting.get(100,TimeUnit.MILLISECONDS));
+                    assertFalse(peer.isClosed());peer.commit();peer.close();
+                    try(var exclusive=waiting.get(3,TimeUnit.SECONDS);var rows=offline.createStatement().executeQuery("SELECT revision FROM tk_owner WHERE id='draining'")) {
+                        assertTrue(rows.next());assertEquals(7,rows.getLong(1));
+                    }
+                }finally{worker.shutdownNow();worker.awaitTermination(5,TimeUnit.SECONDS);}
+            }
+        });
+    }
     @Test void postgresOfflineFenceNeedsNoSuperuserAndDoesNotTerminateOtherClients() throws Exception {
         postgres((url,password,owner)->{
             try(var offline=DriverManager.getConnection(url,"postgres",password)) {

@@ -81,8 +81,16 @@ class InstanceRestoreFence {
                 if(!rows.next()||!rows.getBoolean(1))throw unavailable("INSTANCE_OTHER_DATABASE_CLIENTS");held=true;
             }else{try(var statement=connection.createStatement()){statement.execute("SET EXCLUSIVE 1");}held=true;}
             String sql=postgres?"SELECT COUNT(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()":"SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE SESSION_ID<>SESSION_ID()";
-            try(var statement=connection.createStatement();var rows=statement.executeQuery(sql)) {
-                if(!rows.next()||rows.getLong(1)!=0)throw unavailable("INSTANCE_OTHER_DATABASE_CLIENTS");
+            // Client teardown and autovacuum can briefly outlive the application.
+            // Backend types are hidden from unprivileged roles, so require all
+            // other backends to leave rather than filtering or terminating them.
+            long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(8);
+            while(true) {
+                try(var statement=connection.createStatement();var rows=statement.executeQuery(sql)) {
+                    if(rows.next()&&rows.getLong(1)==0)break;
+                }
+                if(!postgres||System.nanoTime()>=deadline)throw unavailable("INSTANCE_OTHER_DATABASE_CLIENTS");
+                try{Thread.sleep(50);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new SQLException("Offline client drain interrupted","57014",interrupted);}
             }
             // The offline helper must acknowledge durable commits even when the
             // deployment normally uses asynchronous/default H2 writes.

@@ -59,9 +59,15 @@ test('day note menus stay beside the press after scrolling and fit the viewport 
     await signIn(page,await fresh(request));await month(page);
     for(const date of ['2026-05-11','2026-05-31']){
       const cell=day(page,date);await cell.evaluate(node=>node.scrollIntoView({block:'end',behavior:'instant'}));
-      const point=await cell.evaluate(node=>{const r=node.getBoundingClientRect();return{x:r.right-8,y:r.bottom-8};});
+      // Calendar metadata can finish laying out between reading a viewport
+      // position and pressing. Let Playwright verify a stable, exposed target,
+      // then check placement against the actual press's viewport coordinates.
+      await cell.evaluate(node=>node.addEventListener('contextmenu',event=>{node.menuPress={x:event.clientX,y:event.clientY};},{once:true}));
+      const size=await cell.boundingBox();
+      await cell.click({button:'right',position:{x:size.width-8,y:size.height-8}});
+      const point=await cell.evaluate(node=>node.menuPress);
       expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(0);
-      await page.mouse.click(point.x,point.y,{button:'right'});await expectMenuAt(page,point);await page.keyboard.press('Escape');
+      await expectMenuAt(page,point);await page.keyboard.press('Escape');
     }
   }finally{await owner.close();}
 });

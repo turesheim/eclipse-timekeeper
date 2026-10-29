@@ -67,7 +67,7 @@ func maintenanceConnection(root string) (Settings, string, int, error) {
 		return s, "", 0, err
 	}
 	password := strings.TrimSpace(string(raw))
-	query := "SELECT current_setting('server_version_num')::int/10000; SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid(); SELECT schema_version||'|'||state FROM tk_schema WHERE id=1;"
+	query := offlineDrainSQL + "SELECT current_setting('server_version_num')::int/10000; SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid(); SELECT schema_version||'|'||state FROM tk_schema WHERE id=1;"
 	value, err := psql(nativePSQL, s.DatabasePort, s.Role, password, s.Database, query)
 	if err != nil {
 		return s, "", 0, err
