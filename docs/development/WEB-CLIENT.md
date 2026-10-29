@@ -913,3 +913,14 @@ If another edit or a removed destination makes restoration unsafe, Undo reports
 that conflict without overwriting current records. A lost response offers
 **Retry undo**, which checks the same command safely. Signing out clears the
 notification. No work snapshots are stored in browser storage.
+
+
+Bottom navigation uses the shared `--workspace-nav-bottom-inset` in both its
+height and padding. Fine-pointer desktop layouts use a compact 4rem bar even
+when a macOS browser reports a bottom safe-area inset. Devices with any coarse
+pointer retain `env(safe-area-inset-bottom)` at every viewport width, including
+wide touch/hybrid layouts. Horizontal safe-area protection remains independent.
+Today/Week sizing and workspace/scroll padding derive from the same navigation
+height. The navigation browser regression uses native Chromium safe-area
+emulation to check a 34px inset with desktop and touch input at narrow/wide
+widths; other engines check their naturally reported inset.

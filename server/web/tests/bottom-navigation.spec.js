@@ -47,3 +47,34 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(bar).toBeVisible();
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(bar).not.toBeVisible();await expect(page.locator('#sync-status')).not.toBeVisible();
 });
+
+test('bottom navigation uses compact desktop spacing while preserving touch safe areas at every width',async({browser,browserName})=>{
+  for(const [touch,width] of [[false,1440],[false,390],[true,390],[true,1440]]){
+    const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,viewport:{width,height:900},hasTouch:touch,isMobile:touch&&browserName!=='firefox',locale:'en-GB'});
+    try{
+      const page=await context.newPage();await page.goto('/web/');
+      if(browserName==='chromium'){
+        const protocol=await context.newCDPSession(page);
+        await protocol.send('Emulation.setSafeAreaInsetsOverride',{insets:{bottom:34}});
+      }
+      const inset=await page.evaluate(()=>{
+        const probe=document.createElement('div');probe.style.height='env(safe-area-inset-bottom, 0px)';document.body.append(probe);const value=probe.getBoundingClientRect().height;probe.remove();return value;
+      });
+      if(browserName==='chromium')expect(inset).toBe(34);
+      expect(await page.evaluate(()=>matchMedia('(any-pointer: coarse)').matches)).toBe(touch);
+      await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+      const bar=page.locator('#workspace-navigation');await expect(bar).toBeVisible();
+      await captureScreenshot(page,{path:`test-results/bottom-navigation-inset-${touch?'touch':'desktop'}-${width}.png`});
+      const bounds=await bar.boundingBox(),target=await bar.getByRole('button',{name:'Today',exact:true}).boundingBox();
+      expect(bounds.height).toBeCloseTo(64+(touch?inset:0),0);expect(bounds.y+bounds.height).toBeCloseTo(900,0);
+      const above=target.y-bounds.y,below=bounds.y+bounds.height-target.y-target.height;
+      expect(below-above).toBeCloseTo(touch?inset:0,0);expect(target.height).toBeGreaterThanOrEqual(44);
+      for(const name of ['Today','Calendar','Week','Workweek','Activities','Clients','Projects'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
+      if(width>=1024){
+        await bar.getByRole('button',{name:'Today',exact:true}).click();
+        await expect.poll(async()=>{const note=await page.locator('#today-note-editor').boundingBox(),nav=await bar.boundingBox();return Math.abs(nav.y-note.y-note.height-8);}).toBeLessThan(2);
+      }
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }finally{await context.close();}
+  }
+});
