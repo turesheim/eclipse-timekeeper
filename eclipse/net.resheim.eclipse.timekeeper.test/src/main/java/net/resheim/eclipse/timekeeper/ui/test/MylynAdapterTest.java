@@ -200,9 +200,16 @@ public class MylynAdapterTest {
 		});
 		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
 		var task = service.createTask(new CreateTask(Optional.empty(), "Created by server", Optional.empty()));
-		var history = service
-				.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, Instant.now().minusSeconds(3600),
-						Optional.of(Instant.now().minusSeconds(1800)), "Recorded on server", Set.of()));
+        var zone = java.time.ZoneId.systemDefault();
+        var day = java.time.LocalDate.now(zone).minusDays(2);
+        var from = day.atTime(23, 45).atZone(zone).toInstant();
+        var until = day.plusDays(1).atTime(0, 15).atZone(zone).toInstant();
+        var history = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, from,
+                Optional.of(until), "Recorded on server", Set.of()));
+        var query = new ActivityQuery(from, until, Optional.of(OwnerId.LOCAL), Optional.of(task.id()), Optional.empty(), zone);
+        var recorded = Set.copyOf(service.activities(query).activities());
+        assertEquals("History is partitioned at midnight", 2, recorded.size());
+        assertTrue(recorded.contains(history));
 		var external = new LocalTask("987654", "Reconnected provider summary");
 		external.setUrl("https://example.test/reconnected");
 		var key = new ExternalTaskReference("local", MylynMetadata.getRepositoryUrl(external), external.getTaskId(),
@@ -219,15 +226,15 @@ public class MylynAdapterTest {
 				assertEquals(Optional.of(external.getUrl()), connected.url());
 				assertEquals(task.id().value().toString(),
 						external.getAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID));
-				assertEquals(history, service.activity(history.id()).orElseThrow());
+				assertEquals(recorded, Set.copyOf(service.activities(query).activities()));
 				var replacement = new LocalTask(external.getTaskId(), "Replacement Mylyn object");
 				// The stable external key works even without a Mylyn UUID attribute.
 				assertEquals(task.id(), adapter.resolve(replacement).id());
-				assertEquals(history, service.activity(history.id()).orElseThrow());
+				assertEquals(recorded, Set.copyOf(service.activities(query).activities()));
 			});
 		} finally {
-			service.deleteActivity(
-					new DeleteActivity(history.id(), service.activity(history.id()).orElseThrow().version()));
+            for (var segment : recorded)
+                service.deleteActivity(new DeleteActivity(segment.id(), service.activity(segment.id()).orElseThrow().version()));
 			service.deleteTask(new DeleteTask(task.id(), service.task(task.id()).orElseThrow().version()));
 		}
 	}
