@@ -6,6 +6,7 @@ import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
 import {iconButton,isProjectIcon,projectIcon} from './icons.js';
 import {TrackDayNotes} from './track-day-notes.js';
 import {WeekNoteEditor,isoWeek} from './week-note-editor.js';
+import {workSummaryCard} from './work-summary-card.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const byId=id=>document.getElementById(id);
@@ -114,14 +115,12 @@ export class TodayView {
     });
     for(const entry of entries){
       const client=this.data.clients.find(value=>value.id===entry.clientId),sessions=this.daySessions.get(entry.clientId),writable=this.connected&&this.callbacks.canWrite();
-      const item=node('li',undefined,'today-session'),action=node(writable?'button':'div',undefined,'calendar-summary-card today-session-action');
+      const item=node('li',undefined,'today-session'),{card:action,line:details,duration}=workSummaryCard({tag:writable?'button':'div',className:'today-session-action',title:client?.name||t('ui.client'),color:client?.color});
       action.dataset.todayClient=entry.clientId;if(writable)action.type='button';else action.setAttribute('role','group');
-      action.style.setProperty('--client-color',client?.color||'var(--accent)');
-      action.append(node('strong',client?.name||t('ui.client')));
-      const details=node('span',undefined,'calendar-summary-total today-session-details'),icons=node('span',undefined,'track-project-icons'),projects=new Map();
+      details.classList.add('today-session-details');duration.classList.add('today-duration');const icons=node('span',undefined,'track-project-icons'),projects=new Map();
       for(const session of sessions){const project=this.data.projects.find(value=>value.id===session.projectId);if(isProjectIcon(project?.icon)){const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}}
       for(const [id,names] of projects)icons.append(projectIcon({icon:id,name:[...names].join(', ')}));icons.setAttribute('aria-hidden','true');
-      details.append(node('span',nanosText(entry.duration),'calendar-summary-time today-duration'),icons);action.append(details);
+      duration.textContent=nanosText(entry.duration);details.append(icons);
       action.title=(client?.name||t('ui.client'))+'\n'+t('count.work_sessions',{count:sessions.length})+'\n'+sessions.map(session=>[session.summary||t('ui.work_session_21aa04'),instantText(session.start,zone)+' → '+(session.end?instantText(session.end,zone):t('ui.in_progress'))].join(' · ')).join('\n');
       if(writable)action.addEventListener('click',()=>this.openSessions(entry.clientId));item.append(action);list.append(item);
     }
