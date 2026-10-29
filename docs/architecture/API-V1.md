@@ -901,6 +901,33 @@ exact Markdown body and ETag. `PUT` with `{ "body": "..." }` and the current
 years are used at New Year. Account archives include these notes as separate
 `YYYY-Www.md` files, and WebDAV exposes them at `/dav/journal/`.
 
+`GET /event-notes` lists private note summaries (without bodies), including notes
+whose calendar subscription was removed. `GET /event-notes/{subscriptionId}/{key}`
+returns the exact body, bounded original event snapshot and ETag; an untouched
+identity reads as version zero. `PUT` requires `If-Match` and `{ "body": "..." }`.
+For a first write, include `fromDate` and exclusive `toDate` (at most 31 days)
+to resolve an occurrence from the signed-in account's cached feed. Unknown or
+foreign subscriptions cannot be used to create a note. Subsequent writes need
+only the body, including after subscription removal. `DELETE` requires the
+current ETag and keeps a versioned tombstone. Read-only tokens cannot write.
+Bodies have the same 200,000 UTF-8-byte limit as weekly notes. Responses are
+private/no-store; change notifications contain no note content.
+
+`GET /event-notes/{subscriptionId}/{key}/markdown` downloads
+`event-<subscription UUID>-<64-character occurrence key>.md`. That stable ASCII
+filename does not include a mutable title, slash, reserved device name or feed
+credential. The document starts with a bounded `timekeeper-event` JSON
+frontmatter line identifying the subscription, occurrence and original
+UID/recurrence/title snapshot. The exact Markdown body follows. WebDAV exposes
+the same file, with its existing guarded create/update/delete rules. Removing
+or changing the identity header is rejected. Account ZIP export/import includes
+these files and refuses to overwrite a differing active note. Imported notes
+retain their identity; absent subscriptions are not recreated or reassigned.
+Today and Week event details share the note icon and guarded Markdown dialog.
+A journal-text icon on an event indicates a nonempty note; journal-plus in its
+details starts a note. Editing notes does not convert events to activities or
+change work totals.
+
 `GET /journal-assets/{filename}` returns private attachment bytes with a strong
 ETag and safe media type. `PUT` accepts JSON `{data}` with base64 bytes, using
 `If-None-Match: *` for a new filename or `If-Match` for an existing one.

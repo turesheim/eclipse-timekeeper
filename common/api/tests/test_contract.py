@@ -68,6 +68,19 @@ class ContractTest(unittest.TestCase):
             self.assertTrue(validator('TaskSyncFieldDecision').is_valid({'field':field,'outcome':'INCOMPLETE_GROUP'}))
             self.assertTrue(validator('TaskSyncExportWarning').is_valid({'field':field,'reason':'INCOMPLETE_GROUP'}))
 
+    def test_event_notes_preserve_identity_and_reject_unsafe_archive_names(self):
+        key='ab'*32
+        note={'body':'# Meeting\n','fromDate':'2026-10-29','toDate':'2026-10-30'}
+        self.assertTrue(validator('EventNoteInput').is_valid(note))
+        self.assertTrue(validator('EventNoteInput').is_valid({'body':''}))
+        self.assertFalse(validator('EventNoteInput').is_valid({**note,'ownerId':ID}))
+        self.assertFalse(validator('EventNoteInput').is_valid({'body':'x'*200001}))
+        filename='event-'+ID+'-'+key+'.md'
+        file={'path':filename,'bytes':232768,'sha256':'a'*64}
+        self.assertTrue(validator('ArchiveJournalFile').is_valid(file))
+        for name in ('../'+filename,'CON.md','event-'+ID+'-'+key+'?.md'):
+            self.assertFalse(validator('ArchiveJournalFile').is_valid({**file,'path':name}))
+
     def test_complete_openapi_document(self):
         validate(CONTRACT)
         for schema in CONTRACT['components']['schemas'].values():
@@ -618,6 +631,7 @@ class ContractTest(unittest.TestCase):
             'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'updateExternalTaskAssignment', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
+            'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'undoWorkSessionChange', 'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',

@@ -594,6 +594,7 @@ their JSON payloads and are validated within owner-scoped server transactions.
 | `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
 | `WEEK_NOTE` | One deterministic UUID per ISO week Monday and owner. Stores the ISO week key (`YYYY-Www`), exact Markdown `body`, an internal modification time and optimistic `version`. The ISO week-based year may differ from the calendar year at New Year. |
 | `WEEK_NOTE_DELETE` | Week-keyed deletion marker tied to the `WEEK_NOTE` version. A deleted weekly file remains versioned so stale writes fail. |
+| `EVENT_NOTE` | Deterministic UUID derived from subscription UUID and stable occurrence key, within the owner. Stores those identities, a bounded original UID/recurrence/title snapshot, exact Markdown body, internal modification time, deletion flag and optimistic version. Rescheduling or renaming an event does not change its note; recurring occurrences have distinct notes. The row survives removal of its calendar subscription. |
 | `JOURNAL_ASSET` | One deterministic UUID per account and safe filename under `assets/`. The JSON payload contains the filename, base64 binary data, byte length, derived safe media type, modification time, deletion flag and optimistic version. Deleted rows retain their version so old ETags cannot be reused. |
 
 `DAY_NOTE` and `DAY_LABEL` writes use independent conditional versions and publish a content-free profile
@@ -602,6 +603,8 @@ and `hasBody`, not the Markdown body. Active notes are included in account
 archives, including canonical Markdown even for empty but present notes.
 Version 3 account archives store labels separately and daily and weekly notes as separate
 `YYYY-MM-DD.md` and `YYYY-Www.md` files, with a checksummed `journalFiles` index.
+Calendar-event notes use `event-<subscription UUID>-<64-character occurrence key>.md`. A bounded `timekeeper-event` JSON frontmatter line preserves the identity and event snapshot; the Markdown body follows byte-for-byte. Names contain ASCII letters, digits and hyphens, independent of event titles and feed URLs. Active event notes round-trip through the same checksummed journal-file index. Imported notes retain the source identity, even when that subscription is absent; they are available through the event-note API and WebDAV, and are never guessed onto a different subscription.
+
 Journal assets use `assets/`; task attachment bytes use `assets/task attachments/` and
 retain their metadata in the task graph. `archive.json.dayLabels` backs up labels separately, including explicit clears and labels on deleted-note dates. Legacy version 2 file archives and version 1 archives with inline
 `dayNotes`, `weekNotes` and `journalAssets` remain readable. Daily and weekly notes are independent.

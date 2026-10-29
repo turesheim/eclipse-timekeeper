@@ -46,4 +46,23 @@ class AccountArchiveFilesTest {
             var snapshot=AccountArchiveInput.read(download.file(),"application/zip");assertEquals(6,snapshot.path("journalFiles").size());inputs.validate("AccountArchiveSnapshot",snapshot);
         }
     }
+    @Test void eventNotesExportAndImportWithSafeStableNamesAndExactMarkdown() throws Exception {
+        var key=new EventNotes.Key(UUID.randomUUID(),"ab".repeat(32));String body="# Ø\r\n\r\n<https://example.org/a?q=1>  \r\n---\r\n";
+        var value=object().put("subscriptionId",key.subscription().toString()).put("eventKey",key.event()).put("body",body);
+        value.set("event",object().put("uid","../CON: meeting?*").put("recurrenceId","2026-10-27T10:00:00Z").put("title","../CON: Meeting / \"?*"));
+        byte[] bytes=EventNotes.document(value);assertTrue(key.filename().matches("[a-z0-9-]+\\.md"));assertEquals(body,EventNotes.parse(key.filename(),bytes).body());
+        store.transaction("a",()->{var notes=new EventNotes(store);notes.saveDocument(key,etag(notes.get(key)),bytes);return null;});
+        try(var download=archives.download(tokens.authenticate("Bearer test-a"));var zip=new ZipFile(download.file().toFile())){
+            assertArrayEquals(bytes,zip.getInputStream(zip.getEntry(key.filename())).readAllBytes());
+            var snapshot=AccountArchiveInput.read(download.file(),"application/zip");inputs.validate("AccountArchiveSnapshot",snapshot);assertEquals(1,AccountArchiveInput.counts(snapshot).path("eventNotes").asInt());
+            store.transaction("b",()->{ArchiveJournalFiles.restore(download.file(),snapshot.path("journalFiles"),store,true);assertArrayEquals(bytes,new EventNotes(store).document(key));return null;});
+            store.transaction("b",()->{ArchiveJournalFiles.restore(download.file(),snapshot.path("journalFiles"),store,true);return null;});
+            store.transaction("b",()->{var notes=new EventNotes(store);notes.saveDocument(key,etag(notes.get(key)),EventNotes.document(value.deepCopy().put("body","Keep newer work")));return null;});
+            assertThrows(ApiFailure.class,()->store.transaction("b",()->{ArchiveJournalFiles.restore(download.file(),snapshot.path("journalFiles"),store,true);return null;}));
+        }
+        assertThrows(ApiFailure.class,()->EventNotes.parse("../"+key.filename(),bytes));
+        assertThrows(ApiFailure.class,()->EventNotes.parse(key.filename(),new byte[]{(byte)0xff}));
+        assertThrows(ApiFailure.class,()->EventNotes.parse(new EventNotes.Key(UUID.randomUUID(),key.event()).filename(),bytes));
+    }
+
 }

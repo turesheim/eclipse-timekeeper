@@ -429,3 +429,6 @@ button.calendar-summary-card:disabled { opacity: .65; }
 .app-header #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 575px) { .app-header #owner { display: none; } }
 .journal-webdav-url { display: block; overflow-wrap: anywhere; margin-block-end: 1rem; color: inherit; }
+
+.calendar-event-note-indicator { margin-inline-start: .3rem; font-size: .85em; }
+.calendar-planned > .calendar-event-note-indicator { position: absolute; inset-inline-end: .25rem; top: .2rem; }

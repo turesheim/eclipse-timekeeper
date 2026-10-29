@@ -99,6 +99,8 @@ class AccountArchive {
         records(c,owner,JournalState.Kind.WEEK_NOTE_DELETE.name(),value->deletedWeeks.put(value.path("id").asText(),value.path("noteVersion").asLong()));
         final long[] weekCount={0};records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks))weekCount[0]++;});
         if(weekCount[0]>0)counts.put("weekNotes",weekCount[0]);
+        final long[] eventCount={0};records(c,owner,EventNotes.TYPE,value->{if(EventNotes.present(value))eventCount[0]++;});
+        if(eventCount[0]>0)counts.put("eventNotes",eventCount[0]);
         final long[] assetCount={0};records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())assetCount[0]++;});
         if(assetCount[0]>0)counts.put("journalAssets",assetCount[0]);
         var profile=profile(c,owner);var metadata=metadata(c,owner);
@@ -107,6 +109,7 @@ class AccountArchive {
         files.put("archive.json","Private account snapshot and checksummed journal file index. Restore work and selected preferences; account and credential metadata are informational.");
         files.put("YYYY-MM-DD.md","Exact daily Markdown files. Independent day labels are stored in archive.json.");
         files.put("YYYY-Www.md","Exact ISO weekly Markdown files.");
+        files.put("event-<subscription UUID>-<occurrence key>.md","Calendar-event notes with stable identity metadata and exact Markdown body.");
         files.put("assets/*","Binary journal attachments referenced by Markdown.");
         files.put("README.txt","Format, privacy and CSV notes.");
         for(String name:new TreeSet<>(WORK.keySet())) files.put(name+".csv","Spreadsheet-safe "+name+"; exact stored instants and JSON-encoded collection fields.");
@@ -170,6 +173,7 @@ class AccountArchive {
             output.accept(path,bytes);
         }});
         records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks))output.accept(value.path("week").asText()+".md",value.path("body").asText().getBytes(StandardCharsets.UTF_8));});
+        records(c,owner,EventNotes.TYPE,value->{if(EventNotes.present(value))output.accept(new EventNotes.Key(uuid(value.path("subscriptionId")),value.path("eventKey").asText()).filename(),EventNotes.document(value));});
         records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())output.accept("assets/"+value.path("filename").asText(),JournalAssets.bytes(value));});
         records(c,owner,"TASK_ATTACHMENT",value->output.accept(ArchiveJournalFiles.taskPath(value.path("id").asText()),Base64.getDecoder().decode(value.path("data").asText())));
     }

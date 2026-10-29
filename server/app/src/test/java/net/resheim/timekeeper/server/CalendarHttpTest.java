@@ -50,7 +50,7 @@ class CalendarHttpTest {
         clock.set(NOW);Feeds.body.set(ics("Planning"));Feeds.status.set(200);Feeds.requests.set(0);Feeds.started=null;Feeds.release=null;
         for(String owner:List.of("a","b"))store.transaction(owner,()->{
             store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='CAL_SUB'",owner);
-            for(String type:List.of(CalendarSubscriptions.SUB,CalendarSubscriptions.FEED,CalendarSubscriptions.LINK))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=?",owner,type);
+            for(String type:List.of(CalendarSubscriptions.SUB,CalendarSubscriptions.FEED,CalendarSubscriptions.LINK,EventNotes.TYPE))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=?",owner,type);
             store.updateProfile("Europe/Oslo");return null;
         });
     }
@@ -155,4 +155,50 @@ class CalendarHttpTest {
             while(!NOW.plusSeconds(900).toString().equals(parse(get("test-a",path).asString()).path("lastSuccess").asText()))Thread.sleep(20);
         });assertEquals(2,Feeds.requests.get());assertEquals(1,events().path("items").size());
     }
+    @Test void eventNotesArePrivateGuardedAndSurviveReschedulingAndSubscriptionRemoval(){
+        String subscription=subscribe(client("test-a").path("id").asText());refresh(subscription).then().statusCode(200);
+        var event=events().path("items").get(0);String path="/event-notes/"+event.path("subscriptionId").asText()+"/"+event.path("key").asText();
+        String markdown="# Private minutes\r\n\r\n- [ ] Follow up  \r\n<https://example.org/a?q=1>\r\n---\r\n";
+        var initial=get("test-a",path);initial.then().statusCode(200);assertEquals(0,initial.jsonPath().getLong("version"));
+        var input=object().put("body",markdown).put("fromDate","2026-05-04").put("toDate","2026-05-11");
+        call("test-a","PUT",path,input,null,null).then().statusCode(428);
+        call("test-read","PUT",path,input,initial.header("ETag"),null).then().statusCode(403);
+        call("test-a","PUT",path,input.deepCopy().put("body","ø".repeat(100001)),initial.header("ETag"),null).then().statusCode(422);
+        var saved=call("test-a","PUT",path,input,initial.header("ETag"),null);saved.then().statusCode(200);
+        assertEquals(markdown,saved.jsonPath().getString("body"));assertEquals("private, no-store",saved.header("Cache-Control"));
+        assertEquals(markdown,get("test-read",path).jsonPath().getString("body"));assertEquals(0,get("test-b",path).jsonPath().getLong("version"));
+        call("test-b","PUT",path,input,get("test-b",path).header("ETag"),null).then().statusCode(404);
+        call("test-a","PUT",path,input,initial.header("ETag"),null).then().statusCode(412);
+        assertTrue(events().path("items").get(0).path("hasNote").asBoolean());
+        var listed=get("test-a","/event-notes");listed.then().statusCode(200);assertFalse(listed.asString().contains("Private minutes"));
+        var download=get("test-a",path+"/markdown");download.then().statusCode(200);
+        String filename=download.header("Content-Disposition").split("\"")[1];assertEquals(markdown,EventNotes.parse(filename,download.asByteArray()).body());assertFalse(filename.contains("Planning"));
+        assertFalse(download.asString().contains("private-access"));
+        String dav="/dav/journal/"+filename;
+        var remote=given().auth().preemptive().basic("journal","test-a").get(dav);remote.then().statusCode(200);assertArrayEquals(download.asByteArray(),remote.asByteArray());
+        given().auth().preemptive().basic("journal","test-b").get(dav).then().statusCode(404);
+        given().auth().preemptive().basic("journal","test-a").contentType("text/markdown").body("changed").put(dav).then().statusCode(428);
+        given().auth().preemptive().basic("journal","test-a").header("If-Match",initial.header("ETag")).contentType("text/markdown").body(remote.asByteArray()).put(dav).then().statusCode(412);
+        given().auth().preemptive().basic("journal","test-a").header("If-Match",remote.header("ETag")).contentType("text/markdown").body(remote.asByteArray()).put(dav).then().statusCode(204);
+        given().auth().preemptive().basic("journal","test-a").header("Depth","1").request("PROPFIND","/dav/journal/").then().statusCode(207).body(org.hamcrest.Matchers.containsString(filename));
+
+        clock.set(NOW.plusSeconds(31));Feeds.body.set(ics("Renamed : / meeting").replace("20260504T215900Z","20260505T215900Z").replace("20260504T220100Z","20260505T220100Z"));refresh(subscription).then().statusCode(200);
+        assertEquals(event.path("key"),events().path("items").get(0).path("key"));assertTrue(events().path("items").get(0).path("hasNote").asBoolean());assertEquals(markdown,get("test-a",path).jsonPath().getString("body"));
+        call("test-a","DELETE",subscription,null,get("test-a",subscription).header("ETag"),null).then().statusCode(204);
+        var edited=call("test-a","PUT",path,object().put("body","After subscription removal"),saved.header("ETag"),null);edited.then().statusCode(200);
+        call("test-a","DELETE",path,null,edited.header("ETag"),null).then().statusCode(204);
+        assertTrue(get("test-a",path).jsonPath().getBoolean("deleted"));get("test-a",path+"/markdown").then().statusCode(404);
+        call("test-a","PUT",path,object().put("body",markdown),get("test-a",path).header("ETag"),null).then().statusCode(200);
+    }
+
+    @Test void recurringOccurrencesHaveSeparateNotes(){
+        Feeds.body.set(ics("Recurring").replace("SUMMARY:","RRULE:FREQ=DAILY;COUNT=2\r\nSUMMARY:"));
+        String subscription=subscribe(client("test-a").path("id").asText());refresh(subscription).then().statusCode(200);
+        var items=events().path("items");assertEquals(2,items.size());assertNotEquals(items.get(0).path("key"),items.get(1).path("key"));
+        String prefix="/event-notes/"+items.get(0).path("subscriptionId").asText()+"/",first=prefix+items.get(0).path("key").asText(),second=prefix+items.get(1).path("key").asText();
+        call("test-a","PUT",first,object().put("body","First occurrence only").put("fromDate","2026-05-04").put("toDate","2026-05-11"),get("test-a",first).header("ETag"),null).then().statusCode(200);
+        assertEquals(0,get("test-a",second).jsonPath().getLong("version"));
+        var marked=events().path("items");assertTrue(marked.get(0).path("hasNote").asBoolean());assertFalse(marked.get(1).path("hasNote").asBoolean());
+    }
+
 }
