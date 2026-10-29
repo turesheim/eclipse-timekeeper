@@ -1,11 +1,13 @@
 # Full-instance backup implementation
 
-This feature is being implemented for [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
-The internal encrypted archive, configuration inventory, database-image and
-administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
-jobs, one-use native downloads and uploaded-archive review. The Administration
-interface supports archive operations, asynchronous private restore preparation, destination review and explicit confirmation. Complete native deployment integration and migration acceptance remain unfinished; packaged JVM startup automatically runs the recovery coordinator. The acceptance criteria in the
-issue remain the delivery requirements; these foundations alone do not satisfy them.
+This document describes the implementation of
+[#473](https://github.com/turesheim/eclipse-timekeeper/issues/473). Administration
+provides encrypted installation backups, session-bound upload and validation,
+private restore preparation, destination review and explicit confirmation.
+Exclusive preboot recovery applies committed consent before the framework starts.
+Native DSM and Compose maintenance retain the recovered security material needed
+for later restarts and disaster recovery. See the
+[operator guide](../operations/INSTANCE-BACKUP.md) for deployment procedures.
 
 ## Administration workflow
 
@@ -133,6 +135,13 @@ inputs still fail coverage. It does not collect unrelated host environment
 variables. Its file inventory covers token/setup files, external configuration
 files and [Quarkus 3.40 TLS inputs](https://quarkus.io/version/3.40/guides/tls-registry-reference/),
 including named PEM pairs, keystores, certificate lists and flat trust directories.
+Resolved `javax.net.ssl.*` settings and their explicit key/trust stores are also
+captured. PostgreSQL JDBC additional SSL properties inventory `sslcert`, `sslkey`
+and `sslrootcert`, including named datasources. The inventory retains conventional
+JVM trust material (`jssecacerts`, otherwise `cacerts`) and existing pgJDBC
+service-home certificate/key/root files as source material. These derived entries
+do not override destination database or TLS settings. Secret values and original
+file bytes remain inside the encrypted archive.
 Classpath inputs are supported; input paths are never silently omitted when
 missing, unreadable, oversized or unsupported. Unknown application file inputs
 fail coverage, and a source-level test checks newly declared application
@@ -197,7 +206,8 @@ separate native GET consumes it atomically, records a safe started audit event,
 and streams encrypted bytes directly to the browser. No secret enters the URL or
 JSON response, and the client need not accumulate a Blob. Simultaneous requests
 can consume the grant only once. Replacement, expiry, wrong job/session and
-logout invalidate access. Uploaded archive validation/review is integrated. Restore activation remains unfinished.
+logout invalidate access. Uploaded archive validation/review, public preparation/confirmation and exclusive
+preboot activation enforce their separate authority and integrity boundaries.
 See [API policy](API-V1.md).
 
 ## Durable operation records and schema 9
@@ -286,7 +296,7 @@ The safe review records source build/deployment metadata, archive UUID/time,
 logical schema and table counts. It explicitly returns `restoreReady: false`;
 archive verification alone does not prove empty-target readiness, usable restored
 authentication/configuration, correct deployment mapping or exclusive activation.
-The staging, confirmation and exclusive preboot phases check these additional boundaries. Native migration and full coverage acceptance remain release requirements.
+The staging, confirmation and exclusive preboot phases check these additional boundaries. The deployment acceptance tests below exercise migration and later material recovery.
 
 ## Complete database image
 
@@ -329,7 +339,7 @@ replaces rows in dependency order without disabling constraints, and leaves
 commit authority with the caller. A savepoint rolls back all replacements if
 staging is damaged after preflight or an insertion fails.
 
-## Verification and remaining integration
+## Verification
 
 The server reactor and shared module suites, API contracts, pinned web assets and
 packaging checks cover the current implementation. The checks include real-runtime configuration capture, complete archive integrity,
@@ -343,10 +353,13 @@ rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Administration preparation/confirmation/status controls, automatic JVM launch recovery and operator documentation are integrated. Delivery still requires complete native deployment integration, Synology/Docker/standalone migration acceptance and the remaining restored-access/security-material audit. The offline coordinator applies the database, installs mapped
-material, completes activation and resumes committed recovery phases. Deployment integration must still audit all recoverable inputs and applicable
-security material, including native maintenance backup coverage after a restore. No privileged host credentials may be granted to the web process to
-make that integration work.
+Administration preparation/confirmation/status controls, automatic JVM launch
+recovery and deployment-specific maintenance share the same database/material
+binding. The offline coordinator installs mapped material before replacing rows,
+commits with the pending gate, publishes the active pointer and completes
+activation. The native and Compose acceptance tests exercise subsequent
+maintenance backup and recovery after material loss. The web process receives no
+Docker socket, privileged database role or host restart credentials.
 
 ## Runtime maintenance and restore fence
 
@@ -483,7 +496,7 @@ offline entry point uses the real Quarkus configuration loader with the overlay
 and checks required bindings and normal backup inventory limits. Conflicting
 higher-priority settings fail this preflight. Later deliberate operator recovery
 may use a private override properties file with an explicitly higher ordinal;
-final operator procedures remain part of launcher/deployment integration.
+the operator guide documents restart, cancellation and material-retention procedures.
 
 `InstanceRestoreRecovery` installs material, applies the verified image inside
 the exclusive serializable transaction, commits with the pending gate, then
@@ -508,10 +521,13 @@ Its manual mode is an operator recovery interface; public confirmation uses auto
 H2 and a non-superuser PostgreSQL application role, repeated completion, recovery
 after database commit, partial cleanup, and refusal of populated targets.
 
-Complete native integration, coverage review and full migration acceptance are still required. See the operational guide for the implemented public workflow.
-Full package-identity migration and restored login/passkey/journal/attachment
-acceptance remain delivery requirements; SQL/password-hash checks alone do not
-prove those application flows.
+Packaged acceptance verifies the actual public stage/confirm/restart protocol,
+restored password and API-token access, original IDs/versions, separate day labels,
+daily/weekly journals and exact attachment bytes. Signed assertions prove that a
+restored passkey works at its original RP. With a changed RP, the old credential
+remains stored but unusable there; password access permits reenrollment, and a new
+signed assertion verifies the destination credential. The disposable private key
+stays outside the archive, as an authenticator's private key would in production.
 
 The entry point also resolves the deployment's database/SMTP password-file
 variables using the same trailing-newline handling as the shell entrypoint.
@@ -551,7 +567,7 @@ consent, verifies restored password login and the original client ID/version,
 restarts and repeats the authenticated read, then checks that missing required
 material prevents framework startup. This loopback protocol check explicitly
 forwards the Secure session cookie; it does not replace HTTPS browser acceptance
-or the remaining passkey, journal, attachment and native migration requirements.
+or the separate deployment and browser checks.
 
 
 ## Cancellation before database replacement
@@ -648,7 +664,75 @@ source archive, stages/confirms, verifies maintenance fencing, stops/restarts,
 and checks restored password/API-token access, client IDs/versions, daily and
 weekly journal bodies, independent labels and exact attachment bytes. Its source
 archive checksum must remain unchanged. This complements the database fidelity
-suite; native Synology migration and remaining security-material coverage still
-need their own acceptance evidence.
+suite and the separate native/Compose deployment acceptance described below.
 
 Restore preparation and confirmation retry only bounded SQL serialization/deadlock aborts (40001/40P01). Garbage collection and file work stay outside the retried transaction. Each attempt reacquires the runtime fence and current account authority; uncertain connection/commit failures are not replayed. A worker may clean its private workspace only after acquiring its lease, and cleanup finishes before a failed stage becomes retryable. Real PostgreSQL conflict and rejected-worker workspace tests cover these boundaries.
+
+
+## Native package integration
+
+`package_synology.py --package-id timekeeper|dagsverk` creates independent package
+identities from the same verified application image. Package names, accounts,
+appdata, containers, launchers and database defaults are distinct. The compiled
+controller checks its package identity before performing lifecycle operations.
+Preinstall prepares the incoming project for its dedicated UID/GID and permanent
+appdata mount; it does not rewrite the source installation's installed payload.
+The unprivileged application creates private instance roots under that mount.
+
+Native maintenance format 2 retains only the immutable active generation and its
+pointer. Inventory validation rejects missing/extra entries, unsafe paths,
+symlinks/hard links, duplicate JSON fields, invalid private modes and mismatched
+lengths/checksums. Its generation, operation, material digest and intent digest
+must match the database. The restore transaction checks that binding before
+commit; immutable files are installed first and the active pointer is published
+afterwards, while maintenance prevents startup. Legacy archives without active
+material retain format 1 support.
+
+`instance_migration_acceptance.py` loads real Timekeeper and Dagsverk SPKs, runs
+their compiled controllers and application images with separate package accounts
+and native PostgreSQL, and exercises administrator export and public restoration.
+It checks passwords, owner isolation, API-token access, original business
+identities/versions/timestamps/relations, labels, journals and attachment bytes.
+Bootstrap and copied source sessions must be rejected. New destination writes
+must survive later native backup, active-material loss and recovery. The source
+database and installed file bytes, permissions, owners and timestamps are
+fingerprinted before and after destination operations.
+
+The fixture represents DSM resource creation and lifecycle calls using an
+isolated layout. It is not a real Package Center/NAS hardware acceptance receipt;
+that remains a separate stable-publication gate.
+
+## Compose maintenance integration
+
+The image initializes `/instance` with mode 0700 for UID/GID 10001. Both API
+replicas mount the same project-scoped `instance-state` volume and use its backup
+and restore roots. Ordinary container replacement retains that volume. The
+operator maintenance service mounts it for backup and restore; the web application
+continues to run without Docker or host privileges.
+
+`backup.sh` and `restore.sh` hold a kernel lock on that volume across host-side
+SQL and configuration steps. `instance_material.py` reads the exact dump's schema
+and instance control through data-only `pg_restore` output without executing its
+SQL. A pending instance restore or incomplete maintenance marker refuses backup.
+A completed database must have its matching private active material. Only the
+immutable active generation enters `instance-material.tar`; transient uploads,
+plaintext workspaces and prepared handoffs are excluded.
+
+Maintenance restore validates files before extracting them, creates a durable
+startup marker and installs the immutable generation. `restore-database.py` verifies
+the generation/operation/material/intent binding inside the same transaction as
+SQL replacement and schema validation/upgrade. A stripped or inconsistent
+material archive rolls back replacement. After commit and configuration-file
+recovery, the helper publishes the active pointer and removes the marker. The
+entrypoint refuses startup while maintenance is incomplete. Retrying the same
+complete backup is idempotent; schema 2–9 backups without active material remain
+supported.
+
+`compose_instance_restore_acceptance.py` uses two packaged Compose installations
+and the actual application role. It verifies public encrypted migration, two
+accounts and owner isolation, business data, journals and exact attachments;
+then it tests active-material loss/recovery, concurrent-maintenance refusal,
+incomplete-maintenance backup refusal, interrupted-start refusal, stripped-material
+SQL rollback and complete-backup retry. These backend protocol clients explicitly
+forward canonical Origin and Secure cookies as a TLS proxy would. Separate HTTPS
+browser tests verify the user-facing protocol.
