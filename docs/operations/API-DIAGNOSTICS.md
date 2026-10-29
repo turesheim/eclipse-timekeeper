@@ -1,5 +1,29 @@
 # Read-only API diagnostics
 
+## Server availability errors
+
+For HTTP 5xx responses, the server logs `API failure` with the public problem
+`code`, exception `category`, a validated five-character `sql_state` when
+available, and a compiled server class/method as `source`. Missing details are
+reported as `unknown`. Token-registry loading failures also report the safe
+`TOKEN_REGISTRY_UNAVAILABLE` category before returning the existing generic
+HTTP 503 response. These diagnostics do not change authentication decisions.
+
+The records exclude exception messages, stack traces, SQL statements, registry
+contents, filesystem paths, authorization headers and account data. Use them
+alongside the generated request ID, route template and timing in the existing
+`API request completed` record. Record the deployed commit and the exact failed
+step when reporting intermittent failures; a later successful run does not
+establish the cause of an earlier HTTP 503.
+
+Browser acceptance artifacts retain each invocation's JVM log under
+`server-logs/`, including the full HTTP suite before later HTTPS checks run.
+Names use hashes and random suffixes rather than raw selectors or filesystem
+paths. The latest invocation remains available as `server.log`; earlier logs
+survive Playwright's normal output-directory cleanup.
+
+## Read-only inspection
+
 Use a separate personal token under **My Account → API tokens**, with
 **Read-only** access and a short expiry. Administrator access is unnecessary for
 inspecting your own labels and notes. Store its secret outside the repository

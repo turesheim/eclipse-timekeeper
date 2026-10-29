@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -19,6 +20,18 @@ from configure_accounts import create_challenge
 from recovery_fixture import RecoveryFixture
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def retain_server_logs(server_log, output, identity):
+    """Playwright clears its output between invocations; retain earlier JVM evidence."""
+    history=server_log.parent/'server-logs';history.mkdir(parents=True,exist_ok=True)
+    key=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()).hexdigest()[:20]
+    saved=history/(key+'-'+secrets.token_hex(8)+'.log')
+    shutil.copyfile(server_log,saved)
+    destination=output/'server-logs';destination.mkdir(parents=True,exist_ok=True)
+    for path in history.glob('*.log'):
+        if path.is_file() and not path.is_symlink():shutil.copyfile(path,destination/path.name)
+    return saved
 
 
 def main():
@@ -97,6 +110,8 @@ def main():
                 process.terminate()
                 try: process.wait(timeout=10)
                 except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=5)
+                log.flush()
+                retain_server_logs(server_log,output,{'distribution':digest,'browser':args.browser,'https':args.https,'mail':args.mail,'passkeys':args.passkeys,'restore':args.restore,'selector':args.grep})
     return 0
 
 
