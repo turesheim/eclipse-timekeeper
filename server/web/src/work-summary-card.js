@@ -7,6 +7,6 @@ export function workSummaryCard({tag='div',className='',title,color,swatch=false
   const heading=node('strong',title,'calendar-summary-title');heading.title=title;
   if(swatch){card.classList.add('calendar-summary-swatch');heading.classList.add('client-color');heading.replaceChildren(node('span',title,'calendar-summary-title-text'));}
   const line=node('span',undefined,'calendar-summary-total'),duration=node('span',undefined,'calendar-summary-time');
-  line.append(duration);card.append(heading,line);
+  line.append(duration);card.append(heading,' ',line);
   return {card,heading,line,duration};
 }
