@@ -52,6 +52,7 @@ test('read-only daily links and modifier clicks open the requested date without 
     const read=await context.newPage();await read.goto('/web/?day=2026-10-26');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');await expect(read.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(read)).toHaveAttribute('aria-readonly','true');
     const writes=[];context.on('request',r=>{if(['POST','PUT','DELETE','PATCH'].includes(r.method()))writes.push(new URL(r.url()).pathname);});
     const opened=context.waitForEvent('page');await dateLink(rich(read),'2026-10-27').click({modifiers:['ControlOrMeta']});const second=await opened;await expect(second.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(second)).toContainText('Read target');await expect(read.locator('#today-date')).toHaveValue('2026-10-26');
-    await dateLink(rich(read),'2026-10-27').click();await expect(read.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(read)).toContainText('Read target');expect(writes).toEqual([]);
+    await dateLink(rich(read),'2026-10-27').focus();await read.keyboard.press('Enter');await expect(read.locator('#today-date')).toHaveValue('2026-10-27');
+    await read.locator('#today-date').fill('2026-10-26');await expect(dateLink(rich(read),'2026-10-27')).toBeVisible();await dateLink(rich(read),'2026-10-27').click();await expect(read.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(read)).toContainText('Read target');expect(writes).toEqual([]);
   }finally{await context.close();}
 });
