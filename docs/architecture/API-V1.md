@@ -1160,7 +1160,9 @@ another owner or an unknown client fails with 404. Empty memberships are valid.
 
 Focus is a web presentation preference, not an authorization scope. API lists,
 reports, export and client commands retain their usual explicit filters; a web
-selection never silently changes API results. Deleting a client makes its saved
+selection never silently changes API results. Activity focus follows a task's
+current project, matching activity reports; taskless activities use their explicit
+project. Work-session ownership is independent of task moves. Deleting a client makes its saved
 membership inert; the next settings save drops that removed client. Definition
 changes publish a content-free `PROFILE/UPDATED` invalidation. The settings have
 an independent version and are preserved by profile/holiday edits.

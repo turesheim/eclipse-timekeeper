@@ -15,7 +15,7 @@ import { UndoNotice } from './undo.js';
 import { accountMenu } from './account-menu.js';
 import { periodSwipe } from './period-swipe.js';
 import { shiftMonth } from './month-model.js';
-import {focusedSnapshot,focusedCurrentSession} from './focus-model.js';
+import {focusedSnapshot,focusedCurrentSession,focusIncludesActivity} from './focus-model.js';
 import {renderFocusSettings} from './focus-settings.js';
 import {openAbout} from './about.js';
 
@@ -351,8 +351,8 @@ function render() {
   $('zone-caption').textContent = `${s.dates.first} – ${addDays(s.dates.first, 6)} · ${zone}`;
   const active = s.active.data;
   $('active-title').closest('.tracking').dataset.active = String(!!active);
-  $('active-title').replaceChildren(active && !s.projects.some(value=>value.id===active.projectId)&&!s.tasks.some(value=>value.id===active.taskId) && currentFocus() ? document.createTextNode(i18nText('focus.running_outside')) : active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
-  $('active-details').textContent = active && !s.projects.some(value=>value.id===active.projectId)&&!s.tasks.some(value=>value.id===active.taskId) && currentFocus() ? '' : active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
+  $('active-title').replaceChildren(active && !focusIncludesActivity(s,active) ? document.createTextNode(i18nText('focus.running_outside')) : active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
+  $('active-details').textContent = active && !focusIncludesActivity(s,active) ? '' : active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
   $('stop').hidden = !active;readOnlyWhileDisconnected();
   table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
   renderProjects(s);

@@ -21,11 +21,12 @@ test('focus areas filter every client view, totals and separately loaded calenda
   const identity=await(await browserRequest(page).get('/api/v1/auth/session')).json();
   const headers={'X-CSRF-Token':identity.csrf,'X-Timekeeper-Owner':Buffer.from(identity.ownerId).toString('base64url')};
   const api=async(method,path,data,extra={})=>{const result=await browserRequest(page).fetch('/api/v1'+path,{method,data,headers:{...headers,...extra}});expect(result.ok(),`${method} ${path}: ${result.status()}`).toBeTruthy();return result;};
-  const clients=[],projects=[],sessions=[];
+  const clients=[],projects=[],sessions=[],tasks=[];
   for(const [index,name] of ['Included client','Excluded client'].entries()){
     const client=await(await api('POST','/clients',{name,color:index?'#cc2211':'#118866'})).json();clients.push(client);
     const project=await(await api('POST','/projects',{name:name+' project',clientId:client.id,icon:'code'})).json();projects.push(project);
     const task=await(await api('POST','/tasks',{summary:name+' task',projectId:project.id,parentTaskId:null,url:null})).json();
+    tasks.push(task);
     sessions.push(await(await api('POST','/work-sessions',{clientId:client.id,projectId:project.id,summary:name+' session',start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:00:00Z'})).json());
     await api('POST','/activities',{taskId:task.id,projectId:project.id,start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:00:00Z',summary:name+' activity',labelIds:[]});
   }
@@ -58,9 +59,19 @@ test('focus areas filter every client view, totals and separately loaded calenda
   await page.locator('[data-tab=clients]').click();await expect(page.locator('#clients tbody tr')).toHaveCount(0);
   await selectFocus(page,'No focus');await expect(page.locator('#clients')).toContainText(clients[1].name);
   expect((await(await api('GET','/work-sessions')).json()).items).toHaveLength(2);
+  // Activity reports follow a task's current project after a move. Session
+  // client ownership remains unchanged, independently of that task move.
+  let task=await api('GET','/tasks/'+tasks[0].id);
+  await api('PUT','/tasks/'+tasks[0].id,{summary:tasks[0].summary,projectId:projects[1].id,parentTaskId:null,url:null},{'If-Match':task.headers().etag});
+  await page.locator('#refresh').click();await selectFocus(page,'Work');await page.locator('[data-tab=activities]').click();
+  await expect(page.locator('#week-total')).toHaveText('0h 0m');await expect(page.locator('#activities')).not.toContainText(tasks[0].summary);
+  const report=await(await api('GET','/reports/activities?'+new URLSearchParams({from:'2025-05-12T00:00:00Z',to:'2025-05-19T00:00:00Z',projectId:projects[0].id,zoneId:'UTC'}))).json();expect(report.total).toBe('PT0S');
+  task=await api('GET','/tasks/'+tasks[0].id);
+  await api('PUT','/tasks/'+tasks[0].id,{summary:tasks[0].summary,projectId:projects[0].id,parentTaskId:null,url:null},{'If-Match':task.headers().etag});
+  await page.locator('#refresh').click();await expect(page.locator('#activities')).toContainText(tasks[0].summary);
   // Focus is a view preference, never permission to start a second timer.
   const running=await(await api('POST','/work-sessions/start',{clientId:clients[1].id,summary:'Outside focus timer'},{'Idempotency-Key':randomUUID()})).json();
-  await page.locator('#refresh').click();await expect(page.locator('#session-stop')).toBeVisible();await selectFocus(page,'Work');
+  await page.locator('#refresh').click();await expect(page.locator('#session-stop')).toBeVisible();
   await expect(page.locator('#work-session-title')).toHaveText('Work outside this focus');await expect(page.locator('#session-start')).toBeHidden();
   await page.locator('#session-stop').click();await expect(page.locator('#session-start')).toBeVisible();
   expect((await(await api('GET','/work-sessions/'+running.id)).json()).end).toBeTruthy();
