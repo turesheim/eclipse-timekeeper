@@ -39,7 +39,7 @@ class SynologyPackageTest(unittest.TestCase):
                  'private':None,'private/config':None,'private/secrets':None,
                  **{name:b'guide' for name in ('README.md','ACCOUNTS.md','INSTANCE-BACKUP.md','TAILSCALE.md')}}
         if not missing_staged_release:
-            payload['scripts/release.json']=json.dumps({'commit':staged_commit,'image':IMAGE,'serverSchema':9}).encode()
+            payload['scripts/release.json']=json.dumps({'commit':staged_commit,'image':IMAGE,'serverSchema':10}).encode()
         migrations={name:(ROOT/'server/app/src/main/resources/db'/Path(name).name).read_bytes() for name in MIGRATION_FILES}
         payload.update({name:value for name,value in migrations.items() if name!=missing_staged_migration})
         if changed_staged_migration:payload[changed_staged_migration]+=b'\nchanged\n'
@@ -59,7 +59,7 @@ class SynologyPackageTest(unittest.TestCase):
         helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
         files.update({'INFO':''.join(key+'='+json.dumps(value)+'\n' for key,value in info.items()).encode(),
                       'package.tgz':payload,'scripts/timekeeper-dsm':bytes(helper),
-                      'scripts/release.json':json.dumps({'commit':COMMIT,'image':IMAGE,'serverSchema':9}).encode(),
+                      'scripts/release.json':json.dumps({'commit':COMMIT,'image':IMAGE,'serverSchema':10}).encode(),
                       'conf/privilege':json.dumps({'defaults':{'run-as':'root' if elevated else 'package'},'username':'timekeeper','groupname':'timekeeper'}).encode(),
                       'conf/resource':(ROOT/'server/synology/conf/resource').read_bytes(),
                       'PACKAGE_ICON.PNG':(ROOT/'server/synology/ui/images/timekeeper_64.png').read_bytes(),

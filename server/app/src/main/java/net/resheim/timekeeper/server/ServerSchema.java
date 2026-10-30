@@ -13,7 +13,7 @@ import org.h2.tools.RunScript;
 public final class ServerSchema {
     private ServerSchema() { }
     private static final Set<String> LEGACY_TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
-    public static final int CURRENT=9;
+    public static final int CURRENT=10;
     private static final Set<String> AUTH_TABLES;
     private static final Set<String> RECOVERY_TABLES;
     private static final Set<String> PASSKEY_TABLES;
@@ -124,6 +124,12 @@ public final class ServerSchema {
                     update.executeUpdate("INSERT INTO tk_instance SELECT '00000000-0000-0000-0000-000000000000','CONTROL',1,NULL,NULL,'1970-01-01T00:00:00Z','{}' WHERE NOT EXISTS(SELECT 1 FROM tk_instance WHERE kind='CONTROL')");
                     update.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");
                 }
+            }
+        }
+        try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema WHERE id=1")) {
+            if(rows.next()&&rows.getInt(1)==9&&"READY".equals(rows.getString(2))){
+                if(!allowUpgrade)throw new SQLException("Notes schema upgrade requires explicit operator authorization after stopping older server replicas");
+                try(var update=connection.createStatement()){update.executeUpdate("UPDATE tk_schema SET schema_version=10 WHERE id=1 AND schema_version=9 AND state='READY'");}
             }
         }
         validate(connection);

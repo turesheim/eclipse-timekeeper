@@ -16,8 +16,8 @@ async function loadEngine(){if(!engine)engine=await import('./assets/milkdown/mi
 
 /** One in-memory Markdown field. Neither drafts nor bodies enter browser storage. */
 export class MarkdownField {
-  constructor(root,onChange,onState,prefix='journal',onUpload){
-    Object.assign(this,{root,onChange,onState,onUpload,generation:0,readOnly:true});root.classList.add('markdown-editor');
+  constructor(root,onChange,onState,prefix='journal',onUpload,resources){
+    Object.assign(this,{root,onChange,onState,onUpload,resources,generation:0,readOnly:true});root.classList.add('markdown-editor');
     this.modes=node('div',undefined,'btn-group markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
     this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
@@ -161,12 +161,12 @@ export class MarkdownField {
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=normalizeEditorMarkdown(this.rawBody());
-    if(this.unterminated||needsSource(richBody)||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
+    if(this.unterminated||needsSource(richBody,this.resources?.allowsAsset)||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
-      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();},escape:()=>this.source.focus()});
+      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),resources:this.resources,readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();},escape:()=>this.source.focus()});
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}

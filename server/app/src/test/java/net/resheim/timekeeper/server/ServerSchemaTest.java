@@ -24,6 +24,15 @@ class ServerSchemaTest {
         }
         try(var connection=DriverManager.getConnection(url()+";IFEXISTS=TRUE")) {ServerSchema.validate(connection);}
     }
+    @Test void notesCompatibilityGateRequiresAuthorizationAndPreservesAllResources() throws Exception {
+        try(var connection=DriverManager.getConnection(url())){
+            ServerSchema.initializeOrValidate(connection);
+            try(var statement=connection.createStatement()){statement.executeUpdate("UPDATE tk_schema SET schema_version=9 WHERE id=1");}
+            var previous=snapshot(connection);assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));assertEquals(previous,snapshot(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
+            var current=snapshot(connection);ServerSchema.initializeOrValidate(connection);assertEquals(current,snapshot(connection));
+        }
+    }
     @Test void logicalLabelModelUpgradeRequiresOfflineAuthorization() throws Exception {
         try(var connection=DriverManager.getConnection(url())){
             ServerSchema.initializeOrValidate(connection);

@@ -31,9 +31,11 @@ final class AccountArchiveImport {
     private void restoreJournals(Document document){
         store.withJournalSource(DayNoteHistory.Source.ARCHIVE_RESTORE,()->{
         var archive=document.data();
+        VaultArchive.prepare(archive.path("vault"),store);
         new DayLabels(store).restore(archive.path("dayLabels"));
         new DayNotes(store).restore(archive.path("dayNotes"));new WeekNotes(store).restore(archive.path("weekNotes"));new JournalAssets(store).restore(archive.path("journalAssets"));
         if(archive.path("journalFiles").size()>0)ArchiveJournalFiles.restore(document.file().file(),archive.path("journalFiles"),store,archive.has("dayLabels"));
+        VaultArchive.restore(document.file().file(),archive.path("vault"),store);
         return null;});
     }
     private void importWork(Document document){

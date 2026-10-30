@@ -2,8 +2,8 @@ import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { node, button, field, section, form, table } from './account-ui.js';
 import { instantText } from './model.js';
 
-const MAX_BYTES = 256 * 1024 * 1024;
-const labels = { eventNotes: i18nText("event_notes.count"), dayNotes: i18nText("day_notes.count"), clients: i18nText("ui.clients"), projects: i18nText("ui.projects"), tasks: i18nText("ui.tasks"), labels: i18nText("ui.labels"), activities: i18nText("ui.activities"), workSessions: i18nText("ui.work_sessions"), importAuditRecords: i18nText("ui.import_audit_records") };
+const MAX_BYTES = 1024 * 1024 * 1024;
+const labels = { notesEntries:i18nText('notes.entry_count'),notesFiles:i18nText('notes.file_count'),eventNotes: i18nText("event_notes.count"), dayNotes: i18nText("day_notes.count"), clients: i18nText("ui.clients"), projects: i18nText("ui.projects"), tasks: i18nText("ui.tasks"), labels: i18nText("ui.labels"), activities: i18nText("ui.activities"), workSessions: i18nText("ui.work_sessions"), importAuditRecords: i18nText("ui.import_audit_records") };
 const relationshipLabels = { projectClients: i18nText("ui.project_clients"), taskProjects: i18nText("ui.task_projects"), parentTasks: i18nText("ui.parent_tasks"), activityTasks: i18nText("ui.activity_tasks"), activityProjects: i18nText("ui.activity_projects"), activityLabels: i18nText("ui.activity_labels"), workSessionClients: i18nText("ui.work_session_clients"), workSessionProjects: i18nText("ui.work_session_projects"), workSessionLabels: i18nText("ui.work_session_labels") };
 const base = '/data/account';
 
@@ -57,7 +57,7 @@ export async function renderAccountData(view, zone) {
   }
   async function reviewFile() {
     await locked(async () => {
-      const chosen = file.files[0];if (!chosen || chosen.size < 1 || chosen.size > MAX_BYTES) throw new Error(i18nText("ui.choose_a_timekeeper_zip_or_archive_json_up_to_256_mib"));
+      const chosen = file.files[0];if (!chosen || chosen.size < 1 || chosen.size > (chosen.name.toLowerCase().endsWith(".json") ? MAX_BYTES / 4 : MAX_BYTES)) throw new Error(i18nText("ui.choose_a_timekeeper_zip_or_archive_json_up_to_256_mib"));
       const mediaType = chosen.name.toLowerCase().endsWith('.zip') ? 'application/zip' : chosen.name.toLowerCase().endsWith('.json') ? 'application/json' : null;
       if (!mediaType) throw new Error(i18nText("ui.choose_a_timekeeper_zip_or_archive_json"));
       work.hidden = true;review = null;uncertain = false;

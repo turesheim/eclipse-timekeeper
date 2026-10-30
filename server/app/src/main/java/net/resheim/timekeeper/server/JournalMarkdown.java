@@ -27,6 +27,8 @@ final class JournalMarkdown {
     record Document(Note note,Map<String,Object> metadata,boolean frontmatter) {
         @Override public String toString(){return "JournalMarkdown.Document[date="+note.date()+"]";}
     }
+    record Fragment(Map<String,Object> metadata,boolean frontmatter,String body){@Override public String toString(){return "JournalMarkdown.Fragment[]";}}
+    static Fragment fragment(byte[] bytes,int maximumFrontmatter){var value=document((LocalDate)null,bytes,false,maximumFrontmatter);return new Fragment(value.metadata(),value.frontmatter(),value.note().body());}
     static final class Invalid extends RuntimeException {
         final String code;
         Invalid(String code){super(code);this.code=code;}
@@ -43,8 +45,10 @@ final class JournalMarkdown {
     static Document document(String filename,byte[] bytes){return document(filename,bytes,true);}
     static Note parseOpaque(String filename,byte[] bytes){return document(filename,bytes,false).note();}
     private static Document document(String filename,byte[] bytes,boolean legacyLabel){
-        LocalDate date=date(filename);
-        if(bytes.length>FILE_BYTES)throw invalid("FILE_TOO_LARGE");
+        return document(date(filename),bytes,legacyLabel,FRONTMATTER_BYTES);
+    }
+    private static Document document(LocalDate date,byte[] bytes,boolean legacyLabel,int maximumFrontmatter){
+        if(bytes.length>DayNotes.BODY_BYTES+maximumFrontmatter)throw invalid("FILE_TOO_LARGE");
         final String source;
         try {source=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();}
@@ -62,10 +66,10 @@ final class JournalMarkdown {
                 start=end+1;
             }
             if(closing<0)throw invalid("INVALID_FRONTMATTER");
-            if(source.substring(0,bodyStart).getBytes(StandardCharsets.UTF_8).length>FRONTMATTER_BYTES)throw invalid("FRONTMATTER_TOO_LARGE");
+            if(source.substring(0,bodyStart).getBytes(StandardCharsets.UTF_8).length>maximumFrontmatter)throw invalid("FRONTMATTER_TOO_LARGE");
             var options=new LoaderOptions();options.setAllowDuplicateKeys(false);options.setWarnOnDuplicateKeys(false);
             options.setMaxAliasesForCollections(0);options.setAllowRecursiveKeys(false);options.setNestingDepthLimit(16);
-            options.setCodePointLimit(FRONTMATTER_BYTES);options.setTagInspector(tag->false);
+            options.setCodePointLimit(maximumFrontmatter);options.setTagInspector(tag->false);
             final Object metadata;
             try {metadata=new Yaml(new SafeConstructor(options)).load(source.substring(yamlStart,closing));}
             // SnakeYAML exceptions contain source snippets. Never retain their cause.
@@ -115,6 +119,13 @@ final class JournalMarkdown {
         System.arraycopy(suffix,0,result,prefix,suffix.length);
         if(!parseOpaque(filename,result).body().equals(body))throw invalid("INVALID_EXPORT");
         return result;
+    }
+    static byte[] replaceFragmentBody(byte[] original,String body,int maximumFrontmatter){
+        var prior=fragment(original,maximumFrontmatter);if(prior.body().equals(body))return original.clone();
+        int prefix=original.length-prior.body().getBytes(StandardCharsets.UTF_8).length;
+        String separator=prefix>0&&original[prefix-1]!='\n'&&!body.isEmpty()?(new String(original,StandardCharsets.UTF_8).contains("\r\n")?"\r\n":"\n"):"";
+        byte[] suffix=(separator+body).getBytes(StandardCharsets.UTF_8),result=java.util.Arrays.copyOf(original,prefix+suffix.length);System.arraycopy(suffix,0,result,prefix,suffix.length);
+        if(!fragment(result,maximumFrontmatter).body().equals(body))throw invalid("INVALID_EXPORT");return result;
     }
     private static int lineEnd(String text,int start){int end=text.indexOf('\n',start);return end<0?text.length():end;}
     private static String line(String text,int start,int end){return text.substring(start,end>start&&text.charAt(end-1)=='\r'?end-1:end);}

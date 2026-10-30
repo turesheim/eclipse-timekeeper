@@ -31,8 +31,9 @@ final class JournalAssets {
     }
 
     private UUID id(String filename){
-        return UUID.nameUUIDFromBytes((store.owner()+"\0journal-asset\0"+filename).getBytes(StandardCharsets.UTF_8));
+        return id(store.owner(),filename);
     }
+    static UUID id(String owner,String filename){return UUID.nameUUIDFromBytes((owner+"\0journal-asset\0"+filename).getBytes(StandardCharsets.UTF_8));}
 
     JsonNode get(String filename){
         filename=name(filename);
@@ -85,7 +86,8 @@ final class JournalAssets {
                 .put("filename",filename).put("mediaType",mediaType(filename,bytes))
                 .put("data",Base64.getEncoder().encodeToString(bytes)).put("byteLength",bytes.length)
                 .put("modifiedAt",Instant.now().toString()).put("deleted",false);
-        persist(value,version);
+        var vault=VaultCatalog.before(store,new VaultSources.Ref(TYPE,id(filename),filename),bytes);
+        persist(value,version);VaultCatalog.complete(vault);
         store.change("PROFILE","UPDATED",store.owner());
         return value;
     }
@@ -96,7 +98,8 @@ final class JournalAssets {
         if(expected==null||!expected.equals(etag(previous)))throw new ApiFailure(412,"STALE_VERSION");
         long version=previous.path("version").asLong();
         var value=((ObjectNode)previous).deepCopy();value.put("version",version+1);value.put("deleted",true);
-        value.remove("data");value.put("modifiedAt",Instant.now().toString());persist(value,version);
+        var vault=VaultCatalog.before(store,new VaultSources.Ref(TYPE,id(filename),filename),null);
+        value.remove("data");value.put("modifiedAt",Instant.now().toString());persist(value,version);VaultCatalog.complete(vault);
         store.change("PROFILE","UPDATED",store.owner());return value;
     }
 

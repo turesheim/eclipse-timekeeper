@@ -50,6 +50,17 @@ class PostgresSchemaIT {
             ServerSchema.validate(connection);
         }
     }
+    @Test void notesLogicalUpgradeRequiresAuthorizationAndLeavesPrivateRowsUntouched() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()){
+            ServerSchema.initializeOrValidate(connection);statement.executeUpdate("UPDATE tk_schema SET schema_version=9 WHERE id=1");
+            statement.executeUpdate("INSERT INTO tk_owner VALUES('notes-owner','UTC',0,0,'aabb')");UUID id=UUID.randomUUID();
+            statement.executeUpdate("INSERT INTO tk_resource VALUES('notes-owner','DAY_NOTE','"+id+"',1,'{\"body\":\"private source\"}')");
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            try(var rows=statement.executeQuery("SELECT schema_version FROM tk_schema WHERE id=1")){assertTrue(rows.next());assertEquals(9,rows.getInt(1));}
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
+            try(var rows=statement.executeQuery("SELECT payload FROM tk_resource WHERE owner_id='notes-owner' AND id='"+id+"'")){assertTrue(rows.next());assertEquals("{\"body\":\"private source\"}",rows.getString(1));}
+        }
+    }
     @Test void upgradesCanonicalV1WithoutChangingPrivateData() throws Exception {
         try(var connection=connection();var statement=connection.createStatement()) {
             try(var input=getClass().getResourceAsStream("/db/schema-v1-postgresql.sql")) {statement.execute(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}

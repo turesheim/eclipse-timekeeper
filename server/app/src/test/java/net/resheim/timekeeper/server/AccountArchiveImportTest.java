@@ -91,7 +91,7 @@ class AccountArchiveImportTest {
             note.put("text",text);note.put("markdown",new String(JournalMarkdown.render(date+".md",note.path("markdown").asText().getBytes(StandardCharsets.UTF_8),text,note.path("body").asText()),StandardCharsets.UTF_8));
         }
         var inline=archive.putArray("dayNotes");days.values().forEach(inline::add);
-        archive.remove(java.util.List.of("journalFiles","dayLabels"));return archive.put("format",AccountArchive.LEGACY_FORMAT);
+        archive.remove(java.util.List.of("journalFiles","dayLabels","vault"));return archive.put("format",AccountArchive.LEGACY_FORMAT);
     }
     private ObjectNode work() {return store.transaction("b",()->{var value=object();for(var entry:DomainTransfer.TYPES.entrySet()) {var items=value.putArray(entry.getKey());store.list(entry.getValue()).forEach(items::add);}value.set("profile",store.profile());return value;});}
     @Test void linkedTaskTombstonesSurvivePrivateArchiveRestore() throws Exception {
@@ -301,7 +301,7 @@ class AccountArchiveImportTest {
         });
     }
     @Test void olderAccountArchiveWithoutProviderCollectionsStillRestores() throws Exception {
-        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove(java.util.List.of("journalFiles","dayLabels"));var work=(ObjectNode)archive.path("work");
+        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove(java.util.List.of("journalFiles","dayLabels","vault"));var work=(ObjectNode)archive.path("work");
         work.remove("taskConnections");work.remove("taskLists");work.remove("taskListSections");work.remove("taskAttachments");
         inputs.validate("AccountArchiveSnapshot",archive);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));

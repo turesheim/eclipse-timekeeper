@@ -39,6 +39,8 @@ public class ServerStore {
     @Inject PasskeyRealm passkeyRealm;
     @Inject ServiceSettings serviceSettings;
     @Inject ServerInfo serverInfo;
+    @Inject VaultLimits vaultLimits;
+    VaultLimits vaultLimits(){return vaultLimits;}
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     private Connection h2SchemaSession;
@@ -291,10 +293,29 @@ public class ServerStore {
             return List.copyOf(list);
         } catch (SQLException e) { throw databaseFailure(e); }
     }
+    /** Stream one resource kind while building derived indexes for an existing account. */
+    void scan(String type,java.util.function.Consumer<JsonNode> visitor) {
+        try(var query=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner(),type)) {
+            query.setFetchSize(32);
+            try(var rows=query.executeQuery()) {
+                while(rows.next())visitor.accept(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            }
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     List<JsonNode> list(String type,UUID first,UUID last) {
         var result=new ArrayList<JsonNode>();
         try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id",owner(),type,first,last);var rows=statement.executeQuery()) {
             while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    /** Indexed owner-private children without loading canonical document bytes. */
+    List<JsonNode> children(String type,UUID parent,String kind) {
+        var result=new ArrayList<JsonNode>();
+        String sql="SELECT child.id,child.version,child.payload FROM tk_relation link JOIN tk_resource child ON child.owner_id=link.owner_id AND child.entity_type=link.to_type AND child.id=link.to_id "
+                +"WHERE link.owner_id=? AND link.from_type=? AND link.from_id=? AND link.kind=? AND link.to_type=? ORDER BY child.id";
+        try(var query=statement(sql,owner(),type,parent,kind,type);var rows=query.executeQuery()) {
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
     private JsonNode checkedPayload(String type, UUID id, long version, String json) {

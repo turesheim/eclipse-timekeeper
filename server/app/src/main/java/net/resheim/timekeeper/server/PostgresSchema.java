@@ -81,6 +81,14 @@ public final class PostgresSchema {
                 }
                 try(var statement=connection.createStatement()) {statement.execute(resource("instance-v9.sql"));statement.executeUpdate("UPDATE tk_schema SET schema_version="+ServerSchema.CURRENT+" WHERE id=1");}
             }
+            if(shape(connection).equals(resource("schema-v10-postgresql.shape").lines().toList())){
+                try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM public.tk_schema WHERE id=1")){
+                    if(rows.next()&&rows.getInt(1)==9&&"READY".equals(rows.getString(2))){
+                        if(!allowUpgrade)throw new SQLException("Notes schema upgrade requires explicit operator authorization after stopping older server replicas");
+                        try(var update=connection.createStatement()){update.executeUpdate("UPDATE tk_schema SET schema_version=10 WHERE id=1 AND schema_version=9 AND state='READY'");}
+                    }
+                }
+            }
             validate(connection);
             connection.commit();
         } catch (SQLException | RuntimeException e) {
@@ -118,7 +126,7 @@ public final class PostgresSchema {
     }
 
     private static void validateShape(Connection connection) throws SQLException {
-        if (!shape(connection).equals(resource("schema-v9-postgresql.shape").lines().toList()))
+        if (!shape(connection).equals(resource("schema-v10-postgresql.shape").lines().toList()))
             throw new SQLException("Unsupported or incomplete PostgreSQL server schema");
     }
 

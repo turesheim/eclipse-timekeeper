@@ -11,14 +11,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 /** Bounded owner-private staging; large archives do not increase unrelated HTTP request limits. */
 final class AccountUploads {
     static final int CHUNK_BYTES=1024*1024;
-    static final long MAX_BYTES=256L*1024*1024;
+    static final long MAX_BYTES=1024L*1024*1024;
+    static final long MAX_JSON_BYTES=256L*1024*1024;
     static final String UPLOAD="ARCHIVE_UPLOAD",CHUNK="ARCHIVE_CHUNK";
     private final ServerStore store;
     AccountUploads(ServerStore store) {this.store=store;}
 
     ObjectNode create(String fileName,String mediaType,long bytes,String sha256) {
         if(fileName==null || fileName.isBlank() || fileName.length()>255 || fileName.chars().anyMatch(c->c<32 || c==127)
-                || mediaType==null || !Set.of("application/zip","application/json").contains(mediaType) || bytes<1 || bytes>MAX_BYTES
+                || mediaType==null || !Set.of("application/zip","application/json").contains(mediaType) || bytes<1 || bytes>MAX_BYTES || mediaType.equals("application/json")&&bytes>MAX_JSON_BYTES
                 || sha256==null || !sha256.matches("[a-f0-9]{64}")) throw ApiFailure.validation();
         cleanup();long retained=0;int active=0;
         for(var current:store.list(UPLOAD)) if(!current.path("state").asText().equals("IMPORTED")) {

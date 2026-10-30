@@ -17,8 +17,8 @@ REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.
             'conf/privilege','conf/resource','WIZARD_UIFILES/install_uifile.sh',
             'scripts/timekeeper-dsm','scripts/release.json',
             'scripts/migration/postgresql-shape.sql','scripts/migration/schema-v2-postgresql.shape',
-            'scripts/migration/schema-v3-postgresql.shape','scripts/migration/schema-v4-postgresql.shape','scripts/migration/schema-v5-postgresql.shape','scripts/migration/schema-v6-postgresql.shape','scripts/migration/schema-v7-postgresql.shape','scripts/migration/schema-v8-postgresql.shape','scripts/migration/schema-v9-postgresql.shape',
-            'scripts/migration/recovery-v3.sql','scripts/migration/passkeys-v4.sql','scripts/migration/settings-v5.sql','scripts/migration/locale-v6.sql','scripts/migration/day-labels-v7.sql','scripts/migration/day-note-history-v8.sql','scripts/migration/instance-v9.sql',
+            'scripts/migration/schema-v3-postgresql.shape','scripts/migration/schema-v4-postgresql.shape','scripts/migration/schema-v5-postgresql.shape','scripts/migration/schema-v6-postgresql.shape','scripts/migration/schema-v7-postgresql.shape','scripts/migration/schema-v8-postgresql.shape','scripts/migration/schema-v9-postgresql.shape','scripts/migration/schema-v10-postgresql.shape',
+            'scripts/migration/recovery-v3.sql','scripts/migration/passkeys-v4.sql','scripts/migration/settings-v5.sql','scripts/migration/locale-v6.sql','scripts/migration/day-labels-v7.sql','scripts/migration/day-note-history-v8.sql','scripts/migration/instance-v9.sql','scripts/migration/notes-v10.sql',
             *('scripts/'+name for name in ('preinst','postinst','preupgrade','postupgrade','preuninst','postuninst','start-stop-status'))}
 MIGRATION_FILES = {name for name in REQUIRED if name.startswith('scripts/migration/')}
 
@@ -89,7 +89,7 @@ def validate(path):
         if projects['preload-image']!='image.tar.gz' or len(projects['projects'])!=1 or projects['projects'][0]['path']!='project' or projects['projects'][0]['name']!=package_id+'-server':
             raise ValueError('Incorrect Container Manager resource')
         release=json.loads(read('scripts/release.json'))
-        if release['serverSchema']!=9 or not re.fullmatch('[a-f0-9]{40}',release['commit']) or release['image']!='ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+release['commit']:
+        if release['serverSchema']!=10 or not re.fullmatch('[a-f0-9]{40}',release['commit']) or release['image']!='ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+release['commit']:
             raise ValueError('Unpinned package image identity')
         payload=read('package.tgz')
         if hashlib.md5(payload,usedforsecurity=False).hexdigest()!=info.get('checksum'):

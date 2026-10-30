@@ -20,9 +20,10 @@ const withoutAutolinks=value=>value.replace(/<([^<>\s]+)>/g,(match,target)=>{
   if(!email&&!/^(?:https?:\/\/|mailto:)/i.test(target))return match;
   try{return ['https:','http:','mailto:'].includes(new URL(email?'mailto:'+target:target).protocol)?'':match;}catch{return match;}
 }).replace(/\b(?:https?:\/\/|mailto:)[^\s<>()\[\]]+/gi,'');
-export const hasUnsupportedSyntax=value=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
-  withoutAutolinks(value).replace(/!\[[^\]\n]*\]\(assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\)/g,''));
-export function needsSource(body) {
+const journalImage=path=>/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(path);
+export const hasUnsupportedSyntax=(value,imageAllowed=journalImage)=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
+  withoutAutolinks(value).replace(/!\[[^\]\n]*\]\(([^\s)]+)\)/g,(source,path)=>imageAllowed(path)?'':source));
+export function needsSource(body,imageAllowed=journalImage) {
   let fence=null,text='';
   for(const line of body.split(/\r?\n/)){
     const match=line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
@@ -30,7 +31,7 @@ export function needsSource(body) {
     if(match){fence=match[1];continue;}
     text+=line.replace(/(`+)([\s\S]*?)\1/g,'')+'\n';
   }
-  return hasUnsupportedSyntax(text);
+  return hasUnsupportedSyntax(text,imageAllowed);
 }
 
 // Milkdown emits this HTML placeholder for an empty paragraph created with

@@ -51,6 +51,7 @@ class DistributionDocumentationTest(unittest.TestCase):
             package(output, COMMIT)
             with tarfile.open(output) as archive:
                 names = set(archive.getnames())
+                self.assertTrue({'migration/notes-v10.sql','migration/schema-v10-postgresql.shape','NOTES-WEBDAV.md','webdav_sync.py'}.issubset(names))
                 self.assertNotIn('.env', names)
                 self.assertFalse(any(name.startswith(('state/', 'secrets/')) for name in names))
                 local = archive.extractfile('LOCAL.md').read().decode()
@@ -74,7 +75,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                          'server/app/target/quarkus-app/app/fixture.jar',
                          'server/app/target/quarkus-app/lib/fixture.jar',
                          'server/app/target/quarkus-app/quarkus/fixture.jar',
-                         'common/api/openapi.json','server/scripts/create_token.py', 'server/scripts/configure_accounts.py','LICENSE'):
+                         'common/api/openapi.json','server/scripts/create_token.py', 'server/scripts/configure_accounts.py','server/scripts/webdav_sync.py','LICENSE'):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/quarkus-run.jar','w') as jar:
                 jar.writestr('META-INF/MANIFEST.MF','Main-Class: net.resheim.timekeeper.server.InstancePreboot\r\n')

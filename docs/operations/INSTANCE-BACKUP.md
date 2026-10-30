@@ -259,3 +259,10 @@ access, original-session ownership and fresh password proof are enforced at the
 appropriate boundaries. Passwords/passphrases are write-only and never appear in
 operation receipts. Status exposes bounded deployment metadata rather than file
 paths, credentials or authorization capabilities.
+
+Notes (schema 10) are included in the same full-instance logical image: canonical
+general files, journals/event notes/assets, tombstones/recovery bytes, namespace
+indexes and settings, all owners and history. Resolved `timekeeper.notes.*`
+properties are inventoried with the other application configuration. Restore
+preflight verifies the complete logical image before activation; use coordinated
+offline restore, with older replicas stopped. See [Notes](NOTES-WEBDAV.md).

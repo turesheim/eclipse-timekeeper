@@ -1,0 +1,32 @@
+.notes-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; }
+.notes-heading h2 { margin:0; }
+.notes-layout { display:grid; grid-template-columns:minmax(180px,var(--notes-nav-width,260px)) 8px minmax(0,1fr); min-height:280px; }
+.notes-navigation { overflow:auto; padding:.75rem; min-width:0; }
+.notes-navigation-tools,.notes-file-tools,.notes-footer { display:flex; gap:.5rem; align-items:center; }
+.notes-navigation-tools { margin-bottom:.75rem; }
+.notes-navigation-tools button { min-width:2.25rem; }
+.notes-tree { margin-top:.5rem; }
+.notes-tree-row { border-radius:var(--bs-border-radius); min-width:0; }
+.notes-tree-row[aria-selected=true] > .notes-tree-pick { background:var(--bs-tertiary-bg); font-weight:650; }
+.notes-tree-pick { display:flex; align-items:center; gap:.5rem; width:100%; min-width:0; border:0; background:transparent; color:inherit; text-align:left; padding:.45rem; }
+.notes-tree-pick > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.notes-tree [role=group] { padding-left:1rem; }
+.notes-resize { cursor:col-resize; touch-action:none; }
+.notes-resize:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.notes-editor { padding:1rem; min-width:0; min-height:0; display:flex; flex-direction:column; gap:.5rem; overflow:hidden; }
+.notes-editor h3 { font-size:1rem; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.notes-markdown { min-height:0; flex:1; display:flex; flex-direction:column; }
+.notes-markdown .journal-source,.notes-markdown .journal-formatted { flex:1; min-height:0; overflow:auto; }
+.notes-markdown .journal-source:not([hidden]) { display:flex; flex-direction:column; }
+.notes-markdown textarea { flex:1; height:auto; min-height:0; resize:none; }
+.notes-markdown .ProseMirror { min-height:0; }
+.notes-footer { justify-content:flex-end; }
+.notes-footer .hint { margin:0 auto 0 0; }
+.notes-drawer-toggle { display:none; }
+@media(max-width:760px) {
+  .notes-layout { position:relative; grid-template-columns:minmax(0,1fr); }
+  .notes-resize { display:none; }
+  .notes-drawer-toggle { display:inline-flex; }
+  .notes-navigation { display:none; position:absolute; z-index:2; inset:0 auto 0 0; width:min(85%,22rem); box-shadow:0 .25rem 1rem #0003; background:var(--bs-body-bg); }
+  .notes-drawer-open .notes-navigation { display:block; }
+}

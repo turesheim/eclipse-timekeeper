@@ -46,6 +46,8 @@ jobs:
       run: python -m pip install -r common/api/tests/requirements.txt
     - name: Validate OpenAPI and client/schema boundaries
       run: python -m unittest discover -s common/api/tests -v
+    - name: Verify manual WebDAV conflict planning and local write protection
+      run: python -m unittest discover -s server/scripts/tests -p 'test_webdav_sync.py' -v
 
   Server:
     needs: Changes
@@ -103,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     # Browser/dependency installation can take eight minutes on a fresh runner.
     # Keep the bounded test suite's full runtime available after setup.
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
     - uses: actions/checkout@v7.0.1
     - uses: actions/setup-java@v6.0.1
@@ -128,6 +130,8 @@ jobs:
       run: npx playwright install --with-deps chromium
     - name: Verify bundled web client against the packaged server
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+    - name: Verify manual folder synchronization through HTTPS
+      run: python3 server/scripts/webdav_sync_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify email recovery through HTTPS and actual SMTP delivery
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
     - name: Verify Journal WebDAV help and instance backups through HTTPS
@@ -142,6 +146,7 @@ jobs:
         path: |
           server/web/test-results/
           server/web/target/server.log
+          server/target/acceptance/webdav-manual.json
 
   Remote-Eclipse:
     name: Installed client tests

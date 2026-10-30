@@ -668,3 +668,36 @@ bootstrap account during an instance restore can preserve its audit evidence.
 These records are included in full-instance images and excluded from personal
 portability. See [full-instance backup architecture](INSTANCE-BACKUP.md) for
 implementation status and the remaining restore integration.
+
+### Notes collection (schema 10)
+
+The account-private hierarchical namespace uses existing `tk_resource` and
+`tk_relation` tables. `VAULT_ENTRY` holds stable entry ID, kind, parent, portable
+NFC path and canonical source reference. `VAULT_PATH` and `VAULT_REF` are derived
+owner-scoped point indexes; `vault_child` relations provide indexed directory
+membership. Moves update paths and memberships under the same owner transaction
+used by all canonical note writers. Metadata queries never fetch attachment data.
+
+`VAULT_CONTENT` holds exact general-file bytes, checksum, size and content version.
+DAY_NOTE, WEEK_NOTE, EVENT_NOTE and JOURNAL_ASSET remain the sole live sources for
+typed entries. `VAULT_RECYCLE` retains deleted legacy bytes, associated with the
+canonical deletion version. Entry tombstones retain their identity and deletion
+batch; recursive recovery refuses conflicting destinations. `VAULT_SETTINGS`
+holds configured journal/event/assets roots and explicit `.obsidian` opt-in.
+`VAULT_STATE` holds quota counters, a monotonic namespace version and a random
+collection identity. Deleted retained bytes count toward quota.
+
+File content validators are canonical ETags; structural API operations use the
+separate entry validator (`entryEtag`) so a stale rename/delete cannot act on a
+new path while a body save can still address the stable ID. Directory validators
+include namespace generation. DAV resource IDs derive from collection and entry
+identity, survive MOVE and aliases, and distinguish a replaced collection. This
+uses the resource-id property described by [RFC 5842, section 3.1](https://www.rfc-editor.org/rfc/rfc5842#section-3.1); it does not add BIND/UNBIND.
+
+Schema 10 is a logical compatibility fence: older writers lack namespace hooks
+and must remain stopped after upgrade. No database table or engine changes.
+Account archive v4 exports logical entry IDs/paths/settings and checksummed byte
+files; imports rebuild indexes and remap owner-dependent assets while preserving
+journal/event associations. Encrypted instance backups retain raw records and
+history across accounts. See [Notes design](NOTES-VAULT.md) and the
+[manual synchronization guide](../operations/NOTES-WEBDAV.md).

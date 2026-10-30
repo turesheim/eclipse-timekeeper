@@ -16,12 +16,16 @@ class AccountArchiveInputTest {
         var value=object().put("format",AccountArchive.FORMAT).put("archiveId",UUID.randomUUID().toString()).put("generatedAt","2026-10-17T00:00:00Z");
         value.putObject("account").put("username","informational");value.putObject("preferences").put("zoneId","Europe/Oslo");
         var work=value.putObject("work").put("format","timekeeper-domain-v3").put("zoneId","Europe/Oslo");for(String name:AccountArchive.WORK.keySet()) work.putArray(name);
-        value.putArray("importHistory");value.putArray("journalFiles");value.putArray("dayLabels");return value;
+        value.putArray("importHistory");value.putArray("journalFiles");value.putArray("dayLabels");var vault=value.putObject("vault").put("format",1);vault.putObject("settings").put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false);vault.putArray("entries");vault.putArray("files");return value;
     }
     @org.junit.jupiter.api.Test void legacyFileArchiveWithoutIndependentLabelsIsStillAccepted() throws Exception {
-        var value=document().put("format",AccountArchive.FILE_LEGACY_FORMAT);value.remove("dayLabels");
+        var value=document().put("format",AccountArchive.FILE_LEGACY_FORMAT);value.remove(java.util.List.of("dayLabels","vault"));
         var actual=AccountArchiveInput.read(json(value.toString()),"application/json");
         org.junit.jupiter.api.Assertions.assertEquals(AccountArchive.FILE_LEGACY_FORMAT,actual.path("format").asText());
+    }
+    @org.junit.jupiter.api.Test void versionThreeIndependentLabelsRemainPortableWithoutAVault() throws Exception {
+        var value=document().put("format",AccountArchive.LABEL_LEGACY_FORMAT);value.remove("vault");value.withArray("dayLabels").add(object().put("date","2026-10-30").put("text","Independent"));
+        var actual=AccountArchiveInput.read(json(value.toString()),"application/json");org.junit.jupiter.api.Assertions.assertEquals("Independent",actual.path("dayLabels").get(0).path("text").asText());
     }
     private Path json(String value) throws Exception {return Files.writeString(temporary.resolve(UUID.randomUUID()+".json"),value);}
     private Path zip(ObjectNode value,boolean wrongCount,String extra) throws Exception {
@@ -79,7 +83,7 @@ class AccountArchiveInputTest {
         assertEquals(422,assertThrows(ApiFailure.class,()->AccountArchiveInput.read(fileArchive(invalid,Map.of("2026-W44.md",invalidUtf8)),"application/zip")).status);
     }
     @Test void legacyInlineJsonAndZipRetainTheSameRestoreIdentity() throws Exception {
-        var value=document().put("format",AccountArchive.LEGACY_FORMAT);value.remove(java.util.List.of("journalFiles","dayLabels"));value.putArray("dayNotes").add(object().put("date","2026-10-27").put("text","Legacy"));
+        var value=document().put("format",AccountArchive.LEGACY_FORMAT);value.remove(java.util.List.of("journalFiles","dayLabels","vault"));value.putArray("dayNotes").add(object().put("date","2026-10-27").put("text","Legacy"));
         var plain=AccountArchiveInput.readVerified(json(value.toString()),"application/json");var packed=AccountArchiveInput.readVerified(zip(value,false,null),"application/zip");
         assertEquals(plain.data(),packed.data());assertEquals(plain.sha256(),packed.sha256());
     }

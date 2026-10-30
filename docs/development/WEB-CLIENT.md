@@ -924,3 +924,15 @@ Today/Week sizing and workspace/scroll padding derive from the same navigation
 height. The navigation browser regression uses native Chromium safe-area
 emulation to check a 34px inset with desktop and touch input at narrow/wide
 widths; other engines check their naturally reported inset.
+
+## Notes collections
+
+The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
+tree. It supports desktop resizing, keyboard tree navigation, a mobile drawer,
+file/folder creation, guarded rename/deletion/recovery and collection settings.
+Drafts remain in memory across tab changes and are discarded only after review.
+Account/session generations fence async responses; read-only clients cannot edit.
+The editor fills the active area above navigation. Source preserves unknown
+metadata/wiki syntax; relative images are authenticated raster previews, never
+executable SVG/HTML. See [Notes manual and user guide](../operations/NOTES-WEBDAV.md)
+for supported external workflows and Markdown preservation limits.

@@ -145,3 +145,11 @@ Notes outlive removed subscriptions and remain available through WebDAV and
 or attach notes to unrelated subscriptions. Existing real-client certification
 above predates event notes; protocol-level event-note round trips have separate
 coverage.
+
+## Hierarchical Notes collections
+
+The existing flat journal endpoints remain canonical aliases. New vaults use
+`/dav/vault/` or `/remote.php/webdav/vault/`, with configurable `journal`, `events`
+and `assets` folders. Do not repoint a populated flat local folder without a
+reviewed transition. See [Notes manual sync and migration](NOTES-WEBDAV.md),
+including client limitations and relative attachment links.

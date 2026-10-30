@@ -871,12 +871,12 @@ label version, while the response `version` still describes the note. Legacy
 the independent routes. Range summaries contain labels and `hasBody`, never
 body content; label-only days remain visible after a note is deleted.
 
-Schema 9 is the current compatibility fence. It includes the schema-7 label separation and schema-8 prospective diagnostics, and adds the installation-wide operation/audit table described in [instance backup architecture](INSTANCE-BACKUP.md).
+Schema 10 is the current compatibility fence. It retains the schema-7 label separation, schema-8 prospective diagnostics and schema-9 installation-wide operation/audit table described in [instance backup architecture](INSTANCE-BACKUP.md), and fences canonical Notes hooks.
 After an authorized offline upgrade, the server copies old label projections
 into `DAY_LABEL` records in owner-scoped transactions before serving requests.
 Old note versions, deletion markers and existing Markdown bytes are preserved;
 virtual legacy documents are materialized without changing their note version.
-Older server binaries must remain stopped and cannot reopen schema 9.
+Older server binaries must remain stopped and cannot reopen schema 10.
 
 New Markdown documents contain no managed day label. An existing
 `timekeeper-label` property is now inert legacy metadata: byte-exact reads and
@@ -1090,3 +1090,28 @@ are implemented and checked. No restore endpoint currently applies this image to
 the active database. The expanded-data budget defaults to 16 GiB and can be set
 with `timekeeper.instance-backup.maximum-expanded-bytes`; raising it requires
 corresponding private staging capacity.
+
+## Notes collection API (schema 10)
+
+`GET /notes` initializes the owner collection and returns root ID, settings,
+limits and namespace snapshot. `/notes/settings` supports ETag-guarded partial
+updates. `GET /notes/entries` lists a parent directory, filename/path search or
+trash without loading file bytes. Supply the returned snapshot as If-Match on
+subsequent pages; a namespace change returns 412 and requires a new first page.
+`/notes/resolve?path=…` resolves a portable path to stable entry metadata.
+
+Create folders with `POST /notes/folders` and raw files with
+`PUT /notes/files?path=…` using If-None-Match: *. `/notes/entries/{id}/content`
+reads/writes raw canonical bytes with the content ETag. Metadata includes `etag`
+(content validator) and `entryEtag` (structural validator). Metadata responses
+carry entryEtag in the HTTP ETag header; content responses carry the content
+validator. Use entryEtag for PUT `/path`, DELETE entry and POST `/restore`.
+Conflicting destinations are never overwritten. Stale/missing preconditions
+return 412/428; deployment quota growth returns 507. Day labels are independent.
+
+Hierarchical `/dav/vault/` and `/remote.php/webdav/vault/` expose the same sources,
+with guarded PUT/DELETE/MOVE, MKCOL, strong ETags and stable DAV resource-id.
+Existing flat aliases remain available. Account archives use v4 with ZIP uploads
+up to 1 GiB and JSON up to 256 MiB; archive.json remains separately bounded.
+The [OpenAPI](../../common/api/openapi.json) defines complete shapes and paths.
+See [Notes setup and transition](../operations/NOTES-WEBDAV.md).

@@ -38,6 +38,7 @@ class AccountUploadsTest {
         String owner="archive-quota-"+UUID.randomUUID();var uploads=new AccountUploads(store);byte[] bytes={1,2,3};String hash=digest(bytes);
         store.transaction(owner,()->{
             assertEquals(422,assertThrows(ApiFailure.class,()->uploads.create("account.zip","application/zip",AccountUploads.MAX_BYTES+1,hash)).status);
+            assertEquals(422,assertThrows(ApiFailure.class,()->uploads.create("archive.json","application/json",AccountUploads.MAX_JSON_BYTES+1,hash)).status);
             assertEquals(422,assertThrows(ApiFailure.class,()->uploads.create("account.zip",null,3,hash)).status);
             var bad=uploads.create("bad.zip","application/zip",3,"0".repeat(64));UUID id=UUID.fromString(bad.path("id").asText());
             assertEquals(422,assertThrows(ApiFailure.class,()->uploads.chunk(id,0,"AQI=")).status);

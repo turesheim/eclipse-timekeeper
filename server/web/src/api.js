@@ -3,6 +3,13 @@ import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
+  VAULT_CONFIG_DISABLED:'notes.error_config_disabled',
+  VAULT_CONFIG_PRESENT:'notes.error_config_present',
+  VAULT_SPECIAL_FOLDER:'notes.error_special_folder',
+  VAULT_ASSOCIATION_MOVE:'notes.error_association',
+  VAULT_QUOTA:'notes.error_quota',
+  VAULT_IMPORT_NOT_EMPTY:'notes.error_import_not_empty',
+  VAULT_FILE_TOO_LARGE:'notes.error_file_size',
   INSTANCE_RESTORE_MATERIAL_REQUIRED: 'backups.error_material_required',
   INSTANCE_RESTORE_PENDING: 'backups.error_restore_pending',
   INSTANCE_RESTART_REQUIRED: 'backups.error_restart_required',
@@ -72,7 +79,7 @@ const messages = {
 };
 export class ApiError extends Error {
   constructor(code, status = 0) {super(messages[code] ? i18nText(messages[code]) : i18nText("ui.the_request_was_rejected_review_the_current_records_and_try_again"));this.code = code;this.status = status;}
-  get uncertain() {return this.status === 0 || this.status >= 500;}
+  get uncertain() {return this.status === 0 || this.status >= 500 && this.status !== 507;}
 }
 export function ownerHeader(owner) {
   return btoa(String.fromCharCode(...new TextEncoder().encode(owner))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');

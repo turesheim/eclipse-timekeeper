@@ -15,12 +15,12 @@ const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:tog
 const sourceNodes=new Set(['html','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
 const safeAsset=url=>typeof url==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(url);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
-const safeDocument=doc=>{
+const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
   let safe=true;
-  doc.descendants(node=>{if(node.type.name==='image'&&!safeAsset(node.attrs.src)||node.marks.some(mark=>mark.type.name==='link'&&!safeLink(mark.attrs.href)))safe=false;return safe;});
+  doc.descendants(node=>{if(node.type.name==='image'&&!assetAllowed(node.attrs.src)||node.marks.some(mark=>mark.type.name==='link'&&!linkAllowed(mark.attrs.href)))safe=false;return safe;});
   return safe;
 };
-const unsupported=node=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!safeAsset(node.url)||node.type==='link'&&!safeLink(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(unsupported)));
+const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
@@ -69,8 +69,9 @@ function mermaidBlock(node){
   schedule(node.textContent);
   return {dom,contentDOM:code,update(value){if(value.type!==node.type||String(value.attrs.language).toLowerCase()!=='mermaid')return false;schedule(value.textContent);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:mutation=>preview.contains(mutation.target),stopEvent:event=>preview.contains(event.target)};
 }
-export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false}){
-  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{
+export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources}){
+  const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
+  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
     if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
   }})}));
@@ -82,6 +83,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{if(event.key==='Escape'){escape();return true;}return false;},
       nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
+        if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
         else dom.textContent=node.attrs.alt||'';
@@ -92,6 +94,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       handleDOMEvents:{click:(_view,event)=>{
         const link=event.target.closest('a[href]');if(!link)return false;
         event.preventDefault();const href=link.getAttribute('href');
+        if(event.button===0&&(event.metaKey||event.ctrlKey)&&resources?.allowsLink(href)){resources.openLink(href);return true;}
         if(event.button===0&&(event.metaKey||event.ctrlKey)&&safeLink(href)){
           const url=new URL(safeAsset(href)?'/api/v1/journal-assets/'+href.slice(7):href,location.href);
           if(['http:','https:'].includes(url.protocol))window.open(url.href,'_blank','noopener,noreferrer');
@@ -108,20 +111,20 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
     const serialized=normalizeEditorMarkdown(editor.action(getMarkdown()));
-    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
+    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
     if(!safe){await editor.destroy();return null;}
     const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
     const command=(name,payload)=>{
       if(readOnly)return false;
       if(name==='link'){
-        if(!safeLink(payload))return false;
+        if(!linkAllowed(payload))return false;
         if(!editor.action(callCommand(updateLinkCommand.key,{href:payload}))){
           const {from,empty}=view.state.selection;
           if(empty)view.dispatch(view.state.tr.insertText(payload,from).addMark(from,from+payload.length,view.state.schema.marks.link.create({href:payload})));
           else editor.action(callCommand(toggleLinkCommand.key,{href:payload}));
         }
       }else if(name==='image'||name==='asset_link'){
-        if(!safeAsset(payload?.path))return false;
+        if(!assetAllowed(payload?.path))return false;
         if(name==='image')view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.image.create({src:payload.path,alt:payload.label})));
         else{
           const {from,to}=view.state.selection,label=payload.label||payload.path;
