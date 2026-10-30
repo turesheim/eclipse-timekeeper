@@ -38,7 +38,7 @@ function target(node) {
   return candidate&&content.has(candidate)&&visible(candidate)?candidate:null;
 }
 function show(node,focus=null) {
-  clearTimeout(leaveTimer);if(!node||node===dismissed)return;
+  if(!node||node===dismissed)return;clearTimeout(leaveTimer);
   if(active?.node===node){
     if(focus&&!active.descriptions.has(focus)){const description=focus.getAttribute('aria-describedby');active.descriptions.set(focus,description);focus.setAttribute('aria-describedby',[description,active.tip.id].filter(Boolean).join(' '));}
     return;
@@ -55,6 +55,8 @@ function show(node,focus=null) {
   for(const [item,description] of descriptions)item.setAttribute('aria-describedby',[description,tip.id].filter(Boolean).join(' '));
 }
 function inside(node){return node instanceof Node&&active&&(active.node.contains(node)||active.tip.contains(node));}
+function overTooltip(event){if(!active)return false;const box=active.tip.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom;}
+function leave(){clearTimeout(leaveTimer);leaveTimer=setTimeout(hideTooltip,100);}
 export function installTooltips() {
   if(installed)return;installed=true;
   const scan=root=>{if(!(root instanceof Element))return;if(root.hasAttribute('title'))plainTooltip(root);root.querySelectorAll('[title]').forEach(plainTooltip);};
@@ -63,13 +65,17 @@ export function installTooltips() {
     for(const change of changes)if(change.type==='childList')change.addedNodes.forEach(scan);else if(change.attributeName==='title')plainTooltip(change.target);
     if(active&&!visible(active.node))hideTooltip();
   }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['title','hidden','aria-hidden','open']});
-  document.addEventListener('pointerover',event=>{if(event.pointerType!=='mouse')return;if(inside(event.target)&&active.tip.contains(event.target)){clearTimeout(leaveTimer);return;}show(target(event.target));});
-  document.addEventListener('pointerout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)){clearTimeout(leaveTimer);leaveTimer=setTimeout(hideTooltip,100);}});
+  // The overlay never intercepts a calendar drag or a click on a control below
+  // it. Hit-test its bounds for hover persistence instead of capturing presses.
+  document.addEventListener('pointerover',event=>{if(event.pointerType!=='mouse')return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target);if(node)show(node);else if(active)leave();});
+  document.addEventListener('pointermove',event=>{if(active&&overTooltip(event))clearTimeout(leaveTimer);});
+  document.addEventListener('pointerout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
   document.addEventListener('focusin',event=>{if(!pointerFocus)show(target(event.target),event.target);});
   document.addEventListener('focusout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
   document.addEventListener('pointerdown',event=>{pointerFocus=true;if(!active?.tip.contains(event.target))hideTooltip();},true);
   document.addEventListener('keydown',event=>{pointerFocus=false;if(event.key==='Escape'&&active){dismissed=active.node;hideTooltip();if(event.target.closest('dialog[open]'))event.preventDefault();}},true);
   document.addEventListener('click',()=>hideTooltip(),true);
   document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){const bounds=active.node.getBoundingClientRect();if(bounds.bottom<0||bounds.top>innerHeight||bounds.right<0||bounds.left>innerWidth)hideTooltip();else active.instance.update();}},true);
+  document.addEventListener('wheel',event=>{if(!overTooltip(event))return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight)return;inner.scrollTop+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?inner.clientHeight:1);event.preventDefault();},{capture:true,passive:false});
   window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
 }

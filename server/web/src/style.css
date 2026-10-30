@@ -38,7 +38,7 @@ body { background: #f3f6f5; }
   --bs-tooltip-max-width: min(28rem, calc(100vw - 1rem));
   --bs-tooltip-padding-x: .65rem;
   --bs-tooltip-padding-y: .55rem;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .timekeeper-tooltip .tooltip-inner { text-align: start; border: 1px solid var(--line); box-shadow: 0 .2rem .7rem #0003; max-height: min(32rem, 65vh); overflow: auto; overflow-wrap: anywhere; }
 .tooltip-caption, .tooltip-detail, .tooltip-heading, .tooltip-project { display: flex; align-items: baseline; gap: .4rem; white-space: pre-wrap; }
