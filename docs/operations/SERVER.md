@@ -203,3 +203,22 @@ candidate, not a published 2.0 release. See the repository's release checkpoint.
 ## Full-instance recovery
 
 [Full-instance backup and restore](INSTANCE-BACKUP.md) describes encrypted administrator backups, private preparation, explicit confirmation, exclusive startup recovery and interrupted-operation cancellation. Keep the active restore material as part of the deployment after a successful restore.
+
+
+### H2 schema-session lifetime
+
+H2 2.4.240 is retained for its acknowledged-commit crash compatibility. Its
+[`IN` check-constraint regression](https://github.com/h2database/h2database/issues/4308)
+can bind enum checks to the connection that created them. Closing that
+connection during normal pool retirement can then break later writes with
+SQL state `90098`, even while the database remains readable.
+
+The server initializes H2 schema on a dedicated, unpooled connection and keeps
+that session until runtime shutdown. It uses the configured JDBC URL,
+properties, user and password, leaves application-pool capacity available,
+and closes the session on startup failure or shutdown. Enum constraints,
+schema versions, transaction durability and the H2 version stay unchanged.
+PostgreSQL continues using its existing pooled bootstrap path. The regression
+retires every pooled connection repeatedly against a real H2 file with a
+one-slot pool and nondefault database credentials, then verifies authenticated
+reads/writes and rejection of invalid enum values.
