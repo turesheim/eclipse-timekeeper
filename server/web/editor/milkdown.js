@@ -140,7 +140,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
     const serialized=normalizeEditorMarkdown(editor.action(getMarkdown()));
-    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.runSync(parser.parse(value));return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.runSync(parser.parse(serialized))));});
+    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
     if(!safe){await editor.destroy();return null;}
     const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
     const command=(name,payload)=>{

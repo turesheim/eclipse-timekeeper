@@ -31,7 +31,7 @@ test('one click opens Today and protects inline, week and day-dialog drafts befo
   const original='See [[2026-10-26]] or [[2026-10-27]].\n\nA code example `[[2026-10-29]]`.\n';
   await save('2026-10-30',original);await save('2026-10-26','# Target day\n');await save('2026-10-27','# Other day\n');
   const week=await api('GET','/week-notes/2026-W44');await api('PUT','/week-notes/2026-W44',{body:'Weekly link [[2026-10-30]].\n'},{'If-Match':week.headers().etag});
-  await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
   await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
   await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await rich(page).locator('p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Inline draft');
   page.once('dialog',dialog=>dialog.dismiss());await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');await expect(rich(page)).toContainText('Inline draft');
