@@ -82,7 +82,7 @@ final class AccountArchiveInput {
         try {ContractInputs.pathId(value.path("archiveId").asText());Instant.parse(value.path("generatedAt").asText());}
         catch(RuntimeException invalid) {throw ApiFailure.validation();}
         if(!value.path("account").isObject() || !value.path("preferences").isObject() || !value.path("work").isObject() || !value.path("importHistory").isArray()) throw ApiFailure.validation();
-        if(!names(value.path("preferences")).equals(Set.of("zoneId")) || !value.path("preferences").path("zoneId").isTextual()) throw ApiFailure.validation();
+        if(!Set.of("zoneId","focusAreas").containsAll(names(value.path("preferences"))) || !value.path("preferences").path("zoneId").isTextual()) throw ApiFailure.validation();
         ContractInputs.zone(value.path("preferences").path("zoneId").asText());
         if(!value.path("preferences").path("zoneId").equals(value.path("work").path("zoneId"))) throw ApiFailure.validation();
         // Business and metadata JSON schemas plus graph validation are applied

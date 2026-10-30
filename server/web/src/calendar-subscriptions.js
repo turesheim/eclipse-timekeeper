@@ -1,3 +1,4 @@
+import {focusIncludes} from './focus-model.js';
 import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
@@ -63,7 +64,7 @@ export class CalendarSubscriptions {
     if(this.scope!==scope){this.reset();this.scope=scope;}
     this.data=data;this.connected=connected;this.writable=connected&&this.callbacks.canWrite();
     const key=data.dates.first+'|'+data.profile.data.zoneId+'|'+data.revision,changed=key!==this.key;this.key=key;
-    this.paint();if(this.visible()){this.poll();if(changed)void this.load();}
+    this.paint();this.paintAllDay();if(this.visible()){this.poll();if(changed)void this.load();}
   }
   setConnected(value){this.connected=value;this.writable=value&&this.callbacks.canWrite();this.paint();}
   poll(){if(!this.timer&&this.scope&&this.data)this.timer=setInterval(()=>void this.load(),30000);}
@@ -92,12 +93,12 @@ export class CalendarSubscriptions {
     if(!this.data)return;
     this.title.textContent=this.rows.length?t('calendar.subscriptions_count',{count:this.rows.length}):t('calendar.subscriptions');
     const active=document.activeElement,focus=this.panel.contains(active)?active.dataset.calendarAction:null;
-    this.add.disabled=!this.writable||!this.data.clients.length;this.list.replaceChildren();
-    if(!this.rows.length)this.list.append(node('li',this.data.clients.length?t('calendar.none'):t('calendar.client_required'),'hint'));
+    this.add.disabled=!this.writable||!(this.data.allClients||this.data.clients).length;this.list.replaceChildren();
+    if(!this.rows.length)this.list.append(node('li',(this.data.allClients||this.data.clients).length?t('calendar.none'):t('calendar.client_required'),'hint'));
     for(const value of this.rows) {
       const row=node('li',undefined,'calendar-subscription-row'),label=node('label',undefined,'calendar-subscription-choice'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.checked=value.visible;input.disabled=!this.writable||this.busy.has(value.id);input.dataset.calendarAction='visible:'+value.id;input.setAttribute('aria-label',t('calendar.show_name',{name:value.name}));
       input.addEventListener('change',()=>void this.visibility(value,input.checked));
-      const text=node('span');text.append(node('strong',value.name),node('small',this.data.clients.find(client=>client.id===value.clientId)?.name||t('ui.client')));label.append(input,text);
+      const text=node('span');text.append(node('strong',value.name),node('small',(this.data.allClients||this.data.clients).find(client=>client.id===value.clientId)?.name||t('ui.client')));label.append(input,text);
       const status=node('div',undefined,'calendar-subscription-status hint');status.append(node('span',t('calendar.last_success',{date:this.date(value.lastSuccess)})));
       const error=value.lastError||this.errors?.[value.id];if(error)status.append(node('span',calendarFailure(error),'error'));
       else if(value.lastAttempt&&(!value.lastSuccess||Date.parse(value.lastAttempt)>Date.parse(value.lastSuccess))&&Date.now()-Date.parse(value.lastAttempt)<90000)status.append(node('span',t('calendar.refreshing')));
@@ -128,7 +129,7 @@ export class CalendarSubscriptions {
   }
   async edit(id=null,remove=false) {
     if(!this.writable||!this.managementView?.valid()||this.dialog.open)return;const session=this.scope,generation=this.managementGeneration;
-    const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:this.data.clients[0]?.id,visible:true,includeEvents:true,includeTodos:false},etag:null};
+    const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:(this.data.allClients||this.data.clients)[0]?.id,visible:true,includeEvents:true,includeTodos:false},etag:null};
     if(session!==this.scope||generation!==this.managementGeneration||!this.managementView?.valid()||!this.writable||this.dialog.open)return;
     const value=loaded.data;this.fields.replaceChildren();this.formError.textContent='';this.formHint.textContent=remove?t('calendar.remove_explanation'):t('calendar.url_hint');
     this.draft={session,id,remove,etag:loaded.etag,original:value,key:!id?crypto.randomUUID():null,origin:id?(remove?'delete:':'edit:')+id:'add'};
@@ -137,7 +138,7 @@ export class CalendarSubscriptions {
     if(remove)this.fields.append(node('p',t('calendar.remove_confirm',{name:value.name})));
     else {
       this.field(t('ui.name'),'name',value.name,{required:true});const wrap=node('label',undefined,'form-label');wrap.append(node('span',t('ui.client')));const select=node('select',undefined,'form-select');select.id='calendar-subscription-client';select.name='clientId';select.required=true;
-      for(const client of this.data.clients){const option=node('option',client.name);option.value=client.id;select.append(option);}select.value=value.clientId||'';wrap.append(select);this.fields.append(wrap);
+      for(const client of (this.data.allClients||this.data.clients)){const option=node('option',client.name);option.value=client.id;select.append(option);}select.value=value.clientId||'';wrap.append(select);this.fields.append(wrap);
       this.field(t(id?'calendar.url_keep':'calendar.url'),'url','',{required:!id,type:'url'});
       const types=node('fieldset'),legend=node('legend',t('calendar.item_types'),'form-label');types.append(legend);
       for(const [name,key,checked]of [['includeEvents','calendar.include_events',value.includeEvents??true],['includeTodos','calendar.include_todos',value.includeTodos??false]]){
@@ -166,7 +167,7 @@ export class CalendarSubscriptions {
   }
   eventDate(event) {return calendarItemWhen(event,this.data.profile.data.zoneId);}
   paintAllDay() {
-    const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay);this.allDay.replaceChildren();this.allDay.hidden=!values.length;
+    const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay&&focusIncludes(this.data,value.clientId));this.allDay.replaceChildren();this.allDay.hidden=!values.length;
     if(!values.length)return;const title=node('h3',t('calendar.all_day_plans'));title.id='calendar-all-day-title';this.allDay.append(title);
     for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);const title=node('strong',value.title||t('calendar.untitled')),marker=eventNoteIndicator(value);if(marker)title.append(' ',marker);pick.append(title,node('span',this.eventDate(value)));if(calendarTodo(value))pick.append(node('small',calendarItemStatus(value)));pick.append(node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
     if(key&&document.activeElement===document.body)this.allDay.querySelector(`[data-calendar-event-key="${key}"]`)?.focus();

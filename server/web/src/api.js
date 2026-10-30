@@ -179,19 +179,19 @@ export class Api {
           // Bind the owner before issuing parallel reads, including empty pages.
           const profile = await this.request('/me',options);
           const dates = range(profile.data.zoneId);
-          const [clients,projects,tasks,labels,workSessions,activeWorkSession,activities,active,report] = await Promise.all([
+          const [clients,projects,tasks,labels,workSessions,activeWorkSession,activities,active,report,focusAreas] = await Promise.all([
             this.page('/clients',{},options),this.page('/projects',{},options),this.page('/tasks',{},options),this.page('/labels',{},options),
             this.page('/work-sessions',{},options),this.request('/work-sessions/active',options),
             this.page('/activities',{from:dates.from,to:dates.to},options),this.request('/activities/active',options),
-            this.request(`/reports/activities?${new URLSearchParams({from:dates.from,to:dates.to,zoneId:profile.data.zoneId})}`,options)
+            this.request(`/reports/activities?${new URLSearchParams({from:dates.from,to:dates.to,zoneId:profile.data.zoneId})}`,options),this.request('/focus-areas',options)
           ]);
           const chosen = workSessions.items.find((value) => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a, b) => b.start.localeCompare(a.start))[0];
-          const [sessionReport,confirmed,head] = await Promise.all([
-            chosen?this.request(`/work-sessions/${chosen.id}/report`,options):null,this.request('/me',options),this.page('/projects',{},options)
+          const [sessionReport,confirmed,head,confirmedFocus] = await Promise.all([
+            chosen?this.request(`/work-sessions/${chosen.id}/report`,options):null,this.request('/me',options),this.page('/projects',{},options),this.request('/focus-areas',options)
           ]);
           const workSessionReport=sessionReport?.data??null;
-          if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
-          return { profile, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
+          if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version || focusAreas.data.version !== confirmedFocus.data.version) throw new ApiError('BUSY');
+          return { profile, focusAreas, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
         } catch (error) {if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error;}
         finally {clearTimeout(timer);controller.abort();}
       }

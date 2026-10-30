@@ -1,3 +1,4 @@
+import {focusIncludes} from './focus-model.js';
 import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
@@ -159,7 +160,7 @@ export class TodayView {
     const root=byId('today-events'),focused=root.contains(document.activeElement)?document.activeElement.closest('[data-today-event]')?.dataset.todayEvent:null;root.replaceChildren();
     if(this.eventWarning)root.append(node('p',t('calendar.refresh_errors'),'alert alert-warning'));
     const zone=this.data.profile.data.zoneId,day=monthCalendar(this.date.slice(0,7),zone).days.find(value=>value.date===this.date);
-    const events=this.events.filter(value=>value.allDay?value.firstDate<=this.date&&this.date<value.endDate:instantNanos(value.start)<day.to&&instantNanos(value.end)>=day.from)
+    const events=this.events.filter(value=>focusIncludes(this.data,value.clientId)).filter(value=>value.allDay?value.firstDate<=this.date&&this.date<value.endDate:instantNanos(value.start)<day.to&&instantNanos(value.end)>=day.from)
       .sort((a,b)=>Number(b.allDay)-Number(a.allDay)||(a.start||'').localeCompare(b.start||''));
     if(!events.length){root.append(node('p',t('today.no_events'),'hint'));return;}
     const when=event=>calendarItemWhen(event,zone,true);

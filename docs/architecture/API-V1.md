@@ -83,7 +83,7 @@ never a shared remote authentication fallback.
 | Tracking | Read current interval, atomically activate/switch task, stop interval |
 | Daily/weekly reports | Query intervals and authoritative daily/task totals in an explicit zone |
 | Portable interchange | Export domain snapshot; atomic import with fresh UUIDs and relation remapping |
-| Preferences | Read owner profile, explicitly set reporting zone |
+| Preferences | Read owner profile, explicitly set reporting zone; read and replace owner-private focus areas |
 | Concurrent clients | Owner-scoped committed change feed, resource reload, ETag conflict resolution |
 
 Requests use immutable input values; responses are immutable snapshots with
@@ -1146,3 +1146,21 @@ Existing flat aliases remain available. Account archives use v4 with ZIP uploads
 up to 1 GiB and JSON up to 256 MiB; archive.json remains separately bounded.
 The [OpenAPI](../../common/api/openapi.json) defines complete shapes and paths.
 See [Notes setup and transition](../operations/NOTES-WEBDAV.md).
+
+## Focus areas
+
+`GET /focus-areas` returns an owner-private singleton with `id`, `ownerId`,
+`version` and `areas`. Each area has a UUID `id`, a name (1–80 characters) and
+`clientIds` (up to 1,000 owned clients). Up to 100 areas are supported. IDs,
+names (after trimming, case-insensitively) and memberships must be unique.
+`PUT /focus-areas` replaces the complete `{areas: [...]}` definition using the
+returned strong ETag in `If-Match`. Read/write permissions, CSRF and owner binding
+are the usual API rules; missing/stale tags fail with 428/412. A membership of
+another owner or an unknown client fails with 404. Empty memberships are valid.
+
+Focus is a web presentation preference, not an authorization scope. API lists,
+reports, export and client commands retain their usual explicit filters; a web
+selection never silently changes API results. Deleting a client makes its saved
+membership inert; the next settings save drops that removed client. Definition
+changes publish a content-free `PROFILE/UPDATED` invalidation. The settings have
+an independent version and are preserved by profile/holiday edits.

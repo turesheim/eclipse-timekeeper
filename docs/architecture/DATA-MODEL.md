@@ -589,6 +589,7 @@ their JSON payloads and are validated within owner-scoped server transactions.
 
 | `entity_type` | Identity and purpose |
 | --- | --- |
+| `FOCUS_SETTINGS` | Owner-private singleton `00000000-0000-0000-0000-000000000002`, with an independent optimistic version and an `areas` array of `{id,name,clientIds}`. Only owned clients can be assigned. Membership is a presentation preference; client deletion makes a membership inert. Changes publish `PROFILE/UPDATED`. Stored independently from holiday/profile preferences; no domain or SQL schema migration is required. Account archives preserve definitions and remap imported client IDs. |
 | `DAY_LABEL` | Independent date-keyed label with its own `text`, `version` and modification time. Clearing retains a versioned empty value. It neither requires a note nor shares its version, Markdown bytes or deletion lifecycle. |
 | `DAY_NOTE` | Date-keyed Markdown document with canonical UTF-8 `markdown`, projected `body`, internal `modifiedAt`, and its own optimistic `version`. An untouched date has no row and reads as version zero. Legacy `text` is retained only as private compatibility metadata; public labels come from `DAY_LABEL`. `labelIndependent` marks newly written note content; legacy fields may remain privately in migrated records. An existing `DAY_LABEL` row prevents legacy label resurrection. |
 | `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
