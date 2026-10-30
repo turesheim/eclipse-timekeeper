@@ -3,7 +3,7 @@ import Tooltip from './assets/bootstrap/tooltip.js';
 // Content factories construct application-owned DOM with textContent. Never
 // interpret a title, API field, Markdown body or translation as HTML.
 const content=new WeakMap();
-let active=null,installed=false,pointerFocus=false,leaveTimer,dismissed=null;
+let active=null,installed=false,pointerFocus=false,leaveTimer,dismissed=null,pointer=null;
 const visible=node=>node.isConnected&&!node.closest('[hidden]')&&node.getClientRects().length>0;
 export function hideTooltip() {
   clearTimeout(leaveTimer);if(!active)return;
@@ -73,16 +73,25 @@ export function installTooltips() {
   }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['title','hidden','aria-hidden','open']});
   // The overlay never intercepts a calendar drag or a click on a control below
   // it. Hit-test its bounds for hover persistence instead of capturing presses.
-  const hover=event=>{if(event.pointerType!=='mouse'||event.buttons)return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)show(node);else if(active)leave();};
+  const remember=event=>{pointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,buttons:event.buttons};};
+  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons)return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)show(node);else if(active)leave();};
   document.addEventListener('pointerover',hover);
   document.addEventListener('pointermove',hover);
   document.addEventListener('pointerout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
   document.addEventListener('focusin',event=>{if(!pointerFocus)show(target(event.target),event.target);});
   document.addEventListener('focusout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
-  document.addEventListener('pointerdown',event=>{pointerFocus=true;if(!active?.tip.contains(event.target))hideTooltip();},true);
+  document.addEventListener('pointerdown',event=>{remember(event);pointerFocus=true;if(!active?.tip.contains(event.target))hideTooltip();},true);
   document.addEventListener('keydown',event=>{pointerFocus=false;if(event.key==='Escape'&&active){dismissed=active.node;hideTooltip();if(event.target.closest('dialog[open]'))event.preventDefault();}},true);
   document.addEventListener('click',()=>hideTooltip(),true);
-  document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){const bounds=active.node.getBoundingClientRect();if(bounds.bottom<0||bounds.top>innerHeight||bounds.right<0||bounds.left>innerWidth)hideTooltip();else active.instance.update();}},true);
+  document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){
+    const bounds=active.node.getBoundingClientRect();
+    if(bounds.bottom<0||bounds.top>innerHeight||bounds.right<0||bounds.left>innerWidth){
+      hideTooltip();
+      // Horizontal scrolling can move the old source away without a new
+      // pointer event over the control now under the stationary mouse.
+      requestAnimationFrame(()=>{if(pointer){const target=document.elementFromPoint(pointer.clientX,pointer.clientY);if(target)hover({...pointer,target});}});
+    }else active.instance.update();
+  }},true);
   document.addEventListener('wheel',event=>{if(!overTooltip(event))return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight)return;inner.scrollTop+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?inner.clientHeight:1);event.preventDefault();},{capture:true,passive:false});
   window.addEventListener('resize',hideTooltip);window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
 }
