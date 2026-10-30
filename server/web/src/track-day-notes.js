@@ -2,6 +2,7 @@ import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {icon} from './icons.js';
 import {MarkdownField} from './markdown-field.js';
+import {guardDayNoteNavigation} from './journal-links.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=(text,className)=>{const value=node('button',text,className);value.type='button';return value;};
@@ -31,6 +32,7 @@ export class TrackDayNotes {
     // Focus returns before the native close event is delivered. Release editor
     // state synchronously so the next keyboard action can open the day menu.
     if(!this.inline){this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.requestClose();});this.dialog.addEventListener('close',()=>this.finishEditor());}
+    if(!this.inline)guardDayNoteNavigation(this.dialog,()=>this.canLeaveInline(),()=>this.closeEditor());
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.commit();});
     window.addEventListener('beforeunload',event=>{if(this.editor&&(this.dirty()||this.editor.busy||this.editor.uncertain)){event.preventDefault();event.returnValue='';}});
     if(!this.inline)this.buildMenu();

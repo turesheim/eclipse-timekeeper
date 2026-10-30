@@ -181,7 +181,15 @@ review before that draft can be saved.
 The expanded day-note dialog edits the short label and Markdown body independently. **Formatted** provides paragraphs, headings,
 bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
 links, quotations, tables and undo/redo. Link addresses are validated; activating
-a rendered link does not navigate. **Markdown source**
+ordinary clicks edit regular web links; Command/Ctrl-click opens them. A daily
+wiki link such as `[[2026-10-26]]` opens **Today** on that date with one click,
+including from day, week, event and vault notes. Command/Ctrl-click opens the
+requested date in another tab, and `/web/?day=2026-10-26` is a direct link.
+Daily links work in read-only notes too. Notes with unsaved changes require
+confirmation before changing the day or closing their dialog; cancelling keeps
+the drafts intact. Rich edits preserve the `[[YYYY-MM-DD]]` syntax. Code examples
+and escaped brackets stay literal; invalid dates, aliases, embeds and other
+wikilinks keep the existing exact-source fallback. **Markdown source**
 retains unsupported syntax, including Obsidian extensions. Opaque YAML
 frontmatter is shown separately and preserved in saves. The Formatted and Markdown
 source mode buttons share the editor toolbar with formatting actions, separated

@@ -4,20 +4,33 @@ import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remark
 import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
-import {getMarkdown,callCommand,$prose} from '@milkdown/kit/utils';
+import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
+import {InputRule} from '@milkdown/kit/prose/inputrules';
+import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
+import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
 import {hasUnsupportedSyntax,normalizeEditorMarkdown} from '../src/markdown-document.js';
 import {t} from '../src/i18n.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
 const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const dailyWikilink=$node('daily_wikilink',()=>({
+  inline:true,group:'inline',atom:true,selectable:true,leafText:node=>'[['+node.attrs.date+']]',
+  attrs:{date:{default:'',validate:'string'}},
+  toDOM:node=>['a',{'data-day-note-date':node.attrs.date,href:dailyNoteHref(node.attrs.date),contenteditable:'false'},node.attrs.date],
+  parseMarkdown:{match:node=>node.type==='dailyWikilink',runner:(state,node,type)=>state.addNode(type,{date:node.value})},
+  toMarkdown:{match:node=>node.type.name==='daily_wikilink',runner:(state,node)=>state.addNode('dailyWikilink',undefined,node.attrs.date)}
+}));
+const dailyWikilinkInput=$inputRule(ctx=>new InputRule(/\[\[(\d{4}-\d{2}-\d{2})\]\]$/,(state,match,start,end)=>
+  dailyNoteDate(match[1])?state.tr.replaceWith(start,end,dailyWikilink.type(ctx).create({date:match[1]})):null));
+const dailyWikilinkRemark=$remark('timekeeperDailyWikilinks',()=>remarkDailyWikilinks);
 const sourceNodes=new Set(['html','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
 const safeAsset=url=>typeof url==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(url);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
 const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
   let safe=true;
-  doc.descendants(node=>{if(node.type.name==='image'&&!assetAllowed(node.attrs.src)||node.marks.some(mark=>mark.type.name==='link'&&!linkAllowed(mark.attrs.href)))safe=false;return safe;});
+  doc.descendants(node=>{if(node.type.name==='image'&&!assetAllowed(node.attrs.src)||node.type.name==='daily_wikilink'&&!dailyNoteDate(node.attrs.date)||node.marks.some(mark=>mark.type.name==='link'&&!linkAllowed(mark.attrs.href)))safe=false;return safe;});
   return safe;
 };
 const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
@@ -93,6 +106,16 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       // including authenticated journal attachments, without changing the draft.
       handleDOMEvents:{click:(_view,event)=>{
         const link=event.target.closest('a[href]');if(!link)return false;
+        const date=dailyNoteDate(link.dataset.dayNoteDate);
+        if(date){
+          event.preventDefault();
+          if(event.button===0&&(event.metaKey||event.ctrlKey))window.open(dailyNoteHref(date),'_blank','noopener,noreferrer');
+          else if(event.button===0){
+            const navigation=new CustomEvent(dayNoteNavigation,{bubbles:true,cancelable:true,detail:{date,guards:[],leave:[]}});
+            if(root.dispatchEvent(navigation))location.assign(dailyNoteHref(date));
+          }
+          return true;
+        }
         event.preventDefault();const href=link.getAttribute('href');
         if(event.button===0&&(event.metaKey||event.ctrlKey)&&resources?.allowsLink(href)){resources.openLink(href);return true;}
         if(event.button===0&&(event.metaKey||event.ctrlKey)&&safeLink(href)){
@@ -103,15 +126,21 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       }},
       // Prototype accepts pasted text only, so HTML/images cannot fetch remote
       // assets or introduce nodes outside the evaluated Markdown schema.
-      handlePaste:(view,event)=>{const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();view.dispatch(view.state.tr.insertText(text));return true;},
+      handlePaste:(view,event)=>{
+        const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();
+        const match=/^\[\[(\d{4}-\d{2}-\d{2})\]\]$/.exec(text),selection=view.state.selection;
+        if(match&&dailyNoteDate(match[1])&&!selection.$from.parent.type.spec.code&&!selection.$from.marks().some(mark=>mark.type.name==='inlineCode'))
+          view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.daily_wikilink.create({date:match[1]}),true));
+        else view.dispatch(view.state.tr.insertText(text));return true;
+      },
       handleDrop:()=>true
     });
-  }).use(commonmark).use(gfm).use(history).use(changePlugin);
+  }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
     const serialized=normalizeEditorMarkdown(editor.action(getMarkdown()));
-    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
+    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.runSync(parser.parse(value));return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.runSync(parser.parse(serialized))));});
     if(!safe){await editor.destroy();return null;}
     const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
     const command=(name,payload)=>{
