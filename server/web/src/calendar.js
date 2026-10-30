@@ -41,7 +41,7 @@ export class WeekCalendar {
     root.querySelector('#calendar-date').addEventListener('change', (event) => callbacks.onDate(event.target.value));
     root.addEventListener('keydown', (event) => this.key(event));
     this.subscriptions=new CalendarSubscriptions(root,{
-      canWrite:()=>callbacks.canWrite(),onUnauthorized:callbacks.onUnauthorized,onConvert:callbacks.onConvertEvent,onNotesChanged:callbacks.onNotesChanged,
+      canWrite:()=>callbacks.canWrite(),onUnauthorized:callbacks.onUnauthorized,onConvert:callbacks.onConvertEvent,onNotesChanged:callbacks.onNotesChanged,onSubscriptionsChanged:callbacks.onSubscriptionsChanged,
       onEvents:plans=>{this.plans=plans;if(this.data&&!root.hidden&&!this.drag&&!this.busy)this.render();}
     });
   }

@@ -115,12 +115,12 @@ export class CalendarSubscriptions {
     try {
       const current=await session.request('/calendar-subscriptions/'+value.id);if(session!==this.scope)return;
       await session.request('/calendar-subscriptions/'+value.id,{method:'PUT',etag:current.etag,body:{name:current.data.name,clientId:current.data.clientId,visible}});
-      if(session===this.scope)await this.load();
+      if(session===this.scope){await this.load();if(session===this.scope)this.callbacks.onSubscriptionsChanged?.();}
     }catch(error){if(session===this.scope)this.failure(error);}finally{if(session===this.scope){this.busy.delete(value.id);this.paint();if(document.activeElement===document.body)this.findAction('visible:'+value.id)?.focus();}}
   }
   async refresh(value) {
     const session=this.scope;if(!this.writable||this.busy.has(value.id))return;this.busy.add(value.id);this.paint();
-    try{await session.request('/calendar-subscriptions/'+value.id+'/refresh',{method:'POST',timeout:30000});if(session===this.scope)await this.load();}
+    try{await session.request('/calendar-subscriptions/'+value.id+'/refresh',{method:'POST',timeout:30000});if(session===this.scope){await this.load();if(session===this.scope)this.callbacks.onSubscriptionsChanged?.();}}
     finally{if(session===this.scope){this.busy.delete(value.id);this.paint();if(document.activeElement===document.body)this.findAction('refresh:'+value.id)?.focus();}}
   }
   field(label,name,value,{required=false,type='text'}={}) {
@@ -156,7 +156,7 @@ export class CalendarSubscriptions {
     const payload=draft.uncertain?draft.payload:this.formValue();draft.payload=payload;for(const input of this.fields.querySelectorAll('input,select'))input.disabled=true;
     try {
       await draft.session.request('/calendar-subscriptions'+(draft.id?'/'+draft.id:''),{method:draft.remove?'DELETE':draft.id?'PUT':'POST',body:draft.remove?undefined:payload,etag:draft.etag,key:draft.key});
-      if(draft!==this.draft||draft.session!==this.scope)return;view.clean(this.form);view.busy=false;draft.busy=false;this.dialog.close();await this.load();
+      if(draft!==this.draft||draft.session!==this.scope)return;view.clean(this.form);view.busy=false;draft.busy=false;this.dialog.close();await this.load();if(draft.session===this.scope)this.callbacks.onSubscriptionsChanged?.();
     }catch(error){
       if(draft!==this.draft||draft.session!==this.scope)return;if(error.status===401){this.failure(error);return;}
       this.formError.textContent=errorText(error);draft.uncertain=error.uncertain===true;

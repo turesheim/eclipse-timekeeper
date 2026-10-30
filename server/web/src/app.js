@@ -33,6 +33,7 @@ let decimalHours = false,activitiesCollapsed = false;
 const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosText(value);
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
 const calendar = new WeekCalendar($('calendar-panel'), {
+  onSubscriptionsChanged:()=>void today.loadEvents(true),
   canWrite:()=>canWrite,
   onNotesChanged:()=>void refresh().catch(()=>{}),
   onUnauthorized:error=>auth.clear(errorText(error)),

@@ -275,7 +275,7 @@ test('Today periodically reloads calendar items and shows subscription errors wi
   const {page,api,context,client}=await setup(browser,request);
   try{
     await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);
-    await page.clock.install();await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
     await expect(page.locator('#today-events')).toContainText('Planned meeting');
     // Simulate a newly refreshed server snapshot without emitting a domain change.
     const snapshot=(await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json());
@@ -283,7 +283,6 @@ test('Today periodically reloads calendar items and shows subscription errors wi
     await page.route('**/api/v1/calendar-events?*',route=>route.fulfill({json:snapshot}));
     const source=page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true});await source.click();
     const draft=page.locator('#today-journal-body');await draft.fill('Keep this unsaved note');
-    await page.clock.fastForward(31000);
-    await expect(page.locator('#today-events')).toContainText('Newly fetched meeting');await expect(page.locator('#today-events .alert-warning')).toBeVisible();await expect(draft).toHaveValue('Keep this unsaved note');
+    await expect(page.locator('#today-events')).toContainText('Newly fetched meeting',{timeout:35000});await expect(page.locator('#today-events .alert-warning')).toBeVisible();await expect(draft).toHaveValue('Keep this unsaved note');
   }finally{await context.close();}
 });
