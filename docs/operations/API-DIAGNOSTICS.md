@@ -164,3 +164,28 @@ upgrade with older server replicas stopped. It prevents an older server from
 performing unrecorded writes after recording is enabled. It does not rewrite
 existing labels, note bodies, canonical Markdown or resource versions and does
 not manufacture historical events.
+
+## Missing calendar events or to-dos
+
+Read the subscription metadata and the selected civil day's projected items:
+
+```sh
+curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/me"
+curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/calendar-subscriptions"
+curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/calendar-events?fromDate=2026-10-30&toDate=2026-10-31"
+```
+
+Use the account's `zoneId` and an exclusive `toDate`. Check the subscription's
+`visible`, `includeEvents`, `includeTodos`, `lastAttempt`, `lastSuccess`, and
+`lastError` fields. Legacy subscriptions default to events enabled and to-dos
+disabled. A successful HTTP response from `/calendar-events` may contain
+per-subscription failures in `errors`; a failed download retains the previously
+successful cache. A recent `lastSuccess` means Timekeeper fetched or revalidated
+the published feed, not that the provider included every item in the source UI.
+
+To-dos identify themselves with `componentType: "VTODO"`. Their due or scheduled
+markers may differ from an event interval; `undated: true` does not indicate a
+deadline. Google Tasks and Microsoft To Do items omitted from the published ICS
+feed cannot be recovered by refreshing that subscription. Their separate APIs
+require provider connectors. These reads do not disclose credential-bearing
+subscription URLs and do not alter or refresh the user's data.
