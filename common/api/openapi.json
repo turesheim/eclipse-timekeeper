@@ -1680,7 +1680,7 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1828,7 +1828,7 @@
             }
           }
         },
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1894,7 +1894,7 @@
     "/activities/active": {
       "get": {
         "operationId": "getActiveActivity",
-        "summary": "Read the authenticated owner’s current interval",
+        "summary": "Read the authenticated owner\u2019s current interval",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -1959,7 +1959,7 @@
     "/activities/start": {
       "post": {
         "operationId": "startActivity",
-        "summary": "Atomically activate or switch the owner’s task",
+        "summary": "Atomically activate or switch the owner\u2019s task",
         "x-required-permission": "write",
         "responses": {
           "201": {
@@ -2140,7 +2140,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2210,7 +2210,7 @@
       },
       "put": {
         "operationId": "updateProfile",
-        "summary": "Set the owner’s reporting time zone",
+        "summary": "Set the owner\u2019s reporting time zone",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -2340,7 +2340,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Use the owner’s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
+        "description": "Use the owner\u2019s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
         "parameters": [
           {
             "name": "from",
@@ -2440,7 +2440,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner’s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
+        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner\u2019s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
         "parameters": [
           {
             "name": "after",
@@ -3452,7 +3452,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -7566,7 +7566,7 @@
       },
       "get": {
         "operationId": "listPendingAccountArchives",
-        "summary": "List this account’s resumable archive uploads",
+        "summary": "List this account\u2019s resumable archive uploads",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -8044,13 +8044,13 @@
             }
           }
         },
-        "description": "Requires the upload ETag from preview and an unchanged target revision/profile. Remaps all work IDs and links; never changes account identity, roles, email or credentials. Old import history is retained only as inert audit. A durable owner-scoped receipt derived from the verified archive ID, with its JSON digest as the replay fingerprint returns the prior result after lost replies/reselection, before stale-version checks. Existing work is retained. Files and uncompressed JSON are bounded to 256 MiB; each request remains below the existing global body limit."
+        "description": "Requires the upload ETag from preview and an unchanged target revision/profile. Remaps all work IDs and links; never changes account identity, roles, email or credentials. Old import history is retained only as inert audit. A durable owner-scoped receipt derived from the verified archive ID, with its JSON digest as the replay fingerprint returns the prior result after lost replies/reselection, before stale-version checks. Existing work is retained. ZIP files are bounded to 1 GiB and uncompressed JSON to 256 MiB; each request remains below the existing global body limit."
       }
     },
     "/data/account/imports": {
       "get": {
         "operationId": "listAccountArchiveRestores",
-        "summary": "List this account’s completed archive restores",
+        "summary": "List this account\u2019s completed archive restores",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -10589,7 +10589,7 @@
             }
           }
         },
-        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
+        "description": "Conditional replacement or explicit clearing of one linked identity\u2019s provider-data envelope. Legacy link and source updates preserve the envelope."
       }
     },
     "/task-connections": {
@@ -12834,7 +12834,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "Matches a deleted task’s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
+        "description": "Matches a deleted task\u2019s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
       }
     },
     "/task-list-sections": {
@@ -15598,7 +15598,7 @@
     "/admin/instance/uploads/{id}/staging": {
       "get": {
         "operationId": "getInstanceRestoreStage",
-        "summary": "Read the initiating session’s restore preparation status",
+        "summary": "Read the initiating session\u2019s restore preparation status",
         "tags": [
           "Accounts"
         ],
@@ -16569,12 +16569,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           },
           {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/IfMatch"
           }
         ],
         "responses": {
@@ -16775,12 +16770,7 @@
             }
           },
           {
-            "name": "If-Match",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/IfMatchOptional"
           }
         ],
         "responses": {
@@ -16937,13 +16927,7 @@
             }
           },
           {
-            "name": "If-None-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "const": "*"
-            }
+            "$ref": "#/components/parameters/IfNoneMatchStarRequired"
           }
         ],
         "responses": {
@@ -17105,12 +17089,7 @@
             }
           },
           {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/IfMatch"
           }
         ],
         "responses": {
@@ -17153,7 +17132,8 @@
           "507": {
             "$ref": "#/components/responses/507"
           }
-        }
+        },
+        "description": "If-Match must contain the current metadata ETag from GET /notes/entries/{id} or the entryEtag field. The canonical content ETag is used separately for /content writes."
       }
     },
     "/notes/entries/{id}/content": {
@@ -17248,12 +17228,7 @@
             }
           },
           {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/IfMatch"
           }
         ],
         "responses": {
@@ -17342,12 +17317,7 @@
             }
           },
           {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/IfMatch"
           }
         ],
         "responses": {
@@ -17414,7 +17384,8 @@
               }
             }
           }
-        }
+        },
+        "description": "If-Match must contain the current metadata ETag from GET /notes/entries/{id} or the entryEtag field. The canonical content ETag is used separately for /content writes."
       }
     },
     "/notes/entries/{id}/restore": {
@@ -17435,12 +17406,7 @@
             }
           },
           {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/IfMatch"
           }
         ],
         "responses": {
@@ -17497,7 +17463,8 @@
           "507": {
             "$ref": "#/components/responses/507"
           }
-        }
+        },
+        "description": "If-Match must contain the current metadata ETag from GET /notes/entries/{id} or the entryEtag field. The canonical content ETag is used separately for /content writes."
       }
     }
   },
@@ -22505,7 +22472,7 @@
           "bytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 268435456
+            "maximum": 1073741824
           },
           "sha256": {
             "type": "string",
@@ -22517,7 +22484,8 @@
           "mediaType",
           "bytes",
           "sha256"
-        ]
+        ],
+        "description": " ZIP uploads are limited to 1 GiB; JSON uploads and archive.json remain limited to 256 MiB."
       },
       "AccountArchiveChunkInput": {
         "type": "object",
@@ -22845,7 +22813,7 @@
           "bytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 268435456
+            "maximum": 1073741824
           },
           "sha256": {
             "type": "string",
@@ -22936,7 +22904,8 @@
           "state",
           "createdAt",
           "expiresAt"
-        ]
+        ],
+        "description": " ZIP uploads are limited to 1 GiB; JSON uploads and archive.json remain limited to 256 MiB."
       },
       "AccountArchiveImportRecord": {
         "type": "object",
@@ -28108,7 +28077,7 @@
           "baseline"
         ],
         "additionalProperties": false,
-        "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
+        "description": "Atomically replace a linked identity\u2019s source revision and last-common field snapshot. Null baseline clears the snapshot."
       },
       "TaskTombstone": {
         "type": "object",
@@ -31558,10 +31527,12 @@
             "format": "date-time"
           },
           "etag": {
-            "type": "string"
+            "type": "string",
+            "description": "Canonical file-content validator (or folder generation validator). Use this for /content writes and WebDAV file operations."
           },
           "entryEtag": {
-            "type": "string"
+            "type": "string",
+            "description": "Metadata representation validator, also returned by metadata GET as the ETag header. Use this for path moves, deletion and recovery through the Notes API."
           }
         }
       },
@@ -31975,6 +31946,15 @@
           "const": "*"
         },
         "description": "Create only when the asset is absent; use this instead of If-Match for new uploads."
+      },
+      "IfNoneMatchStarRequired": {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "const": "*"
+        },
+        "description": "Create only when the file is absent. An existing file always returns 412."
       }
     },
     "responses": {
@@ -32202,10 +32182,10 @@
               "$ref": "#/components/schemas/Problem"
             },
             "example": {
-              "type": "urn:timekeeper:problem:unavailable",
-              "title": "Transient server failure",
-              "status": 503,
-              "code": "UNAVAILABLE"
+              "type": "urn:timekeeper:problem:vault-quota",
+              "title": "Notes storage limit reached",
+              "status": 507,
+              "code": "VAULT_QUOTA"
             }
           }
         }
@@ -32219,7 +32199,7 @@
     },
     {
       "name": "Accounts",
-      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user’s business data."
+      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user\u2019s business data."
     }
   ]
 }

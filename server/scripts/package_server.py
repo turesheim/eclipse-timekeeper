@@ -80,6 +80,7 @@ def package(output, tag, commit):
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/operations/JOURNAL-WEBDAV.md': 'JOURNAL-WEBDAV.md',
+              'docs/operations/NOTES-WEBDAV.md': 'NOTES-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
@@ -130,6 +131,7 @@ def package(output, tag, commit):
     files += [(ROOT / 'common/api/openapi.json', 'timekeeper-server/openapi.json'),
               (ROOT / 'server/scripts/create_token.py', 'timekeeper-server/create_token.py'),
               (ROOT / 'server/scripts/configure_accounts.py', 'timekeeper-server/configure_accounts.py'),
+              (ROOT / 'server/scripts/webdav_sync.py', 'timekeeper-server/webdav_sync.py'),
               (ROOT / 'LICENSE', 'timekeeper-server/LICENSE')]
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as target:
         for source, name in files:

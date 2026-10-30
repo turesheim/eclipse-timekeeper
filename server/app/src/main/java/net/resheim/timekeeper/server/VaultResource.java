@@ -29,7 +29,7 @@ public class VaultResource {
     @GET public Response info(){ContractInputs.queries(uri.getQueryParameters());return tx(()->{
         var value=object().put("rootId",VaultIndex.ROOT.toString()).put("snapshot",vault().generation());value.set("settings",new VaultSettings(store).get());value.set("limits",limits.snapshot());return Response.ok(value).build();});}
     @GET @Path("/settings") public Response settings(){ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,new VaultSettings(store).get(),null).response());}
-    @GET @Path("/resolve") public Response resolve(@QueryParam("path")String path){ContractInputs.queries(uri.getQueryParameters(),"path");var target=new VaultPath(path);return tx(()->{var collection=vault();var value=collection.get(target);return Response.ok(collection.metadata(value)).header("ETag",collection.tag(value)).build();});}
+    @GET @Path("/resolve") public Response resolve(@QueryParam("path")String path){ContractInputs.queries(uri.getQueryParameters(),"path");var target=new VaultPath(path);return tx(()->{var collection=vault();var value=collection.get(target);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
     @PUT @Path("/settings") @Consumes("application/json") public Response settings(@HeaderParam("If-Match")String match,JsonNode input){ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,vault().configure(match,input),null).response());}
     @GET @Path("/entries") public Response entries(@QueryParam("parentId")String parent,@QueryParam("query")String query,@QueryParam("trash")String trash,
             @QueryParam("offset")String offset,@QueryParam("limit")String limit,@HeaderParam("If-Match")String snapshot){
@@ -41,13 +41,13 @@ public class VaultResource {
     }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());fields(input,"path");var path=new VaultPath(input.path("path").asText());
-        return tx(()->{var collection=vault();var entry=collection.mkdir(path);return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.tag(entry)).build();});
+        return tx(()->{var collection=vault();var entry=collection.mkdir(path);return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
     }
     @PUT @Path("/files") @Consumes("application/octet-stream") public Response create(@QueryParam("path")String name,@HeaderParam("If-None-Match")String none,byte[] bytes){
         ContractInputs.queries(uri.getQueryParameters(),"path");if(!"*".equals(none))throw new ApiFailure(428,"PRECONDITION_REQUIRED");var path=new VaultPath(name);
-        return tx(()->{var collection=vault();var entry=collection.put(path,null,true,bytes);return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.tag(entry)).build();});
+        return tx(()->{var collection=vault();var entry=collection.put(path,null,true,bytes);return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
     }
-    @GET @Path("/entries/{id}") public Response entry(@PathParam("id")String id){ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.get(entry);return Response.ok(collection.metadata(value)).header("ETag",collection.tag(value)).build();});}
+    @GET @Path("/entries/{id}") public Response entry(@PathParam("id")String id){ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.get(entry);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
     @GET @Path("/entries/{id}/content") @Produces("application/octet-stream") public Response content(@PathParam("id")String id){
         ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.get(entry);
             return Response.ok(collection.read(value)).header("ETag",collection.tag(value)).header("Content-Disposition","attachment").build();});
@@ -59,12 +59,12 @@ public class VaultResource {
     }
     @PUT @Path("/entries/{id}/path") @Consumes("application/json") public Response move(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());fields(input,"path");UUID entry=uuid(id);var target=new VaultPath(input.path("path").asText());
-        return tx(()->{var collection=vault();var value=collection.move(collection.get(entry),target,match);return Response.ok(collection.metadata(value)).header("ETag",collection.tag(value)).build();});
+        return tx(()->{var collection=vault();var current=collection.get(entry);VaultCollection.match(collection.metadataTag(current),match);var value=collection.move(current,target,collection.tag(current));return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});
     }
     @DELETE @Path("/entries/{id}") public Response delete(@PathParam("id")String id,@HeaderParam("If-Match")String match){
-        ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();collection.delete(collection.get(entry),match);return Response.noContent().build();});
+        ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var current=collection.get(entry);VaultCollection.match(collection.metadataTag(current),match);collection.delete(current,collection.tag(current));return Response.noContent().build();});
     }
     @POST @Path("/entries/{id}/restore") public Response restore(@PathParam("id")String id,@HeaderParam("If-Match")String match){
-        ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.restore(collection.get(entry),match);return Response.ok(collection.metadata(value)).header("ETag",collection.tag(value)).build();});
+        ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var current=collection.get(entry);VaultCollection.match(collection.metadataTag(current),match);var value=collection.restore(current,collection.tag(current));return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});
     }
 }

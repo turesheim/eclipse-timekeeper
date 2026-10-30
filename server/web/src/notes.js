@@ -72,21 +72,21 @@ export class NotesView {
     if(this.note&&!this.busy)this.status.textContent=this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
   }
   fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}
-  async list(parameters,session){
-    const rows=[];let offset=0,snapshot;
+  async list(parameters,session,snapshot){
+    const rows=[];let offset=0;
     do{const query=new URLSearchParams({...parameters,offset,limit:this.info.limits.pageSize});const reply=await session.request('/notes/entries?'+query,{etag:snapshot});snapshot=reply.data.snapshot;rows.push(...reply.data.items);offset=reply.data.nextOffset;}while(offset!==undefined);
     return rows;
   }
-  async reload(){
+  async reload(retry=0){
     if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1;this.loadGeneration=current;this.loading=true;
     try{
-      if(!this.info){const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;}
+      const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;const snapshot=reply.data.snapshot;
       const search=this.search.value.trim();const children=new Map(),entries=new Map();
-      if(search||this.showTrash){const rows=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session);children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
-      else for(const parent of [this.info.rootId,...this.expanded]){const rows=await this.list({parentId:parent},session);children.set(parent,rows);for(const row of rows)entries.set(row.id,row);}
-      if(session!==this.session||current!==this.loadGeneration)return;this.children=children;this.entries=entries;this.paint();this.error.hidden=true;
-      if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.etag!==this.note.etag)this.stale=true;else{this.note={...reply.data,etag:reply.etag};this.documentTitle.textContent=this.note.path;}}
-    }catch(error){if(session===this.session&&current===this.loadGeneration)this.fail(error);}
+      if(search||this.showTrash){const rows=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot);children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
+      else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),rows=await this.list({parentId:parent},session,snapshot);children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&this.expanded.has(row.id))pending.push(row.id);}}}
+      if(session!==this.session||current!==this.loadGeneration)return;this.children=children;this.entries=entries;this.paint();if(!this.stale)this.error.hidden=true;
+      if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=this.note.path;}}
+    }catch(error){if(session===this.session&&current===this.loadGeneration){if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.controls();}}
   }
   paint(){
@@ -112,7 +112,7 @@ export class NotesView {
     const session=this.session,current=++this.generation;this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
     try{
       const reply=await session.request('/notes/entries/'+id);if(session!==this.session||current!==this.generation)return;
-      const metadata={...reply.data,etag:reply.etag};let text='';
+      const metadata={...reply.data};let text='';
       if(metadata.kind!=='FOLDER'&&!metadata.deleted){const content=await session.request('/notes/entries/'+id+'/content',{binary:'application/octet-stream'});if(content.etag!==metadata.etag)throw new Error(t('notes.stale'));if(session!==this.session||current!==this.generation)return;
         if(['MARKDOWN','DAY','WEEK','EVENT'].includes(metadata.kind))text=textDecoder.decode(await content.data.arrayBuffer());else this.binary=true;}
       if(session!==this.session||current!==this.generation)return;this.note=metadata;this.original=text;this.documentTitle.textContent=metadata.path;this.markdown.setValue(text);this.error.hidden=true;
@@ -132,7 +132,7 @@ export class NotesView {
   }
   async applyPath(){
     if(this.busy)return;const session=this.session,current=this.generation,mode=this.pathMode,path=this.pathInput.value;this.busy=true;this.controls();
-    try{let reply;if(mode==='move')reply=await session.request('/notes/entries/'+this.note.id+'/path',{method:'PUT',etag:this.note.etag,body:{path}});
+    try{let reply;if(mode==='move')reply=await session.request('/notes/entries/'+this.note.id+'/path',{method:'PUT',etag:this.note.entryEtag,body:{path}});
       else if(mode==='folder')reply=await session.request('/notes/folders',{method:'POST',body:{path}});
       else reply=await session.request('/notes/files?'+new URLSearchParams({path}),{method:'PUT',noneMatch:'*',rawBody:new Uint8Array()});
       if(session!==this.session||current!==this.generation)return;this.dialog.close();this.busy=false;this.info=null;await this.reload();await this.select(reply.data.id,true);this.callbacks.onChanged?.();
@@ -142,13 +142,13 @@ export class NotesView {
   async delete(){
     if(this.remove.disabled||!this.canLeave()||!confirm(t('notes.delete_confirm',{path:this.note.path})))return;
     const session=this.session,current=this.generation;this.busy=true;this.controls();
-    try{await session.request('/notes/entries/'+this.note.id,{method:'DELETE',etag:this.note.etag});if(session!==this.session||current!==this.generation)return;this.note=null;this.markdown.clear();this.original='';this.busy=false;await this.reload();this.callbacks.onChanged?.();}
+    try{await session.request('/notes/entries/'+this.note.id,{method:'DELETE',etag:this.note.entryEtag});if(session!==this.session||current!==this.generation)return;this.note=null;this.markdown.clear();this.original='';this.busy=false;await this.reload();this.callbacks.onChanged?.();}
     catch(error){if(session===this.session&&current===this.generation){this.stale=true;this.fail(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
   }
   async restore(){
     if(this.recover.disabled)return;const session=this.session,current=this.generation;this.busy=true;this.controls();
-    try{const reply=await session.request('/notes/entries/'+this.note.id+'/restore',{method:'POST',etag:this.note.etag});if(session!==this.session||current!==this.generation)return;this.busy=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');await this.reload();await this.select(reply.data.id,true);this.callbacks.onChanged?.();}
+    try{const reply=await session.request('/notes/entries/'+this.note.id+'/restore',{method:'POST',etag:this.note.entryEtag});if(session!==this.session||current!==this.generation)return;this.busy=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');await this.reload();await this.select(reply.data.id,true);this.callbacks.onChanged?.();}
     catch(error){if(session===this.session&&current===this.generation){this.stale=true;this.fail(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
   }
@@ -167,13 +167,20 @@ export class NotesView {
     if(session!==this.session||current!==this.generation)throw new Error();this.callbacks.onChanged?.();return encodeURIComponent(name);
   }
   linkPath(reference){return this.note?relativeNotePath(this.note.path,reference,{kind:this.note.kind,assetsFolder:this.info?.settings.assetsFolder}):null;}
-  async resolveLink(reference,session=this.session){const path=this.linkPath(reference);if(!path)throw new Error(t('notes.invalid_link'));return (await session.request('/notes/resolve?'+new URLSearchParams({path}))).data;}
+  async resolveLink(reference,session=this.session){
+    const path=this.linkPath(reference),relative=this.note?relativeNotePath(this.note.path,reference,{legacyAssets:false}):null;if(!path||!relative)throw new Error(t('notes.invalid_link'));
+    const find=async path=>{try{return (await session.request('/notes/resolve?'+new URLSearchParams({path}))).data;}catch(error){if(error.status===404)return null;throw error;}};
+    const ordinary=await find(relative);if(path===relative){if(!ordinary)throw new Error(t('notes.invalid_link'));return ordinary;}
+    const candidate=await find(path),legacy=candidate?.kind==='ASSET'?candidate:null;
+    if(ordinary&&legacy&&ordinary.id!==legacy.id)throw new Error(t('notes.ambiguous_link'));
+    if(!ordinary&&!legacy)throw new Error(t('notes.invalid_link'));return ordinary||legacy;
+  }
   image(reference,alt){
     const dom=node('img');dom.alt=alt;dom.loading='lazy';let disposed=false,url;const session=this.session,current=this.generation;
     void (async()=>{try{const entry=await this.resolveLink(reference,session);const reply=await session.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});
       const type=rasterType(new Uint8Array(await reply.data.slice(0,12).arrayBuffer()));if(!type||disposed||session!==this.session||current!==this.generation)return;
       url=URL.createObjectURL(reply.data.slice(0,reply.data.size,type));dom.src=url;
-    }catch{if(!disposed)dom.alt=alt||t('notes.unavailable_image');}})();
+    }catch(error){if(!disposed&&session===this.session&&current===this.generation){dom.alt=(alt?alt+' · ':'')+t('notes.unavailable_image');dom.title=error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}})();
     return {dom,destroy(){disposed=true;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
   }
   async openLink(reference){const session=this.session,current=this.generation;try{const entry=await this.resolveLink(reference,session);if(session===this.session&&current===this.generation)await this.select(entry.id);}catch(error){if(session===this.session&&current===this.generation)this.fail(error);}}

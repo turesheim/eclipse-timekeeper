@@ -33,7 +33,8 @@ final class VaultArchive {
     }
     static byte[] read(ZipFile zip,JsonNode file)throws IOException{
         String path=file.path("path").asText();long size=file.path("bytes").asLong(-1);
-        if(!owns(path)||size<0||size>AccountUploads.MAX_BYTES)throw ApiFailure.validation();var entry=zip.getEntry(path);
+        int maximum=org.eclipse.microprofile.config.ConfigProvider.getConfig().getOptionalValue("timekeeper.notes.max-file-bytes",Integer.class).orElse(16000000);
+        if(!owns(path)||size<0||size>maximum||size>=Integer.MAX_VALUE)throw ApiFailure.validation();var entry=zip.getEntry(path);
         if(entry==null||entry.isDirectory()||entry.getSize()!=size)throw ApiFailure.validation();
         try(var stream=zip.getInputStream(entry)){byte[] bytes=stream.readNBytes((int)size+1);if(bytes.length!=size||!ArchiveJournalFiles.digest(bytes).equals(file.path("sha256").asText()))throw ApiFailure.validation();return bytes;}
     }
@@ -75,6 +76,21 @@ final class VaultArchive {
             var seen=new HashSet<UUID>();var ancestor=value;
             while(!VaultCollection.id(ancestor).equals(VaultIndex.ROOT)){if(!seen.add(VaultCollection.id(ancestor))||seen.size()>VaultPath.MAX_DEPTH)throw ApiFailure.validation();ancestor=entries.get(uuid(ancestor.path("parentId")));if(ancestor==null)throw ApiFailure.validation();}
         }
+        var settings=vault.path("settings");
+        var roots=new HashMap<String,VaultPath>();
+        for(String field:List.of("journalFolder","eventsFolder","assetsFolder")){
+            var path=new VaultPath(settings.path(field).asText());roots.put(field,path);
+            if(path.isRoot()||entries.values().stream().noneMatch(entry->!entry.path("deleted").asBoolean()&&VaultCollection.folder(entry)&&VaultCollection.path(entry).equals(path)))throw ApiFailure.validation();
+        }
+        for(var entry:entries.values())if(!VaultCollection.folder(entry)){
+            String field=switch(entry.path("kind").asText()){case "DAY","WEEK"->"journalFolder";case "EVENT"->"eventsFolder";case "ASSET"->"assetsFolder";default->null;};
+            if(field!=null){
+                var parent=entries.get(uuid(entry.path("parentId")));
+                String leaf=entry.path("sourceKey").asText()+(Set.of("DAY","WEEK").contains(entry.path("kind").asText())?".md":"");
+                if(parent==null||!VaultCollection.path(parent).equals(roots.get(field))||!VaultCollection.path(entry).name().equals(leaf)
+                        ||!entry.path("deleted").asBoolean()&&!VaultCollection.path(entry).equals(roots.get(field).resolve(leaf)))throw ApiFailure.validation();
+            }
+        }
         return entries;
     }
     private static UUID identifier(String value){try{var id=UUID.fromString(value);if(!id.toString().equals(value))throw ApiFailure.validation();return id;}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}}
@@ -85,7 +101,11 @@ final class VaultArchive {
         var settings=new VaultSettings(store).get();var allowed=new HashSet<String>();allowed.add("");
         for(String field:SETTINGS_FIELDS)if(!field.equals("syncObsidianConfig")){var path=new VaultPath(settings.path(field).asText());while(!path.isRoot()){allowed.add(path.value());path=path.parent();}}
         for(var entry:store.list(VaultIndex.ENTRY))if(!VaultCollection.folder(entry)||entry.path("deleted").asBoolean()||!allowed.contains(entry.path("path").asText()))throw new ApiFailure(409,"VAULT_IMPORT_NOT_EMPTY");
-        for(String type:List.of(VaultIndex.ENTRY,VaultIndex.PATH,VaultIndex.REFERENCE,VaultState.TYPE,VaultSettings.TYPE))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=?",store.owner(),type);
+        // Preserve deterministic-resource version fences even when rebuilding
+        // derived indexes in a pristine target. A restore cannot revive an old
+        // directory/settings validator, including under a frozen test clock.
+        new VaultState(store,store.vaultLimits()).resetForImport();
+        for(String type:List.of(VaultIndex.ENTRY,VaultIndex.PATH,VaultIndex.REFERENCE))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=?",store.owner(),type);
         store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND kind=?",store.owner(),VaultIndex.ENTRY,"vault_child");
     }
     static void restore(Path archive,JsonNode vault,ServerStore store){
@@ -111,12 +131,14 @@ final class VaultArchive {
                 }
                 index.install(VaultCollection.id(entry),entry);
                 if(snapshot!=null)index.content(VaultCollection.id(entry),snapshot,retained);
-                if(!VaultCollection.id(entry).equals(VaultIndex.ROOT))state.changed(retained,1,true);
+                if(!VaultCollection.id(entry).equals(VaultIndex.ROOT))state.changed(retained,1,false);
             }
             if(!used.equals(files.keySet()))throw ApiFailure.validation();
         }catch(IOException unavailable){throw new ApiFailure(503,"UNAVAILABLE");}
         // Also index any pre-existing canonical journal documents absent from the
         // archive; an additive account import cannot hide that existing content.
         new VaultCatalog(store,store.vaultLimits()).initialize();
+        var usage=state.get();
+        if(usage.path("totalBytes").asLong()>store.vaultLimits().totalBytes()||usage.path("entries").asLong()>store.vaultLimits().entries())throw new ApiFailure(507,"VAULT_QUOTA");
     }
 }

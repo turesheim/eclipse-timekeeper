@@ -490,6 +490,10 @@ class ContractTest(unittest.TestCase):
                     if path == '/journal-assets/{filename}' and method == 'put':
                         self.assertIn({'$ref': '#/components/parameters/IfMatchOptional'}, op['parameters'])
                         self.assertIn({'$ref': '#/components/parameters/IfNoneMatchStar'}, op['parameters'])
+                    elif path == '/notes/files' and method == 'put':
+                        self.assertIn({'$ref': '#/components/parameters/IfNoneMatchStarRequired'}, op['parameters'])
+                        self.assertTrue(CONTRACT['components']['parameters']['IfNoneMatchStarRequired']['required'])
+                        self.assertEqual({'const': '*'}, CONTRACT['components']['parameters']['IfNoneMatchStarRequired']['schema'])
                     else:
                         self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
                     self.assertIn('412', op['responses'])
@@ -632,6 +636,8 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
+            'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries',
+            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'moveNoteEntry', 'restoreNoteEntry',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'undoWorkSessionChange', 'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',

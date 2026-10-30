@@ -117,14 +117,14 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     const command=(name,payload)=>{
       if(readOnly)return false;
       if(name==='link'){
-        if(!safeLink(payload))return false;
+        if(!linkAllowed(payload))return false;
         if(!editor.action(callCommand(updateLinkCommand.key,{href:payload}))){
           const {from,empty}=view.state.selection;
           if(empty)view.dispatch(view.state.tr.insertText(payload,from).addMark(from,from+payload.length,view.state.schema.marks.link.create({href:payload})));
           else editor.action(callCommand(toggleLinkCommand.key,{href:payload}));
         }
       }else if(name==='image'||name==='asset_link'){
-        if(!safeAsset(payload?.path))return false;
+        if(!assetAllowed(payload?.path))return false;
         if(name==='image')view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.image.create({src:payload.path,alt:payload.label})));
         else{
           const {from,to}=view.state.selection,label=payload.label||payload.path;

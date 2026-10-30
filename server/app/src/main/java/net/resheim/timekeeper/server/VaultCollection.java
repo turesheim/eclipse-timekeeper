@@ -21,8 +21,11 @@ final class VaultCollection {
     static boolean folder(JsonNode entry){return entry.path("kind").asText().equals(VaultIndex.Kind.FOLDER.name());}
     private void allowed(VaultPath path){if(!settings.allowed(path))throw new ApiFailure(403,"VAULT_CONFIG_DISABLED");}
     String generation(){return etag(state.get());}
-    String tag(JsonNode entry){return folder(entry)?etag(object().put("entry",etag(entry)).put("generation",generation())):entry.path("contentTag").asText();}
-    ObjectNode metadata(ObjectNode entry){return entry.deepCopy().put("etag",tag(entry)).put("entryEtag",etag(entry));}
+    String tag(JsonNode entry){return tag(entry,folder(entry)?generation():null);}
+    String tag(JsonNode entry,String snapshot){return folder(entry)?etag(object().put("entry",etag(entry)).put("generation",snapshot)):entry.path("contentTag").asText();}
+    String metadataTag(JsonNode entry){return folder(entry)?tag(entry):etag(entry);}
+    ObjectNode metadata(ObjectNode entry){return metadata(entry,folder(entry)?generation():null);}
+    private ObjectNode metadata(ObjectNode entry,String snapshot){String tag=tag(entry,snapshot);return entry.deepCopy().put("etag",tag).put("entryEtag",folder(entry)?tag:etag(entry));}
     ObjectNode page(UUID parent,String query,boolean trash,int offset,int count,String snapshot){
         if(offset<0||count<1||count>limits.pageSize())throw ApiFailure.validation();
         String current=generation();if(snapshot!=null&&!current.equals(snapshot))throw new ApiFailure(412,"STALE_VERSION");
@@ -33,11 +36,11 @@ final class VaultCollection {
         entries=entries.stream().filter(entry->settings.allowed(path(entry))).toList();
         var result=object().put("snapshot",current);var items=result.putArray("items");
         if(offset>entries.size())throw ApiFailure.validation();int end=(int)Math.min(entries.size(),(long)offset+count);
-        for(var entry:entries.subList(offset,end))items.add(metadata(entry));
+        for(var entry:entries.subList(offset,end))items.add(metadata(entry,current));
         if(end<entries.size())result.put("nextOffset",end);return result;
     }
     List<ObjectNode> descendants(ObjectNode entry,boolean recursive){
-        var entries=recursive?index.subtree(id(entry)):List.of(entry);
+        var entries=recursive?index.search("",false).stream().filter(value->path(value).beneath(path(entry))).toList():List.of(entry);
         return entries.stream().filter(value->settings.allowed(path(value))).toList();
     }
     byte[] read(ObjectNode entry){if(folder(entry)||entry.path("deleted").asBoolean())throw ApiFailure.notFound();return source(entry).read();}

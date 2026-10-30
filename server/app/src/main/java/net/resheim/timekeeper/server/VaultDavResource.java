@@ -24,6 +24,7 @@ public class VaultDavResource {
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     @Inject RequestIdentity identity;
+    @Inject BrowserOrigins origins;
     @jakarta.ws.rs.core.Context jakarta.ws.rs.core.UriInfo uri;
     private String root(){return uri.getPath().replaceFirst("^/","").startsWith("remote.php/webdav/")?"/remote.php/webdav/vault/":"/dav/vault/";}
     private VaultPath path(){return parse(uri.getRequestUri().getRawPath());}
@@ -34,6 +35,16 @@ public class VaultDavResource {
         return VaultPath.encoded(relative);
     }
     private VaultCollection collection(){return new VaultCollection(store,limits);}
+    private boolean sameOrigin(URI target,URI request){
+        URI effective=request;String configured=origins.currentOrigin();
+        if("http".equalsIgnoreCase(request.getScheme())&&configured!=null&&!configured.equals("NONE")){
+            try{var front=URI.create(configured);if("https".equalsIgnoreCase(front.getScheme())&&front.getRawAuthority()!=null&&front.getRawAuthority().equalsIgnoreCase(request.getRawAuthority()))effective=front;}
+            catch(IllegalArgumentException ignored){/* Invalid configuration grants no destination authority. */}
+        }
+        return target.getScheme()!=null&&target.getScheme().equalsIgnoreCase(effective.getScheme())&&target.getHost()!=null&&effective.getHost()!=null
+                &&target.getHost().equalsIgnoreCase(effective.getHost())&&port(target)==port(effective);
+    }
+    private static int port(URI value){return value.getPort()>=0?value.getPort():"https".equalsIgnoreCase(value.getScheme())?443:80;}
     private Response tx(Supplier<Response> action){return store.authenticated(identity,()->store.withJournalSource(DayNoteHistory.Source.WEBDAV,()->{
         collection().initialize();return Response.fromResponse(action.get()).header("Cache-Control","private, no-store").header("DAV","1").header("X-Content-Type-Options","nosniff").build();
     }));}
@@ -44,21 +55,21 @@ public class VaultDavResource {
     private Response propertyResponse(String depth){
         if(depth!=null&&!Set.of("0","1","infinity").contains(depth))throw ApiFailure.badRequest();
         return tx(()->{
-            var vault=collection();var entry=vault.get(path());var items=new ArrayList<ObjectNode>();items.add(entry);
+            var vault=collection();var entry=vault.get(path());var items=new ArrayList<ObjectNode>();items.add(entry);var namespace=new VaultState(store,limits).get();String generation=etag(namespace),collectionId=namespace.path("collectionId").asText();
             if(VaultCollection.folder(entry)&&!"0".equals(depth)){
                 if("infinity".equals(depth)){var descendants=vault.descendants(entry,true);items.clear();items.addAll(descendants);}
                 else items.addAll(new VaultIndex(store).children(VaultCollection.id(entry)).stream().filter(value->new VaultSettings(store).allowed(VaultCollection.path(value))).toList());
             }
             var xml=new StringBuilder("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\">");
-            for(var item:items)property(xml,vault,item);xml.append("</D:multistatus>");
+            for(var item:items)property(xml,vault,item,generation,collectionId);xml.append("</D:multistatus>");
             return Response.status(207).type("application/xml; charset=utf-8").entity(xml.toString()).build();
         });
     }
-    private void property(StringBuilder xml,VaultCollection vault,ObjectNode entry){
+    private void property(StringBuilder xml,VaultCollection vault,ObjectNode entry,String generation,String collectionId){
         boolean folder=VaultCollection.folder(entry);var path=VaultCollection.path(entry);
         xml.append("<D:response><D:href>").append(escape(root()+path.encoded()+(folder&&!path.isRoot()?"/":""))).append("</D:href><D:propstat><D:prop>")
                 .append("<D:displayname>").append(escape(path.isRoot()?"vault":path.name())).append("</D:displayname><D:resourcetype>")
-                .append(folder?"<D:collection/>":"").append("</D:resourcetype><D:getetag>").append(escape(vault.tag(entry))).append("</D:getetag>")
+                .append(folder?"<D:collection/>":"").append("</D:resourcetype><D:resource-id><D:href>urn:uuid:").append(ImportLedger.identifier("vault-dav-resource",collectionId,entry.path("id").asText())).append("</D:href></D:resource-id><D:getetag>").append(escape(vault.tag(entry,generation))).append("</D:getetag>")
                 .append("<D:getcontentlength>").append(folder?0:entry.path("byteLength").asLong()).append("</D:getcontentlength><D:getcontenttype>")
                 .append(folder?"httpd/unix-directory":media(entry)).append("</D:getcontenttype>");
         Instant modified=entry.hasNonNull("modifiedAt")?Instant.parse(entry.path("modifiedAt").asText()):Instant.EPOCH;
@@ -90,7 +101,7 @@ public class VaultDavResource {
         final URI target;try{target=URI.create(destination);}catch(IllegalArgumentException invalid){throw ApiFailure.badRequest();}
         var request=uri.getRequestUri();
         if(target.getRawQuery()!=null||target.getRawFragment()!=null||target.getRawUserInfo()!=null
-                ||target.isAbsolute()&&(!Objects.equals(target.getScheme(),request.getScheme())||!Objects.equals(target.getRawAuthority(),request.getRawAuthority()))
+                ||target.getRawAuthority()!=null&&!target.isAbsolute()||target.isAbsolute()&&!sameOrigin(target,request)
                 ||target.getRawPath()==null||!target.getRawPath().startsWith("/"))throw ApiFailure.badRequest();
         var next=parse(target.getRawPath());
         return tx(()->{var vault=collection();if(new VaultIndex(store).at(next,false)!=null)throw new ApiFailure(412,"VAULT_DESTINATION_EXISTS");

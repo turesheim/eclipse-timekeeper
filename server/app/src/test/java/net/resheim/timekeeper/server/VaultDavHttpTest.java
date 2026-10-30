@@ -30,9 +30,21 @@ class VaultDavHttpTest {
         moved=client("test-a").header("If-Match",tag).header("Overwrite","F").header("Destination",ALIAS+"Nested/Moved.md").request("MOVE",ALIAS+path);assertEquals(201,moved.statusCode());
         assertEquals(404,client("test-a").get(ROOT+path).statusCode());assertEquals(body,client("test-a").get(ROOT+"Nested/Moved.md").asString());
         assertEquals(204,client("test-a").header("If-Match",moved.header("ETag")).delete(ROOT+"Nested/Moved.md").statusCode());
-        var trash=api("test-a").get("/api/v1/notes/entries?trash=true");assertEquals(200,trash.statusCode());String id=trash.jsonPath().getString("items.find { it.path == 'Nested/Moved.md' }.id");String deletedTag=trash.jsonPath().getString("items.find { it.path == 'Nested/Moved.md' }.etag");
+        var trash=api("test-a").get("/api/v1/notes/entries?trash=true");assertEquals(200,trash.statusCode());String id=trash.jsonPath().getString("items.find { it.path == 'Nested/Moved.md' }.id");String deletedTag=trash.jsonPath().getString("items.find { it.path == 'Nested/Moved.md' }.entryEtag");
         assertEquals(200,api("test-a").header("If-Match",deletedTag).post("/api/v1/notes/entries/"+id+"/restore").statusCode());assertEquals(body,client("test-a").get(ROOT+"Nested/Moved.md").asString());
         assertEquals(404,api("test-b").get("/api/v1/notes/entries/"+id).statusCode());
+    }
+    private String resourceId(String token,String path){
+        var response=client(token).header("Depth","0").request("PROPFIND",path);assertEquals(207,response.statusCode());
+        try{var factory=javax.xml.parsers.DocumentBuilderFactory.newInstance();factory.setNamespaceAware(true);var xml=factory.newDocumentBuilder().parse(new org.xml.sax.InputSource(new java.io.StringReader(response.asString())));return xml.getElementsByTagNameNS("DAV:","resource-id").item(0).getTextContent();}
+        catch(Exception invalid){throw new AssertionError(invalid);}
+    }
+    @Test void resourceIdentitySurvivesMovesAndAliasesButNotDeleteRecreate(){
+        assertEquals(201,client("test-a").request("MKCOL",ROOT+"Identity/").statusCode());String first=resourceId("test-a",ROOT+"Identity/");
+        assertEquals(first,resourceId("test-a",ALIAS+"Identity/"));assertNotEquals(resourceId("test-a",ROOT),resourceId("test-b",ROOT));
+        String tag=client("test-a").header("Depth","0").request("PROPFIND",ROOT+"Identity/").xmlPath().getString("multistatus.response.propstat.prop.getetag");
+        var moved=client("test-a").header("If-Match",tag).header("Overwrite","F").header("Destination",ROOT+"Identity-moved/").request("MOVE",ROOT+"Identity/");assertEquals(201,moved.statusCode());assertEquals(first,resourceId("test-a",ROOT+"Identity-moved/"));
+        assertEquals(204,client("test-a").header("If-Match",moved.header("ETag")).delete(ROOT+"Identity-moved/").statusCode());assertEquals(201,client("test-a").request("MKCOL",ROOT+"Identity-moved/").statusCode());assertNotEquals(first,resourceId("test-a",ROOT+"Identity-moved/"));
     }
     @Test void journalEditsShareCanonicalVersionsAndLeaveLabelsIndependent(){
         String filename="2026-10-30.md";
@@ -51,5 +63,23 @@ class VaultDavHttpTest {
         assertEquals(422,client("test-a").body("x").put(ROOT+"CON.md").statusCode());
         assertEquals(400,client("test-a").header("Depth","2").request("PROPFIND",ROOT).statusCode());
         assertEquals(403,client("test-read").request("MKCOL",ROOT+"Blocked/").statusCode());
+    }
+    @Test void absoluteMoveDestinationsUseTheTrustedPublicHttpsOriginBehindAProxy(){
+        var created=client("test-a").header("Host","timekeeper.example.test").header("If-None-Match","*").body("Proxy source").put(ROOT+"Proxy.md");assertEquals(201,created.statusCode());
+        assertEquals(400,client("test-a").header("Host","timekeeper.example.test").header("If-Match",created.header("ETag")).header("Destination","https://foreign.example/dav/vault/Foreign.md").request("MOVE",ROOT+"Proxy.md").statusCode());
+        assertEquals(400,client("test-a").header("Host","timekeeper.example.test").header("If-Match",created.header("ETag")).header("Destination","//foreign.example/dav/vault/Foreign.md").request("MOVE",ROOT+"Proxy.md").statusCode());
+        var moved=client("test-a").header("Host","timekeeper.example.test").header("If-Match",created.header("ETag")).header("Overwrite","F").header("Destination","https://TIMEKEEPER.example.test:443/dav/vault/Proxy-moved.md").request("MOVE",ROOT+"Proxy.md");assertEquals(201,moved.statusCode());
+        assertEquals("Proxy source",client("test-a").get(ROOT+"Proxy-moved.md").asString());assertEquals(404,client("test-a").get(ROOT+"Proxy.md").statusCode());
+    }
+    @Test void metadataValidatorsProtectStructuralApiWritesAcrossAConcurrentRename(){
+        var created=api("test-a").header("If-None-Match","*").contentType("application/octet-stream").body("Metadata source".getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files?path=Structural.md");assertEquals(201,created.statusCode());
+        String id=created.jsonPath().getString("id"),metadataTag=created.header("ETag"),contentTag=created.jsonPath().getString("etag");assertNotEquals(contentTag,metadataTag);
+        var moved=api("test-a").header("If-Match",metadataTag).contentType("application/json").body("{\"path\":\"Structural-renamed.md\"}").put("/api/v1/notes/entries/"+id+"/path");assertEquals(200,moved.statusCode());assertEquals(contentTag,moved.jsonPath().getString("etag"));assertNotEquals(metadataTag,moved.header("ETag"));
+        assertEquals(412,api("test-a").header("If-Match",metadataTag).delete("/api/v1/notes/entries/"+id).statusCode());
+        assertEquals("Metadata source",api("test-a").get("/api/v1/notes/entries/"+id+"/content").asString());
+        var edited=api("test-a").header("If-Match",contentTag).contentType("application/octet-stream").body("Body saved after rename".getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/entries/"+id+"/content");assertEquals(200,edited.statusCode());
+        assertEquals(412,api("test-a").header("If-Match",moved.header("ETag")).delete("/api/v1/notes/entries/"+id).statusCode());
+        var current=api("test-a").get("/api/v1/notes/entries/"+id);assertEquals(current.header("ETag"),current.jsonPath().getString("entryEtag"));
+        assertEquals(204,api("test-a").header("If-Match",current.header("ETag")).delete("/api/v1/notes/entries/"+id).statusCode());
     }
 }

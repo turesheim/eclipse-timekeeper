@@ -12,6 +12,7 @@ final class VaultCatalog {
     private final VaultState state;
     VaultCatalog(ServerStore store,VaultLimits limits){this.store=store;this.limits=limits;index=new VaultIndex(store);state=new VaultState(store,limits);}
     void initialize(){
+        state.ensureIdentity();
         if(state.get().path("initialized").asBoolean())return;
         index.root();var settings=new VaultSettings(store).get();
         for(String field:List.of("journalFolder","eventsFolder","assetsFolder"))folders(new VaultPath(settings.path(field).asText()),true);

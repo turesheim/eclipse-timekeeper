@@ -3,7 +3,7 @@
   "locale.browser": "Use browser language",
   "locale.save": "Save language",
   "locale.saved": "Language saved. Reloading…",
-  "ui.the_archive_could_not_be_read_choose_a_timekeeper_zip_or_archive_json_up_to_256_mib": "The archive could not be read. Choose a Timekeeper ZIP or legacy archive.json up to 256 MiB.",
+  "ui.the_archive_could_not_be_read_choose_a_timekeeper_zip_or_archive_json_up_to_256_mib": "The archive could not be read. Choose a Timekeeper ZIP or legacy archive.json ZIP up to 1 GiB; JSON up to 256 MiB.",
   "ui.clients": "Clients",
   "ui.projects": "Projects",
   "ui.tasks": "Tasks",
@@ -31,14 +31,14 @@
   "ui.review_archive": "Review archive",
   "ui.adds_the_listed_records_to_this_account_existing_records_and_sign_in_details_are_kept": "Adds the listed records to this account. Existing records and sign-in details are kept.",
   "ui.timekeeper_archive": "Timekeeper archive",
-  "ui.timekeeper_zip_or_archive_json_up_to_256_mib": "Timekeeper ZIP or legacy archive.json · up to 256 MiB. Notes and attachments require the complete ZIP.",
+  "ui.timekeeper_zip_or_archive_json_up_to_256_mib": "Timekeeper ZIP or legacy archive.json · ZIP up to 1 GiB; JSON up to 256 MiB. Notes and attachments require the complete ZIP.",
   "ui.restore_the_archived_time_zone": "Restore the archived time zone",
   "ui.cancel_reading": "Cancel reading",
   "ui.pending_uploads": "Pending uploads",
   "ui.archive_restore_history": "Archive restore history",
   "ui.reading_cancelled": "Reading cancelled.",
   "ui.the_archive_could_not_be_read_choose_the_unchanged_timekeeper_file": "The archive could not be read. Choose the unchanged Timekeeper file.",
-  "ui.choose_a_timekeeper_zip_or_archive_json_up_to_256_mib": "Choose a Timekeeper ZIP or legacy archive.json up to 256 MiB.",
+  "ui.choose_a_timekeeper_zip_or_archive_json_up_to_256_mib": "Choose a Timekeeper ZIP or legacy archive.json ZIP up to 1 GiB; JSON up to 256 MiB.",
   "ui.choose_a_timekeeper_zip_or_archive_json": "Choose a Timekeeper ZIP or legacy archive.json.",
   "ui.reading_archive": "Reading archive…",
   "ui.uploading_archive": "Uploading archive: {{value0}}%.",
@@ -1201,5 +1201,6 @@
   "notes.error_quota": "The collection storage or entry limit has been reached. Reduce the file size or ask the server administrator to adjust the limit.",
   "notes.error_import_not_empty": "The target Notes collection contains data. Restore this vault into an empty collection to avoid mixing or replacing notes.",
   "notes.error_file_size": "This file exceeds the server’s Notes file-size limit.",
-  "notes.download_attachment": "Download attachment"
+  "notes.download_attachment": "Download attachment",
+  "notes.ambiguous_link": "This attachment name matches both a legacy journal asset and a different relative file. Use an explicit relative path to choose the intended file."
 }

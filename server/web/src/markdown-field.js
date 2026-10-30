@@ -161,7 +161,7 @@ export class MarkdownField {
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=normalizeEditorMarkdown(this.rawBody());
-    if(this.unterminated||needsSource(richBody)||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
+    if(this.unterminated||needsSource(richBody,this.resources?.allowsAsset)||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);
     try{

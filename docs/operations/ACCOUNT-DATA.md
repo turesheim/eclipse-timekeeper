@@ -100,7 +100,7 @@ select the unchanged file and choose **Review archive** again. Pending uploads
 expire after 24 hours. **Discard upload** clears staging data and keeps existing
 work records.
 
-Restore accepts files and uncompressed JSON up to 256 MiB, up to 250,000 records
+Restore accepts ZIP files up to 1 GiB and uncompressed JSON up to 256 MiB, up to 250,000 records
 of each work type and 1,000,000 import audit records. Oversized input is rejected
 explicitly. At most three uploads and 512 MiB of declared upload data can be
 pending for one account. Read-only sessions can download their account and cannot
@@ -117,3 +117,14 @@ an archive keeps source evidence as inert audit copies and records new local
 restore events. Supplied event identities or client claims are never installed
 as locally authenticated history. See [API diagnostics](API-DIAGNOSTICS.md) for
 retention, legacy gaps and inspecting source versus local evidence.
+
+### Notes and vaults in archive v4
+
+The complete Notes namespace, stable IDs, configured roots, canonical
+journal/event references, general Markdown/binary files and retained trash are
+included. Raw general/recovery bytes are separate checksummed ZIP entries;
+canonical journals/assets retain the existing portable framing. Versions v1–v3
+remain readable. A restore rebuilds account-private derived indexes and enforces
+the destination quotas. It requires a pristine general Notes collection and
+refuses an implicit collection merge. Day labels remain separate. See
+[Notes recovery limits and transition](NOTES-WEBDAV.md).

@@ -114,7 +114,7 @@ class Fixture:
         self.containers.append(name)
         command('docker','cp',str(CLIENT/'cdp.mjs'),name+':/cdp.mjs')
         config={'remoteBackend':'nextcloud','nextcloudUrl':self.origin,'nextcloudUsername':'journal-user','nextcloudPassword':token,
-                'nextcloudRemotePath':'/','syncFolderMode':'vault-root','syncObsidianConfig':False,'logLevel':'off'}
+                'nextcloudRemotePath':'/vault' if getattr(self.args,'vault',False) else '/','syncFolderMode':'vault-root','syncObsidianConfig':False,'logLevel':'off'}
         self.private(name+'-settings.json',json.dumps(config))
         self.evaluate('(async()=>{await app.plugins.setEnable(true);await app.plugins.enablePluginAndSave("mysync");'
             'const p=app.plugins.plugins.mysync;p.updateLogLevel("off");Object.assign(p.settings,'+json.dumps(config)+');await p.saveSettings();'
@@ -126,14 +126,14 @@ class Fixture:
         if expected is not None and result!=expected:raise AssertionError('Unexpected desktop operation result')
         return result
 
-    def dav(self,method,path,body=None,match=None,none=False,expected=None,token=None):
+    def dav(self,method,path,body=None,match=None,none=False,expected=None,token=None,root="/dav/journal/"):
         auth=base64.b64encode(('journal-user:'+(token or self.token)).encode()).decode()
         args=['docker','exec','-i',self.server,'curl','--silent','--show-error','--max-time','30','--dump-header','-',
               '--request',method,'--header','Authorization: Basic '+auth]
         if match is not None:args+=['--header','If-Match: '+match]
         if none:args+=['--header','If-None-Match: *']
         if body is not None:args+=['--header','Content-Type: application/octet-stream','--data-binary','@-']
-        raw=command(*args,'http://127.0.0.1:8080/dav/journal/'+path,input=body)
+        raw=command(*args,'http://127.0.0.1:8080'+root+path,input=body)
         head,_,data=raw.partition(b'\r\n\r\n');status=int(head.split(b'\r\n',1)[0].split()[1])
         headers=BytesHeaderParser().parsebytes(head.split(b'\r\n',1)[1])
         if status not in (expected if expected is not None else range(200,300)):
@@ -258,6 +258,42 @@ class Fixture:
             'offlineWorkAndRetry':True,'accountIsolation':True,'tokenRevocationPreservesLocalWork':True}
         self.args.output.parent.mkdir(parents=True,exist_ok=True);self.args.output.write_text(json.dumps(receipt,indent=2)+'\n')
 
+    def run_vault(self):
+        def dav(method,path,body=None,**kwargs):return self.dav(method,path,body,root='/dav/vault/',**kwargs)
+        self.api.call('GET','/notes');dav('MKCOL','Research/');dav('MKCOL','Research/Nested/')
+        exact='---\r\nunknown: [true, "keep"]\r\n---\r\n[[Other note]]  \r\n![Attachment](asset.bin)\r\n'
+        dav('PUT','Research/Nested/Unicode-%C3%A6%2B100%25.md',exact.encode(),none=True)
+        dav('PUT','Research/Nested/asset.bin',self.asset,none=True);dav('PUT','Research/empty.md',b'',none=True)
+        self.action('pullFromRemote');self.read_file('Research/Nested/Unicode-æ+100%.md',exact.replace('\r\n','\n'));self.read_binary('Research/Nested/asset.bin',self.asset);self.read_file('Research/empty.md','')
+        self.read_file('journal/2026-10-20.md','# Calendar source æ\n');self.read_file('journal/2026-W44.md','# Weekly fixture\n')
+        before,tag=dav('GET','Research/Nested/Unicode-%C3%A6%2B100%25.md');self.push();after,current=dav('GET','Research/Nested/Unicode-%C3%A6%2B100%25.md')
+        if before!=after or tag['ETag']!=current['ETag']:raise AssertionError('A no-op vault scan changed canonical bytes/version')
+        self.write_file('Research/Nested/Local.md','# Local nested note\n');self.push()
+        if dav('GET','Research/Nested/Local.md')[0]!=b'# Local nested note\n':raise AssertionError('Nested client upload lost')
+        _,tag=dav('GET','Research/Nested/Local.md');dav('PUT','Research/Nested/Local.md',b'# Remote nested edit\n',match=tag['ETag']);self.action('pullFromRemote');self.read_file('Research/Nested/Local.md','# Remote nested edit\n')
+        self.evaluate('(async()=>{await app.vault.rename(app.vault.getAbstractFileByPath("Research/Nested/Local.md"),"Research/Nested/Renamed.md");return true;})()',expected=True);self.push()
+        if dav('GET','Research/Nested/Renamed.md')[0]!=b'# Remote nested edit\n':raise AssertionError('Released plugin rename lost bytes')
+        dav('GET','Research/Nested/Local.md',expected=(404,))
+        self.evaluate('(async()=>{await app.vault.delete(app.vault.getAbstractFileByPath("Research/empty.md"));return true;})()',expected=True);self.push();dav('GET','Research/empty.md',expected=(404,))
+        self.write_file('Research/empty.md','');self.push()
+        if dav('GET','Research/empty.md')[0]!=b'':raise AssertionError('Nested empty recreate failed')
+        self.write_file('journal/2026-10-20.md','# Journal through vault\n');self.push()
+        if self.api.call('GET','/day-notes/2026-10-20/content')['body']!='# Journal through vault\n' or self.api.call('GET','/day-labels/2026-10-20')['text']!='Independent label':raise AssertionError('Canonical journal/label association changed')
+        command('docker','network','disconnect',self.network,self.client);self.write_file('Research/Offline.md','Offline local bytes\n');self.push();self.read_file('Research/Offline.md','Offline local bytes\n');dav('GET','Research/Offline.md',expected=(404,));command('docker','network','connect',self.network,self.client);self.push()
+        if dav('GET','Research/Offline.md')[0]!=b'Offline local bytes\n':raise AssertionError('Offline nested edit lost')
+        print('Released Obsidian plugin passed nested vault, attachments, exact no-op, rename, empty/delete/recreate and offline retry',flush=True)
+        second=self.prefix+'-vault-second';self.make_client(second,self.token);self.action('pullFromRemote',second);self.read_file('Research/Nested/Renamed.md','# Remote nested edit\n',second)
+        self.write_file('Research/Nested/Renamed.md','Pending device one\n');self.action('syncNow');self.write_file('Research/Nested/Renamed.md','Published device two\n',second);self.push(second);self.action('pushToRemote')
+        self.read_file('Research/Nested/Renamed.md','Pending device one\n')
+        if dav('GET','Research/Nested/Renamed.md')[0]!=b'Published device two\n':raise AssertionError('Concurrent vault edit silently overwritten')
+        found=self.evaluate('(async()=>{const s=app.plugins.plugins.mysync.syncService;const c=(await s.listActiveConflicts()).find(c=>c.path==="Research/Nested/Renamed.md");if(!c)return false;await s.resolveConflict(c._id,"keep-remote");return true;})()')
+        if not found:raise AssertionError('Nested conflict not exposed')
+        self.read_file('Research/Nested/Renamed.md','Published device two\n')
+        self.api.call('DELETE','/auth/tokens/'+self.token_id);self.write_file('Research/Nested/Renamed.md','Retained revoked-token draft\n');self.push();self.read_file('Research/Nested/Renamed.md','Retained revoked-token draft\n')
+        if self.api.call('GET','/notes/resolve?path=Research%2FNested%2FRenamed.md')['path']!='Research/Nested/Renamed.md':raise AssertionError('Revocation changed namespace')
+        receipt={'serverCommit':self.server_commit,'serverImage':self.args.server_image,'clientImage':self.args.client_image,'obsidianVersion':'1.14.5','mySyncVersion':'3.0.7','realDesktopAndUnmodifiedRelease':True,'verifiedHttps':True,'hierarchicalVault':True,'unicodePlusPercent':True,'nestedBinaryRoundTrip':True,'unchangedRawMarkdownAndEtag':True,'clientTextUploadLineEndings':'LF','nestedManualTwoWay':True,'pluginRenameWorkflow':True,'emptyDeleteRecreate':True,'canonicalJournalAndIndependentLabel':True,'offlineWorkAndRetry':True,'twoDeviceConflictPreservedAndResolved':True,'revocationRetainsLocalDraft':True}
+        self.args.output.parent.mkdir(parents=True,exist_ok=True);self.args.output.write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt),flush=True)
+
     def close(self):
         for name in reversed(self.containers):subprocess.run(['docker','rm','-f','-v',name],capture_output=True)
         if self.network_created:subprocess.run(['docker','network','rm',self.network],capture_output=True)
@@ -269,13 +305,17 @@ def main():
     parser.add_argument('--expected-commit',help='Require the packaged server to report this clean source commit')
     parser.add_argument('--client-image',default='timekeeper-mysync-client:obsidian-1.14.5-mysync-3.0.7')
     parser.add_argument('--output',type=Path,default=ROOT/'server/target/acceptance/mysync.json')
+    parser.add_argument('--vault',action='store_true',help='Verify the hierarchical Notes namespace with the released plugin')
     parser.add_argument('--keep-fixture',action='store_true',help='Keep only these disposable fixtures for local diagnosis')
     args=parser.parse_args();args.output.unlink(missing_ok=True)
     folder=Path(tempfile.mkdtemp(prefix='timekeeper-mysync-421-'));folder.chmod(0o700)
     fixture=Fixture(folder,args)
     descriptor=folder/'fixture.json';descriptor.write_text(json.dumps({'folder':str(folder),'network':fixture.network,'server':fixture.server,'database':fixture.database,'client':fixture.client}));descriptor.chmod(0o600)
     print('Disposable fixture: '+str(folder),flush=True)
-    try:fixture.start();fixture.run()
+    try:
+        fixture.start()
+        if args.vault:fixture.run_vault()
+        else:fixture.run()
     finally:
         if not args.keep_fixture:
             fixture.close();shutil.rmtree(folder)

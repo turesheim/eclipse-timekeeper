@@ -29,8 +29,11 @@ final class VaultState {
                 .put("entries",current.path("entries").asLong()+entries));
     }
     ObjectNode initialized(){var current=get();return current.path("initialized").asBoolean()?current:persist(current,current.deepCopy().put("initialized",true));}
+    void ensureIdentity(){var current=get();if(current.path("version").asLong()>0&&!current.hasNonNull("collectionId"))persist(current,current.deepCopy());}
+    void resetForImport(){var current=get();persist(current,current.deepCopy().put("totalBytes",0).put("entries",0).put("initialized",false));}
     private ObjectNode persist(ObjectNode previous,ObjectNode value){
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
+        if(!value.hasNonNull("collectionId"))value.put("collectionId",UUID.randomUUID().toString());
         value.put("version",version+1).put("modifiedAt",store.now().toString());
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),TYPE,ID,version+1,value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),TYPE,ID,version)!=1)throw new ApiFailure(412,"STALE_VERSION");

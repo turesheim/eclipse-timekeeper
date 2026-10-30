@@ -34,4 +34,17 @@ class VaultStateTest {
             assertNotEquals(before,etag(changed));assertEquals(0,changed.path("totalBytes").asLong());assertEquals(0,changed.path("entries").asLong());return null;
         });
     }
+    @Test void rebuildingAnEmptyImportTargetCannotReviveAnEarlierDirectoryGeneration(){
+        store.transaction("import-generation",()->{
+            var state=new VaultState(store,limits);state.changed(0,3,true);state.initialized();String before=etag(state.get());long version=state.get().path("version").asLong();
+            state.resetForImport();state.changed(0,3,true);state.initialized();assertNotEquals(before,etag(state.get()));assertTrue(state.get().path("version").asLong()>version);return null;
+        });
+    }
+    @Test void collectionIdentityIsStableAcrossEditsAndImportButDifferentForAnotherCollection(){
+        String first=store.transaction("identity-a",()->{
+            var state=new VaultState(store,limits);state.initialized();String identity=state.get().path("collectionId").asText();assertDoesNotThrow(()->UUID.fromString(identity));
+            state.changed(0,0,false);state.resetForImport();assertEquals(identity,state.get().path("collectionId").asText());return identity;
+        });
+        String other=store.transaction("identity-b",()->new VaultState(store,limits).initialized().path("collectionId").asText());assertNotEquals(first,other);
+    }
 }

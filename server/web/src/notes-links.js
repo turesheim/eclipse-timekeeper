@@ -1,11 +1,11 @@
 /** Resolve Markdown paths inside a logical collection, never the host filesystem. */
-export function relativeNotePath(origin,reference,{kind,assetsFolder='assets'}={}){
+export function relativeNotePath(origin,reference,{kind,assetsFolder='assets',legacyAssets=true}={}){
   if(typeof reference!=='string'||!reference||reference.startsWith('/')||reference.includes('\\')||/[\u0000-\u001f\u007f]/.test(reference)||/^[a-z][a-z0-9+.-]*:/i.test(reference)||reference.startsWith('//'))return null;
   const raw=reference.split('#')[0];if(!raw||raw.includes('?'))return null;
   let parts;
   try{parts=raw.split('/').map(part=>decodeURIComponent(part));}catch{return null;}
   if(parts.some(part=>part.includes('/')||part.includes('\\')||/[\u0000-\u001f\u007f]/.test(part)))return null;
-  const legacy=['DAY','WEEK','EVENT'].includes(kind)&&parts[0]==='assets';
+  const legacy=legacyAssets&&['DAY','WEEK','EVENT'].includes(kind)&&parts[0]==='assets';
   const result=(legacy?assetsFolder:origin.split('/').slice(0,-1).join('/')).split('/').filter(Boolean);
   for(const part of legacy?parts.slice(1):parts){if(part==='..'){if(!result.length)return null;result.pop();}else if(part&&part!=='.')result.push(part);}
   return result.length?result.join('/').normalize('NFC'):null;

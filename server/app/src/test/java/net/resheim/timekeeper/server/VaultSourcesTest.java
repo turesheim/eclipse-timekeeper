@@ -51,4 +51,22 @@ class VaultSourcesTest {
             assertEquals(40,index.children(uuid(index.at(new VaultPath("journal"),false).path("id"))).size());return null;
         });
     }
+    @Test void eventFrontmatterCommentsUnknownMetadataAndLineEndingsSurviveEveryInterface(){
+        store.transaction("event-exact",()->{
+            var key=new EventNotes.Key(UUID.randomUUID(),"cd".repeat(32));var events=new EventNotes(store);var value=object().put("subscriptionId",key.subscription().toString()).put("eventKey",key.event()).put("body","");
+            value.set("event",object().put("uid","private uid").put("recurrenceId","2026-10-30T10:00:00Z").put("title","Meeting"));
+            String header="\ufeff"+new String(EventNotes.document(value),StandardCharsets.UTF_8).replace("\n","\r\n");int split=header.indexOf('\n')+1;
+            header=header.substring(0,split)+"# Keep this comment\r\ncustom: {unicode: Ø, flags: [true, 1]}\r\n"+header.substring(split);
+            String body="# Body  \r\n<https://example.invalid/link>\r\n---\r\n";byte[] original=(header+body).getBytes(StandardCharsets.UTF_8);
+            new VaultCatalog(store,limits).initialize();events.saveDocument(key,etag(events.get(key)),original);
+            assertArrayEquals(original,events.document(key));assertFalse(events.get(key).has("markdown"));
+            var source=new VaultSources(store,limits,new VaultSources.Ref(EventNotes.TYPE,key.id(),key.filename()));assertArrayEquals(original,source.read());String before=source.snapshot().tag();
+            source.write(before,original,true);assertEquals(before,source.snapshot().tag());
+            String changedHeader=header.replace("# Keep this comment","# Keep this changed comment");source.write(before,(changedHeader+body).getBytes(StandardCharsets.UTF_8),true);assertNotEquals(before,source.snapshot().tag());
+            events.save(key,etag(events.get(key)),object().put("body","Changed through the event editor"));
+            byte[] edited=(changedHeader+"Changed through the event editor").getBytes(StandardCharsets.UTF_8);assertArrayEquals(edited,source.read());
+            var index=new VaultIndex(store);var entry=index.referenced(EventNotes.TYPE,key.id());var id=uuid(entry.path("id"));source.delete(source.snapshot().tag());assertArrayEquals(edited,new VaultRecycle(store).read(id,source.snapshot().version()));
+            var vault=new VaultCollection(store,limits);var deleted=vault.get(id);vault.restore(deleted,vault.tag(deleted));assertArrayEquals(edited,events.document(key));return null;
+        });
+    }
 }

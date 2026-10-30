@@ -70,7 +70,7 @@ final class AccountArchiveInput {
         catch(NoSuchAlgorithmException impossible) {throw new IllegalStateException(impossible);}
     }
     private static ObjectNode document(InputStream input) throws IOException {
-        JsonNode value=json(input,AccountUploads.MAX_BYTES);
+        JsonNode value=json(input,AccountUploads.MAX_JSON_BYTES);
         if(!value.isObject() || !fields(value).equals(FIELDS) || !Set.of(AccountArchive.FORMAT,AccountArchive.LABEL_LEGACY_FORMAT,AccountArchive.FILE_LEGACY_FORMAT,AccountArchive.LEGACY_FORMAT).contains(value.path("format").asText())) throw ApiFailure.validation();
         if(!value.path("format").asText().equals(AccountArchive.LEGACY_FORMAT)){
             if(!value.path("journalFiles").isArray()||value.has("dayNotes")||value.has("weekNotes")||value.has("journalAssets"))throw ApiFailure.validation();
