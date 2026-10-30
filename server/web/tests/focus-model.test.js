@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {focusedSnapshot,focusIncludes,focusedCurrentSession} from '../src/focus-model.js';
+import {focusedSnapshot,focusIncludes,focusedCurrentSession,focusIncludesActivity} from '../src/focus-model.js';
 import {durationNanos} from '../src/model.js';
 
 const fixture=()=>({profile:{data:{zoneId:'Europe/Oslo'}},dates:{first:'2025-10-20'},
@@ -35,4 +35,11 @@ test('the timer header follows focus for stopped sessions and retains running ti
   source.workSessionReport={session:{id:'reported',clientId:'b'}};
   assert.equal(focusedCurrentSession(source,null).id,'reported');assert.equal(focusedCurrentSession(source,area).id,'last');
   assert.equal(focusedCurrentSession(source,{clientIds:[]}),null);
+});
+test('task moves follow the same project association as API reports and retain visible activity rows',()=>{
+  const source=fixture();source.activities=[
+    {id:'moved-in',taskId:'ta',projectId:'pb',start:'2025-10-26T08:00:00Z',end:'2025-10-26T09:00:00Z'},
+    {id:'moved-out',taskId:'tb',projectId:'pa',start:'2025-10-26T08:00:00Z',end:'2025-10-26T09:00:00Z'}];
+  const s=focusedSnapshot(source,{clientIds:['a']});assert.deepEqual(s.activities.map(value=>value.id),['moved-in']);
+  assert.equal(durationNanos(s.report.total),3600000000000n);assert.equal(focusIncludesActivity(s,source.activities[0]),true);assert.equal(focusIncludesActivity(s,source.activities[1]),false);
 });
