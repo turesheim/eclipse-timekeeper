@@ -63,6 +63,14 @@ test('shared hints update dynamically and remain visible inside native dialogs, 
   const close=dialog.getByRole('button',{name:'Close',exact:true}),tip=await tooltipFor(close);
   await expect(tip).toContainText('Close');expect(await tip.evaluate(node=>!!node.closest('dialog[open]'))).toBe(true);
   await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(dialog).toBeVisible();
+  await dialog.getByRole('button',{name:'Markdown source',exact:true}).click();
+  await page.locator('#weekly-journal-body').fill('[Authored link](https://example.invalid "Authored title")\n\nText');
+  await dialog.getByRole('button',{name:'Formatted',exact:true}).click();
+  const rich=page.locator('#weekly-journal-formatted .ProseMirror'),authored=rich.locator('a');
+  await expect(authored).toHaveAttribute('title','Authored title');await expect(authored).not.toHaveAttribute('data-tk-tooltip');
+  await rich.press('ControlOrMeta+End');await rich.press('!');
+  await dialog.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#weekly-journal-body')).toHaveValue(/"Authored title"/);
+  page.on('dialog',prompt=>prompt.accept());
   await close.click();await expect(dialog).not.toBeVisible();await expect(page.getByRole('tooltip')).toHaveCount(0);
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await expect(page.getByRole('tooltip')).toHaveCount(0);
 });

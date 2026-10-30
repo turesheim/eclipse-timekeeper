@@ -20,6 +20,9 @@ export function richTooltip(node,render) {
   if(active?.node===node)refreshTooltip();return node;
 }
 function plainTooltip(node) {
+  // ProseMirror owns authored link/image titles. Changing those DOM attributes
+  // can change the saved Markdown, so only application UI hints are enhanced.
+  if(node.closest('.ProseMirror, [contenteditable="true"]'))return;
   const title=node.getAttribute('title');if(title===null)return;
   // A composite card owns its whole surface, including icons and text.
   if(node.parentElement?.closest('[data-tk-tooltip]')){node.removeAttribute('title');return;}
