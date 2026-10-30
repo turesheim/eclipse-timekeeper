@@ -414,7 +414,9 @@ the API's existing concurrency and authorization rules remain in use.
 
 `tooltips.js` is the single tooltip lifecycle and presentation entry point. It
 enhances UI `title` hints with Bootstrap's HTML variant, using text nodes for all
-translations and API data. `tooltip-content.js` provides shared decorated session
+translations and API data. Authored link/image titles inside the Markdown editor
+are left untouched so hint enhancement cannot change saved notes.
+`tooltip-content.js` provides shared decorated session
 and calendar-event details. Each composite card owns one tooltip containing its
 individual sessions, project icons, times and durations; its child icons, title
 and duration do not create separate hints. The same builders serve Today, the

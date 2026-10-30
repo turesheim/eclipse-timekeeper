@@ -14,7 +14,7 @@ async function signIn(page){
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
-test('one rich tooltip covers each composite, preserves literal data and supports hover, keyboard and every theme',async({page,request})=>{
+test('one rich tooltip covers each composite, preserves literal data and supports hover, keyboard and every theme',async({page,request,browserName})=>{
   const records=[],original=await(await api(request,'GET','/me')).json(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   const create=async(collection,data)=>{const value=await(await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;};
   try {
@@ -29,7 +29,8 @@ test('one rich tooltip covers each composite, preserves literal data and support
     await expect(card.locator('[title],[data-tk-tooltip]')).toHaveCount(0);
     const id=await tip.getAttribute('id');await card.locator('.calendar-summary-time').hover();await expect(tip).toHaveAttribute('id',id);
     const bounds=await tip.boundingBox();await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await expect(tip).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('tooltip')).toHaveCount(0);
-    await card.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(card).toBeFocused();
+    const option=browserName==='webkit'&&process.platform==='darwin'?'Alt+':'';
+    await card.focus();await page.keyboard.press(option+'Tab');await page.keyboard.press(option+'Shift+Tab');await expect(card).toBeFocused();
     await expect(page.getByRole('tooltip')).toBeVisible();await expect(card).toHaveAttribute('aria-describedby',await page.getByRole('tooltip').getAttribute('id'));
     await page.keyboard.press('Escape');await expect(card).not.toHaveAttribute('aria-describedby');
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){

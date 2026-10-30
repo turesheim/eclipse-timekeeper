@@ -2,6 +2,7 @@
 import {build} from 'esbuild';
 import {readFile, writeFile, mkdir, readdir, rm} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 const source = new URL('../node_modules/bootstrap/', import.meta.url);
 const target = new URL('../src/assets/bootstrap/', import.meta.url);
 const check = process.argv.includes('--check');
@@ -21,7 +22,7 @@ css = css.replace(/url\("data:image\/svg\+xml,([^"\n]+)"\)/g, (_, data) => {
 }).replace(/\/\*# sourceMappingURL=.*?\*\//g, '');
 if (/data:|https?:\/\//.test(css.replace(/\/\*[\s\S]*?\*\//g,''))) throw new Error('Unexpected external or embedded asset');
 const files = new Map([['bootstrap.min.css',css],['LICENSE',await readFile(new URL('LICENSE',source),'utf8')],...images]);
-const bundle=await build({absWorkingDir:new URL('../',import.meta.url).pathname,entryPoints:['bootstrap/js/dist/tooltip.js'],bundle:true,format:'esm',target:['es2022'],minify:true,legalComments:'eof',write:false,metafile:true});
+const bundle=await build({absWorkingDir:fileURLToPath(new URL('../',import.meta.url)),entryPoints:['bootstrap/js/dist/tooltip.js'],bundle:true,format:'esm',target:['es2022'],minify:true,legalComments:'eof',write:false,metafile:true});
 const dependencies=Object.keys(bundle.metafile.inputs);
 if(dependencies.some(path=>!path.startsWith('node_modules/bootstrap/')&&!path.startsWith('node_modules/@popperjs/core/')))throw new Error('Unexpected tooltip dependency');
 files.set('tooltip.js',bundle.outputFiles[0].text);
