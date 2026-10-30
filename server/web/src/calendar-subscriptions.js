@@ -128,7 +128,7 @@ export class CalendarSubscriptions {
   }
   async edit(id=null,remove=false) {
     if(!this.writable||!this.managementView?.valid()||this.dialog.open)return;const session=this.scope,generation=this.managementGeneration;
-    const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:this.data.clients[0]?.id,visible:true},etag:null};
+    const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:this.data.clients[0]?.id,visible:true,includeEvents:true,includeTodos:false},etag:null};
     if(session!==this.scope||generation!==this.managementGeneration||!this.managementView?.valid()||!this.writable||this.dialog.open)return;
     const value=loaded.data;this.fields.replaceChildren();this.formError.textContent='';this.formHint.textContent=remove?t('calendar.remove_explanation'):t('calendar.url_hint');
     this.draft={session,id,remove,etag:loaded.etag,original:value,key:!id?crypto.randomUUID():null,origin:id?(remove?'delete:':'edit:')+id:'add'};
@@ -139,10 +139,15 @@ export class CalendarSubscriptions {
       this.field(t('ui.name'),'name',value.name,{required:true});const wrap=node('label',undefined,'form-label');wrap.append(node('span',t('ui.client')));const select=node('select',undefined,'form-select');select.id='calendar-subscription-client';select.name='clientId';select.required=true;
       for(const client of this.data.clients){const option=node('option',client.name);option.value=client.id;select.append(option);}select.value=value.clientId||'';wrap.append(select);this.fields.append(wrap);
       this.field(t(id?'calendar.url_keep':'calendar.url'),'url','',{required:!id,type:'url'});
+      const types=node('fieldset'),legend=node('legend',t('calendar.item_types'),'form-label');types.append(legend);
+      for(const [name,key,checked]of [['includeEvents','calendar.include_events',value.includeEvents??true],['includeTodos','calendar.include_todos',value.includeTodos??false]]){
+        const label=node('label',undefined,'form-check'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.name=name;input.checked=checked;
+        label.append(input,node('span',t(key),'form-check-label'));types.append(label);
+      }this.fields.append(types);
     }
     this.draft.baseline=JSON.stringify(this.formValue());this.dialog.showModal();(this.fields.querySelector('input,select')||this.cancel).focus();
   }
-  formValue(){const get=name=>this.fields.querySelector(`[name="${name}"]`)?.value||'';return {name:get('name'),clientId:get('clientId'),url:get('url'),visible:this.draft?.original.visible??true};}
+  formValue(){const get=name=>this.fields.querySelector(`[name="${name}"]`)?.value||'';return {name:get('name'),clientId:get('clientId'),url:get('url'),visible:this.draft?.original.visible??true,includeEvents:this.fields.querySelector('[name=includeEvents]')?.checked??true,includeTodos:this.fields.querySelector('[name=includeTodos]')?.checked??false};}
   dirty(){return !!this.draft&&(this.draft.busy||!this.draft.remove&&JSON.stringify(this.formValue())!==this.draft.baseline);}
   cancelEditor(){if(this.draft?.busy)return;if(this.dirty()&&!window.confirm(t('calendar.discard')))return;this.dialog.close();void this.load();}
   async save() {

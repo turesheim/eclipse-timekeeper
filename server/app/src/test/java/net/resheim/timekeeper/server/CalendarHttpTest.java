@@ -69,9 +69,21 @@ class CalendarHttpTest {
     private ObjectNode activity(JsonNode event){var value=object().putNull("taskId").putNull("projectId").put("summary","Reviewed meeting").put("start",event.path("start").asText()).put("end",event.path("end").asText());value.putArray("labelIds");return value;}
     private ObjectNode conversion(JsonNode event){var value=object().put("fromDate","2026-05-04").put("toDate","2026-05-11").put("eventVersion",event.path("eventVersion").asText());value.set("activity",activity(event));return value;}
     private String conversionPath(String subscription,JsonNode event){return subscription+"/events/"+event.path("key").asText()+"/activity";}
+    @Test void subscriptionSelectsEventsTodosOrBothAndLegacyUpdatesPreserveTheSelection(){
+        Feeds.body.set(ics("Meeting").replace("END:VCALENDAR","BEGIN:VTODO\r\nUID:selection-task\r\nDTSTAMP:20260101T000000Z\r\nDUE;VALUE=DATE:20260504\r\nSUMMARY:Task\r\nEND:VTODO\r\nEND:VCALENDAR"));
+        String path=subscribe(client("test-a").path("id").asText());refresh(path).then().statusCode(200);var original=get("test-a",path);var value=parse(original.asString());
+        assertTrue(value.path("includeEvents").asBoolean());assertFalse(value.path("includeTodos").asBoolean());assertEquals(1,events().path("items").size());assertEquals("Meeting",events().path("items").get(0).path("title").asText());
+        var input=configuration(value.path("clientId").asText()).put("url","").put("includeEvents",false).put("includeTodos",true);
+        var tasksOnly=call("test-a","PUT",path,input,original.header("ETag"),null);tasksOnly.then().statusCode(200);
+        assertEquals(1,events().path("items").size());assertEquals("VTODO",events().path("items").get(0).path("componentType").asText());assertEquals(1,Feeds.requests.get());
+        var legacy=configuration(value.path("clientId").asText()).put("url","").put("name","Legacy edit");
+        var edited=call("test-a","PUT",path,legacy,tasksOnly.header("ETag"),null);edited.then().statusCode(200);assertTrue(parse(edited.asString()).path("includeTodos").asBoolean());assertFalse(parse(edited.asString()).path("includeEvents").asBoolean());
+        call("test-a","PUT",path,input.deepCopy().put("includeTodos",false),edited.header("ETag"),null).then().statusCode(422);
+        call("test-a","PUT",path,input.put("includeEvents",true),edited.header("ETag"),null).then().statusCode(200);assertEquals(2,events().path("items").size());
+    }
     @Test void subscribedTodosRefreshWithStableIdentityAndCannotBeConvertedToWorkedTime(){
         String body="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Todo test//EN\r\nBEGIN:VTODO\r\nUID:http-todo\r\nDTSTAMP:20260101T000000Z\r\nDUE;VALUE=DATE:20260504\r\nSUMMARY:Submit report\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
-        Feeds.body.set(body);String path=subscribe(client("test-a").path("id").asText());refresh(path).then().statusCode(200);
+        Feeds.body.set(body);var config=configuration(client("test-a").path("id").asText()).put("includeTodos",true);String path="/calendar-subscriptions/"+parse(create("test-a",config).then().statusCode(201).extract().asString()).path("id").asText();refresh(path).then().statusCode(200);
         var item=events().path("items").get(0);assertEquals("VTODO",item.path("componentType").asText());assertEquals("NEEDS-ACTION",item.path("todoStatus").asText());
         assertEquals("2026-05-04",item.path("firstDate").asText());assertEquals("2026-05-05",item.path("endDate").asText());
         assertEquals(0,parse(get("test-b","/calendar-events?fromDate=2026-05-04&toDate=2026-05-05").asString()).path("items").size());

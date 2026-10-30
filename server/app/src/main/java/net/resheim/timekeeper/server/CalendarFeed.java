@@ -31,7 +31,8 @@ final class CalendarFeed {
             value.put("eventVersion",version(value));return value;
         }
     }
-    CalendarFeed(String text) {
+    CalendarFeed(String text){this(text,true,false);}
+    CalendarFeed(String text,boolean includeEvents,boolean includeTodos) {
         if(text!=null&&text.startsWith("\ufeff"))text=text.substring(1);
         if(text==null||text.length()>MAX_BYTES||!text.stripLeading().regionMatches(true,0,"BEGIN:VCALENDAR",0,15))throw CalendarFailure.invalid();
         int lines=0,depth=0;
@@ -43,7 +44,7 @@ final class CalendarFeed {
         if(depth!=0)throw CalendarFailure.invalid();
         try {
             var calendar=new CalendarBuilder().build(new StringReader(text));int count=0;
-            for(var component:calendar.getComponents()) if(component instanceof VEvent||component instanceof VToDo) {
+            for(var component:calendar.getComponents()) if(includeEvents&&component instanceof VEvent||includeTodos&&component instanceof VToDo) {
                 CalendarComponent event=(CalendarComponent)component;
                 if(++count>5000)throw CalendarFailure.complex();
                 String uid=text(event,"UID",null,1024);if(uid==null||uid.isBlank())throw CalendarFailure.invalid();
@@ -130,9 +131,9 @@ final class CalendarFeed {
         if(result.abs().compareTo(java.time.Duration.ofDays(366))>0)throw CalendarFailure.complex();return result;
     }
     @SuppressWarnings("unchecked")
-    private static List<net.fortuna.ical4j.model.Period<Temporal>> periods(CalendarComponent event,Instant from,Instant to,ZoneId zone,java.time.Duration shift,Budget budget) {
+    private static List<net.fortuna.ical4j.model.Period<Temporal>> periods(CalendarComponent event,CalendarComponent timing,Instant from,Instant to,ZoneId zone,java.time.Duration shift,Budget budget) {
         Temporal seed=date(event,"DTSTART"),begin=move(boundary(from,seed,zone),shift.negated()),finish=move(boundary(to,seed,zone),shift.negated());
-        TemporalAmount length=duration(event);var dates=new ArrayList<Temporal>();var exceptions=new ArrayList<Temporal>();
+        TemporalAmount length=duration(timing);var dates=new ArrayList<Temporal>();var exceptions=new ArrayList<Temporal>();
         var explicit=new HashSet<net.fortuna.ical4j.model.Period<Temporal>>();
         for(String name:List.of("RRULE","EXRULE"))for(var property:event.getProperties(name)) {
             Recur<Temporal> rule=name.equals("RRULE")?((RRule<Temporal>)property).getRecur():((ExRule<Temporal>)property).getRecur();
@@ -146,7 +147,7 @@ final class CalendarFeed {
             else for(var value:((DateListProperty<Temporal>)property).getDates())(name.equals("RDATE")?dates:exceptions).add(
                     name.equals("EXDATE")?boundary(instant(value,zone),seed,zone):value);
         }
-        var bounds=new net.fortuna.ical4j.model.Period<Temporal>(begin,finish);
+        var bounds=new net.fortuna.ical4j.model.Period<Temporal>(begin.minus(length),finish);
         // Rules have already been expanded through a bounded stream. The library
         // still applies the RFC duration, RDATE periods and exclusion algebra.
         return List.copyOf(new RecurrenceSet.Builder<Temporal>().start(seed).duration(length).period(bounds)
@@ -172,7 +173,8 @@ final class CalendarFeed {
                     var override=segment<0?null:ranges.get(segment);if(override!=null&&cancelled(override))continue;
                     Instant lower=override==null?Instant.MIN:instant(date(override,"RECURRENCE-ID"),zone),upper=segment+1<ranges.size()?instant(date(ranges.get(segment+1),"RECURRENCE-ID"),zone):Instant.MAX;
                     var delta=override==null?java.time.Duration.ZERO:shift(override,zone);
-                    for(var period:periods(master,todo(master)?from.minusSeconds(1):from,to,zone,delta,budget)) {
+                    var timing=override!=null&&(override.getProperty(todo(override)?"DUE":"DTEND").isPresent()||override.getProperty("DURATION").isPresent())?override:master;
+                    for(var period:periods(master,timing,todo(master)?from.minusSeconds(1):from,to,zone,delta,budget)) {
                         budget.use();Temporal original=period.getStart();Instant position=instant(original,zone);
                         if(position.isBefore(lower)||!position.isBefore(upper)||overrides.stream().anyMatch(value->!range(value)&&identity(date(value,"RECURRENCE-ID")).equals(identity(original))))continue;
                         var source=override==null?master:override;Temporal start=move(original,delta),end=override!=null&&(override.getProperty(todo(override)?"DUE":"DTEND").isPresent()||override.getProperty("DURATION").isPresent())?start.plus(duration(override)):start.plus(period.getDuration());

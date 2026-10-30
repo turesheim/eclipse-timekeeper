@@ -665,6 +665,13 @@ returns `409 CALENDAR_EVENT_CHANGED`; a second conversion command returns
 `422 CALENDAR_FUTURE_ACTIVITY`. All-day events require an explicitly reviewed,
 completed interval; zero-duration timed events remain valid markers.
 
+Each subscription independently selects calendar events (`includeEvents`) and/or
+to-do items (`includeTodos`). At least one must be enabled. Existing subscriptions
+and omitted creation options default to events enabled and to-dos disabled.
+Omitting these optional fields on an update preserves the stored selection,
+including when an older client changes visibility. Selection changes reuse the
+cached feed and take effect without another provider download.
+
 Subscribed feeds also expose `VTODO` items through `/calendar-events`, marked
 with `componentType: "VTODO"`, `todoStatus` and `undated`. A dated to-do appears
 on its `DUE` date/time, or its scheduled `DTSTART` when there is no due date;

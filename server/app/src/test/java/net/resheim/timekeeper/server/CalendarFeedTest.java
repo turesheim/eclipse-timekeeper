@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class CalendarFeedTest {
     private static String event(String fields) {return "BEGIN:VEVENT\r\nDTSTAMP:20260101T000000Z\r\n"+fields.replace("\n","\r\n")+"\r\nEND:VEVENT\r\n";}
-    private static CalendarFeed feed(String... events) {return new CalendarFeed("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Calendar test//EN\r\n"+String.join("",events)+"END:VCALENDAR\r\n");}
+    private static CalendarFeed feed(String... events) {return new CalendarFeed("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Calendar test//EN\r\n"+String.join("",events)+"END:VCALENDAR\r\n",true,true);}
     private static List<CalendarFeed.Occurrence> week(CalendarFeed feed,String from,String zone) {var start=LocalDate.parse(from);return feed.occurrences(start,start.plusDays(7),ZoneId.of(zone));}
     @Test void recurrenceRetainsWallClockAcrossDstAndRespectsExdatesAndRdates() {
         var source=feed(event("UID:weekly\nDTSTART;TZID=Europe/Oslo:20260322T090000\nDTEND;TZID=Europe/Oslo:20260322T100000\nRRULE:FREQ=WEEKLY;COUNT=4\nEXDATE;TZID=Europe/Oslo:20260405T090000\nRDATE;TZID=Europe/Oslo:20260406T090000\nSUMMARY:Planning"));
@@ -95,6 +95,12 @@ class CalendarFeedTest {
         var day=source.occurrences(LocalDate.parse("2026-05-04"),LocalDate.parse("2026-05-05"),ZoneOffset.UTC);
         var week=week(source,"2026-05-04","UTC");assertEquals(1,day.size());assertEquals(1,week.size());assertTrue(day.getFirst().undated());
         assertEquals(day.getFirst().key(),week.getFirst().key());assertEquals(day.getFirst().json().get("eventVersion"),week.getFirst().json().get("eventVersion"));
+    }
+    @Test void thisAndFutureTodoDueChangesExpandTheUpdatedInterval(){
+        var master=todo("UID:future-due\nDTSTART:20260504T090000Z\nDUE:20260504T100000Z\nRRULE:FREQ=DAILY;COUNT=5\nSUMMARY:Task");
+        var changed=todo("UID:future-due\nRECURRENCE-ID;RANGE=THISANDFUTURE:20260505T090000Z\nDTSTART:20260505T090000Z\nDUE:20260507T120000Z\nSUMMARY:Extended deadline");
+        var values=feed(master,changed).occurrences(LocalDate.parse("2026-05-07"),LocalDate.parse("2026-05-08"),ZoneOffset.UTC);
+        assertEquals(1,values.size());assertEquals("2026-05-07T12:00:00Z",values.getFirst().start().toString());assertEquals("Extended deadline",values.getFirst().title());
     }
     @Test void malformedTodoIntervalsFailExplicitly(){
         assertThrows(CalendarFailure.class,()->feed(todo("UID:bad\nDTSTART:20260504T090000Z\nDUE:20260504T080000Z")));

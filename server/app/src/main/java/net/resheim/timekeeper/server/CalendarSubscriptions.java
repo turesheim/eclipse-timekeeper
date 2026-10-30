@@ -28,6 +28,7 @@ final class CalendarSubscriptions {
     }
     ObjectNode visible(JsonNode value){
         var result=object();for(String field:List.of("id","ownerId","version","name","clientId","visible","createdAt","lastAttempt","lastSuccess","lastError","nextRefresh"))result.set(field,value.path(field));
+        result.put("includeEvents",value.path("includeEvents").asBoolean(true)).put("includeTodos",value.path("includeTodos").asBoolean(false));
         try{result.put("origin",new java.net.URI(value.get("url").asText()).getHost());}catch(Exception failure){throw ApiFailure.conflict();}return result;
     }
     ObjectNode list(){var result=object().put("refreshMinutes",REFRESH_MINUTES);var items=result.putArray("items");store.list(SUB).stream().sorted(Comparator.comparing(value->value.path("name").asText(),String.CASE_INSENSITIVE_ORDER)).forEach(value->items.add(visible(value)));return result;}
@@ -42,6 +43,9 @@ final class CalendarSubscriptions {
             try{value.put("url",policy.address(url).toString());}catch(CalendarFailure failure){throw new ApiFailure(422,failure.code);}
         }
         for(var existing:store.list(SUB))if(!existing.path("id").asText().equals(value.path("id").asText())&&java.net.URI.create(existing.path("url").asText()).normalize().equals(java.net.URI.create(value.path("url").asText()).normalize()))throw new ApiFailure(409,"CALENDAR_DUPLICATE_SUBSCRIPTION");
+        if(input.has("includeEvents"))value.set("includeEvents",input.get("includeEvents"));
+        if(input.has("includeTodos"))value.set("includeTodos",input.get("includeTodos"));
+        if(!value.path("includeEvents").asBoolean(true)&&!value.path("includeTodos").asBoolean(false))throw new ApiFailure(422,"CALENDAR_EMPTY_SELECTION");
         value.put("name",input.get("name").asText().strip()).set("clientId",input.get("clientId"));value.set("visible",input.get("visible"));
         if(value.path("name").asText().isEmpty())throw ApiFailure.validation();
     }
@@ -62,7 +66,7 @@ final class CalendarSubscriptions {
         // Conversion tombstones deliberately outlive subscriptions and activities.
     }
     private static String configuration(JsonNode value){return hash(value.path("url").asText());}
-    record Claim(String owner,UUID id,String lease,String configuration,String url,String body,String etag,String modified){}
+    record Claim(String owner,UUID id,String lease,String configuration,String url,String body,String etag,String modified,boolean includeEvents,boolean includeTodos){}
     private boolean enabled(){try(var query=store.statement("SELECT state FROM tk_account WHERE owner_id=?",store.owner());var rows=query.executeQuery()){return rows.next()&&!rows.getString(1).equals("DISABLED");}catch(SQLException failure){throw new ApiFailure(503,"UNAVAILABLE");}}
     Claim claim(UUID id,boolean force){
         var value=required(id);if(!enabled())return null;Instant now=store.now();
@@ -73,7 +77,7 @@ final class CalendarSubscriptions {
         String lease=UUID.randomUUID().toString();feed.put("lease",lease).put("leaseUntil",now.plusSeconds(90).toString());
         if(previous.isEmpty())feed=insert(FEED,id,feed);else feed=save(FEED,feed);
         value.put("lastAttempt",now.toString()).put("nextRefresh",now.plusSeconds(REFRESH_MINUTES*60L).toString());value=save(SUB,value);
-        return new Claim(store.owner(),id,lease,configuration(value),value.get("url").asText(),optionalText(feed.get("body")).orElse(null),optionalText(feed.get("etag")).orElse(null),optionalText(feed.get("modified")).orElse(null));
+        return new Claim(store.owner(),id,lease,configuration(value),value.get("url").asText(),optionalText(feed.get("body")).orElse(null),optionalText(feed.get("etag")).orElse(null),optionalText(feed.get("modified")).orElse(null),value.path("includeEvents").asBoolean(true),value.path("includeTodos").asBoolean(false));
     }
     void finish(Claim claim,CalendarDownload.Result result,String error){
         if(!store.owner().equals(claim.owner()))throw ApiFailure.notFound();
@@ -95,7 +99,7 @@ final class CalendarSubscriptions {
     private List<ObjectNode> occurrences(JsonNode subscription,LocalDate first,LocalDate last){
         var feed=store.find(FEED,uuid(subscription.get("id")));if(feed.isEmpty()||!feed.get().hasNonNull("body"))return List.of();
         var client=store.find("CLIENT",uuid(subscription.get("clientId"))).orElseThrow(ApiFailure::notFound);
-        var values=new CalendarFeed(feed.get().get("body").asText()).occurrences(first,last,ZoneId.of(store.profile().path("zoneId").asText()));
+        var values=new CalendarFeed(feed.get().get("body").asText(),subscription.path("includeEvents").asBoolean(true),subscription.path("includeTodos").asBoolean(false)).occurrences(first,last,ZoneId.of(store.profile().path("zoneId").asText()));
         return values.stream().map(value->{var node=value.json();node.put("subscriptionId",subscription.path("id").asText()).put("calendarName",subscription.path("name").asText())
                 .put("clientId",client.path("id").asText()).put("clientName",client.path("name").asText()).put("color",client.path("color").asText());
             node.remove("eventVersion");node.put("eventVersion",CalendarFeed.version(node));return node;}).toList();

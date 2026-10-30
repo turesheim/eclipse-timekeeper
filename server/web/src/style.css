@@ -124,20 +124,22 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-journal { display: flex; flex-direction: column; }
 .today-journal > .journal-inline { height: calc(var(--today-editor-height, 32rem) - var(--workspace-content-gap)); min-height: 0; flex: none; }
 @media(min-width: 1051px) { .today-sidebar { max-height: calc(var(--today-editor-height, 100dvh) - var(--workspace-content-gap)); overflow-y: auto; } }
+.today-sidebar { --today-sidebar-heading-font-size: calc(1rem - 1pt); --today-calendar-font-size: .7rem; }
 .today-sidebar, .today-calendar { display: grid; gap: .75rem; }
 .today-calendar { min-width: 0; align-content: start; }
 .today-month, .today-summary { padding: .85rem; }
 .today-month-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
-.today-month-heading h3, .today-summary h3 { margin: 0; font-size: 1rem; }
+.today-month-heading h3, .today-summary h3 { margin: 0; font-size: var(--today-sidebar-heading-font-size); }
 .today-month-heading button { width: 2.25rem; height: 2.25rem; min-height: 2.25rem; font-size: .85rem; }
 .week-note-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
 .week-note-heading h2 { margin: 0; }
 .week-note-heading .icon-button { flex-shrink: 0; }
-.today-month-grid { display: grid; grid-template-columns: 1.25rem repeat(7,minmax(0,1fr)); gap: .1rem; }
-.today-weekday { text-align: center; color: var(--muted); font-size: .75rem; font-weight: 650; }
-.today-week-number { position: relative; min-width: 0; min-height: 2rem; padding: .15rem 0; color: var(--muted); font-size: .7rem; white-space: nowrap; }
+.today-month-grid { position: relative; display: grid; grid-template-columns: 1.25rem repeat(7,minmax(0,1fr)); gap: .1rem; }
+.today-month-grid::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: calc(1.25rem + .05rem); border-inline-start: 1px solid var(--line); pointer-events: none; }
+.today-weekday { text-align: center; color: var(--muted); font-size: var(--today-calendar-font-size); font-weight: 650; }
+.today-week-number { position: relative; min-width: 0; min-height: 2rem; padding: .15rem 0; color: var(--muted); font-size: var(--today-calendar-font-size); white-space: nowrap; }
 .today-week-number:hover, .today-week-number:focus-visible { color: var(--accent); text-decoration: underline; }
-.today-month-day { position: relative; min-width: 0; min-height: 2rem; padding: .15rem 0; border: 1px solid transparent; font-size: .8rem; white-space: nowrap; }
+.today-month-day { position: relative; min-width: 0; min-height: 2rem; padding: .15rem 0; border: 1px solid transparent; font-size: var(--today-calendar-font-size); white-space: nowrap; }
 .today-month-day.outside { color: var(--muted); }
 .today-month-day.current { border-color: var(--accent); }
 .today-month-day.selected { background: var(--accent); color: #fff; }

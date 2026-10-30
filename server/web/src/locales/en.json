@@ -1211,5 +1211,9 @@
   "calendar.todo_status.NEEDS-ACTION": "Needs action",
   "calendar.todo_status.IN-PROCESS": "In progress",
   "calendar.todo_status.COMPLETED": "Completed",
-  "calendar.todo_status.CANCELLED": "Cancelled"
+  "calendar.todo_status.CANCELLED": "Cancelled",
+  "calendar.item_types": "Subscribe to",
+  "calendar.include_events": "Calendar events",
+  "calendar.include_todos": "To-do items",
+  "calendar.error.CALENDAR_EMPTY_SELECTION": "Select calendar events, to-do items, or both."
 }

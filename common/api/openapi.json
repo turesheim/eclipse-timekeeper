@@ -25277,6 +25277,14 @@
           },
           "origin": {
             "type": "string"
+          },
+          "includeEvents": {
+            "type": "boolean",
+            "description": "Include VEVENT items. Defaults to true on creation; omission preserves an existing selection."
+          },
+          "includeTodos": {
+            "type": "boolean",
+            "description": "Include VTODO items. Defaults to false on creation; omission preserves an existing selection. At least one item type must be enabled."
           }
         },
         "required": [
@@ -25312,6 +25320,14 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 8192
+          },
+          "includeEvents": {
+            "type": "boolean",
+            "description": "Include VEVENT items. Defaults to true on creation; omission preserves an existing selection."
+          },
+          "includeTodos": {
+            "type": "boolean",
+            "description": "Include VTODO items. Defaults to false on creation; omission preserves an existing selection. At least one item type must be enabled."
           }
         },
         "required": [
@@ -25339,6 +25355,14 @@
             "type": "string",
             "minLength": 0,
             "maxLength": 8192
+          },
+          "includeEvents": {
+            "type": "boolean",
+            "description": "Include VEVENT items. Defaults to true on creation; omission preserves an existing selection."
+          },
+          "includeTodos": {
+            "type": "boolean",
+            "description": "Include VTODO items. Defaults to false on creation; omission preserves an existing selection. At least one item type must be enabled."
           }
         },
         "required": [

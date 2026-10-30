@@ -754,6 +754,13 @@ shown as zero-duration markers. All presentation follows the account time zone;
 floating calendar times use that zone. Recurrences retain local wall-clock times
 across DST, including moved/cancelled occurrences and THISANDFUTURE changes.
 
+Each subscription independently selects calendar events (`includeEvents`) and/or
+to-do items (`includeTodos`). At least one must be enabled. Existing subscriptions
+and omitted creation options default to events enabled and to-dos disabled.
+Omitting these optional fields on an update preserves the stored selection,
+including when an older client changes visibility. Selection changes reuse the
+cached feed and take effect without another provider download.
+
 Feeds can also contain **to-dos (`VTODO`)**. Today and Week show them with a
 **To-do** label and their completion state. A due date/time determines their
 calendar position; without one, the scheduled start is used. A date-only item

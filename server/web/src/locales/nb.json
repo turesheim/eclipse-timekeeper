@@ -1211,5 +1211,9 @@
   "calendar.todo_status.NEEDS-ACTION": "Ikke påbegynt",
   "calendar.todo_status.IN-PROCESS": "Pågår",
   "calendar.todo_status.COMPLETED": "Fullført",
-  "calendar.todo_status.CANCELLED": "Avbrutt"
+  "calendar.todo_status.CANCELLED": "Avbrutt",
+  "calendar.item_types": "Abonner på",
+  "calendar.include_events": "Kalenderhendelser",
+  "calendar.include_todos": "Gjøremål",
+  "calendar.error.CALENDAR_EMPTY_SELECTION": "Velg kalenderhendelser, gjøremål eller begge deler."
 }
