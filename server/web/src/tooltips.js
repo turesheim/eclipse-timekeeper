@@ -68,8 +68,8 @@ export function installTooltips() {
   document.addEventListener('focusin',event=>{if(!pointerFocus)show(target(event.target),event.target);});
   document.addEventListener('focusout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
   document.addEventListener('pointerdown',event=>{pointerFocus=true;if(!active?.tip.contains(event.target))hideTooltip();},true);
-  document.addEventListener('keydown',event=>{pointerFocus=false;if(event.key==='Escape'&&active){dismissed=active.node;hideTooltip();event.preventDefault();event.stopPropagation();}},true);
+  document.addEventListener('keydown',event=>{pointerFocus=false;if(event.key==='Escape'&&active){dismissed=active.node;hideTooltip();if(event.target.closest('dialog[open]'))event.preventDefault();}},true);
   document.addEventListener('click',()=>hideTooltip(),true);
-  document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target))hideTooltip();},true);
+  document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){const bounds=active.node.getBoundingClientRect();if(bounds.bottom<0||bounds.top>innerHeight||bounds.right<0||bounds.left>innerWidth)hideTooltip();else active.instance.update();}},true);
   window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
 }
