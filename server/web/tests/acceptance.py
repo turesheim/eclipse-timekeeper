@@ -45,7 +45,7 @@ def bootstrap_batch(base,code,password,certificate=None):
     handlers=[HTTPCookieProcessor(CookieJar(policy=DefaultCookiePolicy(secure_protocols=('https','http'))))]
     if certificate:handlers.append(HTTPSHandler(context=ssl.create_default_context(cafile=str(certificate))))
     opener=build_opener(*handlers)
-    with opener.open(base+'/api/v1/auth/status',timeout=10) as reply:
+    with opener.open(Request(base+'/api/v1/auth/status',headers={'Origin':base}),timeout=10) as reply:
         if not json.load(reply)['setupRequired']:raise RuntimeError('Expected a fresh browser fixture')
     body={'code':code,'username':'browser-admin','password':password,'displayName':'browser-admin','email':'browser-admin@example.org'}
     request=Request(base+'/api/v1/auth/setup',data=json.dumps(body).encode(),headers={'Origin':base,'Content-Type':'application/json'},method='POST')
