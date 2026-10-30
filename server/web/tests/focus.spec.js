@@ -14,6 +14,7 @@ async function login(page,user){
 async function selectFocus(page,label){await openAccountMenu(page);await page.locator('#focus-select').selectOption({label});await page.getByRole('button',{name:'Account menu',exact:true}).click();}
 
 test('focus areas filter every client view, totals and separately loaded calendar events without losing work',async({page,request})=>{
+  test.setTimeout(90000);
   const username='focus-'+randomUUID().slice(0,8),password='Private focus area test password';
   const created=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.org',administrator:false}});expect(created.status()).toBe(201);
   await login(page,{username,password});

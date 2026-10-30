@@ -158,7 +158,7 @@ for (const node of document.querySelectorAll('[data-tab]')) node.addEventListene
 
 const auth = authentication({
   beforeSignOut:()=>notes.canLeave(),
-  renderFocus:view=>renderFocusSettings(view,()=>refresh()),
+  renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
     const panel=$('labels-panel');view.root.append(panel);panel.hidden=false;

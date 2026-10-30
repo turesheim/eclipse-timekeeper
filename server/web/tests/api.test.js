@@ -154,6 +154,11 @@ test('snapshot reads overlap after owner binding and still confirm revisions and
   const snapshot=await api.snapshot(snapshotDates,'session-a',{timeout:500});
   assert.equal(paths.size,10);assert.equal(snapshot.revision,1);assert.equal(snapshot.workSessionReport.session.id,'session-a');
 });
+test('snapshots retry a concurrent focus configuration change before publishing',async()=>{
+  let reads=0;
+  const api=new Api('token',async url=>new URL(url,'http://localhost').pathname==='/api/v1/focus-areas' ? reply({version:++reads===1?1:2,areas:[]}) : snapshotReply(url));
+  const snapshot=await api.snapshot(snapshotDates);assert.equal(reads,4);assert.equal(snapshot.focusAreas.data.version,2);
+});
 test('parallel snapshots retry mixed revisions and never publish inconsistent data',async()=>{
   let profiles=0;
   const api=new Api('token',async url=>{if(new URL(url,'http://localhost').pathname==='/api/v1/me')profiles++;return snapshotReply(url,profiles<3?2:1);});
