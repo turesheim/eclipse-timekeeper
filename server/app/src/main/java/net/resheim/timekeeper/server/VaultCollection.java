@@ -64,7 +64,7 @@ final class VaultCollection {
             // A deleted binding may have moved or its old path may be occupied.
             // Never make two namespace entries point at the same canonical note.
             var old=index.referenced(bound.type(),bound.id());
-            if(old!=null&&!path(old).value().equals(target.value()))throw ApiFailure.conflict();
+            if(old!=null&&!old.path("deleted").asBoolean()&&!path(old).value().equals(target.value()))throw ApiFailure.conflict();
             var src=new VaultSources(store,limits,bound);src.write(src.snapshot().tag(),bytes,true);
             return index.referenced(bound.type(),bound.id());
         }

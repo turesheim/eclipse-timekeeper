@@ -22485,7 +22485,25 @@
           "bytes",
           "sha256"
         ],
-        "description": " ZIP uploads are limited to 1 GiB; JSON uploads and archive.json remain limited to 256 MiB."
+        "description": "ZIP uploads are limited to 1 GiB; JSON uploads and archive.json remain limited to 256 MiB.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mediaType": {
+                  "const": "application/json"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "bytes": {
+                  "maximum": 268435456
+                }
+              }
+            }
+          }
+        ]
       },
       "AccountArchiveChunkInput": {
         "type": "object",
@@ -22834,12 +22852,12 @@
           "chunkCount": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 256
+            "maximum": 1024
           },
           "nextChunk": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 256
+            "maximum": 1024
           },
           "state": {
             "enum": [
@@ -22905,7 +22923,25 @@
           "createdAt",
           "expiresAt"
         ],
-        "description": " ZIP uploads are limited to 1 GiB; JSON uploads and archive.json remain limited to 256 MiB."
+        "description": "ZIP uploads are limited to 1 GiB; JSON uploads and archive.json remain limited to 256 MiB.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mediaType": {
+                  "const": "application/json"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "bytes": {
+                  "maximum": 268435456
+                }
+              }
+            }
+          }
+        ]
       },
       "AccountArchiveImportRecord": {
         "type": "object",

@@ -1,8 +1,9 @@
 # Notes and vaults — implementation design
 
-Issue [#501](https://github.com/turesheim/eclipse-timekeeper/issues/501) is in
-progress. This document records implementation decisions; it is not a claim
-that full-vault synchronization is already available or certified.
+Implementation for issue [#501](https://github.com/turesheim/eclipse-timekeeper/issues/501).
+The [operations guide](../operations/NOTES-WEBDAV.md) defines supported workflows
+and their observed limits; [acceptance](../verification/NOTES-VAULT.md) records
+the reproducible client and packaged-browser checks.
 
 ## Document identity and paths
 
@@ -25,62 +26,52 @@ characters round-trip without changing hierarchy.
 
 ## Existing journals and events
 
-Daily, weekly and event entries will reference their existing canonical
-resources. Their defaults are `journal/` and `events/`; Notes, Calendar, Today,
-work-session entry points and legacy WebDAV aliases must share that content.
-Day labels stay independent. Namespace metadata must not become a second live
-copy of a journal body. General documents and binary files need canonical
-content storage, versioning and recovery, while indexes remain derived metadata.
+Daily, weekly and event entries reference their existing canonical resources.
+The configured defaults are `journal/`, `events/` and `assets/`. Notes, Calendar,
+Today, work-session entry points and legacy DAV aliases share canonical bytes,
+versions and change events. Day labels remain independent. Raw general content
+and tombstone recovery have separate canonical storage; namespace hints/indexes
+never become a second live copy of a typed note.
 
-Special-folder configuration, association-changing moves, initial indexing,
-legacy replica/schema guards, archive conversion and recovery are outstanding
-integration work. Their acceptance must preserve existing content and refuse
-ambiguous collisions rather than guessing which document is authoritative.
+Direct date/week names in the journal folder and stable event names in the event
+folder bind to canonical resources. Date-looking names elsewhere are ordinary
+Markdown. Association-changing moves are refused. Reconfiguring special folders
+moves their existing roots atomically and preserves IDs/content versions, including
+nested assets. Existing conflicting destinations require explicit review.
 
-The current implementation adds canonical journal bindings, owner-atomic usage
-and directory generations, guarded collection operations, hierarchical WebDAV
-and the Notes API. A first Notes interface is available for packaged-browser
-validation. Account archive v4 stores logical entries plus separate checksummed
-content/recovery files and still reads v1–v3. Schema 10 is a logical compatibility
-gate; no database engine or physical resource-table migration is introduced.
-Full-client, packaged-browser and recovery acceptance remain delivery gates.
+The Notes UI provides lazy metadata navigation, search, resize, mobile drawer,
+keyboard access and the shared editor. Exact source and unsupported syntax are
+retained; rich edits can normalize body Markdown. Relative link/image handling is
+account-authenticated and generation-fenced. Opaque `.obsidian` data requires
+explicit opt-in; no synchronized code/configuration is executed.
+
+File metadata and bytes have separate validators. Directory tags include the
+monotonic namespace generation; pagination rejects a stale snapshot. Random
+collection identity distinguishes a replaced root. Owner transactions include
+usage counters, bindings, canonical writes, recovery and change events. Historical
+overages are indexed without truncation; new growth and portable restores enforce
+deployment quotas.
+
+Account archive v4 exports logical namespace records and separate checked byte
+files, reads v1–v3, and rebuilds owner-private indexes on a pristine target.
+Encrypted full-instance backup/preflight restores every owner's raw namespace,
+canonical documents, associations, retained bytes and history. Schema 10 is a
+logical compatibility fence; no table or engine migration is introduced.
 
 ## Manual WebDAV interoperability
 
-The cached unmodified MySync 3.0.7 release contains nested-directory `MKCOL`
-support and guarded file updates. Source inspection finds no WebDAV `MOVE`
-request; file renames therefore need to be tested as the client's actual
-upload/delete workflow, separately from server-side moves that preserve IDs.
-The existing journal-only acceptance receipt does not certify vault behavior.
+The actual unmodified Obsidian 1.14.5/MySync 3.0.7 desktop release was exercised
+against nested vaults over verified HTTPS. It handles guarded Markdown/PDF edits,
+first-import and concurrent conflicts, delete/recreate, selected remote roots and
+offline retry. It normalizes edited text to LF, skips unknown extensions such as
+`.bin`, and does not issue MOVE. These are client limits, not lossless whole-vault
+or stable-identity rename claims. The packaged Python POSIX helper synchronizes
+arbitrary file bytes with explicit review, guarded MOVE/deletion, private retained
+copies and an interrupted-operation journal. It is manual, with no scheduler.
 
-Test Obsidian 1.14.5/MySync 3.0.7 with populated nested folders and the expanded
-namespace before declaring support. Verify folder listing, selected local and
-remote roots, relative attachments, edits, empty files, rename/delete/recreate,
-conflicts, offline work and token revocation over verified HTTPS.
-
-Also evaluate a practical non-Obsidian manual folder workflow. `davfs2` is a
-candidate because its documented configuration supports conditional requests;
-the early result below prevents claiming full compatibility. Plain curl
-is available for explicit conditional protocol operations, but those operations
-alone do not certify a practical folder synchronization client. Existing
-rclone/Cyberduck limitations remain until actual contrary evidence is obtained.
-
-The first isolated probe used released Debian davfs2 1.6.1-1 against the clean
-Timekeeper journal build `48d706bef02d83c2a71aa050079e31c6b67e4890` over
-verified HTTPS. Conditional overwrite succeeded; an actual stale upload was
-rejected with 412 and both local and remote content survived. Its actual delete
-received 428 because it did not provide a sufficient precondition. Thus this
-release is **not certified for full vault synchronization**. This is an early
-client capability result, not a test of the unfinished vault namespace.
-
-No Timekeeper-specific daemon, scheduler, CouchDB service or database-engine
-migration is required by this issue. No guards may be weakened for compatibility.
-
-## Remaining delivery gates
-
-- Canonical content, reference hooks, settings, quotas, pagination and recovery.
-- Hierarchical authenticated WebDAV and documented manual real-client workflows.
-- Notes UI, safe relative links/embeds and exact Markdown preservation.
-- Account archive and full-instance recovery coverage, including associations.
-- H2/PostgreSQL, browser, real-client, authorization and concurrency acceptance.
-- OpenAPI, user, deployment and operations documentation.
+Released davfs2 1.6.1-1 rejected a conditional delete (428) and remains unsupported
+for full synchronization. rclone/Cyberduck/Remotely Save retain their previously
+observed guard limitations. Do not weaken conditional writes for compatibility.
+The [operations guide](../operations/NOTES-WEBDAV.md) documents transition from flat
+journals, relative attachment links, settings, quotas, account isolation and
+recovery. Acceptance receipts identify exact candidate commits and client hashes.

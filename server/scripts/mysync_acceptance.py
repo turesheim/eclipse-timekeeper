@@ -104,7 +104,7 @@ class Fixture:
         self.dav('PUT','assets/fixture.pdf',self.asset,none=True)
         self.make_client(self.client,self.token)
 
-    def make_client(self,name,token):
+    def make_client(self,name,token,overrides=None):
         command('docker','run','-d','--init','--name',name,'--network',self.network,'--shm-size','256m',
                 '-e','NODE_EXTRA_CA_CERTS=/certs/ca.crt','-v',str(self.folder/'ca.crt')+':/certs/ca.crt:ro',
                 '--entrypoint','sh',self.args.client_image,'-ec',
@@ -115,6 +115,7 @@ class Fixture:
         command('docker','cp',str(CLIENT/'cdp.mjs'),name+':/cdp.mjs')
         config={'remoteBackend':'nextcloud','nextcloudUrl':self.origin,'nextcloudUsername':'journal-user','nextcloudPassword':token,
                 'nextcloudRemotePath':'/vault' if getattr(self.args,'vault',False) else '/','syncFolderMode':'vault-root','syncObsidianConfig':False,'logLevel':'off'}
+        config.update(overrides or {})
         self.private(name+'-settings.json',json.dumps(config))
         self.evaluate('(async()=>{await app.plugins.setEnable(true);await app.plugins.enablePluginAndSave("mysync");'
             'const p=app.plugins.plugins.mysync;p.updateLogLevel("off");Object.assign(p.settings,'+json.dumps(config)+');await p.saveSettings();'
@@ -261,12 +262,20 @@ class Fixture:
     def run_vault(self):
         def dav(method,path,body=None,**kwargs):return self.dav(method,path,body,root='/dav/vault/',**kwargs)
         self.api.call('GET','/notes');dav('MKCOL','Research/');dav('MKCOL','Research/Nested/')
-        exact='---\r\nunknown: [true, "keep"]\r\n---\r\n[[Other note]]  \r\n![Attachment](asset.bin)\r\n'
+        exact='---\r\nunknown: [true, "keep"]\r\n---\r\n[[Other note]]  \r\n![Attachment](asset.pdf)\r\n'
         dav('PUT','Research/Nested/Unicode-%C3%A6%2B100%25.md',exact.encode(),none=True)
-        dav('PUT','Research/Nested/asset.bin',self.asset,none=True);dav('PUT','Research/empty.md',b'',none=True)
-        self.action('pullFromRemote');self.read_file('Research/Nested/Unicode-æ+100%.md',exact.replace('\r\n','\n'));self.read_binary('Research/Nested/asset.bin',self.asset);self.read_file('Research/empty.md','')
+        dav('PUT','Research/Nested/asset.pdf',self.asset,none=True);dav('PUT','Research/unsupported.bin',self.asset,none=True);dav('PUT','Research/empty.md',b'',none=True)
+        dav('PUT','Research/Collision.md',b'Existing remote version\n',none=True)
+        self.evaluate('(async()=>{await app.vault.createFolder("Research");await app.vault.create("Research/Collision.md","Existing local version\\n");return true;})()',expected=True)
+        self.action('syncNow');self.action('pullFromRemote');self.read_file('Research/Nested/Unicode-æ+100%.md',exact.replace('\r\n','\n'));self.read_binary('Research/Nested/asset.pdf',self.asset);self.read_file('Research/empty.md','')
         self.read_file('journal/2026-10-20.md','# Calendar source æ\n');self.read_file('journal/2026-W44.md','# Weekly fixture\n')
+        self.read_file('Research/Collision.md','Existing local version\n')
+        if dav('GET','Research/Collision.md')[0]!=b'Existing remote version\n':raise AssertionError('First import overwrote an existing remote file')
+        reviewed=self.evaluate('(async()=>{const s=app.plugins.plugins.mysync.syncService;const c=(await s.listActiveConflicts()).find(c=>c.path==="Research/Collision.md");if(!c)return false;await s.resolveConflict(c._id,"keep-remote");return true;})()')
+        if not reviewed:raise AssertionError('First import did not expose the existing-content collision for review')
+        self.read_file('Research/Collision.md','Existing remote version\n')
         before,tag=dav('GET','Research/Nested/Unicode-%C3%A6%2B100%25.md');self.push();after,current=dav('GET','Research/Nested/Unicode-%C3%A6%2B100%25.md')
+        if dav('GET','Research/unsupported.bin')[0]!=self.asset:raise AssertionError('Plugin removed an unsupported remote file')
         if before!=after or tag['ETag']!=current['ETag']:raise AssertionError('A no-op vault scan changed canonical bytes/version')
         self.write_file('Research/Nested/Local.md','# Local nested note\n');self.push()
         if dav('GET','Research/Nested/Local.md')[0]!=b'# Local nested note\n':raise AssertionError('Nested client upload lost')
@@ -289,9 +298,12 @@ class Fixture:
         found=self.evaluate('(async()=>{const s=app.plugins.plugins.mysync.syncService;const c=(await s.listActiveConflicts()).find(c=>c.path==="Research/Nested/Renamed.md");if(!c)return false;await s.resolveConflict(c._id,"keep-remote");return true;})()')
         if not found:raise AssertionError('Nested conflict not exposed')
         self.read_file('Research/Nested/Renamed.md','Published device two\n')
+        selected=self.prefix+'-selected';self.make_client(selected,self.token,{'nextcloudRemotePath':'/vault/Research'});self.action('pullFromRemote',selected);self.read_file('Nested/Renamed.md','Published device two\n',selected);self.read_file('journal/2026-10-20.md',None,selected)
+        self.write_file('Selected.md','Selected remote root\n',selected);self.push(selected)
+        if dav('GET','Research/Selected.md')[0]!=b'Selected remote root\n':raise AssertionError('Selected remote root mapping failed')
         self.api.call('DELETE','/auth/tokens/'+self.token_id);self.write_file('Research/Nested/Renamed.md','Retained revoked-token draft\n');self.push();self.read_file('Research/Nested/Renamed.md','Retained revoked-token draft\n')
         if self.api.call('GET','/notes/resolve?path=Research%2FNested%2FRenamed.md')['path']!='Research/Nested/Renamed.md':raise AssertionError('Revocation changed namespace')
-        receipt={'serverCommit':self.server_commit,'serverImage':self.args.server_image,'clientImage':self.args.client_image,'obsidianVersion':'1.14.5','mySyncVersion':'3.0.7','realDesktopAndUnmodifiedRelease':True,'verifiedHttps':True,'hierarchicalVault':True,'unicodePlusPercent':True,'nestedBinaryRoundTrip':True,'unchangedRawMarkdownAndEtag':True,'clientTextUploadLineEndings':'LF','nestedManualTwoWay':True,'pluginRenameWorkflow':True,'emptyDeleteRecreate':True,'canonicalJournalAndIndependentLabel':True,'offlineWorkAndRetry':True,'twoDeviceConflictPreservedAndResolved':True,'revocationRetainsLocalDraft':True}
+        receipt={'serverCommit':self.server_commit,'serverImage':self.args.server_image,'clientImage':self.args.client_image,'obsidianVersion':'1.14.5','mySyncVersion':'3.0.7','realDesktopAndUnmodifiedRelease':True,'verifiedHttps':True,'hierarchicalVault':True,'firstImportCollisionReviewed':True,'selectedRemoteFolder':True,'unicodePlusPercent':True,'nestedPdfRoundTrip':True,'unsupportedExtensionsSkippedAndRemoteRetained':True,'unchangedRawMarkdownAndEtag':True,'clientTextUploadLineEndings':'LF','nestedManualTwoWay':True,'pluginRenameWorkflow':True,'emptyDeleteRecreate':True,'canonicalJournalAndIndependentLabel':True,'offlineWorkAndRetry':True,'twoDeviceConflictPreservedAndResolved':True,'revocationRetainsLocalDraft':True}
         self.args.output.parent.mkdir(parents=True,exist_ok=True);self.args.output.write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt),flush=True)
 
     def close(self):

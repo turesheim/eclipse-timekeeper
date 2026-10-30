@@ -50,6 +50,8 @@ final class VaultCatalog {
         if(!catalog.state.get().path("initialized").asBoolean())return null;
         var entry=catalog.index.referenced(ref.type(),ref.id());
         var source=new VaultSources(store,store.vaultLimits(),ref);var previous=source.snapshot();
+        // A native delete of a never-created note is not a recoverable file.
+        if(entry==null&&next==null&&previous.deleted())return null;
         long retained=entry==null?0:entry.path("retainedBytes").asLong();
         int maximum=ref.type().equals(JournalAssets.TYPE)?catalog.limits.fileBytes():Math.min(catalog.limits.fileBytes(),catalog.limits.markdownBytes());
         if(next!=null&&next.length>maximum&&next.length>retained)throw new ApiFailure(413,"VAULT_FILE_TOO_LARGE");
@@ -58,7 +60,8 @@ final class VaultCatalog {
         catalog.state.check(length-retained,entry==null?1:0);
         if(entry==null){var conflict=catalog.index.at(catalog.path(ref),false);if(conflict!=null)throw ApiFailure.conflict();}
         else if(entry.path("deleted").asBoolean()&&next!=null){
-            var conflict=catalog.index.at(new VaultPath(entry.path("path").asText()),false);
+            var parent=catalog.index.get(uuid(entry.path("parentId")));
+            var conflict=catalog.index.at(new VaultPath(parent.path("path").asText()).resolve(new VaultPath(entry.path("path").asText()).name()),false);
             if(conflict!=null&&!conflict.path("id").equals(entry.path("id")))throw ApiFailure.conflict();
         }
         byte[] recovery=next==null&&!previous.deleted()?source.read():null;

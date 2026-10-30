@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(VaultArchiveQuotaTest.Profile.class)
 class VaultArchiveQuotaTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_archive_quota","timekeeper.notes.max-file-bytes","1000","timekeeper.notes.max-markdown-bytes","500","timekeeper.notes.max-total-bytes","10000","timekeeper.notes.max-entries","8");}
+        public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("archivequota",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_archive_quota","timekeeper.notes.max-file-bytes","1000","timekeeper.notes.max-markdown-bytes","500","timekeeper.notes.max-total-bytes","10000","timekeeper.notes.max-entries","8"));}
     }
     @Inject ServerStore store;
     @Inject VaultLimits limits;

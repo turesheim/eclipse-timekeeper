@@ -39,6 +39,12 @@ class VaultCatalogTest {
             assertNotNull(index.at(new VaultPath("journal/2026-10-31.md"),false));return null;
         });
     }
+    @Test void deletingNeverCreatedNativeNotesDoesNotInventUnrecoverableTrash(){
+        store.transaction("missing",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();var date=DayNotes.date("2026-11-03");var notes=new DayNotes(store);notes.deleteContent(date,etag(notes.getContent(date)));var weeks=new WeekNotes(store);var week=WeekNotes.week("2026-W45");weeks.delete(week,etag(weeks.get(week)));
+            assertEquals(4,store.list(VaultIndex.ENTRY).size());assertTrue(store.list(VaultRecycle.TYPE).isEmpty());return null;
+        });
+    }
     @Test void aggregateQuotaRejectsExistingInterfaceWritesAtomically(){
         var date=DayNotes.date("2026-11-01");
         store.transaction("quota",()->{var notes=new DayNotes(store);notes.saveContent(date,etag(notes.getContent(date)),object().put("body","x".repeat(900)));new VaultCatalog(store,limits).initialize();return null;});

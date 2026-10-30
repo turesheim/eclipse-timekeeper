@@ -47,6 +47,13 @@ class VaultCollectionTest {
             assertEquals(409,assertThrows(ApiFailure.class,()->vault.move(vault.get(VaultCollection.id(day)),new VaultPath("Renamed.md"),vault.tag(day))).status);return null;
         });
     }
+    @Test void deletedJournalCanBeRecreatedAtItsReconfiguredFolderWithoutTouchingOldPathReuse(){
+        store.transaction("moved-trash",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();var entry=vault.put(new VaultPath("journal/2026-10-29.md"),null,true,bytes("Original"));UUID identity=VaultCollection.id(entry);vault.delete(entry,vault.tag(entry));
+            var settings=new VaultSettings(store);vault.configure(etag(settings.get()),object().put("journalFolder","PrivateJournal"));vault.mkdir(new VaultPath("journal"));vault.put(new VaultPath("journal/old.md"),null,true,bytes("Unrelated"));
+            var recreated=vault.put(new VaultPath("PrivateJournal/2026-10-29.md"),null,true,bytes("Recreated"));assertEquals(identity,VaultCollection.id(recreated));assertArrayEquals(bytes("Recreated"),vault.read(recreated));assertArrayEquals(bytes("Unrelated"),vault.read(vault.get(new VaultPath("journal/old.md"))));return null;
+        });
+    }
     @Test void configurationRequiresOptInAndCannotDisappearOnOptOut(){
         store.transaction("config",()->{
             var vault=new VaultCollection(store,limits);vault.initialize();

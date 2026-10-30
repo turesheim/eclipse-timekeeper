@@ -3,6 +3,7 @@
 import argparse
 from http.cookiejar import CookieJar
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -56,10 +57,24 @@ def main():
         registry=data/'tokens.json';registry.write_text('[]');registry.chmod(0o600);code,_=create_challenge(data/'setup.json')
         with socket.socket() as port_socket:port_socket.bind(('127.0.0.1',0));port=port_socket.getsockname()[1]
         fixture=RecoveryFixture(data,port,https=True)
+        faults={'mode':None,'used':False}
         for server in fixture.servers:
             handler=server.RequestHandlerClass
             if hasattr(handler,'relay'):
-                for verb in ['PROPFIND','MKCOL','MOVE']:setattr(handler,'do_'+verb,handler.relay)
+                relay=handler.relay
+                def fault_relay(self):
+                    if faults['mode']=='partial-list' and self.command=='PROPFIND':
+                        faults['used']=True;body=b'<D:multistatus xmlns:D="DAV:"><D:response>'
+                        self.send_response(207);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
+                    if faults['mode']=='lost-ack' and self.command=='PUT':
+                        faults['mode']=None;faults['used']=True;body=self.rfile.read(int(self.headers.get('Content-Length','0')));connection=http.client.HTTPConnection('127.0.0.1',port,timeout=30)
+                        try:
+                            connection.request(self.command,self.path,body=body,headers=dict(self.headers));response=connection.getresponse();response.read()
+                            if response.status not in (201,204):raise AssertionError('Lost-reply fixture failed to commit')
+                        finally:connection.close()
+                        self.close_connection=True;self.connection.shutdown(socket.SHUT_RDWR);return
+                    relay(self)
+                for verb in ['GET','POST','PUT','DELETE','OPTIONS','HEAD','PROPFIND','MKCOL','MOVE']:setattr(handler,'do_'+verb,fault_relay)
         certificate=data/'fixture-cert.pem';base=fixture.base;process=None;log=(data/'server.log').open('w')
         environment={**os.environ,'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:'+str(data/'database'),'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry),'TIMEKEEPER_SERVER_SETUP_FILE':str(data/'setup.json'),'TIMEKEEPER_PUBLIC_ORIGIN':base,**fixture.environment}
         def start():
@@ -110,11 +125,30 @@ def main():
             # The selected local directory must not silently become a new empty
             # root after a missing mount, path replacement, or interruption.
             folder.rename(data/'retained-local');folder.mkdir();run(expected=1);folder.rmdir();(data/'retained-local').rename(folder)
-            stop();start();assert run()['actions']==[]
+            # A damaged XML listing and an unavailable transport are errors,
+            # never an authoritative empty scan or a new deletion baseline.
+            before_state=(control/'state.json').read_bytes();faults.update(mode='partial-list',used=False);run(expected=1);assert faults['used'];assert (control/'state.json').read_bytes()==before_state;faults['mode']=None
+            stop();run(expected=1);assert (control/'state.json').read_bytes()==before_state;start();assert run()['actions']==[]
+            (folder/'Lost-reply.md').write_bytes(b'Committed once; keep exact bytes');preview=run();faults.update(mode='lost-ack',used=False);run(['--apply',preview['review']],expected=1);assert faults['used'];assert (folder/'Lost-reply.md').read_bytes()==b'Committed once; keep exact bytes';apply(['--resume']);assert run()['actions']==[]
+            # First import has no implicit winner even if both folders already
+            # contain the same path. Review is required before replacing bytes.
+            first=data/'existing-folder';first.mkdir();(first/'empty.md').write_bytes(b'Existing local version');first_state=data/'existing-control';collision=run(local_folder=first,state=first_state);assert any(row['path']=='empty.md' for row in collision['conflicts']);run(['--apply',collision['review']],expected=1,local_folder=first,state=first_state);assert (first/'empty.md').read_bytes()==b'Existing local version'
+            apply(['--prefer-remote','empty.md'],local_folder=first,state=first_state);assert (first/'empty.md').read_bytes()==b'Recreated'
+            # Remove a populated local folder only after explicit delete review;
+            # descendants are guarded and the empty collection is checked again.
+            (folder/'Remove').mkdir();(folder/'Remove'/'child.md').write_bytes(b'Retain in server trash');apply();(folder/'Remove'/'child.md').unlink();(folder/'Remove').rmdir();apply(['--allow-deletes']);api.call('GET','/notes/resolve?path=Manual%2FRemove',expected=404)
             read_only,_=api.call('POST','/auth/tokens',{'name':'Read-only manual fixture','permissions':['read'],'expiresAt':None},expected=201)
             (folder/'Denied.md').write_bytes(b'Keep local write');preview=run(credential=read_only['token']);run(['--apply',preview['review']],expected=1,credential=read_only['token']);assert (folder/'Denied.md').read_bytes()==b'Keep local write';api.call('GET','/notes/resolve?path=Manual%2FDenied.md',expected=404);(folder/'Denied.md').unlink();apply(['--resume'])
+            (folder/'.obsidian').mkdir();(folder/'.obsidian'/'app.json').write_bytes(b'{"opaque":true}');assert run()['actions']==[]
+            settings,tag=api.call('GET','/notes/settings');api.call('PUT','/notes/settings',{'syncObsidianConfig':True},tag);apply(['--include-obsidian']);opaque,_=api.call('GET','/notes/resolve?path=Manual%2F.obsidian%2Fapp.json');assert api.call('GET','/notes/entries/'+opaque['id']+'/content')[0]==b'{"opaque":true}'
+            settings,tag=api.call('GET','/notes/settings');api.call('PUT','/notes/settings',{'syncObsidianConfig':False},tag,expected=409)
+            # A different account cannot inherit the saved baseline even when it
+            # has an identically named folder at the same HTTP endpoint.
+            other_password=secrets.token_urlsafe(32);api.call('POST','/admin/users',{'username':'other-manual','password':other_password,'displayName':'Other','email':'other@example.invalid','administrator':False},expected=201)
+            other=API(base,certificate);other.call('GET','/auth/status');other.call('POST','/auth/login',{'username':'other-manual','password':other_password,'remember':False});other.call('GET','/notes');other.call('POST','/notes/folders',{'path':'Manual'},expected=201);other_token,_=other.call('POST','/auth/tokens',{'name':'Other account','permissions':['read','write'],'expiresAt':None},expected=201);run(expected=1,credential=other_token['token']);assert (folder/'empty.md').read_bytes()==b'Recreated'
+            before={path.relative_to(folder).as_posix():path.read_bytes() for path in folder.rglob('*') if path.is_file()};root,tag=api.call('GET','/notes/resolve?path=Manual');api.call('DELETE','/notes/entries/'+root['id'],etag=tag,expected=204);api.call('POST','/notes/folders',{'path':'Manual'},expected=201);run(expected=1);assert before=={path.relative_to(folder).as_posix():path.read_bytes() for path in folder.rglob('*') if path.is_file()}
             api.call('DELETE','/auth/tokens/'+issued['id'],expected=204);run(expected=1)
-            receipt={'serverCommit':manifest['commit'],'distributionSha256':checksum,'clientVersion':'1.0','clientSha256':hashlib.sha256(client.read_bytes()).hexdigest(),'packagedClient':args.client is None,'python':sys.version.split()[0],'verifiedHttps':True,'ordinaryNestedFolder':True,'selectedRemoteRoot':True,'exactMarkdownAndBinary':True,'emptyFiles':True,'manualTwoWayEdits':True,'guardedMovePreservesDocumentId':True,'concurrentVersionsPreserved':True,'explicitConflictResolution':True,'explicitDeletionReview':True,'deleteRecreate':True,'missingLocalRootRefused':True,'restart':True,'readOnlyRejected':True,'revokedTokenRejected':True,'passed':True}
+            receipt={'serverCommit':manifest['commit'],'distributionSha256':checksum,'clientVersion':'1.0','clientSha256':hashlib.sha256(client.read_bytes()).hexdigest(),'packagedClient':args.client is None,'python':sys.version.split()[0],'verifiedHttps':True,'ordinaryNestedFolder':True,'selectedRemoteRoot':True,'exactMarkdownAndBinary':True,'emptyFiles':True,'manualTwoWayEdits':True,'guardedMovePreservesDocumentId':True,'concurrentVersionsPreserved':True,'explicitConflictResolution':True,'explicitDeletionReview':True,'deleteRecreate':True,'missingLocalRootRefused':True,'restart':True,'partialListingRefused':True,'unavailableServerPreservesBaseline':True,'lostCommitReplyResumedSafely':True,'firstImportCollisionsReviewed':True,'nestedFolderDeletionGuarded':True,'obsidianConfigExplicitOpaqueOptIn':True,'accountSwitchRefused':True,'replacedRemoteRootRefused':True,'readOnlyRejected':True,'revokedTokenRejected':True,'passed':True}
             args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
         finally:stop();fixture.close();log.close()
 

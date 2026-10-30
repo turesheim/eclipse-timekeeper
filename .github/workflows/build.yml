@@ -146,6 +146,7 @@ jobs:
         path: |
           server/web/test-results/
           server/web/target/server.log
+          server/target/acceptance/webdav-manual.json
 
   Remote-Eclipse:
     name: Installed client tests
