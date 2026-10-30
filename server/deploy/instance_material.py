@@ -146,7 +146,7 @@ def copy_value(value):
 def dump_control(dump, client):
     with dump.open('rb') as source:
         schema = client('pg_restore', ['--data-only', '--table=tk_schema', '--file=-'], input=source)
-    match = re.search(r'COPY public\.tk_schema \(id, schema_version, state\) FROM stdin;\n1\t([2-9])\tREADY\n\\\.\n', schema)
+    match = re.search(r'COPY public\.tk_schema \(id, schema_version, state\) FROM stdin;\n1\t(10|[2-9])\tREADY\n\\\.\n', schema)
     if not match:
         raise invalid()
     if int(match[1]) < 9:

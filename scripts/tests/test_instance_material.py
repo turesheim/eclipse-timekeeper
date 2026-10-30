@@ -134,10 +134,23 @@ class InstanceMaterialTest(unittest.TestCase):
         def client(program, arguments, *, input=None, output=None):
             calls.append((program, arguments))
             if '--table=tk_schema' in arguments:
-                return 'COPY public.tk_schema (id, schema_version, state) FROM stdin;\n1\t9\tREADY\n\\.\n'
+                return f'COPY public.tk_schema (id, schema_version, state) FROM stdin;\n1\t{version}\tREADY\n\\.\n'
             self.assertEqual('pg_restore', program)
             output.write(('COPY public.tk_instance (id, kind, version, operation_id, actor_owner, occurred_at, payload) FROM stdin;\n'
                 '00000000-0000-0000-0000-000000000000\tCONTROL\t1\t\\N\t\\N\t1970-01-01T00:00:00Z\t' + escaped + '\n\\.\n').encode())
         self.path.touch()
-        self.assertEqual(control, material.dump_control(self.path, client))
-        self.assertEqual(2, len(calls))
+        for version in (9, 10):
+            with self.subTest(schema=version):
+                calls.clear()
+                self.assertEqual(control, material.dump_control(self.path, client))
+                self.assertEqual(2, len(calls))
+
+    def test_unknown_or_unready_schema_is_rejected_before_reading_instance_control(self):
+        self.path.touch()
+        for version, state in [(1, 'READY'), (11, 'READY'), (10, 'UPGRADING')]:
+            with self.subTest(schema=version, state=state):
+                def client(program, arguments, *, input=None, output=None):
+                    self.assertIn('--table=tk_schema', arguments)
+                    return f'COPY public.tk_schema (id, schema_version, state) FROM stdin;\n1\t{version}\t{state}\n\\.\n'
+                with self.assertRaises(ValueError):
+                    material.dump_control(self.path, client)

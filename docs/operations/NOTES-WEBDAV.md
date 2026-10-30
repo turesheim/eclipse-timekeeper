@@ -25,8 +25,11 @@ read-only token for browsing only. Revoke the token to disconnect; local files
 remain. Never put the token in a URL or share it with a public vault repository.
 
 The hierarchical root is `https://HOST/dav/vault/`. The compatible Nextcloud-style
-alias is `https://HOST/remote.php/webdav/vault/`. A selected existing subfolder,
-for example `/dav/vault/Research/`, is also a synchronization root. Create that
+alias is `https://HOST/remote.php/webdav/vault/`.
+The `remote.php` name is a Nextcloud-compatible URL convention, handled directly
+by Timekeeper's Java/Quarkus server. No PHP code, interpreter or service is used.
+A selected existing subfolder, for example `/dav/vault/Research/`, is also a
+synchronization root. Create that
 folder in Notes before connecting. Folder listings expose stable resource IDs,
 strong ETags and raw file sizes. Overwrites and deletes require current
 preconditions; moves do not overwrite existing destinations. A stale request

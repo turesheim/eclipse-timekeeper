@@ -219,7 +219,7 @@ def main():
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in compared)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
             metadata=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"SELECT schema_version||'|'||state FROM tk_schema WHERE id=1").stdout.strip()
-            if metadata!='9|READY':raise AssertionError('Migration did not produce the current ready schema')
+            if metadata!='10|READY':raise AssertionError('Migration did not produce the current ready schema')
             if args.source_schema<4:
                 sessions=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c','SELECT count(*) FROM tk_auth_session').stdout.strip()
                 if sessions!='0':raise AssertionError('Migration retained sessions without origin/browser provenance')
@@ -266,7 +266,7 @@ def main():
             print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':10,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
                 'beyondJavaScriptIntegerRange':not bool(args.server_image),
-                'schemaMetadataUpgraded':args.source_schema<9,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
+                'schemaMetadataUpgraded':args.source_schema<10,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
                 'passkeyCredentialsAndRevocationTombstonesPreserved':args.source_schema>=4,'legacyBrowserSessionsRevoked':args.source_schema<4,
                 'accountAndTokenHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True,**native}))
         finally:
