@@ -1202,5 +1202,7 @@
   "notes.error_import_not_empty": "Notatsamlingen på målet inneholder data. Gjenopprett hvelvet i en tom samling for å unngå å blande eller erstatte notater.",
   "notes.error_file_size": "Denne filen overskrider serverens filstørrelsesgrense for notater.",
   "notes.download_attachment": "Last ned vedlegg",
-  "notes.ambiguous_link": "Vedleggsnavnet samsvarer både med et eldre dagbokvedlegg og en annen relativ fil. Bruk en uttrykkelig relativ sti for å velge riktig fil."
+  "notes.ambiguous_link": "Vedleggsnavnet samsvarer både med et eldre dagbokvedlegg og en annen relativ fil. Bruk en uttrykkelig relativ sti for å velge riktig fil.",
+  "notes.webdav_url": "WebDAV-adresse for notatsamlingen",
+  "notes.sync_guide": "Manuelt synkroniseringsoppsett og klientbegrensninger"
 }

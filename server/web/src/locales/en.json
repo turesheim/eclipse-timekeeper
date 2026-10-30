@@ -1202,5 +1202,7 @@
   "notes.error_import_not_empty": "The target Notes collection contains data. Restore this vault into an empty collection to avoid mixing or replacing notes.",
   "notes.error_file_size": "This file exceeds the server’s Notes file-size limit.",
   "notes.download_attachment": "Download attachment",
-  "notes.ambiguous_link": "This attachment name matches both a legacy journal asset and a different relative file. Use an explicit relative path to choose the intended file."
+  "notes.ambiguous_link": "This attachment name matches both a legacy journal asset and a different relative file. Use an explicit relative path to choose the intended file.",
+  "notes.webdav_url": "WebDAV collection URL",
+  "notes.sync_guide": "Manual synchronization setup and client limitations"
 }

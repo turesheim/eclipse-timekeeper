@@ -103,7 +103,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 #workspace { padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 .workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + var(--workspace-nav-bottom-inset)); box-shadow: 0 -.25rem 1rem #233b380d; }
 .workspace-nav .container-fluid { max-width: 1332px; }
-.workspace-nav .navbar-nav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(2.75rem, 1fr); width: 100%; overflow-x: auto; }
+.workspace-nav .navbar-nav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(2rem, 1fr); width: 100%; overflow-x: auto; }
 /* Switching text and background colors together must not pass through low contrast. */
 .workspace-nav .nav-link { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; min-width: 0; padding: .5rem .25rem; border-radius: var(--bs-border-radius); font-weight: 600; transition: none; }
 .workspace-nav .nav-link:not(.active):hover { background: #e4ede7; }

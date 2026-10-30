@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the real, unprivileged schema-2/3/4/5/6/7/8-to-9 package upgrade and interrupted retries."""
+"""Verify the real, unprivileged schema-2/3/4/5/6/7/8/9-to-10 package upgrade and interrupted retries."""
 import argparse
 import hashlib
 import io
