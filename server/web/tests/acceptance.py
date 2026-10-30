@@ -13,7 +13,7 @@ import tempfile
 import time
 from urllib.error import URLError
 from urllib.request import urlopen, build_opener, HTTPCookieProcessor, HTTPSHandler, Request
-from http.cookiejar import CookieJar
+from http.cookiejar import CookieJar, DefaultCookiePolicy
 import ssl
 import re
 import zipfile
@@ -38,11 +38,11 @@ def retain_server_logs(server_log, output, identity):
     return saved
 
 
-
-
 def bootstrap_batch(base,code,password,certificate=None):
     """Use the normal public setup flow; bootstrap UI coverage keeps its fresh fixture."""
-    handlers=[HTTPCookieProcessor(CookieJar())]
+    # Browsers accept Secure cookies on the trusted HTTP loopback fixture.
+    # Match that fixture-only behavior; HTTPS still validates its own certificate.
+    handlers=[HTTPCookieProcessor(CookieJar(policy=DefaultCookiePolicy(secure_protocols=('https','http'))))]
     if certificate:handlers.append(HTTPSHandler(context=ssl.create_default_context(cafile=str(certificate))))
     opener=build_opener(*handlers)
     with opener.open(base+'/api/v1/auth/status',timeout=10) as reply:
@@ -101,13 +101,13 @@ def run_batches(args,output,digest):
             for index,specs in enumerate(batches,1):
                 if output.exists():shutil.rmtree(output)
                 output.mkdir(parents=True)
-                command=[sys.executable,str(Path(__file__).resolve()),'--distribution',str(args.distribution.resolve()),'--java',args.java,'--browser',args.browser]
+                command=[sys.executable,str(Path(__file__).resolve()),'--distribution',str(args.distribution.resolve()),'--java',args.java,'--browser',args.browser,'--deadline',str(deadline)]
                 for flag in ('https','mail','passkeys','restore'):
                     if getattr(args,flag):command.append('--'+flag)
                 for spec in specs:command.extend(['--spec',spec])
                 print(f'Browser fixture {index}/{len(batches)}: '+', '.join(specs),flush=True)
                 try:
-                    result=subprocess.run(command,timeout=max(.001,deadline-time.monotonic()))
+                    result=subprocess.run(command,timeout=max(.001,deadline-time.monotonic())+60)
                 finally:
                     shutil.copytree(output,saved/f'{index:02d}')
                 if result.returncode:raise RuntimeError(f'Browser fixture {index} failed')
@@ -133,6 +133,7 @@ def main():
     parser.add_argument('--passkeys', action='store_true', help='Use the HTTPS localhost RP for virtual WebAuthn browser tests (requires --https)')
     parser.add_argument('--restore', action='store_true', help='Enable private restore staging for isolated confirmation acceptance')
     parser.add_argument('--spec', action='append', choices=sorted(path.name for path in (ROOT/'server/web/tests').glob('*.spec.js')), help='Run selected spec files in one isolated fixture')
+    parser.add_argument('--deadline', type=float, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.mail and not args.https:parser.error('--mail requires --https')
     if args.passkeys and not args.https:parser.error('--passkeys requires --https')
@@ -194,7 +195,7 @@ def main():
                 # The serial suite exceeds 12 minutes on shared CI runners.
                 # Keep individual test limits; bound the whole suite separately,
                 # with dependency-installation/HTTPS headroom in the CI job.
-                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser,'TIMEKEEPER_WEB_RESTORE_FIXTURE':'true' if args.restore else 'false','TIMEKEEPER_WEB_PASSKEY_FIXTURE':'true' if args.passkeys else 'false'}, timeout=1200)
+                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser,'TIMEKEEPER_WEB_RESTORE_FIXTURE':'true' if args.restore else 'false','TIMEKEEPER_WEB_PASSKEY_FIXTURE':'true' if args.passkeys else 'false'}, timeout=max(.001,args.deadline-time.monotonic()) if args.deadline else 1200)
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
                 (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':args.browser, 'https':args.https,'loopbackSmtp':args.mail,'virtualPasskeys':args.passkeys,'passed':True}, indent=2) + '\n')
             finally:
