@@ -48,6 +48,7 @@ final class VaultIndex {
         var existing=at(target,true);
         if(existing!=null&&!existing.path("deleted").asBoolean())throw ApiFailure.conflict();
         var parent=at(target.parent(),false);if(parent==null||!parent.path("kind").asText().equals(Kind.FOLDER.name()))throw ApiFailure.conflict();
+        target=path(parent).resolve(target.name());
         UUID entryId=UUID.randomUUID();
         if(sourceType!=null&&sourceId!=null&&referenced(sourceType,sourceId)!=null)throw ApiFailure.conflict();
         var value=object().put("path",target.value()).put("kind",kind.name()).put("parentId",id(parent).toString()).put("deleted",false);
@@ -77,6 +78,7 @@ final class VaultIndex {
         var original=get(source);if(original.path("deleted").asBoolean()||source.equals(ROOT)||destination.isRoot())throw ApiFailure.conflict();
         if(path(original).value().equals(destination.value()))return original;
         var parent=at(destination.parent(),false);if(parent==null||!parent.path("kind").asText().equals(Kind.FOLDER.name()))throw ApiFailure.conflict();
+        destination=path(parent).resolve(destination.name());if(path(original).equals(destination))return original;
         var entries=subtree(source);var ids=new HashSet<UUID>();entries.forEach(value->ids.add(id(value)));
         if(ids.contains(id(parent)))throw ApiFailure.conflict();
         var targets=new LinkedHashMap<UUID,VaultPath>();

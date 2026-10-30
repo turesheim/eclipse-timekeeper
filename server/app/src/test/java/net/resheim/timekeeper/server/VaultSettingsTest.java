@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(VaultSettingsTest.Profile.class)
 class VaultSettingsTest {
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_settings_test");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("settings",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_settings_test"));}}
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     @Test void defaultsAndDeploymentLimitsAreExplicit(){

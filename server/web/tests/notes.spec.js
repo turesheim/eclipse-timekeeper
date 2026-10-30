@@ -39,5 +39,20 @@ test('Notes supports nested creation, keyboard resize, rename and recovery on mo
   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Delete file or folder',exact:true}).click();await expect(page.locator('#notes-body')).not.toBeVisible();
   await page.locator('#notes-panel').getByRole('button',{name:'Recently deleted',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Renamed.md',exact:true}).click();await page.getByRole('button',{name:'Restore deleted item',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue('Body');
   await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-navigation')).not.toBeVisible();await page.locator('.notes-drawer-toggle').click();await expect(page.locator('#notes-navigation')).toBeVisible();await page.locator('#notes-search').fill('Renamed');await expect(page.locator('#notes-navigation').getByRole('button',{name:'Notes/Renamed.md',exact:true})).toBeVisible();
+  expect(await page.locator('#workspace-navigation [data-tab]').evaluateAll(buttons=>buttons.every(button=>Math.abs(button.getBoundingClientRect().top-buttons[0].getBoundingClientRect().top)<1))).toBe(true);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('Notes settings preserve journal associations and relative images use authenticated previews',async({page,request})=>{
+  const api=await setup(page,request),day='2026-10-30';
+  const original=await api('PUT','/notes/files?path=journal%2F'+day+'.md',Buffer.from('Journal body'),{'Content-Type':'application/octet-stream','If-None-Match':'*'}),identity=await original.json();
+  const label=await api('GET','/day-labels/'+day);await api('PUT','/day-labels/'+day,{text:'Independent label'},{'If-Match':label.headers().etag});
+  await page.getByRole('button',{name:'Notes settings',exact:true}).click();await page.getByLabel('Journal folder',{exact:true}).fill('Private/Journal');await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Save',exact:true}).click();await expect(page.getByRole('dialog',{name:'Notes settings',exact:true})).not.toBeVisible();
+  expect((await(await api('GET','/notes/resolve?path=Private%2FJournal%2F'+day+'.md')).json()).id).toBe(identity.id);expect((await(await api('GET','/day-labels/'+day)).json()).text).toBe('Independent label');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  await api('PUT','/notes/files?path=Notes%2Fimage.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FImage.md',Buffer.from('# Image\n\n![Pixel](image.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Image.md',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#notes-formatted img[alt=Pixel]')).toHaveAttribute('src',/^blob:/);await expect.poll(()=>page.locator('#notes-formatted img[alt=Pixel]').evaluate(image=>image.naturalWidth)).toBe(1);
+  await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+  const violations=await new AxeBuilder({page}).include('#notes-panel').analyze();expect(violations.violations).toEqual([]);
 });

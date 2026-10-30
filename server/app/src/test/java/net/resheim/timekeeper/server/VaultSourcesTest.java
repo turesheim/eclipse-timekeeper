@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(VaultSourcesTest.Profile.class)
 class VaultSourcesTest {
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_sources_test");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("sources",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_sources_test"));}}
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     @Test void aJournalBindingSharesExactCanonicalBytesAndVersionsWithoutCouplingTheLabel(){

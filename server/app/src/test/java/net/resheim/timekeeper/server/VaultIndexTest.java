@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(VaultIndexTest.Profile.class)
 class VaultIndexTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_index_test");}
+        public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("index",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_index_test"));}
     }
     @Inject ServerStore store;
     private static VaultPath path(String value){return new VaultPath(value);}

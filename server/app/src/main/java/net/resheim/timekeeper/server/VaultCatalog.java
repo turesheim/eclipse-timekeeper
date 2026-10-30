@@ -50,6 +50,8 @@ final class VaultCatalog {
         var entry=catalog.index.referenced(ref.type(),ref.id());
         var source=new VaultSources(store,store.vaultLimits(),ref);var previous=source.snapshot();
         long retained=entry==null?0:entry.path("retainedBytes").asLong();
+        int maximum=ref.type().equals(JournalAssets.TYPE)?catalog.limits.fileBytes():Math.min(catalog.limits.fileBytes(),catalog.limits.markdownBytes());
+        if(next!=null&&next.length>maximum&&next.length>retained)throw new ApiFailure(413,"VAULT_FILE_TOO_LARGE");
         // Deletion retains the original bytes, so trash still consumes the quota.
         long length=next==null?retained:next.length;
         catalog.state.check(length-retained,entry==null?1:0);

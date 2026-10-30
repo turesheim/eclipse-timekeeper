@@ -11,7 +11,7 @@ import io.restassured.specification.RequestSpecification;
 @QuarkusTest @TestProfile(VaultDavHttpTest.Profile.class)
 class VaultDavHttpTest {
     static final String ROOT="/dav/vault/",ALIAS="/remote.php/webdav/vault/";
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_dav_http","timekeeper.auth.public-origin","https://timekeeper.example.test");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("http",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_dav_http","timekeeper.auth.public-origin","https://timekeeper.example.test"));}}
     private RequestSpecification client(String token){return given().header("Authorization","Basic "+Base64.getEncoder().encodeToString(("vault:"+token).getBytes(StandardCharsets.UTF_8)));}
     private RequestSpecification api(String token){return given().header("Authorization","Bearer "+token);}
     @Test void nestedCollectionIsPrivateGuardedAndSharedAcrossAliases(){

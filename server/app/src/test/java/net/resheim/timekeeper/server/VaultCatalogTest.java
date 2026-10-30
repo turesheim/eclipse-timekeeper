@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(VaultCatalogTest.Profile.class)
 class VaultCatalogTest {
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_catalog_test",
-            "timekeeper.notes.max-file-bytes","1000","timekeeper.notes.max-markdown-bytes","500","timekeeper.notes.max-total-bytes","1000","timekeeper.notes.max-entries","8");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("catalog",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_catalog_test",
+            "timekeeper.notes.max-file-bytes","1000","timekeeper.notes.max-markdown-bytes","1000","timekeeper.notes.max-total-bytes","1000","timekeeper.notes.max-entries","8"));}}
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     @Test void existingAndNewJournalInterfacesShareTheIndexAndRetainedDeletionBytes(){
@@ -42,7 +42,7 @@ class VaultCatalogTest {
     @Test void aggregateQuotaRejectsExistingInterfaceWritesAtomically(){
         var date=DayNotes.date("2026-11-01");
         store.transaction("quota",()->{var notes=new DayNotes(store);notes.saveContent(date,etag(notes.getContent(date)),object().put("body","x".repeat(900)));new VaultCatalog(store,limits).initialize();return null;});
-        var failure=assertThrows(ApiFailure.class,()->store.transaction("quota",()->{var notes=new DayNotes(store);return notes.saveContent(date,etag(notes.getContent(date)),object().put("body","x".repeat(1001)));}));
+        var failure=assertThrows(ApiFailure.class,()->store.transaction("quota",()->{var notes=new DayNotes(store);var next=date.plusDays(1);return notes.saveContent(next,etag(notes.getContent(next)),object().put("body","x".repeat(200)));}));
         assertEquals(507,failure.status);
         store.transaction("quota",()->{assertEquals(900,new DayNotes(store).getContent(date).path("body").asText().length());assertEquals(900,new VaultState(store,limits).get().path("totalBytes").asLong());return null;});
     }

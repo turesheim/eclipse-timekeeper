@@ -26,7 +26,7 @@ def quote(value):return "'"+value.replace("'","''")+"'"
 
 
 def fixture_sql(schema=6, *, runtime=False):
-    if schema not in (2,3,4,5,6,7,8,9):raise ValueError('Unsupported fixture schema')
+    if schema not in (2,3,4,5,6,7,8,9,10):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
     now='2026-10-14T12:34:56.123456789Z'
@@ -122,13 +122,15 @@ def fixture_sql(schema=6, *, runtime=False):
 
     if schema>=9:
         sql+=(DB/'instance-v9.sql').read_text()+"UPDATE tk_schema SET schema_version=9;\n"
+    if schema>=10:
+        sql+=(DB/'notes-v10.sql').read_text()+"UPDATE tk_schema SET schema_version=10;\n"
     return sql
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image')
-    parser.add_argument('--source-schema',type=int,choices=(2,3,4,5,6,7,8,9),default=9)
+    parser.add_argument('--source-schema',type=int,choices=(2,3,4,5,6,7,8,9,10),default=10)
     args=parser.parse_args()
     suffix=secrets.token_hex(4);source='timekeeper-migrate18-'+suffix;target='timekeeper-migrate17-'+suffix
     names=[]
@@ -166,13 +168,13 @@ def main():
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                 'chown -R 37017:37017 /var/packages/timekeeper')
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
-            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':9}))
+            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':10}))
             command('docker','cp',str(release),target+':/var/packages/timekeeper/scripts/release.json')
             blueprint=folder/'compose.yaml'
             blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
             command('docker','exec',target,'mkdir','-p','/var/packages/timekeeper/target/project')
             command('docker','cp',str(blueprint),target+':/var/packages/timekeeper/target/project/compose.yaml')
-            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','schema-v9-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql','instance-v9.sql'):
+            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','schema-v9-postgresql.shape','schema-v10-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql','instance-v9.sql','notes-v10.sql'):
                 command('docker','cp',str(DB/file),target+':/var/packages/timekeeper/scripts/migration/'+file)
             env={'SYNOPKG_PKGINST_TEMP_DIR':'/tmp/timekeeper-migration-incoming','SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',
                  'wizard_database_port':'5433','wizard_http_port':'8098','wizard_public_origin':'https://timekeeper.example.invalid','wizard_owner':'',
@@ -190,7 +192,7 @@ def main():
             helper('validate')
             command('docker','exec',target,'cp','/tmp/timekeeper-migration-incoming/project/compose.yaml','/var/packages/timekeeper/target/project/compose.yaml')
             helper('install')
-            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','instance-v9.sql'))+"UPDATE tk_schema SET schema_version=9,state='READY';"
+            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','instance-v9.sql'))+"UPDATE tk_schema SET schema_version=10,state='READY';"
             canonical="SET ROLE timekeeper_fixture_app; "+ddl
             command('docker','exec','-i',target,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=canonical)
             archive.chmod(0o644);command('docker','cp',str(archive),target+':/var/packages/timekeeper/var/server/backups/migration.tar')
@@ -212,7 +214,7 @@ def main():
             command('docker','exec',target,'test','-f','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
             helper('cancel-empty-import')
             helper('import-postgresql18',native_archive)
-            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==9) and (table!='tk_auth_session' or args.source_schema>=4)]
+            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==10) and (table!='tk_auth_session' or args.source_schema>=4)]
             fingerprints=client('psql',['-X','-q','-A','-t'],sql='\n'.join(exporter.fingerprint_sql(table) for table in compared))
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in compared)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
@@ -261,7 +263,7 @@ def main():
                     helper('prestart')
                 from native_server import verify
                 native=verify(command,target,folder,args.server_image)
-            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':9,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
+            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':10,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
                 'beyondJavaScriptIntegerRange':not bool(args.server_image),
                 'schemaMetadataUpgraded':args.source_schema<9,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(VaultContentTest.Profile.class)
 class VaultContentTest {
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_content_test");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("content",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_content_test"));}}
     @Inject ServerStore store;
     @Test void opaqueMarkdownAndBinaryBytesSurviveAndNoopsDoNotAdvanceVersions(){
         UUID note=UUID.randomUUID(),attachment=UUID.randomUUID();

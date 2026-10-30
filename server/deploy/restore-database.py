@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore a protected schema-2–9 dump and upgrade it in one offline transaction."""
+"""Restore a protected schema-2–10 dump and upgrade it in one offline transaction."""
 from pathlib import Path
 import re
 import subprocess
@@ -10,8 +10,8 @@ HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE))
 from instance_material import guard_sql, read_archive, ARCHIVE, OFFLINE_DRAIN_SQL
 
-CURRENT=9
-SUPPORTED=(2,3,4,5,6,7,8,9)
+CURRENT=10
+SUPPORTED=tuple(range(2,CURRENT+1))
 
 
 def resources():
@@ -46,7 +46,7 @@ def restore(dump,client=compose_client,db_resources=None,material=None):
     # until its declared version is supported and the complete transaction exists.
     with Path(dump).open('rb') as source:
         metadata=client('pg_restore',['--data-only','--table=tk_schema','--file=-'],input=source)
-    match=re.search(r'COPY public\.tk_schema \(id, schema_version, state\) FROM stdin;\n1\t([23456789])\tREADY\n\\\.\n',metadata)
+    match=re.search(r'COPY public\.tk_schema \(id, schema_version, state\) FROM stdin;\n1\t(10|[23456789])\tREADY\n\\\.\n',metadata)
     if not match:raise ValueError('Backup does not contain a supported ready Timekeeper schema')
     incoming=int(match[1])
     def query(sql):return client('psql',[*connection,'-X','-q','-A','-t','-v','ON_ERROR_STOP=1'],input=sql)
@@ -80,7 +80,7 @@ def restore(dump,client=compose_client,db_resources=None,material=None):
         sql.seek(0,2)
         after=schema_guard(directory,incoming)
         for version in range(incoming+1,CURRENT+1):
-            after+=(directory/{3:'recovery-v3.sql',4:'passkeys-v4.sql',5:'settings-v5.sql',6:'locale-v6.sql',7:'day-labels-v7.sql',8:'day-note-history-v8.sql',9:'instance-v9.sql'}[version]).read_text()
+            after+=(directory/{3:'recovery-v3.sql',4:'passkeys-v4.sql',5:'settings-v5.sql',6:'locale-v6.sql',7:'day-labels-v7.sql',8:'day-note-history-v8.sql',9:'instance-v9.sql',10:'notes-v10.sql'}[version]).read_text()
             after+=f'\nUPDATE public.tk_schema SET schema_version={version} WHERE id=1;\n'+schema_guard(directory,version)
         after+=guard_sql(material)
         sql.write(after.encode());sql.seek(0)

@@ -78,7 +78,7 @@ public class VaultDavResource {
     @PUT @Path("/{path:.*}") @Consumes("*/*") public Response put(@HeaderParam("If-Match")String match,@HeaderParam("If-None-Match")String none,byte[] bytes){
         if(none!=null&&!none.equals("*")||none!=null&&match!=null)throw ApiFailure.badRequest();
         return tx(()->{var vault=collection();var target=path();boolean existed=new VaultIndex(store).at(target,false)!=null;
-            var entry=vault.put(target,match,none!=null,bytes);return Response.status(existed?204:201).header("ETag",vault.tag(entry)).header("Location",root()+target.encoded()).build();});
+            var entry=vault.put(target,match,none!=null,bytes);return Response.status(existed?204:201).header("ETag",vault.tag(entry)).header("Location",root()+VaultCollection.path(entry).encoded()).build();});
     }
     @MKCOL @Path("/{path:.*}") public Response mkdir(byte[] body){
         if(body!=null&&body.length>0)throw new ApiFailure(415,"UNSUPPORTED_MEDIA_TYPE");
@@ -94,6 +94,6 @@ public class VaultDavResource {
                 ||target.getRawPath()==null||!target.getRawPath().startsWith("/"))throw ApiFailure.badRequest();
         var next=parse(target.getRawPath());
         return tx(()->{var vault=collection();if(new VaultIndex(store).at(next,false)!=null)throw new ApiFailure(412,"VAULT_DESTINATION_EXISTS");
-            var entry=vault.move(vault.get(path()),next,match);return Response.status(201).header("ETag",vault.tag(entry)).header("Location",root()+next.encoded()).build();});
+            var entry=vault.move(vault.get(path()),next,match);return Response.status(201).header("ETag",vault.tag(entry)).header("Location",root()+VaultCollection.path(entry).encoded()).build();});
     }
 }

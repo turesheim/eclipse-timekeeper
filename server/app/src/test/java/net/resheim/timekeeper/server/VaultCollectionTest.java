@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(VaultCollectionTest.Profile.class)
 class VaultCollectionTest {
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_collection_test");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("collection",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_collection_test"));}}
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     private byte[] bytes(String value){return value.getBytes(StandardCharsets.UTF_8);}
@@ -63,6 +63,15 @@ class VaultCollectionTest {
             var first=vault.page(VaultIndex.ROOT,".md",false,0,1,null);assertEquals(1,first.path("items").size());assertFalse(first.toString().contains("Secret body"));
             assertEquals(1,vault.page(VaultIndex.ROOT,".md",false,1,1,first.path("snapshot").asText()).path("items").size());
             vault.put(new VaultPath("Gamma.md"),null,true,new byte[0]);assertEquals(412,assertThrows(ApiFailure.class,()->vault.page(VaultIndex.ROOT,".md",false,1,1,first.path("snapshot").asText())).status);return null;
+        });
+    }
+    @Test void caseAliasesKeepCanonicalAncestorsAndCannotBypassJournalClassification(){
+        store.transaction("case",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();vault.mkdir(new VaultPath("Notes"));
+            var note=vault.put(new VaultPath("NOTES/First.md"),null,true,bytes("Text"));assertEquals("Notes/First.md",note.path("path").asText());
+            var day=vault.put(new VaultPath("JOURNAL/2026-10-30.md"),null,true,bytes("Daily"));assertEquals("DAY",day.path("kind").asText());assertEquals("journal/2026-10-30.md",day.path("path").asText());
+            assertEquals("Daily",new DayNotes(store).getContent(DayNotes.date("2026-10-30")).path("body").asText());
+            var moved=vault.move(note,new VaultPath("nOtEs/Second.md"),vault.tag(note));assertEquals("Notes/Second.md",moved.path("path").asText());return null;
         });
     }
 }

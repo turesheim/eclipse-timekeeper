@@ -82,11 +82,11 @@ final class VaultCollection {
     }
     private VaultSources.Ref association(VaultPath target){
         var config=settings.get();String name=target.name();
-        if(target.parent().equals(new VaultPath(config.path("journalFolder").asText()))){
+        if(target.parent().key().equals(new VaultPath(config.path("journalFolder").asText()).key())){
             if(name.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")){var date=DayNotes.date(name.substring(0,10));return new VaultSources.Ref(DayNotes.TYPE,DayNotes.id(date),date.toString());}
             if(name.matches("[0-9]{4}-W[0-9]{2}\\.md")){var week=WeekNotes.filename(name);return new VaultSources.Ref(WeekNotes.TYPE,WeekNotes.id(week),week.name());}
         }
-        if(target.parent().equals(new VaultPath(config.path("eventsFolder").asText()))&&name.startsWith("event-")&&name.endsWith(".md")){
+        if(target.parent().key().equals(new VaultPath(config.path("eventsFolder").asText()).key())&&name.startsWith("event-")&&name.endsWith(".md")){
             var key=EventNotes.filename(name);return new VaultSources.Ref(EventNotes.TYPE,key.id(),key.filename());
         }
         return null;

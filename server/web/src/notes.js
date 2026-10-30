@@ -12,11 +12,11 @@ export class NotesView {
   constructor(root,callbacks){
     Object.assign(this,{root,callbacks,generation:0,entries:new Map(),children:new Map(),expanded:new Set(),writable:false});
     const heading=node('div',undefined,'notes-heading');this.title=node('h2',t('notes.title'));this.title.id='notes-title';
-    this.toggle=action(t('notes.navigation'),()=>{this.root.classList.toggle('notes-drawer-open');this.toggle.setAttribute('aria-expanded',String(this.root.classList.contains('notes-drawer-open')));},'folder');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');this.toggle.setAttribute('aria-expanded','false');heading.append(this.title,this.toggle);
+    this.toggle=action(t('notes.navigation'),()=>{this.root.classList.toggle('notes-drawer-open');this.toggle.setAttribute('aria-expanded',String(this.root.classList.contains('notes-drawer-open')));},'folder');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');this.toggle.setAttribute('aria-expanded','false');this.settingsButton=action(t('notes.settings'),()=>void this.openSettings(),'gear');const headingActions=node('div',undefined,'notes-file-tools');headingActions.append(this.settingsButton,this.toggle);heading.append(this.title,headingActions);
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.layout=node('div',undefined,'notes-layout');this.navigation=node('aside',undefined,'notes-navigation card');this.navigation.id='notes-navigation';this.navigation.setAttribute('aria-label',t('notes.navigation'));
     const tools=node('div',undefined,'notes-navigation-tools');
-    this.newNote=action(t('notes.new_note'),()=>this.pathDialog('note'),'file-earmark-plus');this.newFolder=action(t('notes.new_folder'),()=>this.pathDialog('folder'),'folder-plus');this.refresh=action(t('ui.refresh'),()=>void this.reload(),'refresh');
+    this.newNote=action(t('notes.new_note'),()=>this.pathDialog('note'),'file-earmark-plus');this.newFolder=action(t('notes.new_folder'),()=>this.pathDialog('folder'),'folder-plus');this.refresh=action(t('notes.refresh'),()=>void this.reload(),'refresh');
     this.trash=action(t('notes.trash'),()=>{this.showTrash=!this.showTrash;this.trash.setAttribute('aria-pressed',String(this.showTrash));void this.reload();},'delete');this.trash.setAttribute('aria-pressed','false');tools.append(this.newNote,this.newFolder,this.refresh,this.trash);
     const searchLabel=node('label',t('notes.search'),'form-label');this.search=node('input',undefined,'form-control');this.search.type='search';this.search.id='notes-search';searchLabel.htmlFor=this.search.id;
     this.search.addEventListener('input',()=>{clearTimeout(this.searchTimer);this.searchTimer=setTimeout(()=>void this.reload(),250);});
@@ -29,9 +29,9 @@ export class NotesView {
     this.resize.addEventListener('pointerup',event=>this.resize.releasePointerCapture(event.pointerId));
     this.resize.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();width(event.key==='Home'?180:event.key==='End'?480:(this.navWidth||260)+(event.key==='ArrowLeft'?-20:20));}});
     this.editor=node('section',undefined,'notes-editor card');this.editor.setAttribute('aria-labelledby','notes-document-title');this.documentTitle=node('h3',t('notes.select'));this.documentTitle.id='notes-document-title';
-    const fileTools=node('div',undefined,'notes-file-tools');this.rename=action(t('notes.move'),()=>this.pathDialog('move'),'edit');this.remove=action(t('notes.delete'),()=>void this.delete(),'delete');this.recover=action(t('notes.restore'),()=>void this.restore(),'arrow-counterclockwise');this.reloadNote=action(t('notes.reload'),()=>{if(this.canLeave())void this.select(this.note?.id,true);},'refresh');fileTools.append(this.rename,this.remove,this.recover,this.reloadNote);
+    const fileTools=node('div',undefined,'notes-file-tools');this.rename=action(t('notes.move'),()=>this.pathDialog('move'),'edit');this.remove=action(t('notes.delete'),()=>void this.delete(),'delete');this.recover=action(t('notes.restore'),()=>void this.restore(),'arrow-counterclockwise');this.reloadNote=action(t('notes.reload'),()=>{if(this.canLeave())void this.select(this.note?.id,true);},'refresh');this.download=action(t('notes.download_attachment'),()=>void this.downloadAttachment(),'download');fileTools.append(this.rename,this.remove,this.recover,this.reloadNote,this.download);
     const resources={allowsAsset:reference=>!!this.linkPath(reference),allowsLink:reference=>!!this.linkPath(reference),image:(reference,alt)=>this.image(reference,alt),openLink:reference=>void this.openLink(reference)};
-    const host=node('div',undefined,'notes-markdown');this.markdown=new MarkdownField(host,()=>this.controls(),()=>{},'notes',file=>this.upload(file),resources);
+    const host=node('div',undefined,'notes-markdown');this.markdown=new MarkdownField(host,()=>this.controls(),()=>{},'notes',(file,image)=>this.upload(file,image),resources);
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.save=action(t('ui.save'),()=>void this.commit());this.save.className='btn btn-primary';const footer=node('div',undefined,'notes-footer');footer.append(this.status,this.save);
     this.editor.append(this.documentTitle,fileTools,this.empty,host,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
@@ -40,28 +40,38 @@ export class NotesView {
     this.dialogError=node('p','','alert alert-danger');this.dialogError.hidden=true;this.dialogError.setAttribute('role','alert');
     const buttons=node('div',undefined,'dialog-actions');this.cancel=action(t('ui.cancel'),()=>{if(!this.busy)this.dialog.close();});this.apply=node('button',t('ui.save'),'btn btn-primary');this.apply.type='submit';buttons.append(this.cancel,this.apply);this.form.append(pathLabel,this.pathInput,this.dialogError,buttons);this.dialog.append(this.dialogTitle,this.form);root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
+    this.settingsDialog=node('dialog',undefined,'app-dialog');this.settingsDialog.setAttribute('aria-labelledby','notes-settings-title');const settingsTitle=node('h2',t('notes.settings'));settingsTitle.id='notes-settings-title';this.settingsForm=node('form');this.settingsFields={};
+    this.settingsForm.append(node('p',t('notes.settings_help'),'hint'));
+    for(const name of ['journalFolder','eventsFolder','assetsFolder']){const label=node('label',t('notes.'+name),'form-label'),input=node('input',undefined,'form-control');input.id='notes-setting-'+name;input.required=true;input.maxLength=1024;label.htmlFor=input.id;this.settingsFields[name]=input;this.settingsForm.append(label,input);}
+    const configLabel=node('label',undefined,'form-check-label');this.configCheckbox=node('input',undefined,'form-check-input');this.configCheckbox.type='checkbox';configLabel.append(this.configCheckbox,document.createTextNode(' '+t('notes.config_opt_in')));const configField=node('div',undefined,'form-check');configField.append(configLabel);this.settingsForm.append(configField,node('p',t('notes.config_help'),'hint'));
+    this.settingsError=node('p','','alert alert-danger');this.settingsError.setAttribute('role','alert');this.settingsError.hidden=true;this.settingsForm.append(this.settingsError);
+    const settingsActions=node('div',undefined,'dialog-actions');this.settingsCancel=action(t('ui.cancel'),()=>{if(!this.busy)this.settingsDialog.close();});this.settingsApply=node('button',t('ui.save'),'btn btn-primary');this.settingsApply.type='submit';settingsActions.append(this.settingsCancel,this.settingsApply);this.settingsForm.append(settingsActions);this.settingsDialog.append(settingsTitle,this.settingsForm);root.append(this.settingsDialog);
+    this.settingsDialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.settingsForm.addEventListener('submit',event=>{event.preventDefault();void this.saveSettings();});
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
     this.observer=new ResizeObserver(()=>this.fit());this.observer.observe(document.documentElement);window.addEventListener('resize',()=>this.fit());this.controls();
   }
   dirty(){return !!this.note&&!this.binary&&this.markdown.value()!==this.original;}
-  canLeave(){return !this.busy&&(!this.dirty()||confirm(t('journal.discard')));}
+  canLeave(){return !this.busy&&(!this.dirty()||confirm(t('notes.discard')));}
   update(snapshot,connected,session,writable){
     if(this.session&&this.session!==session)this.reset();this.session=session;this.writable=connected&&writable;this.controls();
     if(this.visible&&!this.busy&&!this.loading)void this.reload();
   }
   show(){this.visible=true;this.fit();if(this.session)void this.reload();}
   hide(){this.visible=false;}
-  reset(){++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  reset(){++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.settingsDialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
   fit(){if(!this.visible)return;const bar=document.getElementById('workspace-navigation');const bottom=bar?.getBoundingClientRect().top||innerHeight;this.layout.style.height=Math.max(280,bottom-this.layout.getBoundingClientRect().top-8)+'px';}
   controls(){
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.save.disabled=!write||!this.dirty()||this.markdown.loading;this.save.hidden=!this.note||this.binary||this.note.deleted;
     this.rename.disabled=this.remove.disabled=!write||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;
     this.reloadNote.disabled=!this.note||this.busy;this.apply.disabled=this.cancel.disabled=!!this.busy;
-    this.empty.hidden=!!this.note&&!this.binary;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
+    this.download.hidden=!this.note||this.note.kind!=='BINARY'&&this.note.kind!=='ASSET'||this.note.deleted;this.download.disabled=!!this.busy;
+    this.settingsButton.disabled=!this.session||this.busy;this.settingsApply.disabled=!this.writable||this.busy;this.settingsCancel.disabled=!!this.busy;
+    for(const input of [...Object.values(this.settingsFields),this.configCheckbox])input.disabled=!this.writable||this.busy;
+    this.empty.hidden=!!this.note&&!this.binary&&!this.note.deleted;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
     if(this.note&&!this.busy)this.status.textContent=this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
   }
-  fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}
+  fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}
   async list(parameters,session){
     const rows=[];let offset=0,snapshot;
     do{const query=new URLSearchParams({...parameters,offset,limit:this.info.limits.pageSize});const reply=await session.request('/notes/entries?'+query,{etag:snapshot});snapshot=reply.data.snapshot;rows.push(...reply.data.items);offset=reply.data.nextOffset;}while(offset!==undefined);
@@ -75,7 +85,7 @@ export class NotesView {
       if(search||this.showTrash){const rows=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session);children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
       else for(const parent of [this.info.rootId,...this.expanded]){const rows=await this.list({parentId:parent},session);children.set(parent,rows);for(const row of rows)entries.set(row.id,row);}
       if(session!==this.session||current!==this.loadGeneration)return;this.children=children;this.entries=entries;this.paint();this.error.hidden=true;
-      if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.etag!==this.note.etag)this.stale=true;}
+      if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.etag!==this.note.etag)this.stale=true;else{this.note={...reply.data,etag:reply.etag};this.documentTitle.textContent=this.note.path;}}
     }catch(error){if(session===this.session&&current===this.loadGeneration)this.fail(error);}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.controls();}}
   }
@@ -142,9 +152,17 @@ export class NotesView {
     catch(error){if(session===this.session&&current===this.generation){this.stale=true;this.fail(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
   }
-  async upload(file){
+  async upload(file,image){
     if(!this.note||!this.writable||this.stale||this.busy)throw new Error();
     const session=this.session,current=this.generation,parent=this.note.path.split('/').slice(0,-1).join('/'),name=file.name,path=(parent?parent+'/':'')+name;
+    if(['DAY','WEEK','EVENT'].includes(this.note.kind)){
+      if(file.size>5_000_000||image&&!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type))throw new Error();
+      const suffix=(name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin').toLowerCase(),filename=crypto.randomUUID()+'.'+suffix,bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+      for(let offset=0;offset<bytes.length;offset+=8192)binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
+      if(session!==this.session||current!==this.generation)throw new Error();
+      await session.request('/journal-assets/'+filename,{method:'PUT',noneMatch:'*',body:{data:btoa(binary)},emptyResponse:true,timeout:60000});
+      if(session!==this.session||current!==this.generation)throw new Error();this.callbacks.onChanged?.();return 'assets/'+filename;
+    }
     const reply=await session.request('/notes/files?'+new URLSearchParams({path}),{method:'PUT',noneMatch:'*',rawBody:file});
     if(session!==this.session||current!==this.generation)throw new Error();this.callbacks.onChanged?.();return encodeURIComponent(name);
   }
@@ -159,4 +177,22 @@ export class NotesView {
     return {dom,destroy(){disposed=true;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
   }
   async openLink(reference){const session=this.session,current=this.generation;try{const entry=await this.resolveLink(reference,session);if(session===this.session&&current===this.generation)await this.select(entry.id);}catch(error){if(session===this.session&&current===this.generation)this.fail(error);}}
+  async downloadAttachment(){
+    if(!this.note||this.download.disabled)return;const session=this.session,current=this.generation,note=this.note;
+    try{const reply=await session.request('/notes/entries/'+note.id+'/content',{binary:'application/octet-stream'});if(session!==this.session||current!==this.generation)return;
+      const url=URL.createObjectURL(reply.data),link=node('a');link.href=url;link.download=note.path.split('/').at(-1);link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
+  }
+  async openSettings(){
+    if(!this.session||this.busy)return;const session=this.session,current=this.generation;this.settingsError.hidden=true;
+    try{const reply=await session.request('/notes/settings');if(session!==this.session||current!==this.generation)return;this.settingsEtag=reply.etag;this.originalSettings=reply.data;for(const [name,input]of Object.entries(this.settingsFields))input.value=reply.data[name];this.configCheckbox.checked=reply.data.syncObsidianConfig;this.controls();this.settingsDialog.showModal();}
+    catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
+  }
+  async saveSettings(){
+    if(!this.writable||this.busy)return;const session=this.session,current=this.generation;this.busy=true;this.controls();
+    const body=Object.fromEntries(Object.entries(this.settingsFields).filter(([name,input])=>input.value!==this.originalSettings[name]).map(([name,input])=>[name,input.value]));if(this.configCheckbox.checked!==this.originalSettings.syncObsidianConfig)body.syncObsidianConfig=this.configCheckbox.checked;
+    try{await session.request('/notes/settings',{method:'PUT',etag:this.settingsEtag,body});if(session!==this.session||current!==this.generation)return;this.info=null;this.folder=null;this.settingsDialog.close();this.busy=false;await this.reload();this.callbacks.onChanged?.();}
+    catch(error){if(session===this.session&&current===this.generation){this.settingsError.hidden=false;this.settingsError.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
+    finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
+  }
 }
