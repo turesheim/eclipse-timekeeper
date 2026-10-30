@@ -242,3 +242,41 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();await expect(today.locator('.bi-journal-text')).toHaveCount(0);
   }finally{await context.close();}
 });
+
+test('subscribed calendar to-dos show due dates and completion in Week and Today without counting worked time',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request);
+  try{
+    const body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//To-do browser test//EN\r\n'+[
+      'UID:due-task\nDUE;VALUE=DATE:20260504\nSUMMARY:Submit report\nSTATUS:NEEDS-ACTION\nDESCRIPTION:Read-only calendar task',
+      'UID:timed-task\nDUE:20260504T120000Z\nSUMMARY:Finished review\nSTATUS:COMPLETED',
+      'UID:undated-task\nSUMMARY:Someday task'
+    ].map(fields=>'BEGIN:VTODO\r\nDTSTAMP:20260101T000000Z\r\n'+fields.replaceAll('\n','\r\n')+'\r\nEND:VTODO\r\n').join('')+'END:VCALENDAR\r\n';
+    const reply=await request.post(fixture()+'/feeds',{data:{body}});expect(reply.status()).toBe(201);const feed=await reply.json();
+    await calendar(page);const before=(await(await api('GET',reportPath)).json()).total,subscription=await subscribe(page,client,feed);
+    await expect(page.locator('.calendar-all-day-event').filter({hasText:'Submit report'})).toBeVisible();
+    await expect(page.locator('.calendar-all-day-event').filter({hasText:'Someday task'})).toContainText('No date');
+    await expect(planned(page,subscription)).toContainText('To-do · Completed');
+    await planned(page,subscription).click();const details=page.locator('#calendar-event-details');await expect(details).toContainText('read-only');await expect(details.getByRole('button',{name:'Create activity',exact:true})).toBeHidden();await details.getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    const events=page.locator('#today-events');await expect(events.locator('[data-today-event]')).toHaveCount(3);await expect(events).toContainText('Submit report');await expect(events).toContainText('To-do · Completed');await expect(events).toContainText('14:00');await expect(events).toContainText('No date');
+    await events.getByRole('button').filter({hasText:'Submit report'}).click();await expect(page.locator('#today-event-details')).toContainText('Read-only calendar task');await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
+    expect((await(await api('GET',reportPath)).json()).total).toBe(before);
+  }finally{await context.close();}
+});
+
+test('Today periodically reloads calendar items and shows subscription errors without losing an editor draft',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request);
+  try{
+    await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);
+    await page.clock.install();await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    await expect(page.locator('#today-events')).toContainText('Planned meeting');
+    // Simulate a newly refreshed server snapshot without emitting a domain change.
+    const snapshot=(await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json());
+    snapshot.items[0].title='Newly fetched meeting';snapshot.errors[subscription.id]='CALENDAR_INVALID_FEED';
+    await page.route('**/api/v1/calendar-events?*',route=>route.fulfill({json:snapshot}));
+    const source=page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true});await source.click();
+    const draft=page.locator('#today-journal-body');await draft.fill('Keep this unsaved note');
+    await page.clock.fastForward(31000);
+    await expect(page.locator('#today-events')).toContainText('Newly fetched meeting');await expect(page.locator('#today-events .alert-warning')).toBeVisible();await expect(draft).toHaveValue('Keep this unsaved note');
+  }finally{await context.close();}
+});

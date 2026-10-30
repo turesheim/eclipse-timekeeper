@@ -98,7 +98,7 @@ final class CalendarSubscriptions {
         var values=new CalendarFeed(feed.get().get("body").asText()).occurrences(first,last,ZoneId.of(store.profile().path("zoneId").asText()));
         return values.stream().map(value->{var node=value.json();node.put("subscriptionId",subscription.path("id").asText()).put("calendarName",subscription.path("name").asText())
                 .put("clientId",client.path("id").asText()).put("clientName",client.path("name").asText()).put("color",client.path("color").asText());
-            node.remove("eventVersion");node.put("eventVersion",hash(canonical(node).toString()));return node;}).toList();
+            node.remove("eventVersion");node.put("eventVersion",CalendarFeed.version(node));return node;}).toList();
     }
     ObjectNode noteEvent(UUID subscription,String key,String first,String last){
         var dates=window(first,last);
@@ -130,6 +130,7 @@ final class CalendarSubscriptions {
         try{event=occurrences(subscription,dates[0],dates[1]).stream().filter(value->value.path("key").asText().equals(key)).findFirst().orElseThrow(()->new ApiFailure(409,"CALENDAR_EVENT_CHANGED"));}
         catch(CalendarFailure failure){throw new ApiFailure(409,"CALENDAR_EVENT_CHANGED");}
         if(!event.path("eventVersion").asText().equals(input.path("eventVersion").asText()))throw new ApiFailure(409,"CALENDAR_EVENT_CHANGED");
+        if(event.path("componentType").asText().equals("VTODO"))throw new ApiFailure(422,"CALENDAR_TODO_READ_ONLY");
         var activity=input.get("activity");if(!activity.hasNonNull("end"))throw ApiFailure.validation();
         Instant start=Instant.parse(activity.path("start").asText()),end=Instant.parse(activity.path("end").asText());
         if(start.isAfter(store.now()))throw new ApiFailure(422,"CALENDAR_FUTURE_ACTIVITY");

@@ -665,6 +665,30 @@ returns `409 CALENDAR_EVENT_CHANGED`; a second conversion command returns
 `422 CALENDAR_FUTURE_ACTIVITY`. All-day events require an explicitly reviewed,
 completed interval; zero-duration timed events remain valid markers.
 
+Subscribed feeds also expose `VTODO` items through `/calendar-events`, marked
+with `componentType: "VTODO"`, `todoStatus` and `undated`. A dated to-do appears
+on its `DUE` date/time, or its scheduled `DTSTART` when there is no due date;
+`DTSTART` plus `DURATION` places its due marker at the calculated end. These are
+calendar markers, not booked intervals. Date-only markers retain civil dates.
+Recurrence, exclusions, moved occurrences, revisions and cancellations follow
+the same bounded expansion as events, with distinct event/to-do identity keys.
+Completed dated items retain their status. Open undated items appear across the
+requested window with `undated: true`; their presentation bounds do not imply a
+deadline and do not change their stable identity/version. Completed or cancelled
+undated items are omitted. Both Today and Week show source details and permit
+associated notes, while completion edits remain in the source calendar.
+Attempting activity conversion of a subscribed to-do returns
+`422 CALENDAR_TODO_READ_ONLY`. This does not create a native Timekeeper task or
+provide provider write-back; only items actually published in the subscribed
+ICS feed can be displayed. In particular, the separate task-provider APIs and
+connectors described in [the task protocol](TASK-SYNC-PROTOCOL.md) remain separate.
+
+Today, like Week, reloads subscription results every 30 seconds while visible.
+The server refreshes upstream feeds at its existing 15-minute interval. Today
+shows visible-subscription download/parse failures rather than silently treating
+a partial result as an empty calendar. Source providers can cache published ICS
+feeds independently of Timekeeper.
+
 Private `CAL_SUB`, `CAL_FEED` and `CAL_LINK` records use existing owner-scoped
 storage. Network I/O runs outside owner transactions; refresh claims and final
 publication are fenced by expiring database leases and source configuration.

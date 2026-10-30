@@ -1204,5 +1204,12 @@
   "notes.download_attachment": "Last ned vedlegg",
   "notes.ambiguous_link": "Vedleggsnavnet samsvarer både med et eldre dagbokvedlegg og en annen relativ fil. Bruk en uttrykkelig relativ sti for å velge riktig fil.",
   "notes.webdav_url": "WebDAV-adresse for notatsamlingen",
-  "notes.sync_guide": "Manuelt synkroniseringsoppsett og klientbegrensninger"
+  "notes.sync_guide": "Manuelt synkroniseringsoppsett og klientbegrensninger",
+  "calendar.todo": "Gjøremål",
+  "calendar.undated": "Ingen dato",
+  "calendar.todo_read_only": "Dette abonnerte gjøremålet er skrivebeskyttet. Gjør endringer i kildekalenderen.",
+  "calendar.todo_status.NEEDS-ACTION": "Ikke påbegynt",
+  "calendar.todo_status.IN-PROCESS": "Pågår",
+  "calendar.todo_status.COMPLETED": "Fullført",
+  "calendar.todo_status.CANCELLED": "Avbrutt"
 }

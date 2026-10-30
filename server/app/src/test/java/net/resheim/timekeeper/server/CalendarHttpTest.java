@@ -69,6 +69,16 @@ class CalendarHttpTest {
     private ObjectNode activity(JsonNode event){var value=object().putNull("taskId").putNull("projectId").put("summary","Reviewed meeting").put("start",event.path("start").asText()).put("end",event.path("end").asText());value.putArray("labelIds");return value;}
     private ObjectNode conversion(JsonNode event){var value=object().put("fromDate","2026-05-04").put("toDate","2026-05-11").put("eventVersion",event.path("eventVersion").asText());value.set("activity",activity(event));return value;}
     private String conversionPath(String subscription,JsonNode event){return subscription+"/events/"+event.path("key").asText()+"/activity";}
+    @Test void subscribedTodosRefreshWithStableIdentityAndCannotBeConvertedToWorkedTime(){
+        String body="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Todo test//EN\r\nBEGIN:VTODO\r\nUID:http-todo\r\nDTSTAMP:20260101T000000Z\r\nDUE;VALUE=DATE:20260504\r\nSUMMARY:Submit report\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+        Feeds.body.set(body);String path=subscribe(client("test-a").path("id").asText());refresh(path).then().statusCode(200);
+        var item=events().path("items").get(0);assertEquals("VTODO",item.path("componentType").asText());assertEquals("NEEDS-ACTION",item.path("todoStatus").asText());
+        assertEquals("2026-05-04",item.path("firstDate").asText());assertEquals("2026-05-05",item.path("endDate").asText());
+        assertEquals(0,parse(get("test-b","/calendar-events?fromDate=2026-05-04&toDate=2026-05-05").asString()).path("items").size());
+        assertEquals("CALENDAR_TODO_READ_ONLY",parse(post("test-a",conversionPath(path,item),conversion(item)).then().statusCode(422).extract().asString()).path("code").asText());
+        clock.set(NOW.plusSeconds(31));Feeds.body.set(body.replace("STATUS:NEEDS-ACTION","STATUS:COMPLETED"));refresh(path).then().statusCode(200);
+        var changed=events().path("items").get(0);assertEquals(item.path("key"),changed.path("key"));assertNotEquals(item.path("eventVersion"),changed.path("eventVersion"));assertEquals("COMPLETED",changed.path("todoStatus").asText());
+    }
     @Test void configurationHasOwnedConditionalBoundariesAndNeverReturnsTheCredentialUrl(){
         String client=client("test-a").path("id").asText(),foreign=client("test-b").path("id").asText();var input=configuration(client);String key=UUID.randomUUID().toString();
         var created=call("test-a","POST","/calendar-subscriptions",input,null,key);created.then().statusCode(201);assertFalse(created.asString().contains("private-access"));assertFalse(parse(created.asString()).has("url"));

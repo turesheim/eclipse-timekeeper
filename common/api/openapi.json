@@ -25445,6 +25445,27 @@
           "hasNote": {
             "type": "boolean",
             "description": "This occurrence has a nonempty account-private note."
+          },
+          "componentType": {
+            "type": "string",
+            "enum": [
+              "VEVENT",
+              "VTODO"
+            ],
+            "description": "Absent on legacy/event items; VTODO identifies a read-only subscribed to-do, never worked time."
+          },
+          "todoStatus": {
+            "type": "string",
+            "enum": [
+              "NEEDS-ACTION",
+              "IN-PROCESS",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "undated": {
+            "type": "boolean",
+            "description": "An open undated to-do projected across the requested window. Presentation start/end dates are not a deadline."
           }
         },
         "required": [

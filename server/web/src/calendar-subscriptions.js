@@ -1,3 +1,4 @@
+import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
@@ -158,26 +159,23 @@ export class CalendarSubscriptions {
       else for(const input of this.fields.querySelectorAll('input,select'))input.disabled=false;
     }finally{view.busy=false;if(draft===this.draft){draft.busy=false;this.submit.disabled=!this.writable||draft.uncertain&&!draft.key;this.cancel.disabled=false;}}
   }
-  eventDate(event) {
-    if(!event.allDay)return instantText(event.start,this.data.profile.data.zoneId)+' → '+instantText(event.end,this.data.profile.data.zoneId);
-    const format=date=>dateTimeFormat(getLocale(),{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
-    const last=addDays(event.endDate,-1);return t('calendar.all_day')+' · '+format(event.firstDate)+(last!==event.firstDate?' – '+format(last):'');
-  }
+  eventDate(event) {return calendarItemWhen(event,this.data.profile.data.zoneId);}
   paintAllDay() {
     const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay);this.allDay.replaceChildren();this.allDay.hidden=!values.length;
     if(!values.length)return;const title=node('h3',t('calendar.all_day_plans'));title.id='calendar-all-day-title';this.allDay.append(title);
-    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);const title=node('strong',value.title||t('calendar.untitled')),marker=eventNoteIndicator(value);if(marker)title.append(' ',marker);pick.append(title,node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
+    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);const title=node('strong',value.title||t('calendar.untitled')),marker=eventNoteIndicator(value);if(marker)title.append(' ',marker);pick.append(title,node('span',this.eventDate(value)));if(calendarTodo(value))pick.append(node('small',calendarItemStatus(value)));pick.append(node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
     if(key&&document.activeElement===document.body)this.allDay.querySelector(`[data-calendar-event-key="${key}"]`)?.focus();
   }
   openEvent(event,date=null) {
     if(!this.details.open)this.originDate=date;
     this.selected=event;this.detailZone=this.data.profile.data.zoneId;this.details.replaceChildren();const title=node('h2',event.title||t('calendar.untitled'));title.id='calendar-event-title';
     this.detailNotice=node('p',undefined,'hint');this.detailNotice.setAttribute('role','status');
-    this.convert=button(t('calendar.create_activity'),()=>{const selected=this.selected;if(!selected||!this.writable||selected.activityIds?.length)return;const range={fromDate:this.data.dates.first,toDate:addDays(this.data.dates.first,7)};this.details.close();this.callbacks.onConvert(selected,range);},'btn btn-primary');
-    this.convert.disabled=!this.writable||!!event.activityIds?.length;
-    if(event.activityIds?.length)this.detailNotice.textContent=t('calendar.already_recorded');else if(!this.writable)this.detailNotice.textContent=t('calendar.read_only');
+    this.convert=button(t('calendar.create_activity'),()=>{const selected=this.selected;if(!selected||calendarTodo(selected)||!this.writable||selected.activityIds?.length)return;const range={fromDate:this.data.dates.first,toDate:addDays(this.data.dates.first,7)};this.details.close();this.callbacks.onConvert(selected,range);},'btn btn-primary');
+    this.convert.hidden=calendarTodo(event);this.convert.disabled=calendarTodo(event)||!this.writable||!!event.activityIds?.length;
+    if(calendarTodo(event))this.detailNotice.textContent=t('calendar.todo_read_only');else if(event.activityIds?.length)this.detailNotice.textContent=t('calendar.already_recorded');else if(!this.writable)this.detailNotice.textContent=t('calendar.read_only');
     const actions=node('div',undefined,'dialog-actions');actions.append(eventNoteButton(event,()=>void this.eventNoteEditor.open(event,this.scope,this.writable,this.data.profile.data.zoneId)),button(t('ui.close'),()=>this.details.close()),this.convert);
     this.details.append(title,node('p',this.eventDate(event)),node('p',event.clientName+' · '+event.calendarName,'hint'));
+    if(calendarTodo(event))this.details.append(node('p',calendarItemStatus(event)));
     if(event.location)this.details.append(node('p',t('calendar.location',{location:event.location})));
     if(event.description)this.details.append(node('p',event.description,'calendar-description'));
     this.details.append(this.detailNotice,actions);if(!this.details.open)this.details.showModal();actions.querySelector('button').focus();
@@ -188,6 +186,6 @@ export class CalendarSubscriptions {
       this.convert.disabled=true;this.detailNotice.replaceChildren(node('span',t('calendar.event_changed')));
       if(current)this.detailNotice.append(' ',button(t('calendar.review_updated'),()=>this.openEvent(current),'btn btn-link'));
     }else if(current.activityIds?.length){this.convert.disabled=true;this.detailNotice.textContent=t('calendar.already_recorded');}
-    else this.convert.disabled=!this.writable;
+    else this.convert.disabled=calendarTodo(current)||!this.writable;
   }
 }
