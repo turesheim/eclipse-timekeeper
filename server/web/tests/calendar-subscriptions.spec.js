@@ -278,9 +278,9 @@ test('Today periodically reloads calendar items and shows subscription errors wi
     await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
     await expect(page.locator('#today-events')).toContainText('Planned meeting');
     // Simulate a newly refreshed server snapshot without emitting a domain change.
-    const snapshot=(await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json());
+    const snapshotReply=await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05'),snapshot=await snapshotReply.json();
     snapshot.items[0].title='Newly fetched meeting';snapshot.errors[subscription.id]='CALENDAR_INVALID_FEED';
-    await page.route('**/api/v1/calendar-events?*',route=>route.fulfill({json:snapshot}));
+    await page.route('**/api/v1/calendar-events?*',route=>route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':snapshotReply.headers()['x-timekeeper-owner']}}));
     const source=page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true});await source.click();
     const draft=page.locator('#today-journal-body');await draft.fill('Keep this unsaved note');
     await expect(page.locator('#today-events')).toContainText('Newly fetched meeting',{timeout:35000});await expect(page.locator('#today-events .alert-warning')).toBeVisible();await expect(draft).toHaveValue('Keep this unsaved note');
