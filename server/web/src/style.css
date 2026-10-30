@@ -127,6 +127,9 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-sidebar { --today-sidebar-heading-font-size: calc(1rem - 1pt); --today-calendar-font-size: .7rem; }
 .today-sidebar, .today-calendar { display: grid; gap: .75rem; }
 .today-calendar { min-width: 0; align-content: start; }
+.today-day-label { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.today-day-label .journal-note-label { min-width: 0; margin: 0; }
+.today-day-label > .icon { flex: none; color: var(--muted); }
 .today-month, .today-summary { padding: .85rem; }
 .today-month-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
 .today-month-heading h3, .today-summary h3 { margin: 0; font-size: var(--today-sidebar-heading-font-size); }

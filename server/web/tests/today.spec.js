@@ -45,6 +45,9 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect(await page.locator('#today-month-grid').evaluate(grid=>getComputedStyle(grid,'::before').borderInlineStartWidth)).toBe('1px');
     const dayLabel=page.locator('#today-day-label');
     await expect(dayLabel.getByLabel('Day label',{exact:true})).toBeEnabled();
+    await expect(dayLabel).not.toHaveClass(/card/);await expect(dayLabel).toHaveCSS('border-top-width','0px');
+    await expect(dayLabel.locator('label')).toHaveClass(/visually-hidden/);await expect(dayLabel.locator('.bi-tag')).toHaveAttribute('title','Day label');
+    const labelBox=await dayLabel.locator('input').boundingBox(),labelIcon=await dayLabel.locator('.bi-tag').boundingBox();expect(labelIcon.x).toBeGreaterThan(labelBox.x+labelBox.width);
     await expect(page.locator('#today-note-editor #today-note-text')).toHaveCount(0);
     expect(await dayLabel.locator('input').evaluate(input=>input.form?.id)).toBe('today-note-form');
     const toolbar=page.locator('#today-note-editor').getByRole('toolbar',{name:'Formatting',exact:true});

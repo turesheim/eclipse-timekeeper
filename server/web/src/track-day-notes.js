@@ -24,7 +24,7 @@ export class TrackDayNotes {
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
     this.content=node('div',undefined,'journal-content');this.content.append(this.title);
-    if(this.labelRoot){this.text.setAttribute('form',this.form.id);this.text.disabled=true;this.labelRoot.append(label,this.text);}else this.content.append(label,this.text);
+    if(this.labelRoot){this.text.setAttribute('form',this.form.id);this.text.disabled=true;label.classList.add('visually-hidden');const marker=icon('tag');marker.title=t('day_notes.text');this.labelRoot.append(label,this.text,marker);}else this.content.append(label,this.text);
     this.content.append(this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
