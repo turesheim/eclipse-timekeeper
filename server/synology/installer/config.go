@@ -30,7 +30,7 @@ func packageDisplayName() string {
 }
 
 const nativePSQL = "/var/packages/postgresql/target/bin/psql"
-const currentSchema = 9
+const currentSchema = 10
 
 func supportedSchema(version int) bool { return version >= 2 && version <= currentSchema }
 func supportedUpgrade(from, to int) bool {

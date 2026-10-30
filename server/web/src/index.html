@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./calendar.css">
   <link rel="stylesheet" href="./markdown.css">
+  <link rel="stylesheet" href="./notes.css">
   <link rel="stylesheet" href="./themes.css">
   <script type="module" src="./bootstrap.js" data-timekeeper-entry="/web/app.js"></script>
 </head>
@@ -73,9 +74,11 @@
         <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities" data-i18n-aria-label="ui.activities" data-i18n-title="ui.activities"><span class="icon bi bi-hourglass-split" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.activities">Activities</span></span></button>
         <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients" data-i18n-aria-label="ui.clients" data-i18n-title="ui.clients"><span class="icon bi bi-buildings" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.clients">Clients</span></span></button>
         <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects" data-i18n-aria-label="ui.projects" data-i18n-title="ui.projects"><span class="icon bi bi-folder" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.projects">Projects</span></span></button>
+        <button class="nav-link" data-tab="notes" aria-label="Notes" title="Notes" data-i18n-aria-label="notes.title" data-i18n-title="notes.title"><span class="icon bi bi-journals" aria-hidden="true"></span><span class="nav-label"><span data-i18n="notes.title">Notes</span></span></button>
         </div></div>
       </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
+      <section id="notes-panel" hidden aria-labelledby="notes-title"></section>
       <section id="today-panel" aria-labelledby="today-title">
         <div class="toolbar track-toolbar today-toolbar">
           <div class="track-controls today-date-navigation"><div class="today-date-field"><label class="form-label" for="today-date"><span data-i18n="today.date">Date</span></label><div class="input-group"><input class="form-control" id="today-date" type="date" required><button class="btn btn-outline-secondary" id="today-date-choose" type="button"><span data-i18n="today.choose_date">Choose date</span></button></div></div><div class="calendar-navigation"><button class="btn btn-outline-secondary" id="today-previous" type="button"><span data-i18n="today.previous_day">Previous day</span></button><button class="btn btn-outline-secondary" id="today-current" type="button"><span data-i18n="ui.today">Today</span></button><button class="btn btn-outline-secondary" id="today-next" type="button"><span data-i18n="today.next_day">Next day</span></button></div></div>

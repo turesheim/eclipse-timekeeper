@@ -120,6 +120,7 @@ final class DayNotes {
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
         var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("markdown",markdown).put("modifiedAt",store.now().toString()).put("hasBody",!body.isEmpty()).put("deleted",deleted).put("labelIndependent",true);
         var stored=value.deepCopy();stored.remove(List.of("hasBody","deleted"));
+        var vault=VaultCatalog.before(store,new VaultSources.Ref(TYPE,id(date),date.toString()),deleted?null:markdown.getBytes(StandardCharsets.UTF_8));
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,id(date),stored.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,stored.toString(),store.owner(),TYPE,id(date),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
         if(deleted){
@@ -131,6 +132,7 @@ final class DayNotes {
         // make an older editor's ETag valid again. Existing clients already
         // understand profile invalidations; no Eclipse/domain type is added.
         new DayNoteHistory(store).note(date,previous,value);
+        VaultCatalog.complete(vault);
         store.change("PROFILE","UPDATED",store.owner());return get(date);
     }
     void restoreDocument(LocalDate date,byte[] bytes){

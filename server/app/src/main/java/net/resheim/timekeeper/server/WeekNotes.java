@@ -36,7 +36,7 @@ final class WeekNotes {
         if(filename==null||!filename.matches("[0-9]{4}-W[0-9]{2}\\.md"))throw ApiFailure.validation();
         return week(filename.substring(0,8));
     }
-    private static UUID id(Week week){return DayNotes.id(week.monday());}
+    static UUID id(Week week){return DayNotes.id(week.monday());}
     private ObjectNode record(Week week){
         var value=store.find(TYPE,id(week)).map(record->((ObjectNode)record).deepCopy()).orElseGet(()->object()
                 .put("id",id(week).toString()).put("ownerId",store.owner()).put("version",0).put("week",week.name()).put("body",""));
@@ -79,6 +79,7 @@ final class WeekNotes {
         var value=previous.deepCopy().put("version",version+1).put("body",body).put("modifiedAt",store.now().toString())
                 .put("hasBody",!body.isEmpty()).put("deleted",deleted);
         var stored=value.deepCopy();stored.remove(List.of("hasBody","deleted"));
+        var vault=VaultCatalog.before(store,new VaultSources.Ref(TYPE,id(week),week.name()),deleted?null:body.getBytes(StandardCharsets.UTF_8));
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,id(week),stored.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,stored.toString(),store.owner(),TYPE,id(week),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
         if(deleted){
@@ -86,6 +87,7 @@ final class WeekNotes {
             if(marker.isEmpty())state.insert(JournalState.Kind.WEEK_NOTE_DELETE,id(week),object().put("week",week.name()).put("noteVersion",version+1));
             else state.update(JournalState.Kind.WEEK_NOTE_DELETE,marker.get().put("noteVersion",version+1));
         }
+        VaultCatalog.complete(vault);
         store.change("PROFILE","UPDATED",store.owner());return publicValue(value);
     }
     private static ObjectNode publicValue(ObjectNode value){var result=value.deepCopy();result.remove("modifiedAt");return result;}

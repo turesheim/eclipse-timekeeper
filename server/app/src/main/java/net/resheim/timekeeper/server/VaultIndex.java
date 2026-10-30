@@ -37,6 +37,12 @@ final class VaultIndex {
         if(!type.equals(pointer.path("sourceType").asText())||!source.toString().equals(pointer.path("sourceId").asText()))throw ApiFailure.conflict();
         return get(uuid(pointer.path("entryId")));
     }
+    ObjectNode content(UUID entryId,VaultSources.Snapshot snapshot,long retainedBytes){
+        var entry=get(entryId).put("contentTag",snapshot.tag()).put("contentVersion",snapshot.version())
+                .put("byteLength",snapshot.byteLength()).put("retainedBytes",retainedBytes)
+                .put("sha256",snapshot.sha256()).put("modifiedAt",snapshot.modifiedAt().toString());
+        return write(ENTRY,entryId,entry);
+    }
     ObjectNode create(VaultPath target,Kind kind,String sourceType,UUID sourceId,String sourceKey){
         if(target.isRoot())throw ApiFailure.conflict();
         var existing=at(target,true);
@@ -92,6 +98,19 @@ final class VaultIndex {
         if(entry.path("deleted").asBoolean())return entry;
         if(!children(entryId).isEmpty())throw ApiFailure.conflict();
         retirePath(entry);unlinkChild(entry);entry.put("deleted",true).put("deletionBatch",batch.toString());return write(ENTRY,entryId,entry);
+    }
+    ObjectNode batch(UUID entryId,UUID batch){var entry=get(entryId);if(!entry.path("deleted").asBoolean())throw ApiFailure.conflict();return write(ENTRY,entryId,entry.put("deletionBatch",batch.toString()));}
+    /** Validated logical archive records; rebuild path/reference/parent indexes. */
+    ObjectNode install(UUID entryId,ObjectNode logical){
+        if(store.find(ENTRY,entryId).isPresent())throw ApiFailure.conflict();
+        var target=path(logical);boolean deleted=logical.path("deleted").asBoolean();
+        if(!deleted&&at(target,false)!=null)throw ApiFailure.conflict();
+        if(logical.has("sourceType")&&referenced(logical.path("sourceType").asText(),uuid(logical.path("sourceId")))!=null)throw ApiFailure.conflict();
+        var saved=write(ENTRY,entryId,logical);
+        if(!deleted)link(saved);
+        else if(at(target,false)==null)point(pathId(target),PATH,object().put("key",target.key()).put("entryId",entryId.toString()).put("active",false));
+        if(logical.has("sourceType"))point(refId(logical.path("sourceType").asText(),uuid(logical.path("sourceId"))),REFERENCE,object().put("sourceType",logical.path("sourceType").asText()).put("sourceId",logical.path("sourceId").asText()).put("entryId",entryId.toString()));
+        return saved;
     }
     ObjectNode restore(UUID entryId){
         var entry=get(entryId);if(!entry.path("deleted").asBoolean())return entry;

@@ -37,6 +37,14 @@ legacy replica/schema guards, archive conversion and recovery are outstanding
 integration work. Their acceptance must preserve existing content and refuse
 ambiguous collisions rather than guessing which document is authoritative.
 
+The current implementation adds canonical journal bindings, owner-atomic usage
+and directory generations, guarded collection operations, hierarchical WebDAV
+and the Notes API. A first Notes interface is available for packaged-browser
+validation. Account archive v4 stores logical entries plus separate checksummed
+content/recovery files and still reads v1–v3. Schema 10 is a logical compatibility
+gate; no database engine or physical resource-table migration is introduced.
+Full-client, packaged-browser and recovery acceptance remain delivery gates.
+
 ## Manual WebDAV interoperability
 
 The cached unmodified MySync 3.0.7 release contains nested-directory `MKCOL`
@@ -52,10 +60,18 @@ conflicts, offline work and token revocation over verified HTTPS.
 
 Also evaluate a practical non-Obsidian manual folder workflow. `davfs2` is a
 candidate because its documented configuration supports conditional requests;
-actual overwrite **and delete** behavior still needs verification. Plain curl
+the early result below prevents claiming full compatibility. Plain curl
 is available for explicit conditional protocol operations, but those operations
 alone do not certify a practical folder synchronization client. Existing
 rclone/Cyberduck limitations remain until actual contrary evidence is obtained.
+
+The first isolated probe used released Debian davfs2 1.6.1-1 against the clean
+Timekeeper journal build `48d706bef02d83c2a71aa050079e31c6b67e4890` over
+verified HTTPS. Conditional overwrite succeeded; an actual stale upload was
+rejected with 412 and both local and remote content survived. Its actual delete
+received 428 because it did not provide a sufficient precondition. Thus this
+release is **not certified for full vault synchronization**. This is an early
+client capability result, not a test of the unfinished vault namespace.
 
 No Timekeeper-specific daemon, scheduler, CouchDB service or database-engine
 migration is required by this issue. No guards may be weakened for compatibility.

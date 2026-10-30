@@ -16426,6 +16426,1079 @@
           }
         ]
       }
+    },
+    "/notes": {
+      "get": {
+        "operationId": "getNotesCollection",
+        "summary": "Read collection settings, snapshot and deployment quotas",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      }
+    },
+    "/notes/settings": {
+      "get": {
+        "operationId": "getNotesSettings",
+        "summary": "Read special-folder mappings and configuration opt-in",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateNotesSettings",
+        "summary": "Atomically move special folders and update collection settings",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultSettingsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/resolve": {
+      "get": {
+        "operationId": "resolveNotePath",
+        "summary": "Resolve an exact collection-relative path",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      }
+    },
+    "/notes/entries": {
+      "get": {
+        "operationId": "listNoteEntries",
+        "summary": "List a folder, search filenames, or review deleted entries with snapshot-guarded pagination",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "parentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "trash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      }
+    },
+    "/notes/folders": {
+      "post": {
+        "operationId": "createNoteFolder",
+        "summary": "Create one folder beneath an existing parent",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultPathInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/files": {
+      "put": {
+        "operationId": "createNoteFile",
+        "summary": "Create exact bytes; classify reserved filenames only inside configured special folders",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "*"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/entries/{id}": {
+      "get": {
+        "operationId": "getNoteEntry",
+        "summary": "Read entry metadata and deletion status",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteNoteEntry",
+        "summary": "Delete a guarded entry or subtree and retain recoverable bytes",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful owner-private collection operation."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      }
+    },
+    "/notes/entries/{id}/content": {
+      "get": {
+        "operationId": "getNoteBytes",
+        "summary": "Read exact canonical bytes for an active entry",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      },
+      "put": {
+        "operationId": "replaceNoteBytes",
+        "summary": "Replace bytes guarded by the canonical content ETag",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/entries/{id}/path": {
+      "put": {
+        "operationId": "moveNoteEntry",
+        "summary": "Rename or move without overwriting or changing a journal association",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultPathInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/entries/{id}/restore": {
+      "post": {
+        "operationId": "restoreNoteEntry",
+        "summary": "Restore a deletion batch without overwriting paths or newer content",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -21408,6 +22481,9 @@
           },
           {
             "$ref": "#/components/schemas/AccountArchiveLegacyFileSnapshot"
+          },
+          {
+            "$ref": "#/components/schemas/AccountArchiveVaultSnapshot"
           }
         ]
       },
@@ -21547,6 +22623,14 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 250000
+          },
+          "notesEntries": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notesFiles": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -30306,6 +31390,471 @@
             }
           }
         }
+      },
+      "VaultSettingsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "journalFolder": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "eventsFolder": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "assetsFolder": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "syncObsidianConfig": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VaultSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "journalFolder",
+          "eventsFolder",
+          "assetsFolder",
+          "syncObsidianConfig"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "journalFolder": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "eventsFolder": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "assetsFolder": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "syncObsidianConfig": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VaultPathInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          }
+        }
+      },
+      "VaultEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "path",
+          "parentId",
+          "kind",
+          "deleted",
+          "etag",
+          "entryEtag"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "parentId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "MARKDOWN",
+              "BINARY",
+              "DAY",
+              "WEEK",
+              "EVENT",
+              "ASSET"
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "deletionBatch": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "sourceId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceKey": {
+            "type": "string"
+          },
+          "contentTag": {
+            "type": "string"
+          },
+          "contentVersion": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "byteLength": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retainedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "etag": {
+            "type": "string"
+          },
+          "entryEtag": {
+            "type": "string"
+          }
+        }
+      },
+      "VaultLimits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fileBytes",
+          "markdownBytes",
+          "totalBytes",
+          "entries",
+          "pageSize",
+          "pathBytes",
+          "segmentBytes",
+          "depth"
+        ],
+        "properties": {
+          "fileBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "markdownBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "totalBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "entries": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pathBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "segmentBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "VaultInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rootId",
+          "snapshot",
+          "settings",
+          "limits"
+        ],
+        "properties": {
+          "rootId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "snapshot": {
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/VaultSettings"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/VaultLimits"
+          }
+        }
+      },
+      "VaultEntryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "snapshot",
+          "items"
+        ],
+        "properties": {
+          "snapshot": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VaultEntry"
+            }
+          },
+          "nextOffset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "AccountArchiveVaultEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "kind",
+          "parentId",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "parentId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "MARKDOWN",
+              "BINARY",
+              "DAY",
+              "WEEK",
+              "EVENT",
+              "ASSET"
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "deletionBatch": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "sourceId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceKey": {
+            "type": "string"
+          }
+        }
+      },
+      "AccountArchiveVaultFile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^vault/(content|recycle)/[a-f0-9-]{36}\\.bin$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 268435456
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "AccountArchiveVault": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "format",
+          "settings",
+          "entries",
+          "files"
+        ],
+        "properties": {
+          "format": {
+            "const": 1
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "journalFolder",
+              "eventsFolder",
+              "assetsFolder",
+              "syncObsidianConfig"
+            ],
+            "properties": {
+              "journalFolder": {
+                "type": "string",
+                "maxLength": 1024,
+                "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+              },
+              "eventsFolder": {
+                "type": "string",
+                "maxLength": 1024,
+                "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+              },
+              "assetsFolder": {
+                "type": "string",
+                "maxLength": 1024,
+                "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+              },
+              "syncObsidianConfig": {
+                "type": "boolean"
+              }
+            }
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/AccountArchiveVaultEntry"
+            }
+          },
+          "files": {
+            "type": "array",
+            "maxItems": 500000,
+            "items": {
+              "$ref": "#/components/schemas/AccountArchiveVaultFile"
+            }
+          }
+        }
+      },
+      "AccountArchiveVaultSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "timekeeper-account-v4"
+          },
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "generatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "account": {
+            "$ref": "#/components/schemas/ArchiveAccountMetadata"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/ArchivePreferences"
+          },
+          "work": {
+            "$ref": "#/components/schemas/ArchiveWorkFiles"
+          },
+          "importHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchiveAuditRecord"
+            },
+            "maxItems": 1000000
+          },
+          "journalFiles": {
+            "type": "array",
+            "maxItems": 1010000,
+            "items": {
+              "$ref": "#/components/schemas/ArchiveJournalFile"
+            },
+            "description": "Checksummed separate Markdown and binary ZIP entries. Nonempty indexes require the complete ZIP for restore."
+          },
+          "dayLabels": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDayLabel"
+            },
+            "description": "Independent day labels, including explicitly cleared values. Markdown frontmatter is opaque and does not own these labels."
+          },
+          "vault": {
+            "$ref": "#/components/schemas/AccountArchiveVault"
+          }
+        },
+        "required": [
+          "format",
+          "archiveId",
+          "generatedAt",
+          "account",
+          "preferences",
+          "work",
+          "importHistory",
+          "journalFiles",
+          "dayLabels",
+          "vault"
+        ]
       }
     },
     "parameters": {
@@ -30641,6 +32190,22 @@
               "title": "Undo offer expired",
               "status": 410,
               "code": "UNDO_EXPIRED"
+            }
+          }
+        }
+      },
+      "507": {
+        "description": "Collection storage or entry quota exceeded. No content changed.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "example": {
+              "type": "urn:timekeeper:problem:unavailable",
+              "title": "Transient server failure",
+              "status": 503,
+              "code": "UNAVAILABLE"
             }
           }
         }

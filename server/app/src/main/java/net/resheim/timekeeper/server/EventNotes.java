@@ -68,8 +68,10 @@ final class EventNotes {
         if(version>0&&previous.path("body").asText().equals(body)&&previous.path("event").equals(event)&&previous.path("deleted").asBoolean()==deleted)return previous;
         if(version>=9007199254740991L)throw ApiFailure.conflict();
         var value=previous.deepCopy().put("version",version+1).put("body",body).put("deleted",deleted).put("modifiedAt",store.now().toString());value.set("event",event);value.remove("hasBody");parse(key.filename(),document(value));
+        var vault=VaultCatalog.before(store,new VaultSources.Ref(TYPE,key.id(),key.filename()),deleted?null:document(value));
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,key.id(),value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),TYPE,key.id(),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
+        VaultCatalog.complete(vault);
         store.change("PROFILE","UPDATED",store.owner());return get(key);
     }
     void restore(String filename,byte[] bytes){var parsed=parse(filename,bytes);var current=get(parsed.key());if(present(current)){

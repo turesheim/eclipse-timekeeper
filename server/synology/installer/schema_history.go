@@ -18,7 +18,7 @@ func schemaUpgradeSQL(resources string, from, to int) (string, error) {
 		return "", err
 	}
 	for version := from + 1; version <= to; version++ {
-		name := map[int]string{3: "recovery-v3.sql", 4: "passkeys-v4.sql", 5: "settings-v5.sql", 6: "locale-v6.sql", 7: "day-labels-v7.sql", 8: "day-note-history-v8.sql", 9: "instance-v9.sql"}[version]
+		name := map[int]string{3: "recovery-v3.sql", 4: "passkeys-v4.sql", 5: "settings-v5.sql", 6: "locale-v6.sql", 7: "day-labels-v7.sql", 8: "day-note-history-v8.sql", 9: "instance-v9.sql", 10: "notes-v10.sql"}[version]
 		if name == "" {
 			return "", errors.New("Missing Timekeeper schema transition")
 		}

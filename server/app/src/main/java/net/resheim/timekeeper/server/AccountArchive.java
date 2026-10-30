@@ -20,7 +20,8 @@ import jakarta.inject.Inject;
 /** Explicit account-data allowlist; neither database dumps nor authentication authority are portable. */
 @ApplicationScoped
 class AccountArchive {
-    static final String FORMAT="timekeeper-account-v3";
+    static final String FORMAT="timekeeper-account-v4";
+    static final String LABEL_LEGACY_FORMAT="timekeeper-account-v3";
     static final String FILE_LEGACY_FORMAT="timekeeper-account-v2";
     static final String LEGACY_FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
@@ -103,6 +104,8 @@ class AccountArchive {
         if(eventCount[0]>0)counts.put("eventNotes",eventCount[0]);
         final long[] assetCount={0};records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())assetCount[0]++;});
         if(assetCount[0]>0)counts.put("journalAssets",assetCount[0]);
+        final long[] vaultCounts={0,0};records(c,owner,VaultIndex.ENTRY,value->vaultCounts[0]++);VaultArchive.files(c,owner,(path,bytes)->vaultCounts[1]++);
+        counts.put("notesEntries",vaultCounts[0]);counts.put("notesFiles",vaultCounts[1]);
         var profile=profile(c,owner);var metadata=metadata(c,owner);
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
@@ -121,6 +124,7 @@ class AccountArchive {
             json.writeArrayFieldStart("journalFiles");
             journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));
             json.writeEndArray();
+            VaultArchive.metadata(c,owner,json);
             json.writeArrayFieldStart("dayLabels");
             records(c,owner,DayLabels.TYPE,value->json.writeTree(object().put("date",value.path("date").asText()).put("text",value.path("text").asText())));
             json.writeEndArray();
@@ -141,6 +145,7 @@ class AccountArchive {
             });
             json.writeEndArray();json.writeEndObject();json.close();zip.closeEntry();
             journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});
+            VaultArchive.files(c,owner,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});
             entry(zip,"manifest.json");zip.write(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest));zip.closeEntry();
             for(String name:new TreeSet<>(WORK.keySet())) {
                 entry(zip,name+".csv");
@@ -201,8 +206,8 @@ class AccountArchive {
     private static void csv(OutputStream stream,List<String> cells) throws IOException {
         stream.write((String.join(",",cells.stream().map(AccountArchive::csvCell).toList())+"\r\n").getBytes(StandardCharsets.UTF_8));
     }
-    @FunctionalInterface private interface Row {void accept(ObjectNode value) throws IOException;}
-    private static void records(Connection c,String owner,String type,Row row) throws SQLException,IOException {
+    @FunctionalInterface interface Row {void accept(ObjectNode value) throws IOException;}
+    static void records(Connection c,String owner,String type,Row row) throws SQLException,IOException {
         try(var statement=query(c,"SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner,type)) {
             statement.setFetchSize(256);
             try(var rows=statement.executeQuery()) {while(rows.next()) {

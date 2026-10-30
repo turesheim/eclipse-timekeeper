@@ -39,6 +39,8 @@ public class ServerStore {
     @Inject PasskeyRealm passkeyRealm;
     @Inject ServiceSettings serviceSettings;
     @Inject ServerInfo serverInfo;
+    @Inject VaultLimits vaultLimits;
+    VaultLimits vaultLimits(){return vaultLimits;}
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     private Connection h2SchemaSession;
@@ -290,6 +292,15 @@ public class ServerStore {
             while (rows.next()) list.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
             return List.copyOf(list);
         } catch (SQLException e) { throw databaseFailure(e); }
+    }
+    /** Stream one resource kind while building derived indexes for an existing account. */
+    void scan(String type,java.util.function.Consumer<JsonNode> visitor) {
+        try(var query=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner(),type)) {
+            query.setFetchSize(32);
+            try(var rows=query.executeQuery()) {
+                while(rows.next())visitor.accept(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            }
+        }catch(SQLException failure){throw databaseFailure(failure);}
     }
     List<JsonNode> list(String type,UUID first,UUID last) {
         var result=new ArrayList<JsonNode>();
