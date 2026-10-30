@@ -27,6 +27,8 @@ const messages = {
   INSTANCE_DOWNLOAD_REQUIRED: 'backups.error_download',
   JOURNAL_HTTPS_REQUIRED: "journal.webdav.error.https_required",
   RATE_LIMITED: "api.error.rate_limited",
+  CALENDAR_EMPTY_SELECTION: "calendar.error.CALENDAR_EMPTY_SELECTION",
+  CALENDAR_TODO_READ_ONLY: "calendar.todo_read_only",
   CALENDAR_FUTURE_ACTIVITY: "calendar.error.CALENDAR_FUTURE_ACTIVITY",
   CALENDAR_INVALID_FEED: "calendar.error.CALENDAR_INVALID_FEED",
   CALENDAR_TOO_COMPLEX: "calendar.error.CALENDAR_TOO_COMPLEX",

@@ -35,7 +35,7 @@ class CalendarRefresh {
         CalendarDownload.Result result=null;String error=null;
         try{
             result=download.get(claim.url(),claim.etag(),claim.modified(),claim.body()!=null);
-            if(!result.unchanged())new CalendarFeed(result.body());
+            if(!result.unchanged())new CalendarFeed(result.body(),claim.includeEvents(),claim.includeTodos());
         }catch(CalendarFailure failure){error=failure.code;}
         catch(Exception failure){error="CALENDAR_CONNECTION_FAILED";}
         var outcome=result;String failure=error;

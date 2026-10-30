@@ -34,8 +34,9 @@ async function setup(browser,request){
   return {user,context,page,api,client};
 }
 async function calendar(page){await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-04');await expect(page.locator('#calendar-zone')).toContainText('2026-05-04');await expect(page.locator('#calendar-panel .calendar-subscriptions')).toHaveCount(0);}
-async function subscribe(page,client,feed,name='Team planning'){
+async function subscribe(page,client,feed,name='Team planning',types={}){
   await manage(page);await page.locator('#calendar-subscription-add').click();const dialog=page.locator('#calendar-subscription-editor');await dialog.getByLabel('Name',{exact:true}).fill(name);await dialog.locator('select[name=clientId]').selectOption(client.id);await dialog.getByLabel('Calendar feed URL',{exact:true}).fill(feed.url);
+  for(const [name,checked]of Object.entries(types))await dialog.locator(`input[name=${name}]`).setChecked(checked);
   const response=page.waitForResponse(reply=>reply.request().method()==='POST'&&new URL(reply.url()).pathname==='/api/v1/calendar-subscriptions');await dialog.getByRole('button',{name:'Save',exact:true}).click();const reply=await response;expect(reply.status()).toBe(201);await expect(dialog).toBeHidden();await tracking(page);return reply.json();
 }
 const planned=(page,subscription)=>page.locator(`.calendar-planned[data-calendar-subscription-id="${subscription.id}"]`);
@@ -240,5 +241,48 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     page.once('dialog',dialog=>dialog.accept());await todayEditor.getByRole('button',{name:'Delete note',exact:true}).click();await expect(todayEditor).toBeHidden();
     expect((await(await api('GET',path)).json()).deleted).toBe(true);
     await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();await expect(today.locator('.bi-journal-text')).toHaveCount(0);
+  }finally{await context.close();}
+});
+
+test('subscribed calendar to-dos show due dates and completion in Week and Today without counting worked time',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request);
+  try{
+    const body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//To-do browser test//EN\r\nBEGIN:VEVENT\r\nUID:included-meeting\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:20260504T090000Z\r\nDTEND:20260504T100000Z\r\nSUMMARY:Selected meeting\r\nEND:VEVENT\r\n'+[
+      'UID:due-task\nDUE;VALUE=DATE:20260504\nSUMMARY:Submit report\nSTATUS:NEEDS-ACTION\nDESCRIPTION:Read-only calendar task',
+      'UID:timed-task\nDUE:20260504T120000Z\nSUMMARY:Finished review\nSTATUS:COMPLETED',
+      'UID:undated-task\nSUMMARY:Someday task'
+    ].map(fields=>'BEGIN:VTODO\r\nDTSTAMP:20260101T000000Z\r\n'+fields.replaceAll('\n','\r\n')+'\r\nEND:VTODO\r\n').join('')+'END:VCALENDAR\r\n';
+    const reply=await request.post(fixture()+'/feeds',{data:{body}});expect(reply.status()).toBe(201);const feed=await reply.json();
+    await calendar(page);const before=(await(await api('GET',reportPath)).json()).total,subscription=await subscribe(page,client,feed,'Team planning',{includeEvents:false,includeTodos:true});
+    await expect(page.locator('.calendar-all-day-event').filter({hasText:'Submit report'})).toBeVisible();
+    await expect(page.locator('.calendar-all-day-event').filter({hasText:'Someday task'})).toContainText('No date');
+    await expect(planned(page,subscription)).toContainText('To-do · Completed');
+    await planned(page,subscription).click();const details=page.locator('#calendar-event-details');await expect(details).toContainText('read-only');await expect(details.getByRole('button',{name:'Create activity',exact:true})).toBeHidden();await details.getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    const events=page.locator('#today-events');await expect(events.locator('[data-today-event]')).toHaveCount(3);await expect(events).toContainText('Submit report');await expect(events).toContainText('To-do · Completed');await expect(events).toContainText('14:00');await expect(events).toContainText('No date');
+    await events.getByRole('button').filter({hasText:'Submit report'}).click();await expect(page.locator('#today-event-details')).toContainText('Read-only calendar task');await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
+    expect((await(await api('GET',reportPath)).json()).total).toBe(before);
+    await manage(page);await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();
+    const edit=page.locator('#calendar-subscription-editor');await expect(edit.getByLabel('Calendar events',{exact:true})).not.toBeChecked();await expect(edit.getByLabel('To-do items',{exact:true})).toBeChecked();
+    await edit.getByLabel('To-do items',{exact:true}).uncheck();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit.getByRole('alert')).toContainText('Select calendar events');
+    await edit.getByLabel('Calendar events',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);
+    await expect(events.locator('[data-today-event]')).toHaveCount(1);await expect(events).toContainText('Selected meeting');
+    await manage(page);await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();await edit.getByLabel('To-do items',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);await expect(events.locator('[data-today-event]')).toHaveCount(4);
+  }finally{await context.close();}
+});
+
+test('Today periodically reloads calendar items and shows subscription errors without losing an editor draft',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request);
+  try{
+    await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    await expect(page.locator('#today-events')).toContainText('Planned meeting');
+    // Simulate a newly refreshed server snapshot without emitting a domain change.
+    const snapshotReply=await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05'),snapshot=await snapshotReply.json();
+    snapshot.items[0].title='Newly fetched meeting';snapshot.errors[subscription.id]='CALENDAR_INVALID_FEED';
+    await page.route('**/api/v1/calendar-events?*',route=>route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':snapshotReply.headers()['x-timekeeper-owner']}}));
+    const source=page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true});await source.click();
+    const draft=page.locator('#today-journal-body');await draft.fill('Keep this unsaved note');
+    await expect(page.locator('#today-events')).toContainText('Newly fetched meeting',{timeout:35000});await expect(page.locator('#today-events .alert-warning')).toBeVisible();await expect(draft).toHaveValue('Keep this unsaved note');
   }finally{await context.close();}
 });

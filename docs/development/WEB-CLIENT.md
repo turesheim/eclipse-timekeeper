@@ -721,7 +721,7 @@ or repeating an ordinary write.
 
 ### Calendar subscriptions
 
-Open **My Account → Weeks** to manage read-only iWeek subscriptions.
+Open **My Account → Weeks** to manage read-only iCalendar subscriptions.
 Planned events remain visible in Week.
 Choose **Add calendar**, enter a descriptive name and subscription URL, and select
 its client. HTTPS and `webcal://` subscription links are supported; provider login
@@ -748,11 +748,36 @@ calendar name remain available in their text and accessible name. They appear
 beside recorded work without contributing to reports. Select
 an event with the pointer, touch or keyboard to see its full interval, source,
 location and plain-text description. Read-only sessions can view details.
-All-day plans appear above the time grid, with their exclusive iWeek end date
+All-day plans appear above the time grid, with their exclusive iCalendar end date
 shown as an inclusive human-readable range. Timed events without an end are
 shown as zero-duration markers. All presentation follows the account time zone;
 floating calendar times use that zone. Recurrences retain local wall-clock times
 across DST, including moved/cancelled occurrences and THISANDFUTURE changes.
+
+Each subscription independently selects calendar events (`includeEvents`) and/or
+to-do items (`includeTodos`). At least one must be enabled. Existing subscriptions
+and omitted creation options default to events enabled and to-dos disabled.
+Omitting these optional fields on an update preserves the stored selection,
+including when an older client changes visibility. Selection changes reuse the
+cached feed and take effect without another provider download.
+
+Feeds can also contain **to-dos (`VTODO`)**. Today and Week show them with a
+**To-do** label and their completion state. A due date/time determines their
+calendar position; without one, the scheduled start is used. A date-only item
+stays on that civil date, and an item with only a timed due date is a marker,
+not a booked interval. Recurring to-dos support exclusions and moved occurrences.
+Open undated to-dos appear as **No date**; completed/cancelled undated items are
+omitted. Open the details for the full description or an associated note.
+Changes and completion stay in the source calendar; to-dos have no **Create
+activity** action and do not affect worked-time totals.
+
+Only items the provider includes in the subscribed ICS feed can appear here.
+A Google Tasks or Microsoft To Do item absent from that feed needs a separate
+task-provider connector; subscribing to a calendar does not provide access to
+the provider's task API. Today reloads results every 30 seconds while open,
+without disturbing the note draft, and displays subscription failures. This
+reloads the server cache; upstream downloads retain the 15-minute interval and
+providers may additionally cache their published feeds.
 
 **Create activity** opens a review editor with the event title/description and
 interval. Choose an optional project/task belonging to the subscription's client.
@@ -775,7 +800,7 @@ Subscriptions must be configured separately after importing an account archive.
 The engine is the pinned [iCal4j 4.4.0](https://github.com/ical4j/ical4j/tree/ical4j-4.4.0).
 Its BSD license is included in the server JAR. Calendar downloads and recurrence
 expansion are bounded; no attachment or timezone-definition URLs are fetched.
-Feeds are limited to 2 MiB, 5,000 VEVENT revisions and 2,000 visible occurrences
+Feeds are limited to 2 MiB, 5,000 VEVENT/VTODO revisions and 2,000 visible occurrences
 per calendar. The API accepts windows of at most 31 civil days.
 
 ![Planned and recorded time in Week](../assets/screenshots/calendar-subscriptions-desktop.png)

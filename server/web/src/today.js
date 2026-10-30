@@ -1,3 +1,4 @@
+import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
@@ -43,20 +44,21 @@ export class TodayView {
     window.addEventListener('resize',()=>this.sizeEditor());
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.eventNoteEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
-  show(){this.visible=true;this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
-  hide(){this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.eventNoteEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
+  show(){this.visible=true;this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
+  hide(){clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;}
     this.data=data;this.connected=connected;
     if(!this.date)this.initialize(dateInZone(data.report.generatedAt,data.profile.data.zoneId));
-    if(this.visible){this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}
+    if(this.visible){this.pollEvents();this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}
   }
   select(date){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date){this.dateInput.value=this.date;return;}
     if(date===this.date){this.dateInput.value=this.date;return;}
     if(!this.journal.canLeaveInline()){this.dateInput.value=this.date;return;}
-    this.closePicker();this.closeEvent();this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;this.events=[];this.eventKey=null;++this.generation;
+    this.closePicker();this.closeEvent();this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;this.eventWarning=false;this.events=[];this.eventKey=null;++this.generation;
     this.paint();void this.loadEvents();
   }
   paint(){
@@ -154,31 +156,33 @@ export class TodayView {
     if(focused)([...this.choices.children].find(choice=>choice.dataset.todaySessionChoice===focused)||this.choices.firstElementChild)?.focus();
   }
   paintEvents(){
-    const root=byId('today-events');root.replaceChildren();
+    const root=byId('today-events'),focused=root.contains(document.activeElement)?document.activeElement.closest('[data-today-event]')?.dataset.todayEvent:null;root.replaceChildren();
+    if(this.eventWarning)root.append(node('p',t('calendar.refresh_errors'),'alert alert-warning'));
     const zone=this.data.profile.data.zoneId,day=monthCalendar(this.date.slice(0,7),zone).days.find(value=>value.date===this.date);
     const events=this.events.filter(value=>value.allDay?value.firstDate<=this.date&&this.date<value.endDate:instantNanos(value.start)<day.to&&instantNanos(value.end)>=day.from)
       .sort((a,b)=>Number(b.allDay)-Number(a.allDay)||(a.start||'').localeCompare(b.start||''));
     if(!events.length){root.append(node('p',t('today.no_events'),'hint'));return;}
-    const time=value=>dateTimeFormat(getLocale(),{hour:'2-digit',minute:'2-digit',timeZone:zone}).format(new Date(value));
+    const when=event=>calendarItemWhen(event,zone,true);
     const list=node('ul',undefined,'today-list');for(const event of events){
       const item=node('li',undefined,'today-plan'),action=node('button',undefined,'calendar-summary-card today-event-action');action.type='button';action.dataset.todayEvent=event.key;
       const client=this.data.clients.find(value=>value.id===event.clientId);action.style.setProperty('--client-color',clientColors(client?.color||event.color).background);
       const title=node('strong',event.title||t('calendar.untitled')),marker=eventNoteIndicator(event);if(marker)title.append(' ',marker);action.append(title);
-      action.append(node('span',event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,'calendar-summary-time'));
+      action.append(node('span',when(event),'calendar-summary-time'));
+      if(calendarTodo(event))action.append(node('span',calendarItemStatus(event)));
       action.append(node('span',client?.name||event.clientName));
-      action.title=[event.title||t('calendar.untitled'),event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,client?.name||event.clientName].join('\n');
+      action.title=[event.title||t('calendar.untitled'),when(event),client?.name||event.clientName].join('\n');
       action.addEventListener('click',()=>this.openEvent(event,action));item.append(action);list.append(item);
     }root.append(list);
+    if(focused&&document.activeElement===document.body)root.querySelector(`[data-today-event="${focused}"]`)?.focus({preventScroll:true});
   }
   closeEvent(){this.eventOrigin=null;if(this.eventDetails.open)this.eventDetails.close();this.eventDetails.replaceChildren();}
   openEvent(event,origin){
     this.eventOrigin=origin;const details=this.eventDetails;details.replaceChildren();
     const title=node('h2',event.title||t('calendar.untitled'));title.id='today-event-title';
-    const format=date=>dateTimeFormat(getLocale(),{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
-    const last=event.allDay?addDays(event.endDate,-1):null;
-    const when=event.allDay?t('calendar.all_day')+' · '+format(event.firstDate)+(last!==event.firstDate?' – '+format(last):''):instantText(event.start,this.data.profile.data.zoneId)+' → '+instantText(event.end,this.data.profile.data.zoneId);
+    const when=calendarItemWhen(event,this.data.profile.data.zoneId);
     const client=this.data.clients.find(value=>value.id===event.clientId);
     details.append(title,node('p',when),node('p',[client?.name||event.clientName,event.calendarName].filter(Boolean).join(' · '),'hint'));
+    if(calendarTodo(event))details.append(node('p',calendarItemStatus(event)));
     if(event.location)details.append(node('p',t('calendar.location',{location:event.location})));
     if(event.description)details.append(node('p',event.description,'calendar-description'));
     const actions=node('div',undefined,'dialog-actions'),close=node('button',t('ui.close'),'btn btn-outline-secondary');close.type='button';close.addEventListener('click',()=>details.close());actions.append(eventNoteButton(event,()=>void this.eventNoteEditor.open(event,this.scope,this.connected&&this.callbacks.canWrite(),this.data.profile.data.zoneId)),close);details.append(actions);
@@ -193,14 +197,14 @@ export class TodayView {
     if(!tasks.length){root.append(node('p',empty,'hint'));return;}
     const list=node('ul',undefined,'today-list');for(const task of tasks){const item=node('li',undefined,'today-task'),presentation=taskPresentation(task),title=node(presentation.url?'a':'span',presentation.title);if(presentation.url){title.href=presentation.url;title.target='_blank';title.rel='noopener noreferrer';}item.append(title);const project=this.data.projects.find(value=>value.id===task.projectId);if(project)item.append(node('span',project.name,'hint'));list.append(item);}root.append(list);
   }
-  async loadEvents(){
+  async loadEvents(background=false){
     if(!this.visible||!this.scope||!this.date)return;
     const generation=++this.generation,scope=this.scope,date=this.date;
-    byId('today-events').replaceChildren(node('p',t('calendar.loading'),'hint'));
+    if(!background)byId('today-events').replaceChildren(node('p',t('calendar.loading'),'hint'));
     try{
-      const reply=await scope.request('/calendar-events?'+new URLSearchParams({fromDate:date,toDate:addDays(date,1)}));
+      const [reply,subscriptions]=await Promise.all([scope.request('/calendar-events?'+new URLSearchParams({fromDate:date,toDate:addDays(date,1)})),scope.request('/calendar-subscriptions')]);
       if(generation!==this.generation||scope!==this.scope||date!==this.date)return;
-      this.events=reply.data.items;this.paintEvents();
+      this.events=reply.data.items;this.eventWarning=Object.keys(reply.data.errors||{}).length>0||subscriptions.data.items.some(item=>item.visible&&item.lastError);this.paintEvents();
     }catch(error){
       if(generation!==this.generation||scope!==this.scope)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}

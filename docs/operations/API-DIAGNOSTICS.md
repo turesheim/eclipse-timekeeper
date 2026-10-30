@@ -22,6 +22,17 @@ Names use hashes and random suffixes rather than raw selectors or filesystem
 paths. The latest invocation remains available as `server.log`; earlier logs
 survive Playwright's normal output-directory cleanup.
 
+The complete browser suite runs in groups of at most six spec files, each with a
+fresh packaged JVM, database and credentials. This prevents unrelated feature
+checks from exhausting the shared production password-login budget (100 attempts
+per ten minutes). Production limits and test assertions are unchanged. The
+bootstrap UI spec retains an unclaimed fixture; other groups provision their
+administrator through the normal setup API. Each spec runs once, failures stop
+the acceptance run, and the overall twenty-minute bound is retained. The final
+`browser.xml` merges all test cases; `acceptance.json` records each group's spec
+files and source/checksum receipt. Individual reports, screenshots, receipts and
+server logs remain under `test-results/batches/` as well as the combined output.
+
 ### H2 closed-session diagnosis
 
 A `JdbcSQLNonTransientConnectionException` with SQL state `90098` can be the
@@ -164,3 +175,28 @@ upgrade with older server replicas stopped. It prevents an older server from
 performing unrecorded writes after recording is enabled. It does not rewrite
 existing labels, note bodies, canonical Markdown or resource versions and does
 not manufacture historical events.
+
+## Missing calendar events or to-dos
+
+Read the subscription metadata and the selected civil day's projected items:
+
+```sh
+curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/me"
+curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/calendar-subscriptions"
+curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/calendar-events?fromDate=2026-10-30&toDate=2026-10-31"
+```
+
+Use the account's `zoneId` and an exclusive `toDate`. Check the subscription's
+`visible`, `includeEvents`, `includeTodos`, `lastAttempt`, `lastSuccess`, and
+`lastError` fields. Legacy subscriptions default to events enabled and to-dos
+disabled. A successful HTTP response from `/calendar-events` may contain
+per-subscription failures in `errors`; a failed download retains the previously
+successful cache. A recent `lastSuccess` means Timekeeper fetched or revalidated
+the published feed, not that the provider included every item in the source UI.
+
+To-dos identify themselves with `componentType: "VTODO"`. Their due or scheduled
+markers may differ from an event interval; `undated: true` does not indicate a
+deadline. Google Tasks and Microsoft To Do items omitted from the published ICS
+feed cannot be recovered by refreshing that subscription. Their separate APIs
+require provider connectors. These reads do not disclose credential-bearing
+subscription URLs and do not alter or refresh the user's data.

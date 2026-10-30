@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class CalendarFeedTest {
     private static String event(String fields) {return "BEGIN:VEVENT\r\nDTSTAMP:20260101T000000Z\r\n"+fields.replace("\n","\r\n")+"\r\nEND:VEVENT\r\n";}
-    private static CalendarFeed feed(String... events) {return new CalendarFeed("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Calendar test//EN\r\n"+String.join("",events)+"END:VCALENDAR\r\n");}
+    private static CalendarFeed feed(String... events) {return new CalendarFeed("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Calendar test//EN\r\n"+String.join("",events)+"END:VCALENDAR\r\n",true,true);}
     private static List<CalendarFeed.Occurrence> week(CalendarFeed feed,String from,String zone) {var start=LocalDate.parse(from);return feed.occurrences(start,start.plusDays(7),ZoneId.of(zone));}
     @Test void recurrenceRetainsWallClockAcrossDstAndRespectsExdatesAndRdates() {
         var source=feed(event("UID:weekly\nDTSTART;TZID=Europe/Oslo:20260322T090000\nDTEND;TZID=Europe/Oslo:20260322T100000\nRRULE:FREQ=WEEKLY;COUNT=4\nEXDATE;TZID=Europe/Oslo:20260405T090000\nRDATE;TZID=Europe/Oslo:20260406T090000\nSUMMARY:Planning"));
@@ -60,6 +60,52 @@ class CalendarFeedTest {
             var excluded=feed(event("UID:utc-exclusion\nDTSTART;TZID=Europe/Oslo:20260504T090000\nDURATION:PT1H\nRRULE:FREQ=DAILY;COUNT=2\nEXDATE:20260505T070000Z"));
             assertEquals(1,week(excluded,"2026-05-04","Europe/Oslo").size());
         }
+    }
+    private static String todo(String fields){return event(fields).replace("VEVENT","VTODO");}
+    @Test void calendarTodosIncludeDueOnlyScheduledAndCompletedItemsWithoutEventIdentityCollisions(){
+        var source=feed(event("UID:shared\nDTSTART;VALUE=DATE:20260504\nSUMMARY:Event"),
+                todo("UID:shared\nDUE;VALUE=DATE:20260504\nSUMMARY:Due today"),
+                todo("UID:scheduled\nDTSTART;TZID=Europe/Oslo:20260504T090000\nSUMMARY:Scheduled task"),
+                todo("UID:finished\nDUE:20260504T120000Z\nSTATUS:COMPLETED\nCOMPLETED:20260503T100000Z\nSUMMARY:Finished"));
+        var values=source.occurrences(LocalDate.parse("2026-05-04"),LocalDate.parse("2026-05-05"),ZoneId.of("Europe/Oslo"));
+        assertEquals(4,values.size());assertEquals(4,values.stream().map(CalendarFeed.Occurrence::key).distinct().count());
+        var due=values.stream().filter(value->value.title().equals("Due today")).findFirst().orElseThrow();
+        assertTrue(due.todo());assertTrue(due.allDay());assertEquals("2026-05-04",due.firstDate());assertEquals("2026-05-05",due.endDate());
+        var scheduled=values.stream().filter(value->value.title().equals("Scheduled task")).findFirst().orElseThrow();
+        assertEquals("2026-05-04T07:00:00Z",scheduled.start().toString());assertEquals(scheduled.start(),scheduled.end());
+        assertEquals("COMPLETED",values.stream().filter(value->value.title().equals("Finished")).findFirst().orElseThrow().todoStatus());
+    }
+    @Test void recurringTodosUseDueMarkersWithExclusionsOverridesAndDst(){
+        var master=todo("UID:recurring-task\nDTSTART;TZID=Europe/Oslo:20260322T090000\nDUE;TZID=Europe/Oslo:20260322T100000\nRRULE:FREQ=WEEKLY;COUNT=4\nEXDATE;TZID=Europe/Oslo:20260405T090000\nSUMMARY:Weekly task");
+        var override=todo("UID:recurring-task\nRECURRENCE-ID;TZID=Europe/Oslo:20260329T090000\nDTSTART;TZID=Europe/Oslo:20260329T110000\nDUE;TZID=Europe/Oslo:20260329T120000\nSUMMARY:Moved task");
+        assertEquals("2026-03-22T09:00:00Z",week(feed(master),"2026-03-22","Europe/Oslo").getFirst().start().toString());
+        assertEquals("2026-03-29T08:00:00Z",week(feed(master),"2026-03-29","Europe/Oslo").getFirst().start().toString());
+        var moved=week(feed(master,override),"2026-03-29","Europe/Oslo").getFirst();assertEquals("Moved task",moved.title());assertEquals("2026-03-29T10:00:00Z",moved.start().toString());
+        assertEquals(week(feed(master),"2026-03-29","Europe/Oslo").getFirst().key(),moved.key());
+        assertTrue(week(feed(master),"2026-04-05","Europe/Oslo").isEmpty());
+    }
+    @Test void dueMarkersRespectMidnightAndDoNotClaimTheWholeStartToDueInterval(){
+        var source=feed(todo("UID:deadline\nDTSTART:20260501T090000Z\nDUE:20260504T000000Z\nSUMMARY:Deadline"));
+        assertEquals(1,source.occurrences(LocalDate.parse("2026-05-04"),LocalDate.parse("2026-05-05"),ZoneOffset.UTC).size());
+        assertTrue(source.occurrences(LocalDate.parse("2026-05-03"),LocalDate.parse("2026-05-04"),ZoneOffset.UTC).isEmpty());
+        assertTrue(source.occurrences(LocalDate.parse("2026-05-01"),LocalDate.parse("2026-05-02"),ZoneOffset.UTC).isEmpty());
+    }
+    @Test void undatedOpenTodosAppearInEachWindowWithoutInventingDueDatesAndHaveStableVersions(){
+        var source=feed(todo("UID:undated\nSUMMARY:Someday"),todo("UID:done\nSTATUS:COMPLETED"),todo("UID:cancelled\nSTATUS:CANCELLED"));
+        var day=source.occurrences(LocalDate.parse("2026-05-04"),LocalDate.parse("2026-05-05"),ZoneOffset.UTC);
+        var week=week(source,"2026-05-04","UTC");assertEquals(1,day.size());assertEquals(1,week.size());assertTrue(day.getFirst().undated());
+        assertEquals(day.getFirst().key(),week.getFirst().key());assertEquals(day.getFirst().json().get("eventVersion"),week.getFirst().json().get("eventVersion"));
+    }
+    @Test void thisAndFutureTodoDueChangesExpandTheUpdatedInterval(){
+        var master=todo("UID:future-due\nDTSTART:20260504T090000Z\nDUE:20260504T100000Z\nRRULE:FREQ=DAILY;COUNT=5\nSUMMARY:Task");
+        var changed=todo("UID:future-due\nRECURRENCE-ID;RANGE=THISANDFUTURE:20260505T090000Z\nDTSTART:20260505T090000Z\nDUE:20260507T120000Z\nSUMMARY:Extended deadline");
+        var values=feed(master,changed).occurrences(LocalDate.parse("2026-05-07"),LocalDate.parse("2026-05-08"),ZoneOffset.UTC);
+        assertEquals(1,values.size());assertEquals("2026-05-07T12:00:00Z",values.getFirst().start().toString());assertEquals("Extended deadline",values.getFirst().title());
+    }
+    @Test void malformedTodoIntervalsFailExplicitly(){
+        assertThrows(CalendarFailure.class,()->feed(todo("UID:bad\nDTSTART:20260504T090000Z\nDUE:20260504T080000Z")));
+        assertThrows(CalendarFailure.class,()->feed(todo("UID:bad\nDUE:20260504T090000Z\nDURATION:PT1H")));
+        assertThrows(CalendarFailure.class,()->feed(todo("UID:bad\nDTSTART;VALUE=DATE:20260504\nDUE:20260504T090000Z")));
     }
     private static CalendarFeed oneDayFeed(){return feed(event("UID:one\nDTSTART;VALUE=DATE:20260504"));}
     @Test void timedEventsWithoutAnEndRemainZeroDurationOccurrences(){
