@@ -63,6 +63,8 @@ test('compact account navigation supports touch, keyboard, account settings and 
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const header=await page.locator('.app-header').boundingBox();expect(header.height).toBeLessThanOrEqual(80);
     await toggle.focus();await page.keyboard.press('Enter');await expect(menu).toHaveAttribute('open','');
+    await page.keyboard.press('Tab');await expect(page.getByRole('combobox',{name:'Focus area',exact:true})).toBeFocused();
+    await expect(page.locator('#focus-select')).toContainText('No focus');
     await page.keyboard.press('Tab');await expect(page.getByRole('link',{name:'My Account',exact:true})).toBeFocused();
     if(account.administrator) await expect(page.getByRole('link',{name:'Administration',exact:true})).toBeVisible();
     else await expect(page.getByRole('link',{name:'Administration',exact:true})).not.toBeVisible();

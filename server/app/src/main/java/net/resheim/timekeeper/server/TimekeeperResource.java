@@ -475,6 +475,13 @@ public class TimekeeperResource {
             response.put("generatedAt",store.now().toString());response.put("revision",store.revision());return json(response);
         });
     }
+    @GET @Path("/focus-areas") public Response focusAreas() {
+        ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,new FocusAreas(store).get(),null));
+    }
+    @PUT @Path("/focus-areas") public Response focusAreas(@HeaderParam("If-Match") String match,JsonNode body) {
+        ContractInputs.queries(uri.getQueryParameters());var input=inputs.validate("FocusAreasInput",body);
+        return tx(()->ApiReplies.resource(200,new FocusAreas(store).save(match,input),null));
+    }
     @GET @Path("/me") public Response profile() { ContractInputs.queries(uri.getQueryParameters());return tx(() -> ApiReplies.resource(200,store.profile(),null)); }
     @PUT @Path("/me") public Response profile(@HeaderParam("If-Match") String match,JsonNode body) {
         var input=inputs.validate("ProfileInput",body);String zone=ContractInputs.zone(input.get("zoneId").asText()).getId();ContractInputs.queries(uri.getQueryParameters());

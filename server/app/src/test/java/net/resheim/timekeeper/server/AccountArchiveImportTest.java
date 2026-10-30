@@ -94,6 +94,30 @@ class AccountArchiveImportTest {
         archive.remove(java.util.List.of("journalFiles","dayLabels","vault"));return archive.put("format",AccountArchive.LEGACY_FORMAT);
     }
     private ObjectNode work() {return store.transaction("b",()->{var value=object();for(var entry:DomainTransfer.TYPES.entrySet()) {var items=value.putArray(entry.getKey());store.list(entry.getValue()).forEach(items::add);}value.set("profile",store.profile());return value;});}
+    @Test void focusAreasRestoreWithNewOwnedClientIdentitiesAndPreviewHasNoSideEffects() throws Exception {
+        source();
+        var original=store.transaction("a",()->{
+            var focus=new FocusAreas(store);var body=object();
+            body.putArray("areas").add(object().put("id",UUID.randomUUID().toString()).put("name","Work focus")
+                    .set("clientIds",MAPPER.createArrayNode().add(store.list("CLIENT").getFirst().path("id").asText())));
+            return focus.save(etag(focus.get()),body);
+        });
+        ObjectNode archive;
+        try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=legacySnapshot(file.file());}
+        assertEquals("Work focus",archive.path("preferences").path("focusAreas").get(0).path("name").asText());
+        UUID upload=stage(archive);var review=store.transaction("b",()->importer().preview(upload,false));
+        assertTrue(review.body().path("canImport").asBoolean());
+        assertEquals(0,store.transaction("b",()->new FocusAreas(store).get()).path("areas").size());
+        store.transaction("b",()->importer().apply(upload,false,review.etag()));
+        store.transaction("b",()->{
+            var restored=new FocusAreas(store).get().path("areas").get(0);
+            assertEquals("Work focus",restored.path("name").asText());
+            assertNotEquals(original.path("areas").get(0).path("id"),restored.path("id"));
+            String client=restored.path("clientIds").get(0).asText();
+            assertNotEquals(original.path("areas").get(0).path("clientIds").get(0).asText(),client);
+            assertTrue(store.find("CLIENT",UUID.fromString(client)).isPresent());return null;
+        });
+    }
     @Test void linkedTaskTombstonesSurvivePrivateArchiveRestore() throws Exception {
         source();
         UUID deleted=store.transaction("a",()->{

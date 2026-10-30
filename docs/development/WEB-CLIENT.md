@@ -96,6 +96,18 @@ project catalog and API allow-list. `npm run check:assets` verifies them.
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
 `nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
 Clients and Projects. Labels are configured under **My Account → Labels**.
+
+Configure **My Account → Focus areas** with a name and a set of clients, then
+select an area in the account menu. **No focus** shows all clients and unassigned
+work; an empty area shows no client-related records. Today, Calendar, Week,
+Workweek, Activities, Clients and Projects use the same client filter, including
+totals and subscribed calendar events/to-dos. Journal notes, day labels and the
+notes vault are independent of clients and remain available. Focus changes only
+presentation, never stored work or API permissions. Editors retain all client
+choices. A running timer outside the focus remains stoppable through the timer
+controls, with an outside-focus hint in place of its details. Finish an inline
+work-session edit before switching focus. Signing in starts with **No focus**;
+focus definitions are saved privately on the server.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
 bar and page content clear of each other. Standard action buttons use Bootstrap

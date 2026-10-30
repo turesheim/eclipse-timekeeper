@@ -1,3 +1,4 @@
+import {focusIncludes} from './focus-model.js';
 import {calendarItemStatus} from './calendar-item.js';
 import {eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
@@ -146,7 +147,7 @@ export class WeekCalendar {
     for (const day of calendar.days) for (const piece of calendarLanes(sessions.filter((value) => value.date === day.date), 1.25))
     this.dayNodes.get(day.date).append(this.sessionNode(piece));
     const blocks = [];
-    for(const event of this.plans?.items||[])if(!event.allDay)
+    for(const event of this.plans?.items||[])if(!event.allDay&&focusIncludes(this.data,event.clientId))
       for(const piece of calendarPieces(event.start,instantNanos(event.end)===instantNanos(event.start)?nanosInstant(instantNanos(event.end)+1n):event.end,calendar))blocks.push({...piece,planned:event});
     for (const day of calendar.days) for (const piece of calendarLanes(blocks.filter((value) => value.date === day.date), 3))
     this.dayNodes.get(day.date).append(this.plannedNode(piece));
