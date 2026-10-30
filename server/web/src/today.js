@@ -1,3 +1,5 @@
+import {richTooltip} from './tooltips.js';
+import {workSessionsTooltip,calendarEventTooltip} from './tooltip-content.js';
 import {dailyNoteDateFromSearch,dailyNoteHref} from './journal-links.js';
 import {focusIncludes} from './focus-model.js';
 import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
@@ -122,12 +124,12 @@ export class TodayView {
     for(const entry of entries){
       const client=this.data.clients.find(value=>value.id===entry.clientId),sessions=this.daySessions.get(entry.clientId),writable=this.connected&&this.callbacks.canWrite();
       const item=node('li',undefined,'today-session'),{card:action,line:details,duration}=workSummaryCard({tag:writable?'button':'div',className:'today-session-action',title:client?.name||t('ui.client'),color:client?.color});
-      action.dataset.todayClient=entry.clientId;if(writable)action.type='button';else action.setAttribute('role','group');
+      action.dataset.todayClient=entry.clientId;if(writable)action.type='button';else {action.setAttribute('role','group');action.tabIndex=0;}
       details.classList.add('today-session-details');duration.classList.add('today-duration');const icons=node('span',undefined,'track-project-icons'),projects=new Map();
       for(const session of sessions){const project=this.data.projects.find(value=>value.id===session.projectId);if(isProjectIcon(project?.icon)){const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}}
       for(const [id,names] of projects)icons.append(projectIcon({icon:id,name:[...names].join(', ')}));icons.setAttribute('aria-hidden','true');
       duration.textContent=nanosText(entry.duration);details.append(icons);
-      action.title=(client?.name||t('ui.client'))+'\n'+t('count.work_sessions',{count:sessions.length})+'\n'+sessions.map(session=>[session.summary||t('ui.work_session_21aa04'),instantText(session.start,zone)+' → '+(session.end?instantText(session.end,zone):t('ui.in_progress'))].join(' · ')).join('\n');
+      richTooltip(action,()=>workSessionsTooltip({client,sessions,projects:this.data.projects,zone,asOf:this.data.report.generatedAt,total:entry.duration,date:this.date}));
       if(writable)action.addEventListener('click',()=>this.openSessions(entry.clientId));item.append(action);list.append(item);
     }
     root.append(list);this.paintPicker();
@@ -172,7 +174,7 @@ export class TodayView {
       action.append(node('span',when(event),'calendar-summary-time'));
       if(calendarTodo(event))action.append(node('span',calendarItemStatus(event)));
       action.append(node('span',client?.name||event.clientName));
-      action.title=[event.title||t('calendar.untitled'),when(event),client?.name||event.clientName].join('\n');
+      richTooltip(action,()=>calendarEventTooltip(event,zone));
       action.addEventListener('click',()=>this.openEvent(event,action));item.append(action);list.append(item);
     }root.append(list);
     if(focused&&document.activeElement===document.body)root.querySelector(`[data-today-event="${focused}"]`)?.focus({preventScroll:true});

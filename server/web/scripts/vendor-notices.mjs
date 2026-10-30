@@ -6,7 +6,7 @@ const components=[
   {id:'@noble/hashes',name:'noble-hashes',homepage:'https://github.com/paulmillr/noble-hashes',license:'MIT',directory:'noble-hashes'},
   {id:'@milkdown/kit',name:'Milkdown',homepage:'https://milkdown.dev/',license:'MIT',directory:'milkdown',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
   {id:'mermaid',name:'Mermaid',homepage:'https://mermaid.js.org/',license:'MIT',directory:'mermaid',notices:'/web/assets/mermaid/THIRD-PARTY-LICENSES.txt'},
-  {id:'bootstrap',name:'Bootstrap',homepage:'https://getbootstrap.com/',license:'MIT',directory:'bootstrap'},
+  {id:'bootstrap',name:'Bootstrap',homepage:'https://getbootstrap.com/',license:'MIT',directory:'bootstrap',notices:'/web/assets/bootstrap/THIRD-PARTY-LICENSES.txt'},
   {id:'bootstrap-icons',name:'Bootstrap Icons',homepage:'https://icons.getbootstrap.com/',license:'MIT',directory:'bootstrap-icons'},
   {id:'i18next',name:'i18next',homepage:'https://www.i18next.com/',license:'MIT',directory:'i18next'},
   {id:'date-holidays',name:'date-holidays',homepage:'https://github.com/commenthol/date-holidays',license:'ISC / CC BY-SA 3.0',directory:'date-holidays',notices:'/web/assets/date-holidays/THIRD-PARTY-LICENSES.txt'}

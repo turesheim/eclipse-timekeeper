@@ -30,6 +30,7 @@ export const thirdPartyNotices=[
     "name": "Bootstrap",
     "homepage": "https://getbootstrap.com/",
     "license": "MIT",
+    "notices": "/web/assets/bootstrap/THIRD-PARTY-LICENSES.txt",
     "version": "5.3.8",
     "copyright": "Copyright (c) 2011-2025 The Bootstrap Authors",
     "licenseUrl": "/web/assets/notices/bootstrap-LICENSE.txt"

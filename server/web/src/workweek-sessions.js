@@ -5,6 +5,8 @@ import { instantText } from './model.js';
 import { sameSession } from './calendar-model.js';
 import { iconButton, projectIcon } from './icons.js';
 import { workweekSessionGroups, compactClock, sessionTimeEdit } from './workweek-session-model.js';
+import {richTooltip} from './tooltips.js';
+import {workSessionsTooltip} from './tooltip-content.js';
 
 const node = (tag, text, css) => {const value = document.createElement(tag);if (text !== undefined) value.textContent = text;if (css) value.className = css;return value;};
 export class WorkweekSessions {
@@ -87,12 +89,12 @@ export class WorkweekSessions {
   interval(entry, client, project) {
     const record = entry.session,box = node('div', undefined, 'week-session-interval');box.dataset.workSessionId = record.id;box.dataset.sessionDate = entry.date;
     if (entry.running) box.append(node('span', i18nText("ui.running"), 'visually-hidden'));
-    box.title = [record.summary, `${client.name} · ${project.name}`, `${instantText(record.start, this.snapshot.profile.data.zoneId)} → ${instantText(record.end, this.snapshot.profile.data.zoneId)}`].filter(Boolean).join('\n');
+    richTooltip(box,()=>workSessionsTooltip({client,sessions:[record],projects:this.snapshot.projects,zone:this.snapshot.profile.data.zoneId,asOf:this.snapshot.report.generatedAt,format:this.format}));
     for (const key of ['start', 'end']) {
       if (key === 'end') box.append(node('span', '–', 'week-session-separator'));
       const input = node('input', undefined, 'form-control week-session-time');input.type = 'text';input.value = compactClock(entry[key]);input.placeholder = entry.running && key === 'end' ? i18nText("ui.running") : '';
       input.dataset.endpoint = key;input.readOnly = !entry[key + "Editable"];input.disabled = !this.writable;
-      input.setAttribute('aria-label', `${key === 'start' ? i18nText("ui.start") : i18nText("ui.end")} ${record.summary || i18nText("ui.work_session_21aa04")} · ${client.name} · ${project.name} · ${entry.date}`);input.title = box.title;
+      input.setAttribute('aria-label', `${key === 'start' ? i18nText("ui.start") : i18nText("ui.end")} ${record.summary || i18nText("ui.work_session_21aa04")} · ${client.name} · ${project.name} · ${entry.date}`);
       if (input.readOnly) input.setAttribute('aria-description', i18nText("ui.continues_across_midnight_edit_the_endpoint_on_its_own_day"));
       input.addEventListener('focus', () => {
         if (input.readOnly || !this.writable) return;
