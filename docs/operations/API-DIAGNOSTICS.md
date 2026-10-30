@@ -22,6 +22,17 @@ Names use hashes and random suffixes rather than raw selectors or filesystem
 paths. The latest invocation remains available as `server.log`; earlier logs
 survive Playwright's normal output-directory cleanup.
 
+The complete browser suite runs in groups of at most six spec files, each with a
+fresh packaged JVM, database and credentials. This prevents unrelated feature
+checks from exhausting the shared production password-login budget (100 attempts
+per ten minutes). Production limits and test assertions are unchanged. The
+bootstrap UI spec retains an unclaimed fixture; other groups provision their
+administrator through the normal setup API. Each spec runs once, failures stop
+the acceptance run, and the overall twenty-minute bound is retained. The final
+`browser.xml` merges all test cases; `acceptance.json` records each group's spec
+files and source/checksum receipt. Individual reports, screenshots, receipts and
+server logs remain under `test-results/batches/` as well as the combined output.
+
 ### H2 closed-session diagnosis
 
 A `JdbcSQLNonTransientConnectionException` with SQL state `90098` can be the

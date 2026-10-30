@@ -12,8 +12,12 @@ import subprocess
 import tempfile
 import time
 from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.request import urlopen, build_opener, HTTPCookieProcessor, HTTPSHandler, Request
+from http.cookiejar import CookieJar
+import ssl
+import re
 import zipfile
+import xml.etree.ElementTree as ET
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from configure_accounts import create_challenge
@@ -34,6 +38,90 @@ def retain_server_logs(server_log, output, identity):
     return saved
 
 
+
+
+def bootstrap_batch(base,code,password,certificate=None):
+    """Use the normal public setup flow; bootstrap UI coverage keeps its fresh fixture."""
+    handlers=[HTTPCookieProcessor(CookieJar())]
+    if certificate:handlers.append(HTTPSHandler(context=ssl.create_default_context(cafile=str(certificate))))
+    opener=build_opener(*handlers)
+    with opener.open(base+'/api/v1/auth/status',timeout=10) as reply:
+        if not json.load(reply)['setupRequired']:raise RuntimeError('Expected a fresh browser fixture')
+    body={'code':code,'username':'browser-admin','password':password,'displayName':'browser-admin','email':'browser-admin@example.org'}
+    request=Request(base+'/api/v1/auth/setup',data=json.dumps(body).encode(),headers={'Origin':base,'Content-Type':'application/json'},method='POST')
+    with opener.open(request,timeout=15) as reply:
+        if reply.status!=200:raise RuntimeError('Browser fixture bootstrap failed')
+        csrf=json.load(reply)['csrf']
+    with opener.open(Request(base+'/api/v1/auth/logout',data=b'',headers={'Origin':base,'X-CSRF-Token':csrf},method='POST'),timeout=10) as reply:
+        if reply.status!=204:raise RuntimeError('Browser fixture bootstrap logout failed')
+
+def spec_pattern(name):
+    return r'(^|[\\/])'+re.escape(name)+'$'
+
+
+def spec_batches(specs, size=6):
+    """Bound shared fixture lifetime; unrelated features must not share login budgets."""
+    values=sorted(specs)
+    return [values[index:index+size] for index in range(0,len(values),size)]
+
+
+def restore_batch_artifacts(saved, output):
+    """Playwright clears its output on every invocation; retain all batch evidence."""
+    reports=ET.Element('testsuites')
+    totals={'tests':0,'failures':0,'errors':0,'skipped':0}
+    elapsed=0.0;transport=[]
+    for folder in sorted(saved.iterdir()):
+        shutil.copytree(folder,output,dirs_exist_ok=True)
+        shutil.copytree(folder,output/'batches'/folder.name,dirs_exist_ok=True)
+        audit=folder/'transport.json'
+        if audit.exists():transport.extend(json.loads(audit.read_text()).get('authenticationRequests',[]))
+        report=folder/'browser.xml'
+        if report.exists():
+            root=ET.parse(report).getroot()
+            suites=[root] if root.tag=='testsuite' else list(root)
+            for suite in suites:
+                reports.append(suite)
+                for key in totals:totals[key]+=int(suite.get(key,'0'))
+                elapsed+=float(suite.get('time','0'))
+    (output/'transport.json').write_text(json.dumps({'authenticationRequests':transport},indent=2)+'\n')
+    for key,value in totals.items():reports.set(key,str(value))
+    reports.set('time',str(elapsed))
+    ET.ElementTree(reports).write(output/'browser.xml',encoding='utf-8',xml_declaration=True)
+
+
+def run_batches(args,output,digest):
+    # Fresh JVM/database/credentials per small group. Keep production throttles,
+    # test assertions and individual timeouts intact; never retry a failed login.
+    batches=spec_batches(path.name for path in (ROOT/'server/web/tests').glob('*.spec.js'))
+    if not batches:raise ValueError('No browser spec files found')
+    receipts=[];passed=False;deadline=time.monotonic()+1200
+    with tempfile.TemporaryDirectory(prefix='timekeeper-browser-batches-') as temporary:
+        saved=Path(temporary)
+        try:
+            for index,specs in enumerate(batches,1):
+                if output.exists():shutil.rmtree(output)
+                output.mkdir(parents=True)
+                command=[sys.executable,str(Path(__file__).resolve()),'--distribution',str(args.distribution.resolve()),'--java',args.java,'--browser',args.browser]
+                for flag in ('https','mail','passkeys','restore'):
+                    if getattr(args,flag):command.append('--'+flag)
+                for spec in specs:command.extend(['--spec',spec])
+                print(f'Browser fixture {index}/{len(batches)}: '+', '.join(specs),flush=True)
+                try:
+                    result=subprocess.run(command,timeout=max(.001,deadline-time.monotonic()))
+                finally:
+                    shutil.copytree(output,saved/f'{index:02d}')
+                if result.returncode:raise RuntimeError(f'Browser fixture {index} failed')
+                receipt=json.loads((output/'acceptance.json').read_text())
+                if not receipt.get('passed') or receipt['distributionSha256']!=digest:raise RuntimeError('Browser fixture receipt mismatch')
+                receipts.append({'specs':specs,**receipt})
+            passed=True
+        finally:
+            restore_batch_artifacts(saved,output)
+            summary={'distributionSha256':digest,'browser':args.browser,'https':args.https,'loopbackSmtp':args.mail,'virtualPasskeys':args.passkeys,'passed':passed,'batches':receipts}
+            if receipts:summary['sourceCommit']=receipts[0]['sourceCommit']
+            (output/'acceptance.json').write_text(json.dumps(summary,indent=2)+'\n')
+    return 0
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--distribution', type=Path, required=True)
@@ -44,6 +132,7 @@ def main():
     parser.add_argument('--mail', action='store_true', help='Exercise delivery with a loopback-only SMTP capture fixture (requires --https)')
     parser.add_argument('--passkeys', action='store_true', help='Use the HTTPS localhost RP for virtual WebAuthn browser tests (requires --https)')
     parser.add_argument('--restore', action='store_true', help='Enable private restore staging for isolated confirmation acceptance')
+    parser.add_argument('--spec', action='append', choices=sorted(path.name for path in (ROOT/'server/web/tests').glob('*.spec.js')), help='Run selected spec files in one isolated fixture')
     args = parser.parse_args()
     if args.mail and not args.https:parser.error('--mail requires --https')
     if args.passkeys and not args.https:parser.error('--passkeys requires --https')
@@ -52,6 +141,7 @@ def main():
         raise ValueError('Server distribution checksum mismatch')
     output = ROOT / 'server/web/test-results'
     output.mkdir(parents=True, exist_ok=True)
+    if not args.grep and not args.spec:return run_batches(args,output,digest)
     with tempfile.TemporaryDirectory(prefix='timekeeper-web-') as directory:
         data = Path(directory)
         with zipfile.ZipFile(args.distribution) as archive:
@@ -90,7 +180,9 @@ def main():
                 with urlopen(backend + '/web/', timeout=3) as response:
                     if b'id="login-form"' not in response.read(): raise AssertionError('Missing bundled web client')
                     if "frame-ancestors 'none'" not in response.headers.get('Content-Security-Policy',''): raise AssertionError('Missing web security policy')
-                options=[]
+                if args.spec and 'accounts.spec.js' not in args.spec:
+                    bootstrap_batch(base,code,password,data/'fixture-cert.pem' if args.https else None)
+                options=[spec_pattern(name) for name in (args.spec or [])]
                 if args.https:
                     config=data/'playwright.config.mjs'
                     config.write_text('export default '+json.dumps({'testDir':str(ROOT/'server/web/tests'),'testMatch':'*.spec.js','workers':1,'retries':0,'timeout':45000,'expect':{'timeout':12000},
@@ -112,7 +204,7 @@ def main():
                 try: process.wait(timeout=10)
                 except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=5)
                 log.flush()
-                retain_server_logs(server_log,output,{'distribution':digest,'browser':args.browser,'https':args.https,'mail':args.mail,'passkeys':args.passkeys,'restore':args.restore,'selector':args.grep})
+                retain_server_logs(server_log,output,{'distribution':digest,'browser':args.browser,'https':args.https,'mail':args.mail,'passkeys':args.passkeys,'restore':args.restore,'selector':args.grep,'specs':args.spec})
     return 0
 
 
