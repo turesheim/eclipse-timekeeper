@@ -1215,5 +1215,13 @@
   "calendar.item_types": "Subscribe to",
   "calendar.include_events": "Calendar events",
   "calendar.include_todos": "To-do items",
-  "calendar.error.CALENDAR_EMPTY_SELECTION": "Select calendar events, to-do items, or both."
+  "calendar.error.CALENDAR_EMPTY_SELECTION": "Select calendar events, to-do items, or both.",
+  "focus.title": "Focus areas",
+  "focus.area": "Focus area",
+  "focus.none": "No focus",
+  "focus.add": "Add focus area",
+  "focus.remove": "Remove focus area",
+  "focus.hint": "Select clients for each area. An area with no clients shows no client-related work. No focus shows everything.",
+  "focus.finish_edit": "Finish or cancel the current edit before changing focus.",
+  "focus.running_outside": "Work outside this focus"
 }

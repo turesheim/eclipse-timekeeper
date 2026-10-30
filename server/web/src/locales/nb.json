@@ -1215,5 +1215,13 @@
   "calendar.item_types": "Abonner på",
   "calendar.include_events": "Kalenderhendelser",
   "calendar.include_todos": "Gjøremål",
-  "calendar.error.CALENDAR_EMPTY_SELECTION": "Velg kalenderhendelser, gjøremål eller begge deler."
+  "calendar.error.CALENDAR_EMPTY_SELECTION": "Velg kalenderhendelser, gjøremål eller begge deler.",
+  "focus.title": "Fokusområder",
+  "focus.area": "Fokusområde",
+  "focus.none": "Uten fokus",
+  "focus.add": "Legg til fokusområde",
+  "focus.remove": "Fjern fokusområde",
+  "focus.hint": "Velg klienter for hvert område. Et område uten klienter viser ikke klientrelatert arbeid. Uten fokus viser alt.",
+  "focus.finish_edit": "Fullfør eller avbryt redigeringen før du bytter fokus.",
+  "focus.running_outside": "Arbeid utenfor dette fokusområdet"
 }

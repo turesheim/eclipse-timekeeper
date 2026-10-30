@@ -15,6 +15,8 @@ import { UndoNotice } from './undo.js';
 import { accountMenu } from './account-menu.js';
 import { periodSwipe } from './period-swipe.js';
 import { shiftMonth } from './month-model.js';
+import {focusedSnapshot} from './focus-model.js';
+import {renderFocusSettings} from './focus-settings.js';
 import {openAbout} from './about.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +26,7 @@ $('about-close').addEventListener('click', () => $('server-info').close());
 $('server-info').addEventListener('close', () => {if (!$('session').hidden) $('account-menu').querySelector('summary').focus();});
 let api = null,snapshot = null,connected = false,refreshing = null,reloadAgain = false;
 let editor = null,deleteCandidate = null,selectedActivity = null,selectedDay = null;
+let focusId = '';
 let watchSession = null;
 let accountName = '',canWrite = false;
 let serverInfoRequest = 0;
@@ -155,6 +158,7 @@ for (const node of document.querySelectorAll('[data-tab]')) node.addEventListene
 
 const auth = authentication({
   beforeSignOut:()=>notes.canLeave(),
+  renderFocus:view=>renderFocusSettings(view,()=>refresh()),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
     const panel=$('labels-panel');view.root.append(panel);panel.hidden=false;
@@ -181,7 +185,7 @@ const auth = authentication({
   clear({restoring = false} = {}) {
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshing = null;reloadAgain = false;
-    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
+    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
     calendar.reset();track.reset();today.reset();notes.reset();collapsed.clear();expandedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
@@ -325,14 +329,30 @@ function renderProjects(s) {
   }
   root.replaceChildren(grid);
 }
+function currentFocus(){return snapshot?.focusAreas.data.areas.find(value=>value.id===focusId)||null;}
+function paintFocus(){
+  const selector=$('focus-select'),areas=snapshot.focusAreas.data.areas;
+  if(!areas.some(value=>value.id===focusId))focusId='';
+  const choices=[{id:'',name:i18nText('focus.none')},...areas],key=JSON.stringify(choices.map(({id,name})=>({id,name})));
+  if(selector.dataset.choices!==key){selector.replaceChildren();for(const area of choices){const option=element('option',area.name);option.value=area.id;selector.append(option);}selector.dataset.choices=key;}
+  selector.value=focusId;
+}
+$('focus-select').addEventListener('change',()=>{
+  // Keep inline edits intact; switching a filter must not discard an editor.
+  if(weekSessions.draft||calendar.drag||calendar.busy||document.querySelector('dialog[open]')){
+    $('focus-select').value=focusId;setStatus(i18nText('focus.finish_edit'));return;
+  }
+  focusId=$('focus-select').value;selectedDay=null;render();
+});
 function render() {
-  const s = snapshot,zone = s.profile.data.zoneId;
+  paintFocus();
+  const s = focusedSnapshot(snapshot,currentFocus()),zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;
   $('zone-caption').textContent = `${s.dates.first} – ${addDays(s.dates.first, 6)} · ${zone}`;
   const active = s.active.data;
   $('active-title').closest('.tracking').dataset.active = String(!!active);
-  $('active-title').replaceChildren(active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
-  $('active-details').textContent = active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
+  $('active-title').replaceChildren(active && !s.projects.some(value=>value.id===active.projectId)&&!s.tasks.some(value=>value.id===active.taskId) && currentFocus() ? document.createTextNode(i18nText('focus.running_outside')) : active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
+  $('active-details').textContent = active && !s.projects.some(value=>value.id===active.projectId)&&!s.tasks.some(value=>value.id===active.taskId) && currentFocus() ? '' : active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
   $('stop').hidden = !active;readOnlyWhileDisconnected();
   table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
   renderProjects(s);
@@ -679,12 +699,13 @@ function updateSessionActions() {
 }
 function renderSession() {
   const active = snapshot.activeWorkSession.data,session = displayedSession();
+  const outside = session && currentFocus() && !currentFocus().clientIds.includes(session.clientId);
   $('work-session-state').textContent = active ? i18nText("ui.running") : i18nText("ui.stopped");
   $('work-session-state').className = `badge rounded-pill ${active ? 'text-bg-success' : 'text-bg-secondary'}`;
-  $('work-session-title').textContent = session?.summary || i18nText("ui.your_work_session");
+  $('work-session-title').textContent = outside ? i18nText('focus.running_outside') : session?.summary || i18nText("ui.your_work_session");
   $('work-session').style.setProperty('--session-color', snapshot.clients.find((client) => client.id === session?.clientId)?.color || 'var(--accent)');
   const zone = snapshot.profile.data.zoneId;
-  $('work-session-current').textContent = session ? `${[name(snapshot.clients, session.clientId), session.projectId ? name(snapshot.projects, session.projectId) : null].filter(Boolean).join(' · ')} · ${active ? i18nText("ui.started_fdc851") : ''}${instantText(session.start, zone)}${session.end ? ' → ' + instantText(session.end, zone) : ''}` : '';
+  $('work-session-current').textContent = outside ? '' : session ? `${[name(snapshot.clients, session.clientId), session.projectId ? name(snapshot.projects, session.projectId) : null].filter(Boolean).join(' · ')} · ${active ? i18nText("ui.started_fdc851") : ''}${instantText(session.start, zone)}${session.end ? ' → ' + instantText(session.end, zone) : ''}` : '';
 
   $('work-session-timing').hidden = !session;
   updateSessionActions();

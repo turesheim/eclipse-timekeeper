@@ -440,3 +440,6 @@ button.calendar-summary-card:disabled { opacity: .65; }
 
 .calendar-event-note-indicator { margin-inline-start: .3rem; font-size: .85em; }
 .calendar-planned > .calendar-event-note-indicator { position: absolute; inset-inline-end: .25rem; top: .2rem; }
+
+.focus-menu-field { display: grid; gap: .25rem; padding: .5rem .75rem; }
+.focus-menu-field select { width: 100%; min-width: 0; }

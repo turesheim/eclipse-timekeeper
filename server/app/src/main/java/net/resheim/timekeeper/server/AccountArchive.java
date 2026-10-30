@@ -220,9 +220,16 @@ class AccountArchive {
     private static long count(Connection c,String owner,String type) throws SQLException {
         try(var statement=query(c,"SELECT COUNT(*) FROM tk_resource WHERE owner_id=? AND entity_type=?",owner,type);var rows=statement.executeQuery()) {rows.next();return rows.getLong(1);}
     }
-    private static ObjectNode profile(Connection c,String owner) throws SQLException {
+    private static ObjectNode profile(Connection c,String owner) throws SQLException,IOException {
         try(var statement=query(c,"SELECT zone_id FROM tk_owner WHERE id=?",owner);var rows=statement.executeQuery()) {
-            if(!rows.next()) throw ApiFailure.notFound();return object().put("zoneId",rows.getString(1));
+            if(!rows.next()) throw ApiFailure.notFound();var value=object().put("zoneId",rows.getString(1));
+            var clients=new HashSet<String>();records(c,owner,"CLIENT",client->clients.add(client.path("id").asText()));
+            var areas=value.putArray("focusAreas");
+            records(c,owner,FocusAreas.TYPE,settings->{for(var area:settings.path("areas")){
+                var copy=((ObjectNode)area).deepCopy();var members=copy.putArray("clientIds");
+                for(var client:area.path("clientIds"))if(clients.contains(client.asText()))members.add(client);
+                areas.add(copy);
+            }});return value;
         }
     }
     private static ObjectNode metadata(Connection c,String owner) throws SQLException {

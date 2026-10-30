@@ -40,9 +40,11 @@ final class AccountArchiveImport {
     }
     private void importWork(Document document){
         var archive=document.data();
+        JsonNode mappings;
         if(!archive.path("format").asText().equals(AccountArchive.LEGACY_FORMAT)&&archive.path("work").path("taskAttachments").size()>0){
-            try(var reader=new ArchiveJournalFiles.TaskReader(document.file().file(),archive.path("journalFiles"))){new DomainTransfer(store).importRecords(archive.path("work"),reader::data);}
-        }else new DomainTransfer(store).importRecords(archive.path("work"));
+            try(var reader=new ArchiveJournalFiles.TaskReader(document.file().file(),archive.path("journalFiles"))){mappings=new DomainTransfer(store).importRecords(archive.path("work"),reader::data).body().path("ids");}
+        }else mappings=new DomainTransfer(store).importRecords(archive.path("work")).body().path("ids");
+        new FocusAreas(store).restore(archive.path("preferences").path("focusAreas"),mappings,inputs);
     }
     private static ObjectNode intent(ObjectNode upload) {return object().put("archiveId",upload.path("verifiedArchiveId").asText()).put("documentSha256",upload.path("verifiedArchiveDigest").asText());}
     private static String key(ObjectNode upload) {if(!upload.hasNonNull("verifiedArchiveId") || !upload.hasNonNull("verifiedArchiveDigest")) throw ApiFailure.conflict();return ImportLedger.identifier("account-archive-import",upload.path("verifiedArchiveId").asText()).toString();}
