@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {focusedSnapshot,focusIncludes} from '../src/focus-model.js';
+import {focusedSnapshot,focusIncludes,focusedCurrentSession} from '../src/focus-model.js';
 import {durationNanos} from '../src/model.js';
 
 const fixture=()=>({profile:{data:{zoneId:'Europe/Oslo'}},dates:{first:'2025-10-20'},
@@ -25,4 +25,14 @@ test('focus projects sessions, tasks, activities and exact totals without mutati
 test('No focus returns every record; an empty or deleted-client focus returns none, including unassigned work',()=>{
   const source=fixture();assert.equal(focusedSnapshot(source,null),source);assert.ok(focusIncludes(source,null));
   for(const clientIds of [[],['deleted']]){const s=focusedSnapshot(source,{clientIds});assert.equal(s.activities.length,0);assert.equal(s.workSessions.length,0);assert.equal(durationNanos(s.report.total),0n);assert.equal(focusIncludes(s,'a'),false);}
+});
+test('the timer header follows focus for stopped sessions and retains running timer authority outside focus',()=>{
+  assert.equal(focusedCurrentSession(null,null),null);
+  const source=fixture(),area={clientIds:['a']};assert.equal(focusedCurrentSession(source,area).id,'sb');
+  source.activeWorkSession.data=null;source.workSessions=[
+    {id:'first',clientId:'a',start:'2025-10-26T08:00:00Z'},
+    {id:'last',clientId:'a',start:'2025-10-26T08:00:00.000000001Z'}];
+  source.workSessionReport={session:{id:'reported',clientId:'b'}};
+  assert.equal(focusedCurrentSession(source,null).id,'reported');assert.equal(focusedCurrentSession(source,area).id,'last');
+  assert.equal(focusedCurrentSession(source,{clientIds:[]}),null);
 });

@@ -1,7 +1,14 @@
-import {addDays,activityDayNanos,durationNanos} from './model.js';
+import {addDays,activityDayNanos,durationNanos,instantNanos} from './model.js';
 
 // Focus is a presentation filter. Commands always retain the unfiltered snapshot.
 export function focusIncludes(data,clientId){return !data.focusClientIds || data.focusClientIds.includes(clientId);}
+export function focusedCurrentSession(source,area){
+  if(source?.activeWorkSession.data)return source.activeWorkSession.data;
+  const reported=source?.workSessionReport?.session;
+  if(!area)return reported||null;
+  if(reported&&area.clientIds.includes(reported.clientId))return reported;
+  return source.workSessions.reduce((latest,value)=>area.clientIds.includes(value.clientId)&&(!latest||instantNanos(value.start)>instantNanos(latest.start))?value:latest,null);
+}
 const duration=nanos=>`PT${nanos/1000000000n}.${(nanos%1000000000n).toString().padStart(9,'0')}S`;
 export function focusedSnapshot(source,area){
   if(!area)return source;

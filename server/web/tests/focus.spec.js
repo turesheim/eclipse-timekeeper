@@ -25,7 +25,7 @@ test('focus areas filter every client view, totals and separately loaded calenda
   for(const [index,name] of ['Included client','Excluded client'].entries()){
     const client=await(await api('POST','/clients',{name,color:index?'#cc2211':'#118866'})).json();clients.push(client);
     const project=await(await api('POST','/projects',{name:name+' project',clientId:client.id,icon:'code'})).json();projects.push(project);
-    const task=await(await api('POST','/tasks',{summary:name+' task',projectId:project.id})).json();
+    const task=await(await api('POST','/tasks',{summary:name+' task',projectId:project.id,parentTaskId:null,url:null})).json();
     sessions.push(await(await api('POST','/work-sessions',{clientId:client.id,projectId:project.id,summary:name+' session',start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:00:00Z'})).json());
     await api('POST','/activities',{taskId:task.id,projectId:project.id,start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:00:00Z',summary:name+' activity',labelIds:[]});
   }
@@ -51,8 +51,10 @@ test('focus areas filter every client view, totals and separately loaded calenda
   await expect(page.locator('.calendar-planned')).toContainText([clients[0].name+' meeting']);
   await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-05');
   await expect(page.locator('#track-panel')).toContainText(clients[0].name);await expect(page.locator('#track-panel')).not.toContainText(clients[1].name);
+  await expect(page.locator('#work-session-title')).toHaveText(clients[0].name+' session');
   await captureScreenshot(page,{path:'test-results/focus-calendar.png',fullPage:true});
   await selectFocus(page,'Empty');await expect(page.locator('#track-panel')).not.toContainText(clients[0].name);
+  await expect(page.locator('#session-edit')).toBeDisabled();
   await page.locator('[data-tab=clients]').click();await expect(page.locator('#clients tbody tr')).toHaveCount(0);
   await selectFocus(page,'No focus');await expect(page.locator('#clients')).toContainText(clients[1].name);
   expect((await(await api('GET','/work-sessions')).json()).items).toHaveLength(2);

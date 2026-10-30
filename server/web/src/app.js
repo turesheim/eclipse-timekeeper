@@ -15,7 +15,7 @@ import { UndoNotice } from './undo.js';
 import { accountMenu } from './account-menu.js';
 import { periodSwipe } from './period-swipe.js';
 import { shiftMonth } from './month-model.js';
-import {focusedSnapshot} from './focus-model.js';
+import {focusedSnapshot,focusedCurrentSession} from './focus-model.js';
 import {renderFocusSettings} from './focus-settings.js';
 import {openAbout} from './about.js';
 
@@ -689,7 +689,7 @@ $('editor-delete-confirm').addEventListener('close', () => {
 });
 $('cancel').addEventListener('click', () => {if (editor?.busy) return;editor = null;$('editor').close();$('fields').replaceChildren();});
 $('editor').addEventListener('cancel', (event) => {if (editor?.busy) event.preventDefault();else {editor = null;$('fields').replaceChildren();}});
-function displayedSession() {return snapshot?.activeWorkSession.data || snapshot?.workSessionReport?.session || null;}
+function displayedSession() {return focusedCurrentSession(snapshot,currentFocus());}
 function updateSessionActions() {
   const active = snapshot?.activeWorkSession.data,session = displayedSession(),writable = connected && canWrite;
   $('session-start').disabled = !writable || !!active;$('session-start').hidden = !!active;
