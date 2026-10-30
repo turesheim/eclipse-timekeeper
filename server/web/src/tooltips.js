@@ -73,8 +73,9 @@ export function installTooltips() {
   }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['title','hidden','aria-hidden','open']});
   // The overlay never intercepts a calendar drag or a click on a control below
   // it. Hit-test its bounds for hover persistence instead of capturing presses.
-  document.addEventListener('pointerover',event=>{if(event.pointerType!=='mouse')return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)show(node);else if(active)leave();});
-  document.addEventListener('pointermove',event=>{if(active&&overTooltip(event))clearTimeout(leaveTimer);});
+  const hover=event=>{if(event.pointerType!=='mouse'||event.buttons)return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)show(node);else if(active)leave();};
+  document.addEventListener('pointerover',hover);
+  document.addEventListener('pointermove',hover);
   document.addEventListener('pointerout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
   document.addEventListener('focusin',event=>{if(!pointerFocus)show(target(event.target),event.target);});
   document.addEventListener('focusout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
