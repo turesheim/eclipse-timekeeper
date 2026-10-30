@@ -94,7 +94,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     ctx.set(editorViewOptionsCtx,{
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
-      handleKeyDown:(_view,event)=>{if(event.key==='Escape'){escape();return true;}return false;},
+      handleKeyDown:(_view,event)=>{
+        const link=event.target.closest?.('a[data-day-note-date]');
+        if(event.key==='Enter'&&dailyNoteDate(link?.dataset.dayNoteDate)){
+          event.preventDefault();link.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:event.ctrlKey,metaKey:event.metaKey}));return true;
+        }
+        if(event.key==='Escape'){escape();return true;}return false;
+      },
       nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
         if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');

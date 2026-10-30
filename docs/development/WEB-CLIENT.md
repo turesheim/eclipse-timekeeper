@@ -180,8 +180,8 @@ keeps an unsaved label draft open. A concurrent label change still requires
 review before that draft can be saved.
 The expanded day-note dialog edits the short label and Markdown body independently. **Formatted** provides paragraphs, headings,
 bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
-links, quotations, tables and undo/redo. Link addresses are validated; activating
-ordinary clicks edit regular web links; Command/Ctrl-click opens them. A daily
+links, quotations, tables and undo/redo. Link addresses are validated. Ordinary
+clicks edit regular web links; Command/Ctrl-click opens them. A daily
 wiki link such as `[[2026-10-26]]` opens **Today** on that date with one click,
 including from day, week, event and vault notes. Command/Ctrl-click opens the
 requested date in another tab, and `/web/?day=2026-10-26` is a direct link.

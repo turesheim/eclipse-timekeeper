@@ -16,7 +16,7 @@ test('daily-note targets use strict civil dates and an internal canonical route'
   for(const value of [null,undefined,'0000-01-01','1900-02-29','2026-02-30','2026-13-01','2026-10-26/../x','2026-10-26#x','javascript:alert(1)','2026-1-1']){
     assert.equal(dailyNoteDate(value),null);assert.equal(dailyNoteHref(value),null);
   }
-  assert.equal(dailyNoteDateFromSearch('?unrelated=true'),null);assert.equal(dailyNoteDateFromSearch('?day=2026-02-30'),null);
+  assert.equal(dailyNoteDateFromSearch('?unrelated=true'),null);assert.equal(dailyNoteDateFromSearch('?day=2026-02-30'),null);assert.equal(dailyNoteDateFromSearch('?day=2026-10-26&day=2026-10-27'),null);
 });
 test('daily wikilinks are phrasing nodes and serialize as wikilinks through rich edits',()=>{
   const p=parser(),source='# Review\n\nSee **[[2026-10-26]]** and [[2026-10-27]].\n',tree=p.runSync(p.parse(source));
