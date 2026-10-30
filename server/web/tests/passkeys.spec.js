@@ -39,8 +39,13 @@ test.beforeAll(async({browser,request})=>{
 
 test('passkeys: add with password and fresh passkey proof, rename, Remember me and remove the current key',async({page,request})=>{
   const user=await fresh(request),first=await virtual(page);await login(page,user);await account(page);
-  const add=addForm(page);await add.getByLabel('Passkey name',{exact:true}).fill('Laptop key');await add.getByLabel('Current password',{exact:true}).fill(password);await add.getByRole('button',{name:'Add passkey',exact:true}).click();
-  await expect(add).toContainText('Passkey added.');await expect(page.locator('#account-content tr').filter({hasText:'Laptop key'})).toHaveCount(1);
+  const add=addForm(page),label=add.getByLabel('Passkey name',{exact:true});await add.getByLabel('Current password',{exact:true}).fill(password);
+  let registrations=0;page.on('request',request=>{if(new URL(request.url()).pathname.endsWith('/auth/passkeys/register/options'))registrations++;});
+  await add.getByRole('button',{name:'Add passkey',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
+  await expect(label).toBeFocused();expect(await label.evaluate(input=>input.validity.valueMissing)).toBe(true);expect(registrations).toBe(0);
+  await expect(add.getByLabel('Current password',{exact:true})).toHaveValue(password);
+  await label.fill('Laptop key');await label.press('Enter');
+  await expect(add).toContainText('Passkey added.');await expect(label).toHaveValue('');await expect(page.locator('#account-content tr').filter({hasText:'Laptop key'})).toHaveCount(1);
   const {authenticatorId:second}=await first.cdp.send('WebAuthn.addVirtualAuthenticator',{options:{protocol:'ctap2',transport:'usb',hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:false}});
   await page.route('**/api/v1/auth/passkeys/register/options',async route=>{
     const response=await route.fetch();await first.presence(false);await first.cdp.send('WebAuthn.setAutomaticPresenceSimulation',{authenticatorId:second,enabled:true});await route.fulfill({response});
@@ -50,7 +55,7 @@ test('passkeys: add with password and fresh passkey proof, rename, Remember me a
   await captureScreenshot(page,{path:'test-results/passkeys-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/passkeys-mobile.png',fullPage:true});await page.setViewportSize({width:1280,height:900});
   await page.getByRole('button',{name:'Rename Laptop key',exact:true}).click();
-  const rename=page.getByRole('heading',{name:'Rename “Laptop key”',exact:true}).locator('..');await rename.getByLabel('Passkey name',{exact:true}).fill('Personal passkey');await rename.getByRole('button',{name:'Save name',exact:true}).click();
+  const rename=page.getByRole('heading',{name:'Rename “Laptop key”',exact:true}).locator('..');expect(await rename.getByLabel('Passkey name',{exact:true}).evaluate(input=>input.form.querySelectorAll('input[type=password]').length)).toBe(0);await rename.getByLabel('Passkey name',{exact:true}).fill('Personal passkey');await rename.getByRole('button',{name:'Save name',exact:true}).click();
   await expect(page.locator('#account-content')).toContainText('Passkey renamed.');await expect(page.locator('#account-content tr').filter({hasText:'Personal passkey'})).toHaveCount(1);
   await signOut(page);await page.getByLabel('Remember me on this browser').check();await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#owner')).toHaveText(user.username);
   const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.httpOnly).toBe(true);expect(cookie.secure).toBe(true);expect(cookie.expires).toBeGreaterThan(Date.now()/1000+28*86400);

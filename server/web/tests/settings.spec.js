@@ -263,3 +263,18 @@ for (const [mode, title] of [
     expect(writes).toBe(2);
   } finally {releaseRead(); releaseWrite(); await page.unrouteAll({behavior: 'wait'});}
 });
+
+
+test('passkey labels stay separate from password confirmation and keep account draft protection',async({page,request})=>{
+  const user=await fresh(request);await login(page,user,'#account/passkeys');await ready(page);
+  const label=page.getByLabel('Passkey name',{exact:true}),password=page.getByLabel('Current password',{exact:true});
+  await expect(password).toHaveAttribute('autocomplete','current-password');await expect(password).toHaveAttribute('type','password');
+  expect(await label.evaluate(input=>({ownForm:!!input.form,credentialFields:input.form.querySelectorAll('input[type=password],input[autocomplete=username],input[autocomplete=current-password]').length,autocomplete:input.form.autocomplete}))).toEqual({ownForm:true,credentialFields:0,autocomplete:'off'});
+  await expect(label).toHaveAttribute('autocomplete','off');await expect(label).toHaveAttribute('name','passkey-label');
+  expect(await password.evaluate(input=>input.form.querySelector('[name="passkey-label"]'))).toBeNull();
+  await label.fill('Personal laptop');
+  page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('link',{name:'Profile',exact:true}).click();
+  await expect(page).toHaveURL(/#account\/passkeys$/);await expect(label).toHaveValue('Personal laptop');
+  page.once('dialog',dialog=>dialog.accept());await page.getByRole('link',{name:'Profile',exact:true}).click();await ready(page);
+  await expect(page).toHaveURL(/#account\/profile$/);await expect(label).toHaveCount(0);
+});
