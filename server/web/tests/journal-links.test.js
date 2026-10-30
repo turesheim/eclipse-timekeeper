@@ -34,3 +34,8 @@ test('invalid dates, other wikilinks and embeds retain the conservative source f
   for(const source of ['[[2026-02-30]]','[[0000-01-01]]','[[Project]]','[[2026-10-26|alias]]','![[2026-10-26]]','[[[2026-10-26]]]'])assert.equal(needsSource(source),true,source);
   const p=parser();assert.deepEqual(links(p.runSync(p.parse('[[2026-02-30]]'))),[]);
 });
+test('image alt text retains literal wiki brackets across Markdown round trips',()=>{
+  const p=parser(),tree=p.runSync(p.parse('![A [[2026-10-26]]](assets/pixel.png)'));
+  assert.equal(tree.children[0].children[0].alt,'A [[2026-10-26]]');assert.deepEqual(links(tree),[]);
+  const again=p.runSync(p.parse(p.stringify(tree)));assert.equal(again.children[0].children[0].alt,'A [[2026-10-26]]');
+});

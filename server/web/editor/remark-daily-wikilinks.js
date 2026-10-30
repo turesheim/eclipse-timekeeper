@@ -19,22 +19,15 @@ export function remarkDailyWikilinks(){
   const data=this.data();
   (data.micromarkExtensions??=[]).push({text:{91:{name:'dailyWikilink',tokenize}}});
   (data.fromMarkdownExtensions??=[]).push({
-    enter:{dailyWikilink(token){this.enter({type:'dailyWikilink',value:''},token);}},
-    exit:{dailyWikilink(token){this.stack.at(-1).value=this.sliceSerialize(token).slice(2,-2);this.exit(token);}}
+    enter:{dailyWikilink(token){
+      // Link labels and image alt text are literal phrasing, not nested links.
+      if(this.stack.some(node=>['link','linkReference','image','imageReference'].includes(node.type)))this.config.enter.data.call(this,token);
+      else this.enter({type:'dailyWikilink',value:''},token);
+    }},
+    exit:{dailyWikilink(token){
+      if(this.stack.at(-1).type==='text')this.config.exit.data.call(this,token);
+      else{this.stack.at(-1).value=this.sliceSerialize(token).slice(2,-2);this.exit(token);}
+    }}
   });
   (data.toMarkdownExtensions??=[]).push({handlers:{dailyWikilink:node=>'[['+node.value+']]'}});
-  // An existing Markdown link owns its label. Do not create nested HTML anchors.
-  return tree=>{
-    function visit(node,insideLink=false){
-      if(!node.children)return;
-      const nested=insideLink||node.type==='link'||node.type==='linkReference';
-      node.children=node.children.map(child=>nested&&child.type==='dailyWikilink'?{type:'text',value:'[['+child.value+']]'}:child);
-      node.children=node.children.reduce((children,child)=>{
-        if(child.type==='text'&&children.at(-1)?.type==='text')children.at(-1).value+=child.value;
-        else children.push(child);return children;
-      },[]);
-      node.children.forEach(child=>visit(child,nested));
-    }
-    visit(tree);
-  };
 }
