@@ -34,10 +34,13 @@ function plainTooltip(node) {
     const text=document.createElement('span');text.textContent=title;value.append(text);return value;
   });
 }
-function target(node) {
+function target(node,point=null) {
   if(!(node instanceof Element))return null;
   const titled=node.closest('[title]');if(titled)plainTooltip(titled);
-  const candidate=node.closest('[data-tk-tooltip]');
+  // Bootstrap disables pointer events on disabled controls. Resolve their
+  // bounds from the parent event without adding layout-changing wrappers.
+  const disabled=point&&[...node.querySelectorAll(':disabled[data-tk-tooltip]')].find(value=>{const box=value.getBoundingClientRect();return point.clientX>=box.left&&point.clientX<=box.right&&point.clientY>=box.top&&point.clientY<=box.bottom;});
+  const candidate=disabled||node.closest('[data-tk-tooltip]');
   return candidate&&content.has(candidate)&&visible(candidate)?candidate:null;
 }
 function show(node,focus=null) {
@@ -51,7 +54,7 @@ function show(node,focus=null) {
   const descriptions=new Map([[node,node.getAttribute('aria-describedby')]]);
   if(focus&&focus!==node)descriptions.set(focus,focus.getAttribute('aria-describedby'));
   const instance=new Tooltip(node,{trigger:'manual',html:true,sanitize:true,animation:false,placement:'auto',container,boundary:container,
-    customClass:'timekeeper-tooltip',title:()=>content.get(node)()});
+    customClass:'timekeeper-tooltip',popperConfig:{strategy:'fixed'},title:()=>content.get(node)()});
   instance.show();const tip=document.getElementById(node.getAttribute('aria-describedby'));
   if(!tip){instance.dispose();return;}
   active={node,instance,tip,descriptions};
@@ -70,7 +73,7 @@ export function installTooltips() {
   }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['title','hidden','aria-hidden','open']});
   // The overlay never intercepts a calendar drag or a click on a control below
   // it. Hit-test its bounds for hover persistence instead of capturing presses.
-  document.addEventListener('pointerover',event=>{if(event.pointerType!=='mouse')return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target);if(node)show(node);else if(active)leave();});
+  document.addEventListener('pointerover',event=>{if(event.pointerType!=='mouse')return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)show(node);else if(active)leave();});
   document.addEventListener('pointermove',event=>{if(active&&overTooltip(event))clearTimeout(leaveTimer);});
   document.addEventListener('pointerout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
   document.addEventListener('focusin',event=>{if(!pointerFocus)show(target(event.target),event.target);});
@@ -80,5 +83,5 @@ export function installTooltips() {
   document.addEventListener('click',()=>hideTooltip(),true);
   document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){const bounds=active.node.getBoundingClientRect();if(bounds.bottom<0||bounds.top>innerHeight||bounds.right<0||bounds.left>innerWidth)hideTooltip();else active.instance.update();}},true);
   document.addEventListener('wheel',event=>{if(!overTooltip(event))return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight)return;inner.scrollTop+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?inner.clientHeight:1);event.preventDefault();},{capture:true,passive:false});
-  window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
+  window.addEventListener('resize',hideTooltip);window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
 }
