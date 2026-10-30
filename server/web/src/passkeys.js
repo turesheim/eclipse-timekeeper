@@ -60,6 +60,7 @@ export async function renderPasskeys(view, zone) {
   }
   function cancelControl(target) {const value = button(i18nText("ui.cancel_passkey_request"), () => {});value.hidden = true;target.append(value);return value;}
   const add = form(view, i18nText("ui.add_passkey"), i18nText("ui.add_passkey"), async () => {
+    if (!addName.reportValidity()) return;
     await change(addCancel, add.feedback, async (stage, current) => {
       const name = addName.value.trim(),proof = await addProof.value({ action: 'ADD' }, stage);
       if (!view.valid() || current.canceled) return;
@@ -68,7 +69,14 @@ export async function renderPasskeys(view, zone) {
       addName.value = '';view.clean(add.value);add.feedback.textContent = i18nText("ui.passkey_added");await refresh();
     });
   }, { canSubmit: () => data.enabled && passkeysSupported() });
-  const addName = field(add.value, i18nText("ui.passkey_name"), '', { maxLength: 200 });const addProof = proofFields(add.value),addCancel = cancelControl(add.value);add.finish();
+  // Keep label metadata in a separate form so it is not presented as the
+  // username half of a username/password pair.
+  const labelForm = node('form');labelForm.autocomplete = 'off';
+  const addName = field(labelForm, i18nText("ui.passkey_name"), '', { maxLength: 200 });addName.name = 'passkey-label';
+  for (const event of ['input', 'change']) labelForm.addEventListener(event, () => view.dirty.add(add.value));
+  labelForm.addEventListener('submit', event => {event.preventDefault();add.value.requestSubmit();});
+  add.value.before(labelForm);
+  const addProof = proofFields(add.value),addCancel = cancelControl(add.value);add.finish();
   view.root.append(actions);
   function discardAction() {
     for (let index = managers.length - 1; index >= 0; index--) if (managers[index].target === actionForm) {managers[index].clear();managers.splice(index, 1);}
@@ -102,7 +110,7 @@ export async function renderPasskeys(view, zone) {
     if (remove) {
       editor.value.append(node('p', i18nText("ui.removing_this_passkey_signs_out_sessions_created_with_it_it_does_not_remove_the_crede"), 'alert alert-warning'));
       evidence = proofFields(editor.value);cancel = cancelControl(editor.value);
-    } else name = field(editor.value, i18nText("ui.passkey_name"), key.name, { maxLength: 200 });
+    } else {name = field(editor.value, i18nText("ui.passkey_name"), key.name, { maxLength: 200 });name.name = 'passkey-label';}
     editor.finish();editor.value.append(button(i18nText("ui.cancel"), () => closeAction()));
     actionForm = editor.value;actions.append(editor.value.closest('section'));(name || editor.value.querySelector('input,select'))?.focus();
   }

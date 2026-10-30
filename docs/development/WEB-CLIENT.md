@@ -73,6 +73,10 @@ applies to either method. No credential is requested automatically on page load.
 **My Account → Passkeys** lists user-named keys and creation/last-used times in
 the account time zone. Adding or removing a key requires fresh password or
 passkey proof. Removing the key used for the current session signs the user out.
+The passkey name is a label, separate from the password-confirmation form so it
+is not presented as a login username. Its required-name validation, Enter to
+submit, and unsaved-change protection still apply; the password field keeps its
+normal current-password completion.
 Keys enrolled for an earlier hostname are marked unavailable at the current RP;
 they remain visible until their owner removes them after testing a replacement.
 Token-derived sessions direct the user to account sign-in before enrollment.
