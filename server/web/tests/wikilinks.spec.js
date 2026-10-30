@@ -16,7 +16,7 @@ const rich=page=>page.locator('#today-journal-formatted [role=textbox]');
 const dateLink=(root,date)=>root.locator(`a[data-day-note-date="${date}"]`);
 
 test('daily wikilinks render as inline nodes and preserve Markdown through mode changes, edits, typing and paste',async({page})=>{
-  await page.goto('/web/markdown-lab.html');const original='---\r\ntitle: Daily links\r\n---\r\n\r\nSee **[[2026-10-26]]**.\r\n\r\nCode `[[2026-10-27]]`.\r\n';
+  await page.goto('/web/markdown-lab.html');await expect(page.locator('#markdown-toolbar button')).toHaveCount(8);const original='---\r\ntitle: Daily links\r\n---\r\n\r\nSee **[[2026-10-26]]**.\r\n\r\nCode `[[2026-10-27]]`.\r\n';
   await page.locator('#markdown-file').setInputFiles({name:'wiki.md',mimeType:'text/markdown',buffer:Buffer.from(original)});await expect(page.locator('#markdown-status')).toContainText('Opened locally');
   await page.locator('#markdown-rich').click();const formatted=page.locator('#markdown-formatted');await expect(dateLink(formatted,'2026-10-26')).toHaveText('2026-10-26');await expect(dateLink(formatted,'2026-10-26')).toHaveAttribute('href','/web/?day=2026-10-26');await expect(dateLink(formatted,'2026-10-27')).toHaveCount(0);
   await page.locator('#markdown-source').click();const pending=page.waitForEvent('download');await page.locator('#markdown-download').click();expect(await readFile(await(await pending).path(),'utf8')).toBe(original);
