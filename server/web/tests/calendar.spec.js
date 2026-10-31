@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -393,7 +394,7 @@ test('calendar stale gestures keep the proposal and never adopt a newer snapshot
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-20T08:18');
     expect(await read(request,'work-sessions',f.session.id)).toEqual(peer);await unchangedActivities(request,f);
     await page.locator('#cancel').click();await page.unroute(`**/api/v1/work-sessions/${f.session.id}`);
-    await page.getByRole('button',{name:/^Refresh: /}).click();await expect(bar(page,f.session.id)).toHaveAttribute('title',new RegExp(peer.summary));
+    await page.getByRole('button',{name:/^Refresh: /}).click();await expect(await tooltipFor(bar(page,f.session.id))).toContainText(new RegExp(peer.summary));
     once=true;
     await page.route(`**/api/v1/work-sessions/${f.session.id}`,async route=>{
       if(once && route.request().method()==='PUT') {once=false;peer=await put(request,'work-sessions',peer,{summary:f.prefix+' later peer change'});}

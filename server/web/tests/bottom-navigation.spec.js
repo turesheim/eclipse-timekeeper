@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -25,7 +26,7 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     const bounds=await bar.boundingBox();expect(bounds.y+bounds.height).toBeCloseTo(844,0);
     for(const [id,label] of views) {
       const button=bar.getByRole('button',{name:label,exact:true});
-      await expect(button).toHaveAttribute('title',label);
+      await expect(await tooltipFor(button)).toContainText(label);
       const box=await button.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.width).toBeGreaterThanOrEqual(32);expect(box.height).toBeGreaterThanOrEqual(44);
       if(width<1024)await expect(button.locator('.nav-label')).not.toBeVisible();else await expect(button.locator('.nav-label')).toBeVisible();
       await button.click();await expect(button).toHaveAttribute('aria-current','page');await expect(page.locator('#'+id+'-panel')).toHaveJSProperty('hidden',false);

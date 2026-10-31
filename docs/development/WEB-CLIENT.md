@@ -389,8 +389,9 @@ replace visual review or keyboard testing.
 
 Bootstrap's exact npm version and integrity are pinned in `package-lock.json`.
 Its compiled CSS and MIT license are committed under `src/assets/bootstrap`,
-alongside the SVGs extracted from its data URLs. No Bootstrap JavaScript is needed:
-native modal dialogs and the existing application navigation handle interactions.
+alongside the SVGs extracted from its data URLs. The locally bundled Bootstrap
+Tooltip component and Popper provide hover and keyboard hints; native modal
+dialogs and the existing application navigation handle other interactions.
 The deployed client uses only same-origin files, including icon fonts, and retains
 its `img-src 'self'` security policy. Maven packages these assets directly; it does
 not require npm or an external CDN at runtime or when building the server.
@@ -410,6 +411,22 @@ WCAG A/AA checks for all views at desktop and narrow widths. Those tests verify
 that no design asset triggers a third-party request or is blocked by CSP, and exercise
 keyboard focus, required fields and error recovery. Native browser validation and
 the API's existing concurrency and authorization rules remain in use.
+
+`tooltips.js` is the single tooltip lifecycle and presentation entry point. It
+enhances UI `title` hints with Bootstrap's HTML variant, using text nodes for all
+translations and API data. Authored link/image titles inside the Markdown editor
+are left untouched so hint enhancement cannot change saved notes.
+`tooltip-content.js` provides shared decorated session
+and calendar-event details. Each composite card owns one tooltip containing its
+individual sessions, project icons, times and durations; its child icons, title
+and duration do not create separate hints. The same builders serve Today, the
+monthly Calendar, Week and Workweek. Read-only summary cards are keyboard-focusable.
+Tooltips support hover, keyboard descriptions, Escape dismissal, hovering over
+the tooltip itself and scrolling long details. They use the active dialog as a
+container when necessary and are disposed on removal, hidden views and logout.
+No note contents are copied to browser storage. Bootstrap and Popper's complete
+licenses ship with the bundle and are linked from About. See the upstream
+[Bootstrap 5.3 tooltip documentation](https://getbootstrap.com/docs/5.3/components/tooltips/).
 
 macOS WebKit reports inline-style CSP diagnostics for native select controls even
 on a plain page without application styles/scripts; Playwright screenshots also

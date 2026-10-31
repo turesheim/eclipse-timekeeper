@@ -7,6 +7,8 @@ import { MonthPicker } from './month-picker.js';
 import {TrackHolidays} from './track-holidays.js';
 import {TrackDayNotes} from './track-day-notes.js';
 import {workSummaryCard} from './work-summary-card.js';
+import {richTooltip} from './tooltips.js';
+import {workSessionsTooltip} from './tooltip-content.js';
 
 const node = (tag, text, className) => {const value = document.createElement(tag);if (text !== undefined) value.textContent = text;if (className) value.className = className;return value;};
 function compactTime(value) {
@@ -63,15 +65,6 @@ export class MonthTrack {
   sessions(date, clientId) {
     const ids = new Set(this.days?.find((day) => day.date === date)?.clients.get(clientId)?.sessionIds || []);
     return [...ids].map((id) => this.sessionsById.get(id)).filter(Boolean).sort((a, b) => {const first = instantNanos(a.start),second = instantNanos(b.start);return first < second ? -1 : first > second ? 1 : a.id.localeCompare(b.id);});
-  }
-  details(date, clientId) {
-    const sessions = this.sessions(date, clientId),zone = this.snapshot.profile.data.zoneId;
-    return i18nText('count.work_sessions',{count:sessions.length}) + sessions.map((session) => {
-      const project = this.snapshot.projects.find((project) => project.id === session.projectId);
-      return [session.summary || i18nText("ui.work_session_21aa04"), project?.name, `${
-      instantText(session.start, zone)} → ${session.end ? instantText(session.end, zone) : i18nText("ui.in_progress")}`,
-      session.end ? this.format(instantNanos(session.end) - instantNanos(session.start)) : null].filter(Boolean).join('\n');
-    }).join('\n\n');
   }
   open(date, clientId) {
     if (!this.writable) return;
@@ -157,10 +150,10 @@ export class MonthTrack {
           const client = clientsById.get(entry.clientId);
           const {card:summary,line,duration}=workSummaryCard({tag:this.writable?'button':'div',className:'track-client-day',title:client?.name||i18nText('ui.client'),color:client?.color});summary.dataset.trackDailyClient = entry.clientId;
           if (this.writable) {summary.type = 'button';summary.setAttribute('aria-haspopup', 'dialog');summary.addEventListener('click', () => this.open(day.date, entry.clientId));} else
-          summary.setAttribute('role', 'group');
+          {summary.setAttribute('role', 'group');summary.tabIndex=0;}
           summary.setAttribute('aria-label', `${client?.name || i18nText("ui.client")} · ${day.date}`);
           duration.classList.add('track-client-day-time');const short = node('span', undefined, 'calendar-summary-time track-client-day-time-short');short.setAttribute('aria-hidden', 'true');
-          this.dailyTimes.set(day.date + '/' + entry.clientId, { duration, short, summary, name: client?.name || i18nText("ui.client"), details: this.details(day.date, entry.clientId) });
+          this.dailyTimes.set(day.date + '/' + entry.clientId, { duration, short, summary, name: client?.name || i18nText("ui.client") });
           line.classList.add('track-client-day-total');const icons = node('span', undefined, 'track-project-icons'),projects = new Map();
           for (const session of this.sessions(day.date, entry.clientId)) {
             const project = projectsById.get(session.projectId);
@@ -176,6 +169,7 @@ export class MonthTrack {
       for (const client of clients) {
         const {card,duration}=workSummaryCard({className:'card track-client',title:client.name,color:client.color,swatch:true});
         card.dataset.trackClient = client.id;this.totals.append(card);this.clientTimes.set(client.id, duration);
+        card.tabIndex=0;
       }
       if (!clients.length) this.totals.append(node('p', i18nText("ui.no_work_sessions_this_month"), 'hint'));
       if (focused) this.dailyTimes.get(focused.date + '/' + focused.client)?.summary.focus();
@@ -184,12 +178,15 @@ export class MonthTrack {
       this.paintPicker();
     }
     this.root.querySelector('#track-total').textContent = this.format(result.total);
-    for (const [client, total] of this.clientTimes) total.textContent = this.format(result.clients.get(client) || 0n);
+    for (const [clientId, total] of this.clientTimes) {
+      total.textContent = this.format(result.clients.get(clientId) || 0n);
+      const ids=new Set(result.days.filter(day=>day.inMonth).flatMap(day=>day.clients.get(clientId)?.sessionIds||[]));
+      richTooltip(total.closest('[data-track-client]'),()=>workSessionsTooltip({client:this.snapshot.clients.find(client=>client.id===clientId),sessions:[...ids].map(id=>this.sessionsById.get(id)).filter(Boolean),projects:this.snapshot.projects,zone,asOf:this.asOf,total:result.clients.get(clientId),format:this.format}));
+    }
     for (const day of result.days) for (const entry of day.clients.values()) {
-      const { duration, short, summary, name, details } = this.dailyTimes.get(day.date + '/' + entry.clientId);
+      const { duration, short, summary, name } = this.dailyTimes.get(day.date + '/' + entry.clientId);
       summary.setAttribute('aria-label', `${name} ${this.narrow.matches ? compactTime(entry.duration) : this.format(entry.duration)} · ${day.date}${this.narrow.matches ? ' · ' + this.format(entry.duration) : ''}${entry.running ? i18nText("ui.running_ceef44") : ''}`);
-      summary.title = `${name} · ${day.date} · ${this.format(entry.duration)}
-${details}`;duration.textContent = this.format(entry.duration);
+      richTooltip(summary,()=>workSessionsTooltip({client:this.snapshot.clients.find(client=>client.id===entry.clientId),sessions:this.sessions(day.date,entry.clientId),projects:this.snapshot.projects,zone:this.snapshot.profile.data.zoneId,asOf:this.snapshot.report.generatedAt,total:entry.duration,date:day.date,format:this.format}));duration.textContent = this.format(entry.duration);
       short.textContent = compactTime(entry.duration);
     }
   }

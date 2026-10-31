@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -46,7 +47,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     const dayLabel=page.locator('#today-day-label');
     await expect(dayLabel.getByLabel('Day label',{exact:true})).toBeEnabled();
     await expect(dayLabel).not.toHaveClass(/card/);await expect(dayLabel).toHaveCSS('border-top-width','0px');
-    await expect(dayLabel.locator('label')).toHaveClass(/visually-hidden/);await expect(dayLabel.locator('.bi-tag')).toHaveAttribute('title','Day label');
+    await expect(dayLabel.locator('label')).toHaveClass(/visually-hidden/);await expect(await tooltipFor(dayLabel.locator('.bi-tag'))).toContainText('Day label');
     const labelBox=await dayLabel.locator('input').boundingBox(),labelIcon=await dayLabel.locator('.bi-tag').boundingBox();expect(labelIcon.x).toBeGreaterThan(labelBox.x+labelBox.width);
     await expect(page.locator('#today-note-editor #today-note-text')).toHaveCount(0);
     expect(await dayLabel.locator('input').evaluate(input=>input.form?.id)).toBe('today-note-form');
@@ -95,7 +96,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
         expect(await card.locator('strong').evaluate(title=>title.scrollWidth>title.clientWidth)).toBe(true);
         expect(await card.locator('strong').evaluate(title=>title.getBoundingClientRect().height<=parseFloat(getComputedStyle(title).lineHeight)+1)).toBe(true);
       }
-      await expect(sessionCard).toHaveAttribute('title',new RegExp(client.name));await expect(eventCard).toHaveAttribute('title',new RegExp(meetingTitle));
+      await expect(await tooltipFor(sessionCard)).toContainText(new RegExp(client.name));await expect(await tooltipFor(eventCard)).toContainText(new RegExp(meetingTitle));
       await expect(eventCard.locator('.calendar-summary-time')).toBeVisible();
       await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-05');
       const calendarCard=page.locator(`[data-track-date="${date}"] [data-track-daily-client="${client.id}"]`);await expect(calendarCard).toBeAttached();

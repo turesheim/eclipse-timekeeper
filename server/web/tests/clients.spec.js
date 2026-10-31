@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {expandProjectClient} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -63,11 +64,11 @@ test('clients maintain names and colors, own projects and color work-session sum
     await page.getByLabel('Summary',{exact:true}).fill('A separate description');await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');await save(page);
     session=(await (await api(request,'GET','/work-sessions?clientId='+client.id)).json()).items[0];expect(session.summary).toBe('A separate description');
     await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
-    const bar=page.locator(`.calendar-session[data-session-id="${session.id}"]`).first();await expect(bar).toHaveCSS('border-inline-start-color','rgb(255, 238, 0)');await expect(bar).toHaveAttribute('title',new RegExp(prefix));
+    const bar=page.locator(`.calendar-session[data-session-id="${session.id}"]`).first();await expect(bar).toHaveCSS('border-inline-start-color','rgb(255, 238, 0)');await expect(await tooltipFor(bar)).toContainText(new RegExp(prefix));
     await page.getByRole('button',{name:'Clients',exact:true}).click();let row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Edit',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' renamed');await page.getByLabel('Color',{exact:true}).fill('#102030');await save(page);
     await page.getByRole('button',{name:'Week',exact:true}).click();await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(bar).toHaveCSS('color',await page.locator('body').evaluate(node=>getComputedStyle(node).color));
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(bar).toHaveAttribute('title',new RegExp(prefix+' renamed'));
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(await tooltipFor(bar)).toContainText(new RegExp(prefix+' renamed'));
     await captureScreenshot(page,{path:'test-results/client-calendar.png',fullPage:true});
     await page.getByRole('button',{name:'Clients',exact:true}).click();row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');await page.locator('#cancel').click();
     for(const [collection,values] of [['work-sessions',[session]],['projects',projects]]) for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
@@ -220,7 +221,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.getByRole('button',{name:'Workweek',exact:true}).click();await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
-    await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(entry.locator('[data-project-icon=code]')).toHaveAttribute('title',new RegExp(other.name));await expect(entry).toHaveAttribute('title',new RegExp(globe.name));
+    await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(await tooltipFor(entry.locator('[data-project-icon=code]'))).toContainText(new RegExp(other.name));await expect(await tooltipFor(entry)).toContainText(new RegExp(globe.name));
     async function iconsFollow(selector){
       await expect.poll(()=>entry.evaluate((node,selector)=>{
         const clock=node.querySelector(selector)?.getBoundingClientRect(),icons=[...node.querySelectorAll('.track-project-icons [data-project-icon]')];
