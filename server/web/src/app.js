@@ -17,6 +17,7 @@ import { periodSwipe } from './period-swipe.js';
 import { shiftMonth } from './month-model.js';
 import {focusedSnapshot,focusedCurrentSession,focusIncludesActivity} from './focus-model.js';
 import {renderFocusSettings} from './focus-settings.js';
+import {dailyNoteDate,dailyNoteHref,dailyNoteDateFromSearch,dayNoteNavigation} from './journal-links.js';
 import {openAbout} from './about.js';
 
 const $ = (id) => document.getElementById(id);
@@ -55,6 +56,17 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
+document.addEventListener(dayNoteNavigation,event=>{
+  event.preventDefault();
+  const date=dailyNoteDate(event.detail?.date);if(!date||!api||!snapshot)return;
+  // Confirm every affected editor before closing any of them. A cancelled
+  // navigation keeps both a modal draft and the current Today draft intact.
+  if(!event.detail.guards.every(guard=>guard()))return;
+  if(date!==today.date&&!today.journal.canLeaveInline())return;
+  event.detail.leave.forEach(leave=>leave());
+  today.closeEvent();calendar.subscriptions.details.close();
+  if(today.select(date,{confirmed:true})){tab('today');history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
+});
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),
   changed: async (session) => {if (session === api) {if (weekSessions.draft && !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length) weekSessions.cancel();connected = false;readOnlyWhileDisconnected();await refresh().catch(() => {});}},
@@ -170,7 +182,7 @@ const auth = authentication({
     if (session !== api) return;
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
-    today.initialize(dateInZone(Date.now(),profile.zoneId));
+    today.initialize(dailyNoteDateFromSearch(location.search)||dateInZone(Date.now(),profile.zoneId));
     tab('today');
     $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;$('sync-status').hidden = false;
     await refresh();startWatch(session);
