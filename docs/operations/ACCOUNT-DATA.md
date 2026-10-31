@@ -21,7 +21,12 @@ The private ZIP contains:
 
 The snapshot includes all work records, project/client links, task relationships,
 labels, descriptions, external references, exact timestamps, running intervals,
-time-zone preferences and import audit history. Version 3 archives store day labels independently in `archive.json.dayLabels`,
+time-zone preferences, focus areas and import audit history. Focus areas are
+optional `preferences.focusAreas` metadata: older archives may omit them.
+Restore adds the definitions with new area IDs and maps memberships to the
+newly imported clients. Existing definitions remain intact; duplicate area names
+are reported as a review conflict, so rename the existing area before restoring.
+The selected browser focus is not exported and never limits archive contents. Version 3 archives store day labels independently in `archive.json.dayLabels`,
 including labels on days without a note and explicitly cleared labels. They keep day notes
 as separate `YYYY-MM-DD.md` files and weekly notes as `YYYY-Www.md`, including
 notes without timed work or a visible Calendar label. Markdown and frontmatter

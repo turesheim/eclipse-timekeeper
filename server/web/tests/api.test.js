@@ -134,6 +134,7 @@ const snapshotDates=()=>({first:'2026-05-04',from:'2026-05-04T00:00:00Z',to:'202
 function snapshotReply(url,reportRevision=1){
   const path=new URL(url,'http://localhost').pathname;
   if(path==='/api/v1/me')return reply({ownerId:'owner-a',zoneId:'UTC',version:1});
+  if(path==='/api/v1/focus-areas')return reply({version:0,areas:[]});
   if(path.endsWith('/active'))return reply(null,undefined,204);
   if(path==='/api/v1/reports/activities')return reply({revision:reportRevision,total:'PT0S',days:[],generatedAt:'2026-05-04T12:00:00Z'});
   if(path.endsWith('/report'))return reply({revision:1,session:{id:'session-a'}});
@@ -145,13 +146,18 @@ test('snapshot reads overlap after owner binding and still confirm revisions and
     const path=new URL(url,'http://localhost').pathname;
     if(!ready&&path!=='/api/v1/me'){
       assert.equal(options.headers['X-Timekeeper-Owner'],'b3duZXItYQ');paths.add(path);
-      if(paths.size===9){ready=true;release();}
+      if(paths.size===10){ready=true;release();}
       await new Promise((resolve,reject)=>{gate.then(resolve);options.signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true});});
     }
     return snapshotReply(url);
   });
   const snapshot=await api.snapshot(snapshotDates,'session-a',{timeout:500});
-  assert.equal(paths.size,9);assert.equal(snapshot.revision,1);assert.equal(snapshot.workSessionReport.session.id,'session-a');
+  assert.equal(paths.size,10);assert.equal(snapshot.revision,1);assert.equal(snapshot.workSessionReport.session.id,'session-a');
+});
+test('snapshots retry a concurrent focus configuration change before publishing',async()=>{
+  let reads=0;
+  const api=new Api('token',async url=>new URL(url,'http://localhost').pathname==='/api/v1/focus-areas' ? reply({version:++reads===1?1:2,areas:[]}) : snapshotReply(url));
+  const snapshot=await api.snapshot(snapshotDates);assert.equal(reads,4);assert.equal(snapshot.focusAreas.data.version,2);
 });
 test('parallel snapshots retry mixed revisions and never publish inconsistent data',async()=>{
   let profiles=0;
@@ -168,7 +174,7 @@ test('the snapshot deadline aborts outstanding reads together without signing ou
     return snapshotReply(url);
   });
   await assert.rejects(api.snapshot(snapshotDates,null,{timeout:30}),error=>error.code==='UNAVAILABLE');
-  assert.equal(signals.length,9);assert.ok(signals.every(signal=>signal.aborted));stalled=false;
+  assert.equal(signals.length,10);assert.ok(signals.every(signal=>signal.aborted));stalled=false;
   assert.equal((await api.snapshot(snapshotDates)).revision,1);
 });
 test('binary upload bodies retain CSRF, owner binding and exact bytes',async()=>{

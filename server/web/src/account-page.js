@@ -15,8 +15,8 @@ export function closeAccount() {
   $('account-page').hidden = true;$('account-content').replaceChildren();$('account-navigation').replaceChildren();
   $('account-error').replaceChildren();$('account-heading').textContent = '';$('account-identity').textContent = '';$('users-link').hidden = true;
 }
-export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels) {
-  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels };
+export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus) {
+  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus };
   $('users-link').hidden = !account.administrator || !account.permissions?.includes('write');
   await show(route(), false);
 }
@@ -48,13 +48,13 @@ async function show(hash, ask = true) {
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', i18nText("ui.this_session_is_read_only_sign_in_with_your_password_to_change_settings"), 'alert alert-info'));
   if (page === 'account') {
-    const part = ['profile', 'password', 'passkeys', 'tokens', 'data', 'import', 'calendars', 'labels', 'journal'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
-    for (const [key, title] of [['profile', i18nText("ui.profile")], ['password', i18nText("ui.password")], ['passkeys', i18nText("ui.passkeys")], ['calendars', i18nText('calendar.subscriptions')], ['labels', i18nText('ui.labels')], ['tokens', i18nText("ui.api_tokens")], ['data', i18nText("ui.your_data")], ['import', i18nText("ui.import")]]) {
+    const part = ['profile', 'password', 'passkeys', 'tokens', 'data', 'import', 'calendars', 'labels', 'focus', 'journal'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
+    for (const [key, title] of [['profile', i18nText("ui.profile")], ['password', i18nText("ui.password")], ['passkeys', i18nText("ui.passkeys")], ['calendars', i18nText('calendar.subscriptions')], ['labels', i18nText('ui.labels')], ['focus', i18nText('focus.title')], ['tokens', i18nText("ui.api_tokens")], ['data', i18nText("ui.your_data")], ['import', i18nText("ui.import")]]) {
       const item = link(title, `#account/${key}`, 'nav-link');if (key === part) {item.classList.add('active');item.setAttribute('aria-current', 'page');}
       $('account-navigation').append(item);
     }
     const journal=link(i18nText('journal.webdav.title'),'#account/journal','nav-link');if(part==='journal'){journal.classList.add('active');journal.setAttribute('aria-current','page');}$('account-navigation').append(journal);
-    await view.run(() => part === 'calendars' ? scope.renderCalendars(currentView) : part === 'labels' ? scope.renderLabels(currentView) : renderAccount(currentView, part));
+    await view.run(() => part === 'calendars' ? scope.renderCalendars(currentView) : part === 'labels' ? scope.renderLabels(currentView) : part === 'focus' ? scope.renderFocus(currentView) : renderAccount(currentView, part));
   }
 }
 window.addEventListener('hashchange', () => {if (context) void show(route());});
