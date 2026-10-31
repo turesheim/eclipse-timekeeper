@@ -68,6 +68,7 @@ test('public holiday highlights stay subtle and consistent in Track and Calendar
         const text=label.getBoundingClientRect(),heading=node.getBoundingClientRect();return text.y>=heading.y&&text.bottom<=heading.bottom;
       })).toBe(true);
       await expect(column).toHaveAttribute('aria-label',/Grunnlovsdagen/);await expect(await tooltipFor(header)).toContainText('Grunnlovsdagen');
+      const note=header.locator('.calendar-day-note');await expect(await tooltipFor(note)).toContainText(await note.getAttribute('aria-label'));
       await expect.poll(()=>column.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe(tint);
       await expect.poll(()=>header.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe(tint);
       expect(await page.locator('.calendar-day[data-date="2026-05-16"]').evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe(tint);

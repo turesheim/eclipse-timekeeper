@@ -15,8 +15,9 @@ function refreshTooltip() {
   if(!visible(active.node)){hideTooltip();return;}
   active.tip.querySelector('.tooltip-inner').replaceChildren(content.get(active.node)());active.instance.update();
 }
-export function richTooltip(node,render) {
+export function richTooltip(node,render,{composite=true}={}) {
   node.removeAttribute('title');node.dataset.tkTooltip='';content.set(node,render);
+  if(composite)node.dataset.tkTooltipComposite='';else delete node.dataset.tkTooltipComposite;
   if(active?.node===node)refreshTooltip();return node;
 }
 function plainTooltip(node) {
@@ -25,14 +26,14 @@ function plainTooltip(node) {
   if(node.closest('.ProseMirror, [contenteditable="true"]'))return;
   const title=node.getAttribute('title');if(title===null)return;
   // A composite card owns its whole surface, including icons and text.
-  if(node.parentElement?.closest('[data-tk-tooltip]')){node.removeAttribute('title');return;}
+  if(node.parentElement?.closest('[data-tk-tooltip-composite]')){node.removeAttribute('title');return;}
   node.removeAttribute('title');
   if(!title){delete node.dataset.tkTooltip;content.delete(node);if(active?.node===node)hideTooltip();return;}
   richTooltip(node,()=>{
     const value=document.createElement('div');value.className='tooltip-caption';
     const glyph=node.querySelector('.icon')?.cloneNode(true);if(glyph){glyph.removeAttribute('title');value.append(glyph);}
     const text=document.createElement('span');text.textContent=title;value.append(text);return value;
-  });
+  },{composite:false});
 }
 function target(node,point=null) {
   if(!(node instanceof Element))return null;
