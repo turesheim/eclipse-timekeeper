@@ -291,7 +291,14 @@ class InstanceAdministratorTest {
     }
     private com.fasterxml.jackson.databind.JsonNode awaitUpload(Browser browser,String id,String expected) throws Exception {
         long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30);com.fasterxml.jackson.databind.JsonNode value;
-        do{var response=http(browser,false,"GET","/admin/instance/uploads/"+id,null);assertEquals(200,response.statusCode(),response.asString());value=parse(response.asString());contracts.validate("InstanceRestoreUpload",value);if(value.path("operation").path("state").asText().equals(expected))return value;Thread.sleep(20);}while(System.nanoTime()<deadline);
+        do{
+            var response=http(browser,false,"GET","/admin/instance/uploads/"+id,null);
+            // Validation briefly holds the artifact lock. Status reads are
+            // nonblocking, so retry only this documented busy response.
+            if(response.statusCode()==409&&parse(response.asString()).path("code").asText().equals("INSTANCE_OPERATION_BUSY")){Thread.sleep(20);continue;}
+            assertEquals(200,response.statusCode(),response.asString());value=parse(response.asString());contracts.validate("InstanceRestoreUpload",value);
+            if(value.path("operation").path("state").asText().equals(expected))return value;Thread.sleep(20);
+        }while(System.nanoTime()<deadline);
         fail("Upload did not reach "+expected);return value;
     }
     @Test void httpUploadResumesRejectsChangedRetriesAndReviewsWithoutRestoringData() throws Exception {
