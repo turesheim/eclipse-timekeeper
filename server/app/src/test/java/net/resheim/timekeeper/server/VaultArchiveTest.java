@@ -31,16 +31,20 @@ class VaultArchiveTest {
             vault.put(new VaultPath("journal/2026-W44.md"),null,true,document);
             var events=new EventNotes(store);var value=object().put("subscriptionId",event.subscription().toString()).put("eventKey",event.event()).put("body","Event body");value.set("event",object().put("uid","uid").put("recurrenceId","2026-10-30T10:00:00Z").put("title","Meeting"));events.saveDocument(event,etag(events.get(event)),EventNotes.document(value));
             new JournalAssets(store).save("legacy.bin",null,binary);
-            vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Journal"));return null;
+            vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Journal"));
+            vault.configure(etag(new VaultSettings(store).get()),object().put("assetsFolder","assets"));return null;
         });
         try(var download=archives.download(principal);var zip=new ZipFile(download.file().toFile())){
             var snapshot=AccountArchiveInput.read(download.file(),"application/zip");inputs.validate("AccountArchiveSnapshot",snapshot);
             assertEquals(AccountArchive.FORMAT,snapshot.path("format").asText());assertTrue(zip.getEntry("archive.json").getSize()<20000);
             assertFalse(snapshot.path("vault").toString().contains("ownerId"));assertFalse(snapshot.path("vault").toString().contains("data\""));
             store.transaction("b",()->{
+                new VaultCollection(store,limits).initialize();
                 VaultArchive.prepare(snapshot.path("vault"),store);new DayLabels(store).restore(snapshot.path("dayLabels"));ArchiveJournalFiles.restore(download.file(),snapshot.path("journalFiles"),store,true);VaultArchive.restore(download.file(),snapshot.path("vault"),store);
                 var vault=new VaultCollection(store,limits);assertArrayEquals(document,vault.read(vault.get(identities.get("note"))));assertArrayEquals(binary,vault.read(vault.get(identities.get("binary"))));
                 assertArrayEquals(binary,JournalAssets.bytes(new JournalAssets(store).get("legacy.bin")));assertEquals("Private/Journal",new VaultSettings(store).get().path("journalFolder").asText());
+                assertEquals("assets",new VaultSettings(store).get().path("assetsFolder").asText());vault.initialize();
+                assertArrayEquals(binary,vault.read(vault.get(new VaultPath("assets/legacy.bin"))));
                 var deleted=vault.get(identities.get("trash"));assertTrue(deleted.path("deleted").asBoolean());vault.restore(deleted,vault.tag(deleted));assertArrayEquals(document,vault.read(vault.get(identities.get("trash"))));
                 var day=vault.get(identities.get("day"));assertTrue(day.path("deleted").asBoolean());vault.restore(day,vault.tag(day));assertArrayEquals(document,new DayNotes(store).document(DayNotes.date("2026-10-30")));
                 assertEquals("Independent label",new DayLabels(store).get(DayNotes.date("2026-10-30")).path("text").asText());assertEquals("Event body",new EventNotes(store).get(event).path("body").asText());return null;

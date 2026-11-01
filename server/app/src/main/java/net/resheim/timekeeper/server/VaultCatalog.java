@@ -25,14 +25,15 @@ final class VaultCatalog {
         });
         state.initialized();nestDefaultAssets();
     }
-    /** Upgrade only the unconfigured legacy default, keeping canonical IDs/bytes. */
+    /** Upgrade the old default once, keeping canonical IDs/bytes and custom paths. */
     private void nestDefaultAssets(){
+        if(state.get().path("assetsLayoutReviewed").asBoolean())return;
         var settings=new VaultSettings(store);var current=settings.get();
-        if(current.path("version").asLong()!=0)return;
         var destination=new VaultPath(current.path("journalFolder").asText()).resolve("assets");
         // A user-created destination is never overwritten or merged implicitly.
-        if(index.at(destination,false)!=null)return;
-        new VaultCollection(store,limits).configure(etag(current),object().put("assetsFolder",destination.value()));
+        if(current.path("assetsFolder").asText().equals("assets")&&index.at(destination,false)==null)
+            new VaultCollection(store,limits).configure(etag(current),object().put("assetsFolder",destination.value()));
+        state.assetsLayoutReviewed();
     }
     ObjectNode folders(VaultPath path,boolean backfill){
         var current=index.root();VaultPath cursor=VaultPath.root();

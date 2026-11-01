@@ -135,6 +135,9 @@ final class VaultArchive {
             }
             if(!used.equals(files.keySet()))throw ApiFailure.validation();
         }catch(IOException unavailable){throw new ApiFailure(503,"UNAVAILABLE");}
+        // An explicitly restored layout is authoritative, independent of whether
+        // the target's Notes tab was visited before this import.
+        state.assetsLayoutReviewed();
         // Also index any pre-existing canonical journal documents absent from the
         // archive; an additive account import cannot hide that existing content.
         new VaultCatalog(store,store.vaultLimits()).initialize();

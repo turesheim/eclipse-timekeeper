@@ -42,6 +42,9 @@ class VaultCollectionTest {
             return null;
         });
         store.transaction("legacy-default",()->{
+            // Changing an unrelated setting does not make the old assets root
+            // a custom folder choice.
+            var settings=new VaultSettings(store);settings.save(etag(settings.get()),object().put("syncObsidianConfig",true));
             var assets=new JournalAssets(store);var asset=assets.save("old.png",null,new byte[]{4,5,6});
             var index=new VaultIndex(store);index.root();var catalog=new VaultCatalog(store,limits);
             for(String root:List.of("journal","events","assets"))catalog.folders(new VaultPath(root),true);
@@ -52,7 +55,11 @@ class VaultCollectionTest {
             var vault=new VaultCollection(store,limits);vault.initialize();
             assertEquals(VaultCollection.id(legacy),VaultCollection.id(vault.get(new VaultPath("journal/assets/old.png"))));
             assertArrayEquals(new byte[]{4,5,6},vault.read(vault.get(new VaultPath("journal/assets/old.png"))));
-            assertEquals(etag(asset),vault.tag(vault.get(new VaultPath("journal/assets/old.png"))));return null;
+            assertEquals(etag(asset),vault.tag(vault.get(new VaultPath("journal/assets/old.png"))));
+            assertTrue(settings.get().path("syncObsidianConfig").asBoolean());
+            // A later explicit choice remains authoritative after the upgrade.
+            vault.configure(etag(settings.get()),object().put("assetsFolder","assets"));vault.initialize();
+            assertEquals("assets",settings.get().path("assetsFolder").asText());return null;
         });
     }
     @Test void explicitAssetFoldersAndExistingDestinationsRemainUntouched(){
