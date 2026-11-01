@@ -133,7 +133,10 @@ access, retaining resource IDs, bytes and content ETags. An existing destination
 is never overwritten: if `journal/assets` is already occupied, the old layout
 remains until you resolve it using Notes settings. Explicitly configured asset
 folders are preserved; change **Assets folder** to `<journal folder>/assets` to
-move them atomically. Review the client's sync preview after this folder move. Only direct children
+move them atomically. Review the client's sync preview after this folder move.
+The Notes renderer also resolves old root-`assets/` references to the relocated
+folder when their original path is absent, without rewriting Markdown. Review
+those paths in external editors after synchronizing the folder move. Only direct children
 of the journal folder named `YYYY-MM-DD.md` or `YYYY-Www.md` bind to daily/ISO-week
 notes. Date-looking files elsewhere remain ordinary Markdown. Event files in the
 event folder use the existing `event-<subscription UUID>-<occurrence key>.md`
