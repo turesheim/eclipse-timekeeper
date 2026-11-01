@@ -290,7 +290,7 @@ class InstanceAdministratorTest {
         return request.put("/api/v1/admin/instance/uploads/"+id+"/content?offset="+offset);
     }
     private com.fasterxml.jackson.databind.JsonNode awaitUpload(Browser browser,String id,String expected) throws Exception {
-        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30);com.fasterxml.jackson.databind.JsonNode value;
+        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30);com.fasterxml.jackson.databind.JsonNode value=null;
         do{
             var response=http(browser,false,"GET","/admin/instance/uploads/"+id,null);
             // Validation briefly holds the artifact lock. Status reads are
