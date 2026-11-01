@@ -1,4 +1,4 @@
-import {rasterType} from './notes-links.js';
+import {relativeNotePath,rasterType} from './notes-links.js';
 
 /** Authenticated raster bytes only; never expose credentials in an image URL. */
 export function imagePreview({alt,load,active=()=>true,onError}){
@@ -12,13 +12,22 @@ export function imagePreview({alt,load,active=()=>true,onError}){
   }catch(error){if(!disposed&&active())onError?.(error,dom);}})();
   return {dom,ignoreMutation:()=>true,destroy(){disposed=true;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
 }
-export const journalAssetPath=reference=>typeof reference==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(reference);
+export const journalAssetPath=reference=>typeof reference==='string'&&reference.startsWith('assets/')&&!!relativeNotePath('note.md',reference)?.startsWith('assets/');
 export function journalImageResources(session){
   return {allowsAsset:journalAssetPath,allowsLink:()=>false,image:(reference,alt)=>{
     const current=session();
     return imagePreview({alt,active:()=>!!current&&current===session(),load:async()=>{
       if(!current||!journalAssetPath(reference))throw new Error('Invalid image');
-      return (await current.request('/journal-assets/'+reference.slice(7),{binary:'application/octet-stream'})).data;
+      // Native uploads retain their canonical endpoint. Synced companions may be
+      // ordinary vault binaries, so resolve them in the configured asset folder.
+      if(/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(reference)){
+        try{return (await current.request('/journal-assets/'+reference.slice(7),{binary:'application/octet-stream'})).data;}
+        catch(error){if(error.status!==404)throw error;}
+      }
+      const info=(await current.request('/notes')).data;
+      const path=relativeNotePath(info.settings.assetsFolder+'/note.md',reference.slice(7));
+      const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;
+      return (await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;
     }});
   }};
 }

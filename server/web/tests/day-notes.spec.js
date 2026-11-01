@@ -162,11 +162,17 @@ test('journal images and file attachments survive editing and remain available o
     const basic=Buffer.from('webdav:'+token.token).toString('base64');
     const dav=await request.get('/dav/journal/'+imagePath,{headers:{Authorization:'Basic '+basic}});
     expect(dav.status()).toBe(200);expect(Buffer.from(await dav.body())).toEqual(png);
+    // A file imported through the vault remains BINARY, rather than a native
+    // JOURNAL_ASSET. Both must render from the same journal Markdown document.
+    await api('PUT','/notes/files?path=journal%2Fassets%2Fsynced%20photo.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+    const content=await api('GET','/day-notes/2026-05-17/content');
+    await api('PUT','/day-notes/2026-05-17/content',{body:saved.body+'\n\n![Synced image](assets/synced%20photo.png)\n'},{'If-Match':content.headers().etag});
     const viewer=await context(browser);
     try{
       const read=await viewer.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();
       await month(read);await note(read).click();await dialog(read).getByRole('button',{name:'Formatted',exact:true}).click();
       const preview=dialog(read).locator('.ProseMirror img[alt="photo.png"]');await expect.poll(()=>preview.evaluate(img=>img.naturalWidth)).toBe(1);
+      await expect.poll(()=>dialog(read).locator('.ProseMirror img[alt="Synced image"]').evaluate(img=>img.naturalWidth)).toBe(1);
       await expect(dialog(read).locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');
     }finally{await viewer.close();}
   }finally{await owner.close();}
