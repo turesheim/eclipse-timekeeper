@@ -31,6 +31,42 @@ class VaultCollectionTest {
             assertArrayEquals(original,vault.read(vault.get(fileId)));assertFalse(vault.get(folderId).path("deleted").asBoolean());return null;
         });
     }
+    @Test void defaultAssetsAreNestedAndLegacyDefaultMovesWithoutRewritingContent(){
+        store.transaction("nested-default",()->{
+            var assets=new JournalAssets(store);var asset=assets.save("pixel.png",null,new byte[]{1,2,3});
+            var vault=new VaultCollection(store,limits);vault.initialize();
+            var entry=vault.get(new VaultPath("journal/assets/pixel.png"));var id=VaultCollection.id(entry);
+            assertEquals("journal/assets",new VaultSettings(store).get().path("assetsFolder").asText());
+            assertEquals(etag(asset),vault.tag(entry));assertArrayEquals(new byte[]{1,2,3},vault.read(entry));
+            vault.initialize();assertEquals(id,VaultCollection.id(vault.get(new VaultPath("journal/assets/pixel.png"))));
+            return null;
+        });
+        store.transaction("legacy-default",()->{
+            var assets=new JournalAssets(store);var asset=assets.save("old.png",null,new byte[]{4,5,6});
+            var index=new VaultIndex(store);index.root();var catalog=new VaultCatalog(store,limits);
+            for(String root:List.of("journal","events","assets"))catalog.folders(new VaultPath(root),true);
+            var ref=VaultSources.fromStored(JournalAssets.TYPE,asset);
+            var legacy=index.create(new VaultPath("assets/old.png"),VaultIndex.Kind.ASSET,ref.type(),ref.id(),ref.key());
+            index.content(VaultCollection.id(legacy),new VaultSources(store,limits,ref).snapshot(),3);
+            new VaultState(store,limits).changed(3,1,true);new VaultState(store,limits).initialized();
+            var vault=new VaultCollection(store,limits);vault.initialize();
+            assertEquals(VaultCollection.id(legacy),VaultCollection.id(vault.get(new VaultPath("journal/assets/old.png"))));
+            assertArrayEquals(new byte[]{4,5,6},vault.read(vault.get(new VaultPath("journal/assets/old.png"))));
+            assertEquals(etag(asset),vault.tag(vault.get(new VaultPath("journal/assets/old.png"))));return null;
+        });
+    }
+    @Test void explicitAssetFoldersAndExistingDestinationsRemainUntouched(){
+        store.transaction("explicit-assets",()->{
+            var settings=new VaultSettings(store);settings.save(etag(settings.get()),object().put("assetsFolder","Shared"));
+            var vault=new VaultCollection(store,limits);vault.initialize();assertEquals("Shared",settings.get().path("assetsFolder").asText());return null;
+        });
+        store.transaction("occupied-assets",()->{
+            var index=new VaultIndex(store);index.root();var catalog=new VaultCatalog(store,limits);
+            for(String root:List.of("journal/assets","events","assets"))catalog.folders(new VaultPath(root),true);
+            new VaultState(store,limits).initialized();new VaultCollection(store,limits).initialize();
+            assertEquals("assets",new VaultSettings(store).get().path("assetsFolder").asText());return null;
+        });
+    }
     @Test void settingsMoveCanonicalFoldersAtomicallyWithIndependentLabelsAndNestedAssets(){
         store.transaction("settings",()->{
             var config=new VaultSettings(store);config.save(etag(config.get()),object().put("assetsFolder","journal/assets"));

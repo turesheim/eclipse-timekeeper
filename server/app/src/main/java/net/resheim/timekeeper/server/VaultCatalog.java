@@ -13,7 +13,7 @@ final class VaultCatalog {
     VaultCatalog(ServerStore store,VaultLimits limits){this.store=store;this.limits=limits;index=new VaultIndex(store);state=new VaultState(store,limits);}
     void initialize(){
         state.ensureIdentity();
-        if(state.get().path("initialized").asBoolean())return;
+        if(state.get().path("initialized").asBoolean()){nestDefaultAssets();return;}
         index.root();var settings=new VaultSettings(store).get();
         for(String field:List.of("journalFolder","eventsFolder","assetsFolder"))folders(new VaultPath(settings.path(field).asText()),true);
         for(String type:VaultSources.LEGACY)store.scan(type,value->{
@@ -23,7 +23,16 @@ final class VaultCatalog {
             if(entry==null){entry=createBinding(ref);state.changed(snapshot.byteLength(),1,true);}
             index.content(uuid(entry.path("id")),snapshot,snapshot.byteLength());
         });
-        state.initialized();
+        state.initialized();nestDefaultAssets();
+    }
+    /** Upgrade only the unconfigured legacy default, keeping canonical IDs/bytes. */
+    private void nestDefaultAssets(){
+        var settings=new VaultSettings(store);var current=settings.get();
+        if(current.path("version").asLong()!=0)return;
+        var destination=new VaultPath(current.path("journalFolder").asText()).resolve("assets");
+        // A user-created destination is never overwritten or merged implicitly.
+        if(index.at(destination,false)!=null)return;
+        new VaultCollection(store,limits).configure(etag(current),object().put("assetsFolder",destination.value()));
     }
     ObjectNode folders(VaultPath path,boolean backfill){
         var current=index.root();VaultPath cursor=VaultPath.root();
@@ -48,6 +57,7 @@ final class VaultCatalog {
     static Mutation before(ServerStore store,VaultSources.Ref ref,byte[] next){
         var catalog=new VaultCatalog(store,store.vaultLimits());
         if(!catalog.state.get().path("initialized").asBoolean())return null;
+        catalog.initialize();
         var entry=catalog.index.referenced(ref.type(),ref.id());
         var source=new VaultSources(store,store.vaultLimits(),ref);var previous=source.snapshot();
         // A native delete of a never-created note is not a recoverable file.

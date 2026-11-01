@@ -74,3 +74,42 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
     await reader.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await reader.locator('#notes-navigation').getByRole('button',{name:'Notes/Theme.md',exact:true}).click();await expect(reader.locator('#notes-body')).toHaveValue('# Theme note\n');await expect(reader.locator('#notes-body')).not.toBeEditable();await expect(reader.locator('.notes-footer button')).toBeDisabled();
   }finally{await session.close();}
 });
+
+test('uploaded images appear immediately and remain visible after saving and reopening Markdown',async({page,request})=>{
+  const api=await setup(page,request);
+  await api('PUT','/notes/files?path=Notes%2FUpload.md',Buffer.from('# Uploaded image\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Upload.md',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  await page.locator('#notes-formatted [role=textbox]').click();await page.keyboard.press('End');await page.keyboard.press('Enter');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  await page.locator('.notes-markdown input[type=file][accept]').setInputFiles({name:'uploaded pixel.png',mimeType:'image/png',buffer:png});
+  const image=page.locator('#notes-formatted img[alt="uploaded pixel.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
+  await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+  const stored=await(await api('GET','/notes/resolve?path=Notes%2FUpload.md')).json();
+  const body=await(await api('GET','/notes/entries/'+stored.id+'/content')).text();expect(body).toContain('uploaded%20pixel.png');expect(body).not.toContain('blob:');
+  await page.getByRole('button',{name:'Reload from server',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
+});
+
+test('selecting a raster asset replaces the editor with an authenticated image preview',async({page,request})=>{
+  const api=await setup(page,request);
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  await api('PUT','/notes/files?path=Notes%2Fpreview.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FPreview.md',Buffer.from('Preview note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Preview.md',exact:true}).click();
+  await page.locator('#notes-body').fill('Unsaved draft');page.once('dialog',dialog=>dialog.dismiss());
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes/preview.png',exact:true}).click();
+  await expect(page.locator('#notes-body')).toHaveValue('Unsaved draft');
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#notes-navigation').getByRole('button',{name:'Notes/preview.png',exact:true}).click();
+  const image=page.locator('.notes-image-preview img');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
+  await expect(page.locator('.notes-markdown')).toBeHidden();await expect(page.locator('.notes-footer button')).toBeHidden();
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.setViewportSize({width:1280,height:900});await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Preview.md',exact:true}).click();
+  await expect(image).toHaveCount(0);await expect(page.locator('#notes-body')).toHaveValue('Preview note');
+});
