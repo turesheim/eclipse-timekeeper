@@ -1,6 +1,7 @@
 import {t} from './i18n.js';
 import {iconButton} from './icons.js';
 import {MarkdownField} from './markdown-field.js';
+import {guardDayNoteNavigation} from './journal-links.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=(text,className)=>{const value=node('button',text,className);value.type='button';return value;};
@@ -23,6 +24,7 @@ export class JournalNoteEditor {
     actions.append(this.status,this.cancel,this.delete,this.save);
     this.dialog.append(heading,this.error,host,actions);root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
+    guardDayNoteNavigation(this.dialog,()=>!this.busy&&(!this.dirty()||confirm(t('journal.discard'))),()=>this.close(true));
     this.dialog.addEventListener('close',()=>{if(!root.closest('[hidden]')){const origin=this.context?.originSelector?root.querySelector(this.context.originSelector):this.origin;if(origin?.isConnected)origin.focus();}});
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
   }

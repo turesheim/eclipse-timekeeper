@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -42,7 +43,7 @@ test('Track shows exact client session hours, local dates and independent activi
     await expect(page.locator('[data-track-date="2025-10-01"]')).toContainText('1h 0m');
     expect(await day.locator(`[data-track-daily-client="${a.id}"]`).evaluate(value=>getComputedStyle(value).borderInlineStartColor)).toBe('rgb(103, 80, 164)');
     const tooltip=day.locator(`[data-track-daily-client="${a.id}"]`);await tooltip.hover();
-    await expect(tooltip).toHaveAttribute('title',/2 work sessions/);await expect(tooltip).toHaveAttribute('title',/Clock change/);await expect(tooltip).toHaveAttribute('title',/Another session for the same client/);await expect(tooltip).toHaveAttribute('title',/13:00:00/);await expect(tooltip).toHaveAttribute('title',new RegExp(project.name));await expect(tooltip).not.toHaveAttribute('title',/Other client session|Month boundary/);
+    await expect(await tooltipFor(tooltip)).toContainText(/2 work sessions/);await expect(await tooltipFor(tooltip)).toContainText(/Clock change/);await expect(await tooltipFor(tooltip)).toContainText(/Another session for the same client/);await expect(await tooltipFor(tooltip)).toContainText(/13:00:00/);await expect(await tooltipFor(tooltip)).toContainText(new RegExp(project.name));await expect(await tooltipFor(tooltip)).not.toContainText(/Other client session|Month boundary/);
     const audit=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     const viewport=page.viewportSize();await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await captureScreenshot(page,{path:'test-results/track-desktop.png',fullPage:true});await page.setViewportSize(viewport);
@@ -85,7 +86,7 @@ test('Track shows exact client session hours, local dates and independent activi
     await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator('#track-calendar button[data-track-daily-client]')).toHaveCount(0);await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toContainText('1h 0m');
-    await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toHaveAttribute('title',/Edited boundary\n\nPreserved notes/);
+    await expect(await tooltipFor(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`))).toContainText(/Edited boundary\n\nPreserved notes/);
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('27h 0m');
   } finally {
     await context.close();
@@ -178,7 +179,7 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
       for(const card of [summary,entry]) {
         await expect(card.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');
         for(const time of await card.locator('.calendar-summary-time').all())await expect(time).toHaveCSS('font-weight','400');
-        await expect(card.locator('.calendar-summary-title')).toHaveAttribute('title',client.name);
+        await expect(await tooltipFor(card.locator('.calendar-summary-title'))).toContainText(client.name);
       }
       if(width===390)expect(await summary.locator('.calendar-summary-title-text').evaluate(label=>label.scrollWidth>label.clientWidth)).toBe(true);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

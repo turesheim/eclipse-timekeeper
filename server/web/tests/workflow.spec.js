@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {openTaskHistory,clearTaskHistory} from './task-history.js';
 import {workSessionAction} from './workweek-session-actions.js';
@@ -348,7 +349,7 @@ test('workweek groups linked tasks under projects with seven day columns and con
     return [...document.fonts].some(font => font.family.includes('bootstrap-icons') && font.status === 'loaded');
   })).toBeTruthy();
   const iconAction = page.locator('#activities tr[data-kind=task]').first().getByRole('button', {name:'Edit task', exact:true});
-  await expect(iconAction).toHaveAttribute('title', 'Edit task');
+  await expect(await tooltipFor(iconAction)).toContainText('Edit task');
   await expect(iconAction.locator('.bi-pencil-square')).toHaveAttribute('aria-hidden', 'true');
   await expect(page.locator('#activity-tasks,#tasks,#add-task')).toHaveCount(0);
   for(const selector of ['.actions .bi-play-fill','.actions .bi-trash','.tree-toggle .bi-chevron-down','.activity-icon .bi-clock'])await expect(page.locator('#activities '+selector).first()).toBeVisible();

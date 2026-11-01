@@ -47,7 +47,7 @@ body:has(#workspace:is([data-view=calendar],[data-view=today]):not([hidden])) {
 #calendar-subscription-editor,.calendar-event-details{overflow-wrap:anywhere}
 .calendar-day.public-holiday,.calendar-heading.public-holiday{background:var(--holiday-bg)}
 .calendar-heading.public-holiday{flex-direction:column;min-width:0}
-.calendar-heading.public-holiday button{max-width:100%;min-width:0;padding-block:.15rem;color:var(--holiday-color)}
+.calendar-heading.public-holiday button{max-width:100%;min-width:0;padding-block:.15rem;color:var(--holiday-color);background:transparent}
 .calendar-heading.public-holiday.today{box-shadow:inset 0 -3px var(--accent)}
 .calendar-holiday-name{display:block;max-width:100%;padding:0 .3rem;font-size:.65rem;color:var(--holiday-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 

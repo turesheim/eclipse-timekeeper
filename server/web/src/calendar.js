@@ -1,3 +1,5 @@
+import {richTooltip} from './tooltips.js';
+import {workSessionsTooltip,calendarEventTooltip} from './tooltip-content.js';
 import {focusIncludes} from './focus-model.js';
 import {calendarItemStatus} from './calendar-item.js';
 import {eventNoteIndicator} from './event-note-editor.js';
@@ -207,7 +209,8 @@ export class WeekCalendar {
     const elapsed = instantNanos(session.end || this.data.report.generatedAt) - instantNanos(session.start);
     const duration = nanosText(elapsed > 0n ? elapsed : 0n);
     const description = `${client?.name || i18nText("ui.client")} · ${session.summary || i18nText("ui.work_session_21aa04")} · ${instantText(session.start, this.calendar.zone)} → ${instantText(session.end, this.calendar.zone)} · ${duration}`;
-    bar.title = description;bar.setAttribute('aria-label', description);bar.setAttribute('role', 'group');bar.tabIndex = -1;
+    bar.setAttribute('aria-label', description);bar.setAttribute('role', 'group');bar.tabIndex = -1;
+    if(!preview)richTooltip(bar,()=>workSessionsTooltip({client,sessions:[session],projects:this.data.projects,zone:this.calendar.zone,asOf:this.data.report.generatedAt,total:elapsed>0n?elapsed:0n,date:piece.date}));
     bar.dataset.selected = String(this.selectedId === session.id);
     const label = node('span', undefined, 'calendar-session-label');
     label.append(node('span', session.summary || i18nText("ui.work_session_21aa04"), 'calendar-session-title'), node('span', `${session.end ? '' : i18nText("ui.running_aca7ea")}${duration}`, 'calendar-session-duration'));
@@ -228,7 +231,7 @@ export class WeekCalendar {
         if (edge === 'start' ? endpoint !== piece.start : endpoint !== piece.end) continue;
         const handle = button('', () => {}, `calendar-resize ${edge}`);handle.dataset.edge = edge;handle.dataset.sessionId = session.id;handle.dataset.date = piece.date;
         handle.tabIndex = 0;
-        handle.setAttribute('aria-label', i18nText("ui.resize_of", { value0:i18nText('time.'+edge), value1: session.summary || i18nText("ui.work_session") }));handle.title = i18nText("ui.resize_arrow_keys_adjust_15_minutes", { value0:i18nText('time.'+edge) });
+        handle.setAttribute('aria-label', i18nText("ui.resize_of", { value0:i18nText('time.'+edge), value1: session.summary || i18nText("ui.work_session") }));handle.setAttribute('aria-description',i18nText("ui.resize_arrow_keys_adjust_15_minutes", { value0:i18nText('time.'+edge) }));
         bar.append(handle);
       }
     }return bar;
@@ -238,7 +241,7 @@ export class WeekCalendar {
     value.dataset.calendarEventKey=event.key;value.dataset.calendarSubscriptionId=event.subscriptionId;value.dataset.date=piece.date;
     styleCalendarEvent(value,event);
     value.setAttribute('aria-haspopup','dialog');value.setAttribute('aria-label',i18nText('calendar.event_label',{title:event.title||i18nText('calendar.untitled'),calendar:event.calendarName,client:event.clientName,interval:this.subscriptions.eventDate(event)}));
-    const marker=eventNoteIndicator(event);if(marker)value.append(marker);value.title=value.getAttribute('aria-label');value.append(node('small',calendarItemStatus(event)),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
+    const marker=eventNoteIndicator(event);if(marker)value.append(marker);richTooltip(value,()=>calendarEventTooltip(event,this.calendar.zone));value.append(node('small',calendarItemStatus(event)),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
   }
   select(date, row) {this.selection = { date, row };this.paintSelection();this.buttons();}
   selectSession(session, date, row) {this.selectedId = session.id;this.select(date, row);this.text('');}

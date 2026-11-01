@@ -83,7 +83,21 @@ test('passkeys: wrong fresh proof keeps the session, cancellation is normal and 
   const cancel=add.getByRole('button',{name:'Cancel passkey request',exact:true});await expect(cancel).toBeEnabled();await cancel.click();await expect(add).toContainText('Passkey request canceled.');
   await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await expect(page.locator('#account-content')).toContainText('No passkeys added.');
   await key.presence(true);await add.getByLabel('Passkey name',{exact:true}).fill('Working key');await add.getByLabel('Current password',{exact:true}).fill(password);await add.getByRole('button',{name:'Add passkey',exact:true}).click();await expect(add).toContainText('Passkey added.');
-  await signOut(page);await key.presence(false);await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#passkey-cancel')).toBeEnabled();
+  await signOut(page);await key.presence(false);
+  // The button is enabled during the status/options requests too. Canceling
+  // before a ceremony exists correctly has no server-side nonce to revoke.
+  await page.reload();await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();
+  let arrived,release;const ready=new Promise(resolve=>{arrived=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/auth/status',async route=>{arrived();await gate;await route.continue();},{times:1});
+  try {
+    await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await ready;
+    await page.locator('#passkey-cancel').click();await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();
+    await expect(page.locator('#login-error')).toContainText('canceled');
+  } finally {release();}
+  // Observe the real native call without replacing its virtual authenticator:
+  // a cancellation response is required once the browser prompt is active.
+  await page.evaluate(()=>{const get=navigator.credentials.get;navigator.credentials.get=function(...args){window.passkeyPromptStarted=true;return Reflect.apply(get,this,args);};});
+  await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await page.waitForFunction(()=>window.passkeyPromptStarted===true);
   const canceled=page.waitForResponse(response=>response.url().endsWith('/auth/passkeys/cancel'));await page.locator('#passkey-cancel').click();expect((await canceled).status()).toBe(204);
   await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();await expect(page.locator('#login-error')).toContainText('canceled');
   await key.presence(true);await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#owner')).toHaveText(user.username);
