@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
+import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {browserRequest} from './browser-request.js';
 
@@ -97,7 +98,7 @@ test('uploaded images appear immediately and remain visible after saving and reo
 
 test('selecting a raster asset replaces the editor with an authenticated image preview',async({page,request})=>{
   const api=await setup(page,request);
-  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  const png=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=1200;const context=canvas.getContext('2d');context.fillStyle='#176b59';context.fillRect(0,0,1600,1200);context.fillStyle='#f1c453';context.fillRect(200,200,1200,800);return canvas.toDataURL('image/png').split(',')[1];}),'base64');
   await api('PUT','/notes/files?path=Notes%2Fpreview.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await api('PUT','/notes/files?path=Notes%2FPreview.md',Buffer.from('Preview note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
@@ -107,8 +108,10 @@ test('selecting a raster asset replaces the editor with an authenticated image p
   await page.locator('#notes-navigation').getByRole('button',{name:'Notes/preview.png',exact:true}).click();
   await expect(page.locator('#notes-body')).toHaveValue('Unsaved draft');
   page.once('dialog',dialog=>dialog.accept());await page.locator('#notes-navigation').getByRole('button',{name:'Notes/preview.png',exact:true}).click();
-  const image=page.locator('.notes-image-preview img');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
+  const image=page.locator('.notes-image-preview img');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1600);
   await expect(page.locator('.notes-markdown')).toBeHidden();await expect(page.locator('.notes-footer button')).toBeHidden();
+  await captureScreenshot(page,{path:'test-results/notes-image-preview.png',fullPage:true});
+  const bounds=await image.boundingBox(),pane=await page.locator('.notes-image-preview').boundingBox();expect(bounds.width).toBeLessThanOrEqual(pane.width);expect(bounds.height).toBeLessThanOrEqual(pane.height);
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.setViewportSize({width:1280,height:900});await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Preview.md',exact:true}).click();
   await expect(image).toHaveCount(0);await expect(page.locator('#notes-body')).toHaveValue('Preview note');

@@ -152,6 +152,8 @@ test('journal images and file attachments survive editing and remain available o
     const imagePath=saved.body.match(/!\[[^\]]*\]\((assets\/[a-f0-9-]+\.png)\)/)?.[1];
     const filePath=saved.body.match(/\[notes\.txt\]\((assets\/[a-f0-9-]+\.txt)\)/)?.[1];
     expect(imagePath).toBeTruthy();expect(filePath).toBeTruthy();
+    const collection=await(await api('GET','/notes')).json();expect(collection.settings.assetsFolder).toBe('journal/assets');
+    const asset=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:'journal/'+imagePath}))).json();expect(asset.kind).toBe('ASSET');
     const imageReply=await api('GET','/journal-assets/'+imagePath.slice(7));expect(Buffer.from(await imageReply.body())).toEqual(png);
     const attachment=await api('GET','/journal-assets/'+filePath.slice(7));expect(await attachment.text()).toBe('attached text');
     await note(page).click();await dialog(page).getByRole('button',{name:'Formatted'}).click();
