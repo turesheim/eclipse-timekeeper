@@ -105,8 +105,10 @@ final class VaultArchive {
         // derived indexes in a pristine target. A restore cannot revive an old
         // directory/settings validator, including under a frozen test clock.
         new VaultState(store,store.vaultLimits()).resetForImport();
-        for(String type:List.of(VaultIndex.ENTRY,VaultIndex.PATH,VaultIndex.REFERENCE))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=?",store.owner(),type);
+        // Child relations reference directory resources, including empty default
+        // folders left by a previous visit to Notes. Remove them before entries.
         store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND kind=?",store.owner(),VaultIndex.ENTRY,"vault_child");
+        for(String type:List.of(VaultIndex.ENTRY,VaultIndex.PATH,VaultIndex.REFERENCE))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=?",store.owner(),type);
     }
     static void restore(Path archive,JsonNode vault,ServerStore store){
         if(vault.isMissingNode()||vault.path("entries").isEmpty())return;
