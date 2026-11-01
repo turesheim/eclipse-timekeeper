@@ -118,3 +118,32 @@ test('selecting a raster asset replaces the editor with an authenticated image p
   await page.setViewportSize({width:1280,height:900});await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Preview.md',exact:true}).click();
   await expect(image).toHaveCount(0);await expect(page.locator('#notes-body')).toHaveValue('Preview note');
 });
+
+test('Notes can hide the configured journal without losing drafts or journal access',async({page,request})=>{
+  const api=await setup(page,request),day='2026-11-01';
+  await api('PUT','/notes/files?path=journal%2F'+day+'.md',Buffer.from('Journal original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FKeep.md',Buffer.from('General note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'journal',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'journal/'+day+'.md',exact:true}).click();
+  await page.locator('#notes-body').fill('Private unsaved draft');
+  await page.getByRole('button',{name:'Notes settings',exact:true}).click();
+  await expect(page.getByLabel('Hide journal folder',{exact:true})).not.toBeChecked();
+  await page.getByLabel('Hide journal folder',{exact:true}).check();
+  await page.getByLabel('Journal folder',{exact:true}).fill('Private/Journal');
+  await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Notes settings',exact:true})).toBeHidden();
+  await expect(page.locator('#notes-body')).toHaveValue('Private unsaved draft');
+  expect((await(await api('GET','/day-notes/'+day+'/content')).json()).body).toBe('Journal original');
+  await page.locator('#notes-search').fill('2026');await expect(page.locator('.notes-tree [role=treeitem]')).toHaveCount(0);
+  await page.locator('#notes-search').fill('Keep');await expect(page.locator('#notes-navigation').getByRole('button',{name:'Notes/Keep.md',exact:true})).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Keep.md',exact:true}).click();
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();
+  await page.getByRole('button',{name:'Notes settings',exact:true}).click();await expect(page.getByLabel('Hide journal folder',{exact:true})).toBeChecked();
+  await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Private',exact:true}).click();await expect(page.locator('#notes-navigation').getByRole('button',{name:'Private/Journal',exact:true})).toHaveCount(0);
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);await expect(page.locator('#today-journal-formatted')).toContainText('Journal original');
+  await page.locator('[data-tab=notes]').click();await page.getByRole('button',{name:'Notes settings',exact:true}).click();await page.getByLabel('Hide journal folder',{exact:true}).uncheck();
+  await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.locator('#notes-navigation').getByRole('button',{name:'Private/Journal',exact:true})).toBeVisible();
+});

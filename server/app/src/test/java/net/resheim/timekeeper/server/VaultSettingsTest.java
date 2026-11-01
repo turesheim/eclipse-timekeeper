@@ -16,6 +16,19 @@ class VaultSettingsTest {
         store.transaction("defaults",()->{var settings=new VaultSettings(store);assertEquals("journal",settings.get().path("journalFolder").asText());assertEquals("events",settings.get().path("eventsFolder").asText());assertFalse(settings.get().path("syncObsidianConfig").asBoolean());return null;});
         assertTrue(limits.markdownBytes()<=limits.fileBytes());assertTrue(limits.fileBytes()<=limits.totalBytes());assertTrue(limits.entries()>=4);assertTrue(limits.pageSize()>0);
     }
+    @Test void journalVisibilityIsAnOwnerPrivateGuardedBooleanPreference(){
+        var tag=store.transaction("visibility",()->{
+            var settings=new VaultSettings(store);assertFalse(settings.get().path("hideJournalFolder").asBoolean());
+            return etag(settings.save(etag(settings.get()),object().put("hideJournalFolder",true)));
+        });
+        store.transaction("visibility",()->{
+            var settings=new VaultSettings(store);assertTrue(settings.get().path("hideJournalFolder").asBoolean());
+            assertEquals(tag,etag(settings.save(tag,object().put("hideJournalFolder",true))));
+            assertThrows(ApiFailure.class,()->settings.save(tag,object().put("hideJournalFolder","true")));
+            assertThrows(ApiFailure.class,()->settings.save("\"stale\"",object().put("hideJournalFolder",false)));return null;
+        });
+        store.transaction("visibility-other",()->{assertFalse(new VaultSettings(store).get().path("hideJournalFolder").asBoolean());return null;});
+    }
     @Test void configurationIsOptInOwnerPrivateAndGuarded(){
         String initial=store.transaction("a",()->etag(new VaultSettings(store).get()));
         String updated=store.transaction("a",()->{

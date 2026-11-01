@@ -1,7 +1,7 @@
 import {t} from './i18n.js';
 import {MarkdownField} from './markdown-field.js';
 import {icon,iconButton} from './icons.js';
-import {relativeNotePath,rasterType} from './notes-links.js';
+import {relativeNotePath,rasterType,notesEntryVisible} from './notes-links.js';
 import {imagePreview} from './image-preview.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -46,6 +46,7 @@ export class NotesView {
     this.settingsForm.append(node('p',t('notes.settings_help'),'hint'));
     const connection=node('p',t('notes.webdav_url'),'form-label'),url=node('code',new URL('/dav/vault/',location.origin).href,'journal-webdav-url'),guide=node('a',t('notes.sync_guide'));guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/NOTES-WEBDAV.md';guide.target='_blank';guide.rel='noopener noreferrer';this.settingsForm.append(connection,url,node('p',t('journal.webdav.credentials'),'hint'),guide);
     for(const name of ['journalFolder','eventsFolder','assetsFolder']){const label=node('label',t('notes.'+name),'form-label'),input=node('input',undefined,'form-control');input.id='notes-setting-'+name;input.required=true;input.maxLength=1024;label.htmlFor=input.id;this.settingsFields[name]=input;this.settingsForm.append(label,input);}
+    const hideLabel=node('label',undefined,'form-check-label');this.hideJournalCheckbox=node('input',undefined,'form-check-input');this.hideJournalCheckbox.type='checkbox';this.hideJournalCheckbox.id='notes-setting-hide-journal';this.hideJournalCheckbox.setAttribute('aria-describedby','notes-hide-journal-help');hideLabel.append(this.hideJournalCheckbox,document.createTextNode(' '+t('notes.hide_journal')));const hideField=node('div',undefined,'form-check');hideField.append(hideLabel);const hideHelp=node('p',t('notes.hide_journal_help'),'hint');hideHelp.id='notes-hide-journal-help';this.settingsForm.append(hideField,hideHelp);
     const configLabel=node('label',undefined,'form-check-label');this.configCheckbox=node('input',undefined,'form-check-input');this.configCheckbox.type='checkbox';configLabel.append(this.configCheckbox,document.createTextNode(' '+t('notes.config_opt_in')));const configField=node('div',undefined,'form-check');configField.append(configLabel);this.settingsForm.append(configField,node('p',t('notes.config_help'),'hint'));
     this.settingsError=node('p','','alert alert-danger');this.settingsError.setAttribute('role','alert');this.settingsError.hidden=true;this.settingsForm.append(this.settingsError);
     const settingsActions=node('div',undefined,'dialog-actions');this.settingsCancel=action(t('ui.cancel'),()=>{if(!this.busy)this.settingsDialog.close();});this.settingsApply=node('button',t('ui.save'),'btn btn-primary');this.settingsApply.type='submit';settingsActions.append(this.settingsCancel,this.settingsApply);this.settingsForm.append(settingsActions);this.settingsDialog.append(settingsTitle,this.settingsForm);root.append(this.settingsDialog);
@@ -71,7 +72,7 @@ export class NotesView {
     this.reloadNote.disabled=!this.note||this.busy;this.apply.disabled=this.cancel.disabled=!!this.busy;
     this.download.hidden=!this.note||this.note.kind!=='BINARY'&&this.note.kind!=='ASSET'||this.note.deleted;this.download.disabled=!!this.busy;
     this.settingsButton.disabled=!this.session||this.busy;this.settingsApply.disabled=!this.writable||this.busy;this.settingsCancel.disabled=!!this.busy;
-    for(const input of [...Object.values(this.settingsFields),this.configCheckbox])input.disabled=!this.writable||this.busy;
+    for(const input of [...Object.values(this.settingsFields),this.configCheckbox,this.hideJournalCheckbox])input.disabled=!this.writable||this.busy;
     this.empty.hidden=!!this.selectedImage||!!this.note&&!this.binary&&!this.note.deleted;this.preview.hidden=!this.selectedImage;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
     if(this.note&&!this.busy)this.status.textContent=this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
   }
@@ -84,10 +85,10 @@ export class NotesView {
   async reload(retry=0){
     if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1;this.loadGeneration=current;this.loading=true;
     try{
-      const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;const snapshot=reply.data.snapshot;
+      const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
       const search=this.search.value.trim();const children=new Map(),entries=new Map();
-      if(search||this.showTrash){const rows=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot);children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
-      else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),rows=await this.list({parentId:parent},session,snapshot);children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&this.expanded.has(row.id))pending.push(row.id);}}}
+      if(search||this.showTrash){const rows=(await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot)).filter(entry=>notesEntryVisible(entry,this.info.settings));children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
+      else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),rows=(await this.list({parentId:parent},session,snapshot)).filter(entry=>notesEntryVisible(entry,this.info.settings));children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&this.expanded.has(row.id))pending.push(row.id);}}}
       if(session!==this.session||current!==this.loadGeneration)return;this.children=children;this.entries=entries;this.paint();if(!this.stale)this.error.hidden=true;
       if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=this.note.path;}}
     }catch(error){if(session===this.session&&current===this.loadGeneration){if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
@@ -203,12 +204,12 @@ export class NotesView {
   }
   async openSettings(){
     if(!this.session||this.busy)return;const session=this.session,current=this.generation;this.settingsError.hidden=true;
-    try{const reply=await session.request('/notes/settings');if(session!==this.session||current!==this.generation)return;this.settingsEtag=reply.etag;this.originalSettings=reply.data;for(const [name,input]of Object.entries(this.settingsFields))input.value=reply.data[name];this.configCheckbox.checked=reply.data.syncObsidianConfig;this.controls();this.settingsDialog.showModal();}
+    try{const reply=await session.request('/notes/settings');if(session!==this.session||current!==this.generation)return;this.settingsEtag=reply.etag;this.originalSettings=reply.data;for(const [name,input]of Object.entries(this.settingsFields))input.value=reply.data[name];this.configCheckbox.checked=reply.data.syncObsidianConfig;this.hideJournalCheckbox.checked=!!reply.data.hideJournalFolder;this.controls();this.settingsDialog.showModal();}
     catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
   }
   async saveSettings(){
     if(!this.writable||this.busy)return;const session=this.session,current=this.generation;this.busy=true;this.controls();
-    const body=Object.fromEntries(Object.entries(this.settingsFields).filter(([name,input])=>input.value!==this.originalSettings[name]).map(([name,input])=>[name,input.value]));if(this.configCheckbox.checked!==this.originalSettings.syncObsidianConfig)body.syncObsidianConfig=this.configCheckbox.checked;
+    const body=Object.fromEntries(Object.entries(this.settingsFields).filter(([name,input])=>input.value!==this.originalSettings[name]).map(([name,input])=>[name,input.value]));if(this.configCheckbox.checked!==this.originalSettings.syncObsidianConfig)body.syncObsidianConfig=this.configCheckbox.checked;if(this.hideJournalCheckbox.checked!==!!this.originalSettings.hideJournalFolder)body.hideJournalFolder=this.hideJournalCheckbox.checked;
     try{await session.request('/notes/settings',{method:'PUT',etag:this.settingsEtag,body});if(session!==this.session||current!==this.generation)return;this.info=null;this.folder=null;this.settingsDialog.close();this.busy=false;await this.reload();this.callbacks.onChanged?.();}
     catch(error){if(session===this.session&&current===this.generation){this.settingsError.hidden=false;this.settingsError.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}

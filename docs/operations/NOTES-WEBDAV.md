@@ -7,6 +7,13 @@ phone, use the folder button to open navigation. Rename/move preserves a
 resource's identity. Recently deleted items retain their bytes and can be
 restored if their destination is available. Trash counts against storage limits.
 
+**Hide journal folder** in Notes settings is a saved account preference. It hides
+the configured journal folder and its descendants from navigation, search and
+trash, including after a journal-folder rename. Existing editor drafts remain
+open. Today, Calendar, journal links, images and WebDAV synchronization continue
+to use the same resources. The preference defaults to off and is retained in
+account archives; older archives default to showing the folder.
+
 Markdown source, frontmatter, unknown metadata, empty files, attachment bytes and
 unsupported Obsidian syntax are stored without rewriting. An unchanged editor
 save does not normalize the file. Formatted edits can normalize Markdown body

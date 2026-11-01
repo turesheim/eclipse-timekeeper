@@ -10,12 +10,12 @@ final class VaultSettings {
     static final String TYPE="VAULT_SETTINGS";
     static final UUID ID=ImportLedger.identifier("vault","settings");
     private static final List<String> ROOTS=List.of("journalFolder","eventsFolder","assetsFolder");
-    private static final Set<String> FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig");
+    private static final Set<String> FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder");
     private final ServerStore store;
     VaultSettings(ServerStore store){this.store=store;}
-    ObjectNode get(){return store.find(TYPE,ID).map(value->((ObjectNode)value).deepCopy()).orElseGet(()->object()
+    ObjectNode get(){return store.find(TYPE,ID).map(value->{var result=((ObjectNode)value).deepCopy();if(!result.has("hideJournalFolder"))result.put("hideJournalFolder",false);return result;}).orElseGet(()->object()
             .put("id",ID.toString()).put("ownerId",store.owner()).put("version",0)
-            .put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false));}
+            .put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false).put("hideJournalFolder",false));}
     static boolean configurationPath(VaultPath path){return path.segments().stream().anyMatch(segment->VaultPath.searchKey(segment).equals(".obsidian"));}
     boolean allowed(VaultPath path){return !configurationPath(path)||get().path("syncObsidianConfig").asBoolean();}
     /** The service moves indexed roots in the same owner transaction as this write. */
@@ -29,10 +29,10 @@ final class VaultSettings {
             var root=new VaultPath(input.path(field).asText());if(root.isRoot()||configurationPath(root))throw ApiFailure.validation();
             changed|=!value.path(field).asText().equals(root.value());value.put(field,root.value());
         }
-        if(input.has("syncObsidianConfig")){
-            if(!input.path("syncObsidianConfig").isBoolean())throw ApiFailure.validation();
-            changed|=value.path("syncObsidianConfig").asBoolean()!=input.path("syncObsidianConfig").asBoolean();
-            value.put("syncObsidianConfig",input.path("syncObsidianConfig").asBoolean());
+        for(String field:List.of("syncObsidianConfig","hideJournalFolder"))if(input.has(field)){
+            if(!input.path(field).isBoolean())throw ApiFailure.validation();
+            changed|=value.path(field).asBoolean()!=input.path(field).asBoolean();
+            value.put(field,input.path(field).asBoolean());
         }
         var journal=new VaultPath(value.path("journalFolder").asText());var events=new VaultPath(value.path("eventsFolder").asText());
         if(journal.beneath(events)||events.beneath(journal))throw ApiFailure.validation();
