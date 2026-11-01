@@ -1,4 +1,6 @@
 import {setLocale,applyTranslations} from './i18n.js';
+import {installTooltips} from './tooltips.js';
+installTooltips();
 window.addEventListener('timekeeper-theme-options',()=>applyTranslations());
 applyTranslations();
 

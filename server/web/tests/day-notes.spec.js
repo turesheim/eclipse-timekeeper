@@ -1,3 +1,4 @@
+import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -191,7 +192,7 @@ test('calendar summaries expose body presence while label-only edits preserve pr
       await expect.poll(async()=>note(page).evaluate(button=>{const row=button.closest('.track-date-row'),glyph=button.querySelector('.icon');return row&&glyph?Math.abs(row.getBoundingClientRect().right-glyph.getBoundingClientRect().right):Infinity;})).toBeLessThan(4);
     }
     await page.setViewportSize(viewport);
-    await expect(note(page)).not.toHaveClass(/is-empty/);await expect(note(page)).toHaveAttribute('title','Markdown note');
+    await expect(note(page)).not.toHaveClass(/is-empty/);await expect(await tooltipFor(note(page))).toContainText('Markdown note');
     const summaries=await api('GET','/day-notes?fromDate='+date+'&toDate='+date),summary=await summaries.json();
     expect(summary.items[0].hasBody).toBe(true);expect(summary.items[0]).not.toHaveProperty('body');expect(await summaries.text()).not.toContain('Private Markdown marker');
     await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('');await save(page,'Planning');
@@ -411,7 +412,7 @@ test('journal controls use the account language and reject oversized UTF-8 draft
   const owner=await context(browser),page=await owner.newPage();
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
-    await expect(page.locator('#journal-formatted .ProseMirror')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Tøm notatteksten',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Last ned Markdown',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Formatert',exact:true})).toHaveAttribute('title','Formatert');
+    await expect(page.locator('#journal-formatted .ProseMirror')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Tøm notatteksten',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Last ned Markdown',exact:true})).toHaveCount(0);await expect(await tooltipFor(dialog(page).getByRole('button',{name:'Formatert',exact:true}))).toContainText('Formatert');
     await dialog(page).getByRole('button',{name:'Markdown-kilde',exact:true}).click();const value='ø'.repeat(100001);await page.locator('#journal-body').fill(value);await dialog(page).getByRole('button',{name:'Lagre',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('200 000');await expect(page.locator('#journal-body')).toHaveValue(value);
     const saved=await api('GET','/day-notes/2026-05-17');expect((await saved.json()).version).toBe(0);
   }finally{await owner.close();}

@@ -1,3 +1,4 @@
+import {withoutDailyWikilinks} from './journal-links.js';
 // Frontmatter is opaque metadata: never parse it into the rich-text document.
 export function splitMarkdown(value) {
   const lines=value.match(/[^\n]*\n|[^\n]+$/g)||[];
@@ -22,7 +23,7 @@ const withoutAutolinks=value=>value.replace(/<([^<>\s]+)>/g,(match,target)=>{
 }).replace(/\b(?:https?:\/\/|mailto:)[^\s<>()\[\]]+/gi,'');
 const journalImage=path=>/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(path);
 export const hasUnsupportedSyntax=(value,imageAllowed=journalImage)=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
-  withoutAutolinks(value).replace(/!\[[^\]\n]*\]\(([^\s)]+)\)/g,(source,path)=>imageAllowed(path)?'':source));
+  withoutDailyWikilinks(withoutAutolinks(value)).replace(/!\[[^\]\n]*\]\(([^\s)]+)\)/g,(source,path)=>imageAllowed(path)?'':source));
 export function needsSource(body,imageAllowed=journalImage) {
   let fence=null,text='';
   for(const line of body.split(/\r?\n/)){

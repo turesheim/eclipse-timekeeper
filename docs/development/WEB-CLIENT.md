@@ -180,8 +180,16 @@ keeps an unsaved label draft open. A concurrent label change still requires
 review before that draft can be saved.
 The expanded day-note dialog edits the short label and Markdown body independently. **Formatted** provides paragraphs, headings,
 bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
-links, quotations, tables and undo/redo. Link addresses are validated; activating
-a rendered link does not navigate. **Markdown source**
+links, quotations, tables and undo/redo. Link addresses are validated. Ordinary
+clicks edit regular web links; Command/Ctrl-click opens them. A daily
+wiki link such as `[[2026-10-26]]` opens **Today** on that date with one click,
+including from day, week, event and vault notes. Command/Ctrl-click opens the
+requested date in another tab, and `/web/?day=2026-10-26` is a direct link.
+Daily links work in read-only notes too. Notes with unsaved changes require
+confirmation before changing the day or closing their dialog; cancelling keeps
+the drafts intact. Rich edits preserve the `[[YYYY-MM-DD]]` syntax. Code examples
+and escaped brackets stay literal; invalid dates, aliases, embeds and other
+wikilinks keep the existing exact-source fallback. **Markdown source**
 retains unsupported syntax, including Obsidian extensions. Opaque YAML
 frontmatter is shown separately and preserved in saves. The Formatted and Markdown
 source mode buttons share the editor toolbar with formatting actions, separated
@@ -381,8 +389,9 @@ replace visual review or keyboard testing.
 
 Bootstrap's exact npm version and integrity are pinned in `package-lock.json`.
 Its compiled CSS and MIT license are committed under `src/assets/bootstrap`,
-alongside the SVGs extracted from its data URLs. No Bootstrap JavaScript is needed:
-native modal dialogs and the existing application navigation handle interactions.
+alongside the SVGs extracted from its data URLs. The locally bundled Bootstrap
+Tooltip component and Popper provide hover and keyboard hints; native modal
+dialogs and the existing application navigation handle other interactions.
 The deployed client uses only same-origin files, including icon fonts, and retains
 its `img-src 'self'` security policy. Maven packages these assets directly; it does
 not require npm or an external CDN at runtime or when building the server.
@@ -402,6 +411,22 @@ WCAG A/AA checks for all views at desktop and narrow widths. Those tests verify
 that no design asset triggers a third-party request or is blocked by CSP, and exercise
 keyboard focus, required fields and error recovery. Native browser validation and
 the API's existing concurrency and authorization rules remain in use.
+
+`tooltips.js` is the single tooltip lifecycle and presentation entry point. It
+enhances UI `title` hints with Bootstrap's HTML variant, using text nodes for all
+translations and API data. Authored link/image titles inside the Markdown editor
+are left untouched so hint enhancement cannot change saved notes.
+`tooltip-content.js` provides shared decorated session
+and calendar-event details. Each composite card owns one tooltip containing its
+individual sessions, project icons, times and durations; its child icons, title
+and duration do not create separate hints. The same builders serve Today, the
+monthly Calendar, Week and Workweek. Read-only summary cards are keyboard-focusable.
+Tooltips support hover, keyboard descriptions, Escape dismissal, hovering over
+the tooltip itself and scrolling long details. They use the active dialog as a
+container when necessary and are disposed on removal, hidden views and logout.
+No note contents are copied to browser storage. Bootstrap and Popper's complete
+licenses ship with the bundle and are linked from About. See the upstream
+[Bootstrap 5.3 tooltip documentation](https://getbootstrap.com/docs/5.3/components/tooltips/).
 
 macOS WebKit reports inline-style CSP diagnostics for native select controls even
 on a plain page without application styles/scripts; Playwright screenshots also
