@@ -67,6 +67,11 @@ class VaultCollectionTest {
             var settings=new VaultSettings(store);settings.save(etag(settings.get()),object().put("assetsFolder","Shared"));
             var vault=new VaultCollection(store,limits);vault.initialize();assertEquals("Shared",settings.get().path("assetsFolder").asText());return null;
         });
+        for(String journal:List.of(String.join("/",Collections.nCopies(VaultPath.MAX_DEPTH,"x")),String.join("/",Collections.nCopies(4,"ø".repeat(127)))))
+            store.transaction("bounded-assets-"+journal.length(),()->{
+                var settings=new VaultSettings(store);settings.save(etag(settings.get()),object().put("journalFolder",journal));
+                new VaultCollection(store,limits).initialize();assertEquals("assets",settings.get().path("assetsFolder").asText());return null;
+            });
         store.transaction("occupied-assets",()->{
             var index=new VaultIndex(store);index.root();var catalog=new VaultCatalog(store,limits);
             for(String root:List.of("journal/assets","events","assets"))catalog.folders(new VaultPath(root),true);

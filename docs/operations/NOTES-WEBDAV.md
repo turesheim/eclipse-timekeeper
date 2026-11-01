@@ -130,8 +130,8 @@ synchronization; do not disable Timekeeper's guards to accommodate these clients
 New collections use `journal`, `events` and `journal/assets`. Legacy collections
 using the old default `assets` folder move it under `journal` on first
 access, retaining resource IDs, bytes and content ETags. An existing destination
-is never overwritten: if `journal/assets` is already occupied, the old layout
-remains until you resolve it using Notes settings. Other configured asset
+is never overwritten: if the destination is occupied or exceeds portable path
+limits, the old layout remains until you resolve it using Notes settings. Other configured asset
 folder paths are preserved; change **Assets folder** to `<journal folder>/assets` to
 move them atomically. Review the client's sync preview after this folder move.
 The Notes renderer also resolves old root-`assets/` references to the relocated

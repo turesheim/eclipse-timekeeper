@@ -2,6 +2,7 @@ package net.resheim.timekeeper.server;
 
 import static net.resheim.timekeeper.server.JsonValues.*;
 import java.util.*;
+import java.nio.charset.StandardCharsets;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** All methods run in the caller's owner transaction, including first indexing. */
@@ -29,10 +30,14 @@ final class VaultCatalog {
     private void nestDefaultAssets(){
         if(state.get().path("assetsLayoutReviewed").asBoolean())return;
         var settings=new VaultSettings(store);var current=settings.get();
-        var destination=new VaultPath(current.path("journalFolder").asText()).resolve("assets");
-        // A user-created destination is never overwritten or merged implicitly.
-        if(current.path("assetsFolder").asText().equals("assets")&&index.at(destination,false)==null)
-            new VaultCollection(store,limits).configure(etag(current),object().put("assetsFolder",destination.value()));
+        var journal=new VaultPath(current.path("journalFolder").asText());
+        // Preserve valid existing configurations when an extra path component
+        // would exceed portable limits, or the destination is already occupied.
+        if(current.path("assetsFolder").asText().equals("assets")&&journal.segments().size()<VaultPath.MAX_DEPTH
+                &&journal.value().getBytes(StandardCharsets.UTF_8).length+"/assets".length()<=VaultPath.MAX_BYTES){
+            var destination=journal.resolve("assets");
+            if(index.at(destination,false)==null)new VaultCollection(store,limits).configure(etag(current),object().put("assetsFolder",destination.value()));
+        }
         state.assetsLayoutReviewed();
     }
     ObjectNode folders(VaultPath path,boolean backfill){
