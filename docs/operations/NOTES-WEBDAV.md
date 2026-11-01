@@ -15,7 +15,9 @@ source editor to change frontmatter. Wikilinks and Obsidian embeds remain litera
 source; Timekeeper does not implement Obsidian's link cache or execute plugins.
 Standard relative Markdown links navigate within the collection. Verified raster
 images use authenticated previews, both inline in formatted Markdown and in the
-content pane when selected in the navigation tree; other attachments can be downloaded. Renaming
+content pane when selected in the navigation tree; other attachments can be downloaded.
+Journal image references also resolve companions imported through vault synchronization,
+including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
 
 ## Connection and folder choices

@@ -18,12 +18,8 @@ export function journalImageResources(session){
     const current=session();
     return imagePreview({alt,active:()=>!!current&&current===session(),load:async()=>{
       if(!current||!journalAssetPath(reference))throw new Error('Invalid image');
-      // Native uploads retain their canonical endpoint. Synced companions may be
-      // ordinary vault binaries, so resolve them in the configured asset folder.
-      if(/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(reference)){
-        try{return (await current.request('/journal-assets/'+reference.slice(7),{binary:'application/octet-stream'})).data;}
-        catch(error){if(error.status!==404)throw error;}
-      }
+      // Canonical uploads and synced binaries share the vault content endpoint,
+      // whose octet-stream response retains the API client's strict media checks.
       const info=(await current.request('/notes')).data;
       const path=relativeNotePath(info.settings.assetsFolder+'/note.md',reference.slice(7));
       const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;

@@ -144,7 +144,6 @@ test('journal images and file attachments survive editing and remain available o
     await dialog(page).locator('input[type=file][accept]').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:png});
     const uploaded=await upload;expect(uploaded.status()).toBe(201);
     const image=dialog(page).locator('.ProseMirror img[alt="photo.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
-    await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
     await dialog(page).locator('input[type=file]:not([accept])').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('attached text')});
     await expect(dialog(page).locator('.ProseMirror a')).toContainText('notes.txt');
     await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).toBeHidden();
