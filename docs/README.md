@@ -182,6 +182,10 @@ or H2 version. Current-schema backup and restore instructions are in the
 
 ## Building
 
+See [CI selection and local verification](operations/CI.md) for PR check selection,
+the `ci:full` override, and nightly certification.
+
+
 Use JDK 21 and complete the
 [developer prerequisites](development/REPOSITORY.md#build-and-test). Clone the
 project and from the root execute:

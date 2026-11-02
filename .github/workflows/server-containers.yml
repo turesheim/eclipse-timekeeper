@@ -1,7 +1,11 @@
 name: Server containers
 
 on:
-  pull_request:
+  workflow_call:
+    inputs:
+      h2_verified:
+        type: boolean
+        default: false
   push:
     branches: [main]
     tags: ['v*']
@@ -48,6 +52,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Build and test the H2 server
+        if: inputs.h2_verified != true
         run: ./mvnw -B -ntp -f server/pom.xml clean verify
       - name: Build actual deployment images
         run: |
@@ -307,7 +312,7 @@ jobs:
 
   publish:
     needs: [prepare, verify, verify-journal-client, verify-synology]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     concurrency:
       group: containers-publish-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true

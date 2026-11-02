@@ -6,6 +6,10 @@ on:
     branches: [main]
     tags: ['**']
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 2 * * *'
 
 permissions:
   contents: read
@@ -24,6 +28,15 @@ jobs:
     outputs:
       code: ${{ steps.changes.outputs.code }}
       eclipse: ${{ steps.changes.outputs.eclipse }}
+      full: ${{ steps.changes.outputs.full }}
+      server: ${{ steps.changes.outputs.server }}
+      server_tests: ${{ steps.changes.outputs.server_tests }}
+      api: ${{ steps.changes.outputs.api }}
+      web: ${{ steps.changes.outputs.web }}
+      web_full: ${{ steps.changes.outputs.web_full }}
+      containers: ${{ steps.changes.outputs.containers }}
+      site: ${{ steps.changes.outputs.site }}
+      browser_specs: ${{ steps.changes.outputs.browser_specs }}
     steps:
     - uses: actions/checkout@v7.0.1
       with:
@@ -33,7 +46,7 @@ jobs:
 
   API-contract:
     needs: Changes
-    if: needs.Changes.outputs.code == 'true'
+    if: needs.Changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
@@ -51,7 +64,7 @@ jobs:
 
   Server:
     needs: Changes
-    if: needs.Changes.outputs.code == 'true'
+    if: needs.Changes.outputs.server == 'true'
     concurrency:
       group: build-server-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
@@ -73,12 +86,18 @@ jobs:
     - name: Install HTTP contract validators
       run: python -m pip install -r common/api/tests/requirements.txt
     - name: Build and test standalone Quarkus server
+      if: needs.Changes.outputs.server_tests == 'true'
       run: ./mvnw -B -ntp -f server/pom.xml clean verify
+    - name: Package server fixture for web-only changes
+      if: needs.Changes.outputs.server_tests != 'true'
+      run: ./mvnw -B -ntp -f server/pom.xml clean package -DskipTests
     - name: Package candidate server distribution
       run: python server/scripts/package_server.py --output server/target/distribution --commit "$GITHUB_SHA"
     - name: Verify shipped offline instance recovery and completed retry
+      if: needs.Changes.outputs.server_tests == 'true'
       run: python server/scripts/instance_restore_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify packaged HTTP server, durable restart and authorization
+      if: needs.Changes.outputs.server_tests == 'true'
       run: python server/scripts/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Upload server reports and acceptance evidence
       if: always()
@@ -98,7 +117,8 @@ jobs:
           server/target/distribution/timekeeper-server.zip.sha256
 
   Web:
-    needs: Server
+    needs: [Changes, Server]
+    if: needs.Changes.outputs.web == 'true'
     concurrency:
       group: build-web-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
@@ -129,16 +149,23 @@ jobs:
       working-directory: server/web
       run: npx playwright install --with-deps chromium
     - name: Verify bundled web client against the packaged server
-      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+      env:
+        BROWSER_SPECS: ${{ needs.Changes.outputs.browser_specs }}
+      run: python3 scripts/ci_browser.py
     - name: Verify manual folder synchronization through HTTPS
+      if: needs.Changes.outputs.full == 'true'
       run: python3 server/scripts/webdav_sync_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify email recovery through HTTPS and actual SMTP delivery
+      if: needs.Changes.outputs.full == 'true'
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
     - name: Verify Journal WebDAV help and instance backups through HTTPS
+      if: needs.Changes.outputs.full == 'true'
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection|instance backup Administration'
     - name: Verify passkey enrollment and label validation over HTTPS
+      if: needs.Changes.outputs.full == 'true'
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --passkeys --spec passkeys.spec.js
     - name: Verify explicit instance restore preparation and confirmation through HTTPS
+      if: needs.Changes.outputs.full == 'true'
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --restore --grep 'instance restore preparation'
     - name: Upload browser acceptance evidence
       if: always()
@@ -224,12 +251,13 @@ jobs:
     needs: [Changes, Build, API-contract, Server, Web, Remote-Eclipse, Publication-tooling]
     if: >-
       !cancelled() && needs.Changes.result == 'success' &&
+      needs.Changes.outputs.site == 'true' &&
       needs.Publication-tooling.result == 'success' &&
-      (needs.Changes.outputs.code == 'false' ||
-       (needs.API-contract.result == 'success' &&
-        needs.Server.result == 'success' && needs.Web.result == 'success' &&
-        (needs.Changes.outputs.eclipse == 'false' ||
-         (needs.Build.result == 'success' && needs.Remote-Eclipse.result == 'success'))))
+      (needs.Changes.outputs.api != 'true' || needs.API-contract.result == 'success') &&
+      (needs.Changes.outputs.server != 'true' || needs.Server.result == 'success') &&
+      (needs.Changes.outputs.web != 'true' || needs.Web.result == 'success') &&
+      (needs.Changes.outputs.eclipse != 'true' ||
+       (needs.Build.result == 'success' && needs.Remote-Eclipse.result == 'success'))
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
@@ -341,3 +369,25 @@ jobs:
       with:
         name: p2-repository
         path: eclipse/net.resheim.eclipse.timekeeper-site/target/repository
+
+  Containers:
+    needs: [Changes, Server]
+    if: needs.Changes.outputs.containers == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/server-containers.yml
+    with:
+      h2_verified: true
+
+  Validation:
+    name: PR validation
+    if: always()
+    needs: [Changes, API-contract, Server, Web, Remote-Eclipse, Build, Publication-tooling, Publication, Containers]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - name: Require every selected check to succeed
+      env:
+        CI_NEEDS: ${{ toJSON(needs) }}
+      run: python3 scripts/ci_result.py
