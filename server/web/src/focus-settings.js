@@ -33,6 +33,7 @@ export async function renderFocusSettings(view,changed){
   },'btn btn-primary');apply.disabled=!view.canWrite;
   actions.append(cancel,apply);dialog.append(heading,search,members,actions);editor.value.append(dialog);
   for(const type of ['input','change'])dialog.addEventListener(type,event=>event.stopPropagation());
+  dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}});
   dialog.addEventListener('close',()=>{selectedArea=null;trigger?.focus();});search.addEventListener('input',paintMembers);
   const paint=()=>{
     list.replaceChildren();
