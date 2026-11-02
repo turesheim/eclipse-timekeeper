@@ -14,8 +14,8 @@ function schedule(node,focus=null){
 }
 let active=null,installed=false,pointerFocus=false,leaveTimer,dismissed=null,pointer=null;
 const visible=node=>node.isConnected&&!node.closest('[hidden]')&&node.getClientRects().length>0;
-export function hideTooltip() {
-  cancelPending();clearTimeout(leaveTimer);if(!active)return;
+export function hideTooltip(cancel=true) {
+  if(cancel)cancelPending();clearTimeout(leaveTimer);if(!active)return;
   const previous=active;active=null;previous.instance.dispose();
   for(const [node,value] of previous.descriptions)value===null?node.removeAttribute('aria-describedby'):node.setAttribute('aria-describedby',value);
 }
@@ -72,7 +72,7 @@ function show(node,focus=null) {
 }
 function inside(node){return node instanceof Node&&active&&(active.node.contains(node)||active.tip.contains(node));}
 function overTooltip(event){if(!active)return false;const box=active.tip.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom;}
-function leave(){clearTimeout(leaveTimer);leaveTimer=setTimeout(hideTooltip,100);}
+function leave(){clearTimeout(leaveTimer);leaveTimer=setTimeout(()=>hideTooltip(false),100);}
 export function installTooltips() {
   if(installed)return;installed=true;
   const scan=root=>{if(!(root instanceof Element))return;if(root.hasAttribute('title'))plainTooltip(root);root.querySelectorAll('[title]').forEach(plainTooltip);};
