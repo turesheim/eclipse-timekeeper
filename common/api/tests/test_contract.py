@@ -656,7 +656,7 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
-            'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries',
+            'listNoteRevisions', 'getNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries',
             'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'moveNoteEntry', 'restoreNoteEntry',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',

@@ -45,7 +45,7 @@ public class VaultResource {
         if(trash!=null&&!Set.of("true","false").contains(trash))throw ApiFailure.validation();
         UUID directory=parent==null?VaultIndex.ROOT:uuid(parent);
         int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,limits.pageSize(),1,limits.pageSize());
-        return tx(()->Response.ok(vault().page(directory,query,"true".equals(trash),start,count,snapshot)).build());
+        return tx(()->Response.ok(vault().page(directory,query==null&&uri.getQueryParameters().containsKey("query")?"":query,"true".equals(trash),start,count,snapshot)).build());
     }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());fields(input,"path");var path=new VaultPath(input.path("path").asText());

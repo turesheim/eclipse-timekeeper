@@ -29,6 +29,7 @@ for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,
   for(const license of licenses)notices+=`\n\n${pkg.name}@${pkg.version} / ${license}\n\n`+await readFile(join(pkg.directory,license),'utf8');
 }
 const target=join(root,'src/assets/milkdown');
+files.push([join(target,'CODEMIRROR-LICENSE'),await readFile(join(root,'node_modules/@codemirror/view/LICENSE'))]);
 files.push([join(target,'LICENSE'),await readFile(join(root,'node_modules/@milkdown/kit/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n']);
 const sizes=result.outputFiles.map(file=>({file:file.path.split('/').at(-1),bytes:file.contents.length,gzipBytes:gzipSync(file.contents).length}));
 // Gzip estimates vary across zlib versions. Only deterministic raw sizes belong
