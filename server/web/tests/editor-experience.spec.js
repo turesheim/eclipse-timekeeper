@@ -74,3 +74,8 @@ test('code blocks expose language and copy controls and highlight without replac
   const value='~~~js\nconst answer = 42;\n~~~\n';await engine(page,value);await expect(page.locator('#experience-editor .tok-keyword')).toContainText('const');expect(await source(page)).toBe(value);
   await page.getByRole('textbox',{name:'Code language',exact:true}).fill('javascript');await page.getByRole('textbox',{name:'Code language',exact:true}).press('Tab');expect(await source(page)).toContain('```javascript');await expect(page.getByRole('button',{name:'Copy code',exact:true})).toBeVisible();
 });
+test('switching to source and back without edits keeps rich undo history',async({page})=>{
+  await field(page,'Original.\n');await page.locator('#experience-formatted p').click();await page.keyboard.press('End');await page.keyboard.type(' Added.');
+  const text=await page.evaluate(()=>globalThis.field.value());expect(text).toContain('Added.');await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();
+  await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
+});

@@ -134,3 +134,7 @@
 [data-footnote-definition] { border-block-start: 1px solid var(--bs-border-color); padding-inline-start: .75rem; font-size: .9rem; }
 [data-footnote-definition]::before { content: attr(data-footnote-definition) ". "; color: var(--bs-secondary-color); }
 .markdown-asset-list { display: flex; flex-direction: column; gap: .25rem; margin-block: .75rem; max-height: 50vh; overflow: auto; }
+[data-footnote-reference] { border: 0; background: transparent; font: inherit; color: var(--bs-link-color); }
+.markdown-history-dialog { width: min(60rem,calc(100vw - 1rem)); }
+.markdown-revision-list { display: flex; flex-wrap: wrap; gap: .25rem; max-height: 10rem; overflow: auto; margin-block: .5rem; }
+.markdown-revision-diff { max-height: 45vh; overflow: auto; padding: .75rem; border: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); color: var(--bs-body-color); white-space: pre-wrap; }

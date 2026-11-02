@@ -17,7 +17,7 @@ public class VaultResource {
     @Inject RequestIdentity identity;
     @Context UriInfo uri;
     private VaultCollection vault(){return new VaultCollection(store,limits);}
-    private static UUID uuid(String input){try{var value=UUID.fromString(input);if(!value.toString().equals(input))throw ApiFailure.validation();return value;}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}}
+    private static UUID uuid(String input){if(input==null)throw ApiFailure.validation();try{var value=UUID.fromString(input);if(!value.toString().equals(input))throw ApiFailure.validation();return value;}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}}
     private Response tx(Supplier<Response> operation){return store.authenticated(identity,()->{
         vault().initialize();return Response.fromResponse(operation.get()).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();
     });}
@@ -28,6 +28,14 @@ public class VaultResource {
     }
     @GET public Response info(){ContractInputs.queries(uri.getQueryParameters());return tx(()->{
         var value=object().put("rootId",VaultIndex.ROOT.toString()).put("snapshot",vault().generation());value.set("settings",new VaultSettings(store).get());value.set("limits",limits.snapshot());return Response.ok(value).build();});}
+    @GET @Path("/revisions") public Response revisions(@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source);
+        return tx(()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
+    }
+    @GET @Path("/revisions/{revisionId}") public Response revision(@PathParam("revisionId")String revision,@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
+        return tx(()->{var history=new NoteRevisions(store);return Response.ok(history.get(history.reference(type,id),version)).build();});
+    }
     @GET @Path("/settings") public Response settings(){ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,new VaultSettings(store).get(),null).response());}
     @GET @Path("/resolve") public Response resolve(@QueryParam("path")String path){ContractInputs.queries(uri.getQueryParameters(),"path");var target=new VaultPath(path);return tx(()->{var collection=vault();var value=collection.get(target);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
     @PUT @Path("/settings") @Consumes("application/json") public Response settings(@HeaderParam("If-Match")String match,JsonNode input){ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,vault().configure(match,input),null).response());}

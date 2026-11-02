@@ -115,7 +115,7 @@ export class MarkdownField {
     const prefix=this.frontmatter||'';
     return value.startsWith(prefix)&&this.editor.matchesSource(value.slice(prefix.length));
   }
-  setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.codeEditor?.readOnly(value);this.controls();}
+  setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.suspended?.editor.setReadOnly(value);this.codeEditor?.readOnly(value);this.controls();}
   paintBlockStyle(){
     const level=this.editor?.headingLevel()||0;
     if(level!==this.blockLevel){
@@ -153,7 +153,8 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
-    this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.previewEditor?.destroy();this.previewEditor=null;this.splitHost?.replaceChildren();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
+    this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();
+    this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.previewEditor?.destroy();this.previewEditor=null;this.splitHost?.replaceChildren();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
@@ -161,19 +162,19 @@ export class MarkdownField {
     this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);
     this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
   }
+  position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():this.codeEditor?this.codeEditor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}
+  async restorePosition(position){if(!position)return;const generation=this.restoreGeneration;if(position.formatted)await this.showFormatted(false);if(generation!==this.restoreGeneration)return;if(this.editor)this.editor.restorePosition(position);else{this.text.setSelectionRange(Math.min(position.anchor,this.text.value.length),Math.min(position.head??position.anchor,this.text.value.length));this.text.scrollTop=position.scrollTop||0;}}
   async showSource(){
-    if(this.loading)return;
-    const current=++this.generation,previous=this.editor;
-    if(previous)this.setRaw(previous.markdown());this.editor=null;this.loading=true;this.controls();
-    try{await previous?.destroy();}finally{
-      if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.loading=false;this.controls();this.text.focus();}
-    }
+    if(this.loading||!this.editor)return;
+    const previous=this.editor,position=previous.position(),body=previous.markdown();this.setRaw(body);this.suspended={editor:previous,body};this.editor=null;
+    this.mode(false);this.controls();const normalized=body.slice(0,position.anchor).replace(/\r\n/g,'\n').length;this.text.setSelectionRange(normalized,normalized);this.text.scrollTop=position.scrollTop;this.text.focus();
   }
   async showFormatted(focus=true){
-    if(this.loading)return;if(this.codeEditor){this.sourcePosition=this.codeEditor.position();this.setRaw(this.codeEditor.value());this.codeEditor.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;}if(this.editor){this.editor.focus();return;}
+    if(this.loading)return;this.sourcePosition=this.codeEditor?.position()||{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};if(this.codeEditor){this.sourcePosition=this.codeEditor.position();this.setRaw(this.codeEditor.value());this.codeEditor.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;}if(this.editor){this.editor.focus();return;}
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=this.rawBody();
+    if(this.suspended){const suspended=this.suspended;this.suspended=null;if(suspended.body===richBody){this.editor=suspended.editor;this.editor.setReadOnly(this.readOnly);this.mode(true);this.controls();if(focus)this.editor.focus();return;}await suspended.editor.destroy();this.rich.replaceChildren();}
     if(this.unterminated||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);
@@ -183,7 +184,7 @@ export class MarkdownField {
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}
-      this.paintBlockStyle();this.mode(true);this.updateExperience();this.status.textContent='';if(focus)created.focus();
+      this.paintBlockStyle();this.mode(true);if(this.sourcePosition)created.restorePosition(this.sourcePosition);this.updateExperience();this.status.textContent='';if(focus)created.focus();
     }catch{if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.status.textContent=t('markdown.failed');}}
     finally{if(current===this.generation){this.loading=false;this.controls();}}
   }

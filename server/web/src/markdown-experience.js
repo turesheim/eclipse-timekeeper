@@ -1,3 +1,4 @@
+import {lineComparison} from './note-revisions.js';
 import {t} from './i18n.js';
 import {iconButton} from './icons.js';
 import {headingAnchor} from './wiki-links.js';
@@ -36,6 +37,15 @@ export function buildExperience(field,load,loadSource){
   let assetGeneration=0;
   const listAssets=async()=>{const current=++assetGeneration,generation=f.generation;assetList.textContent=t('markdown.loading');try{const entries=await f.resources.complete(assetSearch.value);if(current!==assetGeneration||generation!==f.generation)return;assetList.replaceChildren();for(const entry of entries.filter(entry=>['ASSET','BINARY'].includes(entry.kind))){const pick=el('button',entry.path);pick.type='button';pick.className='btn btn-outline-secondary';pick.addEventListener('click',()=>{if(f.readOnly)return;const image=/\.(png|jpg|jpeg|gif|webp)$/i.test(entry.path);if(f.editor)f.editor.command(image?'wiki_embed':'wiki_link',{value:entry.path});else{const at=f.text.selectionStart;f.text.setRangeText((image?'!':'')+'[['+entry.path+']]',at,f.text.selectionEnd,'end');f.onChange();}f.assetDialog.close();});assetList.append(pick);}if(!assetList.children.length)assetList.textContent=t('notes.empty');}catch(error){assetList.textContent=error.message;}};
   f.assetPicker=action('markdown.existing_asset',()=>{if(f.readOnly||!f.resources?.complete)return;assetSearch.value='';f.assetDialog.showModal();void listAssets();assetSearch.focus();},'folder');f.toolbar.append(f.assetPicker);assetSearch.addEventListener('input',()=>void listAssets());
+  f.historyDialog=el('dialog');f.historyDialog.className='app-dialog markdown-history-dialog';f.historyDialog.setAttribute('aria-label',t('markdown.revisions'));const historyTitle=el('h2',t('markdown.revisions')),historyList=el('div'),historyStatus=el('p'),diff=el('pre');historyList.className='markdown-revision-list';diff.className='markdown-revision-diff';diff.setAttribute('aria-label',t('markdown.comparison'));let chosen;
+  const applyRevision=action('markdown.restore_draft',()=>{if(f.readOnly||!chosen)return;const text=chosen.text;f.historyDialog.close();f.setValue(text);f.onChange();});applyRevision.disabled=true;
+  const closeHistory=action('ui.close',()=>f.historyDialog.close());f.historyDialog.append(historyTitle,el('p',t('markdown.revision_help')),historyList,historyStatus,diff,applyRevision,closeHistory);f.root.append(f.historyDialog);
+  const showComparison=value=>{chosen=value;diff.textContent=lineComparison(f.value(),value.text);historyStatus.textContent=t('markdown.comparison_legend');applyRevision.disabled=f.readOnly;};
+  f.historyButton=action('markdown.revisions',async()=>{if(!f.resources?.revisions)return;const generation=f.generation;historyList.replaceChildren();diff.textContent='';chosen=null;applyRevision.disabled=true;historyStatus.textContent=t('markdown.loading');f.historyDialog.showModal();try{
+    if(f.resources.latest){const latest=action('markdown.server_version',async()=>{try{const value=await f.resources.latest();if(generation===f.generation)showComparison(value);}catch(error){historyStatus.textContent=error.message;}});historyList.append(latest);}
+    const values=await f.resources.revisions();if(generation!==f.generation)return;historyStatus.textContent=values.length?'':t('markdown.no_revisions');
+    for(const value of values){const pick=el('button',t('markdown.revision_item',{version:value.contentVersion,date:value.modifiedAt}));pick.type='button';pick.className='btn btn-outline-secondary';pick.addEventListener('click',async()=>{try{const revision=await f.resources.revision(value.id);if(generation===f.generation)showComparison(revision);}catch(error){historyStatus.textContent=error.message;}});historyList.append(pick);}
+  }catch(error){if(generation===f.generation)historyStatus.textContent=error.message;}},'clock-history');f.toolbar.append(f.historyButton);
   f.outline=el('details');f.outline.className='markdown-outline';f.outline.append(el('summary',t('markdown.outline')));f.outlineItems=el('nav');f.outlineItems.setAttribute('aria-label',t('markdown.outline'));f.outline.append(f.outlineItems);f.metadata.after(f.outline);
   f.outline.addEventListener('toggle',()=>{if(f.outline.open)paintOutline();});
   const paintOutline=()=>{
@@ -55,6 +65,7 @@ export function buildExperience(field,load,loadSource){
   const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
   f.updateExperience=()=>{
     if(f.outline.open)paintOutline();
+    f.historyButton.disabled=!f.resources?.revisions;
     f.assetPicker.disabled=f.readOnly||!f.resources?.complete;
     f.structured.hidden=!f.editor||f.readOnly;
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}

@@ -247,6 +247,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       focus:()=>view.focus(),
       setReadOnly,
       command,
+      position:()=>{const source=markdown(),block=view.state.selection.$from.index(0),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source)),start=tree.children[block]?.position?.start.offset||0;return {anchor:start+view.state.selection.$from.parentOffset,scrollTop:view.dom.scrollTop};},
+      restorePosition:position=>{const source=markdown(),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source));let index=tree.children.findIndex(node=>(node.position?.end.offset??0)>=position.anchor);if(index<0)index=view.state.doc.childCount-1;const block=view.state.doc.child(index);let start=0;for(let i=0;i<index;i++)start+=view.state.doc.child(i).nodeSize;const offset=Math.min(Math.max(0,position.anchor-(tree.children[index]?.position?.start.offset||0)),Math.max(0,block.nodeSize-2));view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(view.state.doc.content.size,start+1+offset)))));view.dom.scrollTop=position.scrollTop||0;},
       context:()=>({table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
       selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},

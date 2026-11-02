@@ -1,3 +1,4 @@
+import {noteRevisionResources} from './note-revisions.js';
 import {vaultEditorResources} from './vault-editor-resources.js';
 import {journalImageResources} from './image-preview.js';
 import {dateTimeFormat} from './formatters.js';
@@ -22,7 +23,7 @@ export class TrackDayNotes {
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
     const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),
-      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image),{...journalImageResources(()=>this.editor?.session),...vaultEditorResources(()=>this.editor?.session)});
+      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image),{...noteRevisionResources(()=>this.editor?.session,()=>({sourceType:'DAY_NOTE',sourceId:this.editor?.noteId}),{bodyOnly:true,latest:async()=>{const reply=await this.editor.session.request('/day-entries/'+this.editor.date);return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.editor?.session),...vaultEditorResources(()=>this.editor?.session)});
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
@@ -193,7 +194,7 @@ export class TrackDayNotes {
     try{
       const reply=await editor.session.request('/day-entries/'+editor.date);
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
+      this.text.value=reply.data.text;editor.noteId=reply.data.id;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
       this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;

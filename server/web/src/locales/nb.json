@@ -1260,5 +1260,13 @@
   "markdown.footnote": "Fotnote",
   "markdown.toggle_callout": "Utvid eller skjul uthevet merknad",
   "markdown.callout_title": "Tittel på uthevet merknad",
-  "markdown.existing_asset": "Eksisterende fil i hvelvet"
+  "markdown.existing_asset": "Eksisterende fil i hvelvet",
+  "markdown.revisions": "Notatversjoner",
+  "markdown.comparison": "Sammenligning av versjoner",
+  "markdown.restore_draft": "Bruk som ulagret utkast",
+  "markdown.revision_help": "Versjoner beholdes fra nå av, opptil 20 per notat og 8 MB per konto. Et valg endrer bare dette utkastet. Lagring kontrollerer fortsatt gjeldende versjon. Utkast finnes bare i denne fanen.",
+  "markdown.comparison_legend": "− valgt versjon, + gjeldende utkast",
+  "markdown.server_version": "Sammenlign lagret serverversjon",
+  "markdown.no_revisions": "Ingen tidligere versjoner er registrert.",
+  "markdown.revision_item": "Versjon {{version}} · {{date}}"
 }

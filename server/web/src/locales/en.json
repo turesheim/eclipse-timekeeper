@@ -1260,5 +1260,13 @@
   "markdown.footnote": "Footnote",
   "markdown.toggle_callout": "Expand or collapse callout",
   "markdown.callout_title": "Callout title",
-  "markdown.existing_asset": "Existing vault asset"
+  "markdown.existing_asset": "Existing vault asset",
+  "markdown.revisions": "Note revisions",
+  "markdown.comparison": "Revision comparison",
+  "markdown.restore_draft": "Use as unsaved draft",
+  "markdown.revision_help": "Revisions are retained prospectively, up to 20 per note and 8 MB per account. Choosing one changes only this draft; Save still checks the current version. Drafts stay in this tab only.",
+  "markdown.comparison_legend": "− selected version, + current draft",
+  "markdown.server_version": "Compare saved server version",
+  "markdown.no_revisions": "No earlier revisions have been recorded.",
+  "markdown.revision_item": "Version {{version}} · {{date}}"
 }

@@ -57,7 +57,7 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
-document.addEventListener(vaultNoteNavigation,event=>{if(!api||!notes.canLeave()||!today.journal.canLeaveInline())return;tab('notes');void notes.select(event.detail.entry.id).then(()=>notes.markdown.scrollToHeading?.(event.detail.heading));});
+document.addEventListener(vaultNoteNavigation,event=>{event.preventDefault();if(!api||!event.detail.guards.every(guard=>guard())||!notes.canLeave()||!today.journal.canLeaveInline())return;event.detail.leave.forEach(leave=>leave());tab('notes');void notes.select(event.detail.entry.id).then(async()=>{if(event.detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(event.detail.heading);});});
 document.addEventListener(dayNoteNavigation,event=>{
   event.preventDefault();
   const date=dailyNoteDate(event.detail?.date);if(!date||!api||!snapshot)return;

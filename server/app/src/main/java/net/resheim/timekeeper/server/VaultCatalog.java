@@ -61,6 +61,7 @@ final class VaultCatalog {
 
     /** Called before changing canonical bytes; inactive until the collection exists. */
     static Mutation before(ServerStore store,VaultSources.Ref ref,byte[] next){
+        new NoteRevisions(store).before(ref,next);
         var catalog=new VaultCatalog(store,store.vaultLimits());
         if(!catalog.state.get().path("initialized").asBoolean())return null;
         catalog.initialize();
