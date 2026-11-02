@@ -195,16 +195,16 @@ export class MarkdownField {
     if(this.suspended){const suspended=this.suspended;this.suspended=null;if(!this.unterminated&&!splitMarkdown(richBody).frontmatter&&(suspended.body===richBody||suspended.editor.replaceMarkdown(richBody))){this.editor=suspended.editor;this.editor.setReadOnly(this.readOnly);this.mode(true);if(this.sourcePosition)this.editor.restorePosition(this.sourcePosition);this.controls();if(focus)this.editor.focus();return;}await suspended.editor.destroy();this.rich.replaceChildren();}
     if(this.unterminated||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
-    const host=node('div');this.rich.replaceChildren(host);
+    const host=node('div');host.inert=true;this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
       const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
       if(current!==this.generation){await created?.destroy();return;}
-      this.editor=created;
+      this.editor=created;host.inert=false;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}
       this.paintBlockStyle();this.mode(true);if(this.sourcePosition)created.restorePosition(this.sourcePosition);this.updateExperience();this.status.textContent='';if(focus)created.focus();
     }catch{if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.status.textContent=t('markdown.failed');}}
-    finally{if(current===this.generation){this.loading=false;this.controls();}}
+    finally{if(current===this.generation){this.loading=false;this.controls();}host.inert=false;}
   }
   focus(){if(this.editor)this.editor.focus();else if(this.codeEditor)this.codeEditor.focus();else this.text.focus();}
 }

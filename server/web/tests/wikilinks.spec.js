@@ -29,19 +29,32 @@ test('daily wikilinks render as inline nodes and preserve Markdown through mode 
 test('one click opens Today and protects inline, week and day-dialog drafts before navigation',async({page,request})=>{
   test.setTimeout(90000);const errors=[];page.on('pageerror',error=>errors.push(error.message));const {api,save}=await fresh(page,request);
   const original='See [[2026-10-26]] or [[2026-10-27]].\n\nA code example `[[2026-10-29]]`.\n';
+  console.log('Daily-link navigation stage 3');
   await save('2026-10-30',original);await save('2026-10-26','# Target day\n');await save('2026-10-27','# Other day\n');
   const week=await api('GET','/week-notes/2026-W44');await api('PUT','/week-notes/2026-W44',{body:'Weekly link [[2026-10-30]].\n'},{'If-Match':week.headers().etag});
+  console.log('Daily-link navigation stage 5');
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
+  console.log('Daily-link navigation stage 6');
   await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
-  await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await rich(page).locator('p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Inline draft');
+  console.log('Daily-link navigation stage 7');
+  await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await rich(page).locator('p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Inline draft');await expect(rich(page)).toContainText('Inline draft');
+  console.log('Daily-link navigation stage 8');
   let cancelled=false;page.once('dialog',async dialog=>{cancelled=true;await dialog.dismiss();});await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');await expect.poll(()=>cancelled).toBe(true);await expect(page.locator('#today-date')).toHaveValue('2026-10-30');await expect(rich(page)).toContainText('Inline draft');
+  console.log('Daily-link navigation stage 9');
   page.once('dialog',dialog=>dialog.accept());await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toBe(original);
-  await page.locator('#today-month-grid button[data-week="2026-W44"]').click();const weekly=page.locator('#today-week-note-editor');await expect(dateLink(weekly,'2026-10-30')).toBeVisible();await weekly.locator('[role=textbox]').click();await page.keyboard.press('End');await page.keyboard.type(' Week draft');
+  console.log('Daily-link navigation stage 10');
+  await page.locator('#today-month-grid button[data-week="2026-W44"]').click();const weekly=page.locator('#today-week-note-editor');await expect(dateLink(weekly,'2026-10-30')).toBeVisible();await weekly.locator('[role=textbox]').click();await page.keyboard.press('End');await page.keyboard.type(' Week draft');await expect(weekly).toContainText('Week draft');
+  console.log('Daily-link navigation stage 11');
   page.once('dialog',dialog=>dialog.dismiss());await dateLink(weekly,'2026-10-30').click();await expect(weekly).toBeVisible();await expect(weekly).toContainText('Week draft');
+  console.log('Daily-link navigation stage 12');
   page.once('dialog',dialog=>dialog.accept());await dateLink(weekly,'2026-10-30').click();await expect(weekly).not.toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');
-  await page.locator('#today-date').fill('2026-10-26');await expect(rich(page)).toContainText('Target day');await rich(page).click();await page.keyboard.press('End');await page.keyboard.type(' Hidden draft');
-  await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-10');await page.locator('button[data-track-note-date="2026-10-30"]').click();const daily=page.locator('#track-note-editor');await expect(dateLink(daily,'2026-10-27')).toBeVisible();await daily.locator('[role=textbox] p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Modal draft');
+  console.log('Daily-link navigation stage 13');
+  await page.locator('#today-date').fill('2026-10-26');await expect(rich(page)).toContainText('Target day');await rich(page).click();await page.keyboard.press('End');await page.keyboard.type(' Hidden draft');await expect(rich(page)).toContainText('Hidden draft');
+  console.log('Daily-link navigation stage 14');
+  await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-10');await page.locator('button[data-track-note-date="2026-10-30"]').click();const daily=page.locator('#track-note-editor');await expect(dateLink(daily,'2026-10-27')).toBeVisible();await daily.locator('[role=textbox] p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Modal draft');await expect(daily).toContainText('Modal draft');
+  console.log('Daily-link navigation stage 15');
   let prompts=0;const rejectSecond=dialog=>++prompts===1?dialog.accept():dialog.dismiss();page.on('dialog',rejectSecond);await dateLink(daily,'2026-10-27').click();page.off('dialog',rejectSecond);expect(prompts).toBe(2);await expect(daily).toBeVisible();await expect(daily).toContainText('Modal draft');
+  console.log('Daily-link navigation stage 16');
   const accept=dialog=>dialog.accept();page.on('dialog',accept);await dateLink(daily,'2026-10-27').click();page.off('dialog',accept);await expect(daily).not.toBeVisible();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(page)).toContainText('Other day');expect(errors).toEqual([]);
 });
 
