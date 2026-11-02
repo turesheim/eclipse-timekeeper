@@ -1225,5 +1225,9 @@
   "focus.finish_edit": "Fullfør eller avbryt redigeringen før du bytter fokus.",
   "focus.running_outside": "Arbeid utenfor dette fokusområdet",
   "notes.hide_journal": "Skjul journalmappen",
-  "notes.hide_journal_help": "Skjul journalmappen, inkludert notater og vedlegg, fra navigasjon og søk i Notater. Journalvisninger, lenker og synkronisering er fortsatt tilgjengelige."
+  "notes.hide_journal_help": "Skjul journalmappen, inkludert notater og vedlegg, fra navigasjon og søk i Notater. Journalvisninger, lenker og synkronisering er fortsatt tilgjengelige.",
+  "focus.clients_count": "Kunder ({{count}})",
+  "focus.search_clients": "Søk etter kunder",
+  "focus.no_clients": "Ingen kunder funnet",
+  "focus.apply": "Bruk"
 }
