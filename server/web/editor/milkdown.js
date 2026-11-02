@@ -261,7 +261,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx);return JSON.stringify(semantic(dialect.project(parser.parse(source),source)))===JSON.stringify(semantic(dialect.project(parser.parse(canonical),canonical)));});if(!safe)return false;
         const document=parsed.type.create({...parsed.attrs,sourceEpoch:++epoch},parsed.content);rememberSource(source,document);
         view.dispatch(closeHistory(view.state.tr.replaceWith(0,view.state.doc.content.size,document.content).setDocAttribute('sourceEpoch',epoch)));
-        view.dispatch(closeHistory(view.state.tr));snapshot=view.state.doc;snapshotText=source;return true;
+        view.dispatch(closeHistory(view.state.tr));rememberSource(source,view.state.doc);snapshot=view.state.doc;snapshotText=source;return true;
       }catch{return false;}},
       bookmark,
       insertAt:(target,name,payload)=>{if(readOnly||!target)return false;const insertion=target.selection.resolve(view.state.doc),follow=view.state.selection.eq(insertion),restore={selection:view.state.selection.getBookmark()};if(!follow)targets.add(restore);try{view.dispatch(view.state.tr.setSelection(insertion));const applied=command(name,payload,false);if(!follow)view.dispatch(view.state.tr.setSelection(restore.selection.resolve(view.state.doc)));return applied;}finally{targets.delete(restore);}},
