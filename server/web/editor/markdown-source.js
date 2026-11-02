@@ -13,7 +13,8 @@ export function markdownSource({source,tree,document,serialize,equivalent}){
     const remember=value=>{previous=current;previousText=value;return value;};
     if(current.eq(document))return remember(source);
     const canonical=serialize(current);
-    if(!valid||!records.length)return remember(canonical);
+    // Clearing the document must clear its old trailing whitespace as well.
+    if(!canonical||!valid||!records.length)return remember(canonical);
     const nodes=[];current.forEach(node=>nodes.push(node));
     const indices=nodes.map(node=>mapped.get(node));
     // Equal-size edited runs between immutable anchors keep their original
