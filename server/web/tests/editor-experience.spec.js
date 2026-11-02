@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import {test,expect} from '@playwright/test';
 
 async function engine(page,value,options={}){
@@ -33,7 +34,7 @@ async function field(page,value,formatted=true){
   await page.goto('/web/markdown-lab.html');
   await page.evaluate(async({value,formatted})=>{
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
-    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload)throw new Error('Upload failed');return 'assets/'+file.name;});
+    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;});
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
   },{value,formatted});
 }
@@ -78,4 +79,24 @@ test('switching to source and back without edits keeps rich undo history',async(
   await field(page,'Original.\n');await page.locator('#experience-formatted p').click();await page.keyboard.press('End');await page.keyboard.type(' Added.');
   const text=await page.evaluate(()=>globalThis.field.value());expect(text).toContain('Added.');await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();
   await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
+});
+test('multi-file upload retry keeps completed files and does not move an unrelated caret',async({page})=>{
+  await field(page,'One.\n\nTwo.\n');await page.locator('#experience-formatted p').first().click();await page.keyboard.press('End');
+  await page.evaluate(()=>{globalThis.failUploadName='second.txt';const data=new DataTransfer();for(const name of ['first.txt','second.txt'])data.items.add(new File(['bytes'],name,{type:'text/plain'}));document.querySelector('#experience-formatted .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
+  await expect(page.locator('#experience-field')).toContainText('Upload failed');await expect(page.locator('#experience-formatted a')).toHaveCount(1);await page.locator('#experience-formatted p').last().click();await page.keyboard.press('End');
+  await page.evaluate(()=>globalThis.failUploadName=null);await page.locator('#experience-field').getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('#experience-formatted a')).toHaveCount(2);expect(await page.evaluate(()=>globalThis.uploaded)).toEqual(['first.txt','second.txt']);
+  await page.locator('#experience-formatted .ProseMirror').pressSequentially(' Kept caret.');await expect(page.locator('#experience-formatted p').last()).toContainText('Two. Kept caret.');await expect(page.locator('#experience-formatted p').first().locator('a')).toHaveCount(2);
+});
+test('source undo restores the exact original line ending after joining mixed-EOL lines',async({page})=>{
+  const value='First.\r\nSecond.\nThird.\r\n';await field(page,value,false);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();
+  await page.evaluate(()=>globalThis.field.codeEditor.select(14));await page.keyboard.press('Delete');expect(await page.evaluate(()=>globalThis.field.value())).not.toBe(value);await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+});
+test('shared controls remain keyboard accessible and fit narrow screens in every theme',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await field(page,'# Heading\n\n- [ ] Task\n\nParagraph.\n');await page.locator('#experience-field').getByRole('button',{name:'More formatting',exact:true}).click();
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-mobile.png'});
+  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-mobile.png'});
 });

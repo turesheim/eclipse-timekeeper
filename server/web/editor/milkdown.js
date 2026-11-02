@@ -39,7 +39,7 @@ const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
   doc.descendants(node=>{if(node.type.name==='image'&&!assetAllowed(node.attrs.src)||node.type.name==='daily_wikilink'&&!dailyNoteDate(node.attrs.date)||node.marks.some(mark=>mark.type.name==='link'&&!linkAllowed(mark.attrs.href)))safe=false;return safe;});
   return safe;
 };
-const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value.replace(/\[![A-Za-z]+\][+-]?/g,''))||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
+const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type==='code'&&!!node.meta||!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value.replace(/\[![A-Za-z]+\][+-]?/g,''))||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
@@ -187,7 +187,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         equivalent:(left,right)=>JSON.stringify(semantic(dialect.project(parser.parse(left),left)))===JSON.stringify(semantic(dialect.project(parser.parse(right),right)))});
     });
     const setReadOnly=value=>{readOnly=value;code.setReadOnly();view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea,.markdown-callout input'))text.readOnly=readOnly;};
-    const command=(name,payload)=>{
+    const command=(name,payload,focus=true)=>{
       if(readOnly)return false;
       if(name==='link'){
         if(!linkAllowed(payload))return false;
@@ -196,6 +196,15 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           if(empty)view.dispatch(view.state.tr.insertText(payload,from).addMark(from,from+payload.length,view.state.schema.marks.link.create({href:payload})));
           else editor.action(callCommand(toggleLinkCommand.key,{href:payload}));
         }
+      }else if(name==='image_properties'){
+        const selected=view.state.selection.node;if(!selected)return false;
+        if(selected.type.name==='image'&&!payload?.embed){view.dispatch(view.state.tr.setNodeMarkup(view.state.selection.from,undefined,{...selected.attrs,alt:String(payload?.alt||'').slice(0,2000)}));}
+        else if(selected.type.name==='vault_wikilink'&&selected.attrs.embed||selected.type.name==='image'&&payload?.embed){
+          const target=selected.type.name==='image'?payload.path:selected.attrs.value.split('|')[0],width=payload.width?Number(payload.width):null,height=payload.height?Number(payload.height):null;
+          if(width&&(!Number.isInteger(width)||width<1||width>2000)||height&&(!Number.isInteger(height)||height<1||height>2000)||height&&!width)return false;
+          const value=target+(width?'|'+width+(height?'x'+height:''):payload.alt?'|'+String(payload.alt).replace(/[\[\]\r\n|]/g,''): '');if(!wikiReference(value,true))return false;
+          view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.vault_wikilink.create({value,embed:true})));
+        }else return false;
       }else if(name==='wiki_embed'||name==='wiki_link'){
         if(!wikiReference(payload?.value,name==='wiki_embed'))return false;view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.vault_wikilink.create({value:payload.value,embed:name==='wiki_embed'})));
       }else if(name==='image'||name==='asset_link'){
@@ -215,13 +224,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         if(transaction.docChanged)view.dispatch(transaction);
       }else{
-        const action=commands[name];if(!action){const applied=structuredCommand(view,name);if(applied)view.focus();return applied;}
+        const action=commands[name];if(!action){const applied=structuredCommand(view,name);if(applied&&focus)view.focus();return applied;}
         const level=name==='heading'?(payload??2):undefined;
         if(name==='heading'&&(!Number.isInteger(level)||level<1||level>6))return false;
         if(name==='hr'&&!view.state.selection.empty)view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(view.state.selection.to),-1)));
         editor.action(callCommand(action.key,level));
       }
-      view.focus();return true;
+      if(focus)view.focus();return true;
     };
     let snapshot=original,snapshotText=value,comparisonText,comparisonDocument;
     const markdown=()=>{const current=view.state.doc,result=render(current);snapshot=current;snapshotText=result;return result;};
@@ -241,18 +250,19 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     return {
       markdown,
       bookmark,
-      insertAt:(target,name,payload)=>{if(readOnly)return false;try{view.dispatch(view.state.tr.setSelection(target.selection.resolve(view.state.doc)));return command(name,payload);}finally{targets.delete(target);}},
+      insertAt:(target,name,payload)=>{if(readOnly||!target)return false;const insertion=target.selection.resolve(view.state.doc),follow=view.state.selection.eq(insertion),restore={selection:view.state.selection.getBookmark()};if(!follow)targets.add(restore);try{view.dispatch(view.state.tr.setSelection(insertion));const applied=command(name,payload,false);if(!follow)view.dispatch(view.state.tr.setSelection(restore.selection.resolve(view.state.doc)));return applied;}finally{targets.delete(restore);}},
       release:target=>targets.delete(target),
       matchesSource,
       focus:()=>view.focus(),
       setReadOnly,
       command,
+      imageDetails:()=>{const node=view.state.selection.node;if(node?.type.name==='image')return {path:node.attrs.src,alt:node.attrs.alt||'',embed:false};if(node?.type.name==='vault_wikilink'&&node.attrs.embed){const ref=wikiReference(node.attrs.value,true);return {...ref,alt:ref?.width?'':ref?.label||'',embed:true};}return null;},
       position:()=>{const source=markdown(),block=view.state.selection.$from.index(0),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source)),start=tree.children[block]?.position?.start.offset||0;return {anchor:start+view.state.selection.$from.parentOffset,scrollTop:view.dom.scrollTop};},
       restorePosition:position=>{const source=markdown(),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source));let index=tree.children.findIndex(node=>(node.position?.end.offset??0)>=position.anchor);if(index<0)index=view.state.doc.childCount-1;const block=view.state.doc.child(index);let start=0;for(let i=0;i<index;i++)start+=view.state.doc.child(i).nodeSize;const offset=Math.min(Math.max(0,position.anchor-(tree.children[index]?.position?.start.offset||0)),Math.max(0,block.nodeSize-2));view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(view.state.doc.content.size,start+1+offset)))));view.dom.scrollTop=position.scrollTop||0;},
       context:()=>({table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
       selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},
-      active:name=>{const type=view.state.schema.marks[{bold:'strong',italic:'emphasis',strike:'strike_through',inline_code:'inlineCode',link:'link'}[name]||name];return !!type&&!!type.isInSet(view.state.selection.$from.marks());},
+      active:name=>{const type=view.state.schema.marks[{bold:'strong',italic:'emphasis',strike:'strike_through',inline_code:'inlineCode',link:'link'}[name]||name];return !!type&&!!type.isInSet(view.state.storedMarks||view.state.selection.$from.marks());},
       outline:()=>{const values=[];view.state.doc.descendants((node,pos)=>{if(node.type.name==='heading')values.push({text:node.textContent,level:node.attrs.level,pos,anchor:headingAnchor(node.textContent)});});return values;},
       scrollTo:(position)=>{view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(position+1,view.state.doc.content.size)))).scrollIntoView());view.focus();},
       slash:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph')return null;const match=/^\/([\w-]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.start(),to:$from.pos}:null;},

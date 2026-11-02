@@ -102,7 +102,7 @@ export class MarkdownField {
         this.status.textContent=t('markdown.upload_progress',{name:file.name,current:index+1,total:files.length});this.status.setAttribute('aria-busy','true');
         const path=await this.onUpload(file,image);if(generation!==this.generation)return;
         const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
-        if(editor){if(!editor.insertAt(target,image?'image':'asset_link',{path,label}))throw new Error(t('markdown.upload_failed'));target=editor.bookmark();}
+        if(editor){if(!editor.insertAt(target,image?'image':'asset_link',{path,label}))throw new Error(t('markdown.upload_failed'));}
         else{this.text.setRangeText(image?`![${label}](${path})`:`[${label}](${path})`,index?this.text.selectionEnd:start,index?this.text.selectionEnd:end,'end');this.codeEditor?.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;this.onChange();this.text.focus();}
         remaining.shift();
       }
@@ -141,7 +141,7 @@ export class MarkdownField {
   }
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
   controls(){
-    this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;this.codeEditor?.readOnly(this.readOnly||this.loading);if(this.sourceExtras)this.sourceExtras.hidden=!this.rich.hidden;
+    if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;this.codeEditor?.readOnly(this.readOnly||this.loading);if(this.sourceExtras)this.sourceExtras.hidden=!this.rich.hidden;
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||(!this.onUpload&&(action===this.image||action===this.attachment));
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading;
     if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
@@ -157,7 +157,8 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
-    this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();
+    this.sourcePosition=null;this.enhance?.setAttribute('aria-pressed','false');this.split?.setAttribute('aria-pressed','false');this.plain.classList.remove('markdown-split');
+    this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();
     this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.previewEditor?.destroy();this.previewEditor=null;this.splitHost?.replaceChildren();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
@@ -174,7 +175,7 @@ export class MarkdownField {
     this.mode(false);this.controls();const normalized=body.slice(0,position.anchor).replace(/\r\n/g,'\n').length;this.text.setSelectionRange(normalized,normalized);this.text.scrollTop=position.scrollTop;this.text.focus();
   }
   async showFormatted(focus=true){
-    if(this.loading)return;this.sourcePosition=this.codeEditor?.position()||{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};if(this.codeEditor){this.sourcePosition=this.codeEditor.position();this.setRaw(this.codeEditor.value());this.codeEditor.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;}if(this.editor){this.editor.focus();return;}
+    if(this.loading)return;this.sourcePosition=this.codeEditor?.position()||{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};if(this.codeEditor){this.sourcePosition=this.codeEditor.position();this.setRaw(this.codeEditor.value());this.codeEditor.destroy();this.codeEditor=null;this.enhance.setAttribute('aria-pressed','false');this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;}if(this.editor){this.editor.focus();return;}
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=this.rawBody();

@@ -18,14 +18,15 @@ export function vaultEditorResources(session,origin=()=>'',open){
     return cache.promise;
   };
   const resolveWiki=async reference=>{
-    const matches=wikiCandidates(await catalog(),reference,origin());
+    const entries=await catalog(),value=origin(),path=typeof value==='string'?value:entries.find(entry=>(!value?.sourceType||entry.sourceType===value.sourceType)&&(!value?.sourceId||entry.sourceId===value.sourceId)&&(!value?.sourceKey||entry.sourceKey===value.sourceKey))?.path||'';
+    const matches=wikiCandidates(entries,reference,path);
     if(matches.length!==1)throw new Error(t(matches.length?'notes.ambiguous_link':'notes.invalid_link'));
     return matches[0];
   };
   return {resolveWiki,
     previewWiki:async reference=>{const current=session(),entry=await resolveWiki(reference);if(!['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind))return entry.path;const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});if(current!==session())throw new Error(t('notes.invalid_link'));return entry.path+'\n'+(await reply.data.slice(0,1500).text()).slice(0,600);},
-    complete:async query=>(await catalog()).filter(e=>!e.deleted&&e.kind!=='FOLDER'&&e.path.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0,30),
-    openWiki:async(reference,source)=>{const entry=await resolveWiki(reference),heading=wikiReference(reference)?.heading||'';if(open)return open(entry,heading);(source||document).dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,heading,guards:[],leave:[]}}));},
+    complete:async(query,options={})=>(await catalog()).filter(e=>!e.deleted&&e.kind!=='FOLDER'&&(!options.assetsOnly||['ASSET','BINARY'].includes(e.kind))&&e.path.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0,30),
+    openWiki:async(reference,source)=>{const current=session(),entry=await resolveWiki(reference);if(current!==session()||source&&!source.isConnected)return;const heading=wikiReference(reference)?.heading||'';if(open)return open(entry,heading);(source||document).dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,heading,guards:[],leave:[]}}));},
     wikiImage:(reference,alt)=>{const current=session();return imagePreview({alt,active:()=>current===session(),load:async()=>{const entry=await resolveWiki(reference);return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});}
   };
 }

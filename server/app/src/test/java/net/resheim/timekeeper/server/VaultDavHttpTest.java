@@ -14,6 +14,15 @@ class VaultDavHttpTest {
     public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("http",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_dav_http","timekeeper.auth.public-origin","https://timekeeper.example.test"));}}
     private RequestSpecification client(String token){return given().header("Authorization","Basic "+Base64.getEncoder().encodeToString(("vault:"+token).getBytes(StandardCharsets.UTF_8)));}
     private RequestSpecification api(String token){return given().header("Authorization","Bearer "+token);}
+    @Test void revisionsCoverDavWritesAndStayOwnerPrivateWithReadOnlyComparison(){
+        String path="revision-http.md",first="First\r\n",second="Second\n";
+        var created=client("test-a").header("If-None-Match","*").body(first.getBytes(StandardCharsets.UTF_8)).put(ROOT+path);assertEquals(201,created.statusCode());
+        assertEquals(204,client("test-a").header("If-Match",created.header("ETag")).body(second.getBytes(StandardCharsets.UTF_8)).put(ROOT+path).statusCode());
+        var entry=api("test-a").queryParam("path",path).get("/api/v1/notes/resolve");assertEquals(200,entry.statusCode());String id=entry.jsonPath().getString("sourceId"),type=entry.jsonPath().getString("sourceType"),query="?sourceType="+type+"&sourceId="+id;
+        var history=api("test-read").get("/api/v1/notes/revisions"+query);assertEquals(200,history.statusCode());assertEquals(1,history.jsonPath().getList("items").size());assertTrue(history.header("Cache-Control").contains("no-store"));String revision=history.jsonPath().getString("items[0].id");
+        var snapshot=api("test-read").get("/api/v1/notes/revisions/"+revision+query);assertEquals(200,snapshot.statusCode());assertEquals(first,snapshot.jsonPath().getString("markdown"));assertEquals(404,api("test-b").get("/api/v1/notes/revisions"+query).statusCode());assertEquals(404,api("test-b").get("/api/v1/notes/revisions/"+revision+query).statusCode());assertEquals(401,given().get("/api/v1/notes/revisions"+query).statusCode());
+        assertEquals(403,client("test-read").header("If-Match",entry.jsonPath().getString("etag")).body(first).put(ROOT+path).statusCode());assertEquals(second,client("test-a").get(ROOT+path).asString());
+    }
     @Test void nestedCollectionIsPrivateGuardedAndSharedAcrossAliases(){
         assertEquals(401,given().request("PROPFIND",ROOT).statusCode());assertEquals(401,given().request("PROPFIND",ALIAS).statusCode());
         assertEquals(201,client("test-a").request("MKCOL",ROOT+"Nested/").statusCode());assertEquals(201,client("test-a").request("MKCOL",ROOT+"Nested/Child/").statusCode());

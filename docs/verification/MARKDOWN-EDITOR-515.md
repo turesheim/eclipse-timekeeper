@@ -62,9 +62,9 @@ These results precede the final combined commit and must be repeated for it.
 ## Design decisions
 
 CodeMirror is optional and loaded separately, retaining the plain source fallback.
-Milkdown's existing table commands are reused. Its stock image widgets accept URL
-loading and bypass Timekeeper's authenticated-resource and portable-path rules;
-custom views therefore retain those rules. Code highlighting reuses CodeMirror's
+Milkdown's existing table commands are reused. Crepe's image components expose upload and URL-proxy hooks; adopting them would
+still require adapters for authenticated bytes, portable vault paths and the
+source-preservation schema. The existing authenticated views retain that contract. Code highlighting reuses CodeMirror's
 language parsers without replacing the rich code node's editable DOM.
 
 Saving remains explicit. Autosave was considered: quietly issuing writes while a
@@ -72,3 +72,5 @@ note is being reviewed for sync/conflict resolution would change the current
 contract. This increment keeps manual guarded saving. Offline draft recovery is
 in-memory only, cleared with the session; persistent browser recovery would need
 an explicit account privacy/retention option before introduction.
+
+Component evaluation references: [Crepe feature surface](https://github.com/Milkdown/milkdown/blob/main/packages/crepe/src/feature/index.ts), [image adapters](https://github.com/Milkdown/milkdown/blob/main/packages/crepe/src/feature/image-block/index.ts), and [selection toolbar](https://github.com/Milkdown/milkdown/blob/main/packages/crepe/src/feature/toolbar/index.ts). The installed Kit/component interfaces were also checked at 7.22.3; upstream main is architectural context, not a pinned runtime dependency.

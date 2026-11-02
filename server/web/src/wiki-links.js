@@ -10,7 +10,7 @@ export function wikiCandidates(entries,reference,origin=''){
   const ref=wikiReference(reference);if(!ref)return [];
   const files=entries.filter(entry=>!entry.deleted&&entry.kind!=='FOLDER');
   if(!ref.path)return files.filter(entry=>entry.path===origin);
-  const stem=path=>path.normalize('NFC').replace(/\.md$/i,'');
+  const stem=path=>path.normalize('NFC').replace(/\.md$/i,'').toUpperCase().toLowerCase().normalize('NFC');
   const target=stem(ref.path),relative=stem((origin.includes('/')?origin.slice(0,origin.lastIndexOf('/')+1):'')+ref.path);
   const exact=files.filter(entry=>stem(entry.path)===target||stem(entry.path)===relative);
   return exact.length?exact:files.filter(entry=>stem(entry.path.split('/').at(-1))===target);

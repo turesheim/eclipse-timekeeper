@@ -1284,5 +1284,13 @@
   "markdown.cm.Replace with": "Erstatt med",
   "markdown.cm.current match": "gjeldende treff",
   "markdown.cm.replaced $ matches": "erstattet $ treff",
-  "markdown.cm.replaced $ match": "erstattet $ treff"
+  "markdown.cm.replaced $ match": "erstattet $ treff",
+  "markdown.selection_action": "{{action}} i markert tekst",
+  "markdown.image_properties": "Bildeegenskaper",
+  "markdown.image_alt": "Alternativ tekst",
+  "markdown.image_width": "Bredde i piksler",
+  "markdown.image_height": "Høyde i piksler",
+  "markdown.embed_sizing": "Lagre størrelsen som en Obsidian-innbygging",
+  "markdown.image_sizing_help": "Vanlige Markdown-bilder beholder alternativ tekst. Obsidian-innbygginger med angitt størrelse bruker filnavnet som alternativ tekst. La høyden stå tom for å beholde sideforholdet.",
+  "markdown.invalid_image": "Velg en bredde og eventuelt høyde fra 1 til 2000 piksler."
 }

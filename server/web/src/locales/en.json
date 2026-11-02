@@ -1284,5 +1284,13 @@
   "markdown.cm.Replace with": "Replace with",
   "markdown.cm.current match": "current match",
   "markdown.cm.replaced $ matches": "replaced $ matches",
-  "markdown.cm.replaced $ match": "replaced $ match"
+  "markdown.cm.replaced $ match": "replaced $ match",
+  "markdown.selection_action": "{{action}} selection",
+  "markdown.image_properties": "Image properties",
+  "markdown.image_alt": "Alternative text",
+  "markdown.image_width": "Width in pixels",
+  "markdown.image_height": "Height in pixels",
+  "markdown.embed_sizing": "Store sizing as an Obsidian embed",
+  "markdown.image_sizing_help": "Ordinary Markdown images keep their alternative text. Sized Obsidian embeds use the filename as alternative text; leave height empty to keep the aspect ratio.",
+  "markdown.invalid_image": "Choose a width and optional height from 1 to 2000 pixels."
 }
