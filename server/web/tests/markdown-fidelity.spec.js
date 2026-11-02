@@ -39,8 +39,11 @@ test('a changed block boundary stays parseable without normalizing a distant lis
     const root=document.createElement('div');root.id='fidelity-boundary';document.body.append(root);
     globalThis.boundaryEditor=await createMarkdownEditor({root,value:source,label:'Boundary body',taskLabel:value=>value,escape:()=>{}});
   },source);
+  expect(await page.evaluate(source=>globalThis.boundaryEditor.matchesSource(source),source)).toBe(true);
   await page.locator('#fidelity-boundary h1').click();await page.evaluate(()=>globalThis.boundaryEditor.command('paragraph'));
-  const edited=await page.evaluate(()=>globalThis.boundaryEditor.markdown());expect(edited).toContain('Heading\n\nParagraph.');expect(edited).toContain('+ Keep __this__ list\n');
+  expect(await page.evaluate(source=>globalThis.boundaryEditor.matchesSource(source),source)).toBe(false);
+  const edited=await page.evaluate(()=>globalThis.boundaryEditor.markdown());
+  expect(await page.evaluate(source=>globalThis.boundaryEditor.matchesSource(source),edited)).toBe(true);expect(edited).toContain('Heading\n\nParagraph.');expect(edited).toContain('+ Keep __this__ list\n');
   await page.evaluate(async source=>{
     await globalThis.boundaryEditor.destroy();
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
@@ -54,4 +57,24 @@ test('entering formatted mode never repairs or deletes authored HTML source impl
   await page.goto('/web/markdown-lab.html');await expect(page.locator('#markdown-toolbar button')).toHaveCount(8);
   await page.locator('#markdown-file').setInputFiles({name:'source.md',mimeType:'text/markdown',buffer:Buffer.from(source)});await expect(page.locator('#markdown-status')).toContainText('Opened locally');
   await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');expect(await download(page)).toBe(source);
+});
+
+test('long-note dirty checks avoid serialization while explicit Markdown remains cached',async({page})=>{
+  await page.goto('/web/markdown-lab.html');
+  await page.evaluate(async()=>{
+    const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
+    const root=document.createElement('div');root.id='fidelity-performance';document.body.append(root);
+    const value=Array.from({length:350},(_,index)=>'Paragraph '+index+' __retains its authored formatting__ '+('text '.repeat(20))).join('\n\n')+'\n';
+    globalThis.fidelityTimings=[];globalThis.fidelityBytes=new TextEncoder().encode(value).length;
+    globalThis.performanceEditor=await createMarkdownEditor({root,value,label:'Performance body',taskLabel:value=>value,escape:()=>{},changed:()=>{
+      if(!globalThis.performanceEditor)return;const start=performance.now();globalThis.performanceEditor.matchesSource(value);globalThis.fidelityTimings.push(performance.now()-start);
+    }});
+  });
+  await page.locator('#fidelity-performance p').nth(175).click();await page.keyboard.press('End');await page.keyboard.type(' measured');
+  const result=await page.evaluate(()=>{
+    const values=[...globalThis.fidelityTimings].sort((a,b)=>a-b),serializationStart=performance.now();globalThis.performanceEditor.markdown();const serialization=performance.now()-serializationStart;
+    const start=performance.now();for(let index=0;index<100;index++)globalThis.performanceEditor.markdown();
+    return {bytes:globalThis.fidelityBytes,samples:values.length,dirtyP95:values[Math.ceil(values.length*.95)-1],serialization,cached100:performance.now()-start};
+  });
+  console.log('Markdown fidelity timing '+JSON.stringify(result));expect(result.samples).toBeGreaterThan(0);expect(result.dirtyP95).toBeLessThan(50);expect(result.cached100).toBeLessThan(1000);
 });

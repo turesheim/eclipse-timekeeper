@@ -1,6 +1,6 @@
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
-import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx} from '@milkdown/kit/core';
+import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
@@ -190,9 +190,24 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       }
       view.focus();return true;
     };
+    let snapshot=original,snapshotText=value,comparisonText,comparisonDocument;
+    const markdown=()=>{const current=view.state.doc,result=render(current);snapshot=current;snapshotText=result;return result;};
+    const matchesSource=text=>{
+      const current=view.state.doc;
+      if(text===value&&current.eq(original)||text===snapshotText&&current.eq(snapshot))return true;
+      if(text===value||text===snapshotText)return false;
+      if(text!==comparisonText){
+        comparisonText=text;comparisonDocument=null;
+        try{comparisonDocument=editor.action(ctx=>ctx.get(parserCtx)(text));}catch{/* Unknown source stays conservatively dirty. */}
+      }
+      // A different document cannot be the saved source. Only an equal parse
+      // needs exact serialization, e.g. returning to a saved state after a mode switch.
+      return !!comparisonDocument&&current.eq(comparisonDocument)&&markdown()===text;
+    };
     setReadOnly(readOnly);
     return {
-      markdown:()=>render(view.state.doc),
+      markdown,
+      matchesSource,
       focus:()=>view.focus(),
       setReadOnly,
       command,

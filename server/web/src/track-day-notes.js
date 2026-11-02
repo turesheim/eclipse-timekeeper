@@ -38,7 +38,7 @@ export class TrackDayNotes {
     window.addEventListener('beforeunload',event=>{if(this.editor&&(this.dirty()||this.editor.busy||this.editor.uncertain)){event.preventDefault();event.returnValue='';}});
     if(!this.inline)this.buildMenu();
   }
-  dirty(){return !!this.editor?.etag&&(this.text.value.trim()!==this.editor.originalText||this.markdown.value()!==this.editor.originalBody);}
+  dirty(){return !!this.editor?.etag&&(this.text.value.trim()!==this.editor.originalText||!this.markdown.matches(this.editor.originalBody));}
   async uploadAsset(file,image){
     const editor=this.editor;
     if(!editor||!this.writable||file.size>5_000_000||image&&!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type))throw new Error('Invalid attachment');

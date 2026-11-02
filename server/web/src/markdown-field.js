@@ -103,6 +103,12 @@ export class MarkdownField {
   }
   setRaw(value){this.raw=value;this.text.value=value;this.displayedBody=this.text.value;}
   value(){return (this.frontmatter||'')+(this.editor?this.editor.markdown():this.rawBody());}
+  matches(value){
+    if(typeof value!=='string')return false;
+    if(!this.editor)return this.value()===value;
+    const prefix=this.frontmatter||'';
+    return value.startsWith(prefix)&&this.editor.matchesSource(value.slice(prefix.length));
+  }
   setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.controls();}
   paintBlockStyle(){
     const level=this.editor?.headingLevel()||0;
