@@ -1308,5 +1308,9 @@
   "markdown.invalid_image": "Velg en bredde og eventuelt høyde fra 1 til 2000 piksler.",
   "markdown.tab_help": "Tab rykker inn. Trykk Escape og deretter Tab for å flytte fokus ut av kildeeditoren.",
   "markdown.cm.Completions": "Fullføringer",
-  "markdown.heading_missing": "Fant ikke overskriften «{{heading}}» i dette notatet."
+  "markdown.heading_missing": "Fant ikke overskriften «{{heading}}» i dette notatet.",
+  "focus.clients_count": "Kunder ({{count}})",
+  "focus.search_clients": "Søk etter kunder",
+  "focus.no_clients": "Ingen kunder funnet",
+  "focus.apply": "Bruk"
 }

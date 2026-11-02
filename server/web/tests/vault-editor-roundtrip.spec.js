@@ -32,6 +32,14 @@ test('packaged manual client round-trips a representative vault after a formatte
   try{
     for(const [path,bytes]of files){await mkdir(dirname(join(folder,path)),{recursive:true});await writeFile(join(folder,path),bytes);}
     const initial=await sync([]);expect(initial.conflicts).toEqual([]);expect((await sync(['--apply',initial.review])).applied).toBe(true);
+    // A burst of DAV writes can exhaust the watcher's consistent-snapshot reads.
+    // Exercise that state explicitly, then refresh the whole workspace after sync.
+    const reportReads='**/api/v1/reports/activities?**';
+    await page.route(reportReads,route=>route.fulfill({status:409,contentType:'application/problem+json',json:{code:'BUSY'}}));
+    await page.locator('#refresh').click();await expect(page.locator('#status')).toContainText('Records are changing too quickly');
+    await expect(page.locator('#session-new')).toBeDisabled();await expect(page.locator('#refresh')).toBeEnabled();
+    await page.unroute(reportReads);await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await expect(page.locator('#session-new')).toBeEnabled();
     await page.locator('[data-tab=notes]').click();await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await page.locator('#notes-navigation').getByRole('button',{name:'journal',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'journal/2026-11-02.md',exact:true}).click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
     const paragraph=page.locator('#notes-formatted p').filter({hasText:'Edit this paragraph.'});await appendEditorText(paragraph,' Reviewed.');await expect(paragraph).toHaveText('Edit this paragraph. Reviewed.');await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
     const review=await sync([]);expect(review.conflicts).toEqual([]);expect(review.actions.some(action=>action.operation==='pull'&&action.path==='journal/2026-11-02.md')).toBe(true);expect((await sync(['--apply',review.review])).applied).toBe(true);

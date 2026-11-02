@@ -2,6 +2,9 @@ import {expect,test} from '@playwright/test';
 
 /** Select the paragraph end explicitly: End has different native macOS semantics. */
 export async function appendEditorText(paragraph,text){
+  await expect(paragraph).toBeVisible();
+  await expect.poll(()=>paragraph.evaluate(node=>node.isContentEditable&&!node.closest('[inert]')),
+    {message:'The target paragraph must be writable before typing'}).toBe(true);
   await paragraph.evaluate(node=>{
     node.closest('[contenteditable="true"]').focus();
     const range=document.createRange();range.selectNodeContents(node);range.collapse(false);

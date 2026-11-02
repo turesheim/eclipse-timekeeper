@@ -1308,5 +1308,9 @@
   "markdown.invalid_image": "Choose a width and optional height from 1 to 2000 pixels.",
   "markdown.tab_help": "Tab indents. Press Escape, then Tab to move focus out of the source editor.",
   "markdown.cm.Completions": "Completions",
-  "markdown.heading_missing": "Heading “{{heading}}” was not found in this note."
+  "markdown.heading_missing": "Heading “{{heading}}” was not found in this note.",
+  "focus.clients_count": "Clients ({{count}})",
+  "focus.search_clients": "Search clients",
+  "focus.no_clients": "No matching clients",
+  "focus.apply": "Apply"
 }
