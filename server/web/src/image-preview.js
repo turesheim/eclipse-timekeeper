@@ -14,7 +14,7 @@ export function imagePreview({alt,load,active=()=>true,onError}){
 }
 export const journalAssetPath=reference=>typeof reference==='string'&&reference.startsWith('assets/')&&!!relativeNotePath('note.md',reference)?.startsWith('assets/');
 export function journalImageResources(session){
-  return {allowsAsset:journalAssetPath,allowsLink:()=>false,image:(reference,alt)=>{
+  return {canonicalAsset:async reference=>{if(!journalAssetPath(reference))throw new Error('Invalid image');const info=(await session().request('/notes')).data;return info.settings.assetsFolder+'/'+reference.slice(7);},allowsAsset:journalAssetPath,allowsLink:()=>false,image:(reference,alt)=>{
     const current=session();
     return imagePreview({alt,active:()=>!!current&&current===session(),load:async()=>{
       if(!current||!journalAssetPath(reference))throw new Error('Invalid image');

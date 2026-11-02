@@ -115,6 +115,7 @@ final class VaultCollection {
         for(var item:entries){
             if(folder(item)){index.tombstone(id(item),batch);state.changed(0,0,false);}
             else{
+                if(item.path("kind").asText().equals(VaultIndex.Kind.MARKDOWN.name()))new NoteRevisions(store).before(VaultSources.fromEntry(item),null);
                 var next=source(item).delete(tag(item));
                 if(item.path("sourceType").asText().equals(VaultContent.TYPE)){index.tombstone(id(item),batch);index.content(id(item),next,item.path("retainedBytes").asLong());state.changed(0,0,false);}
                 else index.batch(id(item),batch);

@@ -31,9 +31,11 @@ weekly, event-note and wikilink browser suites cover the other shared hosts.
 This is an initial increment, not completion of #515 or its first milestone.
 Editing within a compound block still serializes that entire block. Structural
 edits may normalize their boundaries, and ambiguous projections can normalize
-the whole body through the existing serializer. Unknown dialects still use the
-whole-document source fallback. Obsidian links/embeds, opaque source fragments,
-clipboard/file handling and the remaining editor roadmap stay open in #515.
+the whole body through the existing serializer. Unknown constructs are retained as inert, editable top-level source fragments;
+representable surrounding blocks remain formatted. The conservative prototype
+continues to use whole-document source fallback. See the
+[completion audit](MARKDOWN-EDITOR-515.md) for the broader editor implementation
+and the acceptance work still required before closing #515.
 
 The long-note browser fixture uses 350 paragraphs (53,089 UTF-8 bytes). It
 measures dirty-check, explicit serialization and cached-read costs separately.

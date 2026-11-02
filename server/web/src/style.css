@@ -463,3 +463,5 @@ button.calendar-summary-card:disabled { opacity: .65; }
 .notes-import-files li { display: flex; justify-content: space-between; gap: 1rem; padding-block: .35rem; border-bottom: 1px solid var(--line); }
 .notes-import-files li span { min-width: 0; overflow-wrap: anywhere; }
 .notes-import-files li span:last-child { flex-shrink: 0; max-width: 45%; }
+
+.timekeeper-tooltip a { pointer-events: auto; color: inherit; text-decoration: underline; }

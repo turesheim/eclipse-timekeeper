@@ -1,3 +1,5 @@
+import {noteRevisionResources} from './note-revisions.js';
+import {vaultEditorResources} from './vault-editor-resources.js';
 import {journalImageResources} from './image-preview.js';
 import {t} from './i18n.js';
 import {iconButton} from './icons.js';
@@ -10,14 +12,14 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 /** Shared guarded Markdown dialog for week and calendar-event notes. */
 export class JournalNoteEditor {
   constructor(root,callbacks,prefix,fieldPrefix=prefix+'-journal'){
-    this.callbacks=callbacks;this.generation=0;
+    this.callbacks=callbacks;this.generation=0;this.positions=new Map();
     this.dialog=node('dialog',undefined,'app-dialog journal-dialog shadow-lg');this.dialog.id=prefix+'-editor';
     this.title=node('h2');this.title.id=prefix+'-title';this.dialog.setAttribute('aria-labelledby',this.title.id);
     this.closeButton=iconButton(button('','btn btn-outline-secondary'),'close',t('ui.close'));this.closeButton.addEventListener('click',()=>this.close());
     const heading=node('div',undefined,'week-note-heading');heading.append(this.title,this.closeButton);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
-    const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,undefined,journalImageResources(()=>this.session));
+    const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,(file,image)=>this.uploadAsset(file,image),{...noteRevisionResources(()=>this.session,()=>({sourceType:this.path?.startsWith('/week-notes/')?'WEEK_NOTE':'EVENT_NOTE',sourceId:this.note?.id}),{bodyOnly:true,latest:async()=>{const reply=await this.session.request(this.path);return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.session),...vaultEditorResources(()=>this.session,()=>({sourceType:this.path?.startsWith('/week-notes/')?'WEEK_NOTE':'EVENT_NOTE',sourceId:this.note?.id,sourceKey:this.note?.week||this.note?.subscriptionId&&('event-'+this.note.subscriptionId+'-'+this.note.eventKey+'.md')}))});
     const actions=node('div',undefined,'dialog-actions');
     this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.cancel.addEventListener('click',()=>this.close());
     this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.remove());
@@ -40,8 +42,17 @@ export class JournalNoteEditor {
     this.cancel.disabled=!!this.busy;
   }
   changed(){this.status.textContent='';this.controls();}
+  async uploadAsset(file,image){
+    const session=this.session,generation=this.generation;if(!session||!this.writable||file.size>5_000_000)throw new Error(t('markdown.upload_failed'));
+    const extensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp'},suffix=image?extensions[file.type]:(file.name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin');if(!suffix)throw new Error(t('markdown.upload_failed'));
+    const filename=crypto.randomUUID()+'.'+suffix.toLowerCase(),bytes=new Uint8Array(await file.arrayBuffer());let data='';for(let at=0;at<bytes.length;at+=8192)data+=String.fromCharCode(...bytes.subarray(at,at+8192));
+    if(session!==this.session||generation!==this.generation)throw new Error(t('markdown.upload_failed'));
+    await session.request('/journal-assets/'+filename,{method:'PUT',noneMatch:'*',body:{data:btoa(data)},emptyResponse:true,timeout:60000});
+    if(session!==this.session||generation!==this.generation)throw new Error(t('markdown.upload_failed'));return 'assets/'+filename;
+  }
   async open(context,session,writable){
     if(!session||this.dialog.open)return;
+    if(this.positionSession&&this.positionSession!==session)this.positions.clear();this.positionSession=session;
     this.context=context;this.path=context.path;this.origin=document.activeElement;this.session=session;this.writable=writable;this.note=null;this.stale=false;this.busy=false;
     this.title.textContent=context.title;this.error.hidden=true;this.status.textContent=t('day_notes.loading');
     this.markdown.clear();this.controls();this.dialog.showModal();
@@ -50,7 +61,7 @@ export class JournalNoteEditor {
       const reply=await session.request(this.path);
       if(generation!==this.generation||!this.dialog.open)return;
       this.note={...reply.data,etag:reply.etag};this.markdown.setValue(reply.data.body);this.status.textContent=writable?t('journal.saved'):t('journal.read_only');this.controls();
-      void this.markdown.showFormatted(false);
+      const position=this.positions.get(this.path);if(position)await this.markdown.restorePosition({...position,formatted:true});else void this.markdown.showFormatted(false);
     }catch(error){
       if(generation!==this.generation)return;
       this.error.textContent=error.message;this.error.hidden=false;this.status.textContent='';if(error.status===401)this.callbacks.onUnauthorized(error);
@@ -59,8 +70,10 @@ export class JournalNoteEditor {
   close(force=false){
     if(!this.dialog.open)return;
     if(!force&&(this.busy||this.dirty()&&!confirm(t('journal.discard'))))return;
+    if(this.path&&this.note)this.positions.set(this.path,this.markdown.position());
     ++this.generation;this.dialog.close();this.note=null;this.session=null;this.markdown.clear();
   }
+  reset(){this.close(true);this.positions.clear();this.positionSession=null;}
   async commit(){
     if(!this.note||this.busy||this.stale||!this.writable||this.markdown.loading)return;
     const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.hidden=false;return;}

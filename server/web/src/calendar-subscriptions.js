@@ -71,7 +71,7 @@ export class CalendarSubscriptions {
   show(){if(!this.scope||!this.data)return;this.poll();void this.load();}
   hide(){if(!this.managementView){clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);}this.details.close();}
   reset(){
-    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.close(true);this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
+    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.reset();this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
     this.dialog.close();this.details.close();this.fields.replaceChildren();this.details.replaceChildren();this.list.replaceChildren();this.allDay.replaceChildren();this.allDay.hidden=true;this.message.textContent='';
   }
   async load() {
