@@ -35,8 +35,17 @@ test('focus areas filter every client view, totals and separately loaded calenda
   });
   await page.reload();await expect(page.locator('#focus-settings')).toBeVisible();
   const form=page.locator('#focus-settings');await form.getByRole('button',{name:'Add focus area',exact:true}).click();
-  await form.getByLabel('Name',{exact:true}).fill('Work');await form.getByLabel(clients[0].name,{exact:true}).check();await form.getByRole('button',{name:'Save',exact:true}).click();await expect(form).toContainText('Saved');
+  await form.getByLabel('Name',{exact:true}).fill('Work');await form.getByRole('button',{name:'Clients (0)',exact:true}).click();const popup=page.getByRole('dialog',{name:'Clients',exact:true});await popup.getByLabel(clients[0].name,{exact:true}).check();await popup.getByRole('button',{name:'Apply',exact:true}).click();await expect(form.getByRole('button',{name:'Clients (1)',exact:true})).toBeVisible();await form.getByRole('button',{name:'Save',exact:true}).click();await expect(form).toContainText('Saved');
   await form.getByRole('button',{name:'Add focus area',exact:true}).click();await form.getByLabel('Name',{exact:true}).last().fill('Empty');await form.getByRole('button',{name:'Save',exact:true}).click();await expect(form).toContainText('Saved');
+  await form.getByRole('button',{name:'Clients (1)',exact:true}).click();
+  await popup.getByLabel(clients[1].name,{exact:true}).check();await popup.getByRole('button',{name:'Cancel',exact:true}).click();
+  await form.getByRole('button',{name:'Clients (1)',exact:true}).click();await expect(popup.getByLabel(clients[1].name,{exact:true})).not.toBeChecked();
+  await popup.getByRole('searchbox',{name:'Search clients',exact:true}).fill('Included');await expect(popup.getByRole('checkbox')).toHaveCount(1);
+  const row=popup.locator('.focus-client-choice').first(),box=await row.getByRole('checkbox').boundingBox(),text=await row.locator('span').boundingBox();expect(box.x+box.width).toBeLessThan(text.x);
+  expect((await new AxeBuilder({page}).include('.focus-clients-dialog').analyze()).violations).toEqual([]);
+  await page.setViewportSize({width:390,height:844});await captureScreenshot(page,{path:'test-results/focus-client-popup-mobile.png',fullPage:true});await page.keyboard.press('Escape');await expect(popup).not.toBeVisible();
+  await expect(form.getByRole('button',{name:'Clients (1)',exact:true})).toBeFocused();
+  await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/focus-settings-compact.png',fullPage:true});
   for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   const accessibility=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations.map(value=>value.id)).toEqual([]);
   await page.setViewportSize({width:1440,height:1000});await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
