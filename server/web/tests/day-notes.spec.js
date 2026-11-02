@@ -341,12 +341,12 @@ test('journal preserves unsupported source, opaque frontmatter and exact label-o
     await signIn(page,await fresh(request));const api=await apiFor(page),body='\uFEFF---\r\ntags: [private]\r\n---\r\n\r\n[[Daily link]] ==highlight==\r\n<img src="https://journal-image.invalid/pixel">\r\n[unsafe](javascript:alert(1))\r\n';
     const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});
     const external=[];page.on('request',request=>{if(request.url().includes('journal-image.invalid'))external.push(request.url());});await month(page);await menu(page);
-    await expect(page.locator('#journal-body')).toBeVisible();await expect(dialog(page)).toContainText('cannot safely preserve');await expect(dialog(page).locator('img')).toHaveCount(0);
-    await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#journal-body')).toBeVisible();
+    await expect(dialog(page).locator('.markdown-source-fragment textarea').first()).toBeVisible();await expect(dialog(page).locator('img')).toHaveCount(0);
+    await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(dialog(page).locator('.markdown-source-fragment textarea').first()).toBeVisible();
     await expect(dialog(page).getByRole('button',{name:'Download Markdown',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Clear note body',exact:true})).toHaveCount(0);
 
     await save(page,'Separate label');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);expect(external).toEqual([]);
-    await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('[unsafe](javascript:alert(1))');await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(dialog(page)).toContainText('cannot safely preserve');await expect(dialog(page).locator('a[href^="javascript:"]')).toHaveCount(0);
+    await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('[unsafe](javascript:alert(1))');await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(dialog(page).locator('.markdown-source-fragment textarea').first()).toHaveValue('[unsafe](javascript:alert(1))');await expect(dialog(page).locator('a[href^="javascript:"]')).toHaveCount(0);
     await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('');await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.pressSequentially('[unsafe](javascript:alert(1)) ');await expect(rich.locator('a[href^="javascript:"]')).toHaveCount(0);
     expect(await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Daily link');
   }finally{await owner.close();}

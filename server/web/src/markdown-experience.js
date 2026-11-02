@@ -13,7 +13,7 @@ export function buildExperience(field,load,loadSource){
   f.enhance=action('markdown.source_tools',async()=>{
     if(f.loading)return;if(f.codeEditor){f.setRaw(f.codeEditor.value());f.sourcePosition=f.codeEditor.position();f.codeEditor.destroy();f.codeEditor=null;f.codeHost.replaceChildren();f.codeHost.hidden=true;f.text.hidden=false;f.text.focus();f.enhance.setAttribute('aria-pressed','false');return;}
     const current=f.generation,module=await loadSource();if(current!==f.generation)return;
-    f.codeEditor=module.createSourceEditor({root:f.codeHost,value:f.rawBody(),label:t('markdown.body'),readOnly:f.readOnly,selection:f.sourcePosition&&{anchor:f.sourcePosition.anchor,head:f.sourcePosition.head},changed:value=>{f.setRaw(value);f.onChange();f.refreshPreview();}});
+    f.codeEditor=module.createSourceEditor({root:f.codeHost,value:f.rawBody(),label:t('markdown.body'),readOnly:f.readOnly,uploadFiles:files=>void f.uploadFiles(files),selection:f.sourcePosition&&{anchor:f.sourcePosition.anchor,head:f.sourcePosition.head},changed:value=>{f.setRaw(value);f.onChange();f.refreshPreview();}});
     f.text.hidden=true;f.codeHost.hidden=false;f.codeEditor.focus();f.enhance.setAttribute('aria-pressed','true');
   },'code-square');f.enhance.setAttribute('aria-pressed','false');
   f.find=action('markdown.find_replace',()=>{if(!f.codeEditor){f.enhance.click();setTimeout(()=>f.codeEditor?.find(),100);}else f.codeEditor.find();},'search');

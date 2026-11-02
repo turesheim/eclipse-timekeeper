@@ -81,6 +81,7 @@ export class MarkdownField {
     root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('keydown',event=>{if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
+    for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     buildExperience(this,loadEngine,()=>import('./assets/milkdown/source-editor.js'));
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();this.refreshPreview();});this.clear();
   }
@@ -90,6 +91,8 @@ export class MarkdownField {
   }
   async uploadFiles(files,target,forceImage){
     if(!this.onUpload||this.readOnly||this.loading)return;
+    if(this.codeEditor){const position=this.codeEditor.position();this.text.setSelectionRange(position.anchor,position.head);}
+    const remaining=[...files];
     const generation=this.generation,editor=this.editor,start=this.text.selectionStart,end=this.text.selectionEnd;
     this.loading=true;this.controls();this.retryButton.hidden=true;
     try{
@@ -101,9 +104,10 @@ export class MarkdownField {
         const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
         if(editor){if(!editor.insertAt(target,image?'image':'asset_link',{path,label}))throw new Error(t('markdown.upload_failed'));target=editor.bookmark();}
         else{this.text.setRangeText(image?`![${label}](${path})`:`[${label}](${path})`,index?this.text.selectionEnd:start,index?this.text.selectionEnd:end,'end');this.codeEditor?.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;this.onChange();this.text.focus();}
+        remaining.shift();
       }
       editor?.release(target);this.retryUpload=null;this.status.textContent='';
-    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');this.retryUpload=()=>this.uploadFiles(files,target,forceImage);this.retryButton.hidden=false;}}
+    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');this.retryUpload=()=>this.uploadFiles(remaining,target,forceImage);this.retryButton.hidden=false;}}
     finally{if(generation===this.generation){this.status.removeAttribute('aria-busy');this.loading=false;this.controls();}}
   }
 

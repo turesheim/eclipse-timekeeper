@@ -1268,5 +1268,21 @@
   "markdown.comparison_legend": "− valgt versjon, + gjeldende utkast",
   "markdown.server_version": "Sammenlign lagret serverversjon",
   "markdown.no_revisions": "Ingen tidligere versjoner er registrert.",
-  "markdown.revision_item": "Versjon {{version}} · {{date}}"
+  "markdown.revision_item": "Versjon {{version}} · {{date}}",
+  "markdown.cm.Find": "Søk",
+  "markdown.cm.Replace": "Erstatt",
+  "markdown.cm.next": "neste",
+  "markdown.cm.previous": "forrige",
+  "markdown.cm.all": "alle",
+  "markdown.cm.match case": "skill mellom store og små bokstaver",
+  "markdown.cm.regexp": "regulært uttrykk",
+  "markdown.cm.by word": "hele ord",
+  "markdown.cm.replace": "erstatt",
+  "markdown.cm.replace all": "erstatt alle",
+  "markdown.cm.close": "lukk",
+  "markdown.cm.Search": "Søk",
+  "markdown.cm.Replace with": "Erstatt med",
+  "markdown.cm.current match": "gjeldende treff",
+  "markdown.cm.replaced $ matches": "erstattet $ treff",
+  "markdown.cm.replaced $ match": "erstattet $ treff"
 }

@@ -1166,3 +1166,25 @@ project. Work-session ownership is independent of task moves. Deleting a client 
 membership inert; the next settings save drops that removed client. Definition
 changes publish a content-free `PROFILE/UPDATED` invalidation. The settings have
 an independent version and are preserved by profile/holiday edits.
+
+### Note revision reads
+
+`GET /notes/revisions?sourceType=DAY_NOTE|WEEK_NOTE|EVENT_NOTE|VAULT_CONTENT&sourceId=<uuid>`
+returns owner-private prospective content snapshots, newest first. `sourceType`
+and `sourceId` are the canonical binding exposed by Notes entry metadata; native
+note resources also expose their canonical ID. `GET /notes/revisions/<revisionId>`
+uses the same required source query parameters and returns exact `markdown` plus
+its native-editor `body` (daily/event metadata remains outside that body).
+
+Both reads require `read`, return `Cache-Control: private, no-store`, and reject
+foreign-owner or mismatched-source revision IDs with 404. There is no unguarded
+restore endpoint. The editor compares snapshots and applies one as an unsaved
+draft; the ordinary content write still requires its current validator. Labels
+are independent and are never restored from a note snapshot.
+
+Recording starts with the first changed/deleted existing note after this feature
+is installed. At most 20 snapshots per note and 8,000,000 raw snapshot bytes per
+account are retained; oldest snapshots are evicted atomically. General binary
+assets are excluded. Revision snapshots are server-local recovery data; portable
+Markdown/WebDAV exports contain current files, not a revision database. Full
+instance backups retain the underlying owner-private records.

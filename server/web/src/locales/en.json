@@ -1268,5 +1268,21 @@
   "markdown.comparison_legend": "− selected version, + current draft",
   "markdown.server_version": "Compare saved server version",
   "markdown.no_revisions": "No earlier revisions have been recorded.",
-  "markdown.revision_item": "Version {{version}} · {{date}}"
+  "markdown.revision_item": "Version {{version}} · {{date}}",
+  "markdown.cm.Find": "Find",
+  "markdown.cm.Replace": "Replace",
+  "markdown.cm.next": "next",
+  "markdown.cm.previous": "previous",
+  "markdown.cm.all": "all",
+  "markdown.cm.match case": "match case",
+  "markdown.cm.regexp": "regexp",
+  "markdown.cm.by word": "by word",
+  "markdown.cm.replace": "replace",
+  "markdown.cm.replace all": "replace all",
+  "markdown.cm.close": "close",
+  "markdown.cm.Search": "Search",
+  "markdown.cm.Replace with": "Replace with",
+  "markdown.cm.current match": "current match",
+  "markdown.cm.replaced $ matches": "replaced $ matches",
+  "markdown.cm.replaced $ match": "replaced $ match"
 }
