@@ -1293,5 +1293,7 @@
   "markdown.embed_sizing": "Store sizing as an Obsidian embed",
   "markdown.image_sizing_help": "Ordinary Markdown images keep their alternative text. Sized Obsidian embeds use the filename as alternative text; leave height empty to keep the aspect ratio.",
   "markdown.invalid_image": "Choose a width and optional height from 1 to 2000 pixels.",
-  "markdown.tab_help": "Tab indents. Press Escape, then Tab to move focus out of the source editor."
+  "markdown.tab_help": "Tab indents. Press Escape, then Tab to move focus out of the source editor.",
+  "markdown.cm.Completions": "Completions",
+  "markdown.heading_missing": "Heading “{{heading}}” was not found in this note."
 }

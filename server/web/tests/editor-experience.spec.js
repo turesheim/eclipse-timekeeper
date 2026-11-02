@@ -30,13 +30,14 @@ test('source fragments cannot be changed in a read-only editor',async({page})=>{
   expect(await page.evaluate(()=>globalThis.experience.command('bold'))).toBe(false);
 });
 
-async function field(page,value,formatted=true){
+async function field(page,value,formatted=true,catalog=[]){
   await page.goto('/web/markdown-lab.html');await page.evaluate(()=>{const link=document.createElement('link');link.rel='stylesheet';link.href='/web/assets/bootstrap-icons/bootstrap-icons.min.css';document.head.append(link);});
-  await page.evaluate(async({value,formatted})=>{
+  await page.evaluate(async({value,formatted,catalog})=>{
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
-    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;});
+    const resources=catalog.length?{allowsAsset:()=>false,allowsLink:()=>false,complete:async query=>catalog.filter(entry=>entry.path.toLowerCase().includes(query.toLowerCase())),resolveWiki:async()=>catalog[0],openWiki:async()=>{}}:undefined;
+    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources);
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
-  },{value,formatted});
+  },{value,formatted,catalog});
 }
 test('rich paste retains safe structure and URL-over-selection preserves the selected text',async({page})=>{
   await engine(page,'Text to link.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');
@@ -115,4 +116,14 @@ test('rich undo and redo span a source edit, including a change of Markdown spel
 test('enhanced source history survives a formatted round trip',async({page})=>{
   await field(page,'Original.\n',false);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await content.click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type('Added.');
   await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#experience-formatted .ProseMirror')).toBeVisible();await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(content).toBeVisible();await content.click();await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
+});
+test('editing around authored break HTML never mistakes it for an empty editor paragraph',async({page})=>{
+  const value='Before.\r\n\r\n<br />\r\n\r\nAfter.\r\n';await engine(page,value);await expect(page.locator('.markdown-source-fragment textarea')).toHaveValue('<br />');await page.locator('#experience-editor p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Kept.');expect(await source(page)).toBe(value.replace('After.','After. Kept.'));
+});
+test('typed and pasted ordinary wikilinks become active without escaping their Markdown',async({page})=>{
+  await engine(page,'');await page.locator('#experience-editor .ProseMirror').click();await page.keyboard.type('[[Notes/Design|design]]');await expect(page.locator('[data-wiki-reference="Notes/Design|design"]')).toHaveText('design');expect(await source(page)).toContain('[[Notes/Design|design]]');
+  await page.keyboard.press('End');await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','![[journal/assets/pixel.png|32]]');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});expect(await source(page)).toContain('![[journal/assets/pixel.png|32]]');
+});
+test('enhanced source completes vault names without changing line endings or metadata',async({page})=>{
+  await field(page,'',false,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await content.click();await page.keyboard.type('[[Des');await page.getByRole('option',{name:'Notes/Design.md'}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('[[Notes/Design]]');
 });

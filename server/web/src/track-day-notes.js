@@ -13,7 +13,7 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 /** Optional web metadata has its own read state and never changes timed work. */
 export class TrackDayNotes {
   constructor(root,grid,monthInput,callbacks,options={}){
-    Object.assign(this,{prefix:'track',headingSelector:'.track-date-row',alwaysShow:false,compact:false,inline:false},options,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
+    Object.assign(this,{prefix:'track',headingSelector:'.track-date-row',alwaysShow:false,compact:false,inline:false},options,{root,grid,monthInput,callbacks,positions:new Map(),notes:new Map(),bodyDates:new Set(),generation:0});
     this.noteAttr='data-'+this.prefix+'-note-date';this.cellAttr='data-'+this.prefix+'-date';
     this.status=node('p',undefined,'hint '+this.prefix+'-note-status');this.status.setAttribute('role','status');this.message=node('span');
     this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);if(this.statusAnchor)this.statusAnchor.before(this.status);else grid.after(this.status);this.status.hidden=true;
@@ -59,7 +59,7 @@ export class TrackDayNotes {
   closeEditor(){if(!this.inline)this.dialog.close();this.finishEditor();}
   finishEditor(){
     if(!this.inline&&this.dialog.open)return;
-    const date=this.editor?.date,uncertain=this.editor?.uncertain;this.editor=null;this.text.value='';if(this.labelRoot)this.text.disabled=true;this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
+    const date=this.editor?.date,uncertain=this.editor?.uncertain;if(date&&this.editor?.etag&&!this.editor.loading)this.positions.set(date,this.markdown.position());this.editor=null;this.text.value='';if(this.labelRoot)this.text.disabled=true;this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
     if(date)this.focusDate(date);
     if(uncertain&&this.session){this.key=null;this.load();}
   }
@@ -148,7 +148,7 @@ export class TrackDayNotes {
     this.recovery.hidden=this.reload.hidden;
   }
   reset(){
-    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.notes.clear();this.bodyDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
+    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.positions.clear();this.notes.clear();this.bodyDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
     this.closeEditor();this.text.value='';this.error.textContent='';this.status.hidden=true;this.message.textContent='';this.retry.hidden=true;
   }
   hide(){this.cancelHold();this.closeMenu();if(!this.editor?.busy)this.closeEditor();}
@@ -195,7 +195,7 @@ export class TrackDayNotes {
       const reply=await editor.session.request('/day-entries/'+editor.date);
       if(this.editor!==editor||editor.session!==this.session)return;
       this.text.value=reply.data.text;editor.noteId=reply.data.id;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
-      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
+      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});const position=this.positions.get(editor.date);if(position)await this.markdown.restorePosition({...position,formatted:true});else void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();this.error.scrollIntoView({block:'nearest'});if(error.status===401)this.callbacks.onUnauthorized(error);

@@ -79,12 +79,17 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar flex-nowrap align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
     root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
+    this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>this.controls()));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('keydown',event=>{if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     buildExperience(this,loadEngine,()=>import('./assets/milkdown/source-editor.js'));
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();this.refreshPreview();});this.clear();
+  }
+  insertSource(text,from=this.text.selectionStart,to=this.text.selectionEnd){
+    if(this.readOnly)return null;if(this.codeEditor)return this.codeEditor.insert(text,from,to);
+    const follow=this.text.selectionStart===from&&this.text.selectionEnd===to;this.text.setRangeText(text,from,to,'preserve');const end=from+text.length;if(follow)this.text.setSelectionRange(end,end);this.onChange();this.refreshPreview();return end;
   }
   rawBody(){return this.text.value===this.displayedBody?this.raw:this.text.value;}
   async upload(picker,image){
@@ -94,17 +99,17 @@ export class MarkdownField {
     if(!this.onUpload||this.readOnly||this.loading)return;
     if(this.codeEditor){const position=this.codeEditor.position();this.text.setSelectionRange(position.anchor,position.head);}
     const remaining=[...files];
-    const generation=this.generation,editor=this.editor,start=this.text.selectionStart,end=this.text.selectionEnd;
+    const generation=this.generation,editor=this.editor;let start=this.text.selectionStart,end=this.text.selectionEnd;
     this.loading=true;this.controls();this.retryButton.hidden=true;
     try{
       for(let index=0;index<files.length;index++){
         const file=files[index],image=forceImage??['image/png','image/jpeg','image/gif','image/webp'].includes(file.type);
         if(file.size>5_000_000)throw new Error(t('markdown.asset_too_large'));
         this.status.textContent=t('markdown.upload_progress',{name:file.name,current:index+1,total:files.length});this.status.setAttribute('aria-busy','true');
-        const path=await this.onUpload(file,image);if(generation!==this.generation)return;
+        const path=await this.onUpload(file,image);this.resources?.invalidate?.();if(generation!==this.generation)return;if(this.readOnly)throw new Error(t('markdown.upload_failed'));
         const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
         if(editor){if(!editor.insertAt(target,image?'image':'asset_link',{path,label}))throw new Error(t('markdown.upload_failed'));}
-        else{this.text.setRangeText(image?`![${label}](${path})`:`[${label}](${path})`,index?this.text.selectionEnd:start,index?this.text.selectionEnd:end,'end');this.codeEditor?.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;this.onChange();this.text.focus();}
+        else{const inserted=this.insertSource(image?`![${label}](${path})`:`[${label}](${path})`,start,end);start=end=inserted;}
         remaining.shift();
       }
       editor?.release(target);this.retryUpload=null;this.status.textContent='';
@@ -166,7 +171,7 @@ export class MarkdownField {
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
   setValue(value){
-    this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.text.setSelectionRange(0,0);this.text.scrollTop=0;
+    this.resources?.invalidate?.();this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.text.setSelectionRange(0,0);this.text.scrollTop=0;
     this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
   }
   position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():this.codeEditor?this.codeEditor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}
@@ -201,5 +206,5 @@ export class MarkdownField {
     }catch{if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.status.textContent=t('markdown.failed');}}
     finally{if(current===this.generation){this.loading=false;this.controls();}}
   }
-  focus(){if(this.editor)this.editor.focus();else this.text.focus();}
+  focus(){if(this.editor)this.editor.focus();else if(this.codeEditor)this.codeEditor.focus();else this.text.focus();}
 }
