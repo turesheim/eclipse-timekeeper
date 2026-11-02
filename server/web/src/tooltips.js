@@ -84,7 +84,7 @@ export function installTooltips() {
   // The overlay never intercepts a calendar drag or a click on a control below
   // it. Hit-test its bounds for hover persistence instead of capturing presses.
   const remember=event=>{pointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,buttons:event.buttons};};
-  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons)return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)schedule(node);else{cancelPending();if(active)leave();}};
+  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons)return;const node=target(event.target,event);if(node&&node!==active?.node){schedule(node);return;}if(overTooltip(event)){cancelPending();clearTimeout(leaveTimer);return;}if(node)schedule(node);else{cancelPending();if(active)leave();}};
   document.addEventListener('pointerover',hover);
   document.addEventListener('pointermove',hover);
   document.addEventListener('pointerout',event=>{if(pending&&!pending.contains(event.relatedTarget)){const box=pending.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)cancelPending();}if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
