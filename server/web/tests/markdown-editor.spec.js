@@ -41,9 +41,9 @@ test('empty paragraph created with Enter stays editable after a Markdown round t
   const value=await page.locator('#markdown-body').inputValue();expect(value).toContain('First line');expect(value).not.toContain('<br');
   await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();
   await page.locator('#markdown-source').click();expect(await downloaded(page)).not.toContain('<br');
-  await page.locator('#markdown-body').fill('<br />\n\nFirst line\n');
-  await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();
-  await page.locator('#markdown-source').click();expect(await page.locator('#markdown-body').inputValue()).not.toContain('<br');
+  const authored='<br />\n\nFirst line\n';await page.locator('#markdown-body').fill(authored);
+  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-body')).toBeVisible();
+  expect(await downloaded(page)).toBe(authored);
 });
 test('soft line break stays editable after a Markdown round trip',async({page})=>{
   await open(page);await page.locator('#markdown-body').fill('First line\n');await page.locator('#markdown-rich').click();

@@ -1,5 +1,5 @@
 import {t} from './i18n.js';
-import {splitMarkdown,needsSource,normalizeEditorMarkdown} from './markdown-document.js';
+import {splitMarkdown,needsSource} from './markdown-document.js';
 import {icon,iconButton} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -160,7 +160,7 @@ export class MarkdownField {
     if(this.loading)return;if(this.editor){this.editor.focus();return;}
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
-    const richBody=normalizeEditorMarkdown(this.rawBody());
+    const richBody=this.rawBody();
     if(this.unterminated||needsSource(richBody,this.resources?.allowsAsset)||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);
