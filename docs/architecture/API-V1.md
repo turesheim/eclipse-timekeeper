@@ -1183,7 +1183,7 @@ draft; the ordinary content write still requires its current validator. Labels
 are independent and are never restored from a note snapshot.
 
 Recording starts with the first changed/deleted existing note after this feature
-is installed. At most 20 snapshots per note and 8,000,000 raw snapshot bytes per
+is installed. At most 20 snapshots per note, 1,000 snapshots per account and 8,000,000 raw snapshot bytes per
 account are retained; oldest snapshots are evicted atomically. General binary
 assets are excluded. Revision snapshots are server-local recovery data; portable
 Markdown/WebDAV exports contain current files, not a revision database. Full

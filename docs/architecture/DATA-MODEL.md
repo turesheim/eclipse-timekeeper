@@ -717,7 +717,7 @@ as the content mutation; stale/no-op writes create no snapshot. A snapshot ID
 is separate from the note version so archive restores cannot alias unrelated
 bytes under a reused content version.
 
-Retention is bounded to 20 snapshots per note and 8 MB of raw bytes per owner,
+Retention is bounded to 20 snapshots per note, 1,000 per owner and 8 MB of raw bytes per owner,
 with oldest snapshots removed atomically. Binary assets and independent day
 labels are excluded. This adds a record type, not a SQL table/schema migration.
 Existing day-note audit events remain metadata evidence and are not replaced.

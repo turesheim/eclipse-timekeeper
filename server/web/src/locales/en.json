@@ -1264,7 +1264,7 @@
   "markdown.revisions": "Note revisions",
   "markdown.comparison": "Revision comparison",
   "markdown.restore_draft": "Use as unsaved draft",
-  "markdown.revision_help": "Revisions are retained prospectively, up to 20 per note and 8 MB per account. Choosing one changes only this draft; Save still checks the current version. Drafts stay in this tab only.",
+  "markdown.revision_help": "Revisions are retained prospectively, up to 20 per note, 1,000 per account and 8 MB of content per account. Choosing one changes only this draft; Save still checks the current version. Drafts stay in this tab only.",
   "markdown.comparison_legend": "− selected version, + current draft",
   "markdown.server_version": "Compare saved server version",
   "markdown.no_revisions": "No earlier revisions have been recorded.",

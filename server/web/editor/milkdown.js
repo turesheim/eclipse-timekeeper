@@ -1,8 +1,10 @@
+import {trackedDocument} from './tracked-document.js';
+import {closeHistory} from '@milkdown/kit/prose/history';
 import {codeTools} from './code-tools.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
-import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
+import {commonmark,docSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
@@ -173,7 +175,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(dialect.plugins).use(code.plugin).use(changePlugin);
+  }).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(dialect.plugins).use(code.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -181,14 +183,18 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=dialect.project(parser.parse(value),value);return JSON.stringify(semantic(tree))===JSON.stringify(semantic(dialect.project(parser.parse(serialized),serialized)));});
     if(!safe){await editor.destroy();return null;}
     const serialize=doc=>normalizeEditorMarkdown(editor.action(ctx=>ctx.get(serializerCtx)(doc)));
-    const render=editor.action(ctx=>{
-      const parser=ctx.get(remarkCtx);
-      return markdownSource({source:value,tree:dialect.project(parser.parse(value),value),document:original,serialize,
-        equivalent:(left,right)=>JSON.stringify(semantic(dialect.project(parser.parse(left),left)))===JSON.stringify(semantic(dialect.project(parser.parse(right),right)))});
-    });
+    const origins=new Map();let epoch=0;
+    const rememberSource=(source,document)=>{
+      const render=editor.action(ctx=>{const parser=ctx.get(remarkCtx);return markdownSource({source,tree:dialect.project(parser.parse(source),source),document,serialize,equivalent:(left,right)=>JSON.stringify(semantic(dialect.project(parser.parse(left),left)))===JSON.stringify(semantic(dialect.project(parser.parse(right),right)))});});
+      origins.set(document.attrs.sourceEpoch,{source,document,render});
+      // PM history retains about 100 events. Keep a larger bounded set of source
+      // epochs, plus the initial document, for exact undo across mode changes.
+      while(origins.size>160){const oldest=[...origins.keys()].find(key=>key!==0);origins.delete(oldest);}
+    };
+    rememberSource(value,original);
     const setReadOnly=value=>{readOnly=value;code.setReadOnly();view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea,.markdown-callout input'))text.readOnly=readOnly;};
     const command=(name,payload,focus=true)=>{
-      if(readOnly)return false;
+      if(readOnly||root.contains(document.activeElement)&&document.activeElement.closest?.('.markdown-source-fragment'))return false;
       if(name==='link'){
         if(!linkAllowed(payload))return false;
         if(!editor.action(callCommand(updateLinkCommand.key,{href:payload}))){
@@ -233,22 +239,30 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       if(focus)view.focus();return true;
     };
     let snapshot=original,snapshotText=value,comparisonText,comparisonDocument;
-    const markdown=()=>{const current=view.state.doc,result=render(current);snapshot=current;snapshotText=result;return result;};
+    const markdown=()=>{const current=view.state.doc,result=(origins.get(current.attrs.sourceEpoch)?.render||serialize)(current);snapshot=current;snapshotText=result;return result;};
     const matchesSource=text=>{
       const current=view.state.doc;
-      if(text===value&&current.eq(original)||text===snapshotText&&current.eq(snapshot))return true;
-      if(text===value||text===snapshotText)return false;
+      const origin=origins.get(current.attrs.sourceEpoch);
+      if(text===origin?.source&&current.eq(origin.document)||text===value&&current.eq(original)||text===snapshotText&&current.eq(snapshot))return true;
+      if(text===origin?.source||text===value&&current.attrs.sourceEpoch===0||text===snapshotText&&current.attrs.sourceEpoch===snapshot.attrs.sourceEpoch)return false;
       if(text!==comparisonText){
         comparisonText=text;comparisonDocument=null;
         try{comparisonDocument=editor.action(ctx=>ctx.get(parserCtx)(text));}catch{/* Unknown source stays conservatively dirty. */}
       }
       // A different document cannot be the saved source. Only an equal parse
       // needs exact serialization, e.g. returning to a saved state after a mode switch.
-      return !!comparisonDocument&&current.eq(comparisonDocument)&&markdown()===text;
+      return !!comparisonDocument&&current.content.eq(comparisonDocument.content)&&markdown()===text;
     };
     setReadOnly(readOnly);
     return {
       markdown,
+      replaceMarkdown:source=>{try{
+        if(readOnly)return false;const parsed=editor.action(ctx=>ctx.get(parserCtx)(source)),canonical=serialize(parsed);
+        const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx);return JSON.stringify(semantic(dialect.project(parser.parse(source),source)))===JSON.stringify(semantic(dialect.project(parser.parse(canonical),canonical)));});if(!safe)return false;
+        const document=parsed.type.create({...parsed.attrs,sourceEpoch:++epoch},parsed.content);rememberSource(source,document);
+        view.dispatch(closeHistory(view.state.tr.replaceWith(0,view.state.doc.content.size,document.content).setDocAttribute('sourceEpoch',epoch)));
+        view.dispatch(closeHistory(view.state.tr));snapshot=view.state.doc;snapshotText=source;return true;
+      }catch{return false;}},
       bookmark,
       insertAt:(target,name,payload)=>{if(readOnly||!target)return false;const insertion=target.selection.resolve(view.state.doc),follow=view.state.selection.eq(insertion),restore={selection:view.state.selection.getBookmark()};if(!follow)targets.add(restore);try{view.dispatch(view.state.tr.setSelection(insertion));const applied=command(name,payload,false);if(!follow)view.dispatch(view.state.tr.setSelection(restore.selection.resolve(view.state.doc)));return applied;}finally{targets.delete(restore);}},
       release:target=>targets.delete(target),

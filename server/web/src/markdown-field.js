@@ -79,6 +79,7 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar flex-nowrap align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
     root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
+    this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>this.controls()));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('keydown',event=>{if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
@@ -142,8 +143,9 @@ export class MarkdownField {
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
   controls(){
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;this.codeEditor?.readOnly(this.readOnly||this.loading);if(this.sourceExtras)this.sourceExtras.hidden=!this.rich.hidden;
-    for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||(!this.onUpload&&(action===this.image||action===this.attachment));
-    for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading;
+    const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
+    for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));
+    for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
     if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
     this.tools.hidden=this.rich.hidden||this.readOnly;this.separator.hidden=this.tools.hidden;
     this.normalization.hidden=this.rich.hidden||this.readOnly;
@@ -172,14 +174,20 @@ export class MarkdownField {
   async showSource(){
     if(this.loading||!this.editor)return;
     const previous=this.editor,position=previous.position(),body=previous.markdown();this.setRaw(body);this.suspended={editor:previous,body};this.editor=null;
-    this.mode(false);this.controls();const normalized=body.slice(0,position.anchor).replace(/\r\n/g,'\n').length;this.text.setSelectionRange(normalized,normalized);this.text.scrollTop=position.scrollTop;this.text.focus();
+    this.mode(false);this.controls();const normalized=body.slice(0,position.anchor).replace(/\r\n/g,'\n').length;this.text.setSelectionRange(normalized,normalized);this.text.scrollTop=position.scrollTop;if(this.codeEditor){this.codeEditor.replaceValue(body);this.codeHost.hidden=false;this.text.hidden=true;this.codeEditor.select(normalized);}else this.text.focus();
   }
   async showFormatted(focus=true){
-    if(this.loading)return;this.sourcePosition=this.codeEditor?.position()||{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};if(this.codeEditor){this.sourcePosition=this.codeEditor.position();this.setRaw(this.codeEditor.value());this.codeEditor.destroy();this.codeEditor=null;this.enhance.setAttribute('aria-pressed','false');this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;}if(this.editor){this.editor.focus();return;}
-    if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
+    if(this.loading)return;if(this.editor){this.editor.focus();return;}
+    this.sourcePosition=this.codeEditor?.position()||{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};if(this.codeEditor)this.setRaw(this.codeEditor.value());
+    if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
+      // Frontmatter is deliberately opaque and outside both editor schemas.
+      // A newly authored header changes that boundary; do not retain a body-only
+      // history that could subsequently duplicate it into the Markdown body.
+      if(parts.frontmatter&&this.codeEditor){this.codeEditor.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;this.enhance.setAttribute('aria-pressed','false');}
+    }
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=this.rawBody();
-    if(this.suspended){const suspended=this.suspended;this.suspended=null;if(suspended.body===richBody){this.editor=suspended.editor;this.editor.setReadOnly(this.readOnly);this.mode(true);this.controls();if(focus)this.editor.focus();return;}await suspended.editor.destroy();this.rich.replaceChildren();}
+    if(this.suspended){const suspended=this.suspended;this.suspended=null;if(!this.unterminated&&!splitMarkdown(richBody).frontmatter&&(suspended.body===richBody||suspended.editor.replaceMarkdown(richBody))){this.editor=suspended.editor;this.editor.setReadOnly(this.readOnly);this.mode(true);if(suspended.body!==richBody&&this.sourcePosition)this.editor.restorePosition(this.sourcePosition);this.controls();if(focus)this.editor.focus();return;}await suspended.editor.destroy();this.rich.replaceChildren();}
     if(this.unterminated||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);

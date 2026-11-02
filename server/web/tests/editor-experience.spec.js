@@ -106,3 +106,13 @@ test('source styles keep the strict CSP and a horizontal gutter without trapping
   await content.click();await page.keyboard.press('Escape');await page.keyboard.press('Tab');expect(await content.evaluate(node=>node.getRootNode().activeElement===node)).toBe(false);expect(await page.evaluate(()=>globalThis.styleViolations)).toEqual([]);
   await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-styled.png'});
 });
+test('rich undo and redo span a source edit, including a change of Markdown spelling',async({page})=>{
+  await field(page,'Title\n=====\n\nOriginal.\n');const original=await page.evaluate(()=>globalThis.field.value());await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
+  const changed=original.replace('Original.','__Changed__.');await page.locator('#experience-body').fill(changed);await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
+  await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(original);await page.locator('#experience-field').getByRole('button',{name:'Redo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
+  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-body').fill(original);await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(value=>globalThis.field.matches(value),original)).toBe(true);
+});
+test('enhanced source history survives a formatted round trip',async({page})=>{
+  await field(page,'Original.\n',false);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await content.click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type('Added.');
+  await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#experience-formatted .ProseMirror')).toBeVisible();await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(content).toBeVisible();await content.click();await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
+});

@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 /** Prospective, bounded, owner-private content snapshots, separate from day labels. */
 final class NoteRevisions {
     static final String TYPE="NOTE_REVISION";
-    static final int PER_NOTE=20;
+    static final int PER_NOTE=20,ACCOUNT_RECORDS=1000;
     static final long ACCOUNT_BYTES=8_000_000;
     private static final Set<String> TYPES=Set.of(DayNotes.TYPE,WeekNotes.TYPE,EventNotes.TYPE,VaultContent.TYPE);
     private final ServerStore store;
@@ -33,14 +33,14 @@ final class NoteRevisions {
         store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),TYPE,id,1,value.toString());
         var perNote=values(ref);while(perNote.size()>PER_NOTE)remove(perNote.removeLast());
         var all=new ArrayList<>(store.list(TYPE));all.sort(order());long total=all.stream().mapToLong(item->item.path("byteLength").asLong()).sum();
-        while(total>ACCOUNT_BYTES&&!all.isEmpty()){var oldest=all.removeLast();total-=oldest.path("byteLength").asLong();remove(oldest);}
+        while((total>ACCOUNT_BYTES||all.size()>ACCOUNT_RECORDS)&&!all.isEmpty()){var oldest=all.removeLast();total-=oldest.path("byteLength").asLong();remove(oldest);}
     }
     private static Comparator<JsonNode> order(){return Comparator.<JsonNode>comparingLong(value->value.path("sequence").asLong()).reversed();}
     private ArrayList<JsonNode> values(VaultSources.Ref ref){var result=new ArrayList<JsonNode>();for(var value:store.list(TYPE))if(matches(value,ref))result.add(value);result.sort(order());return result;}
     private boolean matches(JsonNode value,VaultSources.Ref ref){return value.path("sourceType").asText().equals(ref.type())&&value.path("sourceId").asText().equals(ref.id().toString());}
     private void remove(JsonNode value){store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),TYPE,uuid(value.path("id")));}
     private ObjectNode metadata(JsonNode value){var result=((ObjectNode)value).deepCopy();result.remove(List.of("data","ownerId","version"));return result;}
-    ObjectNode list(VaultSources.Ref ref){var result=object().put("retainedPerNote",PER_NOTE).put("accountByteBudget",ACCOUNT_BYTES).put("prospective",true);var items=result.putArray("items");values(ref).forEach(value->items.add(metadata(value)));return result;}
+    ObjectNode list(VaultSources.Ref ref){var result=object().put("retainedPerNote",PER_NOTE).put("accountByteBudget",ACCOUNT_BYTES).put("accountRevisionLimit",ACCOUNT_RECORDS).put("prospective",true);var items=result.putArray("items");values(ref).forEach(value->items.add(metadata(value)));return result;}
     ObjectNode get(VaultSources.Ref ref,UUID revision){
         var value=store.find(TYPE,revision).orElseThrow(ApiFailure::notFound);if(!matches(value,ref))throw ApiFailure.notFound();
         byte[] bytes=Base64.getDecoder().decode(value.path("data").asText());if(bytes.length!=value.path("byteLength").asLong()||!ArchiveJournalFiles.digest(bytes).equals(value.path("sha256").asText()))throw new IllegalStateException("Invalid note revision");

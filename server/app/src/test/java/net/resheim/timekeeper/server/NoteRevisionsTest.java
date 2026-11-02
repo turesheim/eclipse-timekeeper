@@ -13,6 +13,14 @@ class NoteRevisionsTest {
     public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("revisions",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:note_revisions_test"));}}
     @Inject ServerStore store;
     @Inject VaultLimits limits;
+    @Test void accountBudgetsBoundEmptyMetadataAsWellAsSnapshotBytes(){
+        for(boolean large:List.of(false,true))store.transaction(large?"revision-byte-budget":"revision-record-budget",()->{
+            int count=large?9:NoteRevisions.ACCOUNT_RECORDS;byte[] bytes=large?new byte[1_000_000]:new byte[0];if(large)Arrays.fill(bytes,(byte)'a');
+            for(int index=0;index<count;index++){UUID id=new UUID(0,index+1);var value=object().put("id",id.toString()).put("ownerId",store.owner()).put("version",1).put("sourceType",DayNotes.TYPE).put("sourceId",id.toString()).put("contentVersion",1).put("sequence",index+1).put("capturedAt","2020-01-01T00:00:00Z").put("modifiedAt","2020-01-01T00:00:00Z").put("byteLength",bytes.length).put("sha256",ArchiveJournalFiles.digest(bytes)).put("data",Base64.getEncoder().encodeToString(bytes));store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),NoteRevisions.TYPE,id,1,value.toString());}
+            var notes=new DayNotes(store);var day=DayNotes.date("2026-11-03");notes.saveContent(day,etag(notes.getContent(day)),object().put("body","Keep"));notes.saveContent(day,etag(notes.getContent(day)),object().put("body","Changed"));
+            var records=store.list(NoteRevisions.TYPE);assertTrue(records.size()<=NoteRevisions.ACCOUNT_RECORDS);assertTrue(records.stream().mapToLong(value->value.path("byteLength").asLong()).sum()<=NoteRevisions.ACCOUNT_BYTES);assertEquals(1,new NoteRevisions(store).list(new NoteRevisions(store).reference(DayNotes.TYPE,DayNotes.id(day))).path("items").size());assertTrue(store.find(NoteRevisions.TYPE,new UUID(0,1)).isEmpty());return null;
+        });
+    }
     @Test void allNativeAndVaultWritesRetainExactContentWithoutRestoringIndependentLabels(){
         store.transaction("revision-owner",()->{
             var history=new NoteRevisions(store);var notes=new DayNotes(store);var day=DayNotes.date("2026-11-02");

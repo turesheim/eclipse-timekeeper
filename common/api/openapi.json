@@ -32407,7 +32407,8 @@
           "items",
           "retainedPerNote",
           "accountByteBudget",
-          "prospective"
+          "prospective",
+          "accountRevisionLimit"
         ],
         "properties": {
           "items": {
@@ -32425,6 +32426,9 @@
           },
           "prospective": {
             "const": true
+          },
+          "accountRevisionLimit": {
+            "const": 1000
           }
         }
       }

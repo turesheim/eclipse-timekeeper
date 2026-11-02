@@ -2,7 +2,7 @@ import {t} from '../src/i18n.js';
 import {highlightTree,classHighlighter,tags} from '@lezer/highlight';
 import {EditorState,Compartment,StateField,StateEffect} from '@codemirror/state';
 import {EditorView,keymap,lineNumbers,highlightActiveLine,drawSelection} from '@codemirror/view';
-import {defaultKeymap,history,historyKeymap,indentWithTab,invertedEffects} from '@codemirror/commands';
+import {defaultKeymap,history,historyKeymap,indentWithTab,invertedEffects,isolateHistory} from '@codemirror/commands';
 import {searchKeymap,highlightSelectionMatches,search,openSearchPanel} from '@codemirror/search';
 import {markdown} from '@codemirror/lang-markdown';
 import {javascript} from '@codemirror/lang-javascript';
@@ -31,7 +31,7 @@ export function createSourceEditor({root,value,label,readOnly=false,changed,sele
       access.of([EditorState.readOnly.of(readOnly),EditorView.editable.of(!readOnly)]),EditorView.contentAttributes.of({'aria-label':label,'aria-description':t('markdown.tab_help')}),
       EditorView.updateListener.of(update=>{if(!update.docChanged)return;const values=update.state.field(endings);let index=0;raw=update.state.doc.toString().replace(/\n/g,()=>values[index++]||preferred);changed(raw);})]
   })});
-  return {value:()=>raw,focus:()=>view.focus(),find:()=>openSearchPanel(view),
+  return {value:()=>raw,replaceValue:value=>{if(value===raw)return;view.dispatch({changes:{from:0,to:view.state.doc.length,insert:value.replace(/\r\n?/g,'\n')},effects:restoreEndings.of(value.match(/\r\n|\n|\r/g)||[]),annotations:isolateHistory.of('full')});},focus:()=>view.focus(),find:()=>openSearchPanel(view),
     lineNumbers:enabled=>view.dispatch({effects:numbers.reconfigure(enabled?lineNumbers():[])}),
     readOnly:value=>{readOnly=value;view.dispatch({effects:access.reconfigure([EditorState.readOnly.of(value),EditorView.editable.of(!value)])});},
     position:()=>({anchor:view.state.selection.main.anchor,head:view.state.selection.main.head,scrollTop:view.scrollDOM.scrollTop}),
