@@ -12,6 +12,10 @@ and write preconditions enabled; never use a retry to conceal a failed mutation.
 - Use `nativeConfirmations.run` for actions that require discard prompts. Supply
   every expected accept/cancel decision. Missing, extra and wrong-type prompts
   fail the action, and handlers are removed in `finally` with `dispose`.
+- Functional tests should verify the result they own: saved records, visible state,
+  retained timestamps, and rejected writes. Do not use hover tooltips or exact
+  rendering/timer phases as a proxy for a successful edit. Keep tooltip delay and
+  presentation assertions in the dedicated tooltip suite.
 - Prefer named `test.step` blocks to numbered console messages. A failure should
   identify the user action and expected outcome without exposing private content.
 - Use `tooltipFor` to wait for the tooltip associated with the target control or
