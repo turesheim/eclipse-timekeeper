@@ -1223,5 +1223,7 @@
   "focus.remove": "Fjern fokusområde",
   "focus.hint": "Velg klienter for hvert område. Et område uten klienter viser ikke klientrelatert arbeid. Uten fokus viser alt.",
   "focus.finish_edit": "Fullfør eller avbryt redigeringen før du bytter fokus.",
-  "focus.running_outside": "Arbeid utenfor dette fokusområdet"
+  "focus.running_outside": "Arbeid utenfor dette fokusområdet",
+  "notes.hide_journal": "Skjul journalmappen",
+  "notes.hide_journal_help": "Skjul journalmappen, inkludert notater og vedlegg, fra navigasjon og søk i Notater. Journalvisninger, lenker og synkronisering er fortsatt tilgjengelige."
 }

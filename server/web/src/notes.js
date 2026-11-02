@@ -1,7 +1,8 @@
 import {t} from './i18n.js';
 import {MarkdownField} from './markdown-field.js';
 import {icon,iconButton} from './icons.js';
-import {relativeNotePath,rasterType} from './notes-links.js';
+import {relativeNotePath,rasterType,notesEntryVisible} from './notes-links.js';
+import {imagePreview} from './image-preview.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const action=(label,run,name)=>{const value=node('button',name?'':label,'btn btn-outline-secondary');value.type='button';if(name)iconButton(value,name,label);value.addEventListener('click',run);return value;};
@@ -32,9 +33,10 @@ export class NotesView {
     const fileTools=node('div',undefined,'notes-file-tools');this.rename=action(t('notes.move'),()=>this.pathDialog('move'),'edit');this.remove=action(t('notes.delete'),()=>void this.delete(),'delete');this.recover=action(t('notes.restore'),()=>void this.restore(),'arrow-counterclockwise');this.reloadNote=action(t('notes.reload'),()=>{if(this.canLeave())void this.select(this.note?.id,true);},'refresh');this.download=action(t('notes.download_attachment'),()=>void this.downloadAttachment(),'download');fileTools.append(this.rename,this.remove,this.recover,this.reloadNote,this.download);
     const resources={allowsAsset:reference=>!!this.linkPath(reference),allowsLink:reference=>!!this.linkPath(reference),image:(reference,alt)=>this.image(reference,alt),openLink:reference=>void this.openLink(reference)};
     const host=node('div',undefined,'notes-markdown');this.markdown=new MarkdownField(host,()=>this.controls(),()=>{},'notes',(file,image)=>this.upload(file,image),resources);
+    this.preview=node('div',undefined,'notes-image-preview');this.preview.hidden=true;
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.save=action(t('ui.save'),()=>void this.commit());this.save.className='btn btn-primary';const footer=node('div',undefined,'notes-footer');footer.append(this.status,this.save);
-    this.editor.append(this.documentTitle,fileTools,this.empty,host,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
+    this.editor.append(this.documentTitle,fileTools,this.empty,host,this.preview,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
     this.dialog=node('dialog',undefined,'app-dialog');this.dialogTitle=node('h2');this.dialogTitle.id='notes-path-title';this.dialog.setAttribute('aria-labelledby',this.dialogTitle.id);
     this.form=node('form');const pathLabel=node('label',t('notes.path'),'form-label');this.pathInput=node('input',undefined,'form-control');this.pathInput.id='notes-path';this.pathInput.required=true;this.pathInput.maxLength=1024;pathLabel.htmlFor=this.pathInput.id;
     this.dialogError=node('p','','alert alert-danger');this.dialogError.hidden=true;this.dialogError.setAttribute('role','alert');
@@ -44,6 +46,7 @@ export class NotesView {
     this.settingsForm.append(node('p',t('notes.settings_help'),'hint'));
     const connection=node('p',t('notes.webdav_url'),'form-label'),url=node('code',new URL('/dav/vault/',location.origin).href,'journal-webdav-url'),guide=node('a',t('notes.sync_guide'));guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/NOTES-WEBDAV.md';guide.target='_blank';guide.rel='noopener noreferrer';this.settingsForm.append(connection,url,node('p',t('journal.webdav.credentials'),'hint'),guide);
     for(const name of ['journalFolder','eventsFolder','assetsFolder']){const label=node('label',t('notes.'+name),'form-label'),input=node('input',undefined,'form-control');input.id='notes-setting-'+name;input.required=true;input.maxLength=1024;label.htmlFor=input.id;this.settingsFields[name]=input;this.settingsForm.append(label,input);}
+    const hideLabel=node('label',undefined,'form-check-label');this.hideJournalCheckbox=node('input',undefined,'form-check-input');this.hideJournalCheckbox.type='checkbox';this.hideJournalCheckbox.id='notes-setting-hide-journal';this.hideJournalCheckbox.setAttribute('aria-describedby','notes-hide-journal-help');hideLabel.append(this.hideJournalCheckbox,document.createTextNode(' '+t('notes.hide_journal')));const hideField=node('div',undefined,'form-check');hideField.append(hideLabel);const hideHelp=node('p',t('notes.hide_journal_help'),'hint');hideHelp.id='notes-hide-journal-help';this.settingsForm.append(hideField,hideHelp);
     const configLabel=node('label',undefined,'form-check-label');this.configCheckbox=node('input',undefined,'form-check-input');this.configCheckbox.type='checkbox';configLabel.append(this.configCheckbox,document.createTextNode(' '+t('notes.config_opt_in')));const configField=node('div',undefined,'form-check');configField.append(configLabel);this.settingsForm.append(configField,node('p',t('notes.config_help'),'hint'));
     this.settingsError=node('p','','alert alert-danger');this.settingsError.setAttribute('role','alert');this.settingsError.hidden=true;this.settingsForm.append(this.settingsError);
     const settingsActions=node('div',undefined,'dialog-actions');this.settingsCancel=action(t('ui.cancel'),()=>{if(!this.busy)this.settingsDialog.close();});this.settingsApply=node('button',t('ui.save'),'btn btn-primary');this.settingsApply.type='submit';settingsActions.append(this.settingsCancel,this.settingsApply);this.settingsForm.append(settingsActions);this.settingsDialog.append(settingsTitle,this.settingsForm);root.append(this.settingsDialog);
@@ -59,7 +62,8 @@ export class NotesView {
   }
   show(){this.visible=true;this.fit();if(this.session)void this.reload();}
   hide(){this.visible=false;}
-  reset(){++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.settingsDialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
+  reset(){this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.settingsDialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
   fit(){if(!this.visible)return;const bar=document.getElementById('workspace-navigation');const bottom=bar?.getBoundingClientRect().top||innerHeight;this.layout.style.height=Math.max(280,bottom-this.layout.getBoundingClientRect().top-8)+'px';}
   controls(){
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
@@ -68,8 +72,8 @@ export class NotesView {
     this.reloadNote.disabled=!this.note||this.busy;this.apply.disabled=this.cancel.disabled=!!this.busy;
     this.download.hidden=!this.note||this.note.kind!=='BINARY'&&this.note.kind!=='ASSET'||this.note.deleted;this.download.disabled=!!this.busy;
     this.settingsButton.disabled=!this.session||this.busy;this.settingsApply.disabled=!this.writable||this.busy;this.settingsCancel.disabled=!!this.busy;
-    for(const input of [...Object.values(this.settingsFields),this.configCheckbox])input.disabled=!this.writable||this.busy;
-    this.empty.hidden=!!this.note&&!this.binary&&!this.note.deleted;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
+    for(const input of [...Object.values(this.settingsFields),this.configCheckbox,this.hideJournalCheckbox])input.disabled=!this.writable||this.busy;
+    this.empty.hidden=!!this.selectedImage||!!this.note&&!this.binary&&!this.note.deleted;this.preview.hidden=!this.selectedImage;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
     if(this.note&&!this.busy)this.status.textContent=this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
   }
   fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}
@@ -81,10 +85,10 @@ export class NotesView {
   async reload(retry=0){
     if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1;this.loadGeneration=current;this.loading=true;
     try{
-      const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;const snapshot=reply.data.snapshot;
+      const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
       const search=this.search.value.trim();const children=new Map(),entries=new Map();
-      if(search||this.showTrash){const rows=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot);children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
-      else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),rows=await this.list({parentId:parent},session,snapshot);children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&this.expanded.has(row.id))pending.push(row.id);}}}
+      if(search||this.showTrash){const rows=(await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot)).filter(entry=>notesEntryVisible(entry,this.info.settings));children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
+      else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),rows=(await this.list({parentId:parent},session,snapshot)).filter(entry=>notesEntryVisible(entry,this.info.settings));children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&this.expanded.has(row.id))pending.push(row.id);}}}
       if(session!==this.session||current!==this.loadGeneration)return;this.children=children;this.entries=entries;this.paint();if(!this.stale)this.error.hidden=true;
       if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=this.note.path;}}
     }catch(error){if(session===this.session&&current===this.loadGeneration){if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
@@ -110,13 +114,14 @@ export class NotesView {
   }
   async select(id,force=false){
     if(!id||this.busy||!force&&this.note?.id===id||!force&&!this.canLeave())return;
-    const session=this.session,current=++this.generation;this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
+    const session=this.session,current=++this.generation;this.clearPreview();this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
     try{
       const reply=await session.request('/notes/entries/'+id);if(session!==this.session||current!==this.generation)return;
-      const metadata={...reply.data};let text='';
+      const metadata={...reply.data};let text='',imageBlob=null;
       if(metadata.kind!=='FOLDER'&&!metadata.deleted){const content=await session.request('/notes/entries/'+id+'/content',{binary:'application/octet-stream'});if(content.etag!==metadata.etag)throw new Error(t('notes.stale'));if(session!==this.session||current!==this.generation)return;
-        if(['MARKDOWN','DAY','WEEK','EVENT'].includes(metadata.kind))text=textDecoder.decode(await content.data.arrayBuffer());else this.binary=true;}
+        if(['MARKDOWN','DAY','WEEK','EVENT'].includes(metadata.kind))text=textDecoder.decode(await content.data.arrayBuffer());else{this.binary=true;if(rasterType(new Uint8Array(await content.data.slice(0,12).arrayBuffer())))imageBlob=content.data;}}
       if(session!==this.session||current!==this.generation)return;this.note=metadata;this.original=text;this.documentTitle.textContent=metadata.path;this.markdown.setValue(text);this.error.hidden=true;
+      if(imageBlob){this.selectedImage=imagePreview({alt:metadata.path.split('/').at(-1),load:async()=>imageBlob,active:()=>session===this.session&&current===this.generation});this.preview.append(this.selectedImage.dom);}
       this.empty.textContent=metadata.deleted?t('notes.deleted'):this.binary?t('notes.binary'):t('notes.select');this.binary||=metadata.kind==='FOLDER';this.root.classList.remove('notes-drawer-open');this.toggle.setAttribute('aria-expanded','false');this.controls();this.paint();
     }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
   }
@@ -143,7 +148,7 @@ export class NotesView {
   async delete(){
     if(this.remove.disabled||!this.canLeave()||!confirm(t('notes.delete_confirm',{path:this.note.path})))return;
     const session=this.session,current=this.generation;this.busy=true;this.controls();
-    try{await session.request('/notes/entries/'+this.note.id,{method:'DELETE',etag:this.note.entryEtag});if(session!==this.session||current!==this.generation)return;this.note=null;this.markdown.clear();this.original='';this.busy=false;await this.reload();this.callbacks.onChanged?.();}
+    try{await session.request('/notes/entries/'+this.note.id,{method:'DELETE',etag:this.note.entryEtag});if(session!==this.session||current!==this.generation)return;this.clearPreview();this.note=null;this.markdown.clear();this.original='';this.busy=false;await this.reload();this.callbacks.onChanged?.();}
     catch(error){if(session===this.session&&current===this.generation){this.stale=true;this.fail(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
   }
@@ -171,18 +176,24 @@ export class NotesView {
   async resolveLink(reference,session=this.session){
     const path=this.linkPath(reference),relative=this.note?relativeNotePath(this.note.path,reference,{legacyAssets:false}):null;if(!path||!relative)throw new Error(t('notes.invalid_link'));
     const find=async path=>{try{return (await session.request('/notes/resolve?'+new URLSearchParams({path}))).data;}catch(error){if(error.status===404)return null;throw error;}};
-    const ordinary=await find(relative);if(path===relative){if(!ordinary)throw new Error(t('notes.invalid_link'));return ordinary;}
+    const ordinary=await find(relative);if(path===relative){
+      if(ordinary)return ordinary;
+      // Keep old root-assets references renderable after nesting the default
+      // folder, without rewriting authored Markdown or shadowing a real path.
+      const folder=this.info?.settings.assetsFolder;
+      const relocated=relative.startsWith('assets/')&&folder&&folder!=='assets'?await find(folder+'/'+relative.slice(7)):null;
+      if(!relocated)throw new Error(t('notes.invalid_link'));return relocated;
+    }
     const candidate=await find(path),legacy=candidate?.kind==='ASSET'?candidate:null;
     if(ordinary&&legacy&&ordinary.id!==legacy.id)throw new Error(t('notes.ambiguous_link'));
     if(!ordinary&&!legacy)throw new Error(t('notes.invalid_link'));return ordinary||legacy;
   }
   image(reference,alt){
-    const dom=node('img');dom.alt=alt;dom.loading='lazy';let disposed=false,url;const session=this.session,current=this.generation;
-    void (async()=>{try{const entry=await this.resolveLink(reference,session);const reply=await session.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});
-      const type=rasterType(new Uint8Array(await reply.data.slice(0,12).arrayBuffer()));if(!type||disposed||session!==this.session||current!==this.generation)return;
-      url=URL.createObjectURL(reply.data.slice(0,reply.data.size,type));dom.src=url;
-    }catch(error){if(!disposed&&session===this.session&&current===this.generation){dom.alt=(alt?alt+' · ':'')+t('notes.unavailable_image');dom.title=error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}})();
-    return {dom,destroy(){disposed=true;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
+    const session=this.session,current=this.generation;
+    return imagePreview({alt,active:()=>session===this.session&&current===this.generation,load:async()=>{
+      const entry=await this.resolveLink(reference,session);
+      return (await session.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;
+    },onError:(error,dom)=>{dom.alt=(alt?alt+' · ':'')+t('notes.unavailable_image');dom.title=error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}});
   }
   async openLink(reference){const session=this.session,current=this.generation;try{const entry=await this.resolveLink(reference,session);if(session===this.session&&current===this.generation)await this.select(entry.id);}catch(error){if(session===this.session&&current===this.generation)this.fail(error);}}
   async downloadAttachment(){
@@ -193,12 +204,12 @@ export class NotesView {
   }
   async openSettings(){
     if(!this.session||this.busy)return;const session=this.session,current=this.generation;this.settingsError.hidden=true;
-    try{const reply=await session.request('/notes/settings');if(session!==this.session||current!==this.generation)return;this.settingsEtag=reply.etag;this.originalSettings=reply.data;for(const [name,input]of Object.entries(this.settingsFields))input.value=reply.data[name];this.configCheckbox.checked=reply.data.syncObsidianConfig;this.controls();this.settingsDialog.showModal();}
+    try{const reply=await session.request('/notes/settings');if(session!==this.session||current!==this.generation)return;this.settingsEtag=reply.etag;this.originalSettings=reply.data;for(const [name,input]of Object.entries(this.settingsFields))input.value=reply.data[name];this.configCheckbox.checked=reply.data.syncObsidianConfig;this.hideJournalCheckbox.checked=!!reply.data.hideJournalFolder;this.controls();this.settingsDialog.showModal();}
     catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
   }
   async saveSettings(){
     if(!this.writable||this.busy)return;const session=this.session,current=this.generation;this.busy=true;this.controls();
-    const body=Object.fromEntries(Object.entries(this.settingsFields).filter(([name,input])=>input.value!==this.originalSettings[name]).map(([name,input])=>[name,input.value]));if(this.configCheckbox.checked!==this.originalSettings.syncObsidianConfig)body.syncObsidianConfig=this.configCheckbox.checked;
+    const body=Object.fromEntries(Object.entries(this.settingsFields).filter(([name,input])=>input.value!==this.originalSettings[name]).map(([name,input])=>[name,input.value]));if(this.configCheckbox.checked!==this.originalSettings.syncObsidianConfig)body.syncObsidianConfig=this.configCheckbox.checked;if(this.hideJournalCheckbox.checked!==!!this.originalSettings.hideJournalFolder)body.hideJournalFolder=this.hideJournalCheckbox.checked;
     try{await session.request('/notes/settings',{method:'PUT',etag:this.settingsEtag,body});if(session!==this.session||current!==this.generation)return;this.info=null;this.folder=null;this.settingsDialog.close();this.busy=false;await this.reload();this.callbacks.onChanged?.();}
     catch(error){if(session===this.session&&current===this.generation){this.settingsError.hidden=false;this.settingsError.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}

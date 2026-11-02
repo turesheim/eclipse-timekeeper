@@ -1223,5 +1223,7 @@
   "focus.remove": "Remove focus area",
   "focus.hint": "Select clients for each area. An area with no clients shows no client-related work. No focus shows everything.",
   "focus.finish_edit": "Finish or cancel the current edit before changing focus.",
-  "focus.running_outside": "Work outside this focus"
+  "focus.running_outside": "Work outside this focus",
+  "notes.hide_journal": "Hide journal folder",
+  "notes.hide_journal_help": "Hide the journal folder, including its notes and assets, from Notes navigation and search. Journal views, links and synchronization remain available."
 }

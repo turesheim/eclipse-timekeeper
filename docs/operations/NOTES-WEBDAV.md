@@ -7,6 +7,13 @@ phone, use the folder button to open navigation. Rename/move preserves a
 resource's identity. Recently deleted items retain their bytes and can be
 restored if their destination is available. Trash counts against storage limits.
 
+**Hide journal folder** in Notes settings is a saved account preference. It hides
+the configured journal folder and its descendants from navigation, search and
+trash, including after a journal-folder rename. Existing editor drafts remain
+open. Today, Calendar, journal links, images and WebDAV synchronization continue
+to use the same resources. The preference defaults to off and is retained in
+account archives; older archives default to showing the folder.
+
 Markdown source, frontmatter, unknown metadata, empty files, attachment bytes and
 unsupported Obsidian syntax are stored without rewriting. An unchanged editor
 save does not normalize the file. Formatted edits can normalize Markdown body
@@ -14,7 +21,10 @@ syntax; frontmatter remains separate and read-only in the editor. Use a local
 source editor to change frontmatter. Wikilinks and Obsidian embeds remain literal
 source; Timekeeper does not implement Obsidian's link cache or execute plugins.
 Standard relative Markdown links navigate within the collection. Verified raster
-images use authenticated previews; other attachments can be downloaded. Renaming
+images use authenticated previews, both inline in formatted Markdown and in the
+content pane when selected in the navigation tree; other attachments can be downloaded.
+Journal image references also resolve companions imported through vault synchronization,
+including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
 
 ## Connection and folder choices
@@ -124,7 +134,17 @@ synchronization; do not disable Timekeeper's guards to accommodate these clients
 
 ## Journal and event folders
 
-Notes settings default to `journal`, `events` and `assets`. Only direct children
+New collections use `journal`, `events` and `journal/assets`. Legacy collections
+using the old default `assets` folder move it under `journal` on first
+access, retaining resource IDs, bytes and content ETags. An existing destination
+is never overwritten: if the destination is occupied or exceeds portable path
+limits, the old layout remains until you resolve it using Notes settings. Other configured asset
+folder paths are preserved; change **Assets folder** to `<journal folder>/assets` to
+move them atomically. Review the client's sync preview after this folder move.
+The Notes renderer also resolves old root-`assets/` references to the relocated
+folder when their original path is absent, without rewriting Markdown. Review
+those paths in external editors after synchronizing the folder move. Explicit
+account-archive restores retain their reviewed folder layout. Only direct children
 of the journal folder named `YYYY-MM-DD.md` or `YYYY-Www.md` bind to daily/ISO-week
 notes. Date-looking files elsewhere remain ordinary Markdown. Event files in the
 event folder use the existing `event-<subscription UUID>-<occurrence key>.md`

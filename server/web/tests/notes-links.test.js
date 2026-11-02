@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {relativeNotePath,rasterType} from '../src/notes-links.js';
+import {relativeNotePath,rasterType,notesEntryVisible} from '../src/notes-links.js';
 import {needsSource} from '../src/markdown-document.js';
 
 test('collection-relative links decode once and cannot escape or load external images',()=>{
@@ -26,4 +26,16 @@ test('vault-relative images enter rich mode only with an explicit safe resolver'
   assert.equal(needsSource('![Pixel](../../outside.png)',allowed),true);
   assert.equal(needsSource('![Pixel](https://external.example/image.png)',allowed),true);
   assert.equal(needsSource('![[image.png]]',allowed),true);
+});
+
+test('hidden journals exclude their complete subtree and old journal tombstones without hiding similar names',()=>{
+  const settings={hideJournalFolder:true,journalFolder:'Private/Journål'};
+  for(const path of ['Private/Journål','PRIVATE/JOURNÅL/2026-11-01.md','Private/Journål/assets/photo.png'])
+    assert.equal(notesEntryVisible({kind:'BINARY',path},settings),false,path);
+  for(const path of ['Private','Private/Journål-backup/Keep.md','events/event.md','Notes/Keep.md'])
+    assert.equal(notesEntryVisible({kind:'MARKDOWN',path},settings),true,path);
+  assert.equal(notesEntryVisible({kind:'DAY',path:'old-journal/2026-11-01.md'},settings),false);
+  assert.equal(notesEntryVisible({kind:'WEEK',path:'old-journal/2026-W44.md',deleted:true},settings),false);
+  assert.equal(notesEntryVisible({kind:'DAY',path:'journal/2026-11-01.md'},{hideJournalFolder:false}),true);
+  assert.equal(notesEntryVisible({kind:'FOLDER',path:'journal'},{}),true);
 });

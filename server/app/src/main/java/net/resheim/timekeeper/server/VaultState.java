@@ -12,7 +12,7 @@ final class VaultState {
     private final VaultLimits limits;
     VaultState(ServerStore store,VaultLimits limits){this.store=store;this.limits=limits;}
     ObjectNode get(){return store.find(TYPE,ID).map(value->((ObjectNode)value).deepCopy()).orElseGet(()->object()
-            .put("id",ID.toString()).put("ownerId",store.owner()).put("version",0).put("totalBytes",0).put("entries",0).put("initialized",false));}
+            .put("id",ID.toString()).put("ownerId",store.owner()).put("version",0).put("totalBytes",0).put("entries",0).put("initialized",false).put("assetsLayoutReviewed",false));}
     void check(long bytes,int entries){check(get(),bytes,entries,false);}
     private void check(ObjectNode current,long bytes,int entries,boolean backfill){
         final long nextBytes,nextEntries;
@@ -29,8 +29,9 @@ final class VaultState {
                 .put("entries",current.path("entries").asLong()+entries));
     }
     ObjectNode initialized(){var current=get();return current.path("initialized").asBoolean()?current:persist(current,current.deepCopy().put("initialized",true));}
+    void assetsLayoutReviewed(){var current=get();if(!current.path("assetsLayoutReviewed").asBoolean())persist(current,current.deepCopy().put("assetsLayoutReviewed",true));}
     void ensureIdentity(){var current=get();if(current.path("version").asLong()>0&&!current.hasNonNull("collectionId"))persist(current,current.deepCopy());}
-    void resetForImport(){var current=get();persist(current,current.deepCopy().put("totalBytes",0).put("entries",0).put("initialized",false));}
+    void resetForImport(){var current=get();persist(current,current.deepCopy().put("totalBytes",0).put("entries",0).put("initialized",false).put("assetsLayoutReviewed",false));}
     private ObjectNode persist(ObjectNode previous,ObjectNode value){
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
         if(!value.hasNonNull("collectionId"))value.put("collectionId",UUID.randomUUID().toString());

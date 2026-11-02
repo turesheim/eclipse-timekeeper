@@ -685,6 +685,9 @@ typed entries. `VAULT_RECYCLE` retains deleted legacy bytes, associated with the
 canonical deletion version. Entry tombstones retain their identity and deletion
 batch; recursive recovery refuses conflicting destinations. `VAULT_SETTINGS`
 holds configured journal/event/assets roots and explicit `.obsidian` opt-in.
+`VAULT_SETTINGS.hideJournalFolder` is an optional account presentation preference
+(default false) for Notes navigation and search; it never changes resource
+authorization or synchronization.
 `VAULT_STATE` holds quota counters, a monotonic namespace version and a random
 collection identity. Deleted retained bytes count toward quota.
 

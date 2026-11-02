@@ -31610,6 +31610,11 @@
           },
           "syncObsidianConfig": {
             "type": "boolean"
+          },
+          "hideJournalFolder": {
+            "type": "boolean",
+            "default": false,
+            "description": "Hide the configured journal folder and its descendants from Notes navigation, search and trash. Journal views, image references and synchronization remain available."
           }
         }
       },
@@ -31656,6 +31661,11 @@
           },
           "syncObsidianConfig": {
             "type": "boolean"
+          },
+          "hideJournalFolder": {
+            "type": "boolean",
+            "default": false,
+            "description": "Hide the configured journal folder and its descendants from Notes navigation, search and trash. Journal views, image references and synchronization remain available."
           }
         }
       },
@@ -31974,6 +31984,11 @@
               },
               "syncObsidianConfig": {
                 "type": "boolean"
+              },
+              "hideJournalFolder": {
+                "type": "boolean",
+                "default": false,
+                "description": "Hide the configured journal folder and its descendants from Notes navigation, search and trash. Journal views, image references and synchronization remain available."
               }
             }
           },

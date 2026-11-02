@@ -22,6 +22,18 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_journal_visibility_is_optional_and_boolean_in_settings_and_archives(self):
+        for value in (True, False):
+            self.assertTrue(validator('VaultSettingsInput').is_valid({'hideJournalFolder': value}))
+        for value in ('true', 1, None):
+            self.assertFalse(validator('VaultSettingsInput').is_valid({'hideJournalFolder': value}))
+        self.assertTrue(validator('VaultSettingsInput').is_valid({}))
+        archive_settings = CONTRACT['components']['schemas']['AccountArchiveVault']['properties']['settings']
+        legacy = {'journalFolder': 'journal', 'eventsFolder': 'events', 'assetsFolder': 'assets', 'syncObsidianConfig': False}
+        self.assertTrue(Draft202012Validator(archive_settings).is_valid(legacy))
+        self.assertTrue(Draft202012Validator(archive_settings).is_valid({**legacy, 'hideJournalFolder': True}))
+        self.assertFalse(Draft202012Validator(archive_settings).is_valid({**legacy, 'hideJournalFolder': 'true'}))
+
     def test_task_titles_accept_google_limit_without_widening_other_names(self):
         title='T'*1024
         value={'projectId':None,'parentTaskId':None,'summary':title,'url':None}

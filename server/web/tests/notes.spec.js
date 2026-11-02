@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
+import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {browserRequest} from './browser-request.js';
 
@@ -52,9 +53,11 @@ test('Notes settings preserve journal associations and relative images use authe
   expect((await(await api('GET','/notes/resolve?path=Private%2FJournal%2F'+day+'.md')).json()).id).toBe(identity.id);expect((await(await api('GET','/day-labels/'+day)).json()).text).toBe('Independent label');
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
   await api('PUT','/notes/files?path=Notes%2Fimage.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
-  await api('PUT','/notes/files?path=Notes%2FImage.md',Buffer.from('# Image\n\n![Pixel](image.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Private%2FJournal%2Fassets%2Flegacy.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FImage.md',Buffer.from('# Image\n\n![Pixel](image.png)\n\n![Legacy](../assets/legacy.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Image.md',exact:true}).click();
   await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#notes-formatted img[alt=Pixel]')).toHaveAttribute('src',/^blob:/);await expect.poll(()=>page.locator('#notes-formatted img[alt=Pixel]').evaluate(image=>image.naturalWidth)).toBe(1);
+  await expect.poll(()=>page.locator('#notes-formatted img[alt=Legacy]').evaluate(image=>image.naturalWidth)).toBe(1);
   await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
   const violations=await new AxeBuilder({page}).include('#notes-panel').analyze();expect(violations.violations).toEqual([]);
 });
@@ -73,4 +76,74 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
   try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#notes-search')).toBeVisible();
     await reader.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await reader.locator('#notes-navigation').getByRole('button',{name:'Notes/Theme.md',exact:true}).click();await expect(reader.locator('#notes-body')).toHaveValue('# Theme note\n');await expect(reader.locator('#notes-body')).not.toBeEditable();await expect(reader.locator('.notes-footer button')).toBeDisabled();
   }finally{await session.close();}
+});
+
+test('uploaded images appear immediately and remain visible after saving and reopening Markdown',async({page,request})=>{
+  const api=await setup(page,request);
+  await api('PUT','/notes/files?path=Notes%2FUpload.md',Buffer.from('# Uploaded image\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Upload.md',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  await page.locator('#notes-formatted [role=textbox]').click();await page.keyboard.press('End');await page.keyboard.press('Enter');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  await page.locator('.notes-markdown input[type=file][accept]').setInputFiles({name:'uploaded pixel.png',mimeType:'image/png',buffer:png});
+  const image=page.locator('#notes-formatted img[alt="uploaded pixel.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
+  await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+  const stored=await(await api('GET','/notes/resolve?path=Notes%2FUpload.md')).json();
+  const body=await(await api('GET','/notes/entries/'+stored.id+'/content')).text();expect(body).toContain('uploaded%20pixel.png');expect(body).not.toContain('blob:');
+  await page.getByRole('button',{name:'Reload from server',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
+});
+
+test('selecting a raster asset replaces the editor with an authenticated image preview',async({page,request})=>{
+  const api=await setup(page,request);
+  const png=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=1200;const context=canvas.getContext('2d');context.fillStyle='#176b59';context.fillRect(0,0,1600,1200);context.fillStyle='#f1c453';context.fillRect(200,200,1200,800);return canvas.toDataURL('image/png').split(',')[1];}),'base64');
+  await api('PUT','/notes/files?path=Notes%2Fpreview.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FPreview.md',Buffer.from('Preview note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Preview.md',exact:true}).click();
+  await page.locator('#notes-body').fill('Unsaved draft');page.once('dialog',dialog=>dialog.dismiss());
+  await page.locator('#notes-navigation').getByRole('button',{name:'Notes/preview.png',exact:true}).click();
+  await expect(page.locator('#notes-body')).toHaveValue('Unsaved draft');
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#notes-navigation').getByRole('button',{name:'Notes/preview.png',exact:true}).click();
+  const image=page.locator('.notes-image-preview img');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1600);
+  await expect(page.locator('.notes-markdown')).toBeHidden();await expect(page.locator('.notes-footer button')).toBeHidden();
+  await captureScreenshot(page,{path:'test-results/notes-image-preview.png',fullPage:true});
+  const bounds=await image.boundingBox(),pane=await page.locator('.notes-image-preview').boundingBox();expect(bounds.width).toBeLessThanOrEqual(pane.width);expect(bounds.height).toBeLessThanOrEqual(pane.height);
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.setViewportSize({width:1280,height:900});await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Preview.md',exact:true}).click();
+  await expect(image).toHaveCount(0);await expect(page.locator('#notes-body')).toHaveValue('Preview note');
+});
+
+test('Notes can hide the configured journal without losing drafts or journal access',async({page,request})=>{
+  const api=await setup(page,request),day='2026-11-01';
+  await api('PUT','/notes/files?path=journal%2F'+day+'.md',Buffer.from('Journal original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FKeep.md',Buffer.from('General note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'journal',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'journal/'+day+'.md',exact:true}).click();
+  await page.locator('#notes-body').fill('Private unsaved draft');
+  await page.getByRole('button',{name:'Notes settings',exact:true}).click();
+  await expect(page.getByLabel('Hide journal folder',{exact:true})).not.toBeChecked();
+  await page.getByLabel('Hide journal folder',{exact:true}).check();
+  await page.getByLabel('Journal folder',{exact:true}).fill('Private/Journal');
+  await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Notes settings',exact:true})).toBeHidden();
+  await expect(page.locator('#notes-body')).toHaveValue('Private unsaved draft');
+  expect((await(await api('GET','/day-notes/'+day+'/content')).json()).body).toBe('Journal original');
+  await page.locator('#notes-search').fill('2026');await expect(page.locator('.notes-tree [role=treeitem]')).toHaveCount(0);
+  await page.locator('#notes-search').fill('Keep');await expect(page.locator('#notes-navigation').getByRole('button',{name:'Notes/Keep.md',exact:true})).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Keep.md',exact:true}).click();
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();
+  await page.getByRole('button',{name:'Notes settings',exact:true}).click();await expect(page.getByLabel('Hide journal folder',{exact:true})).toBeChecked();
+  await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.locator('#notes-navigation').getByRole('button',{name:'Private',exact:true}).click();await expect(page.locator('#notes-navigation').getByRole('button',{name:'Private/Journal',exact:true})).toHaveCount(0);
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);await expect(page.locator('#today-journal-formatted')).toContainText('Journal original');
+  await page.locator('[data-tab=notes]').click();await page.getByRole('button',{name:'Notes settings',exact:true}).click();await page.getByLabel('Hide journal folder',{exact:true}).uncheck();
+  await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.locator('#notes-navigation').getByRole('button',{name:'Private/Journal',exact:true})).toBeVisible();
 });

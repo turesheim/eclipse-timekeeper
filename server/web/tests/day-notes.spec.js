@@ -143,8 +143,7 @@ test('journal images and file attachments survive editing and remain available o
     const upload=page.waitForResponse(response=>response.url().includes('/api/v1/journal-assets/')&&response.request().method()==='PUT');
     await dialog(page).locator('input[type=file][accept]').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:png});
     const uploaded=await upload;expect(uploaded.status()).toBe(201);
-    const image=dialog(page).locator('.ProseMirror img[src^="/api/v1/journal-assets/"]');await expect(image).toBeVisible();
-    const src=await image.getAttribute('src');expect(src).toMatch(/^\/api\/v1\/journal-assets\/[a-f0-9-]+\.png$/);
+    const image=dialog(page).locator('.ProseMirror img[alt="photo.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
     await dialog(page).locator('input[type=file]:not([accept])').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('attached text')});
     await expect(dialog(page).locator('.ProseMirror a')).toContainText('notes.txt');
     await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).toBeHidden();
@@ -152,14 +151,29 @@ test('journal images and file attachments survive editing and remain available o
     const imagePath=saved.body.match(/!\[[^\]]*\]\((assets\/[a-f0-9-]+\.png)\)/)?.[1];
     const filePath=saved.body.match(/\[notes\.txt\]\((assets\/[a-f0-9-]+\.txt)\)/)?.[1];
     expect(imagePath).toBeTruthy();expect(filePath).toBeTruthy();
+    const collection=await(await api('GET','/notes')).json();expect(collection.settings.assetsFolder).toBe('journal/assets');
+    const asset=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:'journal/'+imagePath}))).json();expect(asset.kind).toBe('ASSET');
     const imageReply=await api('GET','/journal-assets/'+imagePath.slice(7));expect(Buffer.from(await imageReply.body())).toEqual(png);
     const attachment=await api('GET','/journal-assets/'+filePath.slice(7));expect(await attachment.text()).toBe('attached text');
     await note(page).click();await dialog(page).getByRole('button',{name:'Formatted'}).click();
-    await expect(dialog(page).locator('.ProseMirror img[src^="/api/v1/journal-assets/"]')).toBeVisible();
+    await expect.poll(()=>dialog(page).locator('.ProseMirror img[alt="photo.png"]').evaluate(img=>img.naturalWidth)).toBe(1);
     const token=await(await api('POST','/auth/tokens',{name:'Attachment browser test',permissions:['read'],expiresAt:null})).json();
     const basic=Buffer.from('webdav:'+token.token).toString('base64');
     const dav=await request.get('/dav/journal/'+imagePath,{headers:{Authorization:'Basic '+basic}});
     expect(dav.status()).toBe(200);expect(Buffer.from(await dav.body())).toEqual(png);
+    // A file imported through the vault remains BINARY, rather than a native
+    // JOURNAL_ASSET. Both must render from the same journal Markdown document.
+    await api('PUT','/notes/files?path=journal%2Fassets%2Fsynced%20photo.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+    const content=await api('GET','/day-notes/2026-05-17/content');
+    await api('PUT','/day-notes/2026-05-17/content',{body:saved.body+'\n\n![Synced image](assets/synced%20photo.png)\n'},{'If-Match':content.headers().etag});
+    const viewer=await context(browser);
+    try{
+      const read=await viewer.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();
+      await month(read);await note(read).click();await dialog(read).getByRole('button',{name:'Formatted',exact:true}).click();
+      const preview=dialog(read).locator('.ProseMirror img[alt="photo.png"]');await expect.poll(()=>preview.evaluate(img=>img.naturalWidth)).toBe(1);
+      await expect.poll(()=>dialog(read).locator('.ProseMirror img[alt="Synced image"]').evaluate(img=>img.naturalWidth)).toBe(1);
+      await expect(dialog(read).locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');
+    }finally{await viewer.close();}
   }finally{await owner.close();}
 });
 

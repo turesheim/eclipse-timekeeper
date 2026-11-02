@@ -2,6 +2,7 @@ package net.resheim.timekeeper.server;
 
 import static net.resheim.timekeeper.server.JsonValues.*;
 import java.util.*;
+import java.nio.charset.StandardCharsets;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** All methods run in the caller's owner transaction, including first indexing. */
@@ -13,7 +14,7 @@ final class VaultCatalog {
     VaultCatalog(ServerStore store,VaultLimits limits){this.store=store;this.limits=limits;index=new VaultIndex(store);state=new VaultState(store,limits);}
     void initialize(){
         state.ensureIdentity();
-        if(state.get().path("initialized").asBoolean())return;
+        if(state.get().path("initialized").asBoolean()){nestDefaultAssets();return;}
         index.root();var settings=new VaultSettings(store).get();
         for(String field:List.of("journalFolder","eventsFolder","assetsFolder"))folders(new VaultPath(settings.path(field).asText()),true);
         for(String type:VaultSources.LEGACY)store.scan(type,value->{
@@ -23,7 +24,21 @@ final class VaultCatalog {
             if(entry==null){entry=createBinding(ref);state.changed(snapshot.byteLength(),1,true);}
             index.content(uuid(entry.path("id")),snapshot,snapshot.byteLength());
         });
-        state.initialized();
+        state.initialized();nestDefaultAssets();
+    }
+    /** Upgrade the old default once, keeping canonical IDs/bytes and custom paths. */
+    private void nestDefaultAssets(){
+        if(state.get().path("assetsLayoutReviewed").asBoolean())return;
+        var settings=new VaultSettings(store);var current=settings.get();
+        var journal=new VaultPath(current.path("journalFolder").asText());
+        // Preserve valid existing configurations when an extra path component
+        // would exceed portable limits, or the destination is already occupied.
+        if(current.path("assetsFolder").asText().equals("assets")&&journal.segments().size()<VaultPath.MAX_DEPTH
+                &&journal.value().getBytes(StandardCharsets.UTF_8).length+"/assets".length()<=VaultPath.MAX_BYTES){
+            var destination=journal.resolve("assets");
+            if(index.at(destination,false)==null)new VaultCollection(store,limits).configure(etag(current),object().put("assetsFolder",destination.value()));
+        }
+        state.assetsLayoutReviewed();
     }
     ObjectNode folders(VaultPath path,boolean backfill){
         var current=index.root();VaultPath cursor=VaultPath.root();
@@ -48,6 +63,7 @@ final class VaultCatalog {
     static Mutation before(ServerStore store,VaultSources.Ref ref,byte[] next){
         var catalog=new VaultCatalog(store,store.vaultLimits());
         if(!catalog.state.get().path("initialized").asBoolean())return null;
+        catalog.initialize();
         var entry=catalog.index.referenced(ref.type(),ref.id());
         var source=new VaultSources(store,store.vaultLimits(),ref);var previous=source.snapshot();
         // A native delete of a never-created note is not a recoverable file.

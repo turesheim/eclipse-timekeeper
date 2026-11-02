@@ -18,3 +18,12 @@ export function rasterType(bytes){
   if(text.startsWith('RIFF')&&text.slice(8,12)==='WEBP')return 'image/webp';
   return null;
 }
+
+/** A presentation preference: resource access and synchronization stay intact. */
+export function notesEntryVisible(entry,{hideJournalFolder=false,journalFolder='journal'}={}){
+  if(!hideJournalFolder)return true;
+  if(['DAY','WEEK'].includes(entry.kind))return false;
+  const fold=value=>value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
+  const path=fold(entry.path),folder=fold(journalFolder);
+  return path!==folder&&!path.startsWith(folder+'/');
+}
