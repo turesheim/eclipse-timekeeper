@@ -41,7 +41,7 @@ test('rich paste retains safe structure and URL-over-selection preserves the sel
   await engine(page,'Text to link.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');
   await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','Heading\nBold');data.setData('text/html','<h2 onclick="bad()">Heading</h2><p><strong>Bold</strong><img src="https://evil.invalid/track"><script>window.bad=true</script></p>');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
   await expect(page.locator('#experience-editor h2')).toHaveText('Heading');await expect(page.locator('#experience-editor strong')).toHaveText('Bold');await expect(page.locator('#experience-editor img')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.bad)).toBeUndefined();
-  await page.locator('#experience-editor strong').click();await page.keyboard.press('Home');await page.keyboard.press('Shift+End');
+  await page.locator('#experience-editor strong').dblclick();await expect.poll(()=>page.evaluate(()=>globalThis.experience.selectedText())).toBe('Bold');
   await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','https://example.org/design');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
   await expect(page.locator('#experience-editor a[href="https://example.org/design"]')).toHaveText('Bold');
 });
@@ -60,7 +60,7 @@ test('source tools preserve mixed line endings and provide highlighted source, s
   await page.locator('#experience-field').getByRole('button',{name:'Source and preview',exact:true}).click();await expect(page.locator('.markdown-split-preview h1')).toHaveText('Title');
 });
 test('table commands edit rows, columns and alignment and preserve other blocks',async({page})=>{
-  await engine(page,'Before.\n\n| A | B |\n| --- | --- |\n| One | Two |\n\nAfter.\n');await page.locator('#experience-editor td').first().click();
+  await engine(page,'Before.\n\n| A | B |\n| --- | --- |\n| One | Two |\n\nAfter.\n');await page.locator('#experience-editor td p').first().click({position:{x:3,y:3}});await expect.poll(()=>page.evaluate(()=>globalThis.experience.context().table)).toBe(true);
   expect(await page.evaluate(()=>globalThis.experience.command('row_after'))).toBe(true);await expect(page.locator('#experience-editor tr')).toHaveCount(3);
   expect(await page.evaluate(()=>globalThis.experience.command('column_after'))).toBe(true);await expect(page.locator('#experience-editor tr').first().locator('th')).toHaveCount(3);
   expect(await page.evaluate(()=>globalThis.experience.command('align_right'))).toBe(true);expect(await source(page)).toContain('Before.');expect(await source(page)).toContain('After.');

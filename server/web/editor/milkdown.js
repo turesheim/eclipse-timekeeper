@@ -45,7 +45,7 @@ const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>!['code','
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).map(([key,entry])=>[key,semantic(entry)]));
-  return value;
+  return typeof value==='string'?value.replace(/\r\n?/g,'\n'):value;
 };
 function taskItem(node,view,getPos,taskLabel){
   const dom=document.createElement('li'),contentDOM=document.createElement('div'),checkbox=document.createElement('input');
@@ -243,6 +243,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       focus:()=>view.focus(),
       setReadOnly,
       command,
+      context:()=>({table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
       selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},
       active:name=>{const type=view.state.schema.marks[{bold:'strong',italic:'emphasis',strike:'strike_through',inline_code:'inlineCode',link:'link'}[name]||name];return !!type&&!!type.isInSet(view.state.selection.$from.marks());},
