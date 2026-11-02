@@ -117,3 +117,20 @@
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { flex: 1 1 100%; flex-wrap: wrap; }
   .markdown-split:not([hidden]) { grid-template-columns: minmax(0,1fr); }
 }
+.markdown-code-block { border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
+.markdown-code-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .25rem .5rem; background: var(--bs-tertiary-bg); font-size: .8rem; }
+.markdown-code-controls input { width: 8rem; margin-inline-start: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); }
+.markdown-code-controls button { border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); color: var(--bs-body-color); padding: .25rem .5rem; border-radius: .25rem; }
+.markdown-code-block pre { margin: 0; }
+.tok-keyword,.tok-operator { color: var(--bs-primary-text-emphasis); font-weight: 600; }
+.tok-string,.tok-regexp { color: var(--bs-success-text-emphasis); }
+.tok-number,.tok-bool,.tok-null { color: var(--bs-danger-text-emphasis); }
+.tok-comment,.tok-meta { color: var(--bs-secondary-color); font-style: italic; }
+.markdown-callout { border-inline-start: .25rem solid var(--bs-info); background: var(--bs-info-bg-subtle); padding: .5rem .75rem; margin-block: .75rem; }
+.markdown-callout > div:first-child { display: flex; gap: .5rem; align-items: center; }
+.markdown-callout > div:first-child button { border: 0; background: transparent; color: var(--bs-info-text-emphasis); font-weight: 700; }
+.markdown-callout input { flex: 1; min-width: 0; background: transparent; color: inherit; border: 0; font-weight: 600; }
+[data-footnote-reference] { color: var(--bs-link-color); cursor: pointer; }
+[data-footnote-definition] { border-block-start: 1px solid var(--bs-border-color); padding-inline-start: .75rem; font-size: .9rem; }
+[data-footnote-definition]::before { content: attr(data-footnote-definition) ". "; color: var(--bs-secondary-color); }
+.markdown-asset-list { display: flex; flex-direction: column; gap: .25rem; margin-block: .75rem; max-height: 50vh; overflow: auto; }

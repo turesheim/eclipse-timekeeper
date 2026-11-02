@@ -1252,5 +1252,13 @@
   "markdown.align_center": "Midtstill kolonne",
   "markdown.align_right": "Høyrejuster kolonne",
   "markdown.delete_table": "Slett tabell",
-  "markdown.upload_progress": "Laster opp {{name}} ({{current}}/{{total}})…"
+  "markdown.upload_progress": "Laster opp {{name}} ({{current}}/{{total}})…",
+  "markdown.code_language": "Kodespråk",
+  "markdown.copy_code": "Kopier kode",
+  "markdown.copied": "Kopiert",
+  "markdown.copy_failed": "Kopiering mislyktes",
+  "markdown.footnote": "Fotnote",
+  "markdown.toggle_callout": "Utvid eller skjul uthevet merknad",
+  "markdown.callout_title": "Tittel på uthevet merknad",
+  "markdown.existing_asset": "Eksisterende fil i hvelvet"
 }

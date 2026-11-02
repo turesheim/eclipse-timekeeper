@@ -31,6 +31,11 @@ export function buildExperience(field,load,loadSource){
       if(generation!==f.generation){await created?.destroy();return;}f.previewEditor=created;
     },250);
   };
+  f.assetDialog=el('dialog');f.assetDialog.className='app-dialog markdown-asset-dialog';f.assetDialog.setAttribute('aria-label',t('markdown.existing_asset'));
+  const assetHeading=el('h2',t('markdown.existing_asset')),assetSearch=el('input');assetSearch.type='search';assetSearch.className='form-control';assetSearch.setAttribute('aria-label',t('notes.search'));const assetList=el('div');assetList.className='markdown-asset-list';const closeAsset=action('ui.close',()=>f.assetDialog.close());f.assetDialog.append(assetHeading,assetSearch,assetList,closeAsset);f.root.append(f.assetDialog);
+  let assetGeneration=0;
+  const listAssets=async()=>{const current=++assetGeneration,generation=f.generation;assetList.textContent=t('markdown.loading');try{const entries=await f.resources.complete(assetSearch.value);if(current!==assetGeneration||generation!==f.generation)return;assetList.replaceChildren();for(const entry of entries.filter(entry=>['ASSET','BINARY'].includes(entry.kind))){const pick=el('button',entry.path);pick.type='button';pick.className='btn btn-outline-secondary';pick.addEventListener('click',()=>{if(f.readOnly)return;const image=/\.(png|jpg|jpeg|gif|webp)$/i.test(entry.path);if(f.editor)f.editor.command(image?'wiki_embed':'wiki_link',{value:entry.path});else{const at=f.text.selectionStart;f.text.setRangeText((image?'!':'')+'[['+entry.path+']]',at,f.text.selectionEnd,'end');f.onChange();}f.assetDialog.close();});assetList.append(pick);}if(!assetList.children.length)assetList.textContent=t('notes.empty');}catch(error){assetList.textContent=error.message;}};
+  f.assetPicker=action('markdown.existing_asset',()=>{if(f.readOnly||!f.resources?.complete)return;assetSearch.value='';f.assetDialog.showModal();void listAssets();assetSearch.focus();},'folder');f.toolbar.append(f.assetPicker);assetSearch.addEventListener('input',()=>void listAssets());
   f.outline=el('details');f.outline.className='markdown-outline';f.outline.append(el('summary',t('markdown.outline')));f.outlineItems=el('nav');f.outlineItems.setAttribute('aria-label',t('markdown.outline'));f.outline.append(f.outlineItems);f.metadata.after(f.outline);
   f.outline.addEventListener('toggle',()=>{if(f.outline.open)paintOutline();});
   const paintOutline=()=>{
@@ -50,6 +55,7 @@ export function buildExperience(field,load,loadSource){
   const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
   f.updateExperience=()=>{
     if(f.outline.open)paintOutline();
+    f.assetPicker.disabled=f.readOnly||!f.resources?.complete;
     f.structured.hidden=!f.editor||f.readOnly;
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
     popup.hidden=!f.editor||f.readOnly||!f.editor.selectedText();if(!popup.hidden)place(popup,f.editor.selectionRect()||{left:8,bottom:8});

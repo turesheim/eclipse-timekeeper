@@ -23,6 +23,7 @@ export function vaultEditorResources(session,origin=()=>'',open){
     return matches[0];
   };
   return {resolveWiki,
+    previewWiki:async reference=>{const current=session(),entry=await resolveWiki(reference);if(!['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind))return entry.path;const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});if(current!==session())throw new Error(t('notes.invalid_link'));return entry.path+'\n'+(await reply.data.slice(0,1500).text()).slice(0,600);},
     complete:async query=>(await catalog()).filter(e=>!e.deleted&&e.kind!=='FOLDER'&&e.path.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0,30),
     openWiki:async reference=>{const entry=await resolveWiki(reference),heading=wikiReference(reference)?.heading||'';if(open)return open(entry,heading);document.dispatchEvent(new CustomEvent(vaultNoteNavigation,{detail:{entry,heading}}));},
     wikiImage:(reference,alt)=>{const current=session();return imagePreview({alt,active:()=>current===session(),load:async()=>{const entry=await resolveWiki(reference);return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});}

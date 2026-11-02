@@ -1,3 +1,4 @@
+import {highlightTree,classHighlighter} from '@lezer/highlight';
 import {EditorState,Compartment} from '@codemirror/state';
 import {EditorView,keymap,lineNumbers,highlightActiveLine,drawSelection} from '@codemirror/view';
 import {defaultKeymap,history,historyKeymap,indentWithTab} from '@codemirror/commands';
@@ -25,4 +26,10 @@ export function createSourceEditor({root,value,label,readOnly=false,changed,sele
     position:()=>({anchor:view.state.selection.main.anchor,head:view.state.selection.main.head,scrollTop:view.scrollDOM.scrollTop}),
     select:(anchor,head=anchor)=>{const size=view.state.doc.length;view.dispatch({selection:{anchor:Math.min(anchor,size),head:Math.min(head,size)},scrollIntoView:true});view.focus();},
     destroy:()=>view.destroy()};
+}
+
+// Shared with the rich editor's code decorations, loaded only for code content.
+export function highlightCode(text,name){
+  const support=language(String(name||'').toLowerCase());if(!support)return [];
+  const spans=[];highlightTree(support.language.parser.parse(text),classHighlighter,(from,to,className)=>spans.push({from,to,className}));return spans;
 }

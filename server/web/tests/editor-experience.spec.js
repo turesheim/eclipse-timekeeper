@@ -65,3 +65,12 @@ test('table commands edit rows, columns and alignment and preserve other blocks'
   expect(await page.evaluate(()=>globalThis.experience.command('column_after'))).toBe(true);await expect(page.locator('#experience-editor tr').first().locator('th')).toHaveCount(3);
   expect(await page.evaluate(()=>globalThis.experience.command('align_right'))).toBe(true);expect(await source(page)).toContain('Before.');expect(await source(page)).toContain('After.');
 });
+test('callouts and footnotes render, remain editable and preserve Markdown references',async({page})=>{
+  const value='Text[^one].\n\n> [!NOTE] Decision\n> Keep this callout.\n\n[^one]: A **useful** footnote.\n\nTail.\n';await engine(page,value);
+  await expect(page.locator('.markdown-callout')).toContainText('Keep this callout.');await expect(page.locator('[data-footnote-reference]')).toHaveText('one');await expect(page.locator('[data-footnote-definition]')).toContainText('useful');expect(await source(page)).toBe(value);
+  await page.locator('.markdown-callout input').fill('New decision');await page.locator('.markdown-callout input').press('Tab');const edited=await source(page);expect(edited).toContain('> [!NOTE] New decision');expect(edited).toContain('[^one]: A **useful** footnote.');
+});
+test('code blocks expose language and copy controls and highlight without replacing their source',async({page})=>{
+  const value='~~~js\nconst answer = 42;\n~~~\n';await engine(page,value);await expect(page.locator('#experience-editor .tok-keyword')).toContainText('const');expect(await source(page)).toBe(value);
+  await page.getByRole('textbox',{name:'Code language',exact:true}).fill('javascript');await page.getByRole('textbox',{name:'Code language',exact:true}).press('Tab');expect(await source(page)).toContain('```javascript');await expect(page.getByRole('button',{name:'Copy code',exact:true})).toBeVisible();
+});

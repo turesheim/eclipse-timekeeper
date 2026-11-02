@@ -1,3 +1,4 @@
+import {codeTools} from './code-tools.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
@@ -10,7 +11,7 @@ import {InputRule} from '@milkdown/kit/prose/inputrules';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
 import {markdownSource} from './markdown-source.js';
 import {structuredCommand} from './structured-commands.js';
-import {headingAnchor} from '../src/wiki-links.js';
+import {wikiReference,headingAnchor} from '../src/wiki-links.js';
 import {clipboardSlice,spreadsheetSlice} from './clipboard.js';
 import {vaultDialect} from './vault-dialect.js';
 import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
@@ -30,7 +31,7 @@ const dailyWikilink=$node('daily_wikilink',()=>({
 const dailyWikilinkInput=$inputRule(ctx=>new InputRule(/\[\[(\d{4}-\d{2}-\d{2})\]\]$/,(state,match,start,end)=>
   dailyNoteDate(match[1])?state.tr.replaceWith(start,end,dailyWikilink.type(ctx).create({date:match[1]})):null));
 const dailyWikilinkRemark=$remark('timekeeperDailyWikilinks',()=>remarkDailyWikilinks);
-const sourceNodes=new Set(['html','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
+const sourceNodes=new Set(['html','imageReference','linkReference','definition']);
 const safeAsset=url=>typeof url==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(url);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
 const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
@@ -89,6 +90,7 @@ function mermaidBlock(node){
 }
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles}){
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
+  const code=codeTools(()=>readOnly);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
   const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly});
@@ -111,7 +113,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         if(event.key==='Escape'){escape();return true;}return false;
       },
-      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
+      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:(node,view,getPos)=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):code.nodeView(node,view,getPos),image:node=>{
         if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
@@ -121,6 +123,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       // Ordinary clicks edit text. A platform modifier opens only web links,
       // including authenticated journal attachments, without changing the draft.
       handleDOMEvents:{click:(_view,event)=>{
+        const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
         const date=dailyNoteDate(link.dataset.dayNoteDate);
         if(date){
@@ -170,7 +173,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(dialect.plugins).use(changePlugin);
+  }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(dialect.plugins).use(code.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -183,7 +186,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       return markdownSource({source:value,tree:dialect.project(parser.parse(value),value),document:original,serialize,
         equivalent:(left,right)=>JSON.stringify(semantic(dialect.project(parser.parse(left),left)))===JSON.stringify(semantic(dialect.project(parser.parse(right),right)))});
     });
-    const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea'))text.readOnly=readOnly;};
+    const setReadOnly=value=>{readOnly=value;code.setReadOnly();view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea,.markdown-callout input'))text.readOnly=readOnly;};
     const command=(name,payload)=>{
       if(readOnly)return false;
       if(name==='link'){
@@ -193,6 +196,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           if(empty)view.dispatch(view.state.tr.insertText(payload,from).addMark(from,from+payload.length,view.state.schema.marks.link.create({href:payload})));
           else editor.action(callCommand(toggleLinkCommand.key,{href:payload}));
         }
+      }else if(name==='wiki_embed'||name==='wiki_link'){
+        if(!wikiReference(payload?.value,name==='wiki_embed'))return false;view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.vault_wikilink.create({value:payload.value,embed:name==='wiki_embed'})));
       }else if(name==='image'||name==='asset_link'){
         if(!assetAllowed(payload?.path))return false;
         if(name==='image')view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.image.create({src:payload.path,alt:payload.label})));

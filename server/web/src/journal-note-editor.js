@@ -18,7 +18,7 @@ export class JournalNoteEditor {
     const heading=node('div',undefined,'week-note-heading');heading.append(this.title,this.closeButton);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
-    const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,undefined,{...journalImageResources(()=>this.session),...vaultEditorResources(()=>this.session)});
+    const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,(file,image)=>this.uploadAsset(file,image),{...journalImageResources(()=>this.session),...vaultEditorResources(()=>this.session)});
     const actions=node('div',undefined,'dialog-actions');
     this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.cancel.addEventListener('click',()=>this.close());
     this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.remove());
@@ -41,6 +41,14 @@ export class JournalNoteEditor {
     this.cancel.disabled=!!this.busy;
   }
   changed(){this.status.textContent='';this.controls();}
+  async uploadAsset(file,image){
+    const session=this.session,generation=this.generation;if(!session||!this.writable||file.size>5_000_000)throw new Error(t('markdown.upload_failed'));
+    const extensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp'},suffix=image?extensions[file.type]:(file.name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin');if(!suffix)throw new Error(t('markdown.upload_failed'));
+    const filename=crypto.randomUUID()+'.'+suffix.toLowerCase(),bytes=new Uint8Array(await file.arrayBuffer());let data='';for(let at=0;at<bytes.length;at+=8192)data+=String.fromCharCode(...bytes.subarray(at,at+8192));
+    if(session!==this.session||generation!==this.generation)throw new Error(t('markdown.upload_failed'));
+    await session.request('/journal-assets/'+filename,{method:'PUT',noneMatch:'*',body:{data:btoa(data)},emptyResponse:true,timeout:60000});
+    if(session!==this.session||generation!==this.generation)throw new Error(t('markdown.upload_failed'));return 'assets/'+filename;
+  }
   async open(context,session,writable){
     if(!session||this.dialog.open)return;
     this.context=context;this.path=context.path;this.origin=document.activeElement;this.session=session;this.writable=writable;this.note=null;this.stale=false;this.busy=false;

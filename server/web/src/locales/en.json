@@ -1252,5 +1252,13 @@
   "markdown.align_center": "Center column",
   "markdown.align_right": "Align column right",
   "markdown.delete_table": "Delete table",
-  "markdown.upload_progress": "Uploading {{name}} ({{current}}/{{total}})…"
+  "markdown.upload_progress": "Uploading {{name}} ({{current}}/{{total}})…",
+  "markdown.code_language": "Code language",
+  "markdown.copy_code": "Copy code",
+  "markdown.copied": "Copied",
+  "markdown.copy_failed": "Copy failed",
+  "markdown.footnote": "Footnote",
+  "markdown.toggle_callout": "Expand or collapse callout",
+  "markdown.callout_title": "Callout title",
+  "markdown.existing_asset": "Existing vault asset"
 }
