@@ -144,16 +144,16 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         return true;
       }},
       handlePaste:(view,event)=>{
-        if(readOnly)return true;
+        if(readOnly)return true;const forcePlain=plainPaste;plainPaste=false;
         const files=[...(event.clipboardData?.files||[])];
         if(files.length&&uploadFiles){event.preventDefault();uploadFiles(files,bookmark());return true;}
         const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();
         const selection=view.state.selection,code=selection.$from.parent.type.spec.code||selection.$from.marks().some(mark=>mark.type.name==='inlineCode');
-        if(!plainPaste&&!code&&!selection.empty&&/^https?:\/\/[^\s]+$/i.test(text)&&linkAllowed(text)){
+        if(!forcePlain&&!code&&!selection.empty&&/^https?:\/\/[^\s]+$/i.test(text)&&linkAllowed(text)){
           view.dispatch(view.state.tr.addMark(selection.from,selection.to,view.state.schema.marks.link.create({href:text})));return true;
         }
         const html=event.clipboardData?.getData('text/html');
-        if(!plainPaste&&!code){
+        if(!forcePlain&&!code){
           const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text);
           if(slice){view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
         }
@@ -259,7 +259,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       imageDetails:()=>{const node=view.state.selection.node;if(node?.type.name==='image')return {path:node.attrs.src,alt:node.attrs.alt||'',embed:false};if(node?.type.name==='vault_wikilink'&&node.attrs.embed){const ref=wikiReference(node.attrs.value,true);return {...ref,alt:ref?.width?'':ref?.label||'',embed:true};}return null;},
       position:()=>{const source=markdown(),block=view.state.selection.$from.index(0),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source)),start=tree.children[block]?.position?.start.offset||0;return {anchor:start+view.state.selection.$from.parentOffset,scrollTop:view.dom.scrollTop};},
       restorePosition:position=>{const source=markdown(),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source));let index=tree.children.findIndex(node=>(node.position?.end.offset??0)>=position.anchor);if(index<0)index=view.state.doc.childCount-1;const block=view.state.doc.child(index);let start=0;for(let i=0;i<index;i++)start+=view.state.doc.child(i).nodeSize;const offset=Math.min(Math.max(0,position.anchor-(tree.children[index]?.position?.start.offset||0)),Math.max(0,block.nodeSize-2));view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(view.state.doc.content.size,start+1+offset)))));view.dom.scrollTop=position.scrollTop||0;},
-      context:()=>({table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
+      composing:()=>view.composing,
+      context:()=>({text:view.state.selection.$from.parent.textContent,table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
       selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},
       active:name=>{const type=view.state.schema.marks[{bold:'strong',italic:'emphasis',strike:'strike_through',inline_code:'inlineCode',link:'link'}[name]||name];return !!type&&!!type.isInSet(view.state.storedMarks||view.state.selection.$from.marks());},

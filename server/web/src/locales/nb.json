@@ -1292,5 +1292,6 @@
   "markdown.image_height": "Høyde i piksler",
   "markdown.embed_sizing": "Lagre størrelsen som en Obsidian-innbygging",
   "markdown.image_sizing_help": "Vanlige Markdown-bilder beholder alternativ tekst. Obsidian-innbygginger med angitt størrelse bruker filnavnet som alternativ tekst. La høyden stå tom for å beholde sideforholdet.",
-  "markdown.invalid_image": "Velg en bredde og eventuelt høyde fra 1 til 2000 piksler."
+  "markdown.invalid_image": "Velg en bredde og eventuelt høyde fra 1 til 2000 piksler.",
+  "markdown.tab_help": "Tab rykker inn. Trykk Escape og deretter Tab for å flytte fokus ut av kildeeditoren."
 }

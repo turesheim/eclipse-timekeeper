@@ -138,3 +138,4 @@
 .markdown-history-dialog { width: min(60rem,calc(100vw - 1rem)); }
 .markdown-revision-list { display: flex; flex-wrap: wrap; gap: .25rem; max-height: 10rem; overflow: auto; margin-block: .5rem; }
 .markdown-revision-diff { max-height: 45vh; overflow: auto; padding: .75rem; border: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); color: var(--bs-body-color); white-space: pre-wrap; }
+.today-journal .markdown-code-editor { min-height: 0; }

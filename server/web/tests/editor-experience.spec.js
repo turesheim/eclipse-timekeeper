@@ -31,7 +31,7 @@ test('source fragments cannot be changed in a read-only editor',async({page})=>{
 });
 
 async function field(page,value,formatted=true){
-  await page.goto('/web/markdown-lab.html');
+  await page.goto('/web/markdown-lab.html');await page.evaluate(()=>{const link=document.createElement('link');link.rel='stylesheet';link.href='/web/assets/bootstrap-icons/bootstrap-icons.min.css';document.head.append(link);});
   await page.evaluate(async({value,formatted})=>{
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
     globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;});
@@ -81,15 +81,15 @@ test('switching to source and back without edits keeps rich undo history',async(
   await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
 });
 test('multi-file upload retry keeps completed files and does not move an unrelated caret',async({page})=>{
-  await field(page,'One.\n\nTwo.\n');await page.locator('#experience-formatted p').first().click();await page.keyboard.press('End');
+  await field(page,'One.\n\nTwo.\n');await page.locator('#experience-formatted .ProseMirror').focus();await page.evaluate(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('#experience-formatted p'));range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});await expect.poll(()=>page.evaluate(()=>globalThis.field.editor.context().text)).toBe('One.');
   await page.evaluate(()=>{globalThis.failUploadName='second.txt';const data=new DataTransfer();for(const name of ['first.txt','second.txt'])data.items.add(new File(['bytes'],name,{type:'text/plain'}));document.querySelector('#experience-formatted .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
-  await expect(page.locator('#experience-field')).toContainText('Upload failed');await expect(page.locator('#experience-formatted a')).toHaveCount(1);await page.locator('#experience-formatted p').last().click();await page.keyboard.press('End');
+  await expect(page.locator('#experience-field')).toContainText('Upload failed');await expect(page.locator('#experience-formatted a')).toHaveCount(1);await page.locator('#experience-formatted p').last().click();await page.evaluate(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('#experience-formatted .ProseMirror').lastElementChild);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});await expect.poll(()=>page.evaluate(()=>globalThis.field.editor.context().text)).toBe('Two.');
   await page.evaluate(()=>globalThis.failUploadName=null);await page.locator('#experience-field').getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('#experience-formatted a')).toHaveCount(2);expect(await page.evaluate(()=>globalThis.uploaded)).toEqual(['first.txt','second.txt']);
   await page.locator('#experience-formatted .ProseMirror').pressSequentially(' Kept caret.');await expect(page.locator('#experience-formatted p').last()).toContainText('Two. Kept caret.');await expect(page.locator('#experience-formatted p').first().locator('a')).toHaveCount(2);
 });
 test('source undo restores the exact original line ending after joining mixed-EOL lines',async({page})=>{
   const value='First.\r\nSecond.\nThird.\r\n';await field(page,value,false);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();
-  await page.evaluate(()=>globalThis.field.codeEditor.select(14));await page.keyboard.press('Delete');expect(await page.evaluate(()=>globalThis.field.value())).not.toBe(value);await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+  await expect(page.locator('#experience-field .cm-editor')).toBeVisible();await page.evaluate(()=>globalThis.field.codeEditor.select(14));await page.keyboard.press('Delete');expect(await page.evaluate(()=>globalThis.field.value())).not.toBe(value);await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
 });
 test('shared controls remain keyboard accessible and fit narrow screens in every theme',async({page})=>{
   await page.setViewportSize({width:390,height:844});await field(page,'# Heading\n\n- [ ] Task\n\nParagraph.\n');await page.locator('#experience-field').getByRole('button',{name:'More formatting',exact:true}).click();
@@ -99,4 +99,10 @@ test('shared controls remain keyboard accessible and fit narrow screens in every
   }
   await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-mobile.png'});
   await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-mobile.png'});
+});
+test('source styles keep the strict CSP and a horizontal gutter without trapping keyboard focus',async({page})=>{
+  await field(page,'# Heading\n\nBody.\n',false);await page.evaluate(()=>{globalThis.styleViolations=[];document.addEventListener('securitypolicyviolation',event=>{if(event.violatedDirective.startsWith('style-src'))globalThis.styleViolations.push(event.blockedURI);});});
+  await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await expect(page.locator('#experience-field .cm-scroller')).toHaveCSS('display','flex');await expect(page.locator('#experience-field .cm-gutters')).toHaveCSS('display','flex');
+  await content.click();await page.keyboard.press('Escape');await page.keyboard.press('Tab');expect(await content.evaluate(node=>node.getRootNode().activeElement===node)).toBe(false);expect(await page.evaluate(()=>globalThis.styleViolations)).toEqual([]);
+  await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-styled.png'});
 });

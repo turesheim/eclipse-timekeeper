@@ -5,10 +5,10 @@ import {t} from '../src/i18n.js';
 let highlighter;
 const key=new PluginKey('timekeeper-code-highlights');
 export function codeTools(readOnly){
-  const controls=new Set();
+  const controls=new Set(),cache=new WeakMap();
   const decorations=doc=>{
     if(!highlighter)return DecorationSet.empty;
-    const marks=[];doc.descendants((node,pos)=>{if(node.type.name!=='code_block'||String(node.attrs.language).toLowerCase()==='mermaid')return;for(const span of highlighter(node.textContent,node.attrs.language))marks.push(Decoration.inline(pos+1+span.from,pos+1+span.to,{class:span.className}));});return DecorationSet.create(doc,marks);
+    const marks=[];doc.descendants((node,pos)=>{if(node.type.name!=='code_block'||String(node.attrs.language).toLowerCase()==='mermaid')return;let spans=cache.get(node);if(!spans){spans=highlighter(node.textContent,node.attrs.language);cache.set(node,spans);}for(const span of spans)marks.push(Decoration.inline(pos+1+span.from,pos+1+span.to,{class:span.className}));});return DecorationSet.create(doc,marks);
   };
   const plugin=$prose(()=>new Plugin({key,state:{init:(_,state)=>decorations(state.doc),apply:(transaction,previous)=>transaction.docChanged||transaction.getMeta(key)?decorations(transaction.doc):previous},props:{decorations:state=>key.getState(state)},view:view=>{
     let disposed=false,loading=false;

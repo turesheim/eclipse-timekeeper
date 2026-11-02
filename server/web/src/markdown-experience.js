@@ -10,12 +10,12 @@ export function buildExperience(field,load,loadSource){
   f.retryButton=action('ui.retry',()=>void f.retryUpload?.());f.retryButton.hidden=true;f.status.after(f.retryButton);
   f.sourceExtras=el('div');f.sourceExtras.className='markdown-source-tools';
   f.codeHost=el('div');f.codeHost.className='markdown-code-editor';f.codeHost.hidden=true;f.plain.append(f.codeHost);
-  f.enhance=action('markdown.source_tools',async()=>{
+  f.enhance=action('markdown.source_tools',async()=>{try{
     if(f.loading)return;if(f.codeEditor){f.setRaw(f.codeEditor.value());f.sourcePosition=f.codeEditor.position();f.codeEditor.destroy();f.codeEditor=null;f.codeHost.replaceChildren();f.codeHost.hidden=true;f.text.hidden=false;f.text.focus();f.enhance.setAttribute('aria-pressed','false');return;}
     const current=f.generation,module=await loadSource();if(current!==f.generation)return;
     f.codeEditor=module.createSourceEditor({root:f.codeHost,value:f.rawBody(),label:t('markdown.body'),readOnly:f.readOnly,uploadFiles:files=>void f.uploadFiles(files),selection:f.sourcePosition&&{anchor:f.sourcePosition.anchor,head:f.sourcePosition.head},changed:value=>{f.setRaw(value);f.onChange();f.refreshPreview();}});
     f.text.hidden=true;f.codeHost.hidden=false;f.codeEditor.focus();f.enhance.setAttribute('aria-pressed','true');
-  },'code-square');f.enhance.setAttribute('aria-pressed','false');
+  }catch{f.status.textContent=t('markdown.failed');f.text.hidden=false;f.codeHost.hidden=true;}},'code-square');f.enhance.setAttribute('aria-pressed','false');
   f.find=action('markdown.find_replace',()=>{if(!f.codeEditor){f.enhance.click();setTimeout(()=>f.codeEditor?.find(),100);}else f.codeEditor.find();},'search');
   f.numbers=action('markdown.line_numbers',()=>{f.showNumbers=f.showNumbers===false;f.codeEditor?.lineNumbers(f.showNumbers);f.numbers.setAttribute('aria-pressed',String(f.showNumbers));},'list-ol');f.numbers.setAttribute('aria-pressed','true');
   f.split=action('markdown.split',()=>{f.splitHost.hidden=!f.splitHost.hidden;f.split.setAttribute('aria-pressed',String(!f.splitHost.hidden));f.plain.classList.toggle('markdown-split',!f.splitHost.hidden);f.refreshPreview();},'layout-split');f.split.setAttribute('aria-pressed','false');
@@ -78,7 +78,7 @@ export function buildExperience(field,load,loadSource){
     f.structured.hidden=!f.editor||f.readOnly;
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
     popup.hidden=!f.editor||f.readOnly||!f.editor.selectedText();if(!popup.hidden)place(popup,f.editor.selectionRect()||{left:8,bottom:8});
-    if(!f.editor||f.readOnly){suggestions.hidden=true;return;}
+    if(!f.editor||f.readOnly||f.editor.composing()){suggestions.hidden=true;popup.hidden=true;return;}
     const wiki=f.editor.wikiQuery(),slash=f.editor.slash(),query=wiki?'wiki:'+wiki.query:slash?'slash:'+slash.query:null;
     if(query===lastQuery)return;lastQuery=query;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
     const add=(label,run)=>{const button=el('button',label);button.type='button';button.className='btn btn-light';button.setAttribute('role','option');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{if(f.readOnly)return;suggestions.hidden=true;run();});suggestions.append(button);};
@@ -86,6 +86,7 @@ export function buildExperience(field,load,loadSource){
     if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query).then(entries=>{if(current!==completion||f.readOnly)return;for(const entry of entries)add(entry.path,()=>f.editor.insertWiki(wiki,entry.path.replace(/\.md$/i,'')));suggestions.hidden=!suggestions.children.length;place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});}).catch(()=>{});
     suggestions.hidden=!suggestions.children.length;if(!suggestions.hidden)place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});
   };
+  f.rich.addEventListener('compositionend',()=>queueMicrotask(()=>f.updateExperience()));
   f.rich.addEventListener('keydown',event=>{
     if(event.isComposing||suggestions.hidden)return;const buttons=[...suggestions.querySelectorAll('button')];if(event.key==='ArrowDown'){event.preventDefault();buttons[0]?.focus();}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();suggestions.hidden=true;}
   });
