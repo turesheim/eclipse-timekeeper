@@ -2,8 +2,8 @@ import {expect,test} from '@playwright/test';
 
 /** Select the paragraph end explicitly: End has different native macOS semantics. */
 export async function appendEditorText(paragraph,text){
-  await paragraph.click();
   await paragraph.evaluate(node=>{
+    node.closest('[contenteditable="true"]').focus();
     const range=document.createRange();range.selectNodeContents(node);range.collapse(false);
     const selection=getSelection();selection.removeAllRanges();selection.addRange(range);
     document.dispatchEvent(new Event('selectionchange'));
