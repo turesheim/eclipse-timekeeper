@@ -57,7 +57,8 @@ def browser_specs(paths):
         else:
             return []  # Unknown/shared web behavior: run the complete browser suite.
     root = Path(__file__).resolve().parents[1] / 'server/web/tests'
-    return sorted(specs) if all((root / spec).is_file() for spec in specs) else []
+    # Larger unions use the acceptance runner's existing isolated fixture batches.
+    return sorted(specs) if len(specs) <= 6 and all((root / spec).is_file() for spec in specs) else []
 
 
 def sensitive_path(path):

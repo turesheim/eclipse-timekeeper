@@ -26,7 +26,7 @@ class ChangesTest(unittest.TestCase):
         for key in ('code', 'server', 'web'):self.assertTrue(selected[key], key)
         for key in ('server_tests', 'api', 'eclipse', 'containers', 'site', 'full', 'web_full'):self.assertFalse(selected[key], key)
         self.assertEqual(sorted(ci.LAYOUT_SPECS), selected['browser_specs'])
-        self.assertIn('notes.spec.js', self.select(['server/web/src/markdown.css'])['browser_specs'])
+        self.assertTrue(self.select(['server/web/src/markdown.css'])['web_full'])
 
     def test_feature_and_shared_web_changes(self):
         self.assertEqual(['day-notes.spec.js', 'today.spec.js'], self.select(['server/web/src/today.js'])['browser_specs'])
@@ -34,6 +34,10 @@ class ChangesTest(unittest.TestCase):
         self.assertTrue(selected['web_full']);self.assertFalse(selected['full'])
         self.assertFalse(self.select(['server/web/tests/today.spec.js'])['server_tests'])
         self.assertTrue(self.select(['server/web/tests/acceptance.py'])['web_full'])
+
+    def test_larger_feature_unions_keep_existing_isolated_fixture_batches(self):
+        selected = self.select(['server/web/src/style.css', 'server/web/src/calendar.js'])
+        self.assertTrue(selected['web_full']);self.assertEqual([],selected['browser_specs'])
 
     def test_ordinary_backend_and_sensitive_changes(self):
         selected = self.select(['server/app/src/main/java/net/ProjectResource.java'])

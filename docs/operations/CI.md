@@ -13,7 +13,8 @@ layout change does not need the full deployment matrix repeated on GitHub.
 | Ordinary Java server endpoint | Server tests, packaged HTTP/recovery checks, API contracts and ordinary browser suite |
 | Database, authentication, dependencies, packaging, CI or unrecognized product paths | Full validation, including platform, HTTPS, containers and Synology checks |
 
-Markdown editor CSS also selects editor, journal and Notes scenarios. Changes to
+Markdown editor CSS and feature unions larger than six suites use the complete
+ordinary browser suite with its existing isolated fixture batches. Changes to
 browser fixtures/helpers run the complete ordinary browser suite. Deleted/renamed
 code remains part of selection. Unavailable or empty comparison history selects
 full validation rather than silently skipping checks.
