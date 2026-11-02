@@ -11,10 +11,9 @@ import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
-import {handlePaste as pasteTable} from '@milkdown/kit/prose/tables';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
 import {markdownSource} from './markdown-source.js';
-import {structuredCommand} from './structured-commands.js';
+import {structuredCommand,pasteTable} from './structured-commands.js';
 import {wikiReference,headingAnchor} from '../src/wiki-links.js';
 import {clipboardSlice,spreadsheetSlice} from './clipboard.js';
 import {vaultDialect} from './vault-dialect.js';
@@ -173,7 +172,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const html=event.clipboardData?.getData('text/html');
         if(!forcePlain&&!code){
           const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text);
-          if(slice){if(!pasteTable(view,event,slice))view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
+          if(slice){if(!pasteTable(view,slice))view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
         }
         const match=/^(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(text);
         if(match&&wikiReference(match[2],!!match[1])&&!code&&!forcePlain){const date=!match[1]&&dailyNoteDate(match[2]);view.dispatch(view.state.tr.replaceSelectionWith(date?view.state.schema.nodes.daily_wikilink.create({date}):view.state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]}),true));}
