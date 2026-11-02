@@ -89,3 +89,31 @@
 .markdown-source-fragment textarea { display: block; width: 100%; min-height: 5rem; font-family: var(--bs-font-monospace); background: var(--bs-body-bg); color: var(--bs-body-color); border: 0; resize: vertical; }
 .markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
 .markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }
+.markdown-source-tools { display: flex; gap: .25rem; flex-wrap: wrap; }
+.markdown-structured > summary, .markdown-outline > summary { color: var(--bs-secondary-color); font-size: .85rem; cursor: pointer; }
+.markdown-outline nav, .markdown-structured-actions { display: flex; flex-wrap: wrap; gap: .25rem; padding-block: .5rem; }
+.markdown-outline nav { flex-direction: column; max-height: 12rem; overflow: auto; }
+.markdown-outline button { text-align: start; border: 0; }
+.markdown-code-editor { flex: 1; min-height: 15rem; min-width: 0; overflow: auto; }
+.markdown-code-editor .cm-editor { height: 100%; background: var(--bs-body-bg); color: var(--bs-body-color); }
+.markdown-code-editor .cm-scroller { font: .9rem/1.6 var(--bs-font-monospace); }
+.markdown-code-editor .cm-gutters, .markdown-code-editor .cm-panels { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border-color: var(--bs-border-color); }
+.markdown-code-editor .cm-activeLine, .markdown-code-editor .cm-activeLineGutter { background: var(--bs-primary-bg-subtle); }
+.markdown-code-editor .cm-cursor { border-color: var(--bs-body-color); }
+.markdown-code-editor .cm-search input { max-width: 100%; background: var(--bs-body-bg); color: var(--bs-body-color); }
+.markdown-split:not([hidden]) { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: .5rem; min-height: 0; }
+.markdown-split > label { grid-column: 1 / -1; }
+.markdown-split-preview { min-width: 0; max-height: 40rem; overflow: auto; border-inline-start: 1px solid var(--bs-border-color); }
+.markdown-context-menu, .markdown-suggestions { position: fixed; z-index: 1080; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; border-radius: .4rem; box-shadow: 0 .25rem .75rem #0002; max-width: calc(100vw - 1rem); }
+.markdown-context-menu { display: flex; gap: .25rem; }
+.markdown-suggestions { display: flex; flex-direction: column; max-height: 12rem; overflow: auto; width: 17rem; }
+.markdown-suggestions button { text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.markdown-overflow { display: none; }
+.markdown-editor button[aria-pressed=true] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
+@media(max-width:600px) {
+  .markdown-editor .markdown-toolbar { flex-wrap: wrap !important; overflow: visible; }
+  .markdown-overflow { display: inline-flex; }
+  .markdown-editor .markdown-toolbar:not([data-expanded=true]) .markdown-tools, .markdown-editor .markdown-toolbar:not([data-expanded=true]) .markdown-toolbar-separator { display: none; }
+  .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { flex: 1 1 100%; flex-wrap: wrap; }
+  .markdown-split:not([hidden]) { grid-template-columns: minmax(0,1fr); }
+}

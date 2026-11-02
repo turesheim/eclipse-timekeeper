@@ -1,3 +1,4 @@
+import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
 import {splitMarkdown,needsSource} from './markdown-document.js';
 import {icon,iconButton} from './icons.js';
@@ -54,7 +55,7 @@ export class MarkdownField {
       ['inline_code','code'],['code_block','code-square'],['list','list-ul'],['ordered','list-ol'],['tasks','list-check'],
       ['link','link-45deg'],['quote','quote'],['table','table'],['hr','hr'],['undo','arrow-counterclockwise'],['redo','arrow-clockwise']
     ]){
-      const action=iconButton(button(),glyph,t('markdown.'+name));
+      const action=iconButton(button(),glyph,t('markdown.'+name));action.dataset.command=name;const shortcuts={bold:'Mod+B',italic:'Mod+I',undo:'Mod+Z',redo:'Mod+Shift+Z'};if(shortcuts[name])action.title+=' ('+shortcuts[name]+')';
       action.addEventListener('mousedown',event=>event.preventDefault());action.addEventListener('click',()=>{
         if(this.readOnly||this.loading||!this.editor)return;
         if(name==='link'){
@@ -79,28 +80,33 @@ export class MarkdownField {
     this.toolbar=node('div',undefined,'btn-toolbar flex-nowrap align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
     root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
-    this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
+    this.text.addEventListener('keydown',event=>{if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
+    buildExperience(this,loadEngine);
+    this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();this.refreshPreview();});this.clear();
   }
   rawBody(){return this.text.value===this.displayedBody?this.raw:this.text.value;}
   async upload(picker,image){
-    const file=picker.files?.[0];picker.value='';
-    if(!file||!this.onUpload||this.readOnly||this.loading)return;
-    if(file.size>5_000_000){this.status.textContent=t('markdown.asset_too_large');return;}
-    const generation=this.generation;this.loading=true;this.controls();this.status.textContent=t('markdown.uploading');
-    try{
-      const path=await this.onUpload(file,image);
-      if(generation!==this.generation)return;
-      const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
-      if(this.editor)this.editor.command(image?'image':'asset_link',{path,label});
-      else{
-        const start=this.text.selectionStart,end=this.text.selectionEnd;
-        this.text.setRangeText(image?`![${label}](${path})`:`[${label}](${path})`,start,end,'end');
-        this.onChange();this.text.focus();
-      }
-      this.status.textContent='';
-    }catch{if(generation===this.generation)this.status.textContent=t('markdown.upload_failed');}
-    finally{if(generation===this.generation){this.loading=false;this.controls();}}
+    const file=picker.files?.[0];picker.value='';if(file)await this.uploadFiles([file],this.editor?.bookmark(),image);
   }
+  async uploadFiles(files,target,forceImage){
+    if(!this.onUpload||this.readOnly||this.loading)return;
+    const generation=this.generation,editor=this.editor,start=this.text.selectionStart,end=this.text.selectionEnd;
+    this.loading=true;this.controls();this.retryButton.hidden=true;
+    try{
+      for(let index=0;index<files.length;index++){
+        const file=files[index],image=forceImage??['image/png','image/jpeg','image/gif','image/webp'].includes(file.type);
+        if(file.size>5_000_000)throw new Error(t('markdown.asset_too_large'));
+        this.status.textContent=t('markdown.upload_progress',{name:file.name,current:index+1,total:files.length});this.status.setAttribute('aria-busy','true');
+        const path=await this.onUpload(file,image);if(generation!==this.generation)return;
+        const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
+        if(editor){if(!editor.insertAt(target,image?'image':'asset_link',{path,label}))throw new Error(t('markdown.upload_failed'));target=editor.bookmark();}
+        else{this.text.setRangeText(image?`![${label}](${path})`:`[${label}](${path})`,index?this.text.selectionEnd:start,index?this.text.selectionEnd:end,'end');this.codeEditor?.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;this.onChange();this.text.focus();}
+      }
+      editor?.release(target);this.retryUpload=null;this.status.textContent='';
+    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');this.retryUpload=()=>this.uploadFiles(files,target,forceImage);this.retryButton.hidden=false;}}
+    finally{if(generation===this.generation){this.status.removeAttribute('aria-busy');this.loading=false;this.controls();}}
+  }
+
   setRaw(value){this.raw=value;this.text.value=value;this.displayedBody=this.text.value;}
   value(){return (this.frontmatter||'')+(this.editor?this.editor.markdown():this.rawBody());}
   matches(value){
@@ -109,7 +115,7 @@ export class MarkdownField {
     const prefix=this.frontmatter||'';
     return value.startsWith(prefix)&&this.editor.matchesSource(value.slice(prefix.length));
   }
-  setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.controls();}
+  setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.codeEditor?.readOnly(value);this.controls();}
   paintBlockStyle(){
     const level=this.editor?.headingLevel()||0;
     if(level!==this.blockLevel){
@@ -131,7 +137,7 @@ export class MarkdownField {
   }
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
   controls(){
-    this.text.readOnly=this.readOnly||this.loading;
+    this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;this.codeEditor?.readOnly(this.readOnly||this.loading);if(this.sourceExtras)this.sourceExtras.hidden=!this.rich.hidden;
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||(!this.onUpload&&(action===this.image||action===this.attachment));
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading;
     if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
@@ -141,12 +147,13 @@ export class MarkdownField {
   }
   mode(formatted){
     if(!formatted)this.closeBlockMenu();
-    this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
+    if(this.sourceExtras)this.sourceExtras.hidden=formatted;this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
     this.normalization.hidden=!formatted||this.readOnly;
     this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.previewEditor?.destroy();this.previewEditor=null;this.splitHost?.replaceChildren();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
@@ -163,7 +170,7 @@ export class MarkdownField {
     }
   }
   async showFormatted(focus=true){
-    if(this.loading)return;if(this.editor){this.editor.focus();return;}
+    if(this.loading)return;if(this.codeEditor){this.sourcePosition=this.codeEditor.position();this.setRaw(this.codeEditor.value());this.codeEditor.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;}if(this.editor){this.editor.focus();return;}
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=this.rawBody();
@@ -172,11 +179,11 @@ export class MarkdownField {
     const host=node('div');this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
-      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),resources:this.resources,readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();},escape:()=>this.source.focus()});
+      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}
-      this.paintBlockStyle();this.mode(true);this.status.textContent='';if(focus)created.focus();
+      this.paintBlockStyle();this.mode(true);this.updateExperience();this.status.textContent='';if(focus)created.focus();
     }catch{if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.status.textContent=t('markdown.failed');}}
     finally{if(current===this.generation){this.loading=false;this.controls();}}
   }

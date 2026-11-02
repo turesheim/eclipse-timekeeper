@@ -1,3 +1,4 @@
+export {createSourceEditor} from './source-editor.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
@@ -9,6 +10,9 @@ import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
 import {markdownSource} from './markdown-source.js';
+import {structuredCommand} from './structured-commands.js';
+import {headingAnchor} from '../src/wiki-links.js';
+import {clipboardSlice,spreadsheetSlice} from './clipboard.js';
 import {vaultDialect} from './vault-dialect.js';
 import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
 import {hasUnsupportedSyntax,normalizeEditorMarkdown} from '../src/markdown-document.js';
@@ -84,10 +88,12 @@ function mermaidBlock(node){
   schedule(node.textContent);
   return {dom,contentDOM:code,update(value){if(value.type!==node.type||String(value.attrs.language).toLowerCase()!=='mermaid')return false;schedule(value.textContent);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:mutation=>preview.contains(mutation.target),stopEvent:event=>preview.contains(event.target)};
 }
-export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources}){
+export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles}){
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
+  const targets=new Set();let plainPaste=false;
+  const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
   const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly});
-  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
+  const changePlugin=$prose(()=>new Plugin({state:{init:()=>null,apply:transaction=>{for(const target of targets)target.selection=target.selection.map(transaction.mapping);return null;}},filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
     if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
   }})}));
@@ -98,6 +104,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{
+        if(event.key.toLowerCase()==='v'&&(event.metaKey||event.ctrlKey))plainPaste=event.shiftKey;
+
         const link=event.target.closest?.('a[data-day-note-date]');
         if(event.key==='Enter'&&dailyNoteDate(link?.dataset.dayNoteDate)){
           event.preventDefault();link.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:event.ctrlKey,metaKey:event.metaKey}));return true;
@@ -133,16 +141,35 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         return true;
       }},
-      // Prototype accepts pasted text only, so HTML/images cannot fetch remote
-      // assets or introduce nodes outside the evaluated Markdown schema.
       handlePaste:(view,event)=>{
+        if(readOnly)return true;
+        const files=[...(event.clipboardData?.files||[])];
+        if(files.length&&uploadFiles){event.preventDefault();uploadFiles(files,bookmark());return true;}
         const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();
-        const match=/^\[\[(\d{4}-\d{2}-\d{2})\]\]$/.exec(text),selection=view.state.selection;
-        if(match&&dailyNoteDate(match[1])&&!selection.$from.parent.type.spec.code&&!selection.$from.marks().some(mark=>mark.type.name==='inlineCode'))
-          view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.daily_wikilink.create({date:match[1]}),true));
-        else view.dispatch(view.state.tr.insertText(text));return true;
+        const selection=view.state.selection,code=selection.$from.parent.type.spec.code||selection.$from.marks().some(mark=>mark.type.name==='inlineCode');
+        if(!plainPaste&&!code&&!selection.empty&&/^https?:\/\/[^\s]+$/i.test(text)&&linkAllowed(text)){
+          view.dispatch(view.state.tr.addMark(selection.from,selection.to,view.state.schema.marks.link.create({href:text})));return true;
+        }
+        const html=event.clipboardData?.getData('text/html');
+        if(!plainPaste&&!code){
+          const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text);
+          if(slice){view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
+        }
+        const match=/^\[\[(\d{4}-\d{2}-\d{2})\]\]$/.exec(text);
+        if(match&&dailyNoteDate(match[1])&&!code)view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.daily_wikilink.create({date:match[1]}),true));
+        else view.dispatch(view.state.tr.insertText(text));plainPaste=false;return true;
       },
-      handleDrop:()=>true
+      handleDrop:(view,event,slice,moved)=>{
+        const files=[...(event.dataTransfer?.files||[])];if(readOnly)return true;
+        if(files.length&&uploadFiles){event.preventDefault();uploadFiles(files,bookmark(view.posAtCoords({left:event.clientX,top:event.clientY})?.pos));return true;}
+        // Native intra-editor moves retain schema and history; external HTML is
+        // routed through the same sanitizer as paste.
+        if(moved)return false;
+        const text=event.dataTransfer?.getData('text/plain')||'',html=event.dataTransfer?.getData('text/html')||'';
+        event.preventDefault();const at=view.posAtCoords({left:event.clientX,top:event.clientY})?.pos;if(at!==undefined)view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))));
+        const safe=html?clipboardSlice(view.state.schema,html,text,linkAllowed):null;
+        view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
+      }
     });
   }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(dialect.plugins).use(changePlugin);
   try{
@@ -184,7 +211,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         if(transaction.docChanged)view.dispatch(transaction);
       }else{
-        const action=commands[name];if(!action)return false;
+        const action=commands[name];if(!action){const applied=structuredCommand(view,name);if(applied)view.focus();return applied;}
         const level=name==='heading'?(payload??2):undefined;
         if(name==='heading'&&(!Number.isInteger(level)||level<1||level>6))return false;
         if(name==='hr'&&!view.state.selection.empty)view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(view.state.selection.to),-1)));
@@ -209,10 +236,22 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     setReadOnly(readOnly);
     return {
       markdown,
+      bookmark,
+      insertAt:(target,name,payload)=>{if(readOnly)return false;try{view.dispatch(view.state.tr.setSelection(target.selection.resolve(view.state.doc)));return command(name,payload);}finally{targets.delete(target);}},
+      release:target=>targets.delete(target),
       matchesSource,
       focus:()=>view.focus(),
       setReadOnly,
       command,
+      selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
+      selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},
+      active:name=>{const type=view.state.schema.marks[{bold:'strong',italic:'emphasis',strike:'strike_through',inline_code:'inlineCode',link:'link'}[name]||name];return !!type&&!!type.isInSet(view.state.selection.$from.marks());},
+      outline:()=>{const values=[];view.state.doc.descendants((node,pos)=>{if(node.type.name==='heading')values.push({text:node.textContent,level:node.attrs.level,pos,anchor:headingAnchor(node.textContent)});});return values;},
+      scrollTo:(position)=>{view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(position+1,view.state.doc.content.size)))).scrollIntoView());view.focus();},
+      slash:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph')return null;const match=/^\/([\w-]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.start(),to:$from.pos}:null;},
+      replaceSlash:(name,payload)=>{const {$from}=view.state.selection;view.dispatch(view.state.tr.delete($from.start(),$from.pos));return command(name,payload);},
+      wikiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code)return null;const match=/\[\[([^\]\n]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.pos-match[0].length,to:$from.pos}:null;},
+      insertWiki:(range,path)=>{if(readOnly)return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.vault_wikilink.create({value:path})));view.focus();return true;},
       headingLevel:()=>{
         const {from,to,$from}=view.state.selection;
         if($from.parent.isTextblock)return $from.parent.type.name==='heading'?$from.parent.attrs.level:0;

@@ -28,3 +28,40 @@ test('source fragments cannot be changed in a read-only editor',async({page})=>{
   await engine(page,'Before.\n\n<div>Unknown</div>\n',{readOnly:true});await expect(page.locator('.markdown-source-fragment textarea')).toHaveAttribute('readonly','');
   expect(await page.evaluate(()=>globalThis.experience.command('bold'))).toBe(false);
 });
+
+async function field(page,value,formatted=true){
+  await page.goto('/web/markdown-lab.html');
+  await page.evaluate(async({value,formatted})=>{
+    const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
+    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload)throw new Error('Upload failed');return 'assets/'+file.name;});
+    globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
+  },{value,formatted});
+}
+test('rich paste retains safe structure and URL-over-selection preserves the selected text',async({page})=>{
+  await engine(page,'Text to link.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');
+  await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','Heading\nBold');data.setData('text/html','<h2 onclick="bad()">Heading</h2><p><strong>Bold</strong><img src="https://evil.invalid/track"><script>window.bad=true</script></p>');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
+  await expect(page.locator('#experience-editor h2')).toHaveText('Heading');await expect(page.locator('#experience-editor strong')).toHaveText('Bold');await expect(page.locator('#experience-editor img')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.bad)).toBeUndefined();
+  await page.locator('#experience-editor strong').click();await page.keyboard.press('Home');await page.keyboard.press('Shift+End');
+  await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','https://example.org/design');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
+  await expect(page.locator('#experience-editor a[href="https://example.org/design"]')).toHaveText('Bold');
+});
+test('failed pasted files retain the draft and can be retried at the original insertion',async({page})=>{
+  await field(page,'Keep this draft.\n');await page.locator('#experience-formatted p').click();await page.keyboard.press('End');
+  await page.evaluate(()=>{globalThis.failUpload=true;const data=new DataTransfer();data.items.add(new File(['bytes'],'example.txt',{type:'text/plain'}));document.querySelector('#experience-formatted .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
+  await expect(page.locator('#experience-field')).toContainText('Upload failed');expect(await page.evaluate(()=>globalThis.field.value())).toBe('Keep this draft.\n');
+  await page.evaluate(()=>globalThis.failUpload=false);await page.locator('#experience-field').getByRole('button',{name:'Retry',exact:true}).click();
+  await expect(page.locator('#experience-formatted a')).toHaveText('example.txt');expect(await page.evaluate(()=>globalThis.field.value())).toContain('Keep this draft.');
+});
+test('source tools preserve mixed line endings and provide highlighted source, search and split preview',async({page})=>{
+  const value='# Title\r\n\r\nKeep __this__.\n\nLast.\r\n';await field(page,value,false);
+  await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await expect(page.locator('#experience-field .cm-editor')).toBeVisible();expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+  await page.locator('#experience-field .cm-content').click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type('Added');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value+'Added');
+  await page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true}).click();await expect(page.locator('.cm-search')).toBeVisible();
+  await page.locator('#experience-field').getByRole('button',{name:'Source and preview',exact:true}).click();await expect(page.locator('.markdown-split-preview h1')).toHaveText('Title');
+});
+test('table commands edit rows, columns and alignment and preserve other blocks',async({page})=>{
+  await engine(page,'Before.\n\n| A | B |\n| --- | --- |\n| One | Two |\n\nAfter.\n');await page.locator('#experience-editor td').first().click();
+  expect(await page.evaluate(()=>globalThis.experience.command('row_after'))).toBe(true);await expect(page.locator('#experience-editor tr')).toHaveCount(3);
+  expect(await page.evaluate(()=>globalThis.experience.command('column_after'))).toBe(true);await expect(page.locator('#experience-editor tr').first().locator('th')).toHaveCount(3);
+  expect(await page.evaluate(()=>globalThis.experience.command('align_right'))).toBe(true);expect(await source(page)).toContain('Before.');expect(await source(page)).toContain('After.');
+});

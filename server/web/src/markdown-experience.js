@@ -1,0 +1,68 @@
+import {t} from './i18n.js';
+import {iconButton} from './icons.js';
+import {headingAnchor} from './wiki-links.js';
+const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
+const action=(key,run,glyph)=>{const button=el('button',glyph?'':t(key));button.type='button';button.className='btn btn-outline-secondary';if(glyph)iconButton(button,glyph,t(key));button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',run);return button;};
+/** UI around the shared schema; all mutations still pass through its read-only guard. */
+export function buildExperience(field,load){
+  const f=field;
+  f.retryButton=action('ui.retry',()=>void f.retryUpload?.());f.retryButton.hidden=true;f.status.after(f.retryButton);
+  f.sourceExtras=el('div');f.sourceExtras.className='markdown-source-tools';
+  f.codeHost=el('div');f.codeHost.className='markdown-code-editor';f.codeHost.hidden=true;f.plain.append(f.codeHost);
+  f.enhance=action('markdown.source_tools',async()=>{
+    if(f.loading)return;if(f.codeEditor){f.setRaw(f.codeEditor.value());f.sourcePosition=f.codeEditor.position();f.codeEditor.destroy();f.codeEditor=null;f.codeHost.replaceChildren();f.codeHost.hidden=true;f.text.hidden=false;f.text.focus();f.enhance.setAttribute('aria-pressed','false');return;}
+    const current=f.generation,module=await load();if(current!==f.generation)return;
+    f.codeEditor=module.createSourceEditor({root:f.codeHost,value:f.rawBody(),label:t('markdown.body'),readOnly:f.readOnly,selection:f.sourcePosition&&{anchor:f.sourcePosition.anchor,head:f.sourcePosition.head},changed:value=>{f.setRaw(value);f.onChange();f.refreshPreview();}});
+    f.text.hidden=true;f.codeHost.hidden=false;f.codeEditor.focus();f.enhance.setAttribute('aria-pressed','true');
+  },'code-square');f.enhance.setAttribute('aria-pressed','false');
+  f.find=action('markdown.find_replace',()=>{if(!f.codeEditor){f.enhance.click();setTimeout(()=>f.codeEditor?.find(),100);}else f.codeEditor.find();},'search');
+  f.numbers=action('markdown.line_numbers',()=>{f.showNumbers=f.showNumbers===false;f.codeEditor?.lineNumbers(f.showNumbers);f.numbers.setAttribute('aria-pressed',String(f.showNumbers));},'list-ol');f.numbers.setAttribute('aria-pressed','true');
+  f.split=action('markdown.split',()=>{f.splitHost.hidden=!f.splitHost.hidden;f.split.setAttribute('aria-pressed',String(!f.splitHost.hidden));f.plain.classList.toggle('markdown-split',!f.splitHost.hidden);f.refreshPreview();},'layout-split');f.split.setAttribute('aria-pressed','false');
+  f.splitHost=el('div');f.splitHost.className='journal-formatted markdown-split-preview';f.splitHost.setAttribute('aria-label',t('markdown.preview'));f.splitHost.hidden=true;f.plain.append(f.splitHost);
+  f.sourceExtras.append(f.enhance,f.find,f.numbers,f.split);f.toolbar.after(f.sourceExtras);
+  f.refreshPreview=()=>{
+    clearTimeout(f.previewTimer);if(f.splitHost.hidden)return;
+    const generation=f.generation;f.previewTimer=setTimeout(async()=>{
+      if(generation!==f.generation||f.splitHost.hidden)return;
+      const source=f.rawBody();if(new TextEncoder().encode(source).length>200000)return;
+      await f.previewEditor?.destroy();f.previewEditor=null;f.splitHost.replaceChildren();
+      const module=await load();if(generation!==f.generation)return;
+      const root=el('div');f.splitHost.append(root);const created=await module.createMarkdownEditor({root,value:source,label:t('markdown.preview'),taskLabel:text=>text,escape:()=>f.text.focus(),readOnly:true,resources:f.resources});
+      if(generation!==f.generation){await created?.destroy();return;}f.previewEditor=created;
+    },250);
+  };
+  f.outline=el('details');f.outline.className='markdown-outline';f.outline.append(el('summary',t('markdown.outline')));f.outlineItems=el('nav');f.outlineItems.setAttribute('aria-label',t('markdown.outline'));f.outline.append(f.outlineItems);f.metadata.after(f.outline);
+  f.outline.addEventListener('toggle',()=>{if(f.outline.open)paintOutline();});
+  const paintOutline=()=>{
+    const headings=f.editor?.outline()||[...f.rawBody().matchAll(/^(#{1,6})\s+(.+)$/gm)].map(match=>({level:match[1].length,text:match[2],pos:match.index,anchor:headingAnchor(match[2])}));
+    f.outlineItems.replaceChildren();for(const heading of headings){const button=action('markdown.outline',()=>{if(f.editor)f.editor.scrollTo(heading.pos);else if(f.codeEditor)f.codeEditor.select(heading.pos);else{f.text.focus();f.text.setSelectionRange(heading.pos,heading.pos);}});button.textContent=heading.text;button.style.paddingInlineStart=(heading.level-1)*.75+.5+'rem';button.title=heading.text;f.outlineItems.append(button);}
+  };
+  f.scrollToHeading=heading=>{if(!heading)return;const target=f.editor?.outline().find(item=>headingAnchor(item.text)===headingAnchor(heading));if(target)f.editor.scrollTo(target.pos);};
+  f.overflow=action('markdown.more',()=>{const open=f.toolbar.dataset.expanded!=='true';f.toolbar.dataset.expanded=String(open);f.overflow.setAttribute('aria-expanded',String(open));},'three-dots');f.overflow.classList.add('markdown-overflow');f.overflow.setAttribute('aria-expanded','false');f.toolbar.append(f.overflow);
+  f.structured=el('details');f.structured.className='markdown-structured';f.structured.append(el('summary',t('markdown.structure')));
+  const structure=el('div');structure.className='markdown-structured-actions';
+  for(const name of ['indent','outdent','row_before','row_after','column_before','column_after','delete_row','delete_column','row_up','row_down','column_left','column_right','align_left','align_center','align_right','delete_table'])structure.append(action('markdown.'+name,()=>{if(!f.readOnly)f.editor?.command(name);}));
+  f.structured.append(structure);f.toolbar.after(f.structured);
+  const popup=el('div');popup.className='markdown-context-menu';popup.hidden=true;popup.setAttribute('role','group');popup.setAttribute('aria-label',t('markdown.formatting'));f.root.append(popup);f.contextPopup=popup;
+  for(const name of ['bold','italic','strike','link'])popup.append(action('markdown.'+name,()=>{if(f.readOnly)return;if(name==='link'){const href=prompt(t('markdown.link_url'),f.editor?.linkHref()||'https://');if(href)f.editor?.command(name,href);}else f.editor?.command(name);}));
+  const suggestions=el('div');suggestions.className='markdown-suggestions';suggestions.hidden=true;suggestions.setAttribute('role','listbox');suggestions.setAttribute('aria-label',t('markdown.suggestions'));f.root.append(suggestions);f.suggestions=suggestions;
+  let completion=0,lastQuery;
+  const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
+  f.updateExperience=()=>{
+    if(f.outline.open)paintOutline();
+    f.structured.hidden=!f.editor||f.readOnly;
+    for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
+    popup.hidden=!f.editor||f.readOnly||!f.editor.selectedText();if(!popup.hidden)place(popup,f.editor.selectionRect()||{left:8,bottom:8});
+    if(!f.editor||f.readOnly){suggestions.hidden=true;return;}
+    const wiki=f.editor.wikiQuery(),slash=f.editor.slash(),query=wiki?'wiki:'+wiki.query:slash?'slash:'+slash.query:null;
+    if(query===lastQuery)return;lastQuery=query;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
+    const add=(label,run)=>{const button=el('button',label);button.type='button';button.className='btn btn-light';button.setAttribute('role','option');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{if(f.readOnly)return;suggestions.hidden=true;run();});suggestions.append(button);};
+    if(slash){for(const name of ['heading','list','ordered','tasks','quote','code_block','table','hr'])if(t('markdown.'+name).toLocaleLowerCase().includes(slash.query.toLocaleLowerCase()))add(t('markdown.'+name),()=>f.editor.replaceSlash(name));}
+    if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query).then(entries=>{if(current!==completion||f.readOnly)return;for(const entry of entries)add(entry.path,()=>f.editor.insertWiki(wiki,entry.path.replace(/\.md$/i,'')));suggestions.hidden=!suggestions.children.length;place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});}).catch(()=>{});
+    suggestions.hidden=!suggestions.children.length;if(!suggestions.hidden)place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});
+  };
+  f.rich.addEventListener('keydown',event=>{
+    if(event.isComposing||suggestions.hidden)return;const buttons=[...suggestions.querySelectorAll('button')];if(event.key==='ArrowDown'){event.preventDefault();buttons[0]?.focus();}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();suggestions.hidden=true;}
+  });
+  suggestions.addEventListener('keydown',event=>{const buttons=[...suggestions.querySelectorAll('button')],index=buttons.indexOf(document.activeElement);if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}if(event.key==='Escape'){event.preventDefault();suggestions.hidden=true;f.editor?.focus();}});
+}
