@@ -3,10 +3,19 @@ import Tooltip from './assets/bootstrap/tooltip.js';
 // Content factories construct application-owned DOM with textContent. Never
 // interpret a title, API field, Markdown body or translation as HTML.
 const content=new WeakMap();
+export const TOOLTIP_SHOW_DELAY=800;
+let showTimer,pending=null;
+function cancelPending(){clearTimeout(showTimer);pending=null;}
+function schedule(node,focus=null){
+  if(!node){cancelPending();return;}
+  if(active?.node===node){show(node,focus);return;}
+  if(pending===node)return;cancelPending();pending=node;
+  showTimer=setTimeout(()=>{pending=null;if(visible(node))show(node,focus);},TOOLTIP_SHOW_DELAY);
+}
 let active=null,installed=false,pointerFocus=false,leaveTimer,dismissed=null,pointer=null;
 const visible=node=>node.isConnected&&!node.closest('[hidden]')&&node.getClientRects().length>0;
 export function hideTooltip() {
-  clearTimeout(leaveTimer);if(!active)return;
+  cancelPending();clearTimeout(leaveTimer);if(!active)return;
   const previous=active;active=null;previous.instance.dispose();
   for(const [node,value] of previous.descriptions)value===null?node.removeAttribute('aria-describedby'):node.setAttribute('aria-describedby',value);
 }
@@ -75,15 +84,15 @@ export function installTooltips() {
   // The overlay never intercepts a calendar drag or a click on a control below
   // it. Hit-test its bounds for hover persistence instead of capturing presses.
   const remember=event=>{pointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,buttons:event.buttons};};
-  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons)return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)show(node);else if(active)leave();};
+  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons)return;if(overTooltip(event)){clearTimeout(leaveTimer);return;}const node=target(event.target,event);if(node)schedule(node);else{cancelPending();if(active)leave();}};
   document.addEventListener('pointerover',hover);
   document.addEventListener('pointermove',hover);
-  document.addEventListener('pointerout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
-  document.addEventListener('focusin',event=>{if(!pointerFocus)show(target(event.target),event.target);});
-  document.addEventListener('focusout',event=>{if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
+  document.addEventListener('pointerout',event=>{if(pending&&!pending.contains(event.relatedTarget))cancelPending();if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
+  document.addEventListener('focusin',event=>{if(!pointerFocus)schedule(target(event.target),event.target);});
+  document.addEventListener('focusout',event=>{cancelPending();if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
   document.addEventListener('pointerdown',event=>{remember(event);pointerFocus=true;if(!active?.tip.contains(event.target))hideTooltip();},true);
   document.addEventListener('keydown',event=>{pointerFocus=false;if(event.key==='Escape'&&active){dismissed=active.node;hideTooltip();if(event.target.closest('dialog[open]'))event.preventDefault();}},true);
-  document.addEventListener('click',()=>hideTooltip(),true);
+  document.addEventListener('click',event=>{if(!active?.tip.contains(event.target))hideTooltip();},true);
   document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){
     const bounds=active.node.getBoundingClientRect();
     if(bounds.bottom<0||bounds.top>innerHeight||bounds.right<0||bounds.left>innerWidth){

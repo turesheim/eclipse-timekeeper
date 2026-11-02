@@ -458,3 +458,5 @@ button.calendar-summary-card:disabled { opacity: .65; }
 
 .focus-menu-field { display: grid; gap: .25rem; padding: .5rem .75rem; }
 .focus-menu-field select { width: 100%; min-width: 0; }
+
+.timekeeper-tooltip a { pointer-events: auto; color: inherit; text-decoration: underline; }

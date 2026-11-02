@@ -4,6 +4,15 @@ import {instantNanos,instantText,nanosText} from './model.js';
 import {calendarTodo,calendarItemWhen,calendarItemStatus} from './calendar-item.js';
 
 const node=(tag,text,css)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(css)value.className=css;return value;};
+function linkedText(text){
+  const fragment=document.createDocumentFragment();let offset=0;
+  for(const match of text.matchAll(/https?:\/\/[^\s<>"']+/gi)){
+    const url=match[0].replace(/[.,;!?)]+$/,'');
+    fragment.append(document.createTextNode(text.slice(offset,match.index)));
+    const link=node('a',url);link.href=url;link.target='_blank';link.rel='noopener noreferrer';fragment.append(link);offset=match.index+url.length;
+  }
+  fragment.append(document.createTextNode(text.slice(offset)));return fragment;
+}
 function line(glyph,text,css='tooltip-detail') {
   const row=node('div',undefined,css);if(glyph){glyph.removeAttribute('title');row.append(glyph);}row.append(node('span',text));return row;
 }
@@ -33,6 +42,6 @@ export function calendarEventTooltip(event,zone) {
   if(event.calendarName&&event.calendarName!==event.clientName)root.append(line(icon('calendar'),event.calendarName));
   const status=calendarItemStatus(event);if(status)root.append(line(icon('info-circle'),status));
   if(event.location)root.append(line(icon('geo-alt'),event.location));
-  if(event.description)root.append(node('div',event.description,'tooltip-description'));
+  if(event.description){const description=node('div',undefined,'tooltip-description');description.append(linkedText(event.description));root.append(description);}
   return root;
 }

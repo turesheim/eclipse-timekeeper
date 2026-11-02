@@ -75,3 +75,13 @@ test('shared hints update dynamically and remain visible inside native dialogs, 
   await close.click();await expect(dialog).not.toBeVisible();await expect(page.getByRole('tooltip')).toHaveCount(0);
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await expect(page.getByRole('tooltip')).toHaveCount(0);
 });
+
+test('tooltips wait before opening and calendar descriptions render safe web links',async({page})=>{
+  await page.goto('/web/markdown-lab.html');await page.evaluate(async()=>{
+    const {richTooltip,installTooltips}=await import('/web/tooltips.js');const {calendarEventTooltip}=await import('/web/tooltip-content.js');installTooltips();
+    const button=document.createElement('button');button.textContent='Delayed event';button.id='delayed-event';document.body.prepend(button);
+    richTooltip(button,()=>calendarEventTooltip({title:'Review',start:'2026-11-02T10:00:00Z',end:'2026-11-02T11:00:00Z',description:'Join https://example.org/meeting. <script>unsafe()</script> javascript:alert(1)'},'UTC'));
+  });
+  await page.locator('#delayed-event').hover();await page.waitForTimeout(150);await expect(page.locator('.timekeeper-tooltip')).toHaveCount(0);
+  const tip=page.locator('.timekeeper-tooltip');await expect(tip).toBeVisible();const link=tip.getByRole('link',{name:'https://example.org/meeting',exact:true});await expect(link).toHaveAttribute('href','https://example.org/meeting');await expect(link).toHaveAttribute('rel','noopener noreferrer');await expect(link).toHaveCSS('pointer-events','auto');await expect(tip.locator('script')).toHaveCount(0);
+});
