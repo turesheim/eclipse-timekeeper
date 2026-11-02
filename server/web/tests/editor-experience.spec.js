@@ -132,6 +132,7 @@ test('spreadsheet paste creates a table and fills existing cells without nesting
   const paste=async text=>page.evaluate(text=>{const data=new DataTransfer();data.setData('text/plain',text);document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));},text);
   await paste('A\tB\nOne\tTwo');await expect(page.locator('#experience-editor table')).toHaveCount(1);await expect(page.locator('#experience-editor tr')).toHaveCount(2);await expect(page.locator('#experience-editor th')).toHaveText(['A','B']);
   await page.locator('#experience-editor td p').first().click();await expect.poll(()=>page.evaluate(()=>globalThis.experience.context().table)).toBe(true);await paste('Three\tFour');await expect(page.locator('#experience-editor table')).toHaveCount(1);await expect(page.locator('#experience-editor td')).toHaveText(['Three','Four']);expect(await source(page)).toContain('Before.');
+  await page.locator('#experience-editor td p').first().click();await paste('Five\tSix\tSeven\nEight\tNine\tTen');await expect(page.locator('#experience-editor tr')).toHaveCount(3);await expect(page.locator('#experience-editor th')).toHaveCount(3);await expect(page.locator('#experience-editor td')).toHaveText(['Five','Six','Seven','Eight','Nine','Ten']);
 });
 test('heading levels and formatted selection stay meaningful across source mode',async({page})=>{
   await field(page,'# Heading\n\nFirst **bold** phrase.\n\nLast paragraph.\n');

@@ -1,5 +1,4 @@
-import {Fragment} from '@milkdown/kit/prose/model';
-import {CellSelection,__pastedCells,__clipCells,__insertCells} from '@milkdown/kit/prose/tables';
+import {CellSelection,TableMap,__pastedCells,__clipCells} from '@milkdown/kit/prose/tables';
 import {addRowBefore,addRowAfter,addColumnBefore,addColumnAfter,deleteRow,deleteColumn,deleteTable,isInTable,selectedRect,moveTableRow,moveTableColumn} from '@milkdown/kit/prose/tables';
 import {sinkListItem,liftListItem} from '@milkdown/kit/prose/schema-list';
 export function structuredCommand(view,name){
@@ -25,12 +24,24 @@ export function pasteTable(view,slice){
   let cells=__pastedCells(slice);if(!cells)return false;
   const rect=selectedRect(view.state);
   if(view.state.selection instanceof CellSelection)cells=__clipCells(cells,rect.right-rect.left,rect.bottom-rect.top);
-  const rows=cells.rows.map((row,index)=>{
-    const values=[],type=view.state.schema.nodes[rect.top+index===0?'table_header':'table_cell'];
-    row.forEach((cell,_offset,column)=>{
-      const header=rect.table.firstChild.maybeChild(rect.left+column);
-      values.push(type.create({...cell.attrs,alignment:header?.attrs.alignment||cell.attrs.alignment},cell.content));
-    });return Fragment.fromArray(values);
+  const schema=view.state.schema,width=Math.max(rect.map.width,rect.left+cells.width),height=Math.max(rect.map.height,rect.top+cells.height,2);
+  // GFM has no merged-cell notation. Expand clipboard spans to a plain grid,
+  // retaining a merged cell's content at its first coordinate only.
+  const pasted=Array.from({length:cells.height},()=>[]);
+  cells.rows.forEach((row,index)=>{let column=0;row.forEach(cell=>{while(pasted[index][column])column++;for(let down=0;down<cell.attrs.rowspan;down++)for(let across=0;across<cell.attrs.colspan;across++){if(pasted[index+down])pasted[index+down][column+across]={cell,first:down===0&&across===0};}column+=cell.attrs.colspan;});});
+  const rows=Array.from({length:height},(_,row)=>{
+    const type=schema.nodes[row===0?'table_header':'table_cell'];
+    const content=Array.from({length:width},(_,column)=>{
+      const position=row<rect.map.height&&column<rect.map.width?rect.map.map[row*rect.map.width+column]:null;
+      const existing=position===null?null:rect.table.nodeAt(position),incoming=row>=rect.top&&column>=rect.left?pasted[row-rect.top]?.[column-rect.left]:null;
+      const header=column<rect.map.width?rect.table.nodeAt(rect.map.map[column]):null;
+      const chosen=incoming?.cell||existing;
+      const duplicate=position!==null&&rect.map.map.indexOf(position)!==row*rect.map.width+column;
+      const body=incoming?incoming.first?incoming.cell.content:null:duplicate?null:existing?.content;
+      return body?type.create({...chosen.attrs,colspan:1,rowspan:1,colwidth:null,alignment:header?.attrs.alignment||chosen.attrs.alignment},body):type.createAndFill({alignment:header?.attrs.alignment||'left'});
+    });return schema.nodes[row===0?'table_header_row':'table_row'].createChecked(null,content);
   });
-  __insertCells(view.state,tr=>view.dispatch(tr),rect.tableStart,rect,{...cells,rows});return true;
+  const table=rect.table.type.createChecked(rect.table.attrs,rows),transaction=view.state.tr.replaceWith(rect.tableStart-1,rect.tableStart-1+rect.table.nodeSize,table),map=TableMap.get(table);
+  transaction.setSelection(CellSelection.create(transaction.doc,rect.tableStart+map.positionAt(rect.top,rect.left,table),rect.tableStart+map.positionAt(rect.top+cells.height-1,rect.left+cells.width-1,table)));
+  view.dispatch(transaction.scrollIntoView());return true;
 }

@@ -10,6 +10,7 @@ import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
+import {isInTable} from '@milkdown/kit/prose/tables';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
 import {markdownSource} from './markdown-source.js';
@@ -171,7 +172,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         const html=event.clipboardData?.getData('text/html');
         if(!forcePlain&&!code){
-          const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text);
+          const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text,{insideTable:isInTable(view.state)});
           if(slice){if(!pasteTable(view,slice))view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
         }
         const match=/^(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(text);
