@@ -192,7 +192,18 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       while(origins.size>160){const oldest=[...origins.keys()].find(key=>key!==0);origins.delete(oldest);}
     };
     rememberSource(value,original);
-    const setReadOnly=value=>{readOnly=value;code.setReadOnly();view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea,.markdown-callout input'))text.readOnly=readOnly;};
+    const setReadOnly=value=>{
+      if(readOnly!==value){
+        // A permission/connection refresh must not replace a newer DOM caret
+        // with the view's last recorded selection while focus is in the editor.
+        const selection=root.getRootNode().getSelection?.()||document.getSelection();
+        if(selection?.anchorNode&&selection.focusNode&&root.contains(selection.anchorNode)&&root.contains(selection.focusNode)&&!document.activeElement?.closest?.('.markdown-source-fragment')){
+          try{const from=view.posAtDOM(selection.anchorNode,selection.anchorOffset),to=view.posAtDOM(selection.focusNode,selection.focusOffset);if(view.state.doc.resolve(from).parent.isTextblock&&view.state.doc.resolve(to).parent.isTextblock)view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc,from,to)));}catch{/* Detached selection stays with the current document. */}
+        }
+        readOnly=value;view.setProps({editable:()=>!readOnly});
+      }
+      code.setReadOnly();for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea,.markdown-callout input'))text.readOnly=readOnly;
+    };
     const command=(name,payload,focus=true)=>{
       if(readOnly||root.contains(document.activeElement)&&document.activeElement.closest?.('.markdown-source-fragment'))return false;
       if(name==='link'){

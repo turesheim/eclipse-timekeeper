@@ -166,7 +166,7 @@ export class MarkdownField {
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
   setValue(value){
-    this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);
+    this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.text.setSelectionRange(0,0);this.text.scrollTop=0;
     this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
   }
   position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():this.codeEditor?this.codeEditor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}

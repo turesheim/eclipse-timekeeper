@@ -33,7 +33,7 @@ export function createSourceEditor({root,value,label,readOnly=false,changed,sele
   })});
   return {value:()=>raw,replaceValue:value=>{if(value===raw)return;view.dispatch({changes:{from:0,to:view.state.doc.length,insert:value.replace(/\r\n?/g,'\n')},effects:restoreEndings.of(value.match(/\r\n|\n|\r/g)||[]),annotations:isolateHistory.of('full')});},focus:()=>view.focus(),find:()=>openSearchPanel(view),
     lineNumbers:enabled=>view.dispatch({effects:numbers.reconfigure(enabled?lineNumbers():[])}),
-    readOnly:value=>{readOnly=value;view.dispatch({effects:access.reconfigure([EditorState.readOnly.of(value),EditorView.editable.of(!value)])});},
+    readOnly:value=>{if(readOnly===value)return;readOnly=value;view.dispatch({effects:access.reconfigure([EditorState.readOnly.of(value),EditorView.editable.of(!value)])});},
     position:()=>({anchor:view.state.selection.main.anchor,head:view.state.selection.main.head,scrollTop:view.scrollDOM.scrollTop}),
     select:(anchor,head=anchor)=>{const size=view.state.doc.length;view.dispatch({selection:{anchor:Math.min(anchor,size),head:Math.min(head,size)},scrollIntoView:true});view.focus();},
     destroy:()=>view.destroy()};
