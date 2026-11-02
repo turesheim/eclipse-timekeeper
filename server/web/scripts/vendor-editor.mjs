@@ -4,7 +4,7 @@ import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {gzipSync} from 'node:zlib';
 const root=fileURLToPath(new URL('../',import.meta.url)),check=process.argv.includes('--check');
-const result=await build({absWorkingDir:root,entryPoints:['editor/milkdown.js'],bundle:true,format:'esm',target:['es2022'],minify:true,legalComments:'eof',write:false,outdir:'src/assets/milkdown',metafile:true});
+const result=await build({absWorkingDir:root,entryPoints:['editor/milkdown.js','editor/source-editor.js'],bundle:true,format:'esm',target:['es2022'],minify:true,legalComments:'eof',write:false,outdir:'src/assets/milkdown',metafile:true});
 const files=result.outputFiles.map(file=>[file.path,file.contents]);
 // Follow the actual bundle graph, not every development dependency. Ship complete
 // license texts for each included package and fail if an unknown license appears.

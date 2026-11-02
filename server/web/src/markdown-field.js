@@ -81,7 +81,7 @@ export class MarkdownField {
     root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('keydown',event=>{if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
-    buildExperience(this,loadEngine);
+    buildExperience(this,loadEngine,()=>import('./assets/milkdown/source-editor.js'));
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();this.refreshPreview();});this.clear();
   }
   rawBody(){return this.text.value===this.displayedBody?this.raw:this.text.value;}
