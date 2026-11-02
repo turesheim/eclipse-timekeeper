@@ -54,7 +54,7 @@ export class NotesView {
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
     this.observer=new ResizeObserver(()=>this.fit());this.observer.observe(document.documentElement);window.addEventListener('resize',()=>this.fit());this.controls();
   }
-  dirty(){return !!this.note&&!this.binary&&this.markdown.value()!==this.original;}
+  dirty(){return !!this.note&&!this.binary&&!this.markdown.matches(this.original);}
   canLeave(){return !this.busy&&(!this.dirty()||confirm(t('notes.discard')));}
   update(snapshot,connected,session,writable){
     if(this.session&&this.session!==session)this.reset();this.session=session;this.writable=connected&&writable;this.controls();

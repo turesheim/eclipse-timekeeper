@@ -1,6 +1,6 @@
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
-import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx} from '@milkdown/kit/core';
+import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
@@ -8,6 +8,7 @@ import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
+import {markdownSource} from './markdown-source.js';
 import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
 import {hasUnsupportedSyntax,normalizeEditorMarkdown} from '../src/markdown-document.js';
 import {t} from '../src/i18n.js';
@@ -148,6 +149,12 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     const serialized=normalizeEditorMarkdown(editor.action(getMarkdown()));
     const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
     if(!safe){await editor.destroy();return null;}
+    const serialize=doc=>normalizeEditorMarkdown(editor.action(ctx=>ctx.get(serializerCtx)(doc)));
+    const render=editor.action(ctx=>{
+      const parser=ctx.get(remarkCtx);
+      return markdownSource({source:value,tree:parser.parse(value),document:original,serialize,
+        equivalent:(left,right)=>JSON.stringify(semantic(parser.parse(left)))===JSON.stringify(semantic(parser.parse(right)))});
+    });
     const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
     const command=(name,payload)=>{
       if(readOnly)return false;
@@ -183,9 +190,24 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       }
       view.focus();return true;
     };
+    let snapshot=original,snapshotText=value,comparisonText,comparisonDocument;
+    const markdown=()=>{const current=view.state.doc,result=render(current);snapshot=current;snapshotText=result;return result;};
+    const matchesSource=text=>{
+      const current=view.state.doc;
+      if(text===value&&current.eq(original)||text===snapshotText&&current.eq(snapshot))return true;
+      if(text===value||text===snapshotText)return false;
+      if(text!==comparisonText){
+        comparisonText=text;comparisonDocument=null;
+        try{comparisonDocument=editor.action(ctx=>ctx.get(parserCtx)(text));}catch{/* Unknown source stays conservatively dirty. */}
+      }
+      // A different document cannot be the saved source. Only an equal parse
+      // needs exact serialization, e.g. returning to a saved state after a mode switch.
+      return !!comparisonDocument&&current.eq(comparisonDocument)&&markdown()===text;
+    };
     setReadOnly(readOnly);
     return {
-      markdown:()=>view.state.doc.eq(original)?value:normalizeEditorMarkdown(editor.action(getMarkdown())),
+      markdown,
+      matchesSource,
       focus:()=>view.focus(),
       setReadOnly,
       command,

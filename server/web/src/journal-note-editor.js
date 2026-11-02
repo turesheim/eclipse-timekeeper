@@ -29,7 +29,7 @@ export class JournalNoteEditor {
     this.dialog.addEventListener('close',()=>{if(!root.closest('[hidden]')){const origin=this.context?.originSelector?root.querySelector(this.context.originSelector):this.origin;if(origin?.isConnected)origin.focus();}});
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
   }
-  dirty(){return this.note&&this.markdown.value()!==this.note.body;}
+  dirty(){return this.note&&!this.markdown.matches(this.note.body);}
   controls(){
     if(!this.markdown)return;
     const ready=!!this.note&&!this.busy,write=ready&&this.writable&&!this.stale;
