@@ -1,3 +1,4 @@
+import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
 import {closeHistory} from '@milkdown/kit/prose/history';
 import {codeTools} from './code-tools.js';
@@ -190,7 +191,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![footnoteReferenceSchema,footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(code.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -294,8 +295,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       setReadOnly,
       command,
       imageDetails:()=>{const node=view.state.selection.node;if(node?.type.name==='image')return {path:node.attrs.src,alt:node.attrs.alt||'',embed:false};if(node?.type.name==='vault_wikilink'&&node.attrs.embed){const ref=wikiReference(node.attrs.value,true);return {...ref,alt:ref?.width?'':ref?.label||'',embed:true};}return null;},
-      position:()=>{const source=markdown(),block=view.state.selection.$from.index(0),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source)),start=tree.children[block]?.position?.start.offset||0;return {anchor:start+view.state.selection.$from.parentOffset,scrollTop:view.dom.scrollTop};},
-      restorePosition:position=>{const source=markdown(),tree=editor.action(ctx=>ctx.get(remarkCtx).parse(source));let index=tree.children.findIndex(node=>(node.position?.end.offset??0)>=position.anchor);if(index<0)index=view.state.doc.childCount-1;const block=view.state.doc.child(index);let start=0;for(let i=0;i<index;i++)start+=view.state.doc.child(i).nodeSize;const offset=Math.min(Math.max(0,position.anchor-(tree.children[index]?.position?.start.offset||0)),Math.max(0,block.nodeSize-2));view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(view.state.doc.content.size,start+1+offset)))));view.dom.scrollTop=position.scrollTop||0;},
+      position:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source);return {anchor:map.source(view.state.selection.anchor),head:map.source(view.state.selection.head,view.state.selection.head>view.state.selection.anchor?-1:1),scrollTop:view.dom.scrollTop};},
+      restorePosition:position=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source),anchor=map.rich(position.anchor),head=map.rich(position.head??position.anchor);view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor),view.state.doc.resolve(head))));view.dom.scrollTop=position.scrollTop||0;},
       composing:()=>view.composing,
       context:()=>({text:view.state.selection.$from.parent.textContent,table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),

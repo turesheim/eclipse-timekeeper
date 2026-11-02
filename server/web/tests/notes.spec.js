@@ -174,3 +174,15 @@ test('vault wikilinks report ambiguity, navigate to headings and preview authent
   await expect(page.locator('#notes-formatted [data-wiki-reference="Plan"]')).toHaveAttribute('data-resolved','false');await expect(page.locator('#notes-formatted [data-wiki-reference="Notes/Design#Decisions|Decision"]')).toHaveAttribute('data-resolved','true');await expect.poll(()=>page.locator('#notes-formatted img[data-wiki-embed]').evaluate(node=>node.complete&&node.naturalWidth>0)).toBe(true);
   await page.locator('#notes-formatted [data-wiki-reference="Notes/Design#Decisions|Decision"]').click();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Design.md');await expect(page.locator('#notes-formatted h2')).toHaveText('Decisions');
 });
+
+test('existing assets and image properties keep portable paths across Notes and Today',async({page,request})=>{
+  const api=await setup(page,request),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  await api('PUT','/notes/files?path=Notes%2Fpixel.png',png,{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2FAssets.md',Buffer.from('Assets.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Assets.md',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await page.locator('#notes-formatted p').click();await page.keyboard.press(process.platform==='darwin'?'Meta+ArrowRight':'End');
+  await page.locator('#notes-panel').getByRole('button',{name:'Existing vault asset',exact:true}).click();const picker=page.getByRole('dialog',{name:'Existing vault asset',exact:true});await picker.getByRole('button',{name:'Notes/pixel.png',exact:true}).click();
+  const image=page.locator('#notes-formatted img');await expect.poll(()=>image.evaluate(node=>node.naturalWidth)).toBe(1);await image.click();await page.locator('#notes-panel').getByRole('button',{name:'Image properties',exact:true}).click();const properties=page.getByRole('dialog',{name:'Image properties',exact:true});await properties.getByLabel('Width in pixels',{exact:true}).fill('48');await properties.getByRole('button',{name:'Save',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();expect(await page.locator('#notes-body').inputValue()).toContain('![[Notes/pixel.png|48]]');
+  await api('PUT','/notes/files?path=journal%2F2026-11-03.md',Buffer.from('![Shared image](../Notes/pixel.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-03');await expect.poll(()=>page.locator('#today-journal-formatted img').evaluate(node=>node.naturalWidth)).toBe(1);
+});

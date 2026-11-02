@@ -179,7 +179,7 @@ export class MarkdownField {
   async showSource(){
     if(this.loading||!this.editor)return;
     const previous=this.editor,position=previous.position(),body=previous.markdown();this.setRaw(body);this.suspended={editor:previous,body};this.editor=null;
-    this.mode(false);this.controls();const normalized=body.slice(0,position.anchor).replace(/\r\n/g,'\n').length;this.text.setSelectionRange(normalized,normalized);this.text.scrollTop=position.scrollTop;if(this.codeEditor){this.codeEditor.replaceValue(body);this.codeHost.hidden=false;this.text.hidden=true;this.codeEditor.select(normalized);}else this.text.focus();
+    this.mode(false);this.controls();const normalized=position.anchor,head=position.head??normalized;this.text.setSelectionRange(Math.min(normalized,head),Math.max(normalized,head),head<normalized?'backward':'forward');this.text.scrollTop=position.scrollTop;if(this.codeEditor){this.codeEditor.replaceValue(body);this.codeHost.hidden=false;this.text.hidden=true;this.codeEditor.select(normalized,head);}else this.text.focus();
   }
   async showFormatted(focus=true){
     if(this.loading)return;if(this.editor){this.editor.focus();return;}
@@ -192,7 +192,7 @@ export class MarkdownField {
     }
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=this.rawBody();
-    if(this.suspended){const suspended=this.suspended;this.suspended=null;if(!this.unterminated&&!splitMarkdown(richBody).frontmatter&&(suspended.body===richBody||suspended.editor.replaceMarkdown(richBody))){this.editor=suspended.editor;this.editor.setReadOnly(this.readOnly);this.mode(true);if(suspended.body!==richBody&&this.sourcePosition)this.editor.restorePosition(this.sourcePosition);this.controls();if(focus)this.editor.focus();return;}await suspended.editor.destroy();this.rich.replaceChildren();}
+    if(this.suspended){const suspended=this.suspended;this.suspended=null;if(!this.unterminated&&!splitMarkdown(richBody).frontmatter&&(suspended.body===richBody||suspended.editor.replaceMarkdown(richBody))){this.editor=suspended.editor;this.editor.setReadOnly(this.readOnly);this.mode(true);if(this.sourcePosition)this.editor.restorePosition(this.sourcePosition);this.controls();if(focus)this.editor.focus();return;}await suspended.editor.destroy();this.rich.replaceChildren();}
     if(this.unterminated||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);

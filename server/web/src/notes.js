@@ -198,7 +198,7 @@ export class NotesView {
       return (await session.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;
     },onError:(error,dom)=>{dom.alt=(alt?alt+' · ':'')+t('notes.unavailable_image');dom.title=error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}});
   }
-  async openLink(reference){const session=this.session,current=this.generation;try{const entry=await this.resolveLink(reference,session);if(session===this.session&&current===this.generation)await this.select(entry.id);}catch(error){if(session===this.session&&current===this.generation)this.fail(error);}}
+  async openLink(reference){const session=this.session,current=this.generation;try{const entry=await this.resolveLink(reference,session);if(session===this.session&&current===this.generation){await this.select(entry.id);let heading=reference.split('#').slice(1).join('#');try{heading=decodeURIComponent(heading);}catch{}if(heading&&this.note?.id===entry.id){await this.markdown.showFormatted(false);this.markdown.scrollToHeading(heading);}}}catch(error){if(session===this.session&&current===this.generation)this.fail(error);}}
   async downloadAttachment(){
     if(!this.note||this.download.disabled)return;const session=this.session,current=this.generation,note=this.note;
     try{const reply=await session.request('/notes/entries/'+note.id+'/content',{binary:'application/octet-stream'});if(session!==this.session||current!==this.generation)return;

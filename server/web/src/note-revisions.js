@@ -8,6 +8,9 @@ export function noteRevisionResources(session,identity,{bodyOnly=false,latest}={
   };
 }
 export function lineComparison(current,previous){
+  // A line-only comparison would hide BOM/EOL changes. Show their escaped
+  // source when all visible lines agree but the exact bytes differ.
+  if(current!==previous&&current.replace(/\r\n?/g,'\n')===previous.replace(/\r\n?/g,'\n'))return '- '+JSON.stringify(previous)+'\n+ '+JSON.stringify(current);
   const before=previous.split(/\r\n|\n|\r/),after=current.split(/\r\n|\n|\r/);let prefix=0,suffix=0;
   while(prefix<before.length&&prefix<after.length&&before[prefix]===after[prefix])prefix++;
   while(suffix<before.length-prefix&&suffix<after.length-prefix&&before[before.length-1-suffix]===after[after.length-1-suffix])suffix++;

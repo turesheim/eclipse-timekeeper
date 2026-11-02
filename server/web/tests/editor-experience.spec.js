@@ -127,3 +127,17 @@ test('typed and pasted ordinary wikilinks become active without escaping their M
 test('enhanced source completes vault names without changing line endings or metadata',async({page})=>{
   await field(page,'',false,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await content.click();await page.keyboard.type('[[Des');await page.getByRole('option',{name:'Notes/Design.md'}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('[[Notes/Design]]');
 });
+test('spreadsheet paste creates a table and fills existing cells without nesting tables',async({page})=>{
+  await engine(page,'Before.\n\nAfter.\n');await page.locator('#experience-editor p').last().click();
+  const paste=async text=>page.evaluate(text=>{const data=new DataTransfer();data.setData('text/plain',text);document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));},text);
+  await paste('A\tB\nOne\tTwo');await expect(page.locator('#experience-editor table')).toHaveCount(1);await expect(page.locator('#experience-editor tr')).toHaveCount(2);await expect(page.locator('#experience-editor th')).toHaveText(['A','B']);
+  await page.locator('#experience-editor td p').first().click();await paste('Three\tFour');await expect(page.locator('#experience-editor table')).toHaveCount(1);await expect(page.locator('#experience-editor td')).toHaveText(['Three','Four']);expect(await source(page)).toContain('Before.');
+});
+test('heading levels and formatted selection stay meaningful across source mode',async({page})=>{
+  await field(page,'# Heading\n\nFirst **bold** phrase.\n\nLast paragraph.\n');
+  await page.locator('#experience-formatted p').first().click();await page.evaluate(()=>{const text=document.querySelector('#experience-formatted strong').firstChild,range=document.createRange();range.setStart(text,0);range.setEnd(text,4);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);document.dispatchEvent(new Event('selectionchange'));});
+  await expect.poll(()=>page.evaluate(()=>globalThis.field.editor.selectedText())).toBe('bold');
+  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
+  expect(await page.locator('#experience-body').evaluate(node=>node.value.slice(node.selectionStart,node.selectionEnd))).toBe('bold');
+  await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.editor.selectedText())).toBe('bold');
+});
