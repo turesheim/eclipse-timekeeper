@@ -142,3 +142,17 @@ test('heading levels and formatted selection stay meaningful across source mode'
   expect(await page.locator('#experience-body').evaluate(node=>node.value.slice(node.selectionStart,node.selectionEnd))).toBe('bold');
   await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.editor.selectedText())).toBe('bold');
 });
+test('file drop inserts at the pointed paragraph and preserves the other paragraph',async({page})=>{
+  await field(page,'One.\n\nTwo.\n');const paragraph=page.locator('#experience-formatted p').last();await paragraph.scrollIntoViewIfNeeded();
+  await paragraph.evaluate(node=>{const bounds=node.getBoundingClientRect(),data=new DataTransfer();data.items.add(new File(['attachment'],'dropped.txt',{type:'text/plain'}));node.closest('.ProseMirror').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,clientX:bounds.left+10,clientY:bounds.top+bounds.height/2,dataTransfer:data}));});
+  await expect(page.locator('#experience-formatted p').first()).toHaveText('One.');await expect(page.locator('#experience-formatted p').last().getByRole('link')).toHaveText('dropped.txt');expect(await page.evaluate(()=>globalThis.uploaded)).toEqual(['dropped.txt']);
+});
+test('composition keeps Unicode text and does not accept a slash command on composing Enter',async({page})=>{
+  await field(page,'');const rich=page.locator('#experience-formatted .ProseMirror');await rich.click();await page.keyboard.type('/');
+  await rich.evaluate(node=>node.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true,data:''})));await page.keyboard.insertText('日本語');
+  await rich.evaluate(node=>{node.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',isComposing:true,bubbles:true,cancelable:true}));node.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'日本語'}));});
+  await expect(page.locator('#experience-formatted p')).toHaveText('/日本語');await expect(page.locator('#experience-formatted :is(h1,h2,h3,h4,h5,h6)')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('日本語');
+});
+test('revision comparison exposes line-ending-only changes',async({page})=>{
+  await page.goto('/web/markdown-lab.html');const diff=await page.evaluate(async()=>{const {lineComparison}=await import('/web/note-revisions.js');return lineComparison('Same.\n','Same.\r\n');});expect(diff).toContain('\\r\\n');expect(diff).toContain('- ');expect(diff).toContain('+ ');
+});

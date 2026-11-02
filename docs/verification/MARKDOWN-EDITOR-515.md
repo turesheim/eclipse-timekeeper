@@ -2,7 +2,7 @@
 
 This audit records implementation and evidence separately. Issue #515 stays open
 until every required acceptance area is verified; a passing focused suite alone
-is not completion. Work is isolated in `codex/markdown-editor-fidelity`; the dirty
+is not completion. Work is isolated in `codex/markdown-editor-experience`; the dirty
 user checkout remains untouched.
 
 ## Implemented, awaiting final regression and visual review
@@ -41,7 +41,18 @@ user checkout remains untouched.
   writes, owner isolation, independent labels and stale-write rejection pass.
 - OpenAPI validation: 54 contract cases pass after registering revision reads.
 
-These results precede the final combined commit and must be repeated for it.
+- Full Java 21 server verification at `5f7ab149`: 514 tests, zero failures/errors,
+  12 opt-in skips. The later table changes affect web code only.
+- At `fe790389`, all 37 editor/Notes/fidelity cases pass. The packaged manual
+  client vault case also passes with a platform-independent paragraph selection;
+  the combined suite is being repeated with that harness correction.
+- Current web unit and API contract suites pass: 124 and 54 cases respectively.
+
+These results do not replace final combined browser/CI verification. PR #516
+merged the foundation at `7237bf5c`; the broader implementation is follow-up work.
+The retained synthetic vault at `/private/tmp/timekeeper-515-obsidian-vault` has
+no credentials or sync state. Reopening it in native Obsidian remains pending;
+a native-app automation attempt timed out and is not counted as verification.
 
 ## Remaining acceptance work
 
@@ -58,6 +69,7 @@ These results precede the final combined commit and must be repeated for it.
   daily/weekly/event notes, unknown constructs, images, attachments and conflicts.
 - Finish user/API/data-model documentation, syntax contract, normalization,
   shortcuts, saving/recovery behavior, performance evidence and platform limits.
+  The [user guide](../operations/MARKDOWN-EDITOR.md) now describes the contract.
 
 ## Design decisions
 
