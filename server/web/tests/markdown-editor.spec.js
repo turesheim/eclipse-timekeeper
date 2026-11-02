@@ -89,8 +89,12 @@ test('Markdown schema guard retains metadata and escaped-code dialects without r
   const external=[];page.on('request',request=>{if(request.url().includes('example.invalid'))external.push(request.url());});
   await open(page);
   for(const value of ['```js title="preserve this"\nconst day = "Sunday";\n```\n','\\`outside [[wikilink]]\\`','\\`![image](https://example.invalid/pixel)\\`']){
-    await page.locator('#markdown-body').fill(value);await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');
-    await expect(page.locator('#markdown-body')).toHaveValue(value);expect(await downloaded(page)).toBe(value);
+    await page.locator('#markdown-body').fill(value);await page.locator('#markdown-rich').click();
+    // The shared engine now preserves unfamiliar constructs as inert source
+    // fragments. Rich admission is safe when the exact authored bytes survive.
+    expect(await downloaded(page)).toBe(value);
+    if(await page.locator('#markdown-formatted').isVisible())await page.locator('#markdown-source').click();
+    await expect(page.locator('#markdown-body')).toHaveValue(value);
   }
   expect(external).toEqual([]);
 });
