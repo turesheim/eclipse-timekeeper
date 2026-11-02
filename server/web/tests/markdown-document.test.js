@@ -33,3 +33,8 @@ test('empty rich paragraphs serialize as Markdown blank lines without changing c
   assert.equal(normalizeEditorMarkdown('```html\n<br />\n```\n'),'```html\n<br />\n```\n');
   assert.equal(normalizeEditorMarkdown('Before <br /> after\n'),'Before <br /> after\n');
 });
+
+test('setext headings remain eligible for rich editing without admitting unsupported highlights',()=>{
+  assert.equal(needsSource('Heading\n=======\n\nText.\n'),false);
+  assert.equal(needsSource('==highlight==\n'),true);
+});

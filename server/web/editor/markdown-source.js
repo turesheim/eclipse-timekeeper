@@ -35,7 +35,7 @@ export function markdownSource({source,tree,document,serialize,equivalent}){
       // Remove the serializer's document terminator, not authored whitespace.
       return serialize(single).replace(/\n$/,'').replace(/\r\n|\n/g,eol);
     });
-    let candidate=indices[0]===0?source.slice(0,records[0].start):'';
+    let candidate=source.slice(0,records[0].start);
     pieces.forEach((piece,index)=>{
       if(index){
         const before=indices[index-1],after=indices[index];let gap=eol+eol;
@@ -48,7 +48,7 @@ export function markdownSource({source,tree,document,serialize,equivalent}){
       }
       candidate+=piece;
     });
-    candidate+=indices.at(-1)===records.length-1?source.slice(records.at(-1).end):eol;
+    candidate+=source.slice(records.at(-1).end);
     // Reused spelling must not change Markdown meaning at a block boundary.
     return remember(equivalent(candidate,canonical)?candidate:canonical);
   };

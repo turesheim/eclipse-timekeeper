@@ -25,12 +25,13 @@ const journalImage=path=>/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(path)
 export const hasUnsupportedSyntax=(value,imageAllowed=journalImage)=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
   withoutDailyWikilinks(withoutAutolinks(value)).replace(/!\[[^\]\n]*\]\(([^\s)]+)\)/g,(source,path)=>imageAllowed(path)?'':source));
 export function needsSource(body,imageAllowed=journalImage) {
-  let fence=null,text='';
+  let fence=null,text='',previous='';
   for(const line of body.split(/\r?\n/)){
     const match=line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if(fence){if(match&&match[1][0]===fence[0]&&match[1].length>=fence.length&&!match[2].trim())fence=null;continue;}
     if(match){fence=match[1];continue;}
-    text+=line.replace(/(`+)([\s\S]*?)\1/g,'')+'\n';
+    if(/^ {0,3}=+[ \t]*$/.test(line)&&previous.trim()){previous=line;continue;}
+    text+=line.replace(/(`+)([\s\S]*?)\1/g,'')+'\n';previous=line;
   }
   return hasUnsupportedSyntax(text,imageAllowed);
 }

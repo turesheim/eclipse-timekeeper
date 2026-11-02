@@ -1,3 +1,4 @@
+import {readFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -146,4 +147,14 @@ test('Notes can hide the configured journal without losing drafts or journal acc
   await page.locator('[data-tab=notes]').click();await page.getByRole('button',{name:'Notes settings',exact:true}).click();await page.getByLabel('Hide journal folder',{exact:true}).uncheck();
   await page.getByRole('dialog',{name:'Notes settings',exact:true}).getByRole('button',{name:'Save',exact:true}).click();
   await expect(page.locator('#notes-navigation').getByRole('button',{name:'Private/Journal',exact:true})).toBeVisible();
+});
+
+test('saving a rich edit preserves untouched vault Markdown and metadata bytes',async({page,request})=>{
+  const api=await setup(page,request),source=(await readFile(new URL('./fixtures/markdown/fidelity/blocks.md',import.meta.url),'utf8')).replaceAll('\n','\r\n');
+  const created=await api('PUT','/notes/files?path=Notes%2FFidelity.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'}),entry=await created.json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'Notes/Fidelity.md',exact:true}).click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  const paragraph=page.locator('#notes-formatted p').filter({hasText:'Edit this paragraph.'});await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' More.');
+  await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+  expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source.replace('Edit this paragraph.','Edit this paragraph. More.'));
 });
