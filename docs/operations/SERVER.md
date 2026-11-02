@@ -92,7 +92,7 @@ storage is suitable for tests; production uses durable file/server storage.
 ## Journal synchronization
 
 Daily Markdown notes are available at the server's WebDAV collection. Follow
-the [WebDAV guide](JOURNAL-WEBDAV.md) for authentication, conditional writes,
+the [WebDAV guide](NOTES-WEBDAV.md) for authentication, conditional writes,
 deletion and tested client compatibility. Users find the collection URL under
 **My account → Journal** and create personal API tokens under **My account → API tokens**.
 The [journal storage policy](JOURNAL-STORAGE.md) covers encryption and backup-key

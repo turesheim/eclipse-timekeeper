@@ -74,7 +74,7 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
   await page.reload();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toHaveText('Notater');await expect(page.locator('#notes-search')).toHaveAccessibleName('Søk i filnavn');
   const token=await(await api('POST','/auth/tokens',{name:'Read-only Notes browser','permissions':['read'],'expiresAt':null})).json();
   const session=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
-  try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#notes-search')).toBeVisible();
+  try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#notes-search')).toBeVisible();await expect(reader.locator('#notes-import-folder')).toBeDisabled();
     await reader.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await reader.locator('#notes-navigation').getByRole('button',{name:'Notes/Theme.md',exact:true}).click();await expect(reader.locator('#notes-body')).toHaveValue('# Theme note\n');await expect(reader.locator('#notes-body')).not.toBeEditable();await expect(reader.locator('.notes-footer button')).toBeDisabled();
   }finally{await session.close();}
 });
@@ -157,4 +157,23 @@ test('saving a rich edit preserves untouched vault Markdown and metadata bytes',
   const paragraph=page.locator('#notes-formatted p').filter({hasText:'Edit this paragraph.'});await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' More.');
   await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
   expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source.replace('Edit this paragraph.','Edit this paragraph. More.'));
+});
+
+test('manual folder import reviews files and preserves existing notes, labels and asset bytes',async({page,request})=>{
+  const {mkdtemp,mkdir,writeFile,rm}=await import('node:fs/promises'),{join}=await import('node:path'),{tmpdir}=await import('node:os');
+  const api=await setup(page,request),root=await mkdtemp(join(tmpdir(),'timekeeper-notes-import-'));
+  const day='2026-11-02',body='\uFEFF---\r\ncustom: keep\r\n---\r\n\r\n# Imported æ\r\n';
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  await api('PUT','/notes/files?path=Notes%2FKeep.md',Buffer.from('Server original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  const label=await api('GET','/day-labels/'+day);await api('PUT','/day-labels/'+day,{text:'Independent label'},{'If-Match':label.headers().etag});
+  try{
+    for(const folder of ['journal/assets','Notes','.obsidian'])await mkdir(join(root,folder),{recursive:true});
+    for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/2026-W45.md','# Week\r\n'],['Notes/New.md','# New note\n'],['Notes/Keep.md','Local conflicting version'],['journal/assets/pixel.png',png],['.obsidian/workspace.json','{}']])await writeFile(join(root,path),bytes);
+    const chooser=page.waitForEvent('filechooser');await page.locator('#notes-panel').getByRole('button',{name:'Import folder',exact:true}).click();await(await chooser).setFiles(root);
+    const dialog=page.getByRole('dialog',{name:'Import folder',exact:true});await expect(dialog).toContainText('4 new files ready to import');await expect(dialog).toContainText('Already exists or conflicts');await expect(dialog).toContainText('Skipped');
+    expect(await(await api('GET','/day-notes/'+day+'/content')).json()).toMatchObject({body:''});
+    await dialog.getByRole('button',{name:'Import new files',exact:true}).click();await expect(dialog).toContainText('Imported 4 files.');await dialog.getByRole('button',{name:'Close',exact:true}).click();
+    for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/assets/pixel.png',png],['Notes/Keep.md','Server original']]){const entry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path}))).json();expect(Buffer.from(await(await api('GET','/notes/entries/'+entry.id+'/content')).body()).equals(Buffer.from(bytes))).toBe(true);}
+    expect((await(await api('GET','/day-labels/'+day)).json()).text).toBe('Independent label');expect((await(await api('GET','/week-notes/2026-W45')).json()).body).toBe('# Week\r\n');
+  }finally{await rm(root,{recursive:true,force:true});}
 });

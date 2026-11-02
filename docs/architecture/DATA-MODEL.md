@@ -575,9 +575,9 @@ The time-overlap calculation does not create a persistent association.
 
 ## Server day notes and WebDAV
 
-The canonical HTTP collection `/dav/journal/` and its MySync-compatible
-`/remote.php/webdav/` alias address these same owner-scoped resources, including
-`assets/`. They share token authorization, data, ETags and guarded mutations.
+The hierarchical HTTP collection `/dav/notes/` exposes owner-scoped notes, including configured
+journal, event and attachment folders. They share token authorization, canonical
+data, ETags and guarded mutations. There is no separate flat journal namespace.
 
 The server has a separate physical schema from embedded Eclipse storage
 (`ServerSchema.CURRENT` is 9). Day notes and their deletion markers reuse
@@ -631,7 +631,7 @@ The note bodies and complete Markdown documents are readable to the server.
 Protect their database, temporary files, backups and exports as described in
 [journal storage protection](../operations/JOURNAL-STORAGE.md). See the
 [day-note API](API-V1.md#private-day-labels-and-markdown-bodies) and
-[WebDAV guide](../operations/JOURNAL-WEBDAV.md) for write,
+[WebDAV guide](../operations/NOTES-WEBDAV.md) for write,
 conflict and authorization behavior.
 
 ### Prospective day-label/note history

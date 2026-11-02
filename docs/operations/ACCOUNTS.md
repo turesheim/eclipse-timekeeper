@@ -212,7 +212,7 @@ results. No shared workspace, membership or invitation model is introduced.
 **My account → Journal** shows the WebDAV collection URL and connection guidance.
 Create a personal API token with read and write permissions under **My account →
 API tokens** for each client. The token is the HTTP Basic password; revoke it
-there to end that client's access. See the [WebDAV guide](JOURNAL-WEBDAV.md)
+there to end that client's access. See the [WebDAV guide](NOTES-WEBDAV.md)
 for guarded writes and tested client compatibility.
 
 ## Recovery email addresses

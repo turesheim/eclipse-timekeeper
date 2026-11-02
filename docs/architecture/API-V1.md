@@ -930,7 +930,7 @@ exact Markdown body and ETag. `PUT` with `{ "body": "..." }` and the current
 `If-Match` saves it; `DELETE` with `If-Match` leaves a versioned tombstone.
 `GET /week-notes/{week}/markdown` downloads `YYYY-Www.md`. ISO week-based
 years are used at New Year. Account archives include these notes as separate
-`YYYY-Www.md` files, and WebDAV exposes them at `/dav/journal/`.
+`YYYY-Www.md` files, and WebDAV exposes them in the configured journal folder under `/dav/notes/`.
 
 `GET /event-notes` lists private note summaries (without bodies), including notes
 whose calendar subscription was removed. `GET /event-notes/{subscriptionId}/{key}`
@@ -966,7 +966,7 @@ ETag and safe media type. `PUT` accepts JSON `{data}` with base64 bytes, using
 Attachment names are one safe ASCII path segment. PNG, JPEG, GIF and WebP files
 with matching signatures can display inline; every other format downloads as an
 octet-stream attachment. The browser route applies session, CSRF and owner
-binding; WebDAV provides the same files under `/dav/journal/assets/` for clients.
+binding; WebDAV provides the same files under the configured assets folder under `/dav/notes/` for clients.
 The account archive includes active attachments as binary files under `assets/`
 and rejects conflicting filenames during review. Task attachment binary files
 use `assets/task attachments/<id>.bin`, referenced by `archiveFile` in version 2/3 work metadata.
@@ -976,10 +976,8 @@ version 1 ZIP and standalone JSON imports retain their inline content support.
 See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
-authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
-the same owner, authorization and conditional-write rules. Its finite
-`/remote.php/webdav/` alias exposes the same journal and asset resources for
-MySync; both prefixes require HTTP Basic with the existing API token as password
+authoritative. The [WebDAV collection](../operations/NOTES-WEBDAV.md) uses
+the same owner, authorization and conditional-write rules. It requires HTTP Basic with the existing API token as password
 and HTTPS outside loopback development. The alias adds no REST API variants or
 independent document state.
 
@@ -1140,7 +1138,7 @@ validator. Use entryEtag for PUT `/path`, DELETE entry and POST `/restore`.
 Conflicting destinations are never overwritten. Stale/missing preconditions
 return 412/428; deployment quota growth returns 507. Day labels are independent.
 
-Hierarchical `/dav/vault/` and `/remote.php/webdav/vault/` expose the same sources,
+Hierarchical `/dav/notes/` exposes the same sources,
 with guarded PUT/DELETE/MOVE, MKCOL, strong ETags and stable DAV resource-id.
 Existing flat aliases remain available. Account archives use v4 with ZIP uploads
 up to 1 GiB and JSON up to 256 MiB; archive.json remains separately bounded.

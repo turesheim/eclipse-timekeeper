@@ -101,7 +101,7 @@ def main():
             folder=data/'ordinary-markdown';folder.mkdir();control=data/'ordinary-state';(folder/'Nested').mkdir()
             source=b'---\r\nunknown: [true, "keep"]\r\n---\r\n[[Other note]]  \r\n<https://example.invalid/x>\r\n---\r\n'
             (folder/'Nested'/'A+B 100%.md').write_bytes(source);(folder/'empty.md').write_bytes(b'');binary=b'\x00\xff\r\n'+bytes(range(256));(folder/'Nested'/'asset.bin').write_bytes(binary)
-            remote=base+'/dav/vault/Manual/'
+            remote=base+'/dav/notes/Manual/'
             def run(extra=(),expected=0,credential=None,url=None,local_folder=None,state=None):
                 command=[sys.executable,str(client),'--url',url or remote,'--folder',str(local_folder or folder),'--state-dir',str(state or control),'--ca-file',str(certificate),*extra]
                 result=subprocess.run(command,env={**os.environ,'WEBDAV_TOKEN':credential or token},capture_output=True,text=True,timeout=90)

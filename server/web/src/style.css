@@ -458,3 +458,8 @@ button.calendar-summary-card:disabled { opacity: .65; }
 
 .focus-menu-field { display: grid; gap: .25rem; padding: .5rem .75rem; }
 .focus-menu-field select { width: 100%; min-width: 0; }
+.notes-import-dialog { width: min(48rem,calc(100vw - 2rem)); }
+.notes-import-files { max-height: 45dvh; overflow-y: auto; padding: 0; list-style: none; }
+.notes-import-files li { display: flex; justify-content: space-between; gap: 1rem; padding-block: .35rem; border-bottom: 1px solid var(--line); }
+.notes-import-files li span { min-width: 0; overflow-wrap: anywhere; }
+.notes-import-files li span:last-child { flex-shrink: 0; max-width: 45%; }

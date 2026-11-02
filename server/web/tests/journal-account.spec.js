@@ -27,11 +27,11 @@ test('Journal shows WebDAV connection and links to API token management',async({
   try{
     await signIn(page,process.env.TIMEKEEPER_WEB_TOKEN);
     const card=page.locator('.journal-account');
-    await expect(card.locator('.journal-webdav-url')).toHaveText(new URL('/dav/journal/',base()).href);
+    await expect(card.locator('.journal-webdav-url')).toHaveText(new URL('/dav/notes/',base()).href);
     await expect(card).toContainText('YYYY-MM-DD.md');
     await expect(card).toContainText('If-Match');
     await expect(card.getByRole('link',{name:'Manage API tokens'})).toHaveAttribute('href','#account/tokens');
-    await expect(card.getByRole('link',{name:'WebDAV connection and compatibility guide'})).toHaveAttribute('href',/JOURNAL-WEBDAV\.md$/);
+    await expect(card.getByRole('link',{name:'WebDAV connection and compatibility guide'})).toHaveAttribute('href',/NOTES-WEBDAV\.md$/);
     await expect(card.getByText('Public SSH key (.pub)')).toHaveCount(0);
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await setTheme(page,theme);
@@ -54,7 +54,7 @@ test('read-only accounts can view the WebDAV connection',async({browser})=>{
   const context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB'}),page=await context.newPage();
   try{
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);
-    await expect(page.locator('.journal-account .journal-webdav-url')).toHaveText(new URL('/dav/journal/',base()).href);
+    await expect(page.locator('.journal-account .journal-webdav-url')).toHaveText(new URL('/dav/notes/',base()).href);
     await expect(page.getByRole('button',{name:'Add client'})).toHaveCount(0);
     await expect(page.getByRole('button',{name:'Save synchronization settings'})).toHaveCount(0);
   }finally{await context.close();}

@@ -11,7 +11,7 @@ sync=importlib.util.module_from_spec(spec);spec.loader.exec_module(sync)
 
 class ManualSyncTests(unittest.TestCase):
     def test_missing_root_and_incomplete_xml_are_not_valid_empty_remote_scans(self):
-        remote=sync.Remote('https://example.invalid/dav/vault/','client','synthetic-token')
+        remote=sync.Remote('https://example.invalid/dav/notes/','client','synthetic-token')
         for xml in [b'<D:multistatus xmlns:D="DAV:"></D:multistatus>',b'<D:multistatus xmlns:D="DAV:"><D:response>']:
             with patch.object(remote,'request',return_value=(207,{},xml)):
                 with self.assertRaises(sync.SyncError):remote.list()
@@ -21,7 +21,7 @@ class ManualSyncTests(unittest.TestCase):
         actions,conflicts=sync.plan({},remote,baseline)
         self.assertEqual([],actions);self.assertEqual(1,len(conflicts))
     def test_recreated_remote_root_aborts_before_reading_any_file(self):
-        remote=sync.Remote('https://example.invalid/dav/vault/','client','synthetic-token')
+        remote=sync.Remote('https://example.invalid/dav/notes/','client','synthetic-token')
         root={'kind':'directory','etag':'"new"','resourceId':'urn:uuid:00000000-0000-0000-0000-000000000002'}
         with patch.object(remote,'list',return_value=(root,{})),patch.object(remote,'read') as read:
             with self.assertRaises(sync.SyncError):remote.scan({},'urn:uuid:00000000-0000-0000-0000-000000000001')

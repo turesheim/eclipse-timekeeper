@@ -159,7 +159,7 @@ test('journal images and file attachments survive editing and remain available o
     await expect.poll(()=>dialog(page).locator('.ProseMirror img[alt="photo.png"]').evaluate(img=>img.naturalWidth)).toBe(1);
     const token=await(await api('POST','/auth/tokens',{name:'Attachment browser test',permissions:['read'],expiresAt:null})).json();
     const basic=Buffer.from('webdav:'+token.token).toString('base64');
-    const dav=await request.get('/dav/journal/'+imagePath,{headers:{Authorization:'Basic '+basic}});
+    const dav=await request.get('/dav/notes/journal/'+imagePath,{headers:{Authorization:'Basic '+basic}});
     expect(dav.status()).toBe(200);expect(Buffer.from(await dav.body())).toEqual(png);
     // A file imported through the vault remains BINARY, rather than a native
     // JOURNAL_ASSET. Both must render from the same journal Markdown document.
