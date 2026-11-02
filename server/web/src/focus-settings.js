@@ -31,7 +31,7 @@ export async function renderFocusSettings(view,changed){
     const next=[...selection];if(next.length!==selectedArea.clientIds.length||next.some(id=>!selectedArea.clientIds.includes(id))){selectedArea.clientIds=next;view.dirty.add(editor.value);trigger.textContent=t('focus.clients_count',{count:next.length});}
     close();
   },'btn btn-primary');apply.disabled=!view.canWrite;
-  actions.append(cancel,apply);dialog.append(heading,search,members,actions);editor.value.append(dialog);
+  actions.append(cancel,apply);dialog.append(heading,search,members,actions);editor.value.parentElement.append(dialog);
   for(const type of ['input','change'])dialog.addEventListener(type,event=>event.stopPropagation());
   dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}});
   dialog.addEventListener('close',()=>{selectedArea=null;trigger?.focus();});search.addEventListener('input',paintMembers);

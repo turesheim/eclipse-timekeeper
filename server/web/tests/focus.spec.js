@@ -40,7 +40,7 @@ test('focus areas filter every client view, totals and separately loaded calenda
   await form.getByRole('button',{name:'Clients (1)',exact:true}).click();
   await popup.getByLabel(clients[1].name,{exact:true}).check();await popup.getByRole('button',{name:'Cancel',exact:true}).click();
   await form.getByRole('button',{name:'Clients (1)',exact:true}).click();await expect(popup.getByLabel(clients[1].name,{exact:true})).not.toBeChecked();
-  await popup.getByRole('searchbox',{name:'Search clients',exact:true}).fill('Included');await expect(popup.getByRole('checkbox')).toHaveCount(1);
+  await popup.getByRole('searchbox',{name:'Search clients',exact:true}).fill('Included');await expect(popup.getByRole('checkbox')).toHaveCount(1);await popup.getByRole('searchbox').press('Enter');await expect(popup).toBeVisible();
   const row=popup.locator('.focus-client-choice').first(),box=await row.getByRole('checkbox').boundingBox(),text=await row.locator('span').boundingBox();expect(box.x+box.width).toBeLessThan(text.x);
   expect((await new AxeBuilder({page}).include('.focus-clients-dialog').analyze()).violations).toEqual([]);
   await page.setViewportSize({width:390,height:844});await captureScreenshot(page,{path:'test-results/focus-client-popup-mobile.png',fullPage:true});await page.keyboard.press('Escape');await expect(popup).not.toBeVisible();
