@@ -29,8 +29,12 @@ export class NotesFolderImport {
   }
   controls(){this.button.disabled=!this.owner.session||!this.owner.writable||this.owner.busy;}
   reset(){++this.generation;this.rows=[];this.list.replaceChildren();this.dialog.close();this.input.value='';this.working=this.applying=this.reviewFailed=false;this.status.textContent='';}
-  render(){
-    this.list.replaceChildren();for(const row of this.rows){const entry=node('li');entry.append(node('span',row.path||row.file.name),node('span',t('notes.import_'+row.status)+(row.reason?' · '+row.reason:'')));this.list.append(entry);}
+  render(changed){
+    if(this.renderedRows!==this.rows){
+      this.renderedRows=this.rows;this.list.replaceChildren();
+      for(const row of this.rows){const entry=node('li');row.label=node('span');entry.append(node('span',row.path||row.file.name),row.label);this.list.append(entry);}
+    }
+    for(const row of changed?[changed]:this.rows)row.label.textContent=t('notes.import_'+row.status)+(row.reason?' · '+row.reason:'');
     this.choose.disabled=this.close.disabled=!!this.applying;this.apply.textContent=t(!this.rows.some(row=>row.status==='ready')&&this.rows.some(row=>row.status==='failed')?'ui.retry':'notes.import_apply');this.apply.disabled=this.working||this.reviewFailed||!this.owner.writable||!this.rows.some(row=>row.status==='ready'||row.status==='failed');
   }
   async review(files){
@@ -59,7 +63,7 @@ export class NotesFolderImport {
     try{
       for(const row of this.rows){
         if(!active())return;if(!['ready','failed'].includes(row.status))continue;
-        this.status.textContent=t('notes.import_progress',{path:row.path});
+        row.reason='';this.status.textContent=t('notes.import_progress',{path:row.path});
         try{
           const parts=row.path.split('/');parts.pop();let path='';
           for(const part of parts){path+=(path?'/':'')+part;if(folders.has(path))continue;
@@ -71,7 +75,7 @@ export class NotesFolderImport {
           await session.request('/notes/files?'+new URLSearchParams({path:row.path}),{method:'PUT',noneMatch:'*',rawBody:row.file});
           if(!active())return;row.status='imported';
         }catch(error){if(!active())return;row.status=[409,412].includes(error.status)?'conflict':'failed';row.reason=error.message;if(error.status===401){owner.fail(error);return;}}
-        this.render();
+        this.render(row);
       }
       if(active()){this.status.textContent=t('notes.import_done',{count:this.rows.filter(row=>row.status==='imported').length});await owner.reload();}
     }finally{if(generation===this.generation){this.applying=this.working=false;if(session===owner.session){owner.busy=false;owner.controls();}this.render();}}
