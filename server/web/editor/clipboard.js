@@ -1,4 +1,4 @@
-import {DOMParser} from '@milkdown/kit/prose/model';
+import {DOMParser,Slice} from '@milkdown/kit/prose/model';
 const tags=new Set(['P','DIV','BR','H1','H2','H3','H4','H5','H6','STRONG','B','EM','I','S','DEL','CODE','PRE','UL','OL','LI','BLOCKQUOTE','TABLE','THEAD','TBODY','TR','TD','TH','HR','A']);
 /** Copy only semantic elements into a fresh inert fragment. Never attach clipboard HTML. */
 export function clipboardSlice(schema,html,text,linkAllowed){
@@ -19,7 +19,11 @@ export function clipboardSlice(schema,html,text,linkAllowed){
   };
   for(const child of input.content.childNodes)copy(child,output);
   if(!output.textContent&&!output.querySelector('hr,br'))return null;
-  return DOMParser.fromSchema(schema).parseSlice(output,{preserveWhitespace:true});
+  const parser=DOMParser.fromSchema(schema);
+  // Preserve block boundaries when pasting headings, lists or multiple blocks.
+  // A single ordinary paragraph remains open so inline paste joins the caret.
+  const blocks=[...output.children];
+  return blocks.length>1||blocks.some(node=>!['P','SPAN'].includes(node.tagName))?new Slice(parser.parse(output,{preserveWhitespace:true}).content,0,0):parser.parseSlice(output,{preserveWhitespace:true});
 }
 export function spreadsheetSlice(schema,text){
   if(!text.includes('\t'))return null;
@@ -27,5 +31,6 @@ export function spreadsheetSlice(schema,text){
   if(rows.length>200||rows.some(row=>row.length>50))return null;
   const table=document.createElement('table');
   rows.forEach((cells,index)=>{const row=document.createElement('tr');cells.forEach(value=>{const cell=document.createElement(index?'td':'th');cell.textContent=value;row.append(cell);});table.append(row);});
-  return DOMParser.fromSchema(schema).parseSlice(table);
+  const holder=document.createElement('div');holder.append(table);
+  return new Slice(DOMParser.fromSchema(schema).parse(holder).content,0,0);
 }

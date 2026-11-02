@@ -71,5 +71,5 @@ export function vaultDialect({unsupported,resources,readOnly}){
       return {dom,stopEvent:()=>true,ignoreMutation:()=>true,destroy(){disposed=true;clearTimeout(timer);}};
     }
   };
-  return {plugins:[wiki,footnote,definition,callout,fragment,guard],project,nodeViews};
+  return {guard,plugins:[wiki,footnote,definition,callout,fragment],project,nodeViews};
 }

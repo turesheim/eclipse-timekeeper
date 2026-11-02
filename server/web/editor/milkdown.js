@@ -5,11 +5,12 @@ import {codeTools} from './code-tools.js';
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,docSchema,paragraphSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
-import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
+import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
+import {handlePaste as pasteTable} from '@milkdown/kit/prose/tables';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
 import {markdownSource} from './markdown-source.js';
 import {structuredCommand} from './structured-commands.js';
@@ -171,7 +172,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const html=event.clipboardData?.getData('text/html');
         if(!forcePlain&&!code){
           const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text);
-          if(slice){view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
+          if(slice){if(!pasteTable(view,event,slice))view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
         }
         const match=/^(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(text);
         if(match&&wikiReference(match[2],!!match[1])&&!code&&!forcePlain){const date=!match[1]&&dailyNoteDate(match[2]);view.dispatch(view.state.tr.replaceSelectionWith(date?view.state.schema.nodes.daily_wikilink.create({date}):view.state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]}),true));}
@@ -189,7 +190,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.plugins).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![footnoteReferenceSchema,footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(code.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
