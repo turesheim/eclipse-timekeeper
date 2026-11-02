@@ -47,7 +47,7 @@ export class NotesFolderImport {
         const limit=/\.md$/i.test(row.path)?owner.info?.limits.markdownBytes:owner.info?.limits.fileBytes;
         if(limit&&row.file.size>limit){row.status='skipped';continue;}
         try{await session.request('/notes/resolve?'+new URLSearchParams({path:row.path}));row.status='conflict';}
-        catch(error){if(error.status!==404)throw error;}
+        catch(error){if(error.status===422){row.status='skipped';row.reason=error.message;continue;}if(error.status!==404)throw error;}
         if(!active())return;
         const parts=row.path.split('/');parts.pop();let path='';
         for(const part of parts){path+=(path?'/':'')+part;if(folders.has(path))continue;try{const reply=await session.request('/notes/resolve?'+new URLSearchParams({path}));if(reply.data.kind!=='FOLDER')row.status='conflict';else folders.add(path);}catch(error){if(error.status!==404)throw error;}if(!active())return;}

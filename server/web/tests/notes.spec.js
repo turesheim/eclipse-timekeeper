@@ -168,7 +168,7 @@ test('manual folder import reviews files and preserves existing notes, labels an
   const label=await api('GET','/day-labels/'+day);await api('PUT','/day-labels/'+day,{text:'Independent label'},{'If-Match':label.headers().etag});
   try{
     for(const folder of ['journal/assets','Notes','.obsidian'])await mkdir(join(root,folder),{recursive:true});
-    for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/2026-W45.md','# Week\r\n'],['Notes/New.md','# New note\n'],['Notes/Keep.md','Local conflicting version'],['journal/assets/pixel.png',png],['.obsidian/workspace.json','{}']])await writeFile(join(root,path),bytes);
+    for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/2026-W45.md','# Week\r\n'],['Notes/New.md','# New note\n'],['Notes/Keep.md','Local conflicting version'],['Notes/CON.md','Nonportable filename'],['journal/assets/pixel.png',png],['.obsidian/workspace.json','{}']])await writeFile(join(root,path),bytes);
     const chooser=page.waitForEvent('filechooser');await page.locator('#notes-panel').getByRole('button',{name:'Import folder',exact:true}).click();await(await chooser).setFiles(root);
     const dialog=page.getByRole('dialog',{name:'Import folder',exact:true});await expect(dialog).toContainText('4 new files ready to import');await expect(dialog).toContainText('Already exists or conflicts');await expect(dialog).toContainText('Skipped');
     expect(await(await api('GET','/day-notes/'+day+'/content')).json()).toMatchObject({body:''});

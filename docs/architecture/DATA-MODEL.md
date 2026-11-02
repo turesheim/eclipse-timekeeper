@@ -580,7 +580,7 @@ journal, event and attachment folders. They share token authorization, canonical
 data, ETags and guarded mutations. There is no separate flat journal namespace.
 
 The server has a separate physical schema from embedded Eclipse storage
-(`ServerSchema.CURRENT` is 9). Day notes and their deletion markers reuse
+(`ServerSchema.CURRENT` is 10). Day notes and their deletion markers reuse
 `tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
 PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
 These are logical row types, not extra SQL tables or Eclipse JPA entities.
