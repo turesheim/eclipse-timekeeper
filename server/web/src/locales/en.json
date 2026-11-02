@@ -1225,5 +1225,6 @@
   "focus.finish_edit": "Finish or cancel the current edit before changing focus.",
   "focus.running_outside": "Work outside this focus",
   "notes.hide_journal": "Hide journal folder",
-  "notes.hide_journal_help": "Hide the journal folder, including its notes and assets, from Notes navigation and search. Journal views, links and synchronization remain available."
+  "notes.hide_journal_help": "Hide the journal folder, including its notes and assets, from Notes navigation and search. Journal views, links and synchronization remain available.",
+  "markdown.fragment": "Preserved Markdown source"
 }

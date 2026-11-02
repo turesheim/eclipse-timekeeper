@@ -1,3 +1,4 @@
+import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale, localeForPreference } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { Api, ApiError } from './api.js';
@@ -56,6 +57,7 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
+document.addEventListener(vaultNoteNavigation,event=>{if(!api||!notes.canLeave()||!today.journal.canLeaveInline())return;tab('notes');void notes.select(event.detail.entry.id).then(()=>notes.markdown.scrollToHeading?.(event.detail.heading));});
 document.addEventListener(dayNoteNavigation,event=>{
   event.preventDefault();
   const date=dailyNoteDate(event.detail?.date);if(!date||!api||!snapshot)return;

@@ -9,6 +9,7 @@ import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
 import {markdownSource} from './markdown-source.js';
+import {vaultDialect} from './vault-dialect.js';
 import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
 import {hasUnsupportedSyntax,normalizeEditorMarkdown} from '../src/markdown-document.js';
 import {t} from '../src/i18n.js';
@@ -34,7 +35,7 @@ const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
   doc.descendants(node=>{if(node.type.name==='image'&&!assetAllowed(node.attrs.src)||node.type.name==='daily_wikilink'&&!dailyNoteDate(node.attrs.date)||node.marks.some(mark=>mark.type.name==='link'&&!linkAllowed(mark.attrs.href)))safe=false;return safe;});
   return safe;
 };
-const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
+const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value.replace(/\[![A-Za-z]+\][+-]?/g,''))||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
@@ -85,6 +86,7 @@ function mermaidBlock(node){
 }
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources}){
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
+  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly});
   const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
     if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
@@ -102,7 +104,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         if(event.key==='Escape'){escape();return true;}return false;
       },
-      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
+      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
         if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
@@ -142,20 +144,20 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       },
       handleDrop:()=>true
     });
-  }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(changePlugin);
+  }).use(commonmark).use(gfm).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(dailyWikilinkInput).use(dialect.plugins).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
     const serialized=normalizeEditorMarkdown(editor.action(getMarkdown()));
-    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree,assetAllowed,linkAllowed)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
+    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=dialect.project(parser.parse(value),value);return JSON.stringify(semantic(tree))===JSON.stringify(semantic(dialect.project(parser.parse(serialized),serialized)));});
     if(!safe){await editor.destroy();return null;}
     const serialize=doc=>normalizeEditorMarkdown(editor.action(ctx=>ctx.get(serializerCtx)(doc)));
     const render=editor.action(ctx=>{
       const parser=ctx.get(remarkCtx);
-      return markdownSource({source:value,tree:parser.parse(value),document:original,serialize,
-        equivalent:(left,right)=>JSON.stringify(semantic(parser.parse(left)))===JSON.stringify(semantic(parser.parse(right)))});
+      return markdownSource({source:value,tree:dialect.project(parser.parse(value),value),document:original,serialize,
+        equivalent:(left,right)=>JSON.stringify(semantic(dialect.project(parser.parse(left),left)))===JSON.stringify(semantic(dialect.project(parser.parse(right),right)))});
     });
-    const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
+    const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;for(const text of root.querySelectorAll('.markdown-source-fragment textarea'))text.readOnly=readOnly;};
     const command=(name,payload)=>{
       if(readOnly)return false;
       if(name==='link'){

@@ -1,3 +1,4 @@
+import {vaultEditorResources} from './vault-editor-resources.js';
 import {journalImageResources} from './image-preview.js';
 import {t} from './i18n.js';
 import {iconButton} from './icons.js';
@@ -17,7 +18,7 @@ export class JournalNoteEditor {
     const heading=node('div',undefined,'week-note-heading');heading.append(this.title,this.closeButton);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
-    const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,undefined,journalImageResources(()=>this.session));
+    const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,undefined,{...journalImageResources(()=>this.session),...vaultEditorResources(()=>this.session)});
     const actions=node('div',undefined,'dialog-actions');
     this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.cancel.addEventListener('click',()=>this.close());
     this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.remove());

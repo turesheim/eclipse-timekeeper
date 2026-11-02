@@ -84,3 +84,8 @@
 .today-journal .journal-formatted :is(.milkdown), .today-journal .journal-formatted > div { min-height: 0; }
 .today-journal .journal-inline :is(.ProseMirror,textarea) { min-height: 0; overflow-y: auto; resize: none; }
 .today-journal .journal-inline .dialog-actions { position: static; flex-shrink: 0; margin-top: 0; padding-bottom: 0; }
+.markdown-source-fragment { border: 1px dashed var(--bs-border-color); border-radius: .4rem; padding: .5rem; margin-block: .75rem; background: var(--bs-tertiary-bg); }
+.markdown-source-fragment label { display: block; font-size: .8rem; color: var(--bs-secondary-color); }
+.markdown-source-fragment textarea { display: block; width: 100%; min-height: 5rem; font-family: var(--bs-font-monospace); background: var(--bs-body-bg); color: var(--bs-body-color); border: 0; resize: vertical; }
+.markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
+.markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }

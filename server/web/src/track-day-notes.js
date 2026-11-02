@@ -1,3 +1,4 @@
+import {vaultEditorResources} from './vault-editor-resources.js';
 import {journalImageResources} from './image-preview.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
@@ -21,7 +22,7 @@ export class TrackDayNotes {
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
     const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),
-      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image),journalImageResources(()=>this.editor?.session));
+      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image),{...journalImageResources(()=>this.editor?.session),...vaultEditorResources(()=>this.editor?.session)});
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
