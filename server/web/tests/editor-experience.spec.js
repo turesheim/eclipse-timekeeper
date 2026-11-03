@@ -14,6 +14,29 @@ async function engine(page,value,options={}){
 }
 const source=page=>page.evaluate(()=>globalThis.experience.markdown());
 
+test('Backspace deletes rich text and joins paragraphs at the caret',async({page})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await field(page,'First.\n\nSecond.\n');const paragraph=page.locator('#experience-formatted p').last();
+  await appendEditorText(paragraph,'x');await page.keyboard.press('Backspace');await expect(paragraph).toHaveText('Second.');
+  await paragraph.evaluate(node=>{node.closest('[contenteditable=true]').focus();const range=document.createRange();range.selectNodeContents(node);range.collapse(true);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);document.dispatchEvent(new Event('selectionchange'));});
+  await page.keyboard.press('Backspace');await expect(page.locator('#experience-formatted p')).toHaveText(['First.Second.']);
+  await page.keyboard.press('ControlOrMeta+z');await expect(page.locator('#experience-formatted p')).toHaveText(['First.','Second.']);expect(errors).toEqual([]);
+});
+
+test('new checkbox items retain a visible caret and Backspace removes the empty item',async({page})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await field(page,'- [ ] First task\n');const rich=page.locator('#experience-formatted .ProseMirror');
+  await appendEditorText(rich.locator('li p'),'');await page.keyboard.press('Enter');
+  await expect(rich.locator('li[data-task=true]')).toHaveCount(2);
+  const empty=rich.locator('li').last().locator('p');
+  const caret=await empty.evaluate(node=>{const selection=getSelection(),rect=globalThis.field.editor.selectionRect(),box=node.getBoundingClientRect();return {inside:node.contains(selection.anchorNode),height:rect.bottom-rect.top,width:box.width,focus:node.closest('.ProseMirror')===document.activeElement};});
+  expect(caret.inside).toBe(true);expect(caret.focus).toBe(true);expect(caret.height).toBeGreaterThan(0);expect(caret.width).toBeGreaterThan(8);
+  await page.keyboard.type('Second task');await expect(empty).toHaveText('Second task');
+  for(let count=0;count<'Second task'.length;count++)await page.keyboard.press('Backspace');
+  await expect(empty).toHaveText('');await page.keyboard.press('Backspace');await expect(rich.locator('li')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 test('unknown constructs are inert editable fragments while surrounding Markdown remains formatted',async({page})=>{
   const value='Before.\r\n\r\n<script>window.bad=true</script>\r\n\r\n==unknown highlight==\r\n\r\nAfter.\r\n';
   await engine(page,value);expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.bad)).toBeUndefined();
