@@ -26,7 +26,7 @@ class ChangesTest(unittest.TestCase):
         for key in ('code', 'server', 'web'):self.assertTrue(selected[key], key)
         for key in ('server_tests', 'api', 'eclipse', 'containers', 'site', 'full', 'web_full'):self.assertFalse(selected[key], key)
         self.assertEqual(sorted(ci.LAYOUT_SPECS), selected['browser_specs'])
-        self.assertTrue(self.select(['server/web/src/markdown.css'])['web_full'])
+        self.assertFalse(self.select(['server/web/src/markdown.css'])['web_full'])
 
     def test_feature_and_shared_web_changes(self):
         self.assertEqual(['day-notes.spec.js', 'today.spec.js'], self.select(['server/web/src/today.js'])['browser_specs'])
@@ -35,9 +35,10 @@ class ChangesTest(unittest.TestCase):
         self.assertFalse(self.select(['server/web/tests/today.spec.js'])['server_tests'])
         self.assertTrue(self.select(['server/web/tests/acceptance.py'])['web_full'])
 
-    def test_larger_feature_unions_keep_existing_isolated_fixture_batches(self):
+    def test_larger_known_feature_unions_are_selected_without_expanding_to_every_spec(self):
         selected = self.select(['server/web/src/style.css', 'server/web/src/calendar.js'])
-        self.assertTrue(selected['web_full']);self.assertEqual([],selected['browser_specs'])
+        self.assertFalse(selected['web_full']);self.assertEqual(7,len(selected['browser_specs']))
+        self.assertEqual(2,len(selected['browser_matrix']['include']))
 
     def test_ordinary_backend_and_sensitive_changes(self):
         selected = self.select(['server/app/src/main/java/net/ProjectResource.java'])
@@ -56,7 +57,7 @@ class ChangesTest(unittest.TestCase):
         self.assertTrue(selected['site']);self.assertFalse(selected['code'])
         event = {'pull_request': {'base': {'sha': 'abc'}, 'labels': [{'name':'ci:full'}]}}
         self.assertTrue(self.select(['README.md'], event)['full'])
-        self.assertTrue(self.select(['server/web/src/style.css'], {'before':'abc'}, 'push', 'refs/heads/main')['full'])
+        self.assertFalse(self.select(['server/web/src/style.css'], {'before':'abc'}, 'push', 'refs/heads/main')['full'])
         self.assertFalse(self.select(['server/web/src/style.css'], {'before':'abc'}, 'push', 'refs/heads/main')['containers'])
         for name, ref in [('schedule','refs/heads/main'), ('workflow_dispatch','refs/heads/main'), ('push','refs/tags/v2')]:
             with patch.object(ci.subprocess,'run') as git:
@@ -77,6 +78,24 @@ class ChangesTest(unittest.TestCase):
         for response in (subprocess.CompletedProcess([],128,b'',b''),subprocess.CompletedProcess([],0,b'',b'')):
             with patch.object(ci.subprocess,'run',return_value=response):
                 self.assertTrue(ci.select_jobs({'before':'abc'},'push','refs/heads/main','def')['full'])
+
+    def test_main_web_merge_does_not_repeat_platform_or_database_certification(self):
+        paths=['server/web/editor/structured-commands.js','server/web/src/markdown-field.js',
+               'server/web/src/assets/milkdown/milkdown.js','server/web/src/locales/en.json',
+               'server/web/tests/editor-experience.spec.js','docs/operations/MARKDOWN-EDITOR.md']
+        selected=self.select(paths,{'before':'abc'},'push','refs/heads/main')
+        for key in ('code','server','web','web_full'):self.assertTrue(selected[key],key)
+        for key in ('full','server_tests','api','eclipse','containers','container_full'):self.assertFalse(selected[key],key)
+        self.assertEqual(4,len(selected['browser_matrix']['include']))
+        for path in ('server/app/src/main/java/net/ProjectResource.java','server/deploy/compose.yaml',
+                     'server/app/src/main/java/net/DatabaseStore.java'):
+            self.assertTrue(self.select([path],{'before':'abc'},'push','refs/heads/main')['container_full'])
+
+    def test_browser_matrix_has_one_job_per_bounded_share(self):
+        for size,expected in ((1,1),(6,1),(7,2),(19,4),(80,4)):
+            rows=ci.browser_matrix(['fixture']*size)['include']
+            self.assertEqual(list(range(1,expected+1)),[row['shard'] for row in rows])
+            self.assertEqual({expected},{row['shards'] for row in rows})
 
     def test_pr_compares_merge_base_and_push_previous_head_without_renames(self):
         with patch.object(ci.subprocess,'run',return_value=subprocess.CompletedProcess([],0,b'README.md\0',b'')) as git:
@@ -102,6 +121,9 @@ class ChangesTest(unittest.TestCase):
         self.assertNotIn('--spec',browser.command([]))
         for spec in ['../today.spec.js','missing.spec.js','--help',123]:
             with self.assertRaises(ValueError):browser.command([spec])
+        self.assertEqual(['--shard','2/4'],browser.command(['today.spec.js'],'2/4')[-2:])
+        for shard in ('0/4','5/4','4/2','1/0','1/4 --help',123):
+            with self.assertRaises(ValueError):browser.command([],shard)
 
     def test_aggregate_rejects_skipped_selected_jobs_and_failed_selector(self):
         needs={'Changes':{'result':'success','outputs':{**{key:'false' for key in ('server','web','api','eclipse','containers','site')},'server':'true'}},

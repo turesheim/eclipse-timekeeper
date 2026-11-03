@@ -32,6 +32,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image', default='timekeeper-server:test')
     parser.add_argument('--postgres-image', default='postgres:18.6-bookworm')
+    parser.add_argument('--smoke', action='store_true', help='Verify startup, private shared storage, authenticated replicas and bundled web assets only')
+    parser.add_argument('--expected-commit', help='Require both replicas to run this exact source commit')
     parser.add_argument('--output', type=Path, default=ROOT / 'server/target/compose-acceptance')
     args = parser.parse_args()
     output = args.output.resolve()
@@ -114,6 +116,8 @@ def main():
             client.assertEqual('2026-10-13T08:30:00Z', information['deployedAt'])
             client.assertRegex(information['commit'], '^[0-9a-f]{40}$')
         client.assertEqual(initial_information['api-1']['commit'], initial_information['api-2']['commit'])
+        if args.expected_commit:
+            for information in initial_information.values():client.assertEqual(args.expected_commit, information['commit'])
         with urlopen(base + '/web/', timeout=3) as response:
             client.assertIn(b'id="login-form"', response.read())
             client.assertIn("frame-ancestors 'none'", response.headers.get('Content-Security-Policy', ''))
@@ -125,6 +129,12 @@ def main():
                                          'http://localhost:8080/api/v1/me',
                                          input='Authorization: Bearer ' + tokens['a'] + '\n'))
             client.assertEqual('owner-a', identity['ownerId'])
+        if args.smoke:
+            receipt.update(mode='smoke', twoReplicas=True, bundledWeb=True,
+                           commit=initial_information['api-1']['commit'])
+            (output / 'acceptance.json').write_text(json.dumps(receipt, indent=2) + '\n')
+            print(json.dumps(receipt, indent=2))
+            return
         # Exercise the same cookie on both actual JVMs; configuration contains no raw credentials.
         def node_request(member, method, path, body=None, cookie=None, csrf=None, expected_status=200, bearer=None):
             options = {'url': 'http://localhost:8080/api/v1' + path, 'request': method,

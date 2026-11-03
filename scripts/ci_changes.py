@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select bounded PR checks; uncertain history and sensitive changes fail open."""
+"""Select checks for PRs and main; uncertain history and sensitive changes fail open."""
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -57,8 +57,13 @@ def browser_specs(paths):
         else:
             return []  # Unknown/shared web behavior: run the complete browser suite.
     root = Path(__file__).resolve().parents[1] / 'server/web/tests'
-    # Larger unions use the acceptance runner's existing isolated fixture batches.
-    return sorted(specs) if len(specs) <= 6 and all((root / spec).is_file() for spec in specs) else []
+    return sorted(specs) if all((root / spec).is_file() for spec in specs) else []
+
+
+def browser_matrix(specs):
+    count = len(specs) if specs else len(list((Path(__file__).resolve().parents[1] / 'server/web/tests').glob('*.spec.js')))
+    shards = max(1, min(4, (count + 5) // 6))
+    return {'include': [{'shard': index, 'shards': shards} for index in range(1, shards + 1)]}
 
 
 def sensitive_path(path):
@@ -77,8 +82,8 @@ def select_jobs(event, event_name, ref, head):
     product = [p for p in (paths or []) if not documentation(p)]
     override = any(label.get('name') == 'ci:full' for label in event.get('pull_request', {}).get('labels', []))
     sensitive = any(sensitive_path(p) for p in product)
-    # Main validates deployable code before publishing; nightly/manual/tag runs certify everything.
-    full = paths is None or override or bool(sensitive) or (event_name == 'push' and bool(product))
+    # Main uses the same selection as PRs. Nightly/manual/tag runs certify everything.
+    full = paths is None or override or bool(sensitive)
     code = full or bool(product)
     web_paths = [p for p in product if p.startswith('server/web/')]
     backend = any(not p.startswith('server/web/') for p in product)
@@ -93,8 +98,10 @@ def select_jobs(event, event_name, ref, head):
         'web': code,
         'web_full': code and (full or backend or not specs),
         'containers': full and event_name != 'push',
+        'container_full': full or backend,
         'site': full or any(documentation(p) for p in (paths or [])),
         'browser_specs': specs,
+        'browser_matrix': browser_matrix(specs),
     }
 
 

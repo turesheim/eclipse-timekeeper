@@ -24,6 +24,7 @@ TABLES = ('tk_owner','tk_resource','tk_relation','tk_external_reference','tk_act
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--postgres-image', default='postgres:17.11-bookworm')
+    parser.add_argument('--source-schema', type=int, choices=range(2,10), nargs='+', help='Select source schemas; default verifies all supported upgrades')
     args = parser.parse_args()
     architecture = command('docker','image','inspect','--format','{{.Architecture}}',args.postgres_image).stdout.strip()
     with tempfile.TemporaryDirectory(prefix='timekeeper-schema-upgrade-') as temporary:
@@ -31,8 +32,8 @@ def main():
         binary = folder/'timekeeper-dsm'
         command('go','-C',str(ROOT/'server/synology/installer'),'build','-o',str(binary),'.',
                 environment={**os.environ,'GOOS':'linux','GOARCH':architecture,'CGO_ENABLED':'0',
-                             'GOCACHE':str(ROOT/'server/target/schema-upgrade-go-cache')})
-        for source_schema,interruption in itertools.product((2,3,4,5,6,7,8,9),('before-commit','after-commit')):
+                             'GOCACHE':os.environ.get('GOCACHE',str(ROOT/'server/target/schema-upgrade-go-cache'))})
+        for source_schema,interruption in itertools.product(args.source_schema or range(2,10),('before-commit','after-commit')):
             container = 'timekeeper-schema-upgrade-'+secrets.token_hex(4)
             password = secrets.token_urlsafe(32)
             command('docker','run','-d','--name',container,'--network','none',

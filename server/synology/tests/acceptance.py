@@ -46,7 +46,7 @@ def main():
         release.write_text(json.dumps({'commit':commit, 'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+commit, 'serverSchema':10}))
         binary = folder / 'timekeeper-dsm'
         command('go', '-C', str(ROOT/'server/synology/installer'), 'build', '-trimpath', '-o', str(binary), '.',
-                environment={**os.environ, 'GOOS':'linux', 'GOARCH':architecture, 'CGO_ENABLED':'0', 'GOCACHE':str(folder/'go-cache')})
+                environment={**os.environ, 'GOOS':'linux', 'GOARCH':architecture, 'CGO_ENABLED':'0', 'GOCACHE':os.environ.get('GOCACHE',str(folder/'go-cache'))})
         variables = {'SYNOPKG_PKGNAME':'timekeeper', 'SYNOPKG_PKGDEST':'/var/packages/timekeeper/target',
                      'SYNOPKG_PKGDEST_VOL':'/volume1', 'SYNOPKG_PKGVAR':'/var/packages/timekeeper/var',
                      'SYNOPKG_PKGINST_TEMP_DIR':'/tmp/timekeeper-incoming-payload',

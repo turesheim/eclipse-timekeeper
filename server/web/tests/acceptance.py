@@ -59,10 +59,21 @@ def spec_pattern(name):
     return r'(^|[\\/])'+re.escape(name)+'$'
 
 
-def spec_batches(specs, size=6):
+def spec_batches(specs, size=6, shard=None):
     """Bound shared fixture lifetime; unrelated features must not share login budgets."""
     values=sorted(specs)
+    if shard:
+        index,total=shard
+        values=values[index-1::total]
     return [values[index:index+size] for index in range(0,len(values),size)]
+
+
+def parse_shard(value):
+    if not re.fullmatch(r'[1-4]/[1-4]', value):
+        raise argparse.ArgumentTypeError('Expected a shard between 1/1 and 4/4')
+    index,total=map(int,value.split('/'))
+    if index>total:raise argparse.ArgumentTypeError('Shard index exceeds shard count')
+    return index,total
 
 
 def restore_batch_artifacts(saved, output):
@@ -92,7 +103,8 @@ def restore_batch_artifacts(saved, output):
 def run_batches(args,output,digest):
     # Fresh JVM/database/credentials per small group. Keep production throttles,
     # test assertions and individual timeouts intact; never retry a failed login.
-    batches=spec_batches(path.name for path in (ROOT/'server/web/tests').glob('*.spec.js'))
+    specs=args.spec or [path.name for path in (ROOT/'server/web/tests').glob('*.spec.js')]
+    batches=spec_batches(specs,shard=args.shard)
     if not batches:raise ValueError('No browser spec files found')
     receipts=[];passed=False;deadline=time.monotonic()+1200
     with tempfile.TemporaryDirectory(prefix='timekeeper-browser-batches-') as temporary:
@@ -105,6 +117,7 @@ def run_batches(args,output,digest):
                 for flag in ('https','mail','passkeys','restore'):
                     if getattr(args,flag):command.append('--'+flag)
                 for spec in specs:command.extend(['--spec',spec])
+                if args.grep:command.extend(['--grep',args.grep])
                 print(f'Browser fixture {index}/{len(batches)}: '+', '.join(specs),flush=True)
                 try:
                     result=subprocess.run(command,timeout=max(.001,deadline-time.monotonic())+60)
@@ -117,7 +130,7 @@ def run_batches(args,output,digest):
             passed=True
         finally:
             restore_batch_artifacts(saved,output)
-            summary={'distributionSha256':digest,'browser':args.browser,'https':args.https,'loopbackSmtp':args.mail,'virtualPasskeys':args.passkeys,'passed':passed,'batches':receipts}
+            summary={'distributionSha256':digest,'browser':args.browser,'https':args.https,'loopbackSmtp':args.mail,'virtualPasskeys':args.passkeys,'passed':passed,'batches':receipts,'shard':args.shard}
             if receipts:summary['sourceCommit']=receipts[0]['sourceCommit']
             (output/'acceptance.json').write_text(json.dumps(summary,indent=2)+'\n')
     return 0
@@ -133,6 +146,7 @@ def main():
     parser.add_argument('--passkeys', action='store_true', help='Use the HTTPS localhost RP for virtual WebAuthn browser tests (requires --https)')
     parser.add_argument('--restore', action='store_true', help='Enable private restore staging for isolated confirmation acceptance')
     parser.add_argument('--spec', action='append', choices=sorted(path.name for path in (ROOT/'server/web/tests').glob('*.spec.js')), help='Run selected spec files in one isolated fixture')
+    parser.add_argument('--shard', type=parse_shard, help='Run this index/count share of spec files, retaining fresh bounded fixtures')
     parser.add_argument('--deadline', type=float, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.mail and not args.https:parser.error('--mail requires --https')
@@ -142,7 +156,7 @@ def main():
         raise ValueError('Server distribution checksum mismatch')
     output = ROOT / 'server/web/test-results'
     output.mkdir(parents=True, exist_ok=True)
-    if not args.grep and not args.spec:return run_batches(args,output,digest)
+    if args.shard or not args.grep and not args.spec:return run_batches(args,output,digest)
     with tempfile.TemporaryDirectory(prefix='timekeeper-web-') as directory:
         data = Path(directory)
         with zipfile.ZipFile(args.distribution) as archive:
