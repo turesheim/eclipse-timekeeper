@@ -45,8 +45,8 @@ transclusions of entire Markdown notes and executable HTML are not supported.
 ## Writing and source tools
 
 The heading menu selects plain text or H1–H6. Toolbar tooltips name each action
-and available shortcut; active formatting is indicated. A selection opens
-contextual formatting controls. Type `/` at the start of a paragraph for commands.
+and available shortcut; active formatting is indicated. Use the main toolbar to
+format a selection. Type `/` at the start of a paragraph for commands.
 On narrow screens, **More formatting** reveals the remaining actions. The
 collapsible outline navigates headings. Returning to a note retains its in-memory
 cursor and scroll position while the session remains open.
@@ -68,8 +68,7 @@ JavaScript/TypeScript, Java, Python, JSON, SQL, HTML, CSS, shell, YAML and Markd
 unknown languages stay plain. Mermaid fences retain editable source and render
 a local preview. External diagram resources are rejected.
 
-Use **Structure** for list indentation and table row/column insertion, deletion,
-movement and alignment. Header rows stay first. Tab in a table moves between cells.
+Use the main toolbar for lists and tables. Tab in a table moves between cells.
 Tab-separated clipboard data can create a table.
 
 ## Paste and attachments
