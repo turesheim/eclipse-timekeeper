@@ -1,10 +1,11 @@
 # CI selection and local verification
 
-PR validation follows the files changed against the PR base. Local verification
+PR validation follows the files changed against the PR base. Main pushes use
+the same rules against the previous main commit. Local verification
 and its commands/results should be recorded in each PR description. A routine
 layout change does not need the full deployment matrix repeated on GitHub.
 
-| Change | Automatic PR checks |
+| Change | Automatic PR/main checks |
 | --- | --- |
 | Documentation only | Packaging/CI tooling tests and website build |
 | Web CSS/layout | Web unit/asset checks, packaged browser fixture, design/theme/Today/mobile scenarios |
@@ -13,8 +14,8 @@ layout change does not need the full deployment matrix repeated on GitHub.
 | Ordinary Java server endpoint | Server tests, packaged HTTP/recovery checks, API contracts and ordinary browser suite |
 | Database, authentication, dependencies, packaging, CI or unrecognized product paths | Full validation, including platform, HTTPS, containers and Synology checks |
 
-Markdown editor CSS and feature unions larger than six suites use the complete
-ordinary browser suite with its existing isolated fixture batches. Changes to
+Known feature unions stay selected even when they contain more than six suites.
+Changes to
 browser fixtures/helpers run the complete ordinary browser suite. Deleted/renamed
 code remains part of selection. Unavailable or empty comparison history selects
 full validation rather than silently skipping checks.
@@ -26,13 +27,50 @@ re-evaluates selection; later pushes retain the label's effect. The **Build**
 workflow also supports **Run workflow**, and runs full validation nightly at
 02:23 UTC. Scheduled/manual runs validate without publishing containers.
 
-Main-branch product pushes and release tags retain full certification. The
-independent main **Server containers** workflow remains the source of deployment
-and Synology release provenance. Documentation-only main pushes reuse previously
-tested binaries. PRs and nightly runs call that container workflow only when full
-validation is selected, after the H2 server checks pass; they reuse that result
-instead of running the same H2 suite again. Browser jobs download the exact server
-artifact produced by their run, with web-only fixtures packaged without Java tests.
+Release tags retain full certification. Routine web-only main pushes skip Java
+tests, Eclipse builds and database/native migration certification. The independent
+main **Server containers** workflow still builds and publishes the current image,
+after a short Compose smoke check of two actual unprivileged replicas, private
+shared storage, authenticated API identity, exact commit and bundled web assets.
+Its smoke receipt says `mode: smoke`; it does not certify backup, migration or
+rolling-update behavior. Backend/deployment changes retain full container checks.
+Documentation-only main pushes reuse previously tested binaries.
+
+PRs and nightly runs call the container workflow only when full validation is
+selected, after the H2 checks pass; they reuse that result instead of running the
+same H2 suite again. The container workflow remains the source of deployment and
+Synology release provenance. Full certification produces Synology candidates;
+routine web-only pushes do not produce a new fully certified SPK candidate.
+
+Browser jobs download the exact server artifact produced by their run, with
+web-only fixtures packaged without Java tests. Up to four jobs divide spec files
+deterministically, with each spec running exactly once. Each job retains the
+existing fresh-JVM/database/credential batches of at most six specs. No retries,
+assertions or production authentication limits change. Each shard uploads its own
+`web-acceptance-<index>` artifact; all shards must pass the aggregate gate.
+Additional HTTPS/passkey/recovery checks run once on the first shard.
+
+Native Synology acceptance runs in seven independent groups (at most four in
+parallel), alongside PostgreSQL/package validation: installer controls, early/late
+interrupted schema upgrades, schema restore, early/late source migrations and the
+runtime migration. All supported source schemas remain covered, including schema
+9. Each subprocess has a ten-minute limit, each job a twenty-minute limit, and
+per-group receipts record completed commands and timings. Go compilation reuses
+the job's content-addressed build cache instead of recompiling its dependencies
+in a new empty cache for every migration. Publication requires every selected
+group to pass; intentional routine-build skips are explicit.
+
+## Observed bottlenecks
+
+On [run 41616348487](https://github.com/turesheim/eclipse-timekeeper/actions/runs/41616348487),
+an editor-only merge spent 8m24s repeating H2 validation in the container workflow.
+Its serial Synology controls/migrations step ran about 39 minutes before the job
+was cancelled. The companion Build run spent 18m48s in its ordinary serial browser
+suite, in addition to unrelated installed-Eclipse and platform validation.
+Selection removes those unrelated checks from this type of merge; sharding
+shortens the suites that remain. These are baseline measurements, not a promised
+new wall-clock duration: cold caches, runner queues and uneven spec costs still
+affect runtime.
 
 ## Required check
 
@@ -60,6 +98,7 @@ python3 -m unittest discover -s scripts/tests -v
 actionlint .github/workflows/build.yml .github/workflows/server-containers.yml
 ```
 
-The tooling tests cover realistic changed paths, full overrides, failed history,
-code moved into documentation, bounded browser arguments, and unexpected skipped
-or failed required jobs. Use full CI when changing the selector or workflows.
+The tooling tests cover realistic PR/main paths, full overrides, failed history,
+code moved into documentation, complete/disjoint shard coverage, bounded browser
+arguments, native schema coverage, and unexpected skipped or failed required jobs.
+Use full CI when changing the selector or workflows.

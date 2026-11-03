@@ -37,6 +37,7 @@ jobs:
       containers: ${{ steps.changes.outputs.containers }}
       site: ${{ steps.changes.outputs.site }}
       browser_specs: ${{ steps.changes.outputs.browser_specs }}
+      browser_matrix: ${{ steps.changes.outputs.browser_matrix }}
     steps:
     - uses: actions/checkout@v7.0.1
       with:
@@ -117,11 +118,15 @@ jobs:
           server/target/distribution/timekeeper-server.zip.sha256
 
   Web:
+    name: Web (${{ matrix.shard }}/${{ matrix.shards }})
     needs: [Changes, Server]
     if: needs.Changes.outputs.web == 'true'
     concurrency:
-      group: build-web-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
+      group: build-web-${{ matrix.shard }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.Changes.outputs.browser_matrix) }}
     runs-on: ubuntu-latest
     # Browser/dependency installation can take eight minutes on a fresh runner.
     # Keep the bounded test suite's full runtime available after setup.
@@ -151,29 +156,34 @@ jobs:
     - name: Verify bundled web client against the packaged server
       env:
         BROWSER_SPECS: ${{ needs.Changes.outputs.browser_specs }}
+        BROWSER_SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
       run: python3 scripts/ci_browser.py
+    - name: Retain ordinary browser evidence before HTTPS checks
+      if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
+      run: cp -R server/web/test-results server/web/target/ordinary-browser
     - name: Verify manual folder synchronization through HTTPS
-      if: needs.Changes.outputs.full == 'true'
+      if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/scripts/webdav_sync_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify email recovery through HTTPS and actual SMTP delivery
-      if: needs.Changes.outputs.full == 'true'
+      if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
     - name: Verify Journal WebDAV help and instance backups through HTTPS
-      if: needs.Changes.outputs.full == 'true'
+      if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection|instance backup Administration'
     - name: Verify passkey enrollment and label validation over HTTPS
-      if: needs.Changes.outputs.full == 'true'
+      if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --passkeys --spec passkeys.spec.js
     - name: Verify explicit instance restore preparation and confirmation through HTTPS
-      if: needs.Changes.outputs.full == 'true'
+      if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --restore --grep 'instance restore preparation'
     - name: Upload browser acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: web-acceptance
+        name: web-acceptance-${{ matrix.shard }}
         path: |
           server/web/test-results/
+          server/web/target/ordinary-browser/
           server/web/target/server.log
           server/target/acceptance/webdav-manual.json
 

@@ -92,7 +92,9 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
    must also allow request lines up to 128 KiB for those extreme lookup URLs.
 
 The server image is published by the **Server containers** workflow after successful
-server/Compose tests. `edge` tracks tested `main`; semantic release tags use the
+server/Compose checks. Web-only main changes use the deployment startup/web smoke
+check; backend/deployment changes and releases retain full certification (see
+[CI selection](CI.md)). `edge` tracks tested `main`; semantic release tags use the
 version without the leading `v`, and immutable `sha-<full-commit>` tags are also
 published. Images first become available after that workflow runs on `main` or
 a release tag. Use the source-build instructions below before publication.

@@ -162,7 +162,7 @@ def main():
             arch=command('docker','image','inspect','--format','{{.Architecture}}','postgres:17.11-bookworm').stdout.strip()
             binary=folder/'timekeeper-dsm'
             command('go','-C',str(ROOT/'server/synology/installer'),'build','-o',str(binary),'.',
-                environment={**os.environ,'GOOS':'linux','GOARCH':arch,'CGO_ENABLED':'0','GOCACHE':str(folder/'go-cache')})
+                environment={**os.environ,'GOOS':'linux','GOARCH':arch,'CGO_ENABLED':'0','GOCACHE':os.environ.get('GOCACHE',str(folder/'go-cache'))})
             command('docker','exec',target,'sh','-ec',
                 'mkdir -p /var/packages/timekeeper/scripts/migration /var/packages/timekeeper/target /var/packages/timekeeper/var /var/packages/postgresql/target/bin; '
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '

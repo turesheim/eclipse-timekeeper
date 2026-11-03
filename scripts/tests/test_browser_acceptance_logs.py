@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import json
 import re
+import argparse
 from types import SimpleNamespace
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
@@ -62,9 +63,24 @@ class BrowserAcceptanceLogsTest(unittest.TestCase):
                 self.assertTrue((output/'batches'/str(index)/'browser.xml').exists())
             self.assertEqual([{'batch':0},{'batch':1}],json.loads((output/'transport.json').read_text())['authenticationRequests'])
 
+    def test_shards_cover_every_selected_spec_once_without_sharing_fixtures(self):
+        specs=[path.name for path in web_tests.glob('*.spec.js')]
+        for selected in (specs, specs[:7], specs[:1]):
+            count=min(4,len(selected));seen=[]
+            for index in range(1,count+1):
+                batches=browser_acceptance.spec_batches(selected,shard=(index,count))
+                self.assertTrue(all(1<=len(batch)<=6 for batch in batches))
+                seen.extend(spec for batch in batches for spec in batch)
+            self.assertEqual(sorted(selected),sorted(seen))
+            self.assertEqual(len(selected),len(set(seen)))
+
+    def test_invalid_shards_cannot_produce_empty_successes(self):
+        for shard in ('0/4','4/2','1/0','1/5','../1'):
+            with self.assertRaises(argparse.ArgumentTypeError):browser_acceptance.parse_shard(shard)
+
     def test_a_failed_batch_is_not_retried_or_hidden_by_an_earlier_success_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary);output=root/'output';args=SimpleNamespace(distribution=root/'server.zip',java='java',browser='chromium',https=False,mail=False,passkeys=False,restore=False)
+            root=Path(temporary);output=root/'output';args=SimpleNamespace(distribution=root/'server.zip',java='java',browser='chromium',https=False,mail=False,passkeys=False,restore=False,spec=None,shard=None,grep=None)
             calls=[]
             def run(command,timeout):
                 calls.append(command)
