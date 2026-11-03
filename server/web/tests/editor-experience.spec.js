@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import AxeBuilder from '@axe-core/playwright';
 import {test,expect} from '@playwright/test';
 
@@ -163,6 +164,7 @@ test('formatted checklists stay editable without extra formatting panels',async(
   await expect(page.locator('#experience-field .markdown-source-fragment')).toHaveCount(0);
   await expect(page.locator('#experience-field .markdown-structured, #experience-field .markdown-context-menu')).toHaveCount(0);
   expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+  await captureScreenshot(page,{path:'test-results/simple-checklist-editor.png',fullPage:true});
   await page.locator('#experience-formatted input[type=checkbox]').first().check();
   expect(await page.evaluate(()=>globalThis.field.value())).toContain('[x] Oppgradere AMQ i PROD');
   await page.evaluate(()=>{const paragraph=document.querySelector('#experience-formatted p'),range=document.createRange();range.selectNodeContents(paragraph);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
