@@ -64,6 +64,15 @@ export class MarkdownField {
         }else this.editor.command(name);
       });this.tools.append(action);
     }
+    this.tableButton=this.tools.querySelector('[data-command="table"]');
+    this.tableButton.addEventListener('keydown',event=>{
+      if(event.isComposing||event.ctrlKey||event.metaKey||event.altKey||this.readOnly||this.loading||!this.editor?.context().table)return;
+      const insert={ArrowUp:'row_before',ArrowDown:'row_after',ArrowLeft:'column_before',ArrowRight:'column_after'};
+      const move={ArrowUp:'row_up',ArrowDown:'row_down',ArrowLeft:'column_left',ArrowRight:'column_right'};
+      const key=event.key.length===1?event.key.toLowerCase():event.key;
+      const name=(event.shiftKey?move:insert)[key]||({Backspace:'delete_row',Delete:event.shiftKey?'delete_table':'delete_column',l:'align_left',c:'align_center',r:'align_right'})[key];
+      if(!name)return;event.preventDefault();this.editor.command(name,undefined,false);
+    });
     this.image=iconButton(button(),'image',t('markdown.insert_image'));
     this.attachment=iconButton(button(),'paperclip',t('markdown.attach_file'));
     this.imagePicker=node('input');this.imagePicker.type='file';this.imagePicker.accept='image/png,image/jpeg,image/gif,image/webp';this.imagePicker.hidden=true;

@@ -66,6 +66,12 @@ export function buildExperience(field,load,loadSource){
     f.historyButton.disabled=!f.resources?.revisions;
     f.assetPicker.disabled=f.readOnly||!f.resources?.complete;
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
+    const tableKeys=!!f.editor?.context().table&&!f.readOnly&&!f.loading;
+    if(f.tableButton.dataset.tableKeys!==String(tableKeys)){
+      f.tableButton.dataset.tableKeys=String(tableKeys);f.tableButton.title=t(tableKeys?'markdown.table_keys':'markdown.table');
+      if(tableKeys){f.tableButton.setAttribute('aria-description',t('markdown.table_keys'));f.tableButton.setAttribute('aria-keyshortcuts','ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Backspace Delete Shift+Delete L C R');}
+      else{f.tableButton.removeAttribute('aria-description');f.tableButton.removeAttribute('aria-keyshortcuts');}
+    }
     if(!f.editor||f.readOnly||f.editor.composing()){suggestions.hidden=true;return;}
     const wiki=f.editor.wikiQuery(),slash=f.editor.slash(),query=wiki?'wiki:'+wiki.query:slash?'slash:'+slash.query:null;
     if(query===lastQuery)return;lastQuery=query;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
