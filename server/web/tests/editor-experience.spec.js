@@ -170,3 +170,54 @@ test('formatted checklists stay editable without extra formatting panels',async(
   await page.evaluate(()=>{const paragraph=document.querySelector('#experience-formatted p'),range=document.createRange();range.selectNodeContents(paragraph);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
   await expect(page.locator('#experience-field .markdown-context-menu')).toHaveCount(0);
 });
+
+for(const enhanced of [false,true])test(`split preview retains reading position and source focus (${enhanced?'highlighted':'plain'} source)`,async({page})=>{
+  const value=Array.from({length:100},(_,i)=>`## Block ${i}\n\nParagraph ${i}. ${'Keep writing without jumps. '.repeat(6)}\n`).join('\n');await field(page,value,false);
+  await page.evaluate(()=>{for(const node of [globalThis.field.text,globalThis.field.codeHost,globalThis.field.splitHost])Object.assign(node.style,{height:'320px',minHeight:'0',maxHeight:'320px'});});
+  if(enhanced)await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();
+  await page.locator('#experience-field').getByRole('button',{name:'Source and preview',exact:true}).click();await expect(page.locator('.markdown-split-preview h2')).toHaveCount(100);
+  const offset=await page.evaluate(enhanced=>{const f=globalThis.field,offset=f.rawBody().indexOf('Paragraph 55.');if(enhanced)f.codeEditor.select(offset);else{f.text.focus();f.text.setSelectionRange(offset,offset);}return offset;},enhanced);
+  const scrollSource=enhanced?page.locator('#experience-field .cm-scroller'):page.locator('#experience-body');await scrollSource.hover();await page.mouse.wheel(0,2000);
+  await expect.poll(()=>page.locator('.markdown-split-preview').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
+  await page.keyboard.insertText('Edited ');await expect(page.locator('.markdown-split-preview')).toContainText('Edited Paragraph 55.');
+  expect(await page.evaluate(()=>globalThis.field.position().anchor)).toBe(offset+7);
+  const source=enhanced?page.locator('#experience-field .cm-content'):page.locator('#experience-body');await expect(source).toBeFocused();
+  expect(await page.locator('.markdown-split-preview').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
+  if(enhanced){
+    await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await expect(page.locator('#experience-body')).toBeFocused();
+    expect(await page.locator('#experience-body').evaluate(node=>node.selectionStart)).toBe(offset+7);
+    await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await expect(page.locator('#experience-field .cm-content')).toBeFocused();
+    expect(await page.evaluate(()=>globalThis.field.codeEditor.position().anchor)).toBe(offset+7);
+  }
+  await expect.poll(()=>page.locator('.markdown-split-preview').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
+  await page.locator('.markdown-split-preview').hover();await page.mouse.wheel(0,-100000);
+  await expect.poll(()=>page.evaluate(()=>{const f=globalThis.field;return (f.codeEditor?.scrollElement||f.text).scrollTop;})).toBeLessThan(5);
+});
+
+test('a delayed split preview cannot replace newer content or reappear after clearing the note',async({page})=>{
+  await page.goto('/web/markdown-lab.html');await page.evaluate(async()=>{
+    const {buildPreview}=await import('/web/markdown-preview.js');
+    const plain=document.createElement('div'),text=document.createElement('textarea'),splitHost=document.createElement('div');plain.append(text,splitHost);document.body.append(plain);
+    globalThis.previews=[];globalThis.previewField={plain,text,splitHost,generation:1,rawBody:()=>text.value};
+    buildPreview(globalThis.previewField,async()=>({createMarkdownEditor:options=>new Promise(resolve=>{const entry={value:options.value,resolve:()=>{options.root.textContent=options.value;resolve({destroy:async()=>{entry.destroyed=true;}});}};globalThis.previews.push(entry);})}));
+    text.value='Old preview';globalThis.previewField.refreshPreview();
+  });
+  await expect.poll(()=>page.evaluate(()=>globalThis.previews.length)).toBe(1);
+  await page.evaluate(()=>{globalThis.previewField.text.value='Newest preview';globalThis.previewField.refreshPreview();});
+  await expect.poll(()=>page.evaluate(()=>globalThis.previews.length)).toBe(2);
+  await page.evaluate(()=>globalThis.previews[1].resolve());await expect(page.locator('body')).toContainText('Newest preview');
+  await page.evaluate(()=>globalThis.previews[0].resolve());await expect.poll(()=>page.evaluate(()=>globalThis.previews[0].destroyed)).toBe(true);
+  expect(await page.evaluate(()=>globalThis.previewField.splitHost.textContent)).toBe('Newest preview');
+  await page.evaluate(()=>{globalThis.previewField.text.value='Private pending preview';globalThis.previewField.refreshPreview();});await expect.poll(()=>page.evaluate(()=>globalThis.previews.length)).toBe(3);
+  await page.evaluate(()=>{globalThis.previewField.generation++;globalThis.previewField.resetPreview();globalThis.previewField.splitHost.hidden=true;globalThis.previews[2].resolve();});
+  await expect.poll(()=>page.evaluate(()=>globalThis.previews[2].destroyed)).toBe(true);expect(await page.evaluate(()=>globalThis.previewField.splitHost.textContent)).toBe('');
+});
+
+test('Find opens after highlighted source loads without relying on a timer',async({page})=>{
+  await field(page,'Find this text.\n',false);let release,entered;
+  const held=new Promise(resolve=>release=resolve),started=new Promise(resolve=>entered=resolve);
+  await page.route('**/assets/milkdown/source-editor.js',async route=>{entered();await held;await route.continue();});
+  await page.clock.install();await page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true}).click();
+  await started;await expect(page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true})).toBeDisabled();await page.clock.fastForward(500);release();
+  await expect(page.locator('#experience-field .cm-search')).toBeVisible();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Find this text.\n');
+});

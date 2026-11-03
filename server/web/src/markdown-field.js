@@ -166,7 +166,7 @@ export class MarkdownField {
   clear(){
     this.sourcePosition=null;this.enhance?.setAttribute('aria-pressed','false');this.split?.setAttribute('aria-pressed','false');this.plain.classList.remove('markdown-split');
     this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();
-    this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.previewEditor?.destroy();this.previewEditor=null;this.splitHost?.replaceChildren();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
+    this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.resetPreview?.();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
@@ -179,7 +179,7 @@ export class MarkdownField {
   async showSource(){
     if(this.loading||!this.editor)return;
     const previous=this.editor,position=previous.position(),body=previous.markdown();this.setRaw(body);this.suspended={editor:previous,body};this.editor=null;
-    this.mode(false);this.controls();const normalized=position.anchor,head=position.head??normalized;this.text.setSelectionRange(Math.min(normalized,head),Math.max(normalized,head),head<normalized?'backward':'forward');this.text.scrollTop=position.scrollTop;if(this.codeEditor){this.codeEditor.replaceValue(body);this.codeHost.hidden=false;this.text.hidden=true;this.codeEditor.select(normalized,head);}else this.text.focus();
+    this.mode(false);this.controls();const normalized=position.anchor,head=position.head??normalized;this.text.setSelectionRange(Math.min(normalized,head),Math.max(normalized,head),head<normalized?'backward':'forward');this.text.scrollTop=position.scrollTop;if(this.codeEditor){this.codeEditor.replaceValue(body);this.codeHost.hidden=false;this.text.hidden=true;this.codeEditor.select(normalized,head);}else this.text.focus();this.refreshPreview();
   }
   async showFormatted(focus=true){
     if(this.loading)return;if(this.editor){this.editor.focus();return;}

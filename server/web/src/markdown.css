@@ -142,3 +142,6 @@
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { display: grid; grid-template-columns: repeat(auto-fill,minmax(2.75rem,1fr)); }
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-block-trigger { grid-column: span 2; justify-content: center; }
 }
+
+/* The split pane owns scrolling; nested rich-editor overflow would bypass synchronization. */
+.markdown-split-preview :is(.ProseMirror,.milkdown), .markdown-split-preview > div { flex: none; overflow: visible; }
