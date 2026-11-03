@@ -189,7 +189,9 @@ class HttpTransportTest {
         server.setHttpsConfigurator(new com.sun.net.httpserver.HttpsConfigurator(javax.net.ssl.SSLContext.getDefault()));
         server.createContext("/",exchange->reply(exchange,200,"{}"));server.start();
         URI endpoint=URI.create("https://127.0.0.1:"+server.getAddress().getPort());
-        try(var client=new HttpTimekeeperService(endpoint,()->TOKEN,Duration.ofSeconds(2))) {
+        // This test verifies TLS classification, not response deadlines. Cold TLS
+        // initialization on a shared CI runner can exceed the ordinary 2s fixture budget.
+        try(var client=new HttpTimekeeperService(endpoint,()->TOKEN,Duration.ofSeconds(10))) {
             var failure=assertThrows(RemoteFailure.class,client::profile);
             assertEquals(RemoteFailure.Kind.OFFLINE,failure.kind());assertEquals("TLS_ERROR",failure.code());
             assertTrue(failure.connectionMessage(endpoint).contains("HTTPS certificate"));assertSafe(failure);

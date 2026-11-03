@@ -78,3 +78,14 @@ test('long-note dirty checks avoid serialization while explicit Markdown remains
   });
   console.log('Markdown fidelity timing '+JSON.stringify(result));expect(result.samples).toBeGreaterThan(0);expect(result.dirtyP95).toBeLessThan(50);expect(result.cached100).toBeLessThan(1000);
 });
+
+test('long-note input reaches the next animation frame within the typing budget',async({page,browser})=>{
+  await page.goto('/web/markdown-lab.html');await page.evaluate(async()=>{
+    const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js'),root=document.createElement('div');root.id='typing-performance';document.body.append(root);
+    const value=Array.from({length:350},(_,index)=>'Paragraph '+index+' __retains its authored formatting__ '+('text '.repeat(20))).join('\n\n')+'\n';
+    globalThis.typingEditor=await createMarkdownEditor({root,value,label:'Typing performance',taskLabel:value=>value,escape:()=>{}});globalThis.typingSamples=[];
+    root.addEventListener('beforeinput',()=>{const start=performance.now();requestAnimationFrame(()=>globalThis.typingSamples.push(performance.now()-start));});
+  });
+  await page.locator('#typing-performance p').nth(175).click();await page.keyboard.type(' measured typing responsiveness');await expect.poll(()=>page.evaluate(()=>globalThis.typingSamples.length)).toBeGreaterThan(20);
+  const samples=await page.evaluate(()=>[...globalThis.typingSamples].sort((a,b)=>a-b)),p95=samples[Math.ceil(samples.length*.95)-1];console.log('Editor input timing '+JSON.stringify({browser:browser.version(),platform:process.platform,architecture:process.arch,samples:samples.length,p95}));expect(p95).toBeLessThan(150);
+});

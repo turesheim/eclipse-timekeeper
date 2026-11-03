@@ -17,9 +17,14 @@ account archives; older archives default to showing the folder.
 Markdown source, frontmatter, unknown metadata, empty files, attachment bytes and
 unsupported Obsidian syntax are stored without rewriting. An unchanged editor
 save does not normalize the file. Formatted edits can normalize Markdown body
-syntax; frontmatter remains separate and read-only in the editor. Use a local
-source editor to change frontmatter. Wikilinks and Obsidian embeds remain literal
-source; Timekeeper does not implement Obsidian's link cache or execute plugins.
+syntax in the edited block; unchanged top-level blocks retain their source when
+the semantic preservation check succeeds. Frontmatter remains separate and
+read-only in the editor. Use a local source editor to change frontmatter. Ordinary
+wikilinks, aliases, heading targets and raster image embeds (including sizing)
+render in formatted mode. Missing or ambiguous targets are reported instead of
+selecting an arbitrary file. Unknown extensions remain editable source fragments.
+Timekeeper does not execute Obsidian plugins. See the
+[shared editor guide](MARKDOWN-EDITOR.md) for the supported dialect and controls.
 Standard relative Markdown links navigate within the collection. Verified raster
 images use authenticated previews, both inline in formatted Markdown and in the
 content pane when selected in the navigation tree; other attachments can be downloaded.

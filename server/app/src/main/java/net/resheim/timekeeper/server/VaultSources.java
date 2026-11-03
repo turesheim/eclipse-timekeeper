@@ -76,7 +76,7 @@ final class VaultSources {
             case WeekNotes.TYPE->new WeekNotes(store).saveDocument(WeekNotes.week(ref.key()),expected,bytes);
             case EventNotes.TYPE->new EventNotes(store).saveDocument(EventNotes.filename(ref.key()),expected,bytes);
             case JournalAssets.TYPE->new JournalAssets(store).save(ref.key(),expected,bytes);
-            case VaultContent.TYPE->{if(markdown)VaultContent.markdown(bytes,limits.markdownBytes());new VaultContent(store).save(ref.id(),expected,bytes,limits.fileBytes());}
+            case VaultContent.TYPE->{if(markdown){VaultContent.markdown(bytes,limits.markdownBytes());new NoteRevisions(store).before(ref,bytes);}new VaultContent(store).save(ref.id(),expected,bytes,limits.fileBytes());}
             default->throw new IllegalStateException("Invalid stored vault reference");
         }
         return snapshot();

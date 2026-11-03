@@ -1,5 +1,140 @@
 [
   {
+    "name": "@codemirror/autocomplete",
+    "version": "6.20.4",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/commands",
+    "version": "6.11.1",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-css",
+    "version": "6.3.1",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-html",
+    "version": "6.4.12",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-java",
+    "version": "6.0.2",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-javascript",
+    "version": "6.2.5",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-json",
+    "version": "6.0.2",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-markdown",
+    "version": "6.5.2",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-python",
+    "version": "6.2.1",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/lang-sql",
+    "version": "6.10.0",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/language",
+    "version": "6.13.1",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/legacy-modes",
+    "version": "6.5.5",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/search",
+    "version": "6.7.2",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/state",
+    "version": "6.7.6",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/streamparser",
+    "version": "6.0.0",
+    "license": "MIT"
+  },
+  {
+    "name": "@codemirror/view",
+    "version": "6.43.15",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/common",
+    "version": "1.5.4",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/css",
+    "version": "1.3.9",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/highlight",
+    "version": "1.2.5",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/html",
+    "version": "1.3.13",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/java",
+    "version": "1.1.5",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/javascript",
+    "version": "1.5.6",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/json",
+    "version": "1.0.3",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/lr",
+    "version": "1.4.11",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/markdown",
+    "version": "1.8.1",
+    "license": "MIT"
+  },
+  {
+    "name": "@lezer/python",
+    "version": "1.1.19",
+    "license": "MIT"
+  },
+  {
+    "name": "@marijn/find-cluster-break",
+    "version": "1.0.4",
+    "license": "MIT"
+  },
+  {
     "name": "@milkdown/core",
     "version": "7.22.3",
     "license": "MIT"
@@ -57,6 +192,11 @@
   {
     "name": "ccount",
     "version": "2.0.1",
+    "license": "MIT"
+  },
+  {
+    "name": "crelt",
+    "version": "1.0.7",
     "license": "MIT"
   },
   {
@@ -377,6 +517,11 @@
   {
     "name": "rope-sequence",
     "version": "1.3.4",
+    "license": "MIT"
+  },
+  {
+    "name": "style-mod",
+    "version": "4.1.4",
     "license": "MIT"
   },
   {

@@ -705,3 +705,22 @@ files; imports rebuild indexes and remap owner-dependent assets while preserving
 journal/event associations. Encrypted instance backups retain raw records and
 history across accounts. See [Notes design](NOTES-VAULT.md) and the
 [manual synchronization guide](../operations/NOTES-WEBDAV.md).
+
+### Prospective note revisions
+
+`NOTE_REVISION` owner-scoped `tk_resource` records retain prior canonical UTF-8
+Markdown for `DAY_NOTE`, `WEEK_NOTE`, `EVENT_NOTE` and ordinary Markdown
+`VAULT_CONTENT` bindings. Fields include source type/ID, content version,
+monotonic retained sequence, capture/content modification timestamps, raw byte
+length, SHA-256 and base64 bytes. They are written in the same owner transaction
+as the content mutation; stale/no-op writes create no snapshot. A snapshot ID
+is separate from the note version so archive restores cannot alias unrelated
+bytes under a reused content version.
+
+Retention is bounded to 20 snapshots per note, 1,000 per owner and 8 MB of raw bytes per owner,
+with oldest snapshots removed atomically. Binary assets and independent day
+labels are excluded. This adds a record type, not a SQL table/schema migration.
+Existing day-note audit events remain metadata evidence and are not replaced.
+Portable account/Markdown archives retain their existing allowlist; full instance
+backups include the revision records. History begins prospectively and is never
+presented as a record of changes before installation.

@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
+import {appendEditorText,nativeConfirmations} from './editor-interactions.js';
 import {browserRequest} from './browser-request.js';
 
 async function fresh(page,request){
@@ -26,23 +27,33 @@ test('daily wikilinks render as inline nodes and preserve Markdown through mode 
   await page.locator('#markdown-rich').click();await expect(dateLink(formatted,'2026-10-29')).toHaveCount(1);
 });
 
-test('one click opens Today and protects inline, week and day-dialog drafts before navigation',async({page,request})=>{
-  test.setTimeout(90000);const errors=[];page.on('pageerror',error=>errors.push(error.message));const {api,save}=await fresh(page,request);
+test('journal links protect inline, weekly and modal drafts before navigation',async({page,request})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const {api,save}=await fresh(page,request),confirmations=nativeConfirmations(page);
   const original='See [[2026-10-26]] or [[2026-10-27]].\n\nA code example `[[2026-10-29]]`.\n';
-  await save('2026-10-30',original);await save('2026-10-26','# Target day\n');await save('2026-10-27','# Other day\n');
-  const week=await api('GET','/week-notes/2026-W44');await api('PUT','/week-notes/2026-W44',{body:'Weekly link [[2026-10-30]].\n'},{'If-Match':week.headers().etag});
-  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
-  await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
-  await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await rich(page).locator('p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Inline draft');
-  let cancelled=false;page.once('dialog',async dialog=>{cancelled=true;await dialog.dismiss();});await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');await expect.poll(()=>cancelled).toBe(true);await expect(page.locator('#today-date')).toHaveValue('2026-10-30');await expect(rich(page)).toContainText('Inline draft');
-  page.once('dialog',dialog=>dialog.accept());await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toBe(original);
-  await page.locator('#today-month-grid button[data-week="2026-W44"]').click();const weekly=page.locator('#today-week-note-editor');await expect(dateLink(weekly,'2026-10-30')).toBeVisible();await weekly.locator('[role=textbox]').click();await page.keyboard.press('End');await page.keyboard.type(' Week draft');
-  page.once('dialog',dialog=>dialog.dismiss());await dateLink(weekly,'2026-10-30').click();await expect(weekly).toBeVisible();await expect(weekly).toContainText('Week draft');
-  page.once('dialog',dialog=>dialog.accept());await dateLink(weekly,'2026-10-30').click();await expect(weekly).not.toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');
-  await page.locator('#today-date').fill('2026-10-26');await expect(rich(page)).toContainText('Target day');await rich(page).click();await page.keyboard.press('End');await page.keyboard.type(' Hidden draft');
-  await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-10');await page.locator('button[data-track-note-date="2026-10-30"]').click();const daily=page.locator('#track-note-editor');await expect(dateLink(daily,'2026-10-27')).toBeVisible();await daily.locator('[role=textbox] p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Modal draft');
-  let prompts=0;const rejectSecond=dialog=>++prompts===1?dialog.accept():dialog.dismiss();page.on('dialog',rejectSecond);await dateLink(daily,'2026-10-27').click();page.off('dialog',rejectSecond);expect(prompts).toBe(2);await expect(daily).toBeVisible();await expect(daily).toContainText('Modal draft');
-  const accept=dialog=>dialog.accept();page.on('dialog',accept);await dateLink(daily,'2026-10-27').click();page.off('dialog',accept);await expect(daily).not.toBeVisible();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(page)).toContainText('Other day');expect(errors).toEqual([]);
+  await test.step('Seed independent journal fixtures',async()=>{
+    await save('2026-10-30',original);await save('2026-10-26','# Target day\n');await save('2026-10-27','# Other day\n');
+    const week=await api('GET','/week-notes/2026-W44');await api('PUT','/week-notes/2026-W44',{body:'Weekly link [[2026-10-30]].\n'},{'If-Match':week.headers().etag});
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
+  });
+  try{
+    await test.step('Clean links open the requested day',async()=>{
+      await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
+      await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
+    });
+    await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await appendEditorText(rich(page).locator('p').last(),' Inline draft');
+    await confirmations.run('Cancel keyboard navigation and retain inline draft',[false],async()=>{await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');});
+    await expect(page.locator('#today-date')).toHaveValue('2026-10-30');await expect(rich(page)).toContainText('Inline draft');
+    await confirmations.run('Confirm inline draft discard',[true],()=>dateLink(rich(page),'2026-10-26').click());
+    await expect(page.locator('#today-date')).toHaveValue('2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toBe(original);
+    await page.locator('#today-month-grid button[data-week="2026-W44"]').click();const weekly=page.locator('#today-week-note-editor');await expect(dateLink(weekly,'2026-10-30')).toBeVisible();await appendEditorText(weekly.locator('[role=textbox] p').last(),' Week draft');
+    await confirmations.run('Cancel weekly draft discard',[false],()=>dateLink(weekly,'2026-10-30').click());await expect(weekly).toBeVisible();await expect(weekly).toContainText('Week draft');
+    await confirmations.run('Confirm weekly draft discard',[true],()=>dateLink(weekly,'2026-10-30').click());await expect(weekly).not.toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');
+    await page.locator('#today-date').fill('2026-10-26');await expect(rich(page)).toContainText('Target day');await appendEditorText(rich(page).locator('h1'),' Hidden draft');
+    await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-10');await page.locator('button[data-track-note-date="2026-10-30"]').click();const daily=page.locator('#track-note-editor');await expect(dateLink(daily,'2026-10-27')).toBeVisible();await appendEditorText(daily.locator('[role=textbox] p').last(),' Modal draft');
+    await confirmations.run('Cancelling the second prompt preserves both drafts',[true,false],()=>dateLink(daily,'2026-10-27').click());await expect(daily).toBeVisible();await expect(daily).toContainText('Modal draft');
+    await confirmations.run('Both prompts must accept before navigating',[true,true],()=>dateLink(daily,'2026-10-27').click());await expect(daily).not.toBeVisible();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(page)).toContainText('Other day');expect(errors).toEqual([]);
+  }finally{confirmations.dispose();}
 });
 
 test('read-only daily links and modifier clicks open the requested date without making writes',async({page,request,browser})=>{

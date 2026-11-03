@@ -102,8 +102,9 @@ test('running Workweek sessions remain editable without losing exact times and r
     const row = page.locator(`#week-sessions [data-work-session-id="${session.id}"]`).first(); await expect(row).toContainText('Running');
     await workSessionAction(page,session.id);
     await expect(page.getByLabel('Start (local time)', {exact: true})).toHaveValue(localDateTime(session.start, 'Europe/Oslo').slice(0,19).replace(/:00$/, ''));
-    await page.getByLabel('Summary', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible(); await expect(await tooltipFor(row)).toContainText(/Updated running session/);
-    const saved = await (await api(request, 'GET', '/work-sessions/' + session.id)).json(); expect(saved.start).toBe(session.start); expect(saved.end).toBeNull();
+    await page.getByLabel('Summary', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible();
+    await expect(row.locator('.week-session-more')).toHaveAttribute('aria-label', /Updated running session/);
+    const saved = await (await api(request, 'GET', '/work-sessions/' + session.id)).json(); expect(saved.summary).toBe('Updated running session'); expect(saved.start).toBe(session.start); expect(saved.end).toBeNull();
     await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page, process.env.TIMEKEEPER_WEB_READ_TOKEN);
     for(const input of await row.locator('input').all())await expect(input).toBeDisabled();
     const details=await workSessionDetails(page,session.id);await expect(details.getByRole('button', {name: 'Edit session Updated running session', exact: true})).toBeDisabled();

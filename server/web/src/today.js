@@ -48,7 +48,7 @@ export class TodayView {
     window.addEventListener('resize',()=>this.sizeEditor());
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.eventNoteEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
