@@ -1299,5 +1299,6 @@
   "focus.clients_count": "Clients ({{count}})",
   "focus.search_clients": "Search clients",
   "focus.no_clients": "No matching clients",
-  "focus.apply": "Apply"
+  "focus.apply": "Apply",
+  "markdown.table_keys": "Table keyboard controls (while this button is focused): arrows insert rows/columns; Shift+arrows move them. Backspace deletes the row; Delete deletes the column; Shift+Delete deletes the table. L, C and R align the column. Undo restores the previous edit."
 }

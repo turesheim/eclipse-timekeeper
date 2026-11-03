@@ -254,7 +254,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         if(transaction.docChanged)view.dispatch(transaction);
       }else{
-        const action=commands[name];if(!action){const applied=structuredCommand(view,name);if(applied&&focus)view.focus();return applied;}
+        const action=commands[name];if(!action){const applied=structuredCommand(view,name,{singleCell:!focus});if(applied&&focus)view.focus();return applied;}
         const level=name==='heading'?(payload??2):undefined;
         if(name==='heading'&&(!Number.isInteger(level)||level<1||level>6))return false;
         if(name==='hr'&&!view.state.selection.empty)view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(view.state.selection.to),-1)));

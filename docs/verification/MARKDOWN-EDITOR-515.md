@@ -1,8 +1,9 @@
 # Markdown editor completion audit (#515)
 
 Updated 3 November 2026. Daily, weekly, event and general Notes share the same
-editor. Implementation and verification are recorded separately; the issue stays
-open until its required acceptance evidence is complete.
+editor. Implementation and verification are recorded separately. The issue was
+closed by its author on 3 November; that does not certify the untested platforms
+listed below.
 
 ## Delivered
 
@@ -12,6 +13,8 @@ Notes/Today image-test setup. PR #523 removed the unwanted Lists and tables pane
 and floating formatting bar, and made checklists containing a bare inline
 `<br />` editable without rewriting their unchanged source. #523 is merged and
 all its selected GitHub checks passed in [run 41596127827](https://github.com/turesheim/eclipse-timekeeper/actions/runs/41596127827).
+PR #524 fixed source/split-preview position and asynchronous-render handling;
+its selected checks passed in [run 41602725620](https://github.com/turesheim/eclipse-timekeeper/actions/runs/41602725620).
 
 The user explicitly rejected the extra button areas. Issue #515 now records that
 choice: use the existing toolbar and shortcuts; do not reintroduce a floating
@@ -22,7 +25,7 @@ selection toolbar or a separate structured-editing button panel.
 | Fidelity | Exact unchanged source, opaque frontmatter, mixed line endings, edited-block reuse, inert editable fragments, line breaks and mode-switch history: editor/fidelity browser suites |
 | Vault compatibility | Ordinary/daily wikilinks, aliases, headings, completion, sized authenticated image embeds, callouts and footnotes: Notes/editor/wikilink suites |
 | Paste and attachments | Safe rich/plain paste, URL over selection, screenshots and file drop, insertion bookmarks, upload progress/retry and existing assets: editor/Notes suites |
-| Structured content | List/task behavior, table commands and spreadsheet paste, language/copy/highlight controls, Mermaid previews: editor suites; extra command panels were removed after user review |
+| Structured content | List/task behavior, keyboard-accessible table commands and spreadsheet paste, language/copy/highlight controls, Mermaid previews: editor suites; extra command panels were removed after user review |
 | Navigation | Heading outline, link previews, guarded navigation and in-memory cursor restoration: editor/Notes/wikilink suites |
 | Saving and recovery | Canonical revision hooks for native and DAV writes, diff before draft restoration, retention limits, owner isolation and guarded stale writes: Java revision tests and Notes/editor browser suites |
 | Privacy and access | Read-only schema/source/upload guards; drafts stay in memory and clear on session changes: shared editor and host suites |
@@ -57,12 +60,22 @@ not introduced; it would require an explicit privacy/retention design.
   clearing pending private content and Find after a delayed source-module load.
   Firefox remains unverified; its earlier local profile-startup failure was
   infrastructure evidence, not a passed test or an application regression.
+- Final keyboard increment: Java 21 packaged build, 124 web unit tests and
+  47 focused Chromium editor/fidelity cases passed. Five WebKit-over-HTTPS cases
+  covered table operations, list continuation/indentation, header boundaries and
+  controls across themes/narrow viewports. Five additional Chromium cases passed
+  the packaged manual-client vault round-trip, journal/wikilink navigation and
+  keyboard-table accessibility checks. Axe reported no violations in the table
+  keyboard test. No backend behavior changed in this increment.
+- Final Chromium long-note measurements: dirty-check p95 0.1 ms, explicit
+  serialization 59 ms, cached reads below 1 ms, input-to-next-frame p95 41.1 ms
+  on the same 53,089-byte fixture and browser/platform named above.
 
 The user guide is [Shared Markdown editor](../operations/MARKDOWN-EDITOR.md).
 It defines the supported dialect, normalization boundaries, shortcuts, storage,
 save/recovery behavior and limitations. API/data-model documents cover revisions.
 
-## Current continuation
+## Final implementation
 
 Split preview previously rebuilt its DOM before a replacement was ready and
 could lose reading position. The continuation keeps the previous preview until
@@ -73,20 +86,28 @@ plain and highlighted source. Find waits for editor readiness rather than a
 fixed timer, and repeated activation cannot start duplicate source editors.
 No new controls are added.
 
-## Remaining acceptance work
+The existing Table button also exposes keyboard insertion, deletion, movement
+and column alignment, described by its tooltip, accessible description and the
+user guide. Real keyboard navigation reaches the button from a table cell;
+Safari/macOS uses Option+Tab when its default Tab behavior skips buttons.
+Repeated operations retain both button focus and the nearest table cell. Header
+rows stay valid, Undo restores structural edits, and read-only notes reject the
+commands. List Enter/Tab/Shift+Tab behavior has a matching browser regression.
 
-- Review keyboard access to structured commands after the explicit removal of the
-  command panels; do not restore those panels to satisfy the old issue wording.
-- Complete current cross-browser checks and identify infrastructure exclusions
-  separately from application failures.
+## Acceptance limits
+
 - Reopen the representative synchronized vault in native Obsidian. The synthetic
   vault at `/private/tmp/timekeeper-515-obsidian-vault` contains no credentials or
   sync state. The app connection has repeatedly stalled; obtaining its window
-  title is not evidence of successful note rendering.
+  title is not evidence of successful note rendering. The supported Obsidian CLI
+  was checked on 3 November: the installed launcher is 1.8.3, the loaded app is
+  1.15.0, and CLI access is disabled. Enabling it is a user setting; it was not
+  changed automatically. Native rendering is therefore still unverified.
 - Native screen-reader and physical mobile keyboard checks are not certified by
   automated accessibility, emulated viewports or synthetic composition events.
   Record actual manual results before claiming those platforms verified.
 
-The issue's first milestone still needs the native Obsidian reopening check.
-Do not close the issue or mark all acceptance items complete while required
-manual/platform evidence is missing.
+The automated first-milestone workflow passes, including exact untouched bytes
+and assets after synchronization. Its native Obsidian reopening step remains
+unchecked. Do not treat automated browser coverage as a passed native/manual
+check or mark that acceptance item complete without evidence.

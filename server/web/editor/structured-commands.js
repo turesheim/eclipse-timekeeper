@@ -1,9 +1,28 @@
+import {TextSelection} from '@milkdown/kit/prose/state';
 import {CellSelection,TableMap,__pastedCells,__clipCells} from '@milkdown/kit/prose/tables';
 import {addRowBefore,addRowAfter,addColumnBefore,addColumnAfter,deleteRow,deleteColumn,deleteTable,isInTable,selectedRect,moveTableRow,moveTableColumn} from '@milkdown/kit/prose/tables';
 import {sinkListItem,liftListItem} from '@milkdown/kit/prose/schema-list';
-export function structuredCommand(view,name){
+export function structuredCommand(view,name,{singleCell=false}={}){
+  if(!singleCell||!isInTable(view.state))return applyStructuredCommand(view,name);
+  if(view.state.selection instanceof CellSelection)view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(view.state.selection.$anchorCell.pos+1))));
+  const before=selectedRect(view.state),tablePosition=before.tableStart-1;
+  const applied=applyStructuredCommand(view,name);
+  if(applied&&name!=='delete_table'){
+    const table=view.state.doc.nodeAt(tablePosition);
+    if(table?.type.spec.tableRole==='table'){
+      const map=TableMap.get(table);
+      const row=Math.max(0,Math.min(map.height-1,before.top+({row_after:1,row_up:-1,row_down:1}[name]||0)));
+      const column=Math.max(0,Math.min(map.width-1,before.left+({column_after:1,column_left:-1,column_right:1}[name]||0)));
+      const cell=tablePosition+1+map.positionAt(row,column,table);
+      view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(cell+1))));
+    }
+  }
+  return applied;
+}
+function applyStructuredCommand(view,name){
   const state=view.state,dispatch=tr=>view.dispatch(tr);
   const actions={row_before:addRowBefore,row_after:addRowAfter,column_before:addColumnBefore,column_after:addColumnAfter,delete_row:deleteRow,delete_column:deleteColumn,delete_table:deleteTable,indent:sinkListItem(state.schema.nodes.list_item),outdent:liftListItem(state.schema.nodes.list_item)};
+  if(['row_before','delete_row'].includes(name)&&isInTable(state)&&selectedRect(state).top===0)return false;
   if(name in actions){if(!['indent','outdent'].includes(name)&&!isInTable(state))return false;return actions[name](state,dispatch);}
   if(!isInTable(state))return false;
   const rect=selectedRect(state);

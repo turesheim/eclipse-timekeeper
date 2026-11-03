@@ -1,3 +1,4 @@
+import {appendEditorText} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
 import AxeBuilder from '@axe-core/playwright';
 import {test,expect} from '@playwright/test';
@@ -220,4 +221,37 @@ test('Find opens after highlighted source loads without relying on a timer',asyn
   await page.clock.install();await page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true}).click();
   await started;await expect(page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true})).toBeDisabled();await page.clock.fastForward(500);release();
   await expect(page.locator('#experience-field .cm-search')).toBeVisible();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Find this text.\n');
+});
+
+test('existing Table button supports keyboard structure edits without extra controls',async({page,browserName})=>{
+  await field(page,'Before.\n\n| A | B |\n| --- | --- |\n| One | Two |\n\nAfter.\n');
+  await page.locator('#experience-formatted td p').first().click();await page.keyboard.press('Escape');const button=page.locator('#experience-field [data-command=table]');
+  for(let step=0;step<24&&!await button.evaluate(node=>document.activeElement===node);step++)await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');
+  await expect(button).toBeFocused();
+  await expect(button).toHaveAttribute('aria-description',/Table keyboard controls/);
+  expect((await new AxeBuilder({page}).include('#experience-field').analyze()).violations).toEqual([]);
+  await button.press('ArrowDown');await expect(page.locator('#experience-formatted tr')).toHaveCount(3);await expect(button).toBeFocused();
+  await button.press('Shift+ArrowUp');await expect(page.locator('#experience-formatted tr').last()).toContainText('One');
+  await button.press('ArrowRight');await expect(page.locator('#experience-formatted tr').first().locator('th')).toHaveCount(3);
+  await button.press('c');expect(await page.locator('#experience-formatted th').evaluateAll(cells=>cells.filter(cell=>getComputedStyle(cell).textAlign==='center').length)).toBe(1);
+  await button.press('Backspace');await expect(page.locator('#experience-formatted tr')).toHaveCount(2);
+  await button.press('Delete');await expect(page.locator('#experience-formatted tr').first().locator('th')).toHaveCount(2);
+  await page.evaluate(()=>globalThis.field.setReadOnly(true));const before=await page.evaluate(()=>globalThis.field.value());
+  await button.dispatchEvent('keydown',{key:'ArrowDown'});expect(await page.evaluate(()=>globalThis.field.value())).toBe(before);
+  await page.evaluate(()=>globalThis.field.setReadOnly(false));await button.focus();await button.press('Shift+Delete');await expect(page.locator('#experience-formatted table')).toHaveCount(0);
+  expect(await page.evaluate(()=>globalThis.field.value())).toContain('Before.');expect(await page.evaluate(()=>globalThis.field.value())).toContain('After.');
+  await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();await expect(page.locator('#experience-formatted table')).toHaveCount(1);
+  await expect(page.locator('.markdown-structured, .markdown-context-menu')).toHaveCount(0);
+});
+
+test('lists continue and indent with ordinary keyboard actions',async({page})=>{
+  await field(page,'* Parent\n* Child\n');await page.locator('#experience-formatted li p').last().click();await page.keyboard.press('Tab');
+  await expect(page.locator('#experience-formatted ul ul')).toHaveCount(1);await page.keyboard.press('Shift+Tab');await expect(page.locator('#experience-formatted ul ul')).toHaveCount(0);
+  await appendEditorText(page.locator('#experience-formatted li p').last(),' continued');await page.keyboard.press('Enter');await page.keyboard.insertText('Next item');await expect(page.locator('#experience-formatted li')).toHaveCount(3);await expect(page.locator('#experience-formatted li').last()).toContainText('Next item');
+});
+
+test('table header boundaries remain valid during keyboard operations',async({page})=>{
+  const value='| A | B |\n| --- | --- |\n| One | Two |\n';await field(page,value);await page.locator('#experience-formatted th p').first().click();await page.keyboard.press('Escape');
+  const button=page.locator('#experience-field [data-command=table]');await button.focus();await button.press('Backspace');await button.press('ArrowUp');await button.press('Shift+ArrowDown');
+  await expect(page.locator('#experience-formatted tr')).toHaveCount(2);await expect(page.locator('#experience-formatted th').first()).toHaveText('A');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
 });

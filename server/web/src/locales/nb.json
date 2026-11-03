@@ -1299,5 +1299,6 @@
   "focus.clients_count": "Kunder ({{count}})",
   "focus.search_clients": "Søk etter kunder",
   "focus.no_clients": "Ingen kunder funnet",
-  "focus.apply": "Bruk"
+  "focus.apply": "Bruk",
+  "markdown.table_keys": "Tabelltaster (når denne knappen har fokus): piltaster setter inn rader/kolonner; Skift+piltaster flytter dem. Tilbake sletter raden; Delete sletter kolonnen; Skift+Delete sletter tabellen. L, C og R justerer kolonnen til venstre, midten og høyre. Angre gjenoppretter forrige endring."
 }

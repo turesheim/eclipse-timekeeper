@@ -71,7 +71,32 @@ unknown languages stay plain. Mermaid fences retain editable source and render
 a local preview. External diagram resources are rejected.
 
 Use the main toolbar for lists and tables. Tab in a table moves between cells.
-Tab-separated clipboard data can create a table.
+Tab-separated clipboard data can create a table. To use advanced table operations
+without extra controls, select a cell, press Escape to leave the text area, then
+Tab to the existing **Table** toolbar button. Safari on macOS may use Option+Tab
+or require Keyboard Navigation enabled, depending on browser/system settings
+([Apple keyboard-navigation guide](https://support.apple.com/guide/safari/cpsh003/mac)).
+Its tooltip and accessible description explain the keys below. They apply only
+while that button is focused inside a
+writable table, leaving normal text-selection and browser shortcuts unchanged.
+
+| Key on the Table button | Action |
+| --- | --- |
+| Up / Down | Insert a row before / after |
+| Left / Right | Insert a column before / after |
+| Shift + arrow | Move the current row / column in that direction |
+| Backspace | Delete the current row |
+| Delete | Delete the current column |
+| Shift + Delete | Delete the table |
+| L / C / R | Align the current column left / center / right |
+
+On macOS, forward Delete is Fn+Delete. Focus stays on the button for repeated
+operations. Header rows cannot be moved
+into the table body or deleted separately. Row insertion before the header is
+ignored; select a body row to insert before it. Keyboard operations act on one
+cell at a time, even after a row move selects the row. Toolbar Undo restores a
+structural edit; saving remains
+explicit. In lists, Tab/Shift+Tab indent/outdent and Enter continues the list.
 
 ## Paste and attachments
 
@@ -118,4 +143,5 @@ See the [completion audit](../verification/MARKDOWN-EDITOR-515.md) for actual
 browser/platform evidence, pending manual checks and representative-vault
 results. Automated accessibility checks and emulated mobile viewports do not
 certify a physical mobile keyboard, assistive technology or Obsidian rendering.
-The issue remains open while required acceptance evidence is incomplete.
+The audit distinguishes implementation completion from native/manual checks
+that have not been performed.
