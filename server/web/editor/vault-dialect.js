@@ -3,6 +3,11 @@ import {wikiReference} from '../src/wiki-links.js';
 import {t} from '../src/i18n.js';
 
 export function vaultDialect({unsupported,resources,readOnly}){
+  const inlineBreak=$node('inline_break',()=>({inline:true,group:'inline',atom:true,
+    leafText:()=> '\n',toDOM:()=>['br'],
+    parseMarkdown:{match:node=>node.type==='inlineBreak',runner:(state,_node,type)=>state.addNode(type)},
+    toMarkdown:{match:node=>node.type.name==='inline_break',runner:state=>state.addNode('html',undefined,'<br />')}
+  }));
   const wiki=$node('vault_wikilink',()=>({inline:true,group:'inline',atom:true,selectable:true,
     attrs:{value:{default:'',validate:'string'},embed:{default:false,validate:'boolean'}},
     leafText:node=>(node.attrs.embed?'!':'')+'[['+node.attrs.value+']]',
@@ -30,7 +35,7 @@ export function vaultDialect({unsupported,resources,readOnly}){
   }));
   const convert=node=>{
     if(node.children)node={...node,children:node.children.map(child=>node.type==='paragraph'&&child.type==='html'&&/^<br\s*\/?>$/i.test(child.value.trim())
-      ?{type:'break',position:child.position}:convert(child))};
+      ?{type:'inlineBreak',position:child.position}:convert(child))};
     if(node.type!=='blockquote'||node.children?.[0]?.type!=='paragraph')return node;
     const first=node.children[0],text=first.children?.[0];if(text?.type!=='text')return node;
     const match=/^(\[![A-Za-z]+\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;
@@ -73,5 +78,5 @@ export function vaultDialect({unsupported,resources,readOnly}){
       return {dom,stopEvent:()=>true,ignoreMutation:()=>true,destroy(){disposed=true;clearTimeout(timer);}};
     }
   };
-  return {guard,plugins:[wiki,footnote,definition,callout,fragment],project,nodeViews};
+  return {guard,plugins:[...inlineBreak,wiki,footnote,definition,callout,fragment],project,nodeViews};
 }
