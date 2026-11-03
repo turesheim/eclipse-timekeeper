@@ -61,12 +61,6 @@ export function buildExperience(field,load,loadSource){
   };
   f.scrollToHeading=heading=>{if(!heading)return;const target=f.editor?.outline().find(item=>headingAnchor(item.text)===headingAnchor(heading));if(target){f.editor.scrollTo(target.pos);return true;}f.status.textContent=t('markdown.heading_missing',{heading});return false;};
   f.overflow=action('markdown.more',()=>{const open=f.toolbar.dataset.expanded!=='true';f.toolbar.dataset.expanded=String(open);f.overflow.setAttribute('aria-expanded',String(open));},'three-dots');f.overflow.classList.add('markdown-overflow');f.overflow.setAttribute('aria-expanded','false');f.toolbar.append(f.overflow);
-  f.structured=el('details');f.structured.className='markdown-structured';f.structured.append(el('summary',t('markdown.structure')));
-  const structure=el('div');structure.className='markdown-structured-actions';
-  for(const name of ['indent','outdent','row_before','row_after','column_before','column_after','delete_row','delete_column','row_up','row_down','column_left','column_right','align_left','align_center','align_right','delete_table'])structure.append(action('markdown.'+name,()=>{if(!f.readOnly)f.editor?.command(name);}));
-  f.structured.append(structure);f.toolbar.after(f.structured);
-  const popup=el('div');popup.className='markdown-context-menu';popup.hidden=true;popup.setAttribute('role','group');popup.setAttribute('aria-label',t('markdown.formatting'));f.root.append(popup);f.contextPopup=popup;
-  for(const name of ['bold','italic','strike','link']){const contextAction=action('markdown.'+name,()=>{if(f.readOnly)return;if(name==='link'){const href=prompt(t('markdown.link_url'),f.editor?.linkHref()||'https://');if(href)f.editor?.command(name,href);}else f.editor?.command(name);});contextAction.setAttribute('aria-label',t('markdown.selection_action',{action:t('markdown.'+name)}));popup.append(contextAction);}
   const suggestions=el('div');suggestions.className='markdown-suggestions';suggestions.hidden=true;suggestions.setAttribute('role','listbox');suggestions.setAttribute('aria-label',t('markdown.suggestions'));f.root.append(suggestions);f.suggestions=suggestions;
   let completion=0,lastQuery;
   const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
@@ -76,10 +70,8 @@ export function buildExperience(field,load,loadSource){
     f.imageProperties.disabled=f.readOnly||!f.editor?.imageDetails();
     f.historyButton.disabled=!f.resources?.revisions;
     f.assetPicker.disabled=f.readOnly||!f.resources?.complete;
-    f.structured.hidden=!f.editor||f.readOnly;
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
-    popup.hidden=!f.editor||f.readOnly||!f.editor.selectedText();if(!popup.hidden)place(popup,f.editor.selectionRect()||{left:8,bottom:8});
-    if(!f.editor||f.readOnly||f.editor.composing()){suggestions.hidden=true;popup.hidden=true;return;}
+    if(!f.editor||f.readOnly||f.editor.composing()){suggestions.hidden=true;return;}
     const wiki=f.editor.wikiQuery(),slash=f.editor.slash(),query=wiki?'wiki:'+wiki.query:slash?'slash:'+slash.query:null;
     if(query===lastQuery)return;lastQuery=query;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
     const add=(label,run)=>{const button=el('button',label);button.type='button';button.className='btn btn-light';button.setAttribute('role','option');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{if(f.readOnly)return;suggestions.hidden=true;run();});suggestions.append(button);};

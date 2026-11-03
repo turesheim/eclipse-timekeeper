@@ -29,6 +29,8 @@ export function vaultDialect({unsupported,resources,readOnly}){
     toMarkdown:{match:node=>node.type.name==='callout',runner:(state,node)=>state.openNode('callout',undefined,{marker:node.attrs.marker,title:node.attrs.title}).next(node.content).closeNode()}
   }));
   const convert=node=>{
+    if(node.children)node={...node,children:node.children.map(child=>node.type==='paragraph'&&child.type==='html'&&/^<br\s*\/?>$/i.test(child.value.trim())
+      ?{type:'break',position:child.position}:convert(child))};
     if(node.type!=='blockquote'||node.children?.[0]?.type!=='paragraph')return node;
     const first=node.children[0],text=first.children?.[0];if(text?.type!=='text')return node;
     const match=/^(\[![A-Za-z]+\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;

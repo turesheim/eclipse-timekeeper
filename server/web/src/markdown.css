@@ -90,8 +90,8 @@
 .markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
 .markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }
 .markdown-source-tools { display: flex; gap: .25rem; flex-wrap: wrap; }
-.markdown-structured > summary, .markdown-outline > summary { color: var(--bs-secondary-color); font-size: .85rem; cursor: pointer; }
-.markdown-outline nav, .markdown-structured-actions { display: flex; flex-wrap: wrap; gap: .25rem; padding-block: .5rem; }
+.markdown-outline > summary { color: var(--bs-secondary-color); font-size: .85rem; cursor: pointer; }
+.markdown-outline nav { display: flex; flex-wrap: wrap; gap: .25rem; padding-block: .5rem; }
 .markdown-outline nav { flex-direction: column; max-height: 12rem; overflow: auto; }
 .markdown-outline button { text-align: start; border: 0; }
 .markdown-code-editor { flex: 1; min-height: 15rem; min-width: 0; overflow: auto; }
@@ -104,8 +104,7 @@
 .markdown-split:not([hidden]) { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: .5rem; min-height: 0; }
 .markdown-split > label { grid-column: 1 / -1; }
 .markdown-split-preview { min-width: 0; max-height: 40rem; overflow: auto; border-inline-start: 1px solid var(--bs-border-color); }
-.markdown-context-menu, .markdown-suggestions { position: fixed; z-index: 1080; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; border-radius: .4rem; box-shadow: 0 .25rem .75rem #0002; max-width: calc(100vw - 1rem); }
-.markdown-context-menu { display: flex; gap: .25rem; }
+.markdown-suggestions { position: fixed; z-index: 1080; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; border-radius: .4rem; box-shadow: 0 .25rem .75rem #0002; max-width: calc(100vw - 1rem); }
 .markdown-suggestions { display: flex; flex-direction: column; max-height: 12rem; overflow: auto; width: 17rem; }
 .markdown-suggestions button { text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markdown-overflow { display: none; }

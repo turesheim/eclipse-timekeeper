@@ -156,3 +156,15 @@ test('composition keeps Unicode text and does not accept a slash command on comp
 test('revision comparison exposes line-ending-only changes',async({page})=>{
   await page.goto('/web/markdown-lab.html');const diff=await page.evaluate(async()=>{const {lineComparison}=await import('/web/note-revisions.js');return lineComparison('Same.\n','Same.\r\n');});expect(diff).toContain('\\r\\n');expect(diff).toContain('- ');expect(diff).toContain('+ ');
 });
+
+test('formatted checklists stay editable without extra formatting panels',async({page})=>{
+  const value='* [ ] Oppgradere AMQ i PROD\n* [ ] <br />\n';await field(page,value);
+  await expect(page.locator('#experience-formatted input[type=checkbox]')).toHaveCount(2);
+  await expect(page.locator('#experience-field .markdown-source-fragment')).toHaveCount(0);
+  await expect(page.locator('#experience-field .markdown-structured, #experience-field .markdown-context-menu')).toHaveCount(0);
+  expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+  await page.locator('#experience-formatted input[type=checkbox]').first().check();
+  expect(await page.evaluate(()=>globalThis.field.value())).toContain('[x] Oppgradere AMQ i PROD');
+  await page.evaluate(()=>{const paragraph=document.querySelector('#experience-formatted p'),range=document.createRange();range.selectNodeContents(paragraph);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
+  await expect(page.locator('#experience-field .markdown-context-menu')).toHaveCount(0);
+});
