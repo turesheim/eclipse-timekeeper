@@ -184,7 +184,11 @@ test('existing assets and image properties keep portable paths across Notes and 
   await page.locator('#notes-panel').getByRole('button',{name:'Existing vault asset',exact:true}).click();const picker=page.getByRole('dialog',{name:'Existing vault asset',exact:true});await picker.getByRole('button',{name:'Notes/pixel.png',exact:true}).click();
   const image=page.locator('#notes-formatted img[data-wiki-embed]');await expect.poll(()=>image.evaluate(node=>node.naturalWidth)).toBe(1);await image.click();await page.locator('#notes-panel').getByRole('button',{name:'Image properties',exact:true}).click();const properties=page.getByRole('dialog',{name:'Image properties',exact:true});await properties.getByLabel('Width in pixels',{exact:true}).fill('48');await properties.getByRole('button',{name:'Save',exact:true}).click();
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();expect(await page.locator('#notes-body').inputValue()).toContain('![[Notes/pixel.png|48]]');
-  await api('PUT','/notes/files?path=journal%2F2026-11-03.md',Buffer.from('![Shared image](../Notes/pixel.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-03');await expect.poll(()=>page.locator('#today-journal-formatted').getByRole('img',{name:'Shared image',exact:true}).evaluate(node=>node.naturalWidth)).toBe(1);
+  const save=page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true});await save.click();await expect(save).toBeDisabled();
+  await api('PUT','/notes/files?path=journal%2F2026-11-03.md',Buffer.from('![Shared image](../Notes/pixel.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  // The fixture day can already be open at sign-in; filling that date is not a reload.
+  await page.goto('/web/?day=2026-11-03');await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect.poll(()=>page.locator('#today-journal-formatted').getByRole('img',{name:'Shared image',exact:true}).evaluate(node=>node.naturalWidth)).toBe(1);
 });
 
 test('an unavailable save retains the draft and leaves the server version intact',async({page,request})=>{
