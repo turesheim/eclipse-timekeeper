@@ -57,7 +57,9 @@ source edits become history boundaries when returning to formatted mode.
 
 **Source editor tools** loads the optional CodeMirror editor with Markdown/code
 highlighting, indentation, find/replace and optional line numbers. Find uses
-Command/Ctrl+F. **Split preview** refreshes the formatted pane after source edits.
+Command/Ctrl+F. **Split preview** refreshes the formatted pane after source edits
+without moving source focus or resetting its reading position. The two panes
+scroll together by relative document position, including with highlighted source.
 Escape followed by Tab leaves the source editor; Tab alone indents. Turning the
 tools off restores the plain textarea. Source tools require constructed style
 sheets; unavailable features leave plain source editing usable. Split previews

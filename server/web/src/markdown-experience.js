@@ -1,3 +1,4 @@
+import {buildPreview} from './markdown-preview.js';
 import {wikiReference} from './wiki-links.js';
 import {lineComparison} from './note-revisions.js';
 import {t} from './i18n.js';
@@ -11,28 +12,22 @@ export function buildExperience(field,load,loadSource){
   f.retryButton=action('ui.retry',()=>void f.retryUpload?.());f.retryButton.hidden=true;f.status.after(f.retryButton);
   f.sourceExtras=el('div');f.sourceExtras.className='markdown-source-tools';
   f.codeHost=el('div');f.codeHost.className='markdown-code-editor';f.codeHost.hidden=true;f.plain.append(f.codeHost);
-  f.enhance=action('markdown.source_tools',async()=>{try{
-    if(f.loading)return;if(f.codeEditor){f.setRaw(f.codeEditor.value());f.sourcePosition=f.codeEditor.position();f.codeEditor.destroy();f.codeEditor=null;f.codeHost.replaceChildren();f.codeHost.hidden=true;f.text.hidden=false;f.text.focus();f.enhance.setAttribute('aria-pressed','false');return;}
+  f.toggleSourceTools=async()=>{if(f.sourceToolsLoading)return;f.sourceToolsLoading=true;f.enhance.disabled=f.find.disabled=true;try{
+    if(f.loading)return;if(f.codeEditor){f.setRaw(f.codeEditor.value());f.sourcePosition=f.codeEditor.position();f.codeEditor.destroy();f.codeEditor=null;f.codeHost.replaceChildren();f.codeHost.hidden=true;f.text.hidden=false;f.text.focus();f.text.setSelectionRange(f.sourcePosition.anchor,f.sourcePosition.head);f.text.scrollTop=f.sourcePosition.scrollTop;f.enhance.setAttribute('aria-pressed','false');return;}
     const current=f.generation,module=await loadSource();if(current!==f.generation)return;
-    f.codeEditor=module.createSourceEditor({root:f.codeHost,value:f.rawBody(),label:t('markdown.body'),readOnly:f.readOnly,uploadFiles:files=>void f.uploadFiles(files),complete:(query,options)=>f.resources?.complete?.(query,options)||Promise.resolve([]),selection:f.sourcePosition&&{anchor:f.sourcePosition.anchor,head:f.sourcePosition.head},changed:value=>{f.setRaw(value);f.onChange();f.refreshPreview();}});
-    f.text.hidden=true;f.codeHost.hidden=false;f.codeEditor.focus();f.enhance.setAttribute('aria-pressed','true');
-  }catch{f.status.textContent=t('markdown.failed');f.text.hidden=false;f.codeHost.hidden=true;}},'code-square');f.enhance.setAttribute('aria-pressed','false');
-  f.find=action('markdown.find_replace',()=>{if(!f.codeEditor){f.enhance.click();setTimeout(()=>f.codeEditor?.find(),100);}else f.codeEditor.find();},'search');
+    const position={anchor:f.text.selectionStart,head:f.text.selectionEnd,scrollTop:f.text.scrollTop};
+    f.text.hidden=true;f.codeHost.hidden=false;
+    f.codeEditor=module.createSourceEditor({root:f.codeHost,value:f.rawBody(),label:t('markdown.body'),readOnly:f.readOnly,uploadFiles:files=>void f.uploadFiles(files),complete:(query,options)=>f.resources?.complete?.(query,options)||Promise.resolve([]),selection:{anchor:position.anchor,head:position.head},changed:value=>{f.setRaw(value);f.onChange();f.refreshPreview();}});
+    const created=f.codeEditor;await created.ready;if(current!==f.generation||f.codeEditor!==created)return;
+    created.focus();created.scrollElement.scrollTop=position.scrollTop;const scroll=f.codeEditor.scrollElement;scroll.addEventListener('scroll',()=>{if(f.codeEditor?.scrollElement===scroll)f.syncPreviewScroll(scroll);});f.enhance.setAttribute('aria-pressed','true');
+  }catch{f.status.textContent=t('markdown.failed');f.text.hidden=false;f.codeHost.hidden=true;}finally{f.sourceToolsLoading=false;f.enhance.disabled=f.find.disabled=false;}};
+  f.enhance=action('markdown.source_tools',()=>void f.toggleSourceTools(),'code-square');f.enhance.setAttribute('aria-pressed','false');
+  f.find=action('markdown.find_replace',async()=>{const generation=f.generation;if(!f.codeEditor)await f.toggleSourceTools();const editor=f.codeEditor;await editor?.ready;if(generation===f.generation&&editor===f.codeEditor)editor?.find();},'search');
   f.numbers=action('markdown.line_numbers',()=>{f.showNumbers=f.showNumbers===false;f.codeEditor?.lineNumbers(f.showNumbers);f.numbers.setAttribute('aria-pressed',String(f.showNumbers));},'list-ol');f.numbers.setAttribute('aria-pressed','true');
-  f.split=action('markdown.split',()=>{f.splitHost.hidden=!f.splitHost.hidden;f.split.setAttribute('aria-pressed',String(!f.splitHost.hidden));f.plain.classList.toggle('markdown-split',!f.splitHost.hidden);f.refreshPreview();},'layout-split');f.split.setAttribute('aria-pressed','false');
+  f.split=action('markdown.split',()=>{f.splitHost.hidden=!f.splitHost.hidden;f.split.setAttribute('aria-pressed',String(!f.splitHost.hidden));f.plain.classList.toggle('markdown-split',!f.splitHost.hidden);if(!f.splitHost.hidden)f.syncPreviewScroll(f.codeEditor?.scrollElement||f.text);f.refreshPreview();},'layout-split');f.split.setAttribute('aria-pressed','false');
   f.splitHost=el('div');f.splitHost.className='journal-formatted markdown-split-preview';f.splitHost.setAttribute('aria-label',t('markdown.preview'));f.splitHost.hidden=true;f.plain.append(f.splitHost);
   f.sourceExtras.append(f.enhance,f.find,f.numbers,f.split);f.toolbar.after(f.sourceExtras);
-  f.refreshPreview=()=>{
-    clearTimeout(f.previewTimer);if(f.splitHost.hidden)return;
-    const generation=f.generation;f.previewTimer=setTimeout(async()=>{
-      if(generation!==f.generation||f.splitHost.hidden)return;
-      const source=f.rawBody();if(new TextEncoder().encode(source).length>200000)return;
-      await f.previewEditor?.destroy();f.previewEditor=null;f.splitHost.replaceChildren();
-      const module=await load();if(generation!==f.generation)return;
-      const root=el('div');f.splitHost.append(root);const created=await module.createMarkdownEditor({root,value:source,label:t('markdown.preview'),taskLabel:text=>text,escape:()=>f.text.focus(),readOnly:true,resources:f.resources});
-      if(generation!==f.generation){await created?.destroy();return;}f.previewEditor=created;
-    },250);
-  };
+  buildPreview(f,load);
   f.assetDialog=el('dialog');f.assetDialog.className='app-dialog markdown-asset-dialog';f.assetDialog.setAttribute('aria-label',t('markdown.existing_asset'));
   const assetHeading=el('h2',t('markdown.existing_asset')),assetSearch=el('input');assetSearch.type='search';assetSearch.className='form-control';assetSearch.setAttribute('aria-label',t('notes.search'));const assetList=el('div');assetList.className='markdown-asset-list';const closeAsset=action('ui.close',()=>f.assetDialog.close());f.assetDialog.append(assetHeading,assetSearch,assetList,closeAsset);f.root.append(f.assetDialog);
   let assetGeneration=0;

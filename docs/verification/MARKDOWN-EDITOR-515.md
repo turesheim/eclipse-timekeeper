@@ -1,88 +1,92 @@
 # Markdown editor completion audit (#515)
 
-This audit records implementation and evidence separately. Issue #515 stays open
-until every required acceptance area is verified; a passing focused suite alone
-is not completion. Work is isolated in `codex/markdown-editor-experience`; the dirty
-user checkout remains untouched.
+Updated 3 November 2026. Daily, weekly, event and general Notes share the same
+editor. Implementation and verification are recorded separately; the issue stays
+open until its required acceptance evidence is complete.
 
-## Implemented, awaiting final regression and visual review
+## Delivered
 
-- Validated source reuse for unchanged blocks; exact open/save bytes, frontmatter
-  and mixed line endings; editable inert fragments around unsupported syntax.
-- Vault wikilinks, aliases, heading targets, completion and authenticated raster
-  embeds with Obsidian width/height syntax. Missing/ambiguous references are
-  explicit. Vault links participate in unsaved-draft navigation guards.
-- Callouts and footnotes, source retention, language/copy/highlight controls for
-  code, existing Mermaid previews, list indentation and table insertion,
-  deletion, movement, column alignment and spreadsheet paste.
-- Sanitized formatted paste, explicit plain paste, URL over selection, file
-  paste/drop at tracked insertion points, upload status/retry and existing assets.
-  Daily, weekly, event and general note hosts share these capabilities.
-- Active formatting, shortcut hints, contextual controls, slash commands, keyboard
-  suggestions, compact toolbar overflow and a collapsible heading outline.
-- Optional CodeMirror source tools, highlighting, find/replace, indentation,
-  line-number toggle and synchronized split preview; plain source remains a
-  resilient fallback. Rich history survives unchanged mode round trips.
-- In-memory note cursor restoration and prospective server revision snapshots;
-  comparison precedes restoration into an unsaved draft. Native writes, vault
-  writes and WebDAV writes use the same canonical content hooks.
-- Read-only checks remain at schema transactions, source widgets and host upload/
-  write boundaries. No note contents enter localStorage/sessionStorage.
+PR #516 delivered the source-preservation foundation; PR #517 delivered the
+shared editor experience and revision history. PR #522 removed the date-dependent
+Notes/Today image-test setup. PR #523 removed the unwanted Lists and tables panel
+and floating formatting bar, and made checklists containing a bare inline
+`<br />` editable without rewriting their unchanged source. #523 is merged and
+all its selected GitHub checks passed in [run 41596127827](https://github.com/turesheim/eclipse-timekeeper/actions/runs/41596127827).
 
-## Evidence recorded so far
+The user explicitly rejected the extra button areas. Issue #515 now records that
+choice: use the existing toolbar and shortcuts; do not reintroduce a floating
+selection toolbar or a separate structured-editing button panel.
 
-- Foundation: 121 unit tests; 219 Chromium browser cases passed, 7 opt-in cases
-  skipped; 28 selected HTTPS WebKit cases passed (commit `7237bf5c`).
-- New experience increment: 26 selected Chromium cases passed at `ebb7fdfc`,
-  including authenticated wiki resolution/embeds, revision comparison, mixed-EOL
-  source tools, safe paste, table commands, callouts/footnotes, code highlighting,
-  mode-switch history and independent day labels.
-- `NoteRevisionsTest`: bounded retention, exact bytes, daily/weekly/vault native
-  writes, owner isolation, independent labels and stale-write rejection pass.
-- OpenAPI validation: 54 contract cases pass after registering revision reads.
+| Area | Implementation and automated evidence |
+| --- | --- |
+| Fidelity | Exact unchanged source, opaque frontmatter, mixed line endings, edited-block reuse, inert editable fragments, line breaks and mode-switch history: editor/fidelity browser suites |
+| Vault compatibility | Ordinary/daily wikilinks, aliases, headings, completion, sized authenticated image embeds, callouts and footnotes: Notes/editor/wikilink suites |
+| Paste and attachments | Safe rich/plain paste, URL over selection, screenshots and file drop, insertion bookmarks, upload progress/retry and existing assets: editor/Notes suites |
+| Structured content | List/task behavior, table commands and spreadsheet paste, language/copy/highlight controls, Mermaid previews: editor suites; extra command panels were removed after user review |
+| Navigation | Heading outline, link previews, guarded navigation and in-memory cursor restoration: editor/Notes/wikilink suites |
+| Saving and recovery | Canonical revision hooks for native and DAV writes, diff before draft restoration, retention limits, owner isolation and guarded stale writes: Java revision tests and Notes/editor browser suites |
+| Privacy and access | Read-only schema/source/upload guards; drafts stay in memory and clear on session changes: shared editor and host suites |
 
-- Full Java 21 server verification at `5f7ab149`: 514 tests, zero failures/errors,
-  12 opt-in skips. The later table changes affect web code only.
-- At `fe790389`, all 37 editor/Notes/fidelity cases pass. The packaged manual
-  client vault case also passes with a platform-independent paragraph selection;
-  the combined suite is being repeated with that harness correction.
-- Current web unit and API contract suites pass: 124 and 54 cases respectively.
+Saving remains explicit. Autosave was considered and left off to retain guarded
+manual saving during sync/conflict review. Persistent offline draft storage was
+not introduced; it would require an explicit privacy/retention design.
 
-These results do not replace final combined browser/CI verification. PR #516
-merged the foundation at `7237bf5c`; the broader implementation is follow-up work.
-The retained synthetic vault at `/private/tmp/timekeeper-515-obsidian-vault` has
-no credentials or sync state. Reopening it in native Obsidian remains pending;
-a native-app automation attempt timed out and is not counted as verification.
+## Verified evidence
+
+- Full Java 21 verification at `5f7ab149`: 514 tests, zero failures/errors,
+  12 opt-in skips. Later UI-only increments do not change server behavior.
+- Web unit and API contract suites at the editor increment: 124 and 54 cases.
+- #523: packaged server build, 124 web unit tests and 40 focused Chromium editor,
+  fidelity and prototype browser cases passed locally; subsequent GitHub checks
+  passed. Its checklist regression checks unchanged bytes, checkbox editing and
+  absence of the removed controls.
+- Packaged manual WebDAV client/representative-vault checks verified exact
+  Markdown and binary bytes, daily/weekly/event/general note associations,
+  unaffected markup after a rich edit, guarded conflicts and interrupted replies.
+  The round-trip fixture now explicitly recovers a consistent workspace after
+  external DAV writes before attempting an edit.
+- Chromium 156.0.8078.4 on macOS arm64: the long-note fixture is 350 paragraphs / 53,089 bytes.
+  At #523, dirty-check p95 was below 1 ms, cached reads below 1 ms, explicit
+  serialization about 37 ms and input-to-next-frame p95 about 32 ms. These are
+  named local regression measurements, not physical-mobile certification.
+- Foundation HTTPS WebKit checks passed (28 cases at `7237bf5c`).
+- Split/source continuation: packaged build, 124 web unit tests, 44 focused
+  Chromium editor/fidelity cases and 7 WebKit-over-HTTPS cases pass locally.
+  The browser cases cover plain/highlighted source, native wheel scrolling,
+  caret/focus preservation, source-tool toggles, reordered asynchronous renders,
+  clearing pending private content and Find after a delayed source-module load.
+  Firefox remains unverified; its earlier local profile-startup failure was
+  infrastructure evidence, not a passed test or an application regression.
+
+The user guide is [Shared Markdown editor](../operations/MARKDOWN-EDITOR.md).
+It defines the supported dialect, normalization boundaries, shortcuts, storage,
+save/recovery behavior and limitations. API/data-model documents cover revisions.
+
+## Current continuation
+
+Split preview previously rebuilt its DOM before a replacement was ready and
+could lose reading position. The continuation keeps the previous preview until
+new content is ready, rejects stale asynchronous renders, clears pending private
+content when a note closes, and synchronizes pane scrolling proportionally.
+It retains source focus/caret and uses the live selection when switching between
+plain and highlighted source. Find waits for editor readiness rather than a
+fixed timer, and repeated activation cannot start duplicate source editors.
+No new controls are added.
 
 ## Remaining acceptance work
 
-- Exercise completion, asset selection, drop positioning and multi-file retry;
-  review all new controls with keyboard, mobile viewport, IME and theme checks.
-- Check selection/scroll behavior across edited mode changes and note navigation;
-  review image alt/sizing controls and structured-editing boundary cases.
-- Verify revision API access control, event-note revisions, account retention and
-  document archive/backup treatment.
-- Run full server tests, full browser regressions and HTTPS WebKit/Firefox checks;
-  inspect screenshots and resolve every applicable CI failure.
-- Complete a representative manual WebDAV vault round trip and reopen it in
-  Timekeeper and the installed Obsidian application. Include Unicode/spaced names,
-  daily/weekly/event notes, unknown constructs, images, attachments and conflicts.
-- Finish user/API/data-model documentation, syntax contract, normalization,
-  shortcuts, saving/recovery behavior, performance evidence and platform limits.
-  The [user guide](../operations/MARKDOWN-EDITOR.md) now describes the contract.
+- Review keyboard access to structured commands after the explicit removal of the
+  command panels; do not restore those panels to satisfy the old issue wording.
+- Complete current cross-browser checks and identify infrastructure exclusions
+  separately from application failures.
+- Reopen the representative synchronized vault in native Obsidian. The synthetic
+  vault at `/private/tmp/timekeeper-515-obsidian-vault` contains no credentials or
+  sync state. The app connection has repeatedly stalled; obtaining its window
+  title is not evidence of successful note rendering.
+- Native screen-reader and physical mobile keyboard checks are not certified by
+  automated accessibility, emulated viewports or synthetic composition events.
+  Record actual manual results before claiming those platforms verified.
 
-## Design decisions
-
-CodeMirror is optional and loaded separately, retaining the plain source fallback.
-Milkdown's existing table commands are reused. Crepe's image components expose upload and URL-proxy hooks; adopting them would
-still require adapters for authenticated bytes, portable vault paths and the
-source-preservation schema. The existing authenticated views retain that contract. Code highlighting reuses CodeMirror's
-language parsers without replacing the rich code node's editable DOM.
-
-Saving remains explicit. Autosave was considered: quietly issuing writes while a
-note is being reviewed for sync/conflict resolution would change the current
-contract. This increment keeps manual guarded saving. Offline draft recovery is
-in-memory only, cleared with the session; persistent browser recovery would need
-an explicit account privacy/retention option before introduction.
-
-Component evaluation references: [Crepe feature surface](https://github.com/Milkdown/milkdown/blob/main/packages/crepe/src/feature/index.ts), [image adapters](https://github.com/Milkdown/milkdown/blob/main/packages/crepe/src/feature/image-block/index.ts), and [selection toolbar](https://github.com/Milkdown/milkdown/blob/main/packages/crepe/src/feature/toolbar/index.ts). The installed Kit/component interfaces were also checked at 7.22.3; upstream main is architectural context, not a pinned runtime dependency.
+The issue's first milestone still needs the native Obsidian reopening check.
+Do not close the issue or mark all acceptance items complete while required
+manual/platform evidence is missing.

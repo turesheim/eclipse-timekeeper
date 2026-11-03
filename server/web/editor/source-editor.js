@@ -48,12 +48,13 @@ export function createSourceEditor({root,value,label,readOnly=false,changed,sele
       access.of([EditorState.readOnly.of(readOnly),EditorView.editable.of(!readOnly)]),EditorView.contentAttributes.of({'aria-label':label,'aria-description':t('markdown.tab_help')}),
       EditorView.updateListener.of(update=>{if(!update.docChanged)return;const values=update.state.field(endings);let index=0;raw=update.state.doc.toString().replace(/\n/g,()=>values[index++]||preferred);changed(raw);})]
   })});
-  return {value:()=>raw,insert:(text,from=view.state.selection.main.from,to=view.state.selection.main.to)=>{const current=view.state.selection.main,follow=current.from===from&&current.to===to;view.dispatch({changes:{from,to,insert:text},...(follow?{selection:{anchor:from+text.length}}:{})});return from+text.length;},replaceValue:value=>{if(value===raw)return;view.dispatch({changes:{from:0,to:view.state.doc.length,insert:value.replace(/\r\n?/g,'\n')},effects:restoreEndings.of(value.match(/\r\n|\n|\r/g)||[]),annotations:isolateHistory.of('full')});},focus:()=>view.focus(),find:()=>openSearchPanel(view),
+  let readyResolve;const ready=new Promise(resolve=>{readyResolve=resolve;view.requestMeasure({read:()=>null,write:()=>resolve()});});
+  return {ready,scrollElement:view.scrollDOM,value:()=>raw,insert:(text,from=view.state.selection.main.from,to=view.state.selection.main.to)=>{const current=view.state.selection.main,follow=current.from===from&&current.to===to;view.dispatch({changes:{from,to,insert:text},...(follow?{selection:{anchor:from+text.length}}:{})});return from+text.length;},replaceValue:value=>{if(value===raw)return;view.dispatch({changes:{from:0,to:view.state.doc.length,insert:value.replace(/\r\n?/g,'\n')},effects:restoreEndings.of(value.match(/\r\n|\n|\r/g)||[]),annotations:isolateHistory.of('full')});},focus:()=>view.focus(),find:()=>openSearchPanel(view),
     lineNumbers:enabled=>view.dispatch({effects:numbers.reconfigure(enabled?lineNumbers():[])}),
     readOnly:value=>{if(readOnly===value)return;readOnly=value;view.dispatch({effects:access.reconfigure([EditorState.readOnly.of(value),EditorView.editable.of(!value)])});},
     position:()=>({anchor:view.state.selection.main.anchor,head:view.state.selection.main.head,scrollTop:view.scrollDOM.scrollTop}),
     select:(anchor,head=anchor)=>{const size=view.state.doc.length;view.dispatch({selection:{anchor:Math.min(anchor,size),head:Math.min(head,size)},scrollIntoView:true});view.focus();},
-    destroy:()=>view.destroy()};
+    destroy:()=>{readyResolve();view.destroy();}};
 }
 
 // Shared with the rich editor's code decorations, loaded only for code content.
