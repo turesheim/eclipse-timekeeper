@@ -31,29 +31,6 @@ replies and resume, opaque `.obsidian` opt-in, account switching, read-only writ
 and revocation. Client unit tests additionally cover local editor/symlink races,
 portable collisions and concurrent baseline locks.
 
-## Released Obsidian plugin
-
-```sh
-docker build --build-arg TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)" \
-  --build-arg TIMEKEEPER_BUILD_DIRTY=false -t timekeeper-server:test -f server/Dockerfile .
-docker build -t timekeeper-mysync-client:obsidian-1.14.5-mysync-3.0.7 server/scripts/clients/mysync
-python3 server/scripts/mysync_acceptance.py --server-image timekeeper-server:test --expected-commit "$(git rev-parse HEAD)" --vault --output server/target/acceptance/mysync-vault.json
-```
-
-The client image verifies released Obsidian/MySync checksums and executes the
-unmodified desktop application. The fixture invokes the plugin's published
-manual command service over CDP. It exercises verified TLS, nested Markdown/PDF,
-Unicode/plus/percent names, frontmatter/wiki syntax, unchanged server bytes/ETags,
-first-import conflict review, selected remote folders, two-way edits, empty files,
-rename/delete/recreate, independent labels, offline retry, two-device conflict
-preservation/resolution and revoked-token local drafts.
-
-Observed limits are explicit: edited text uploads use LF; unknown extensions
-(e.g. `.bin`) are skipped but retained remotely; rename is the plugin's
-upload/delete workflow. Use the packaged helper for arbitrary-file mirrors and
-Notes/guarded MOVE when preserving entry identity across renames matters.
-Configuration/plugin bytes are never executed by Timekeeper. The existing flat
-journal acceptance remains a separate regression, not proof of vault support.
 
 ## Databases and recovery
 

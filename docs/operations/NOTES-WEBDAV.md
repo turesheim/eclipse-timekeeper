@@ -39,11 +39,8 @@ username and the token as the WebDAV password over verified HTTPS. Use a
 read-only token for browsing only. Revoke the token to disconnect; local files
 remain. Never put the token in a URL or share it with a public vault repository.
 
-The hierarchical root is `https://HOST/dav/vault/`. The compatible Nextcloud-style
-alias is `https://HOST/remote.php/webdav/vault/`.
-The `remote.php` name is a Nextcloud-compatible URL convention, handled directly
-by Timekeeper's Java/Quarkus server. No PHP code, interpreter or service is used.
-A selected existing subfolder, for example `/dav/vault/Research/`, is also a
+The hierarchical root is `https://HOST/dav/notes/`. There are no Nextcloud-style aliases or PHP endpoints.
+A selected existing subfolder, for example `/dav/notes/Research/`, is also a
 synchronization root. Create that
 folder in Notes before connecting. Folder listings expose stable resource IDs,
 strong ETags and raw file sizes. Overwrites and deletes require current
@@ -62,7 +59,7 @@ roots, incomplete listings and redirects. It requires verified HTTPS; a private
 CA can be supplied with `--ca-file`.
 
 ```sh
-python3 webdav_sync.py --url https://HOST/dav/vault/Research/ \
+python3 webdav_sync.py --url https://HOST/dav/notes/Research/ \
   --folder "$PWD/Research" --state-dir "$PWD/.timekeeper-research"
 ```
 
@@ -88,54 +85,11 @@ The client uses a complete scan for each user-triggered invocation; it is not an
 incremental/background indexing service. Only use one client profile for a given
 local folder. Review large deletion sets rather than approving them mechanically.
 
-### Obsidian
+### Obsidian and other Markdown editors
 
-The released **MySync 3.0.7** plugin with **Obsidian 1.14.5** was exercised as an
-unmodified desktop release over verified HTTPS against the PostgreSQL server.
-In MySync settings, choose **Nextcloud**, set the server URL to `https://HOST`,
-username to a nonempty value and password to a dedicated Timekeeper API token.
-Set **remote path** to `/vault` (or `/vault/Research` for a selected existing
-remote folder), and **sync folder** to the vault root or the local folder you
-intend to synchronize. This uses `/remote.php/webdav/vault/` on the server.
-
-Back up an existing vault first. Run **Sync now** to collect local work, then
-**Pull from remote** to establish the remote baseline. Review any first-import
-conflicts in MySync before choosing a version; both local and remote versions
-were retained in the acceptance test. After local edits, run **Sync now** and
-**Push to remote**; after Timekeeper edits, run **Pull from remote**. No Timekeeper
-daemon or CouchDB service is needed. The tested plugin exposes manual commands;
-keep synchronization user-triggered while reviewing an import or conflict.
-
-Verified cases include nested Markdown/PDFs, Unicode/plus/percent filenames,
-frontmatter/wiki syntax, no-op preservation of server CRLF bytes and ETags,
-empty files, rename/delete/recreate, selected remote roots, first-import and
-two-device conflicts, offline retry, journal/label independence and revocation.
-The plugin uploads edited text with LF line endings. It implements rename using
-its upload/delete workflow, so use Notes or a guarded MOVE client when retaining
-identity across a general-note rename matters. Typed journal/event association
-changes remain rejected.
-
-MySync supports Markdown, its supported text/image formats and PDFs; **it skips
-unknown extensions such as `.bin`**. The test confirmed those remote files remain
-intact, but they are not copied into the local vault. Use the packaged manual
-client for arbitrary files or configuration trees. Do not claim a complete
-arbitrary-file mirror from MySync. Its configuration synchronization is limited
-to supported top-level Obsidian configuration files, not arbitrary plugin trees.
-Revoke the token under My Account to disconnect; unsynchronized local drafts
-remain on disk. See [reproducible acceptance](../verification/NOTES-VAULT.md).
-
-`.obsidian` is excluded by default on both server and manual client. To transfer
-it, explicitly enable **Synchronize Obsidian configuration** in Notes settings
-and use `--include-obsidian` in the manual client. This synchronizes opaque bytes;
-Timekeeper never loads the plugins or configuration. Disable local third-party
-plugins before reviewing configuration imported from another device. Active
-configuration files must be removed before the server opt-in can be disabled.
-
-rclone, Cyberduck and Obsidian Remotely Save remain unsupported for complete
-synchronization because their observed writes/deletes omit required guards.
-The tested davfs2 1.6.1-1 conditional overwrite succeeds, but its delete omits
-If-Match and receives 428. Listing or an initial upload is not proof of safe
-synchronization; do not disable Timekeeper's guards to accommodate these clients.
+Use the packaged manual WebDAV client to synchronize a local folder, then open
+that folder in your editor. Timekeeper does not require or support a specific
+Obsidian synchronization plugin. Review the client plan before applying writes.
 
 ## Journal and event folders
 
@@ -164,12 +118,10 @@ moves nested assets unless an explicit assets destination is supplied. Conflicti
 destinations are rejected. Day labels have independent storage and versions:
 clearing, deleting or synchronizing Markdown never deletes a label.
 
-The old `/dav/journal/` and flat `/remote.php/webdav/` endpoints remain available
-with their original filenames and canonical versions. Avoid pointing two sync
-profiles at the same canonical journal through different aliases. Keep the old
-profile until its work is synchronized and backed up, then disconnect it and
-review a clean hierarchical profile. Do not blindly repoint a populated flat
-local root: it would otherwise create unrelated ordinary root-level files.
+The hierarchical `/dav/notes/` collection is the synchronization interface.
+There are no flat journal endpoints or redirects. Select the configured journal
+subfolder when synchronizing only daily and weekly notes, or the notes root for
+a complete collection including general notes, event notes and attachments.
 
 Legacy `assets/name` links are resolved to the canonical asset by Timekeeper
 when unambiguous, without rewriting stored bytes. Standard external Markdown
@@ -215,3 +167,23 @@ ZIP uploads are bounded to 1 GiB, archive JSON to 256 MiB and extracted content 
 limits. Encrypted full-instance backup retains every owner's canonical records,
 derived indexes, history and resolved configuration, including these quota
 properties. Continue to test restores and keep a pre-upgrade backup.
+
+## Manual folder import
+
+Choose **Import folder** in Notes and select the local vault root in the browser's
+folder picker. Review the relative paths before choosing **Import new files**.
+The selected root's name is stripped; its contents retain their hierarchy.
+Empty folders are not imported.
+Use the configured journal, event and assets folder names shown in Notes settings.
+Daily/weekly/event filenames retain their canonical associations and day labels
+remain separate. Existing files and case/path collisions are reported and never
+overwritten. Hidden configuration directories (including `.obsidian`, `.git` and
+trash) and files exceeding the configured per-file limits are skipped.
+
+File bytes, including Markdown metadata and line endings, are uploaded unchanged.
+The server still validates paths, canonical event/journal formats and storage
+limits. Files import individually: a failure or interrupted session retains
+completed imports. The result lists each imported, conflicting or failed path;
+retry failed files or select the folder again to review remaining work. No local
+filesystem path is sent to Timekeeper and no browser-persistent import queue is
+created. Folder import is available only to writable accounts.

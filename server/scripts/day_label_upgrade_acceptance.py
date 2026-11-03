@@ -82,14 +82,14 @@ def main():
                 raw=response.read();value=json.loads(raw) if raw and response.headers.get('Content-Type','').startswith('application/json') else raw
                 return value,response.headers.get('ETag')
         try:
-            day='2026-10-27';legacy='/api/v1/day-notes/'+day;label='/api/v1/day-labels/'+day;content=legacy+'/content';dav='/dav/journal/'+day+'.md'
+            day='2026-10-27';legacy='/api/v1/day-notes/'+day;label='/api/v1/day-labels/'+day;content=legacy+'/content';dav='/dav/journal/'+day+'.md' # Historical baseline only; upgraded routes are asserted below.
             start('old');_,tag=request(legacy)
             original,_=request(legacy,'PUT',{'text':'Migration label','body':'# Existing note\r\n  exact body  \n'},tag)
             document,_=request(dav,dav=True);stop()
             start('new',blocked=True)
             start('old');retained,_=request(legacy)
             if retained['text']!='Migration label' or retained['version']!=original['version']:raise AssertionError('Rejected upgrade changed old labels')
-            start('new',upgrade=True);migrated,label_tag=request(label);note,note_tag=request(content)
+            start('new',upgrade=True);dav='/dav/notes/journal/'+day+'.md';migrated,label_tag=request(label);note,note_tag=request(content)
             history_path=legacy+'/history';initial_history,_=request(history_path)
             if initial_history['items'] or not initial_history['legacyGap']:raise AssertionError('Upgrade fabricated history for existing notes')
             if migrated['text']!='Migration label' or note['body']!=original['body'] or note['version']!=original['version']:raise AssertionError('Authorized upgrade changed a label, note or note version')

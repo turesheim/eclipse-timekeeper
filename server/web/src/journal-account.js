@@ -8,7 +8,7 @@ export function renderJournal(view){
   const card=section(view,t('journal.webdav.title'));
   card.append(node('p',t('journal.webdav.intro')));
   const label=node('p',t('journal.webdav.url_label'),'mb-1');
-  const url=node('code',new URL('/dav/journal/',location.origin).href,'journal-webdav-url');
+  const url=node('code',new URL('/dav/notes/',location.origin).href,'journal-webdav-url');
   card.append(label,url);
   const credentials=node('p',t('journal.webdav.credentials'));
   const tokens=node('a',t('journal.webdav.tokens'),'btn btn-outline-secondary');
@@ -16,7 +16,7 @@ export function renderJournal(view){
   card.append(credentials,tokens,node('p',t('journal.webdav.naming'),'mt-3'),node('p',t('journal.webdav.concurrency'),'hint'));
   card.append(node('p',t('journal.webdav.client'),'hint'));
   const guide=node('a',t('journal.webdav.guide'));
-  guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/JOURNAL-WEBDAV.md';
+  guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/NOTES-WEBDAV.md';
   guide.target='_blank';guide.rel='noopener noreferrer';
   card.append(guide);
 }
