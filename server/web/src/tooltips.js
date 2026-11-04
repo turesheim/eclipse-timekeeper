@@ -54,7 +54,7 @@ export function richTooltip(node,render,{composite=true}={}) {
 function plainTooltip(node) {
   // ProseMirror owns authored link/image titles. Changing those DOM attributes
   // can change the saved Markdown, so only application UI hints are enhanced.
-  if(node.closest('.ProseMirror, [contenteditable="true"]'))return;
+  if(node.closest('.ProseMirror, [contenteditable="true"], .timekeeper-tooltip'))return;
   const title=node.getAttribute('title');if(title===null)return;
   // A composite card owns its whole surface, including icons and text.
   if(node.parentElement?.closest('[data-tk-tooltip-composite]')){node.removeAttribute('title');return;}
@@ -93,7 +93,8 @@ function show(node,focus=null) {
   for(const [item,description] of descriptions)item.setAttribute('aria-describedby',[description,tip.id].filter(Boolean).join(' '));
 }
 function inside(node){return node instanceof Node&&active&&(active.node.contains(node)||active.tip.contains(node));}
-function overTooltip(event){if(!active)return false;const box=active.tip.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom;}
+function over(node,event){const box=node.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom;}
+function overTooltip(event){return !!active&&over(active.tip,event);}
 function leave(){cancelFocus();clearTimeout(leaveTimer);if(active?.tip.contains(document.activeElement))return;leaveTimer=setTimeout(()=>hideTooltip(false),100);}
 export function installTooltips() {
   if(installed)return;installed=true;
@@ -106,7 +107,7 @@ export function installTooltips() {
   // A passive overlay leaves calendar drags and controls underneath available.
   // Test its geometry first: pointer-events:none can target another hint below.
   const remember=event=>{pointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,buttons:event.buttons};};
-  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons){cancelFocus();return;}if(overTooltip(event)){dwell();return;}cancelFocus();if(active?.tip.contains(document.activeElement))return;const node=target(event.target,event);if(node)schedule(node);else{cancelPending();if(active)leave();}};
+  const hover=event=>{remember(event);if(dismissed&&!over(dismissed,event))dismissed=null;if(event.pointerType!=='mouse'||event.buttons){cancelFocus();return;}if(overTooltip(event)){dwell();return;}cancelFocus();if(active?.tip.contains(document.activeElement))return;const node=target(event.target,event);if(node)schedule(node);else{cancelPending();if(active)leave();}};
   document.addEventListener('pointerover',hover);
   document.addEventListener('pointermove',hover);
   document.addEventListener('pointerout',event=>{if(pending&&!pending.contains(event.relatedTarget)){const box=pending.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)cancelPending();}if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});

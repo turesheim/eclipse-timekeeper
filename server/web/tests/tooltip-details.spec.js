@@ -20,11 +20,12 @@ async function show(page,button){await button.hover();await page.clock.runFor(85
 async function pointAt(page,tip){const box=await tip.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);return box;}
 
 test('calendar descriptions preserve safe HTML and links, but all other event fields remain literal',async({page})=>{
-  const button=await setup(page,'<p><strong>Agenda &amp; decisions</strong><br>Bring <em>notes</em>.</p><ul><li>Review</li><li>Plan</li></ul><table><tr><th>When</th><td>Now</td></tr></table><a href="https://meeting.example.test/join?q=one&amp;next=two">Join meeting</a> <a href="mailto:team@example.org">Email</a> <a href="tel:+4712345678">Call</a> https://example.org/plain','Review <b>literal title</b>');
+  const button=await setup(page,'<p><strong>Agenda &amp; decisions</strong><br>Bring <em>notes</em>.</p><ul><li>Review</li><li>Plan</li></ul><table><tr><th>When</th><td>Now</td></tr></table><a href="https://meeting.example.test/join?q=one&amp;next=two" title="Open the call">Join meeting</a> <a href="mailto:team@example.org">Email</a> <a href="tel:+4712345678">Call</a> https://example.org/plain','Review <b>literal title</b>');
   const tip=await show(page,button);
   await expect(tip.locator('.tooltip-heading')).toHaveText('Review <b>literal title</b>');await expect(tip.locator('.tooltip-heading b')).toHaveCount(0);
   await expect(tip.locator('strong')).toHaveText('Agenda & decisions');await expect(tip.locator('em')).toHaveText('notes');await expect(tip.locator('li')).toHaveCount(2);await expect(tip.locator('td')).toHaveText('Now');
   const link=tip.getByRole('link',{name:'Join meeting'});await expect(link).toHaveAttribute('href','https://meeting.example.test/join?q=one&next=two');await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel','noopener noreferrer');
+  await expect(link).toHaveAttribute('title','Open the call');await expect(link).not.toHaveAttribute('data-tk-tooltip');
   await expect(tip.getByRole('link',{name:'Email'})).toHaveAttribute('href','mailto:team@example.org');await expect(tip.getByRole('link',{name:'Call'})).toHaveAttribute('href','tel:+4712345678');await expect(tip.getByRole('link',{name:'https://example.org/plain'})).toHaveCount(1);
   await page.context().route('https://meeting.example.test/**',route=>route.fulfill({contentType:'text/html',body:'Meeting page'}));
   const popupPromise=page.waitForEvent('popup');await link.click();const popup=await popupPromise;await popup.waitForLoadState();expect(await popup.evaluate(()=>window.opener)).toBeNull();await expect(popup.locator('body')).toHaveText('Meeting page');await popup.close();
@@ -56,9 +57,9 @@ test('passive tooltip stays the same over another hint and focuses only after fi
   await pointAt(page,tip);await page.clock.runFor(1000);await expect(tip).toHaveAttribute('id',id);expect(await page.evaluate(()=>window.tooltipRemovals)).toBe(0);await expect(tip).toHaveAttribute('role','tooltip');await expect(tip.locator('.tooltip-inner')).not.toBeFocused();
   await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
   await page.clock.runFor(3999);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await page.clock.runFor(1);await expect(tip.locator('.tooltip-inner')).toBeFocused();await expect(tip).toHaveAttribute('role','dialog');await expect(tip).toHaveAttribute('aria-label','Review');await expect(tip).toHaveCSS('pointer-events','auto');
-  const before=await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop);await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(before);
-  // axe schedules work with browser timers; exact dwell assertions are done.
-  await page.clock.resume();const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
+  // Native WebKit scrolling and axe need real timers after the dwell assertions.
+  await page.clock.resume();const before=await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop);await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(before);
+  const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
   await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(button).toBeFocused();await expect(button).not.toHaveAttribute('aria-describedby');
 });
 
@@ -70,7 +71,7 @@ test('leaving the tooltip cancels its focus countdown and a new hover starts a f
 
 test('keyboard focus opens details with F2 and live refreshes preserve the focused link and scrolled content',async({page,browserName})=>{
   const button=await setup(page,'<a href="https://example.org/first">First link</a>'+('<p>Long detail</p>').repeat(80));await button.focus();await page.clock.runFor(850);const tip=page.locator('.timekeeper-tooltip');await expect(tip).toBeVisible();await page.keyboard.press('F2');await expect(tip.locator('.tooltip-inner')).toBeFocused();
-  await page.keyboard.press('PageDown');await page.clock.runFor(300);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+  await page.clock.resume();await page.keyboard.press('PageDown');await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
   await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');const link=tip.getByRole('link',{name:'First link'});await expect(link).toBeFocused();
   await tip.locator('.tooltip-inner').evaluate(node=>{node.scrollTop=100;});await page.evaluate(()=>window.updateEventDescription('<a href="https://example.org/new">Updated link</a>'));await expect(link).toBeFocused();expect(await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBe(100);
   await page.keyboard.press('Escape');await expect(button).toBeFocused();await expect(tip).toHaveCount(0);await page.mouse.move(0,0);await show(page,button);await expect(page.locator('.timekeeper-tooltip')).toContainText('Updated link');
