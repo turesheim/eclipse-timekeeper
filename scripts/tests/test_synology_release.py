@@ -55,6 +55,7 @@ class SynologyReleaseTest(unittest.TestCase):
                          'digest': digest(self.zip.read_bytes()),
                          'workflow_run': {'id': 123, 'head_sha': COMMIT, 'head_branch': 'main'}}
         self.artifacts = [self.artifact]
+        self.container_jobs = {'verify', 'Synology candidate and PostgreSQL 17'}
         self.matrix_jobs = set(release.MATRIX_JOBS)
         self.uploads = []
         self.addCleanup(patch.stopall)
@@ -93,7 +94,7 @@ class SynologyReleaseTest(unittest.TestCase):
             '/releases/tags/v2.0.0': self.remote,
             '/git/ref/tags/v2.0.0': {'object': {'type': 'commit', 'sha': COMMIT}},
             '/actions/runs/123': self.run,
-            '/actions/runs/123/jobs?per_page=100': {'jobs': self.jobs({'verify', 'Synology candidate and PostgreSQL 17'})},
+            '/actions/runs/123/jobs?per_page=100': {'jobs': self.jobs(self.container_jobs)},
             '/actions/runs/124/jobs?per_page=100': {'jobs': self.jobs(self.matrix_jobs)},
             '/actions/runs/123/artifacts?per_page=100': {'artifacts': self.artifacts},
             f'/actions/workflows/build.yml/runs?head_sha={COMMIT}&event=push&status=success&per_page=100': {'workflow_runs': [self.matrix]},
@@ -151,6 +152,29 @@ class SynologyReleaseTest(unittest.TestCase):
         self.artifacts.append({**self.artifact, 'id': 51, 'name': 'synology-installer'})
         with self.assertRaisesRegex(ValueError, 'Ambiguous'):
             release.candidate_artifact(REPO, 123, 'main', COMMIT)
+
+    def test_web_preview_requires_smoke_and_same_commit_selected_checks_but_cannot_be_promoted(self):
+        self.artifact['name']=release.WEB_PREVIEW_ARTIFACT
+        self.container_jobs=set(release.WEB_PREVIEW_JOBS)
+        self.matrix_jobs={'Server','Packaging and channel tests','PR validation'}|{f'Web ({index}/4)' for index in range(1,5)}
+        self.assertEqual(self.artifact,release.candidate_artifact(REPO,123,'main',COMMIT,allow_web_preview=True))
+        self.assertEqual(124,release.matrix_run(REPO,'main',COMMIT,web_preview=True))
+        with self.assertRaises(ValueError):self.prepare()
+        self.assertFalse(self.uploads)
+        self.matrix_jobs.remove('Web (4/4)')
+        with self.assertRaisesRegex(ValueError,'Web'):release.matrix_run(REPO,'main',COMMIT,web_preview=True)
+        self.container_jobs.remove('Deployment startup and bundled web')
+        with self.assertRaisesRegex(ValueError,'Deployment startup'):release.candidate_artifact(REPO,123,'main',COMMIT,allow_web_preview=True)
+
+    def test_full_certification_accepts_complete_web_shards_and_rejects_missing_or_mixed_shards(self):
+        self.matrix_jobs=(set(release.MATRIX_JOBS)-{'Web'})|{f'Web ({index}/4)' for index in range(1,5)}
+        self.assertEqual(124,release.matrix_run(REPO,'main',COMMIT))
+        self.matrix_jobs.remove('Web (2/4)')
+        with self.assertRaisesRegex(ValueError,'Web'):release.matrix_run(REPO,'main',COMMIT)
+        self.matrix_jobs.add('Web (2/3)')
+        with self.assertRaisesRegex(ValueError,'Web'):release.matrix_run(REPO,'main',COMMIT)
+        self.matrix_jobs.add('Web')
+        with self.assertRaisesRegex(ValueError,'Web'):release.matrix_run(REPO,'main',COMMIT)
 
     def test_untrusted_or_incomplete_ci_and_wrong_release_are_refused(self):
         original = json.loads(json.dumps(self.run))

@@ -16,6 +16,15 @@ spec.loader.exec_module(p2)
 
 
 class PublicationTest(unittest.TestCase):
+    def test_web_gate_accepts_legacy_and_complete_shards_and_rejects_partial_matrices(self):
+        self.assertTrue(p2.web_checks_passed({'Web'}))
+        for total in range(1,5):
+            jobs={f'Web ({index}/{total})' for index in range(1,total+1)}
+            self.assertTrue(p2.web_checks_passed(jobs))
+            self.assertFalse(p2.web_checks_passed(jobs-{f'Web ({total}/{total})'}))
+        for jobs in ({'Web (1/2)'},{'Web','Web (1/2)'},{'Web (1/2)','Web (2/3)'},{'Web (0/1)'},{'Web (5/5)'}):
+            self.assertFalse(p2.web_checks_passed(jobs))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -182,6 +191,22 @@ class PublicationTest(unittest.TestCase):
         self.assertEqual(result,json.loads((repository/"timekeeper-build.json").read_text()))
         self.assertEqual("0",ET.parse(output/"updates/compositeContent.xml").find("children").get("size"))
         self.assertIn("unreleased build",(output/"updates/testing/index.html").read_text())
+
+    def test_testing_channel_requires_every_browser_shard_to_pass(self):
+        for failed in (False, True):
+            with self.subTest(failed=failed):
+                run, jobs, artifact, archive, github, download = self._testing_fixture()
+                jobs[:] = [job for job in jobs if job['name'] != 'Web']
+                jobs.extend({'name': f'Web ({index}/4)', 'status': 'completed',
+                             'conclusion': 'failure' if failed and index == 4 else 'success'}
+                            for index in range(1, 5))
+                with patch.object(p2, 'gh', side_effect=github), patch.object(p2, 'download_testing_artifact', side_effect=download) as fetch:
+                    result = p2.add_testing_channel('owner/repo', self.root / str(failed))
+                    if failed:
+                        self.assertIsNone(result)
+                        fetch.assert_not_called()
+                    else:
+                        self.assertEqual('a' * 40, result['commit'])
 
     def test_site_checks_use_the_supplied_matrix_artifact_without_an_older_run(self):
         output=self.root/"checked-site"

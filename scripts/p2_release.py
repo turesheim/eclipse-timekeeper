@@ -35,6 +35,21 @@ def gh(*args):
     return subprocess.check_output(["gh", *args], text=True)
 
 
+def web_checks_passed(passed):
+    """Accept the legacy Web job or every member of one complete shard matrix."""
+    names = {name for name in passed if name.startswith('Web (')}
+    if not names:
+        return 'Web' in passed
+    shards = [re.fullmatch(r'Web \(([1-4])/([1-4])\)', name) for name in names]
+    if not all(shards):
+        return False
+    totals = {int(match[2]) for match in shards}
+    if len(totals) != 1:
+        return False
+    total = totals.pop()
+    return {int(match[1]) for match in shards} == set(range(1, total + 1))
+
+
 def asset_state(release):
     names = {asset["name"] for asset in release.get("assets", [])}
     found = names & {ARCHIVE, CHECKSUM}
@@ -249,7 +264,7 @@ def add_testing_channel(repo, output):
                       "--method","GET","-f",f"branch={branch}","-f","event=push",
                       "-f","status=success","-f","per_page=100","--paginate","--slurp"))
     runs=[run for page in pages for run in page["workflow_runs"]]
-    required={"API-contract","Server","Web","Build (ubuntu-latest)",
+    required={"API-contract","Server","Build (ubuntu-latest)",
               "Build (macos-latest)","Build (windows-latest)"}
     for run in runs:
         if (run.get("status")!="completed" or run.get("conclusion")!="success"
@@ -262,7 +277,7 @@ def add_testing_channel(repo, output):
             raise ValueError("Invalid testing source commit")
         jobs=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"))["jobs"]
         passed={job["name"] for job in jobs if job.get("status")=="completed" and job.get("conclusion")=="success"}
-        if (not required.issubset(passed)
+        if (not required.issubset(passed) or not web_checks_passed(passed)
                 or not passed.intersection({"Remote-Eclipse","Installed client tests"})
                 or not passed.intersection({"Publication","Update site checks","Build website and update site"})
                 or (passed.intersection({"Update site checks","Build website and update site"})

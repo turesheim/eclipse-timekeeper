@@ -575,7 +575,7 @@ The time-overlap calculation does not create a persistent association.
 
 ## Server day notes and WebDAV
 
-The canonical HTTP collection `/dav/journal/` and its MySync-compatible
+The canonical HTTP collection `/dav/journal/` and its legacy
 `/remote.php/webdav/` alias address these same owner-scoped resources, including
 `assets/`. They share token authorization, data, ETags and guarded mutations.
 

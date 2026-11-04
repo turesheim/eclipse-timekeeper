@@ -428,6 +428,16 @@ results are uploaded separately as `synology-test-results`, including on failure
 An **incomplete** `dsm-acceptance-template.json` binds the real-NAS test record to
 that exact candidate. Automated CI does not fill in the manual test results.
 
+Web-only main builds use **Synology web preview** and upload
+`synology-web-preview` instead. This packages the exact image that passed
+deployment startup and bundled-web checks, without repeating the database and
+native backup matrix. When preview publication is enabled, the preview channel
+also requires the matching commit's selected Build checks, every Web shard and
+**PR validation**. Channel metadata identifies these packages as
+`validation: web-smoke`; fully certified candidates use `validation: full`.
+Web previews cannot be promoted to stable: stable publication still requires
+the full candidate and real-NAS acceptance.
+
 The installer artifact name describes its contents. Preview status remains in
 the SPK version (`1.99.0-<revision>`), provenance and repository channel. Release
 and Pages tooling also accept the former `synology-preview-candidate` name for

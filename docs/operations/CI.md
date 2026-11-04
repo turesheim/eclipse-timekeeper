@@ -39,8 +39,16 @@ Documentation-only main pushes reuse previously tested binaries.
 PRs and nightly runs call the container workflow only when full validation is
 selected, after the H2 checks pass; they reuse that result instead of running the
 same H2 suite again. The container workflow remains the source of deployment and
-Synology release provenance. Full certification produces Synology candidates;
-routine web-only pushes do not produce a new fully certified SPK candidate.
+Synology release provenance. Full certification produces Synology candidates.
+Routine web-only pushes also package an installable **synology-web-preview** SPK
+from the exact smoke-tested immutable image, so frontend fixes reach NAS users.
+The preview channel requires the same commit's successful selected Build checks,
+including every browser shard and **PR validation**. Its channel metadata records
+`validation: web-smoke`; full candidates record `validation: full`. Stable NAS
+promotion still requires full database certification and real-NAS acceptance.
+
+Publication gates accept both historical **Web** jobs and complete **Web (i/n)**
+matrices. Missing, failed or mixed browser shards prevent publication.
 
 Browser jobs download the exact server artifact produced by their run, with
 web-only fixtures packaged without Java tests. Up to four jobs divide spec files
@@ -49,6 +57,10 @@ existing fresh-JVM/database/credential batches of at most six specs. No retries,
 assertions or production authentication limits change. Each shard uploads its own
 `web-acceptance-<index>` artifact; all shards must pass the aggregate gate.
 Additional HTTPS/passkey/recovery checks run once on the first shard.
+
+Notes synchronization is verified through the packaged manual WebDAV client
+over HTTPS. CI does not build Obsidian or test third-party synchronization
+plugins; these are outside the supported client workflow.
 
 Native Synology acceptance runs in seven independent groups (at most four in
 parallel), alongside PostgreSQL/package validation: installer controls, early/late

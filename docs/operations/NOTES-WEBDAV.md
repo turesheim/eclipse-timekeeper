@@ -113,39 +113,11 @@ local folder. Review large deletion sets rather than approving them mechanically
 
 ### Obsidian
 
-The released **MySync 3.0.7** plugin with **Obsidian 1.14.5** was exercised as an
-unmodified desktop release over verified HTTPS against the PostgreSQL server.
-In MySync settings, choose **Nextcloud**, set the server URL to `https://HOST`,
-username to a nonempty value and password to a dedicated Timekeeper API token.
-Set **remote path** to `/vault` (or `/vault/Research` for a selected existing
-remote folder), and **sync folder** to the vault root or the local folder you
-intend to synchronize. This uses `/remote.php/webdav/vault/` on the server.
-
-Back up an existing vault first. Run **Sync now** to collect local work, then
-**Pull from remote** to establish the remote baseline. Review any first-import
-conflicts in MySync before choosing a version; both local and remote versions
-were retained in the acceptance test. After local edits, run **Sync now** and
-**Push to remote**; after Timekeeper edits, run **Pull from remote**. No Timekeeper
-daemon or CouchDB service is needed. The tested plugin exposes manual commands;
-keep synchronization user-triggered while reviewing an import or conflict.
-
-Verified cases include nested Markdown/PDFs, Unicode/plus/percent filenames,
-frontmatter/wiki syntax, no-op preservation of server CRLF bytes and ETags,
-empty files, rename/delete/recreate, selected remote roots, first-import and
-two-device conflicts, offline retry, journal/label independence and revocation.
-The plugin uploads edited text with LF line endings. It implements rename using
-its upload/delete workflow, so use Notes or a guarded MOVE client when retaining
-identity across a general-note rename matters. Typed journal/event association
-changes remain rejected.
-
-MySync supports Markdown, its supported text/image formats and PDFs; **it skips
-unknown extensions such as `.bin`**. The test confirmed those remote files remain
-intact, but they are not copied into the local vault. Use the packaged manual
-client for arbitrary files or configuration trees. Do not claim a complete
-arbitrary-file mirror from MySync. Its configuration synchronization is limited
-to supported top-level Obsidian configuration files, not arbitrary plugin trees.
-Revoke the token under My Account to disconnect; unsynchronized local drafts
-remain on disk. See [reproducible acceptance](../verification/NOTES-VAULT.md).
+Use the packaged manual client described above with the vault root as the local
+folder. Timekeeper synchronizes the Markdown and attachment files directly;
+no Obsidian plugin or Nextcloud connection is required. Review the first preview
+before applying changes, and resolve reported conflicts while retaining both
+versions. See [reproducible acceptance](../verification/NOTES-VAULT.md).
 
 `.obsidian` is excluded by default on both server and manual client. To transfer
 it, explicitly enable **Synchronize Obsidian configuration** in Notes settings
