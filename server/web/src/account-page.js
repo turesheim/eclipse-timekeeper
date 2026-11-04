@@ -53,7 +53,6 @@ async function show(hash, ask = true) {
       const item = link(title, `#account/${key}`, 'nav-link');if (key === part) {item.classList.add('active');item.setAttribute('aria-current', 'page');}
       $('account-navigation').append(item);
     }
-    const journal=link(i18nText('journal.webdav.title'),'#account/journal','nav-link');if(part==='journal'){journal.classList.add('active');journal.setAttribute('aria-current','page');}$('account-navigation').append(journal);
     await view.run(() => part === 'calendars' ? scope.renderCalendars(currentView) : part === 'labels' ? scope.renderLabels(currentView) : part === 'focus' ? scope.renderFocus(currentView) : renderAccount(currentView, part));
   }
 }

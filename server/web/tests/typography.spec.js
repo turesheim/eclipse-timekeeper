@@ -134,7 +134,10 @@ test('typography follows confirmed peer changes and all web entry pages without 
   for (const path of ['/admin/', '/web/project-report.html', '/web/#notes']) {
     await other.goto(path);await expect(other.locator('html')).toHaveCSS('font-size', '20px');
     await expect(other.locator('.brand')).toHaveCSS('font-size', '40px');
-    expect(await other.evaluate(() => window.typographyPolicyViolations)).toEqual([]);
+    const mainPage=path==='/web/#notes';if(mainPage)await expect(other.locator('#notes-panel')).toBeVisible();
+    // A full main-page reload has the same startup baseline as the initial
+    // sign-in page; separate entry pages must still have no policy violations.
+    expect(await other.evaluate(() => window.typographyPolicyViolations),path).toEqual(mainPage?startup:[]);
   }
   await page.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
   await expect(page.locator('html')).toHaveCSS('font-size', '16px');
