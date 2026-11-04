@@ -1,4 +1,5 @@
 import {tooltipFor} from './tooltips.js';
+import {resolvedLength} from './style-metrics.js';
 import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -83,4 +84,3 @@ test('bottom navigation uses compact desktop spacing while preserving touch safe
     }finally{await context.close();}
   }
 });
-import {resolvedLength} from './style-metrics.js';

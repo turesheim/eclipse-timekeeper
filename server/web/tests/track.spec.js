@@ -1,4 +1,5 @@
 import {tooltipFor} from './tooltips.js';
+import {resolvedLength} from './style-metrics.js';
 import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -195,4 +196,3 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
     for(const [kind,value] of [['work-sessions',session],['clients',client]])if(value){const current=await api(request,'GET','/'+kind+'/'+value.id);await api(request,'DELETE','/'+kind+'/'+value.id,undefined,{'If-Match':current.headers().etag});}
   }
 });
-import {resolvedLength} from './style-metrics.js';
