@@ -62,12 +62,10 @@ username and the token as the WebDAV password over verified HTTPS. Use a
 read-only token for browsing only. Revoke the token to disconnect; local files
 remain. Never put the token in a URL or share it with a public vault repository.
 
-The hierarchical root is `https://HOST/dav/vault/`. The compatible Nextcloud-style
-alias is `https://HOST/remote.php/webdav/vault/`.
-The `remote.php` name is a Nextcloud-compatible URL convention, handled directly
-by Timekeeper's Java/Quarkus server. No PHP code, interpreter or service is used.
-A selected existing subfolder, for example `/dav/vault/Research/`, is also a
-synchronization root. Create that
+The single WebDAV root is `https://HOST/dav/notes/`. All notes, journal entries,
+event notes and attachments belong to that collection. A selected existing
+subfolder, for example `/dav/notes/Research/`, is also a synchronization root.
+Create that
 folder in Notes before connecting. Folder listings expose stable resource IDs,
 strong ETags and raw file sizes. Overwrites and deletes require current
 preconditions; moves do not overwrite existing destinations. A stale request
@@ -75,8 +73,11 @@ fails with 412, an unguarded destructive request with 428.
 
 ### Ordinary Markdown folder: packaged manual client
 
-The distribution includes `webdav_sync.py` version 1.0, a Python 3 POSIX command
-line client for macOS/Linux. It has no daemon, watcher or scheduled jobs. Back up
+Choose **Download manual sync client** under **My Account → Notes** to save
+`webdav_sync.py` from this server. The same helper is included in the Java ZIP,
+Compose archive and Synology SPK, beside this guide. On a NAS it is available at
+`/var/packages/timekeeper/target/webdav_sync.py`; copy it to the Mac/Linux client
+where the vault is stored. It is a Python 3 POSIX command-line client, version 1.0. It has no daemon, watcher or scheduled jobs. Back up
 an existing local collection before its first synchronization. Choose a private
 control directory **outside** the folder, on the same filesystem. It holds the
 baseline, operation journal and retained copies of replaced/deleted local files,
@@ -85,7 +86,7 @@ roots, incomplete listings and redirects. It requires verified HTTPS; a private
 CA can be supplied with `--ca-file`.
 
 ```sh
-python3 webdav_sync.py --url https://HOST/dav/vault/Research/ \
+python3 webdav_sync.py --url https://HOST/dav/notes/Research/ \
   --folder "$PWD/Research" --state-dir "$PWD/.timekeeper-research"
 ```
 
@@ -159,18 +160,12 @@ moves nested assets unless an explicit assets destination is supplied. Conflicti
 destinations are rejected. Day labels have independent storage and versions:
 clearing, deleting or synchronizing Markdown never deletes a label.
 
-The old `/dav/journal/` and flat `/remote.php/webdav/` endpoints remain available
-with their original filenames and canonical versions. Avoid pointing two sync
-profiles at the same canonical journal through different aliases. Keep the old
-profile until its work is synchronized and backed up, then disconnect it and
-review a clean hierarchical profile. Do not blindly repoint a populated flat
-local root: it would otherwise create unrelated ordinary root-level files.
-
 Legacy `assets/name` links are resolved to the canonical asset by Timekeeper
 when unambiguous, without rewriting stored bytes. Standard external Markdown
-renderers use relative paths from the containing folder, so review links when
-changing from the flat journal root to `journal/` or `events/` (`../assets/name`
-may be required). An ordinary relative asset and a legacy asset with the same
+renderers use paths relative to the containing folder. With the default layout,
+`assets/photo.png` refers to a journal image from a daily note;
+`../journal/assets/photo.png` refers to it from an event note. Review relative
+links when changing folders. An ordinary relative asset and a legacy asset with the same
 link text is an ambiguity requiring review, not an implicit selection.
 
 ## Deployment, quotas and recovery

@@ -196,13 +196,13 @@ class CalendarHttpTest {
         var download=get("test-a",path+"/markdown");download.then().statusCode(200);
         String filename=download.header("Content-Disposition").split("\"")[1];assertEquals(markdown,EventNotes.parse(filename,download.asByteArray()).body());assertFalse(filename.contains("Planning"));
         assertFalse(download.asString().contains("private-access"));
-        String dav="/dav/journal/"+filename;
+        String dav="/dav/notes/events/"+filename;
         var remote=given().auth().preemptive().basic("journal","test-a").get(dav);remote.then().statusCode(200);assertArrayEquals(download.asByteArray(),remote.asByteArray());
         given().auth().preemptive().basic("journal","test-b").get(dav).then().statusCode(404);
         given().auth().preemptive().basic("journal","test-a").contentType("text/markdown").body("changed").put(dav).then().statusCode(428);
         given().auth().preemptive().basic("journal","test-a").header("If-Match",initial.header("ETag")).contentType("text/markdown").body(remote.asByteArray()).put(dav).then().statusCode(412);
         given().auth().preemptive().basic("journal","test-a").header("If-Match",remote.header("ETag")).contentType("text/markdown").body(remote.asByteArray()).put(dav).then().statusCode(204);
-        given().auth().preemptive().basic("journal","test-a").header("Depth","1").request("PROPFIND","/dav/journal/").then().statusCode(207).body(org.hamcrest.Matchers.containsString(filename));
+        given().auth().preemptive().basic("journal","test-a").header("Depth","1").request("PROPFIND","/dav/notes/events/").then().statusCode(207).body(org.hamcrest.Matchers.containsString(filename));
 
         clock.set(NOW.plusSeconds(31));Feeds.body.set(ics("Renamed : / meeting").replace("20260504T215900Z","20260505T215900Z").replace("20260504T220100Z","20260505T220100Z"));refresh(subscription).then().statusCode(200);
         assertEquals(event.path("key"),events().path("items").get(0).path("key"));assertTrue(events().path("items").get(0).path("hasNote").asBoolean());assertEquals(markdown,get("test-a",path).jsonPath().getString("body"));

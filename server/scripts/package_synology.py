@@ -25,6 +25,7 @@ GUIDES = {'docs/operations/SYNOLOGY-PACKAGE.md': 'README.md',
           'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
           'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
+          'docs/operations/NOTES-WEBDAV.md': 'NOTES-WEBDAV.md',
           'docs/operations/TAILSCALE.md': 'TAILSCALE.md'}
 
 
@@ -146,6 +147,7 @@ def build(output, commit, image, revision, channel, package_id="timekeeper"):
                 raise ValueError('Unable to save the verified application image')
         for source,destination in GUIDES.items():
             (payload/destination).write_text(package_guide(render_document(ROOT, source, GUIDES, commit),package_id))
+        shutil.copyfile(ROOT/'server/scripts/webdav_sync.py',payload/'webdav_sync.py')
         shutil.copyfile(ROOT/'LICENSE', outer/'LICENSE')
         shutil.copyfile(package/'ui/images/timekeeper_64.png', outer/'PACKAGE_ICON.PNG')
         shutil.copyfile(package/'ui/images/timekeeper_256.png', outer/'PACKAGE_ICON_256.PNG')

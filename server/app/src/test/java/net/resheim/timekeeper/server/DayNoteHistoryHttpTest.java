@@ -71,7 +71,7 @@ class DayNoteHistoryHttpTest {
         var expired=given().header("Authorization","Bearer test-a").queryParam("cursor",cursor).get("/api/v1"+path);assertEquals(409,expired.statusCode());assertEquals("CURSOR_EXPIRED",expired.jsonPath().getString("code"));
     }
     @Test void webdavMetadataAndDeletionRecordTheRealSourceAndPreserveLabels(){
-        String day="2026-11-05",label="/day-labels/"+day,path="/dav/journal/"+day+".md";
+        String day="2026-11-05",label="/day-labels/"+day,path="/dav/notes/journal/"+day+".md";
         put(label,get("test-a",label).header("ETag"),"{\"text\":\"Keep label\"}").then().statusCode(200);
         String auth="Basic "+Base64.getEncoder().encodeToString("client:test-a".getBytes(StandardCharsets.UTF_8));
         var created=given().header("Authorization",auth).header("If-None-Match","*").body("---\ncustom: one\n---\nPRIVATE_DAV_BODY\n").put(path);assertEquals(201,created.statusCode());
