@@ -1,3 +1,4 @@
+import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -77,7 +78,7 @@ test('shared hints update dynamically and remain visible inside native dialogs, 
 });
 
 test('tooltips wait before opening and calendar descriptions render safe web links',async({page})=>{
-  await page.goto('/web/markdown-lab.html');await page.evaluate(async()=>{
+  await openEditorFixture(page);await page.evaluate(async()=>{
     const {richTooltip,installTooltips}=await import('/web/tooltips.js');const {calendarEventTooltip}=await import('/web/tooltip-content.js');installTooltips();
     const button=document.createElement('button');button.textContent='Delayed event';button.id='delayed-event';document.body.prepend(button);
     const next=document.createElement('button');next.id='next-delayed-hint';next.textContent='Next control';next.title='Next delayed hint';document.body.prepend(next);

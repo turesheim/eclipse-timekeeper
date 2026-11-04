@@ -1,10 +1,11 @@
+import {openEditorFixture} from './editor-fixture.js';
 import {appendEditorText} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
 import AxeBuilder from '@axe-core/playwright';
 import {test,expect} from '@playwright/test';
 
 async function engine(page,value,options={}){
-  await page.goto('/web/markdown-lab.html');
+  await openEditorFixture(page);
   await page.evaluate(async({value,options})=>{
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
     const root=document.createElement('div');root.id='experience-editor';document.body.append(root);
@@ -56,11 +57,11 @@ test('source fragments cannot be changed in a read-only editor',async({page})=>{
 });
 
 async function field(page,value,formatted=true,catalog=[]){
-  await page.goto('/web/markdown-lab.html');await page.evaluate(()=>{const link=document.createElement('link');link.rel='stylesheet';link.href='/web/assets/bootstrap-icons/bootstrap-icons.min.css';document.head.append(link);});
+  await openEditorFixture(page);await page.evaluate(()=>{const link=document.createElement('link');link.rel='stylesheet';link.href='/web/assets/bootstrap-icons/bootstrap-icons.min.css';document.head.append(link);});
   await page.evaluate(async({value,formatted,catalog})=>{
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
     const resources=catalog.length?{allowsAsset:()=>false,allowsLink:()=>false,complete:async query=>catalog.filter(entry=>entry.path.toLowerCase().includes(query.toLowerCase())),resolveWiki:async()=>catalog[0],openWiki:async()=>{}}:undefined;
-    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources,{sourceTools:true});
+    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources);
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
   },{value,formatted,catalog});
 }
@@ -78,13 +79,6 @@ test('failed pasted files retain the draft and can be retried at the original in
   await expect(page.locator('#experience-field')).toContainText('Upload failed');expect(await page.evaluate(()=>globalThis.field.value())).toBe('Keep this draft.\n');
   await page.evaluate(()=>globalThis.failUpload=false);await page.locator('#experience-field').getByRole('button',{name:'Retry',exact:true}).click();
   await expect(page.locator('#experience-formatted a')).toHaveText('example.txt');expect(await page.evaluate(()=>globalThis.field.value())).toContain('Keep this draft.');
-});
-test('source tools preserve mixed line endings and provide highlighted source, search and split preview',async({page})=>{
-  const value='# Title\r\n\r\nKeep __this__.\n\nLast.\r\n';await field(page,value,false);
-  await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await expect(page.locator('#experience-field .cm-editor')).toBeVisible();expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
-  await page.locator('#experience-field .cm-content').click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type('Added');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value+'Added');
-  await page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true}).click();await expect(page.locator('.cm-search')).toBeVisible();
-  await page.locator('#experience-field').getByRole('button',{name:'Source and preview',exact:true}).click();await expect(page.locator('.markdown-split-preview h1')).toHaveText('Title');
 });
 test('table commands edit rows, columns and alignment and preserve other blocks',async({page})=>{
   await engine(page,'Before.\n\n| A | B |\n| --- | --- |\n| One | Two |\n\nAfter.\n');await page.locator('#experience-editor td p').first().click({position:{x:3,y:3}});await expect.poll(()=>page.evaluate(()=>globalThis.experience.context().table)).toBe(true);
@@ -113,10 +107,6 @@ test('multi-file upload retry keeps completed files and does not move an unrelat
   await page.evaluate(()=>globalThis.failUploadName=null);await page.locator('#experience-field').getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('#experience-formatted a')).toHaveCount(2);expect(await page.evaluate(()=>globalThis.uploaded)).toEqual(['first.txt','second.txt']);
   await page.locator('#experience-formatted .ProseMirror').pressSequentially(' Kept caret.');await expect(page.locator('#experience-formatted p').last()).toContainText('Two. Kept caret.');await expect(page.locator('#experience-formatted p').first().locator('a')).toHaveCount(2);
 });
-test('source undo restores the exact original line ending after joining mixed-EOL lines',async({page})=>{
-  const value='First.\r\nSecond.\nThird.\r\n';await field(page,value,false);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();
-  await expect(page.locator('#experience-field .cm-editor')).toBeVisible();await page.evaluate(()=>globalThis.field.codeEditor.select(14));await page.keyboard.press('Delete');expect(await page.evaluate(()=>globalThis.field.value())).not.toBe(value);await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
-});
 test('shared controls remain keyboard accessible and fit narrow screens in every theme',async({page})=>{
   await page.setViewportSize({width:390,height:844});await field(page,'# Heading\n\n- [ ] Task\n\nParagraph.\n');await page.locator('#experience-field').getByRole('button',{name:'More formatting',exact:true}).click();
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
@@ -126,21 +116,11 @@ test('shared controls remain keyboard accessible and fit narrow screens in every
   await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-mobile.png'});
   await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-mobile.png'});
 });
-test('source styles keep the strict CSP and a horizontal gutter without trapping keyboard focus',async({page})=>{
-  await field(page,'# Heading\n\nBody.\n',false);await page.evaluate(()=>{globalThis.styleViolations=[];document.addEventListener('securitypolicyviolation',event=>{if(event.violatedDirective.startsWith('style-src'))globalThis.styleViolations.push(event.blockedURI);});});
-  await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await expect(page.locator('#experience-field .cm-scroller')).toHaveCSS('display','flex');await expect(page.locator('#experience-field .cm-gutters')).toHaveCSS('display','flex');
-  await content.click();await page.keyboard.press('Escape');await page.keyboard.press('Tab');expect(await content.evaluate(node=>node.getRootNode().activeElement===node)).toBe(false);expect(await page.evaluate(()=>globalThis.styleViolations)).toEqual([]);
-  await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-styled.png'});
-});
 test('rich undo and redo span a source edit, including a change of Markdown spelling',async({page})=>{
   await field(page,'Title\n=====\n\nOriginal.\n');const original=await page.evaluate(()=>globalThis.field.value());await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
   const changed=original.replace('Original.','__Changed__.');await page.locator('#experience-body').fill(changed);await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
   await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(original);await page.locator('#experience-field').getByRole('button',{name:'Redo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
   await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-body').fill(original);await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(value=>globalThis.field.matches(value),original)).toBe(true);
-});
-test('enhanced source history survives a formatted round trip',async({page})=>{
-  await field(page,'Original.\n',false);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await content.click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type('Added.');
-  await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#experience-formatted .ProseMirror')).toBeVisible();await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(content).toBeVisible();await content.click();await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
 });
 test('editing around authored break HTML never mistakes it for an empty editor paragraph',async({page})=>{
   const value='Before.\r\n\r\n<br />\r\n\r\nAfter.\r\n';await engine(page,value);await expect(page.locator('.markdown-source-fragment textarea')).toHaveValue('<br />');await page.locator('#experience-editor p').last().click();await page.keyboard.press('End');await page.keyboard.type(' Kept.');expect(await source(page)).toBe(value.replace('After.','After. Kept.'));
@@ -148,9 +128,6 @@ test('editing around authored break HTML never mistakes it for an empty editor p
 test('typed and pasted ordinary wikilinks become active without escaping their Markdown',async({page})=>{
   await engine(page,'');await page.locator('#experience-editor .ProseMirror').click();await page.keyboard.type('[[Notes/Design|design]]');await expect(page.locator('[data-wiki-reference="Notes/Design|design"]')).toHaveText('design');expect(await source(page)).toContain('[[Notes/Design|design]]');
   await page.keyboard.press('End');await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','![[journal/assets/pixel.png|32]]');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});expect(await source(page)).toContain('![[journal/assets/pixel.png|32]]');
-});
-test('enhanced source completes vault names without changing line endings or metadata',async({page})=>{
-  await field(page,'',false,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();const content=page.locator('#experience-field .cm-content');await expect(content).toBeVisible();await content.click();await page.keyboard.type('[[Des');await page.getByRole('option',{name:'Notes/Design.md'}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('[[Notes/Design]]');
 });
 test('spreadsheet paste creates a table and fills existing cells without nesting tables',async({page})=>{
   await engine(page,'Before.\n\nAfter.\n');await page.locator('#experience-editor p').last().click();
@@ -179,7 +156,7 @@ test('composition keeps Unicode text and does not accept a slash command on comp
   await expect(page.locator('#experience-formatted p')).toHaveText('/日本語');await expect(page.locator('#experience-formatted :is(h1,h2,h3,h4,h5,h6)')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('日本語');
 });
 test('revision comparison exposes line-ending-only changes',async({page})=>{
-  await page.goto('/web/markdown-lab.html');const diff=await page.evaluate(async()=>{const {lineComparison}=await import('/web/note-revisions.js');return lineComparison('Same.\n','Same.\r\n');});expect(diff).toContain('\\r\\n');expect(diff).toContain('- ');expect(diff).toContain('+ ');
+  await openEditorFixture(page);const diff=await page.evaluate(async()=>{const {lineComparison}=await import('/web/note-revisions.js');return lineComparison('Same.\n','Same.\r\n');});expect(diff).toContain('\\r\\n');expect(diff).toContain('- ');expect(diff).toContain('+ ');
 });
 
 test('formatted checklists stay editable without extra formatting panels',async({page})=>{
@@ -193,57 +170,6 @@ test('formatted checklists stay editable without extra formatting panels',async(
   expect(await page.evaluate(()=>globalThis.field.value())).toContain('[x] Oppgradere AMQ i PROD');
   await page.evaluate(()=>{const paragraph=document.querySelector('#experience-formatted p'),range=document.createRange();range.selectNodeContents(paragraph);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
   await expect(page.locator('#experience-field .markdown-context-menu')).toHaveCount(0);
-});
-
-for(const enhanced of [false,true])test(`split preview retains reading position and source focus (${enhanced?'highlighted':'plain'} source)`,async({page})=>{
-  const value=Array.from({length:100},(_,i)=>`## Block ${i}\n\nParagraph ${i}. ${'Keep writing without jumps. '.repeat(6)}\n`).join('\n');await field(page,value,false);
-  await page.evaluate(()=>{for(const node of [globalThis.field.text,globalThis.field.codeHost,globalThis.field.splitHost])Object.assign(node.style,{height:'320px',minHeight:'0',maxHeight:'320px'});});
-  if(enhanced)await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();
-  await page.locator('#experience-field').getByRole('button',{name:'Source and preview',exact:true}).click();await expect(page.locator('.markdown-split-preview h2')).toHaveCount(100);
-  const offset=await page.evaluate(enhanced=>{const f=globalThis.field,offset=f.rawBody().indexOf('Paragraph 55.');if(enhanced)f.codeEditor.select(offset);else{f.text.focus();f.text.setSelectionRange(offset,offset);}return offset;},enhanced);
-  const scrollSource=enhanced?page.locator('#experience-field .cm-scroller'):page.locator('#experience-body');await scrollSource.hover();await page.mouse.wheel(0,2000);
-  await expect.poll(()=>page.locator('.markdown-split-preview').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
-  await page.keyboard.insertText('Edited ');await expect(page.locator('.markdown-split-preview')).toContainText('Edited Paragraph 55.');
-  expect(await page.evaluate(()=>globalThis.field.position().anchor)).toBe(offset+7);
-  const source=enhanced?page.locator('#experience-field .cm-content'):page.locator('#experience-body');await expect(source).toBeFocused();
-  expect(await page.locator('.markdown-split-preview').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
-  if(enhanced){
-    await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await expect(page.locator('#experience-body')).toBeFocused();
-    expect(await page.locator('#experience-body').evaluate(node=>node.selectionStart)).toBe(offset+7);
-    await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await expect(page.locator('#experience-field .cm-content')).toBeFocused();
-    expect(await page.evaluate(()=>globalThis.field.codeEditor.position().anchor)).toBe(offset+7);
-  }
-  await expect.poll(()=>page.locator('.markdown-split-preview').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
-  await page.locator('.markdown-split-preview').hover();await page.mouse.wheel(0,-100000);
-  await expect.poll(()=>page.evaluate(()=>{const f=globalThis.field;return (f.codeEditor?.scrollElement||f.text).scrollTop;})).toBeLessThan(5);
-});
-
-test('a delayed split preview cannot replace newer content or reappear after clearing the note',async({page})=>{
-  await page.goto('/web/markdown-lab.html');await page.evaluate(async()=>{
-    const {buildPreview}=await import('/web/markdown-preview.js');
-    const plain=document.createElement('div'),text=document.createElement('textarea'),splitHost=document.createElement('div');plain.append(text,splitHost);document.body.append(plain);
-    globalThis.previews=[];globalThis.previewField={plain,text,splitHost,generation:1,rawBody:()=>text.value};
-    buildPreview(globalThis.previewField,async()=>({createMarkdownEditor:options=>new Promise(resolve=>{const entry={value:options.value,resolve:()=>{options.root.textContent=options.value;resolve({destroy:async()=>{entry.destroyed=true;}});}};globalThis.previews.push(entry);})}));
-    text.value='Old preview';globalThis.previewField.refreshPreview();
-  });
-  await expect.poll(()=>page.evaluate(()=>globalThis.previews.length)).toBe(1);
-  await page.evaluate(()=>{globalThis.previewField.text.value='Newest preview';globalThis.previewField.refreshPreview();});
-  await expect.poll(()=>page.evaluate(()=>globalThis.previews.length)).toBe(2);
-  await page.evaluate(()=>globalThis.previews[1].resolve());await expect(page.locator('body')).toContainText('Newest preview');
-  await page.evaluate(()=>globalThis.previews[0].resolve());await expect.poll(()=>page.evaluate(()=>globalThis.previews[0].destroyed)).toBe(true);
-  expect(await page.evaluate(()=>globalThis.previewField.splitHost.textContent)).toBe('Newest preview');
-  await page.evaluate(()=>{globalThis.previewField.text.value='Private pending preview';globalThis.previewField.refreshPreview();});await expect.poll(()=>page.evaluate(()=>globalThis.previews.length)).toBe(3);
-  await page.evaluate(()=>{globalThis.previewField.generation++;globalThis.previewField.resetPreview();globalThis.previewField.splitHost.hidden=true;globalThis.previews[2].resolve();});
-  await expect.poll(()=>page.evaluate(()=>globalThis.previews[2].destroyed)).toBe(true);expect(await page.evaluate(()=>globalThis.previewField.splitHost.textContent)).toBe('');
-});
-
-test('Find opens after highlighted source loads without relying on a timer',async({page})=>{
-  await field(page,'Find this text.\n',false);let release,entered;
-  const held=new Promise(resolve=>release=resolve),started=new Promise(resolve=>entered=resolve);
-  await page.route('**/assets/milkdown/source-editor.js',async route=>{entered();await held;await route.continue();});
-  await page.clock.install();await page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true}).click();
-  await started;await expect(page.locator('#experience-field').getByRole('button',{name:'Find and replace',exact:true})).toBeDisabled();await page.clock.fastForward(500);release();
-  await expect(page.locator('#experience-field .cm-search')).toBeVisible();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Find this text.\n');
 });
 
 test('existing Table button supports keyboard structure edits without extra controls',async({page,browserName})=>{

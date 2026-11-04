@@ -5,7 +5,7 @@ export const thirdPartyNotices=[
     "homepage": "https://codemirror.net/",
     "license": "MIT",
     "notices": "/web/assets/milkdown/THIRD-PARTY-LICENSES.txt",
-    "version": "6.43.15",
+    "version": "6.13.1",
     "copyright": "Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
     "licenseUrl": "/web/assets/notices/milkdown-CODEMIRROR-LICENSE.txt"
   },
