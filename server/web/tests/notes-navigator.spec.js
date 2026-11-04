@@ -43,6 +43,7 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
     await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
   }
   const sort=toolbar.getByRole('button',{name:'Sort notes',exact:true});await sort.focus();await sort.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Modified (newest first)',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(sort).toBeFocused();
+  await sort.press('ArrowRight');await expect(toolbar.getByRole('button',{name:'Collapse all folders',exact:true})).toBeFocused();await page.keyboard.press('ArrowLeft');await expect(sort).toBeFocused();
   await page.locator('#notes-search').fill('.md');await expect(toolbar.getByRole('button',{name:'Expand all folders',exact:true})).toBeDisabled();
   await expect(navigation.locator('[role=treeitem] > button')).toHaveText(['Notes/Alpha.md','Notes/Zulu.md','Notes/Beta.md']);
 });

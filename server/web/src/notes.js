@@ -40,6 +40,11 @@ export class NotesView {
     for(const [label,buttons]of [['notes.create_actions',[this.newNote,this.newFolder]],['notes.organize_actions',[this.sortButton,this.collapseAll,this.expandAll]],['notes.browse_actions',[this.refresh,this.trash]]]){
       const group=node('div',undefined,'btn-group');group.setAttribute('role','group');group.setAttribute('aria-label',t(label));group.append(...buttons);tools.append(group);
     }
+    tools.addEventListener('keydown',event=>{
+      if(event.ctrlKey||event.altKey||event.metaKey||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      const buttons=[...tools.querySelectorAll('button:not(:disabled)')],index=buttons.indexOf(event.target.closest('button'));if(index<0)return;
+      event.preventDefault();buttons[event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length].focus();
+    });
     this.sortState();
     window.addEventListener('resize',()=>this.positionSortMenu());document.addEventListener('scroll',()=>this.positionSortMenu(),true);
     const searchLabel=node('label',t('notes.search'),'form-label');this.search=node('input',undefined,'form-control');this.search.type='search';this.search.id='notes-search';searchLabel.htmlFor=this.search.id;
