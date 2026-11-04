@@ -82,7 +82,7 @@ def main():
                 raw=response.read();value=json.loads(raw) if raw and response.headers.get('Content-Type','').startswith('application/json') else raw
                 return value,response.headers.get('ETag')
         try:
-            day='2026-10-27';legacy='/api/v1/day-notes/'+day;label='/api/v1/day-labels/'+day;content=legacy+'/content';dav='/dav/journal/'+day+'.md'
+            day='2026-10-27';legacy='/api/v1/day-notes/'+day;label='/api/v1/day-labels/'+day;content=legacy+'/content';dav='/dav/notes/journal/'+day+'.md'
             start('old');_,tag=request(legacy)
             original,_=request(legacy,'PUT',{'text':'Migration label','body':'# Existing note\r\n  exact body  \n'},tag)
             document,_=request(dav,dav=True);stop()

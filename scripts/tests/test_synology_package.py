@@ -105,6 +105,8 @@ class SynologyPackageTest(unittest.TestCase):
                 self.assertEqual(validate(package)['imageId'],provenance['imageId'])
                 self.assertEqual(package_id,validate(package)['package'])
                 with tarfile.open(package) as outer,tarfile.open(fileobj=io.BytesIO(outer.extractfile('package.tgz').read()),mode='r:gz') as inner:
+                    self.assertEqual((ROOT/'server/scripts/webdav_sync.py').read_bytes(),inner.extractfile('webdav_sync.py').read())
+                    self.assertIn('/dav/notes/',inner.extractfile('NOTES-WEBDAV.md').read().decode())
                     guide=inner.extractfile('README.md').read().decode()
                     self.assertIn('**Package identity: `'+package_id+'`',guide)
                     self.assertIn('/var/packages/'+package_id+'/',guide)

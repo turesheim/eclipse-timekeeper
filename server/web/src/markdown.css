@@ -1,49 +1,43 @@
-.markdown-lab-page main { max-width: 60rem; padding-bottom: 2rem; }
-.markdown-lab-page #day-label { max-width: 32rem; }
-.markdown-file-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-block: 1rem; }
-.markdown-file-actions input { width: min(100%, 22rem); }
 .markdown-toolbar { overflow-x: auto; margin-block: .75rem; padding: .2rem; }
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .markdown-editor .markdown-modes, .markdown-editor .markdown-tools { flex: none; flex-wrap: nowrap; gap: 0; margin: 0; }
 .markdown-toolbar-separator { flex: 0 0 1px; align-self: stretch; min-height: 2rem; margin-block: .25rem; background: var(--bs-border-color); }
-:is(.markdown-lab-page,.markdown-editor) pre, :is(.markdown-lab-page,.markdown-editor) textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
-.markdown-lab-page textarea { font-family: var(--bs-font-monospace); min-height: 24rem; }
-.markdown-lab-page #markdown-formatted { border: 1px solid var(--bs-border-color); border-radius: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
-:is(#markdown-formatted,.journal-formatted):not([hidden]), :is(#markdown-formatted,.journal-formatted) > div, :is(#markdown-formatted,.journal-formatted) .milkdown { display: flex; flex-direction: column; }
-:is(#markdown-formatted,.journal-formatted) :is(.ProseMirror,.milkdown), :is(#markdown-formatted,.journal-formatted) > div { flex: 1; min-width: 0; }
-:is(#markdown-formatted,.journal-formatted):has(.ProseMirror:focus-visible) { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror:focus-visible { outline: none; box-shadow: none; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h1 { font-size: 1.7rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h2 { font-size: 1.4rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h3 { font-size: 1.2rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h4 { font-size: 1.1rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h5 { font-size: 1rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h6 { font-size: .9rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror .markdown-mermaid-block { margin-block: 1rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; overflow: hidden; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror .markdown-mermaid-block pre { margin: 0; border-radius: 0; }
+.markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
+.markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
+.journal-formatted:not([hidden]), .journal-formatted > div, .journal-formatted .milkdown { display: flex; flex-direction: column; }
+.journal-formatted :is(.ProseMirror,.milkdown), .journal-formatted > div { flex: 1; min-width: 0; }
+.journal-formatted:has(.ProseMirror:focus-visible) { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+.markdown-editor .ProseMirror:focus-visible { outline: none; box-shadow: none; }
+.markdown-editor .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
+.markdown-editor .ProseMirror h1 { font-size: 1.7rem; }
+.markdown-editor .ProseMirror h2 { font-size: 1.4rem; }
+.markdown-editor .ProseMirror h3 { font-size: 1.2rem; }
+.markdown-editor .ProseMirror h4 { font-size: 1.1rem; }
+.markdown-editor .ProseMirror h5 { font-size: 1rem; }
+.markdown-editor .ProseMirror h6 { font-size: .9rem; }
+.markdown-editor .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
+.markdown-editor .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
+.markdown-editor .ProseMirror .markdown-mermaid-block { margin-block: 1rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; overflow: hidden; }
+.markdown-editor .ProseMirror .markdown-mermaid-block pre { margin: 0; border-radius: 0; }
 .markdown-mermaid-preview { padding: .5rem; border-top: 1px solid var(--bs-border-color); background: var(--bs-body-bg); }
 .markdown-mermaid-preview p:empty { display: none; }
 .markdown-mermaid-preview p { margin: .25rem; color: var(--bs-secondary-color); }
 .markdown-mermaid-preview img { display: block; max-width: 100%; height: auto; margin-inline: auto; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror code { color: inherit; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror img { display: block; max-width: 100%; height: auto; margin-block: .75rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror table { width: 100%; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] { display: flex; align-items: flex-start; gap: .75rem; list-style: none; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror li > div { min-width: 0; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] > div { flex: 1; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] > div > p:first-child { margin-block-start: 0; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror input[type="checkbox"] { flex: none; width: 1.25rem; height: 1.25rem; min-width: 1.25rem; min-height: 1.25rem; margin: max(0px,calc((1lh - 1.25rem)/2)) 0 0; accent-color: var(--bs-primary); }
+.markdown-editor .ProseMirror code { color: inherit; }
+.markdown-editor .ProseMirror img { display: block; max-width: 100%; height: auto; margin-block: .75rem; }
+.markdown-editor .ProseMirror table { width: 100%; }
+.markdown-editor .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
+.markdown-editor .ProseMirror li[data-task="true"] { display: flex; align-items: flex-start; gap: .75rem; list-style: none; }
+.markdown-editor .ProseMirror li > div { min-width: 0; }
+.markdown-editor .ProseMirror li[data-task="true"] > div { flex: 1; }
+.markdown-editor .ProseMirror li[data-task="true"] > div > p:first-child { margin-block-start: 0; }
+.markdown-editor .ProseMirror input[type="checkbox"] { flex: none; width: 1.25rem; height: 1.25rem; min-width: 1.25rem; min-height: 1.25rem; margin: max(0px,calc((1lh - 1.25rem)/2)) 0 0; accent-color: var(--bs-primary); }
 .markdown-block-trigger { width: auto; gap: .2rem; padding-inline: .5rem; }
 .markdown-block-menu { position: fixed; inset: auto; margin: 0; max-height: min(24rem,calc(100dvh - 1rem)); overflow-y: auto; }
 .markdown-block-menu:popover-open { display: block; }
 .markdown-block-menu .dropdown-item { display: flex; align-items: center; gap: .5rem; min-height: 2.75rem; }
 .markdown-block-menu [aria-checked="true"] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); font-weight: 700; }
-.markdown-lab-page #markdown-status { min-height: 1.5em; }
 
 .journal-dialog { --journal-padding: clamp(.75rem, 2vw, 1.5rem); width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }
 .journal-dialog form { display: flex; flex-direction: column; gap: .25rem; height: min(calc(94dvh - var(--journal-padding) - var(--journal-padding) - 2px), 54rem); }
@@ -56,7 +50,6 @@
 .journal-dialog .journal-note-label { max-width: 36rem; }
 .journal-dialog .hint { margin-bottom: .25rem; }
 .journal-dialog .markdown-toolbar button { flex: none; min-height: 2.75rem; }
-.journal-dialog .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
 .journal-dialog .ProseMirror, .journal-dialog textarea { min-height: clamp(16rem, 43dvh, 36rem); }
 .journal-dialog textarea { font-family: var(--bs-font-monospace); resize: vertical; }
 .journal-recovery { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem; }
@@ -90,17 +83,6 @@
 .markdown-source-fragment textarea { display: block; width: 100%; min-height: 5rem; font-family: var(--bs-font-monospace); background: var(--bs-body-bg); color: var(--bs-body-color); border: 0; resize: vertical; }
 .markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
 .markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }
-.markdown-source-tools { display: flex; gap: .25rem; flex-wrap: wrap; }
-.markdown-code-editor { flex: 1; min-height: 15rem; min-width: 0; overflow: auto; }
-.markdown-code-editor .cm-editor { height: 100%; background: var(--bs-body-bg); color: var(--bs-body-color); }
-.markdown-code-editor .cm-scroller { font: .9rem/1.6 var(--bs-font-monospace); }
-.markdown-code-editor .cm-gutters, .markdown-code-editor .cm-panels { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border-color: var(--bs-border-color); }
-.markdown-code-editor .cm-activeLine, .markdown-code-editor .cm-activeLineGutter { background: var(--bs-primary-bg-subtle); }
-.markdown-code-editor .cm-cursor { border-color: var(--bs-body-color); }
-.markdown-code-editor .cm-search input { max-width: 100%; background: var(--bs-body-bg); color: var(--bs-body-color); }
-.markdown-split:not([hidden]) { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: .5rem; min-height: 0; }
-.markdown-split > label { grid-column: 1 / -1; }
-.markdown-split-preview { min-width: 0; max-height: 40rem; overflow: auto; border-inline-start: 1px solid var(--bs-border-color); }
 .markdown-suggestions { position: fixed; z-index: 1080; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; border-radius: .4rem; box-shadow: 0 .25rem .75rem #0002; max-width: calc(100vw - 1rem); }
 .markdown-suggestions { display: flex; flex-direction: column; max-height: 12rem; overflow: auto; width: 17rem; }
 .markdown-suggestions button { text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -111,7 +93,6 @@
   .markdown-overflow { display: inline-flex; }
   .markdown-editor .markdown-toolbar:not([data-expanded=true]) .markdown-tools, .markdown-editor .markdown-toolbar:not([data-expanded=true]) .markdown-toolbar-separator { display: none; }
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { flex: 1 1 100%; flex-wrap: wrap; }
-  .markdown-split:not([hidden]) { grid-template-columns: minmax(0,1fr); }
 }
 .markdown-code-block { border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
 .markdown-code-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .25rem .5rem; background: var(--bs-tertiary-bg); font-size: .8rem; }
@@ -134,11 +115,9 @@
 .markdown-history-dialog { width: min(60rem,calc(100vw - 1rem)); }
 .markdown-revision-list { display: flex; flex-wrap: wrap; gap: .25rem; max-height: 10rem; overflow: auto; margin-block: .5rem; }
 .markdown-revision-diff { max-height: 45vh; overflow: auto; padding: .75rem; border: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); color: var(--bs-body-color); white-space: pre-wrap; }
-.today-journal .markdown-code-editor { min-height: 0; }
 @media(max-width:600px) {
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { display: grid; grid-template-columns: repeat(auto-fill,minmax(2.75rem,1fr)); }
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-block-trigger { grid-column: span 2; justify-content: center; }
 }
 
 /* The split pane owns scrolling; nested rich-editor overflow would bypass synchronization. */
-.markdown-split-preview :is(.ProseMirror,.milkdown), .markdown-split-preview > div { flex: none; overflow: visible; }

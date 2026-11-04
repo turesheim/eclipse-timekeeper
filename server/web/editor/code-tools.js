@@ -14,7 +14,7 @@ export function codeTools(readOnly){
   const plugin=$prose(()=>new Plugin({key,state:{init:(_,state)=>decorations(state.doc),apply:(transaction,previous)=>transaction.docChanged||transaction.getMeta(key)?decorations(transaction.doc):previous},props:{decorations:state=>key.getState(state)},view:view=>{
     let disposed=false,loading=false;
     const load=()=>{let hasCode=false;view.state.doc.descendants(node=>{if(node.type.name==='code_block'&&highlightedLanguages.has(String(node.attrs.language).toLowerCase()))hasCode=true;});if(!hasCode||highlighter||loading)return;loading=true;
-      void import(new URL('./source-editor.js',import.meta.url).href).then(module=>{if(disposed)return;highlighter=module.highlightCode;view.dispatch(view.state.tr.setMeta(key,true));}).catch(()=>{});
+      void import(new URL('./code-highlight.js',import.meta.url).href).then(module=>{if(disposed)return;highlighter=module.highlightCode;view.dispatch(view.state.tr.setMeta(key,true));}).catch(()=>{});
     };load();return {update:load,destroy(){disposed=true;}};
   }}));
   const nodeView=(initial,view,getPos)=>{
