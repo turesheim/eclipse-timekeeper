@@ -1,9 +1,10 @@
 import Tooltip from './assets/bootstrap/tooltip.js';
 
-// Content factories construct application-owned DOM with textContent. Never
-// interpret a title, API field, Markdown body or translation as HTML.
+// Content factories construct application-owned DOM. All fields remain literal
+// except calendar descriptions, sanitized by tooltip-description.js.
 const content=new WeakMap();
 export const TOOLTIP_SHOW_DELAY=800;
+export const TOOLTIP_FOCUS_DELAY=5000;
 let showTimer,pending=null;
 function cancelPending(){clearTimeout(showTimer);pending=null;}
 function schedule(node,focus=null){
@@ -12,17 +13,37 @@ function schedule(node,focus=null){
   if(pending===node)return;cancelPending();pending=node;
   showTimer=setTimeout(()=>{pending=null;if(visible(node))show(node,focus);},TOOLTIP_SHOW_DELAY);
 }
-let active=null,installed=false,pointerFocus=false,leaveTimer,dismissed=null,pointer=null;
-const visible=node=>node.isConnected&&!node.closest('[hidden]')&&node.getClientRects().length>0;
+let active=null,installed=false,pointerFocus=false,leaveTimer,focusTimer,dismissed=null,pointer=null;
+function cancelFocus(){clearTimeout(focusTimer);focusTimer=null;}
+const visible=node=>!!node?.isConnected&&!node.closest('[hidden]')&&node.getClientRects().length>0;
 export function hideTooltip(cancel=true) {
-  if(cancel)cancelPending();clearTimeout(leaveTimer);if(!active)return;
+  if(cancel)cancelPending();cancelFocus();clearTimeout(leaveTimer);if(!active)return;
   const previous=active;active=null;previous.instance.dispose();
   for(const [node,value] of previous.descriptions)value===null?node.removeAttribute('aria-describedby'):node.setAttribute('aria-describedby',value);
 }
 function refreshTooltip() {
   if(!active)return;
   if(!visible(active.node)){hideTooltip();return;}
+  // Keep a focused link/selection and scroll position stable through live clocks
+  // and refreshes. Reopening gets the newest content from the factory.
+  if(active.interactive){active.instance.update();return;}
   active.tip.querySelector('.tooltip-inner').replaceChildren(content.get(active.node)());active.instance.update();
+}
+function focusTooltip(){
+  cancelFocus();if(!active||!visible(active.node))return;
+  const {tip,node}=active;
+  if(!active.interactive){
+    active.previousFocus=document.activeElement;active.interactive=true;
+    tip.classList.add('is-interactive');tip.tabIndex=0;tip.setAttribute('role','dialog');
+    tip.setAttribute('aria-label',tip.querySelector('.tooltip-heading,.tooltip-caption')?.textContent||node.getAttribute('aria-label')||node.textContent);
+  }
+  tip.focus({preventScroll:true});
+}
+function dwell(){
+  clearTimeout(leaveTimer);cancelPending();
+  if(active?.interactive||focusTimer)return;
+  const current=active;
+  focusTimer=setTimeout(()=>{focusTimer=null;if(active===current&&pointer?.pointerType==='mouse'&&!pointer.buttons&&overTooltip(pointer))focusTooltip();},TOOLTIP_FOCUS_DELAY);
 }
 export function richTooltip(node,render,{composite=true}={}) {
   node.removeAttribute('title');node.dataset.tkTooltip='';content.set(node,render);
@@ -72,7 +93,7 @@ function show(node,focus=null) {
 }
 function inside(node){return node instanceof Node&&active&&(active.node.contains(node)||active.tip.contains(node));}
 function overTooltip(event){if(!active)return false;const box=active.tip.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom;}
-function leave(){clearTimeout(leaveTimer);leaveTimer=setTimeout(()=>hideTooltip(false),100);}
+function leave(){cancelFocus();clearTimeout(leaveTimer);if(active?.tip.contains(document.activeElement))return;leaveTimer=setTimeout(()=>hideTooltip(false),100);}
 export function installTooltips() {
   if(installed)return;installed=true;
   const scan=root=>{if(!(root instanceof Element))return;if(root.hasAttribute('title'))plainTooltip(root);root.querySelectorAll('[title]').forEach(plainTooltip);};
@@ -81,17 +102,26 @@ export function installTooltips() {
     for(const change of changes)if(change.type==='childList')change.addedNodes.forEach(scan);else if(change.attributeName==='title')plainTooltip(change.target);
     if(active&&!visible(active.node))hideTooltip();
   }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['title','hidden','aria-hidden','open']});
-  // The overlay never intercepts a calendar drag or a click on a control below
-  // it. Hit-test its bounds for hover persistence instead of capturing presses.
+  // A passive overlay leaves calendar drags and controls underneath available.
+  // Test its geometry first: pointer-events:none can target another hint below.
   const remember=event=>{pointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,buttons:event.buttons};};
-  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons)return;const node=target(event.target,event);if(node&&node!==active?.node){schedule(node);return;}if(overTooltip(event)){cancelPending();clearTimeout(leaveTimer);return;}if(node)schedule(node);else{cancelPending();if(active)leave();}};
+  const hover=event=>{remember(event);if(event.pointerType!=='mouse'||event.buttons){cancelFocus();return;}if(overTooltip(event)){dwell();return;}cancelFocus();if(active?.tip.contains(document.activeElement))return;const node=target(event.target,event);if(node)schedule(node);else{cancelPending();if(active)leave();}};
   document.addEventListener('pointerover',hover);
   document.addEventListener('pointermove',hover);
   document.addEventListener('pointerout',event=>{if(pending&&!pending.contains(event.relatedTarget)){const box=pending.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)cancelPending();}if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget)&&!overTooltip(event))leave();});
-  document.addEventListener('focusin',event=>{if(!pointerFocus)schedule(target(event.target),event.target);});
+  document.addEventListener('focusin',event=>{if(active?.tip.contains(event.target)){clearTimeout(leaveTimer);return;}if(!pointerFocus)schedule(target(event.target),event.target);});
   document.addEventListener('focusout',event=>{cancelPending();if(dismissed&&!dismissed.contains(event.relatedTarget))dismissed=null;if(active&&!inside(event.relatedTarget))hideTooltip();});
-  document.addEventListener('pointerdown',event=>{remember(event);pointerFocus=true;if(!active?.tip.contains(event.target))hideTooltip();},true);
-  document.addEventListener('keydown',event=>{pointerFocus=false;if(event.key==='Escape'&&active){dismissed=active.node;hideTooltip();if(event.target.closest('dialog[open]'))event.preventDefault();}},true);
+  document.addEventListener('pointerdown',event=>{remember(event);pointerFocus=true;cancelFocus();if(active?.tip.contains(event.target))focusTooltip();else hideTooltip();},true);
+  document.addEventListener('keydown',event=>{
+    pointerFocus=false;cancelFocus();
+    if(event.key==='F2'&&active&&inside(event.target)){event.preventDefault();focusTooltip();return;}
+    if(event.key==='Escape'&&active){
+      const previous=active,restore=previous.tip.contains(document.activeElement);dismissed=previous.node;hideTooltip();
+      // Escape dismisses this popup before a containing native dialog.
+      event.preventDefault();event.stopPropagation();
+      if(restore){const focus=visible(previous.previousFocus)&&previous.previousFocus!==document.body?previous.previousFocus:previous.node;focus.focus({preventScroll:true});}
+    }
+  },true);
   document.addEventListener('click',event=>{if(!active?.tip.contains(event.target))hideTooltip();},true);
   document.addEventListener('scroll',event=>{if(active&&!active.tip.contains(event.target)){
     const bounds=active.node.getBoundingClientRect();
@@ -102,6 +132,6 @@ export function installTooltips() {
       requestAnimationFrame(()=>{if(pointer){const target=document.elementFromPoint(pointer.clientX,pointer.clientY);if(target)hover({...pointer,target});}});
     }else active.instance.update();
   }},true);
-  document.addEventListener('wheel',event=>{if(!overTooltip(event))return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight)return;inner.scrollTop+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?inner.clientHeight:1);event.preventDefault();},{capture:true,passive:false});
+  document.addEventListener('wheel',event=>{if(!overTooltip(event)||active.interactive)return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight)return;inner.scrollTop+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?inner.clientHeight:1);event.preventDefault();},{capture:true,passive:false});
   window.addEventListener('resize',hideTooltip);window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
 }

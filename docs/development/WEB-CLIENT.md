@@ -473,8 +473,15 @@ keyboard focus, required fields and error recovery. Native browser validation an
 the API's existing concurrency and authorization rules remain in use.
 
 `tooltips.js` is the single tooltip lifecycle and presentation entry point. It
-enhances UI `title` hints with Bootstrap's HTML variant, using text nodes for all
-translations and API data. Authored link/image titles inside the Markdown editor
+enhances UI `title` hints with Bootstrap's HTML variant, using text nodes for
+translations, titles and other API fields. Calendar descriptions alone accept
+HTML through `tooltip-description.js`: the pinned, locally bundled DOMPurify
+sanitizes an inert template before any content enters the live document. The
+allowlist preserves prose, lists, tables and links; it excludes scripts, styles,
+images, embedded resources, forms, custom attributes and non-HTML namespaces.
+Links allow only absolute HTTP(S), mailto and tel URLs and open with
+`noopener noreferrer`. Plain descriptions retain line breaks and linked web
+URLs. No remote description resources are fetched. Authored link/image titles inside the Markdown editor
 are left untouched so hint enhancement cannot change saved notes.
 `tooltip-content.js` provides shared decorated session
 and calendar-event details. Each composite card owns one tooltip containing its
@@ -482,10 +489,19 @@ individual sessions, project icons, times and durations; its child icons, title
 and duration do not create separate hints. The same builders serve Today, the
 monthly Calendar, Week and Workweek. Read-only summary cards are keyboard-focusable.
 Tooltips support hover, keyboard descriptions, Escape dismissal, hovering over
-the tooltip itself and scrolling long details. They use the active dialog as a
+the tooltip itself and scrolling long details. Hints open after 800 ms. Keeping
+the mouse inside a hint for five continuous seconds focuses it as a nonmodal
+details dialog, allowing selection, links and native scrolling. Leaving before
+five seconds resets the countdown. Keyboard users can press F2 from the focused
+hint source to enter details immediately; Escape closes details and restores
+focus. A focused popup stays open until focus leaves, it is dismissed, or its
+source disappears. Its content remains stable through live data refreshes;
+reopening uses current data. Passive hints leave underlying calendar controls
+and drags available. The geometry check precedes underlying control detection
+so moving over an overlapping hint cannot replace it. They use the active dialog as a
 container when necessary and are disposed on removal, hidden views and logout.
 No note contents are copied to browser storage. Bootstrap and Popper's complete
-licenses ship with the bundle and are linked from About. See the upstream
+licenses, and DOMPurify's license, ship with the bundle and are linked from About. See the upstream
 [Bootstrap 5.3 tooltip documentation](https://getbootstrap.com/docs/5.3/components/tooltips/).
 
 macOS WebKit reports inline-style CSP diagnostics for native select controls even

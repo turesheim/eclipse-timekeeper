@@ -44,11 +44,21 @@ body { background: #f3f6f5; }
   pointer-events: none;
 }
 .timekeeper-tooltip .tooltip-inner { text-align: start; border: 1px solid var(--line); box-shadow: 0 .2rem .7rem #0003; max-height: min(32rem, 65vh); overflow: auto; overflow-wrap: anywhere; }
+.timekeeper-tooltip.is-interactive { pointer-events: auto; }
+.timekeeper-tooltip.is-interactive .tooltip-inner { overscroll-behavior: contain; }
+.timekeeper-tooltip.is-interactive:focus { outline: none; }
+.timekeeper-tooltip.is-interactive:focus-visible .tooltip-inner { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tooltip-caption, .tooltip-detail, .tooltip-heading, .tooltip-project { display: flex; align-items: baseline; gap: .4rem; white-space: pre-wrap; }
 .timekeeper-tooltip .icon { flex: 0 0 1em; }
 .tooltip-heading, .tooltip-project, .tooltip-session-title { font-weight: 600; }
 .tooltip-session { border-block-start: 1px solid var(--line); padding-block-start: .45rem; margin-block-start: .45rem; }
 .tooltip-description { white-space: pre-wrap; margin-block-start: .4rem; }
+.tooltip-description-html { white-space: normal; }
+.tooltip-description-html :is(h1,h2,h3,h4,h5,h6) { font-size: inherit; font-weight: 600; margin-block: .5rem; }
+.tooltip-description-html :is(ul,ol) { padding-inline-start: 1.25rem; margin-block: .4rem; }
+.tooltip-description-html :is(pre,code) { white-space: pre-wrap; }
+.tooltip-description-html table { max-width: 100%; border-collapse: collapse; }
+.tooltip-description-html :is(th,td) { padding: .15rem .3rem; border: 1px solid var(--line); }
 a, button, input, select, summary { touch-action: manipulation; }
 :is(a, button, input, select, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: none; box-shadow: 0 0 0 .2rem #17665326;
