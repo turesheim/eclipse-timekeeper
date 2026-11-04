@@ -70,6 +70,7 @@ test('leaving the tooltip cancels its focus countdown and a new hover starts a f
 
 test('keyboard focus opens details with F2 and live refreshes preserve the focused link and scrolled content',async({page,browserName})=>{
   const button=await setup(page,'<a href="https://example.org/first">First link</a>'+('<p>Long detail</p>').repeat(80));await button.focus();await page.clock.runFor(850);const tip=page.locator('.timekeeper-tooltip');await expect(tip).toBeVisible();await page.keyboard.press('F2');await expect(tip.locator('.tooltip-inner')).toBeFocused();
+  await page.keyboard.press('PageDown');await page.clock.runFor(300);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
   await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');const link=tip.getByRole('link',{name:'First link'});await expect(link).toBeFocused();
   await tip.locator('.tooltip-inner').evaluate(node=>{node.scrollTop=100;});await page.evaluate(()=>window.updateEventDescription('<a href="https://example.org/new">Updated link</a>'));await expect(link).toBeFocused();expect(await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBe(100);
   await page.keyboard.press('Escape');await expect(button).toBeFocused();await expect(tip).toHaveCount(0);await page.mouse.move(0,0);await show(page,button);await expect(page.locator('.timekeeper-tooltip')).toContainText('Updated link');
