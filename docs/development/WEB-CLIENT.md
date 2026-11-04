@@ -340,6 +340,41 @@ web controls. All styles and checkbox/radio assets are bundled locally.
 settings, persistence, cross-tab updates and unavailable storage. It captures
 desktop and mobile previews for every theme under `server/web/test-results/`.
 
+## Font sizes
+
+Open **My Account → Font sizes** to edit the font properties from
+`server/web/src/typography.css`. Every property has a descriptive name and a
+comment explaining where it is used. This stylesheet is the source of the
+application defaults; components reference its properties instead of repeating
+font-size values.
+
+`--font-base: 100%` follows the browser's default font size, usually 16px. Set it
+to a percentage or a pixel value such as `18px` to change the size of **1rem**.
+Other `rem` sizes and rem-based spacing scale with it. `em` sizes remain relative
+to their surrounding text. Separate properties cover desktop/mobile variants,
+Calendar and Week labels, Today cards, tables, forms, tooltips, Notes and
+formatted Markdown heading levels. CSS math expressions such as `clamp()` and
+`calc()` are supported for these other sizes.
+
+Changes apply when **Save font sizes** succeeds. The editor accepts one `:root`
+block with the named font properties and CSS comments; it reports invalid
+properties or values without replacing the draft or saved settings. Omitting a
+property uses its application default. **Reset font sizes** immediately clears
+the saved fragment and restores the commented defaults.
+
+Like themes, sizes are saved in this browser and shared across its Timekeeper
+accounts and tabs, including sign-in, Administration, reports and the Markdown
+lab. They do not sync to another browser or enter account archives. Read-only
+sessions can change this browser preference. Storage failures preserve the draft
+and previous sizes; invalid stored CSS falls back to defaults. Clean editors
+follow changes from other tabs while unsaved drafts stay intact. The early
+`typography.js` script applies only the declared font properties through the CSS
+object model, preserving the existing Content Security Policy.
+
+`tests/typography.spec.js` checks saving, reset, rem scaling, validation,
+persistence, cross-tab updates, read-only sessions, Norwegian labels, keyboard
+navigation and accessible desktop/mobile layouts across all six themes.
+
 ## Design baseline
 
 The main views share a fixed bottom navigation bar, with an icon for each view.

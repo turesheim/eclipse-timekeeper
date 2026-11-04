@@ -1,0 +1,203 @@
+/* Timekeeper typography preferences.
+   Edit the values in this :root block, then choose Save font sizes.
+   rem follows --font-base; em follows the surrounding text. CSS math such as
+   clamp(), min(), max() and calc() is supported. Remove a property to use its
+   application default. Keep the property names and the :root wrapper. */
+:root {
+
+  /* Base and shared controls */
+  /* Base size for 1rem. 100% follows your browser default (usually 16px). Use px or %. Increasing this also scales rem-based spacing and controls. */
+  --font-base: 100%;
+  /* Default body text and navigation labels. */
+  --font-body: 1rem;
+  /* Standard button text. */
+  --font-button: 1rem;
+  /* Text inputs, text areas and select controls. */
+  --font-input: 1rem;
+  /* Small text without a more specific setting, relative to its parent. */
+  --font-small: .875em;
+  /* Badges without a more specific setting, relative to their parent. */
+  --font-badge: .75em;
+  /* Inline code and preformatted text, relative to surrounding text. */
+  --font-code: .875em;
+  /* Hover and keyboard-focus tooltips. */
+  --font-tooltip: .875rem;
+  /* Text in this typography CSS editor. */
+  --font-css-editor: .875rem;
+
+  /* Application headings, forms, Today, Calendar and reports */
+  /* Page titles (h1). Grows with the viewport between the two rem limits. */
+  --font-page-title: clamp(1.8rem, 3vw, 2.35rem);
+  /* Section headings (h2), unless a more specific heading below applies. */
+  --font-section-heading: 1.25rem;
+  /* Subsection headings (h3), unless a more specific heading below applies. */
+  --font-subsection-heading: 1.05rem;
+  /* Form labels and fieldset legends. */
+  --font-form-label: .9rem;
+  /* Help text and general hints. */
+  --font-hint: .875rem;
+  /* Small uppercase labels above page and work-session headings. */
+  --font-eyebrow: .7rem;
+  /* Timekeeper name in the application header. */
+  --font-brand: 1.4rem;
+  /* Version number beside the Timekeeper name. */
+  --font-brand-version: .75rem;
+  /* Synchronization status and its refresh button. */
+  --font-sync-status: .875rem;
+  /* Information, warning and error messages. */
+  --font-alert: .9rem;
+  /* Current activity and work-session headings. */
+  --font-tracking-heading: 1.1rem;
+  /* Previous and next month buttons in the Today sidebar. */
+  --font-today-month-button: .75rem;
+  /* Secondary text in Today event and task lists. */
+  --font-today-hint: .8rem;
+  /* Text in ordinary data tables. */
+  --font-table: .9rem;
+  /* Column headings in data tables. */
+  --font-table-heading: .8rem;
+  /* Illustrative icons in empty states. */
+  --font-empty-icon: 1.5rem;
+  /* Explanations in empty states. */
+  --font-empty-text: .9rem;
+  /* Workweek session rows and their inline time inputs. */
+  --font-workweek-table: .875rem;
+  /* More-actions icons in Workweek session rows. */
+  --font-workweek-action-icon: 1rem;
+  /* Feedback beneath Workweek session edits. */
+  --font-workweek-feedback: .85rem;
+  /* Secondary details beneath activity titles. */
+  --font-activity-detail: .75rem;
+  /* Labels above report totals. */
+  --font-report-caption: .9rem;
+  /* Emphasized totals above reports. */
+  --font-report-total: 1.15rem;
+  /* Daily totals in report day summaries. */
+  --font-day-total: .85rem;
+  /* Secondary captions in report day summaries. */
+  --font-day-caption: .75rem;
+  /* Running or stopped badge beside a work-session heading. */
+  --font-session-badge: .75rem;
+  /* Current work-session and active-activity details. */
+  --font-session-detail: .8rem;
+  /* Label above the running work-session duration. */
+  --font-session-duration-label: .8rem;
+  /* Running work-session duration. */
+  --font-session-duration: 1.4rem;
+  /* Month names in the Calendar month picker. */
+  --font-month-button: .85rem;
+  /* Calendar total duration on larger screens. */
+  --font-month-total: 1.3rem;
+  /* Calendar weekday headings on larger screens. */
+  --font-month-weekday: .85rem;
+  /* Calendar day numbers. */
+  --font-month-date: .85rem;
+  /* Holiday names in Calendar. */
+  --font-month-holiday: .72rem;
+  /* Daily-note labels in Calendar. */
+  --font-month-note-badge: .72rem;
+  /* Calendar total label on narrow screens. */
+  --font-month-total-label-mobile: .85rem;
+  /* Calendar total duration on narrow screens. */
+  --font-month-total-mobile: 1.1rem;
+  /* Calendar weekday headings on narrow screens. */
+  --font-month-weekday-mobile: .75rem;
+  /* Standard interface icons. */
+  --font-icon: 1.1rem;
+  /* Server and build information in About. */
+  --font-server-info: .9rem;
+  /* Show and hide password controls. */
+  --font-password-reveal: .8rem;
+  /* Signed-in account name on narrow screens. */
+  --font-account-name-mobile: .875rem;
+  /* Project icons beside project captions. */
+  --font-project-icon: 1rem;
+  /* Project icons inside Calendar cards. */
+  --font-month-project-icon: .75rem;
+  /* Undo notification text. */
+  --font-undo-message: .9rem;
+  /* Note indicator in calendar event details, relative to its surrounding text. */
+  --font-event-note-icon: .85em;
+
+  /* Today sidebar and Calendar cards */
+  /* Month and summary headings in the Today sidebar. */
+  --font-today-sidebar-heading: calc(1rem - 1pt);
+  /* Weekdays, week numbers and day numbers in the Today mini calendar. */
+  --font-today-calendar: .7rem;
+  /* Shared Calendar and Today work cards on larger screens. */
+  --font-calendar-card: .8rem;
+  /* Shared Calendar and Today work cards on narrow screens. */
+  --font-calendar-card-mobile: .75rem;
+
+  /* Markdown and journal editors */
+  /* Level 1 heading in formatted Markdown notes. */
+  --font-markdown-h1: 1.7rem;
+  /* Level 2 heading in formatted Markdown notes. */
+  --font-markdown-h2: 1.4rem;
+  /* Level 3 heading in formatted Markdown notes. */
+  --font-markdown-h3: 1.2rem;
+  /* Level 4 heading in formatted Markdown notes. */
+  --font-markdown-h4: 1.1rem;
+  /* Level 5 heading in formatted Markdown notes. */
+  --font-markdown-h5: 1rem;
+  /* Level 6 heading in formatted Markdown notes. */
+  --font-markdown-h6: .9rem;
+  /* Heading in a daily-note dialog. */
+  --font-journal-dialog-heading: 1.3rem;
+  /* Markdown source, formatted and split-view buttons in note dialogs. */
+  --font-markdown-mode: .9rem;
+  /* Heading above the inline journal editor. */
+  --font-journal-inline-heading: 1.2rem;
+  /* Labels for Markdown source fragments. */
+  --font-markdown-fragment-label: .8rem;
+  /* Language and other controls above code blocks. */
+  --font-markdown-code-control: .8rem;
+  /* Footnote definitions in formatted Markdown. */
+  --font-markdown-footnote: .9rem;
+
+  /* Week view and calendar subscriptions */
+  /* Week day headings. */
+  --font-week-day-heading: .8rem;
+  /* Label in the upper-left corner of the Week grid. */
+  --font-week-corner: .7rem;
+  /* Time-of-day labels beside the Week grid. */
+  --font-week-hour: .65rem;
+  /* Notices for skipped calendar intervals. */
+  --font-week-notice: .75rem;
+  /* Titles inside recorded sessions in Week. */
+  --font-week-session-title: .7rem;
+  /* Durations inside recorded sessions in Week. */
+  --font-week-session-duration: .65rem;
+  /* Task headings inside Week activity cards. */
+  --font-week-task-heading: .75rem;
+  /* Task action buttons inside Week activity cards. */
+  --font-week-task-action: .7rem;
+  /* Secondary task details inside Week activity cards. */
+  --font-week-task-detail: .7rem;
+  /* Daylight-saving notices below the Week grid. */
+  --font-week-dst-notice: .75rem;
+  /* Week toolbar heading on narrow screens. */
+  --font-week-heading-mobile: 1.1rem;
+  /* Calendar subscription list heading. */
+  --font-subscription-heading: 1rem;
+  /* Heading above all-day plans. */
+  --font-all-day-heading: 1rem;
+  /* Planned events in the Week grid. */
+  --font-week-planned-event: .72rem;
+  /* Preview text while creating a Week activity. */
+  --font-week-create-preview: .75rem;
+  /* Recorded activity text inside the Week grid. */
+  --font-week-activity: .72rem;
+  /* Recorded indicator inside Week activity cards. */
+  --font-week-recorded-marker: .65rem;
+  /* Holiday names in Week day headings. */
+  --font-week-holiday: .65rem;
+
+  /* Notes workspace */
+  /* Selected note name above the Notes editor. */
+  --font-notes-heading: 1rem;
+
+  /* Theme preference */
+  /* Theme preference label in My Account. */
+  --font-theme-choice: .875rem;
+}

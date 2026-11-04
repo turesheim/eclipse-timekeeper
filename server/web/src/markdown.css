@@ -15,12 +15,12 @@
 :is(#markdown-formatted,.journal-formatted):has(.ProseMirror:focus-visible) { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror:focus-visible { outline: none; box-shadow: none; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h1 { font-size: 1.7rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h2 { font-size: 1.4rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h3 { font-size: 1.2rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h4 { font-size: 1.1rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h5 { font-size: 1rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror h6 { font-size: .9rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h1 { font-size: var(--font-markdown-h1); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h2 { font-size: var(--font-markdown-h2); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h3 { font-size: var(--font-markdown-h3); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h4 { font-size: var(--font-markdown-h4); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h5 { font-size: var(--font-markdown-h5); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h6 { font-size: var(--font-markdown-h6); }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror .markdown-mermaid-block { margin-block: 1rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; overflow: hidden; }
@@ -48,9 +48,9 @@
 .journal-dialog { --journal-padding: clamp(.75rem, 2vw, 1.5rem); width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }
 .journal-dialog form { display: flex; flex-direction: column; gap: .25rem; height: min(calc(94dvh - var(--journal-padding) - var(--journal-padding) - 2px), 54rem); }
 .journal-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: .25rem; }
-.journal-dialog h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+.journal-dialog h2 { font-size: var(--font-journal-dialog-heading); margin-bottom: .5rem; }
 .journal-dialog label.form-label { margin: .25rem 0 0; }
-.journal-dialog .markdown-modes button { padding-inline: .5rem; font-size: .9rem; }
+.journal-dialog .markdown-modes button { padding-inline: .5rem; font-size: var(--font-markdown-mode); }
 .markdown-editor > p:empty { display: none; }
 .markdown-editor .journal-source textarea { border: 0; border-radius: 0; }
 .journal-dialog .journal-note-label { max-width: 36rem; }
@@ -69,7 +69,7 @@
 .journal-inline .journal-content { display: flex; flex-direction: column; flex: 1; overflow: visible; }
 .journal-inline .markdown-editor { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .journal-inline :is(.journal-formatted,.journal-source):not([hidden]) { display: flex; flex: 1; flex-direction: column; }
-.journal-inline h2 { font-size: 1.2rem; }
+.journal-inline h2 { font-size: var(--font-journal-inline-heading); }
 .journal-inline .journal-note-label { max-width: 36rem; }
 .journal-inline .journal-formatted { background: var(--bs-body-bg); }
 .journal-inline .ProseMirror, .journal-inline textarea { flex: 1; min-height: 22rem; }
@@ -86,7 +86,7 @@
 .today-journal .journal-inline :is(.ProseMirror,textarea) { min-height: 0; overflow-y: auto; resize: none; }
 .today-journal .journal-inline .dialog-actions { position: static; flex-shrink: 0; margin-top: 0; padding-bottom: 0; }
 .markdown-source-fragment { border: 1px dashed var(--bs-border-color); border-radius: .4rem; padding: .5rem; margin-block: .75rem; background: var(--bs-tertiary-bg); }
-.markdown-source-fragment label { display: block; font-size: .8rem; color: var(--bs-secondary-color); }
+.markdown-source-fragment label { display: block; font-size: var(--font-markdown-fragment-label); color: var(--bs-secondary-color); }
 .markdown-source-fragment textarea { display: block; width: 100%; min-height: 5rem; font-family: var(--bs-font-monospace); background: var(--bs-body-bg); color: var(--bs-body-color); border: 0; resize: vertical; }
 .markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
 .markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }
@@ -114,7 +114,7 @@
   .markdown-split:not([hidden]) { grid-template-columns: minmax(0,1fr); }
 }
 .markdown-code-block { border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
-.markdown-code-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .25rem .5rem; background: var(--bs-tertiary-bg); font-size: .8rem; }
+.markdown-code-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .25rem .5rem; background: var(--bs-tertiary-bg); font-size: var(--font-markdown-code-control); }
 .markdown-code-controls input { width: 8rem; margin-inline-start: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); }
 .markdown-code-controls button { border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); color: var(--bs-body-color); padding: .25rem .5rem; border-radius: .25rem; }
 .markdown-code-block pre { margin: 0; }
@@ -127,7 +127,7 @@
 .markdown-callout > div:first-child button { border: 0; background: transparent; color: var(--bs-info-text-emphasis); font-weight: 700; }
 .markdown-callout input { flex: 1; min-width: 0; background: transparent; color: inherit; border: 0; font-weight: 600; }
 [data-footnote-reference] { color: var(--bs-link-color); cursor: pointer; }
-[data-footnote-definition] { border-block-start: 1px solid var(--bs-border-color); padding-inline-start: .75rem; font-size: .9rem; }
+[data-footnote-definition] { border-block-start: 1px solid var(--bs-border-color); padding-inline-start: .75rem; font-size: var(--font-markdown-footnote); }
 [data-footnote-definition]::before { content: attr(data-footnote-definition) ". "; color: var(--bs-secondary-color); }
 .markdown-asset-list { display: flex; flex-direction: column; gap: .25rem; margin-block: .75rem; max-height: 50vh; overflow: auto; }
 [data-footnote-reference] { border: 0; background: transparent; font: inherit; color: var(--bs-link-color); }

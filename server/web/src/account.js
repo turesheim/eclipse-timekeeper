@@ -8,9 +8,11 @@ import { renderImports } from './imports.js';
 import { renderPasskeys } from './passkeys.js';
 import { renderAccountData } from './account-data.js';
 import { renderJournal } from './journal-account.js';
+import {renderTypography} from './typography-account.js';
 import {renderNotesAccount} from './notes-account.js';
 
 export async function renderAccount(view, part) {
+  if (part === 'typography') {await renderTypography(view);return;}
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
   if (!view.valid()) return;
   const account = loaded.data,zone = profile.data.zoneId;
