@@ -1315,5 +1315,9 @@
   "notes.import_metadata_changed": "Innholdet ble endret etter tidsstempeløyeblikksbildet. Filens nåværende endringstid brukes.",
   "notes.export_title": "Eksporter notater",
   "notes.export_help": "Opprett en ZIP-fil med alle aktive notater, dagbok- og hendelsesmapper og vedlegg. Markdown og relative stier beholdes nøyaktig. Tidsstempelmetadata bevarer opprettelses- og endringsdatoer ved import av den utpakkede mappen. Nylig slettede elementer og kontodata tas ikke med.",
-  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Eksportmetadata fra Timekeeper bevarer disse datoene. For et eksisterende lokalt hvelv kan den manuelle klienten opprette tidsstempelmetadata før du velger mappen."
+  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Eksportmetadata fra Timekeeper bevarer disse datoene. For et eksisterende lokalt hvelv kan den manuelle klienten opprette tidsstempelmetadata før du velger mappen.",
+  "notes.import_reviewed_other": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
+  "notes.import_done_other": "Importerte {{count}} filer. Filer i konflikt er uendret.",
+  "notes.import_reviewed_one": "{{count}} ny fil er klar til import. Se gjennom listen før du fortsetter.",
+  "notes.import_done_one": "Importerte {{count}} fil. Konflikter ble beholdt uendret."
 }

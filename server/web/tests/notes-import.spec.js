@@ -35,7 +35,7 @@ test('selecting files and folders limits uploads, explains oversized files and r
     await page.route('**/api/v1/notes/files?**',async route=>{uploads.push(new URL(route.request().url()).searchParams.get('path'));await hold;await route.continue();});
     await card.getByRole('button',{name:'Import new files',exact:true}).click();await expect.poll(()=>uploads.length).toBe(1);
     const progress=card.getByRole('progressbar',{name:'Notes import progress',exact:true});await expect(progress).toBeVisible();await expect(progress).toHaveAttribute('aria-valuenow','0');await expect(progress).toHaveAttribute('aria-valuetext','0 of 1 selected items processed');
-    await expect(card.getByRole('checkbox',{name:'Notes/Included.md',exact:true})).toBeDisabled();release();await expect(card).toContainText('Imported 1 files.');await expect(progress).toHaveAttribute('aria-valuenow','100');expect(uploads).toEqual(['Notes/Included.md']);
+    await expect(card.getByRole('checkbox',{name:'Notes/Included.md',exact:true})).toBeDisabled();release();await expect(card).toContainText('Imported 1 file.');await expect(progress).toHaveAttribute('aria-valuenow','100');expect(uploads).toEqual(['Notes/Included.md']);
     expect((await resolve(client,'Notes/Included.md')).ok()).toBe(true);for(const path of ['Notes/Skip.md','SkipFolder/Nested.md','Notes/Oversized.md'])expect((await resolve(client,path)).status()).toBe(404);
     for(const width of [1440,320]){
       await page.setViewportSize({width,height:900});for(const theme of width===320?['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']:['timekeeper']){
