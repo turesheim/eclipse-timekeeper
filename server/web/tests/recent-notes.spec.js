@@ -26,8 +26,8 @@ test('Recent notes uses account days, excludes journals and protects drafts when
   await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(22);await expect(recent).not.toContainText('Too old');await expect(recent).not.toContainText('journal/');
   await page.locator('#today-date').fill('2020-01-02');await expect(page.locator('#today-title')).toContainText('2020');await expect(recent.locator('[data-recent-note]')).toHaveCount(22);
   expect((await new AxeBuilder({page}).include('.today-sidebar').analyze()).violations).toEqual([]);
-  await page.locator('#today-journal').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#today-note-body').fill('Keep my unsaved Today draft');
-  page.once('dialog',dialog=>dialog.dismiss());await recent.locator(`[data-recent-note="${first.id}"]`).click();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-note-body')).toHaveValue('Keep my unsaved Today draft');
+  await page.locator('#today-journal').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#today-journal-body').fill('Keep my unsaved Today draft');
+  page.once('dialog',dialog=>dialog.dismiss());await recent.locator(`[data-recent-note="${first.id}"]`).click();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-journal-body')).toHaveValue('Keep my unsaved Today draft');
   page.once('dialog',dialog=>dialog.accept());await recent.locator(`[data-recent-note="${first.id}"]`).click();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Current00.md');
   await page.evaluate(()=>location.hash='#account/notes');const settings=page.locator('#account-content section').filter({has:page.getByRole('heading',{name:'Notes settings',exact:true})});
   const days=settings.getByLabel('Recent notes: number of days',{exact:true});await expect(days).toHaveValue('7');await days.fill('1');await settings.getByRole('button',{name:'Save',exact:true}).click();await expect(settings).toContainText('Notes settings saved.');
