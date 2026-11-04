@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {openEditorFixture} from './editor-fixture.js';
+import {tooltipFor} from './tooltips.js';
 
 async function setup(page,description='Meeting details',title='Review'){
   await openEditorFixture(page);
@@ -67,6 +68,15 @@ test('leaving the tooltip cancels its focus countdown and a new hover starts a f
   const button=await setup(page),tip=await show(page,button);await pointAt(page,tip);await page.clock.runFor(4900);
   await button.hover();await page.clock.runFor(200);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await pointAt(page,tip);await page.clock.runFor(4999);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await page.clock.runFor(1);await expect(tip.locator('.tooltip-inner')).toBeFocused();
   await page.mouse.move(0,0);await page.clock.runFor(1000);await expect(tip).toBeVisible();await page.locator('#event-hint').evaluate(node=>{node.hidden=true;});await expect(tip).toHaveCount(0);
+});
+
+test('independent hint inspections dismiss the popup covering the next control',async({page})=>{
+  const button=await setup(page),tip=await show(page,button),id=await tip.getAttribute('id'),box=await tip.boundingBox();
+  await page.evaluate(box=>{
+    const next=document.createElement('button');next.id='next-inspection';next.title='Next control hint';next.textContent='Next';next.style.position='fixed';next.style.left=(box.x+box.width/2-15)+'px';next.style.top=(box.y+box.height/2-10)+'px';document.body.append(next);
+  },box);
+  await pointAt(page,tip);await page.clock.runFor(1000);await expect(tip).toHaveAttribute('id',id);
+  await page.clock.resume();const nextTip=await tooltipFor(page.locator('#next-inspection'));await expect(nextTip).toHaveText('Next control hint');expect(await nextTip.getAttribute('id')).not.toBe(id);
 });
 
 test('keyboard focus opens details with F2 and live refreshes preserve the focused link and scrolled content',async({page,browserName})=>{
