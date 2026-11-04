@@ -46,6 +46,10 @@ export class TodayView {
       byId(id).addEventListener('click',()=>{this.month=shiftMonth(this.month,months);this.paintMonth();void this.loadMonthNotes();});
     }
     window.addEventListener('resize',()=>this.sizeEditor());
+    // Fonts, translated headings and session details can resize without a
+    // viewport event. Both columns keep their own distance to the fixed dock.
+    this.layoutObserver=new ResizeObserver(()=>this.sizeEditor());
+    for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
   reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
@@ -75,6 +79,8 @@ export class TodayView {
     if(!this.visible||!this.root.offsetParent)return;
     const top=this.journalRoot.getBoundingClientRect().top+scrollY,navHeight=byId('workspace-navigation').getBoundingClientRect().height;
     this.root.style.setProperty('--today-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');
+    const sidebarTop=this.root.querySelector('.today-sidebar').getBoundingClientRect().top+scrollY;
+    this.root.style.setProperty('--today-sidebar-height',Math.max(0,innerHeight-sidebarTop-navHeight)+'px');
   }
   paintMonth(){
     if(!this.data||!this.month)return;
