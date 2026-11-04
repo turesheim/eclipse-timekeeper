@@ -50,6 +50,15 @@ promotion still requires full database certification and real-NAS acceptance.
 Publication gates accept both historical **Web** jobs and complete **Web (i/n)**
 matrices. Missing, failed or mixed browser shards prevent publication.
 
+Every Synology installer uses the repository's **Build** workflow run number.
+Called container checks receive it directly; the independent main container
+workflow resolves the matching source commit's Build run through the read-only
+Actions API. It waits briefly for concurrent run creation and fails if no matching
+run is available. The container workflow's separate counter is never used as a
+package revision. PR and main packages therefore share one version sequence.
+The installer artifact contains Timekeeper; Dagsverk migration fixtures have a
+separate `synology-migration-test-packages` artifact.
+
 Browser jobs download the exact server artifact produced by their run, with
 web-only fixtures packaged without Java tests. Up to four jobs divide spec files
 deterministically, with each spec running exactly once. Each job retains the
@@ -57,6 +66,8 @@ existing fresh-JVM/database/credential batches of at most six specs. No retries,
 assertions or production authentication limits change. Each shard uploads its own
 `web-acceptance-<index>` artifact; all shards must pass the aggregate gate.
 Additional HTTPS/passkey/recovery checks run once on the first shard.
+Web unit and bundled-asset checks also run once on that shard; browser scenarios
+remain distributed across every selected shard.
 
 Notes synchronization is verified through the packaged manual WebDAV client
 over HTTPS. CI does not build Obsidian or test third-party synchronization

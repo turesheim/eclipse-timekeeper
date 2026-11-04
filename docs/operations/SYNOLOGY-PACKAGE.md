@@ -414,7 +414,9 @@ python3 server/scripts/package_synology.py --commit "$COMMIT" --image "ghcr.io/t
 ```
 
 Preview SPKs use `1.99.0-<revision>` so the eventual stable `2.0.0` package sorts
-higher in DSM. Both identify the actual server build under **About** in the web client's account menu. Preloading
+higher in DSM. CI takes the revision from the matching **Build** workflow run,
+including when packaging is executed by the independent **Server containers**
+workflow. Both identify the actual server build under **About** in the web client's account menu. Preloading
 the tested image avoids unpublished PR tags and moving registry aliases.
 
 ## Manual installer downloads
@@ -425,6 +427,8 @@ that artifact from the successful PR/main workflow and verify the adjacent SHA-2
 before a manual NAS installation. It includes the SPK, source/image provenance,
 preview `catalog.json` and icons. Automated acceptance reports and database test
 results are uploaded separately as `synology-test-results`, including on failures.
+The Dagsverk packages used by migration acceptance are uploaded separately as
+`synology-migration-test-packages`; they are excluded from installer downloads.
 An **incomplete** `dsm-acceptance-template.json` binds the real-NAS test record to
 that exact candidate. Automated CI does not fill in the manual test results.
 
