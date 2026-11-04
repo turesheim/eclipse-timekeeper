@@ -219,9 +219,10 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
     await expect(page.locator('#today-date')).toHaveAccessibleName(locale==='nb-NO'?'Dato':'Date');await expect(page.locator('label[for="today-date"]')).toHaveClass(/visually-hidden/);
     const navigator=page.getByRole('toolbar',{name:locale==='nb-NO'?'Datonavigering':'Day navigation',exact:true});
     await expect(navigator.getByRole('group')).toHaveCount(1);await expect(navigator.getByRole('button')).toHaveCount(3);await expect(navigator.locator('.btn-group')).toHaveCount(1);
-    const check=async(width,font,heading=null)=>{
+    const originalBrand=await page.evaluate(()=>document.documentElement.style.getPropertyValue('--font-brand'));
+    const check=async(width,font,heading=null,brand=originalBrand)=>{
       if(page.viewportSize()?.width!==width||page.viewportSize()?.height!==1000)await page.setViewportSize({width,height:1000});
-      await page.evaluate(({font,heading})=>{const root=document.documentElement;root.style.setProperty('--font-base',font+'px');heading?root.style.setProperty('--font-section-heading',heading):root.style.removeProperty('--font-section-heading');scrollTo(0,0);},{font,heading});
+      await page.evaluate(({font,heading,brand})=>{const root=document.documentElement;root.style.setProperty('--font-base',font+'px');heading?root.style.setProperty('--font-section-heading',heading):root.style.removeProperty('--font-section-heading');brand?root.style.setProperty('--font-brand',brand):root.style.removeProperty('--font-brand');scrollTo(0,0);},{font,heading,brand});
       const gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));
       // Font-only changes must redock both columns without a synthetic resize.
       await expect.poll(()=>page.evaluate(gap=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector('#workspace-navigation').getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},gap)).toBeLessThan(2);
@@ -229,7 +230,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
         const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),controls=rect('.today-date-navigation'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect('#workspace-navigation'),main=rect('.today-main'),session=rect('#work-session');
         return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,headerRight:toolbar.right,controlsRight:controls.right,controlsTop:controls.top,controlsCenter:controls.top+controls.height/2,titleTop:title.top,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,columnGap:parseFloat(getComputedStyle(document.querySelector('.today-toolbar')).columnGap),overflow:document.documentElement.scrollWidth>innerWidth};
       });
-      expect(geometry.overflow).toBe(false);
+      expect(geometry.overflow,`${locale}: viewport ${width}px, base font ${font}px, heading ${heading||'default'}, brand ${brand||'default'}`).toBe(false);
       if(width>650){
         expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.columnGap+geometry.headerRight)/2)).toBeLessThan(2);
         expect(Math.abs(geometry.titleCenterY-geometry.controlsCenter)).toBeLessThan(2);
@@ -244,10 +245,10 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
       }else expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.editorBottom);
       for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);}
     };
-    for(const [width,font,heading]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[650,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20]])await check(width,font,heading);
+    for(const [width,font,heading,brand]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[650,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20],[320,20,null,'2rem']])await check(width,font,heading,brand);
     running=await(await api(request,'POST','/work-sessions',{summary:'Running session with a deliberately long title to exercise wrapping',start:new Date(Date.now()-3600000).toISOString(),end:null})).json();
     await page.locator('#refresh').click();await expect(page.locator('#session-stop')).toBeVisible();
-    for(const [width,font]of [[1440,14],[1051,20],[390,14]])await check(width,font);
+    for(const [width,font]of [[1440,14],[1051,20],[320,20],[390,14]])await check(width,font);
     await captureScreenshot(page,{path:`test-results/today-layout-${locale}-mobile.png`});
     await check(1440,14);await captureScreenshot(page,{path:`test-results/today-layout-${locale}-desktop.png`});
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);

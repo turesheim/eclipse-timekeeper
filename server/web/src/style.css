@@ -470,6 +470,7 @@ button.calendar-summary-card:disabled { opacity: .65; }
 @media(prefers-reduced-motion: reduce) { .undo-notice { transition: none; } }
 
 .app-header .status-line { margin: 0; min-width: 0; flex: 0 1 auto; }
+.app-header .brand { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .app-header #session { margin-inline-start: auto; flex: 0 1 auto; min-width: 2.75rem; max-width: 40%; }
 .app-header .status-refresh { min-width: 0; }
 .app-header #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
