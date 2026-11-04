@@ -212,7 +212,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale}),page=await context.newPage();
   let running;
   try{
-    if(original.locale!==null){const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{locale:null},{'If-Match':profile.headers().etag});}
+    if(original.locale!==null){const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId,locale:null},{'If-Match':profile.headers().etag});}
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
     await expect(page.locator('#today-note-editor')).toBeVisible();await expect(page.locator('html')).toHaveAttribute('lang',locale);
     await page.locator('#today-date').fill('2026-10-26');
@@ -254,6 +254,6 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
   }finally{
     await context.close();
     if(running){const current=await api(request,'GET','/work-sessions/'+running.id);await api(request,'DELETE','/work-sessions/'+running.id,undefined,{'If-Match':current.headers().etag});}
-    const current=await api(request,'GET','/me');await api(request,'PUT','/me',{locale:original.locale},{'If-Match':current.headers().etag});
+    const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId,locale:original.locale??null},{'If-Match':current.headers().etag});
   }
 });
