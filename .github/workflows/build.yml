@@ -28,6 +28,7 @@ jobs:
     outputs:
       code: ${{ steps.changes.outputs.code }}
       eclipse: ${{ steps.changes.outputs.eclipse }}
+      remote_eclipse: ${{ steps.changes.outputs.remote_eclipse }}
       full: ${{ steps.changes.outputs.full }}
       server: ${{ steps.changes.outputs.server }}
       server_tests: ${{ steps.changes.outputs.server_tests }}
@@ -191,7 +192,7 @@ jobs:
   Remote-Eclipse:
     name: Installed client tests
     needs: [Changes, Server]
-    if: needs.Changes.outputs.eclipse == 'true'
+    if: needs.Changes.outputs.remote_eclipse == 'true'
     concurrency:
       group: build-installed-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
@@ -267,8 +268,8 @@ jobs:
       (needs.Changes.outputs.api != 'true' || needs.API-contract.result == 'success') &&
       (needs.Changes.outputs.server != 'true' || needs.Server.result == 'success') &&
       (needs.Changes.outputs.web != 'true' || needs.Web.result == 'success') &&
-      (needs.Changes.outputs.eclipse != 'true' ||
-       (needs.Build.result == 'success' && needs.Remote-Eclipse.result == 'success'))
+      (needs.Changes.outputs.eclipse != 'true' || needs.Build.result == 'success') &&
+      (needs.Changes.outputs.remote_eclipse != 'true' || needs.Remote-Eclipse.result == 'success')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
