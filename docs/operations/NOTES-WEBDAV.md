@@ -25,6 +25,17 @@ matching Today. Long source and formatted documents scroll within the editor.
 
 The **Notes** tab presents an account-private folder tree and the shared Markdown
 editor. Search matches names and paths; expand folders to load their children.
+The navigator groups creation, sorting/expansion and browsing actions in a compact
+toolbar. **Sort notes** offers name, creation date and modification date in both
+directions. Folders stay before files; unknown dates follow known dates, with
+alphabetical ties. Sorting covers every page of each loaded folder, search result
+and Recently deleted list. **Expand all folders** loads every visible level;
+**Collapse all folders** also cancels an unfinished expansion. These actions keep
+an open editor's draft. Hidden journal folders are excluded from expansion.
+
+New collection entries record their creation time, which survives editing,
+renaming, recovery and account-archive round trips. Older entries without a
+recorded creation time remain unknown rather than receiving an invented date.
 Drag the divider, or focus it and use arrow keys, to resize navigation. On a
 phone, use the folder button to open navigation. Rename/move preserves a
 resource's identity. Recently deleted items retain their bytes and can be

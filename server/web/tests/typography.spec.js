@@ -35,12 +35,12 @@ async function putProfile(page, body) {
 
 test('typography CSS changes the rem base and named text roles only after the account save succeeds', async ({page, request}) => {
   await openSettings(page, request);
-  const defaults = await editor(page).inputValue();expect(defaults).toContain('--font-base: 100%;');
+  const defaults = await editor(page).inputValue();expect(defaults).toContain('--font-base: 14px;');
   expect(defaults).toContain('Level 1 heading in formatted Markdown notes.');
-  await editor(page).fill(defaults.replace('--font-base: 100%;', '--font-base: 112.5%;')
+  await editor(page).fill(defaults.replace('--font-base: 14px;', '--font-base: 112.5%;')
     .replace('--font-section-heading: 1.25rem;', '--font-section-heading: 1.5rem;')
     .replace('--font-input: 1rem;', '--font-input: 1.125rem;'));
-  await expect(page.locator('html')).toHaveCSS('font-size', '16px');await save(page);await saved(page);
+  await expect(page.locator('html')).toHaveCSS('font-size', '14px');await save(page);await saved(page);
   await expect(page.locator('html')).toHaveCSS('font-size', '18px');
   await expect(page.locator('.account-card h2')).toHaveCSS('font-size', '27px');
   expect((await profile(page)).typographyCss).toContain('--font-base: 112.5%;');
@@ -78,9 +78,9 @@ test('typography validates the entire CSS fragment and preserves invalid and uns
   await expect(page.locator('#account-identity')).toHaveCSS('font-size', '17.5px');
   await page.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
   await expect(page.locator('.form-feedback')).toHaveText('Default font sizes restored.');
-  await expect(page.locator('html')).toHaveCSS('font-size', '16px');await expect(editor(page)).toHaveValue(/--font-base: 100%;/);
+  await expect(page.locator('html')).toHaveCSS('font-size', '14px');await expect(editor(page)).toHaveValue(/--font-base: 14px;/);
   expect((await profile(page)).typographyCss).toBeNull();
-  await page.reload();await expect(editor(page)).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await page.reload();await expect(editor(page)).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '14px');
 });
 
 test('account typography persists in another browser and stays isolated when signing out and switching users', async ({page, request, browser}) => {
@@ -93,14 +93,14 @@ test('account typography persists in another browser and stays isolated when sig
     await expect(other.locator('html')).toHaveCSS('font-size', '18px');await expect(editor(other)).toHaveValue(css);
     const second = await createUser(request);
     await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click();
-    await expect(page.locator('#login')).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '16px');
-    await signIn(page, second);await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+    await expect(page.locator('#login')).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '14px');
+    await signIn(page, second);await expect(page.locator('html')).toHaveCSS('font-size', '14px');
     expect((await profile(page)).typographyCss).toBeNull();
     await page.evaluate(data => window.timekeeperTypography.receive({data}), previous);
-    await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+    await expect(page.locator('html')).toHaveCSS('font-size', '14px');
     await expect(other.locator('html')).toHaveCSS('font-size', '18px');
     await other.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
-    await expect(other.locator('html')).toHaveCSS('font-size', '16px');
+    await expect(other.locator('html')).toHaveCSS('font-size', '14px');
   } finally {await otherContext.close();}
 });
 
@@ -112,7 +112,7 @@ test('a session expiring between profile bootstrap and restore clears account fo
     return route.fulfill({status: 401, contentType: 'application/json', body: JSON.stringify({code: 'UNAUTHENTICATED'})});
   });
   await page.reload();await expect(page.locator('#login')).toBeVisible();
-  await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await expect(page.locator('html')).toHaveCSS('font-size', '14px');
 });
 
 test('typography follows confirmed peer changes and all web entry pages without adding CSP violations', async ({page, context, request, browserName}) => {
@@ -144,9 +144,9 @@ test('typography follows confirmed peer changes and all web entry pages without 
     expect(await other.evaluate(() => window.typographyPolicyViolations),path).toEqual(mainPage?startup:[]);
   }
   await page.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
-  await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await expect(page.locator('html')).toHaveCSS('font-size', '14px');
   await other.bringToFront();await other.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect(other.locator('html')).toHaveCSS('font-size', '16px');
+  await expect(other.locator('html')).toHaveCSS('font-size', '14px');
   expect(await page.evaluate(() => window.typographyPolicyViolations)).toEqual(startup);await other.close();
 });
 
@@ -174,7 +174,7 @@ test('account typography ignores legacy browser-wide CSS and works with browser 
     localStorage.setItem('timekeeper.typography', ':root { --font-base: 30px; }');
     Storage.prototype.getItem = Storage.prototype.setItem = () => {throw new DOMException('Unavailable', 'SecurityError');};
   });
-  await signIn(page, user);await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await signIn(page, user);await expect(page.locator('html')).toHaveCSS('font-size', '14px');
   const css = ':root { --font-base: 18px; }';await editor(page).fill(css);await save(page);await saved(page);
   await page.reload();await expect(editor(page)).toHaveValue(css);await expect(page.locator('html')).toHaveCSS('font-size', '18px');
 });
@@ -182,7 +182,7 @@ test('account typography ignores legacy browser-wide CSS and works with browser 
 test('invalid CSS stored through the profile API remains inert and can be corrected in the editor', async ({page, request}) => {
   await openSettings(page, request);const invalid = ':root { --font-base: 30px; background: red; } body { display: none; }';
   expect((await putProfile(page, {typographyCss: invalid})).ok()).toBeTruthy();await page.reload();
-  await expect(editor(page)).toHaveValue(invalid);await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await expect(editor(page)).toHaveValue(invalid);await expect(page.locator('html')).toHaveCSS('font-size', '14px');
   await editor(page).fill(':root { --font-base: 18px; }');await save(page);await saved(page);
   await expect(page.locator('html')).toHaveCSS('font-size', '18px');
 });

@@ -13,8 +13,34 @@ class VaultIndexTest {
         public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("index",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_index_test"));}
     }
     @Inject ServerStore store;
+    @Inject MockBackendClock clock;
     private static VaultPath path(String value){return new VaultPath(value);}
     private static UUID id(com.fasterxml.jackson.databind.JsonNode value){return uuid(value.path("id"));}
+
+    @Test void creationDatesRemainStableAcrossContentEditsMovesDeletionAndRecovery(){
+        var created=java.time.Instant.parse("2020-01-01T00:00:00Z");var edited=created.plusSeconds(3600);
+        try{
+            clock.set(created);
+            UUID note=store.transaction("dates",()->{
+                var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();
+                return id(vault.put(path("Original.md"),null,true,"First".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            });
+            clock.set(edited);
+            store.transaction("dates",()->{
+                var vault=new VaultCollection(store,store.vaultLimits());var value=vault.get(note);
+                value=vault.put(path("Original.md"),vault.tag(value),false,"Edited".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                assertEquals(created.toString(),value.path("createdAt").asText());assertEquals(edited.toString(),value.path("modifiedAt").asText());
+                vault.move(value,path("Renamed.md"),vault.tag(value));value=vault.get(note);
+                vault.delete(value,vault.tag(value));value=vault.get(note);vault.restore(value,vault.tag(value));
+                assertEquals(created.toString(),vault.get(note).path("createdAt").asText());return null;
+            });
+            store.transaction("legacy-dates",()->{
+                var index=new VaultIndex(store);index.root();var legacy=index.create(path("Legacy.md"),VaultIndex.Kind.MARKDOWN,null,null,null);legacy.remove("createdAt");
+                store.update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=?",legacy.toString(),store.owner(),VaultIndex.ENTRY,id(legacy));
+                assertFalse(index.move(id(legacy),path("Moved.md")).has("createdAt"));return null;
+            });
+        }finally{clock.set(null);}
+    }
 
     @Test void ownerPrivateIndexedTreesMoveWithoutChangingDocumentIdentity(){
         UUID note=store.transaction("a",()->{

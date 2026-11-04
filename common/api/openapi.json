@@ -31913,6 +31913,11 @@
           "entryEtag": {
             "type": "string",
             "description": "Metadata representation validator, also returned by metadata GET as the ETag header. Use this for path moves, deletion and recovery through the Notes API."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time this entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries without a recorded creation time omit this field."
           }
         }
       },
@@ -32059,6 +32064,11 @@
           },
           "sourceKey": {
             "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time this entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries without a recorded creation time omit this field."
           }
         }
       },
