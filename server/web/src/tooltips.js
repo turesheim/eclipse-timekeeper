@@ -134,6 +134,8 @@ export function installTooltips() {
       requestAnimationFrame(()=>{if(pointer){const target=document.elementFromPoint(pointer.clientX,pointer.clientY);if(target)hover({...pointer,target});}});
     }else active.instance.update();
   }},true);
-  document.addEventListener('wheel',event=>{if(!overTooltip(event)||active.interactive)return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight)return;inner.scrollTop+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?inner.clientHeight:1);event.preventDefault();},{capture:true,passive:false});
+  // Geometry also governs focused scrolling: WebKit can retain the underlying
+  // wheel target when a stationary pointer's popup becomes interactive.
+  document.addEventListener('wheel',event=>{if(!overTooltip(event))return;const inner=active.tip.querySelector('.tooltip-inner');if(inner.scrollHeight<=inner.clientHeight&&inner.scrollWidth<=inner.clientWidth)return;const unit=event.deltaMode===1?16:1;inner.scrollTop+=event.deltaY*unit*(event.deltaMode===2?inner.clientHeight:1);inner.scrollLeft+=event.deltaX*unit*(event.deltaMode===2?inner.clientWidth:1);event.preventDefault();},{capture:true,passive:false});
   window.addEventListener('resize',hideTooltip);window.addEventListener('blur',hideTooltip);window.addEventListener('pagehide',hideTooltip);
 }

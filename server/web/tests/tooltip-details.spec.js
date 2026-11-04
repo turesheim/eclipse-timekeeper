@@ -58,7 +58,7 @@ test('passive tooltip stays the same over another hint and focuses only after fi
   await pointAt(page,tip);await page.clock.runFor(1000);await expect(tip).toHaveAttribute('id',id);expect(await page.evaluate(()=>window.tooltipRemovals)).toBe(0);await expect(tip).toHaveAttribute('role','tooltip');await expect(tip.locator('.tooltip-inner')).not.toBeFocused();
   await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
   await page.clock.runFor(3999);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await page.clock.runFor(1);await expect(tip.locator('.tooltip-inner')).toBeFocused();await expect(tip).toHaveAttribute('role','dialog');await expect(tip).toHaveAttribute('aria-label','Review');await expect(tip).toHaveCSS('pointer-events','auto');
-  // Native WebKit scrolling and axe need real timers after the dwell assertions.
+  // Exact dwell assertions are done; axe needs real browser timers.
   await page.clock.resume();const before=await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop);await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(before);
   const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
   await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(button).toBeFocused();await expect(button).not.toHaveAttribute('aria-describedby');
@@ -81,9 +81,11 @@ test('independent hint inspections dismiss the popup covering the next control',
 
 test('keyboard focus opens details with F2 and live refreshes preserve the focused link and scrolled content',async({page,browserName})=>{
   const button=await setup(page,'<a href="https://example.org/first">First link</a>'+('<p>Long detail</p>').repeat(80));await button.focus();await page.clock.runFor(850);const tip=page.locator('.timekeeper-tooltip');await expect(tip).toBeVisible();await page.keyboard.press('F2');await expect(tip.locator('.tooltip-inner')).toBeFocused();
-  await page.clock.resume();await page.keyboard.press('PageDown');await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+  await page.clock.resume();
   await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');const link=tip.getByRole('link',{name:'First link'});await expect(link).toBeFocused();
   await tip.locator('.tooltip-inner').evaluate(node=>{node.scrollTop=100;});await page.evaluate(()=>window.updateEventDescription('<a href="https://example.org/new">Updated link</a>'));await expect(link).toBeFocused();expect(await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBe(100);
+  // Exercise native keyboard animation after the exact refresh-position check.
+  await tip.locator('.tooltip-inner').focus();await page.keyboard.press('PageDown');await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(100);
   await page.keyboard.press('Escape');await expect(button).toBeFocused();await expect(tip).toHaveCount(0);await page.mouse.move(0,0);await show(page,button);await expect(page.locator('.timekeeper-tooltip')).toContainText('Updated link');
 });
 
