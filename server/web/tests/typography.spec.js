@@ -131,7 +131,7 @@ test('typography follows confirmed peer changes and all web entry pages without 
   await editor(page).fill(':root { --font-base: 20px; --font-brand: 2rem; }');await save(page);await saved(page);
   await expect(other.locator('html')).toHaveCSS('font-size', '20px');await expect(editor(other)).toHaveValue(draft);
   await editor(other).fill(await editor(page).inputValue());
-  for (const path of ['/admin/', '/web/project-report.html', '/web/markdown-lab.html']) {
+  for (const path of ['/admin/', '/web/project-report.html', '/web/#notes']) {
     await other.goto(path);await expect(other.locator('html')).toHaveCSS('font-size', '20px');
     await expect(other.locator('.brand')).toHaveCSS('font-size', '40px');
     expect(await other.evaluate(() => window.typographyPolicyViolations)).toEqual([]);
@@ -180,17 +180,15 @@ test('invalid CSS stored through the profile API remains inert and can be correc
   await expect(page.locator('html')).toHaveCSS('font-size', '18px');
 });
 
-test('typography reaches formatted Markdown headings and source editors inside shadow roots', async ({page, request}) => {
+test('typography reaches shared formatted Markdown headings and plain source editors', async ({page, request}) => {
   await openSettings(page, request);
   await editor(page).fill(':root { --font-base: 18px; --font-markdown-h1: 2rem; --font-markdown-source: 1.25rem; }');await save(page);await saved(page);
-  await page.goto('/web/markdown-lab.html');await page.getByRole('button', {name: 'Formatted', exact: true}).click();
-  await expect(page.locator('.ProseMirror h1')).toHaveCSS('font-size', '36px');
-  await page.evaluate(async () => {
-    const {createSourceEditor} = await import('/web/assets/milkdown/source-editor.js');
-    const root = document.createElement('div');root.id = 'typography-source-preview';document.querySelector('main').append(root);
-    const source = createSourceEditor({root, value: '# Source text', label: 'Typography source preview', changed() {}});await source.ready;
-  });
-  await expect(page.locator('#typography-source-preview .cm-scroller')).toHaveCSS('font-size', '22.5px');
+  await page.goto('/web/#today');const field=page.locator('#today-note-editor');
+  await field.getByRole('button', {name: 'Markdown source', exact: true}).click();
+  const source=field.locator('.journal-source textarea');await source.fill('# Typography heading\n\nSource text.\n');
+  await expect(source).toHaveCSS('font-size', '22.5px');
+  await field.getByRole('button', {name: 'Formatted', exact: true}).click();
+  await expect(field.locator('.ProseMirror h1')).toHaveCSS('font-size', '36px');
 });
 
 test('typography settings fit mobile screens, support keyboard editing and are accessible in every theme', async ({page, request, browserName}) => {

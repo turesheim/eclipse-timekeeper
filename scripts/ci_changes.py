@@ -37,7 +37,7 @@ FEATURE_SPECS = {
     'focus.js': ['focus.spec.js'],
     'notes.js': ['notes.spec.js', 'day-notes.spec.js'],
     'notes-folder-import.js': ['notes.spec.js'],
-    'journal-account.js': ['journal-account.spec.js'],
+    'notes-account.js': ['notes-account.spec.js', 'notes.spec.js'],
     'calendar-subscriptions.js': ['calendar-subscriptions.spec.js'],
 }
 

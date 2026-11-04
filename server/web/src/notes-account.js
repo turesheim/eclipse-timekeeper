@@ -37,6 +37,9 @@ export async function renderNotesAccount(view){
   };
   importer=new NotesFolderImport(owner);importer.controls();view.cleanup.add(()=>importer.reset());
   const connection=section(view,t('notes.webdav_url'));
-  connection.append(node('code',new URL('/dav/vault/',location.origin).href,'journal-webdav-url'),node('p',t('journal.webdav.credentials'),'hint'));
+  connection.append(node('code',new URL('/dav/notes/',location.origin).href,'notes-webdav-url'),node('p',t('notes.webdav_credentials'),'hint'));
+  const tokens=node('a',t('notes.webdav_tokens'),'btn btn-outline-secondary');tokens.href='#account/tokens';
+  const client=node('a',t('notes.download_client'),'btn btn-outline-secondary');client.href='/web/tools/webdav_sync.py';client.download='webdav_sync.py';
+  const actions=node('div',undefined,'d-flex flex-wrap gap-2 mb-3');actions.append(client,tokens);connection.append(actions,node('p',t('notes.webdav_naming')),node('p',t('notes.webdav_concurrency'),'hint'));
   const guide=node('a',t('notes.sync_guide'));guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/NOTES-WEBDAV.md';guide.target='_blank';guide.rel='noopener noreferrer';connection.append(guide);
 }

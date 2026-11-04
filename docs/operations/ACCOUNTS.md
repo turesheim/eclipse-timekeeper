@@ -207,12 +207,13 @@ require reviewing current records before another submission. Sign-out or an
 account change clears the page, drafts, displayed token secrets and pending
 results. No shared workspace, membership or invitation model is introduced.
 
-## Journal WebDAV access
+## Notes WebDAV access
 
-**My account → Journal** shows the WebDAV collection URL and connection guidance.
+**My Account → Notes** shows the `/dav/notes/` collection URL, connection guidance
+and a download for the packaged manual client.
 Create a personal API token with read and write permissions under **My account →
 API tokens** for each client. The token is the HTTP Basic password; revoke it
-there to end that client's access. See the [WebDAV guide](JOURNAL-WEBDAV.md)
+there to end that client's access. See the [WebDAV guide](NOTES-WEBDAV.md)
 for guarded writes and tested client compatibility.
 
 ## Recovery email addresses

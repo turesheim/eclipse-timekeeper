@@ -48,7 +48,7 @@ async function show(hash, ask = true) {
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', i18nText("ui.this_session_is_read_only_sign_in_with_your_password_to_change_settings"), 'alert alert-info'));
   if (page === 'account') {
-    const part = ['profile', 'typography', 'password', 'passkeys', 'tokens', 'data', 'import', 'calendars', 'labels', 'focus', 'journal', 'notes'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
+    const part = ['profile', 'typography', 'password', 'passkeys', 'tokens', 'data', 'import', 'calendars', 'labels', 'focus', 'notes'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
     for (const [key, title] of [['profile', i18nText("ui.profile")], ['typography', i18nText('typography.title')], ['password', i18nText("ui.password")], ['passkeys', i18nText("ui.passkeys")], ['calendars', i18nText('calendar.subscriptions')], ['notes', i18nText('notes.title')], ['labels', i18nText('ui.labels')], ['focus', i18nText('focus.title')], ['tokens', i18nText("ui.api_tokens")], ['data', i18nText("ui.your_data")], ['import', i18nText("ui.import")]]) {
       const item = link(title, `#account/${key}`, 'nav-link');if (key === part) {item.classList.add('active');item.setAttribute('aria-current', 'page');}
       $('account-navigation').append(item);

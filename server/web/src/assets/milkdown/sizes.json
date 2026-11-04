@@ -1,14 +1,14 @@
 [
   {
     "file": "milkdown.js",
-    "bytes": 499713
+    "bytes": 499714
   },
   {
     "file": "milkdown.css",
     "bytes": 1561
   },
   {
-    "file": "source-editor.js",
-    "bytes": 719097
+    "file": "code-highlight.js",
+    "bytes": 561352
   }
 ]

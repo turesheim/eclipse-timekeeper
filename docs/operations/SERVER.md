@@ -89,12 +89,12 @@ initialization and H2 database-administration rights. Permitted URL settings are
 persistent JDBC settings are rejected before opening storage. Named memory
 storage is suitable for tests; production uses durable file/server storage.
 
-## Journal synchronization
+## Notes synchronization
 
-Daily Markdown notes are available at the server's WebDAV collection. Follow
-the [WebDAV guide](JOURNAL-WEBDAV.md) for authentication, conditional writes,
+Markdown notes, journal entries and attachments are available at `/dav/notes/`. Follow
+the [WebDAV guide](NOTES-WEBDAV.md) for authentication, conditional writes,
 deletion and tested client compatibility. Users find the collection URL under
-**My account → Journal** and create personal API tokens under **My account → API tokens**.
+**My Account → Notes** and create personal API tokens under **My account → API tokens**.
 The [journal storage policy](JOURNAL-STORAGE.md) covers encryption and backup-key
 custody; the server processes readable Markdown.
 

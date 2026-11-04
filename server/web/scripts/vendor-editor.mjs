@@ -4,7 +4,7 @@ import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {gzipSync} from 'node:zlib';
 const root=fileURLToPath(new URL('../',import.meta.url)),check=process.argv.includes('--check');
-const result=await build({absWorkingDir:root,entryPoints:['editor/milkdown.js','editor/source-editor.js'],bundle:true,format:'esm',target:['es2022'],plugins:[{name:'shared-translations',setup(build){build.onResolve({filter:/\/i18n\.js$/},()=>({path:'../../i18n.js',external:true}));}}],minify:true,legalComments:'eof',write:false,outdir:'src/assets/milkdown',metafile:true});
+const result=await build({absWorkingDir:root,entryPoints:['editor/milkdown.js','editor/code-highlight.js'],bundle:true,format:'esm',target:['es2022'],plugins:[{name:'shared-translations',setup(build){build.onResolve({filter:/\/i18n\.js$/},()=>({path:'../../i18n.js',external:true}));}}],minify:true,legalComments:'eof',write:false,outdir:'src/assets/milkdown',metafile:true});
 const files=result.outputFiles.map(file=>[file.path,file.contents]);
 // Follow the actual bundle graph, not every development dependency. Ship complete
 // license texts for each included package and fail if an unknown license appears.
@@ -29,7 +29,7 @@ for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,
   for(const license of licenses)notices+=`\n\n${pkg.name}@${pkg.version} / ${license}\n\n`+await readFile(join(pkg.directory,license),'utf8');
 }
 const target=join(root,'src/assets/milkdown');
-files.push([join(target,'CODEMIRROR-LICENSE'),await readFile(join(root,'node_modules/@codemirror/view/LICENSE'))]);
+files.push([join(target,'CODEMIRROR-LICENSE'),await readFile(join(root,'node_modules/@codemirror/language/LICENSE'))]);
 files.push([join(target,'LICENSE'),await readFile(join(root,'node_modules/@milkdown/kit/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n']);
 const sizes=result.outputFiles.map(file=>({file:file.path.split('/').at(-1),bytes:file.contents.length,gzipBytes:gzipSync(file.contents).length}));
 // Gzip estimates vary across zlib versions. Only deterministic raw sizes belong

@@ -71,7 +71,7 @@ storage and restrictive service permissions **before** storing journal data:
   service startup, and preserve the existing unprivileged service ownership.
 - External WebDAV clients may keep local copies and their own synchronization
   state. Protect those files and client backups with the same encrypted/private
-  storage policy. Follow the [WebDAV guide](JOURNAL-WEBDAV.md) for account
+  storage policy. Follow the [WebDAV guide](NOTES-WEBDAV.md) for account
   authentication and conditional writes.
 
 The operating system/storage platform manages volume unlock keys. Keep recovery

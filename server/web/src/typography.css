@@ -130,7 +130,7 @@
   --font-calendar-card-mobile: .75rem;
 
   /* Markdown and journal editors */
-  /* Markdown source editor text and line numbers, including split view. */
+  /* Plain Markdown source editor text. */
   --font-markdown-source: .9rem;
   /* Level 1 heading in formatted Markdown notes. */
   --font-markdown-h1: 1.7rem;
@@ -146,7 +146,7 @@
   --font-markdown-h6: .9rem;
   /* Heading in a daily-note dialog. */
   --font-journal-dialog-heading: 1.3rem;
-  /* Markdown source, formatted and split-view buttons in note dialogs. */
+  /* Markdown source and formatted-mode buttons in note dialogs. */
   --font-markdown-mode: .9rem;
   /* Heading above the inline journal editor. */
   --font-journal-inline-heading: 1.2rem;

@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import http.client
 import http.server
+import json
 from pathlib import Path
 import socket
 import ssl
@@ -23,6 +24,11 @@ class BrowserTLSFixtureTest(unittest.TestCase):
             def do_GET(self):
                 if self.headers.get('If-None-Match')=='"fixture"':self.send_response(304);self.send_header('ETag','"fixture"');self.end_headers();return
                 self.send_response(200);self.send_header('Content-Type','text/javascript');self.send_header('Content-Length',str(len(body)));self.send_header('ETag','"fixture"');self.end_headers();self.wfile.write(body)
+            def dav(self):
+                incoming=self.rfile.read(int(self.headers.get('Content-Length','0')))
+                value=json.dumps({'method':self.command,'body':incoming.decode(),'destination':self.headers.get('Destination'),'etag':self.headers.get('If-Match')}).encode()
+                self.send_response(207 if self.command=='PROPFIND' else 201);self.send_header('Content-Length',str(len(value)));self.end_headers();self.wfile.write(value)
+            do_PROPFIND=do_MKCOL=do_MOVE=dav
         class BackendServer(http.server.ThreadingHTTPServer):request_queue_size=128
         backend=BackendServer(('127.0.0.1',0),Backend)
         threading.Thread(target=backend.serve_forever,daemon=True).start()
@@ -43,5 +49,13 @@ class BrowserTLSFixtureTest(unittest.TestCase):
                                 if cached:self.assertIsNone(response.getheader('Content-Length'))
                         finally:client.close()
                     with ThreadPoolExecutor(max_workers=12) as pool:list(pool.map(request,range(36)))
+                    client=http.client.HTTPSConnection('127.0.0.1',address.port,timeout=3,context=ssl._create_unverified_context())
+                    try:
+                        for method in ('PROPFIND','MKCOL','MOVE'):
+                            client.request(method,'/dav/notes/',body=b'<propfind/>',headers={'Destination':'/dav/notes/moved.md','If-Match':'"fixture"'})
+                            response=client.getresponse();value=json.loads(response.read())
+                            self.assertEqual(207 if method=='PROPFIND' else 201,response.status)
+                            self.assertEqual({'method':method,'body':'<propfind/>','destination':'/dav/notes/moved.md','etag':'"fixture"'},value)
+                    finally:client.close()
                 finally:idle.close();fixture.close()
         finally:backend.shutdown();backend.server_close()

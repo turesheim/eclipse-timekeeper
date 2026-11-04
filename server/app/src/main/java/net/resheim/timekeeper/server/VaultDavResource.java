@@ -13,11 +13,12 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 
+@Retention(RetentionPolicy.RUNTIME) @HttpMethod("PROPFIND") @interface PROPFIND {}
 @Retention(RetentionPolicy.RUNTIME) @HttpMethod("MKCOL") @interface MKCOL {}
 @Retention(RetentionPolicy.RUNTIME) @HttpMethod("MOVE") @interface MOVE {}
 
 /** Hierarchical, owner-private WebDAV. No unconditional destructive operations. */
-@Path("/dav/vault") @Blocking
+@Path("/dav/notes") @Blocking
 public class VaultDavResource {
     private static final String ALLOW="OPTIONS, PROPFIND, GET, HEAD, PUT, DELETE, MKCOL, MOVE";
     private static final DateTimeFormatter HTTP_DATE=DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC);
@@ -26,7 +27,7 @@ public class VaultDavResource {
     @Inject RequestIdentity identity;
     @Inject BrowserOrigins origins;
     @jakarta.ws.rs.core.Context jakarta.ws.rs.core.UriInfo uri;
-    private String root(){return uri.getPath().replaceFirst("^/","").startsWith("remote.php/webdav/")?"/remote.php/webdav/vault/":"/dav/vault/";}
+    private String root(){return "/dav/notes/";}
     private VaultPath path(){return parse(uri.getRequestUri().getRawPath());}
     private VaultPath parse(String raw){
         String prefix=root();if(raw.equals(prefix.substring(0,prefix.length()-1)))return VaultPath.root();
@@ -68,7 +69,7 @@ public class VaultDavResource {
     private void property(StringBuilder xml,VaultCollection vault,ObjectNode entry,String generation,String collectionId){
         boolean folder=VaultCollection.folder(entry);var path=VaultCollection.path(entry);
         xml.append("<D:response><D:href>").append(escape(root()+path.encoded()+(folder&&!path.isRoot()?"/":""))).append("</D:href><D:propstat><D:prop>")
-                .append("<D:displayname>").append(escape(path.isRoot()?"vault":path.name())).append("</D:displayname><D:resourcetype>")
+                .append("<D:displayname>").append(escape(path.isRoot()?"notes":path.name())).append("</D:displayname><D:resourcetype>")
                 .append(folder?"<D:collection/>":"").append("</D:resourcetype><D:resource-id><D:href>urn:uuid:").append(ImportLedger.identifier("vault-dav-resource",collectionId,entry.path("id").asText())).append("</D:href></D:resource-id><D:getetag>").append(escape(vault.tag(entry,generation))).append("</D:getetag>")
                 .append("<D:getcontentlength>").append(folder?0:entry.path("byteLength").asLong()).append("</D:getcontentlength><D:getcontenttype>")
                 .append(folder?"httpd/unix-directory":media(entry)).append("</D:getcontenttype>");

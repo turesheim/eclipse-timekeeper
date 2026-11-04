@@ -54,7 +54,7 @@ class DayLabelHttpTest {
     }
     @Test void markdownReplacementAndDeletionNeverChangeTheCalendarLabel(){
         String day="2026-10-04",label="/day-labels/"+day;var named=put("test-a",label,get("test-a",label).header("ETag"),"{\"text\":\"Keep me\"}");
-        String auth="Basic "+Base64.getEncoder().encodeToString("client:test-a".getBytes(StandardCharsets.UTF_8)),path="/dav/journal/"+day+".md",source="---\ntimekeeper-label: Opaque legacy metadata\ncustom: retain\n---\n# Markdown\n";
+        String auth="Basic "+Base64.getEncoder().encodeToString("client:test-a".getBytes(StandardCharsets.UTF_8)),path="/dav/notes/journal/"+day+".md",source="---\ntimekeeper-label: Opaque legacy metadata\ncustom: retain\n---\n# Markdown\n";
         var created=given().header("Authorization",auth).header("If-None-Match","*").body(source).put(path);assertEquals(201,created.statusCode());
         assertEquals("Keep me",get("test-a",label).jsonPath().getString("text"));assertEquals(named.header("ETag"),get("test-a",label).header("ETag"));
         assertEquals(source,given().header("Authorization",auth).get(path).asString());

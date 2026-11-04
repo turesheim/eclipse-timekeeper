@@ -1,6 +1,6 @@
 import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
-import {splitMarkdown,needsSource} from './markdown-document.js';
+import {splitMarkdown} from './markdown-document.js';
 import {icon,iconButton} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -17,8 +17,8 @@ async function loadEngine(){if(!engine)engine=await import('./assets/milkdown/mi
 
 /** One in-memory Markdown field. Neither drafts nor bodies enter browser storage. */
 export class MarkdownField {
-  constructor(root,onChange,onState,prefix='journal',onUpload,resources,{sourceTools=false}={}){
-    Object.assign(this,{root,onChange,onState,onUpload,resources,sourceTools,generation:0,readOnly:true});root.classList.add('markdown-editor');
+  constructor(root,onChange,onState,prefix='journal',onUpload,resources){
+    Object.assign(this,{root,onChange,onState,onUpload,resources,generation:0,readOnly:true});root.classList.add('markdown-editor');
     this.modes=node('div',undefined,'btn-group markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
     this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
@@ -92,12 +92,12 @@ export class MarkdownField {
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('keydown',event=>{if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
-    buildExperience(this,loadEngine,()=>import('./assets/milkdown/source-editor.js'));
-    this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();this.refreshPreview();});this.clear();
+    buildExperience(this);
+    this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
   insertSource(text,from=this.text.selectionStart,to=this.text.selectionEnd){
-    if(this.readOnly)return null;if(this.codeEditor)return this.codeEditor.insert(text,from,to);
-    const follow=this.text.selectionStart===from&&this.text.selectionEnd===to;this.text.setRangeText(text,from,to,'preserve');const end=from+text.length;if(follow)this.text.setSelectionRange(end,end);this.onChange();this.refreshPreview();return end;
+    if(this.readOnly)return null;
+    const follow=this.text.selectionStart===from&&this.text.selectionEnd===to;this.text.setRangeText(text,from,to,'preserve');const end=from+text.length;if(follow)this.text.setSelectionRange(end,end);this.onChange();return end;
   }
   rawBody(){return this.text.value===this.displayedBody?this.raw:this.text.value;}
   async upload(picker,image){
@@ -105,7 +105,6 @@ export class MarkdownField {
   }
   async uploadFiles(files,target,forceImage){
     if(!this.onUpload||this.readOnly||this.loading)return;
-    if(this.codeEditor){const position=this.codeEditor.position();this.text.setSelectionRange(position.anchor,position.head);}
     const remaining=[...files];
     const generation=this.generation,editor=this.editor;let start=this.text.selectionStart,end=this.text.selectionEnd;
     this.loading=true;this.controls();this.retryButton.hidden=true;
@@ -133,7 +132,7 @@ export class MarkdownField {
     const prefix=this.frontmatter||'';
     return value.startsWith(prefix)&&this.editor.matchesSource(value.slice(prefix.length));
   }
-  setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.suspended?.editor.setReadOnly(value);this.codeEditor?.readOnly(value);this.controls();}
+  setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.suspended?.editor.setReadOnly(value);this.controls();}
   paintBlockStyle(){
     const level=this.editor?.headingLevel()||0;
     if(level!==this.blockLevel){
@@ -155,7 +154,7 @@ export class MarkdownField {
   }
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
   controls(){
-    if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;this.codeEditor?.readOnly(this.readOnly||this.loading);if(this.sourceExtras)this.sourceExtras.hidden=!this.rich.hidden;
+    if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
@@ -165,14 +164,14 @@ export class MarkdownField {
   }
   mode(formatted){
     if(!formatted)this.closeBlockMenu();
-    if(this.sourceExtras)this.sourceExtras.hidden=formatted;this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
+    this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
     this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
-    this.sourcePosition=null;this.enhance?.setAttribute('aria-pressed','false');this.split?.setAttribute('aria-pressed','false');this.plain.classList.remove('markdown-split');
+    this.sourcePosition=null;
     this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();
-    this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.codeEditor?.destroy();this.codeEditor=null;this.codeHost?.replaceChildren();if(this.codeHost)this.codeHost.hidden=true;this.text.hidden=false;this.resetPreview?.();if(this.splitHost)this.splitHost.hidden=true;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
+    this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.text.hidden=false;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
@@ -180,21 +179,18 @@ export class MarkdownField {
     this.resources?.invalidate?.();this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.text.setSelectionRange(0,0);this.text.scrollTop=0;
     this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
   }
-  position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():this.codeEditor?this.codeEditor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}
+  position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}
   async restorePosition(position){if(!position)return;const generation=this.restoreGeneration;if(position.formatted)await this.showFormatted(false);if(generation!==this.restoreGeneration)return;if(this.editor)this.editor.restorePosition(position);else{this.text.setSelectionRange(Math.min(position.anchor,this.text.value.length),Math.min(position.head??position.anchor,this.text.value.length));this.text.scrollTop=position.scrollTop||0;}}
   async showSource(){
     if(this.loading||!this.editor)return;
     const previous=this.editor,position=previous.position(),body=previous.markdown();this.setRaw(body);this.suspended={editor:previous,body};this.editor=null;
-    this.mode(false);this.controls();const normalized=position.anchor,head=position.head??normalized;this.text.setSelectionRange(Math.min(normalized,head),Math.max(normalized,head),head<normalized?'backward':'forward');this.text.scrollTop=position.scrollTop;if(this.codeEditor){this.codeEditor.replaceValue(body);this.codeHost.hidden=false;this.text.hidden=true;this.codeEditor.select(normalized,head);}else this.text.focus();this.refreshPreview();
+    this.mode(false);this.controls();const normalized=position.anchor,head=position.head??normalized;this.text.setSelectionRange(Math.min(normalized,head),Math.max(normalized,head),head<normalized?'backward':'forward');this.text.scrollTop=position.scrollTop;this.text.focus();
   }
   async showFormatted(focus=true){
     if(this.loading)return;if(this.editor){this.editor.focus();return;}
-    this.sourcePosition=this.codeEditor?.position()||{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};if(this.codeEditor)this.setRaw(this.codeEditor.value());
+    this.sourcePosition={anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop};
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
-      // Frontmatter is deliberately opaque and outside both editor schemas.
-      // A newly authored header changes that boundary; do not retain a body-only
-      // history that could subsequently duplicate it into the Markdown body.
-      if(parts.frontmatter&&this.codeEditor){this.codeEditor.destroy();this.codeEditor=null;this.codeHost.replaceChildren();this.codeHost.hidden=true;this.text.hidden=false;this.enhance.setAttribute('aria-pressed','false');}
+
     }
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
     const richBody=this.rawBody();
@@ -212,5 +208,5 @@ export class MarkdownField {
     }catch{if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.status.textContent=t('markdown.failed');}}
     finally{if(current===this.generation){this.loading=false;this.controls();}host.inert=false;}
   }
-  focus(){if(this.editor)this.editor.focus();else if(this.codeEditor)this.codeEditor.focus();else this.text.focus();}
+  focus(){if(this.editor)this.editor.focus();else this.text.focus();}
 }
