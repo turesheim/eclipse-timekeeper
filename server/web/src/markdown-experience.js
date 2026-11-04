@@ -26,7 +26,7 @@ export function buildExperience(field,load,loadSource){
   f.numbers=action('markdown.line_numbers',()=>{f.showNumbers=f.showNumbers===false;f.codeEditor?.lineNumbers(f.showNumbers);f.numbers.setAttribute('aria-pressed',String(f.showNumbers));},'list-ol');f.numbers.setAttribute('aria-pressed','true');
   f.split=action('markdown.split',()=>{f.splitHost.hidden=!f.splitHost.hidden;f.split.setAttribute('aria-pressed',String(!f.splitHost.hidden));f.plain.classList.toggle('markdown-split',!f.splitHost.hidden);if(!f.splitHost.hidden)f.syncPreviewScroll(f.codeEditor?.scrollElement||f.text);f.refreshPreview();},'layout-split');f.split.setAttribute('aria-pressed','false');
   f.splitHost=el('div');f.splitHost.className='journal-formatted markdown-split-preview';f.splitHost.setAttribute('aria-label',t('markdown.preview'));f.splitHost.hidden=true;f.plain.append(f.splitHost);
-  f.sourceExtras.append(f.enhance,f.find,f.numbers,f.split);f.toolbar.after(f.sourceExtras);
+  f.sourceExtras.append(f.enhance,f.find,f.numbers,f.split);if(f.sourceTools)f.toolbar.after(f.sourceExtras);
   buildPreview(f,load);
   f.assetDialog=el('dialog');f.assetDialog.className='app-dialog markdown-asset-dialog';f.assetDialog.setAttribute('aria-label',t('markdown.existing_asset'));
   const assetHeading=el('h2',t('markdown.existing_asset')),assetSearch=el('input');assetSearch.type='search';assetSearch.className='form-control';assetSearch.setAttribute('aria-label',t('notes.search'));const assetList=el('div');assetList.className='markdown-asset-list';const closeAsset=action('ui.close',()=>f.assetDialog.close());f.assetDialog.append(assetHeading,assetSearch,assetList,closeAsset);f.root.append(f.assetDialog);
@@ -48,19 +48,12 @@ export function buildExperience(field,load,loadSource){
     const values=await f.resources.revisions();if(generation!==f.generation)return;historyStatus.textContent=values.length?'':t('markdown.no_revisions');
     for(const value of values){const pick=el('button',t('markdown.revision_item',{version:value.contentVersion,date:value.modifiedAt}));pick.type='button';pick.className='btn btn-outline-secondary';pick.addEventListener('click',async()=>{try{const revision=await f.resources.revision(value.id);if(generation===f.generation)showComparison(revision);}catch(error){historyStatus.textContent=error.message;}});historyList.append(pick);}
   }catch(error){if(generation===f.generation)historyStatus.textContent=error.message;}},'clock-history');f.toolbar.append(f.historyButton);
-  f.outline=el('details');f.outline.className='markdown-outline';f.outline.append(el('summary',t('markdown.outline')));f.outlineItems=el('nav');f.outlineItems.setAttribute('aria-label',t('markdown.outline'));f.outline.append(f.outlineItems);f.metadata.after(f.outline);
-  f.outline.addEventListener('toggle',()=>{if(f.outline.open)paintOutline();});
-  const paintOutline=()=>{
-    const headings=f.editor?.outline()||[...f.rawBody().matchAll(/^(#{1,6})\s+(.+)$/gm)].map(match=>({level:match[1].length,text:match[2],pos:match.index,anchor:headingAnchor(match[2])}));
-    f.outlineItems.replaceChildren();for(const heading of headings){const button=action('markdown.outline',()=>{if(f.editor)f.editor.scrollTo(heading.pos);else if(f.codeEditor)f.codeEditor.select(heading.pos);else{f.text.focus();f.text.setSelectionRange(heading.pos,heading.pos);}});button.textContent=heading.text;button.style.paddingInlineStart=(heading.level-1)*.75+.5+'rem';button.title=heading.text;f.outlineItems.append(button);}
-  };
   f.scrollToHeading=heading=>{if(!heading)return;const target=f.editor?.outline().find(item=>headingAnchor(item.text)===headingAnchor(heading));if(target){f.editor.scrollTo(target.pos);return true;}f.status.textContent=t('markdown.heading_missing',{heading});return false;};
   f.overflow=action('markdown.more',()=>{const open=f.toolbar.dataset.expanded!=='true';f.toolbar.dataset.expanded=String(open);f.overflow.setAttribute('aria-expanded',String(open));},'three-dots');f.overflow.classList.add('markdown-overflow');f.overflow.setAttribute('aria-expanded','false');f.toolbar.append(f.overflow);
   const suggestions=el('div');suggestions.className='markdown-suggestions';suggestions.hidden=true;suggestions.setAttribute('role','listbox');suggestions.setAttribute('aria-label',t('markdown.suggestions'));f.root.append(suggestions);f.suggestions=suggestions;
   let completion=0,lastQuery;
   const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
   f.updateExperience=()=>{
-    if(f.outline.open)paintOutline();
     f.applyRevision.disabled=f.readOnly||!chosen;
     f.imageProperties.disabled=f.readOnly||!f.editor?.imageDetails();
     f.historyButton.disabled=!f.resources?.revisions;

@@ -91,10 +91,6 @@
 .markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
 .markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }
 .markdown-source-tools { display: flex; gap: .25rem; flex-wrap: wrap; }
-.markdown-outline > summary { color: var(--bs-secondary-color); font-size: .85rem; cursor: pointer; }
-.markdown-outline nav { display: flex; flex-wrap: wrap; gap: .25rem; padding-block: .5rem; }
-.markdown-outline nav { flex-direction: column; max-height: 12rem; overflow: auto; }
-.markdown-outline button { text-align: start; border: 0; }
 .markdown-code-editor { flex: 1; min-height: 15rem; min-width: 0; overflow: auto; }
 .markdown-code-editor .cm-editor { height: 100%; background: var(--bs-body-bg); color: var(--bs-body-color); }
 .markdown-code-editor .cm-scroller { font: .9rem/1.6 var(--bs-font-monospace); }

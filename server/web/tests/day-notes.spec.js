@@ -395,7 +395,7 @@ test('journal formatted editing fits narrow screens and all themes with accessib
     }
     await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.setViewportSize({width:844,height:390});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeInViewport({ratio:.9});await page.setViewportSize({width:320,height:740});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeInViewport({ratio:.9});
-    await captureScreenshot(page,{path:'test-results/journal-editor-compact.png'});await save(page,'Touch label');await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
+    await captureScreenshot(page,{path:'test-results/journal-editor-compact.png'});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
   }finally{await owner.close();}
 });
 
@@ -435,7 +435,7 @@ test('journal controls use the account language and reject oversized UTF-8 draft
 test('journal toolbar creates the full evaluated Markdown subset and validates link edits',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));await month(page);await menu(page);const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await expect(page.locator('#journal-markdown-normalization')).toBeVisible();await expect(rich).toHaveAttribute('aria-describedby','journal-markdown-normalization');
+    await signIn(page,await fresh(request));await month(page);await menu(page);const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await expect(page.locator('#journal-markdown-normalization')).toHaveCount(0);await expect(rich).not.toHaveAttribute('aria-describedby',/normalization/);
     const action=name=>dialog(page).getByRole('button',{name,exact:true});
     async function draft(text){await expect(rich).toBeVisible();await action('Markdown source').click();await page.locator('#journal-body').fill(text);await action('Formatted').click();await expect(rich).toBeVisible();await rich.press('ControlOrMeta+A');}
     await draft('Done');await action('Strikethrough').click();await expect(rich.locator('del')).toHaveText('Done');

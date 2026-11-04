@@ -15,7 +15,7 @@ export class NotesView {
   constructor(root,callbacks){
     Object.assign(this,{root,callbacks,generation:0,positions:new Map(),entries:new Map(),children:new Map(),expanded:new Set(),writable:false});
     const heading=node('div',undefined,'notes-heading');this.title=node('h2',t('notes.title'));this.title.id='notes-title';
-    this.toggle=action(t('notes.navigation'),()=>{this.root.classList.toggle('notes-drawer-open');this.toggle.setAttribute('aria-expanded',String(this.root.classList.contains('notes-drawer-open')));},'folder');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');this.toggle.setAttribute('aria-expanded','false');this.settingsButton=action(t('notes.settings'),()=>void this.openSettings(),'gear');const headingActions=node('div',undefined,'notes-file-tools');headingActions.append(this.settingsButton,this.toggle);heading.append(this.title,headingActions);
+    this.toggle=action(t('notes.navigation'),()=>{this.root.classList.toggle('notes-drawer-open');this.toggle.setAttribute('aria-expanded',String(this.root.classList.contains('notes-drawer-open')));},'folder');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');this.toggle.setAttribute('aria-expanded','false');const headingActions=node('div',undefined,'notes-file-tools');headingActions.append(this.toggle);heading.append(this.title,headingActions);
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.layout=node('div',undefined,'notes-layout');this.navigation=node('aside',undefined,'notes-navigation card');this.navigation.id='notes-navigation';this.navigation.setAttribute('aria-label',t('notes.navigation'));
     const tools=node('div',undefined,'notes-navigation-tools');
@@ -44,16 +44,8 @@ export class NotesView {
     this.dialogError=node('p','','alert alert-danger');this.dialogError.hidden=true;this.dialogError.setAttribute('role','alert');
     const buttons=node('div',undefined,'dialog-actions');this.cancel=action(t('ui.cancel'),()=>{if(!this.busy)this.dialog.close();});this.apply=node('button',t('ui.save'),'btn btn-primary');this.apply.type='submit';buttons.append(this.cancel,this.apply);this.form.append(pathLabel,this.pathInput,this.dialogError,buttons);this.dialog.append(this.dialogTitle,this.form);root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
-    this.settingsDialog=node('dialog',undefined,'app-dialog');this.settingsDialog.setAttribute('aria-labelledby','notes-settings-title');const settingsTitle=node('h2',t('notes.settings'));settingsTitle.id='notes-settings-title';this.settingsForm=node('form');this.settingsFields={};
-    this.settingsForm.append(node('p',t('notes.settings_help'),'hint'));
-    const connection=node('p',t('notes.webdav_url'),'form-label'),url=node('code',new URL('/dav/vault/',location.origin).href,'journal-webdav-url'),guide=node('a',t('notes.sync_guide'));guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/NOTES-WEBDAV.md';guide.target='_blank';guide.rel='noopener noreferrer';this.settingsForm.append(connection,url,node('p',t('journal.webdav.credentials'),'hint'),guide);
-    for(const name of ['journalFolder','eventsFolder','assetsFolder']){const label=node('label',t('notes.'+name),'form-label'),input=node('input',undefined,'form-control');input.id='notes-setting-'+name;input.required=true;input.maxLength=1024;label.htmlFor=input.id;this.settingsFields[name]=input;this.settingsForm.append(label,input);}
-    const hideLabel=node('label',undefined,'form-check-label');this.hideJournalCheckbox=node('input',undefined,'form-check-input');this.hideJournalCheckbox.type='checkbox';this.hideJournalCheckbox.id='notes-setting-hide-journal';this.hideJournalCheckbox.setAttribute('aria-describedby','notes-hide-journal-help');hideLabel.append(this.hideJournalCheckbox,document.createTextNode(' '+t('notes.hide_journal')));const hideField=node('div',undefined,'form-check');hideField.append(hideLabel);const hideHelp=node('p',t('notes.hide_journal_help'),'hint');hideHelp.id='notes-hide-journal-help';this.settingsForm.append(hideField,hideHelp);
-    const configLabel=node('label',undefined,'form-check-label');this.configCheckbox=node('input',undefined,'form-check-input');this.configCheckbox.type='checkbox';configLabel.append(this.configCheckbox,document.createTextNode(' '+t('notes.config_opt_in')));const configField=node('div',undefined,'form-check');configField.append(configLabel);this.settingsForm.append(configField,node('p',t('notes.config_help'),'hint'));
-    this.settingsError=node('p','','alert alert-danger');this.settingsError.setAttribute('role','alert');this.settingsError.hidden=true;this.settingsForm.append(this.settingsError);
-    const settingsActions=node('div',undefined,'dialog-actions');this.settingsCancel=action(t('ui.cancel'),()=>{if(!this.busy)this.settingsDialog.close();});this.settingsApply=node('button',t('ui.save'),'btn btn-primary');this.settingsApply.type='submit';settingsActions.append(this.settingsCancel,this.settingsApply);this.settingsForm.append(settingsActions);this.settingsDialog.append(settingsTitle,this.settingsForm);root.append(this.settingsDialog);
-    this.settingsDialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.settingsForm.addEventListener('submit',event=>{event.preventDefault();void this.saveSettings();});
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
+    document.addEventListener('timekeeper:notes-changed',()=>{this.info=null;this.folder=null;if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());this.observer.observe(document.documentElement);window.addEventListener('resize',()=>this.fit());this.controls();
   }
   dirty(){return !!this.note&&!this.binary&&!this.markdown.matches(this.original);}
@@ -65,16 +57,14 @@ export class NotesView {
   show(){this.visible=true;this.fit();if(this.session)void this.reload();}
   hide(){this.visible=false;}
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.settingsDialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
-  fit(){if(!this.visible)return;const bar=document.getElementById('workspace-navigation');const bottom=bar?.getBoundingClientRect().top||innerHeight;this.layout.style.height=Math.max(280,bottom-this.layout.getBoundingClientRect().top-8)+'px';}
+  reset(){this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top+scrollY,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0;this.root.style.setProperty('--notes-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');}
   controls(){
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.save.disabled=!write||!this.dirty()||this.markdown.loading;this.save.hidden=!this.note||this.binary||this.note.deleted;
     this.rename.disabled=this.remove.disabled=!write||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;
     this.reloadNote.disabled=!this.note||this.busy;this.apply.disabled=this.cancel.disabled=!!this.busy;
     this.download.hidden=!this.note||this.note.kind!=='BINARY'&&this.note.kind!=='ASSET'||this.note.deleted;this.download.disabled=!!this.busy;
-    this.settingsButton.disabled=!this.session||this.busy;this.settingsApply.disabled=!this.writable||this.busy;this.settingsCancel.disabled=!!this.busy;
-    for(const input of [...Object.values(this.settingsFields),this.configCheckbox,this.hideJournalCheckbox])input.disabled=!this.writable||this.busy;
     this.empty.hidden=!!this.selectedImage||!!this.note&&!this.binary&&!this.note.deleted;this.preview.hidden=!this.selectedImage;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
     if(this.note&&!this.busy)this.status.textContent=this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
   }
@@ -204,17 +194,5 @@ export class NotesView {
     try{const reply=await session.request('/notes/entries/'+note.id+'/content',{binary:'application/octet-stream'});if(session!==this.session||current!==this.generation)return;
       const url=URL.createObjectURL(reply.data),link=node('a');link.href=url;link.download=note.path.split('/').at(-1);link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
-  }
-  async openSettings(){
-    if(!this.session||this.busy)return;const session=this.session,current=this.generation;this.settingsError.hidden=true;
-    try{const reply=await session.request('/notes/settings');if(session!==this.session||current!==this.generation)return;this.settingsEtag=reply.etag;this.originalSettings=reply.data;for(const [name,input]of Object.entries(this.settingsFields))input.value=reply.data[name];this.configCheckbox.checked=reply.data.syncObsidianConfig;this.hideJournalCheckbox.checked=!!reply.data.hideJournalFolder;this.controls();this.settingsDialog.showModal();}
-    catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
-  }
-  async saveSettings(){
-    if(!this.writable||this.busy)return;const session=this.session,current=this.generation;this.busy=true;this.controls();
-    const body=Object.fromEntries(Object.entries(this.settingsFields).filter(([name,input])=>input.value!==this.originalSettings[name]).map(([name,input])=>[name,input.value]));if(this.configCheckbox.checked!==this.originalSettings.syncObsidianConfig)body.syncObsidianConfig=this.configCheckbox.checked;if(this.hideJournalCheckbox.checked!==!!this.originalSettings.hideJournalFolder)body.hideJournalFolder=this.hideJournalCheckbox.checked;
-    try{await session.request('/notes/settings',{method:'PUT',etag:this.settingsEtag,body});if(session!==this.session||current!==this.generation)return;this.info=null;this.folder=null;this.settingsDialog.close();this.busy=false;await this.reload();this.callbacks.onChanged?.();}
-    catch(error){if(session===this.session&&current===this.generation){this.settingsError.hidden=false;this.settingsError.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
-    finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
   }
 }
