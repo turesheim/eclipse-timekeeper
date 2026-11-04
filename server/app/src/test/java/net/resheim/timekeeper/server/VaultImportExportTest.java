@@ -37,13 +37,16 @@ class VaultImportExportTest {
     @Test void privateZipHasPortableExactFilesDatesAndEmptyFoldersAndExcludesTrashAndOtherOwners()throws Exception{
         var principal=tokens.authenticate("Bearer test-a");tokens.authenticate("Bearer test-b");
         byte[] document=bytes("---\r\nunknown: [x, true]\r\n---\r\n[[Note]]  \r\n"),binary={0,(byte)255,4};
+        var event=new EventNotes.Key(UUID.randomUUID(),"cd".repeat(32));
+        var eventValue=object().put("subscriptionId",event.subscription().toString()).put("eventKey",event.event()).put("body","Event body\r\n");eventValue.set("event",object().put("uid","event-uid").put("recurrenceId","2026-11-04T10:00:00Z").put("title","Meeting"));byte[] eventBytes=EventNotes.document(eventValue);
         store.transaction("a",()->{
             var vault=new VaultCollection(store,limits);vault.initialize();vault.mkdir(new VaultPath("Export"));vault.mkdir(new VaultPath("Export/Empty"));
             VaultImportDates.parse(CREATED,MODIFIED).apply(store,vault.put(new VaultPath("Export/Ærlig.md"),null,true,document));
             vault.put(new VaultPath("Export/image.bin"),null,true,binary);vault.put(new VaultPath("journal/2026-W45.md"),null,true,bytes("Week\r\n"));
             vault.put(new VaultPath("journal/2026-11-03.md"),null,true,document);new JournalAssets(store).save("export.bin",null,binary);
+            var events=new EventNotes(store);events.saveDocument(event,etag(events.get(event)),eventBytes);
             var trash=vault.put(new VaultPath("Export/Removed.md"),null,true,bytes("Deleted secret"));vault.delete(trash,vault.tag(trash));
-            vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Journal").put("hideJournalFolder",true));return null;
+            vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Journal").put("eventsFolder","Meetings").put("hideJournalFolder",true));return null;
         });
         store.transaction("b",()->{var vault=new VaultCollection(store,limits);vault.initialize();vault.put(new VaultPath("Other-owner.md"),null,true,bytes("Other owner secret"));return null;});
         java.nio.file.Path temporary;
@@ -51,6 +54,7 @@ class VaultImportExportTest {
             temporary=download.file();assertEquals(download.length(),java.nio.file.Files.size(temporary));
             assertArrayEquals(document,zip.getInputStream(zip.getEntry("Export/Ærlig.md")).readAllBytes());assertArrayEquals(binary,zip.getInputStream(zip.getEntry("Export/image.bin")).readAllBytes());
             assertNotNull(zip.getEntry("Export/Empty/"));assertNotNull(zip.getEntry("Private/Journal/2026-W45.md"));assertNotNull(zip.getEntry("Private/Journal/2026-11-03.md"));assertNotNull(zip.getEntry("Private/Journal/assets/export.bin"));
+            assertArrayEquals(eventBytes,zip.getInputStream(zip.getEntry("Meetings/"+event.filename())).readAllBytes());
             assertNull(zip.getEntry("Export/Removed.md"));assertNull(zip.getEntry("Other-owner.md"));assertNull(zip.getEntry("archive.json"));
             var manifest=parse(new String(zip.getInputStream(zip.getEntry(VaultExport.MANIFEST)).readAllBytes(),StandardCharsets.UTF_8));assertEquals(VaultExport.FORMAT,manifest.path("format").asText());
             var metadata=java.util.stream.StreamSupport.stream(manifest.path("entries").spliterator(),false).filter(row->row.path("path").asText().equals("Export/Ærlig.md")).findFirst().orElseThrow();
