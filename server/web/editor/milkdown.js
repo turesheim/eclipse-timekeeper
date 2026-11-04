@@ -120,11 +120,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{
-        if(!event.isComposing)syncDOMSelection(_view,root);
+        // DOM reconciliation also calls this with an undispatched key event.
+        // Its DOM already contains the edit; keep the model's pre-edit selection.
+        if(event.target&&!event.isComposing)syncDOMSelection(_view,root);
         if(event.key.toLowerCase()==='v'&&(event.metaKey||event.ctrlKey))plainPaste=event.shiftKey;
 
-        const foot=event.target.closest?.('[data-footnote-reference]');if(foot&&['Enter',' '].includes(event.key)){event.preventDefault();foot.click();return true;}
-        const link=event.target.closest?.('a[data-day-note-date]');
+        const foot=event.target?.closest?.('[data-footnote-reference]');if(foot&&['Enter',' '].includes(event.key)){event.preventDefault();foot.click();return true;}
+        const link=event.target?.closest?.('a[data-day-note-date]');
         if(event.key==='Enter'&&dailyNoteDate(link?.dataset.dayNoteDate)){
           event.preventDefault();link.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:event.ctrlKey,metaKey:event.metaKey}));return true;
         }
