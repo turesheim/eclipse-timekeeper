@@ -3,8 +3,8 @@
 .notes-layout { display:grid; grid-template-columns:minmax(180px,var(--notes-nav-width,260px)) 8px minmax(0,1fr); grid-template-rows:minmax(0,1fr); height:max(0px,calc(var(--notes-editor-height,32rem) - var(--workspace-content-gap))); min-height:0; }
 .notes-navigation { overflow:auto; padding:.75rem; min-width:0; }
 .notes-navigation-tools,.notes-file-tools,.notes-footer { display:flex; gap:.5rem; align-items:center; }
-.notes-navigation-tools { margin-bottom:.75rem; gap:.375rem; flex-wrap:wrap; }
-.notes-navigation-tools .btn { min-width:2.25rem; min-height:2.25rem; padding:.25rem; }
+.notes-navigation-tools { margin-bottom:.75rem; gap:.25rem; flex-wrap:wrap; }
+.notes-navigation-tools .btn { width:2.25rem; height:2.25rem; min-width:2.25rem; min-height:2.25rem; padding:.25rem; }
 .notes-sort-menu { position:fixed; inset:auto; margin:0; max-width:calc(100vw - 1rem); max-height:calc(100dvh - 1rem); overflow:auto; }
 .notes-sort-menu:popover-open { display:block; }
 .notes-sort-menu [aria-checked=true] { background:var(--bs-primary-bg-subtle); color:var(--bs-primary-text-emphasis); font-weight:650; }

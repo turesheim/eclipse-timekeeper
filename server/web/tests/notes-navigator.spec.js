@@ -72,6 +72,7 @@ test('navigator toolbar and sort menu fit desktop and mobile themes with the sha
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:900});if(width<760)await page.locator('.notes-drawer-toggle').click();
     await expect(navigation).toBeVisible();expect(await navigation.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);
+    const tops=await navigation.locator('.notes-navigation-tools > .btn-group').evaluateAll(groups=>groups.map(group=>group.getBoundingClientRect().top));expect(Math.max(...tops)-Math.min(...tops)).toBeLessThan(2);
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
       await navigation.getByRole('button',{name:'Sort notes',exact:true}).click();expect((await new AxeBuilder({page}).include('#notes-navigation').analyze()).violations).toEqual([]);
