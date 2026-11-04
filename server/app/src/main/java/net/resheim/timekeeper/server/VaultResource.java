@@ -60,6 +60,11 @@ public class VaultResource {
         int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,limits.pageSize(),1,limits.pageSize());
         return tx(()->Response.ok(vault().page(directory,query==null&&uri.getQueryParameters().containsKey("query")?"":query,"true".equals(trash),start,count,snapshot)).build());
     }
+    @GET @Path("/recent") public Response recent(@QueryParam("offset")String offset,@QueryParam("limit")String limit,@HeaderParam("If-Match")String snapshot){
+        ContractInputs.queries(uri.getQueryParameters(),"offset","limit");
+        int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,Math.min(20,limits.pageSize()),1,limits.pageSize());
+        return tx(()->Response.ok(new RecentNotes(store,limits).page(start,count,snapshot)).build());
+    }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("VaultFolderInput",input);var path=new VaultPath(value.path("path").asText());
         var dates=VaultImportDates.parse(value.has("createdAt")?value.path("createdAt").asText():null,value.has("modifiedAt")?value.path("modifiedAt").asText():null);

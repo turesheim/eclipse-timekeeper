@@ -1321,5 +1321,10 @@
   "notes.import_done_other": "Importerte {{count}} filer. Filer i konflikt er uendret.",
   "notes.import_reviewed_one": "{{count}} ny fil er klar til import. Se gjennom listen før du fortsetter.",
   "notes.import_done_one": "Importerte {{count}} fil. Konflikter ble beholdt uendret.",
-  "notes.import_not_present": "Denne filen ble ikke oppgitt av mappevelgeren. Den kan være skjult eller ikke lenger finnes. Ingenting blir lastet opp."
+  "notes.import_not_present": "Denne filen ble ikke oppgitt av mappevelgeren. Den kan være skjult eller ikke lenger finnes. Ingenting blir lastet opp.",
+  "today.recent_notes": "Nylige notater",
+  "today.no_recent_notes": "Ingen notater er endret i den valgte perioden.",
+  "today.more_notes": "Flere notater",
+  "notes.recent_days": "Nylige notater: antall dager",
+  "notes.recent_days_help": "Vis notater endret i dette antallet kalenderdager, inkludert i dag, i I dag-visningen. Bruker tidssonen på kontoen din. Dagboknotater er utelatt. Velg 1–3650 dager; standardverdien er 7."
 }

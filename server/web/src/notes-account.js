@@ -9,10 +9,11 @@ const changed=()=>document.dispatchEvent(new Event('timekeeper:notes-changed'));
 export async function renderNotesAccount(view){
   const [settings,info]=await Promise.all([view.session.request('/notes/settings'),view.session.request('/notes')]);
   if(!view.valid())return;
-  const fields={},checks={};
+  const fields={},checks={},numbers={};
   const preferences=form(view,t('notes.settings'),t('ui.save'),async()=>{
     const body={};
     for(const [name,input]of Object.entries(fields))if(input.value!==settings.data[name])body[name]=input.value;
+    for(const [name,input]of Object.entries(numbers))if(Number(input.value)!==settings.data[name])body[name]=Number(input.value);
     for(const [name,input]of Object.entries(checks))if(input.checked!==!!settings.data[name])body[name]=input.checked;
     const reply=await view.session.request('/notes/settings',{method:'PUT',etag:settings.etag,body});
     if(!view.valid())return;settings.data=reply.data;settings.etag=reply.etag;info.data.settings=reply.data;
@@ -24,7 +25,9 @@ export async function renderNotesAccount(view){
     const wrap=node('div',undefined,'form-check my-3'),input=node('input',undefined,'form-check-input'),caption=node('label',t(label),'form-check-label'),hint=node('p',t(help),'hint');
     input.type='checkbox';input.id='notes-preference-'+name;input.checked=!!settings.data[name];caption.htmlFor=input.id;hint.id=input.id+'-help';input.setAttribute('aria-describedby',hint.id);wrap.append(input,caption);preferences.value.append(wrap,hint);checks[name]=input;
   }
-  for(const input of [...Object.values(fields),...Object.values(checks)])input.disabled=!view.canWrite;
+  const recent=field(preferences.value,t('notes.recent_days'),settings.data.recentNotesDays,{type:'number'});recent.min='1';recent.max='3650';recent.step='1';numbers.recentNotesDays=recent;
+  const recentHelp=node('p',t('notes.recent_days_help'),'hint');recentHelp.id=recent.id+'-help';recent.setAttribute('aria-describedby',recentHelp.id);preferences.value.append(recentHelp);
+  for(const input of [...Object.values(fields),...Object.values(checks),...Object.values(numbers)])input.disabled=!view.canWrite;
   preferences.finish();
 
   const card=section(view,t('notes.import_title'));
