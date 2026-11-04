@@ -41,9 +41,9 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect(await page.locator('.today-toolbar').evaluate(toolbar=>{const heading=toolbar.querySelector('.track-heading').getBoundingClientRect(),controls=toolbar.querySelector('.track-controls').getBoundingClientRect();return Math.abs(heading.y+heading.height/2-controls.y-controls.height/2);})).toBeLessThan(2);
     await expect(page.locator('#today-note-title')).toHaveClass(/visually-hidden/);
     const gridSizes=await page.locator('#today-month-grid').evaluate(grid=>[...new Set([...grid.children].map(child=>getComputedStyle(child).fontSize))]);
-    expect(gridSizes).toEqual(['11.2px']);
+    expect(gridSizes).toEqual([await resolvedLength(page,'--font-today-calendar')]);
     const headerSizes=await page.locator('.today-sidebar h3').evaluateAll(headers=>[...new Set(headers.map(header=>getComputedStyle(header).fontSize))]);
-    expect(headerSizes).toHaveLength(1);expect(Math.abs(parseFloat(headerSizes[0])-(16-96/72))).toBeLessThan(.01);
+    expect(headerSizes).toEqual([await resolvedLength(page,'--font-today-sidebar-heading')]);
     expect(await page.locator('#today-month-grid').evaluate(grid=>getComputedStyle(grid,'::before').borderInlineStartWidth)).toBe('1px');
     const dayLabel=page.locator('#today-day-label');
     await expect(dayLabel.getByLabel('Day label',{exact:true})).toBeEnabled();

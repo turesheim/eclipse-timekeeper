@@ -175,7 +175,7 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
       const summary=page.locator(`[data-track-client="${client.id}"]`),entry=page.locator(`[data-track-date="2025-10-15"] [data-track-daily-client="${client.id}"]`);
       await expect(summary).toBeVisible();await expect(entry).toBeVisible();
       const a=await summary.boundingBox(),b=await entry.boundingBox();expect(Math.abs(a.height-b.height)).toBeLessThan(1);
-      expect(a.height).toBe(50);
+      expect(a.height).toBe(parseFloat(await resolvedLength(page,'--calendar-work-card-height')));
       await expect(summary).toHaveCSS('font-size',await resolvedLength(page,width<=767?'--font-calendar-card-mobile':'--font-calendar-card'));
       for(const card of [summary,entry]) {
         await expect(card.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');
@@ -189,7 +189,7 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
     await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/calendar-summary-formatting-desktop.png',fullPage:true});
     await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2025-10-15');
     const today=page.locator(`[data-today-client="${client.id}"]`);await expect(today).toBeVisible();
-    expect((await today.boundingBox()).height).toBe(50);
+    expect((await today.boundingBox()).height).toBe(parseFloat(await resolvedLength(page,'--calendar-work-card-height')));
     await expect(today.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');
     await expect(today.locator('.calendar-summary-time')).toHaveCSS('font-weight','400');
   } finally {
