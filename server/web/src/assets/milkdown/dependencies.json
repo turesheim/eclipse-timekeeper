@@ -5,11 +5,6 @@
     "license": "MIT"
   },
   {
-    "name": "@codemirror/commands",
-    "version": "6.11.1",
-    "license": "MIT"
-  },
-  {
     "name": "@codemirror/lang-css",
     "version": "6.3.1",
     "license": "MIT"
@@ -57,11 +52,6 @@
   {
     "name": "@codemirror/legacy-modes",
     "version": "6.5.5",
-    "license": "MIT"
-  },
-  {
-    "name": "@codemirror/search",
-    "version": "6.7.2",
     "license": "MIT"
   },
   {

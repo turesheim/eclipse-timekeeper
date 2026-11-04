@@ -1,9 +1,15 @@
 # Markdown editor completion audit (#515)
 
-Updated 3 November 2026. Daily, weekly, event and general Notes share the same
+Updated 4 November 2026. Daily, weekly, event and general Notes share the same
 editor. Implementation and verification are recorded separately. The issue was
 closed by its author on 3 November; that does not certify the untested platforms
 listed below.
+
+The 4 November cleanup removes the prototype page and its About link, and deletes
+the withdrawn enhanced-source toolbar, source search/line-number controls and
+split preview. The earlier measurements below remain historical evidence for
+those increments. Current component cases use the actual `MarkdownField` through
+test-only fixture routes; code-block highlighting remains supported.
 
 ## Delivered
 
@@ -26,7 +32,7 @@ selection toolbar or a separate structured-editing button panel.
 | Vault compatibility | Ordinary/daily wikilinks, aliases, headings, completion, sized authenticated image embeds, callouts and footnotes: Notes/editor/wikilink suites |
 | Paste and attachments | Safe rich/plain paste, URL over selection, screenshots and file drop, insertion bookmarks, upload progress/retry and existing assets: editor/Notes suites |
 | Structured content | List/task behavior, keyboard-accessible table commands and spreadsheet paste, language/copy/highlight controls, Mermaid previews: editor suites; extra command panels were removed after user review |
-| Navigation | Heading outline, link previews, guarded navigation and in-memory cursor restoration: editor/Notes/wikilink suites |
+| Navigation | Heading links, link previews, guarded navigation and in-memory cursor restoration: editor/Notes/wikilink suites |
 | Saving and recovery | Canonical revision hooks for native and DAV writes, diff before draft restoration, retention limits, owner isolation and guarded stale writes: Java revision tests and Notes/editor browser suites |
 | Privacy and access | Read-only schema/source/upload guards; drafts stay in memory and clear on session changes: shared editor and host suites |
 

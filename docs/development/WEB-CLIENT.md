@@ -115,13 +115,14 @@ bar and page content clear of each other. Standard action buttons use Bootstrap
 clickable sync indicator sits immediately beside the Timekeeper title in the
 header, remains available in My Account and is hidden when signed out.
 
-## Daily-note Markdown prototype
+## Shared Markdown component
 
-About links to a local, lazy-loaded Milkdown editor prototype with formatted and
-source modes, separate day labels, protected YAML frontmatter and source-only
-editing for unsupported Obsidian syntax. It does not save calendar notes. See
-the [evaluation and preservation contract](MARKDOWN-EDITOR.md) for the editor
-choice, dependency licenses, bundle measurements, tests and integration limits.
+Today, Notes and the daily, weekly and event dialogs use `MarkdownField` with
+one Milkdown schema and the same toolbar. Markdown source is a plain textarea.
+Code blocks lazy-load syntax highlighting; the retired enhanced-source and split
+preview implementations are removed. Component/browser tests mount this product
+component through test-only Playwright routes. No prototype page is shipped or
+linked from About. See the [editor development contract](MARKDOWN-EDITOR.md).
 
 ## Today and Calendar views
 

@@ -1,9 +1,10 @@
+import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {readFile} from 'node:fs/promises';
 import {captureScreenshot} from './screenshots.js';
 const fixture=async name=>readFile(new URL('./fixtures/markdown/'+name+'.md',import.meta.url),'utf8');
-const open=async page=>{await page.goto('/web/markdown-lab.html');await expect(page.locator('#markdown-toolbar button')).toHaveCount(8);};
+const open=async page=>{await openEditorFixture(page);await expect(page.locator('#markdown-toolbar')).toBeAttached();};
 async function importNote(page,text){await page.locator('#markdown-file').setInputFiles({name:'note.md',mimeType:'text/markdown',buffer:Buffer.from(text)});await expect(page.locator('#markdown-status')).toContainText('Opened locally');}
 async function downloaded(page){const pending=page.waitForEvent('download');await page.locator('#markdown-download').click();return readFile(await(await pending).path(),'utf8');}
 
@@ -14,7 +15,7 @@ test('Markdown editor lazily loads local formatting and preserves exact mode rou
   await page.locator('#markdown-rich').click();const rich=page.getByRole('textbox',{name:'Note body',exact:true});await expect(rich).toBeVisible();
   for(const selector of ['h1','strong','em','del','ul','ol','blockquote','pre code','table'])await expect(page.locator('#markdown-formatted '+selector).first()).toBeVisible();
   await expect(page.getByRole('checkbox',{name:'Task: Follow up'})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Task: Completed'})).toBeChecked();
-  await page.locator('#markdown-formatted a').click();await expect(page).toHaveURL(/markdown-lab\.html$/);
+  await page.locator('#markdown-formatted a').click();await expect(page).toHaveURL(/editor-fixture\.html$/);
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toBeFocused();expect(await downloaded(page)).toBe(original);
   await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#markdown-source')).toBeFocused();
   await expect(page.locator('#day-label')).toHaveValue('Ferie');expect(await downloaded(page)).toBe(original);
@@ -42,7 +43,7 @@ test('empty paragraph created with Enter stays editable after a Markdown round t
   await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();
   await page.locator('#markdown-source').click();expect(await downloaded(page)).not.toContain('<br');
   const authored='<br />\n\nFirst line\n';await page.locator('#markdown-body').fill(authored);
-  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-body')).toBeVisible();
+  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-formatted')).toBeVisible();
   expect(await downloaded(page)).toBe(authored);
 });
 test('soft line break stays editable after a Markdown round trip',async({page})=>{
@@ -56,9 +57,9 @@ test('soft line break stays editable after a Markdown round trip',async({page})=
 test('Obsidian extensions, frontmatter and CRLF remain exact source, with a usable failed-load fallback',async({page})=>{
   await open(page);const original='\uFEFF'+(await fixture('obsidian')).replaceAll('\n','\r\n');await importNote(page,original);
   await expect(page.locator('#markdown-metadata')).toBeVisible();await expect(page.locator('#markdown-body')).not.toHaveValue(/^---/);
-  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');await expect(page.locator('#markdown-body')).toBeVisible();expect(await downloaded(page)).toBe(original);
+  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-formatted')).toBeVisible();expect(await downloaded(page)).toBe(original);await page.locator('#markdown-source').click();
   await page.locator('#markdown-body').fill('Edited [[wikilink]]\n');expect(await downloaded(page)).toBe(original.slice(0,original.indexOf('# Sunday'))+'Edited [[wikilink]]\n');
-  await page.locator('#markdown-body').fill('# Ordinary note\n');await page.route('**/assets/milkdown/milkdown.js',route=>route.abort());
+  await open(page);await page.locator('#markdown-body').fill('# Ordinary note\n');await page.route('**/assets/milkdown/milkdown.js',route=>route.abort());
   await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('could not be loaded');await expect(page.locator('#markdown-body')).toHaveValue('# Ordinary note\n');
   await page.unroute('**/assets/milkdown/milkdown.js');await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-formatted')).toBeVisible();
   await downloaded(page);
@@ -120,4 +121,10 @@ test('Mermaid fences render as inert SVG previews and preserve editable Markdown
   await expect(page.locator('.markdown-mermaid-preview')).toContainText('cannot contain external resources');
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(external);
   expect(outside).toEqual([]);
+});
+
+// API requests bypass the test-only page routes: these check the shipped server.
+test('production serves the shared editor without the retired prototype or source bundle',async({request})=>{
+  const index=await request.get('/web/');expect(index.ok()).toBe(true);expect(await index.text()).not.toContain('markdown-lab');
+  for(const path of ['/web/markdown-lab.html','/web/markdown-lab.js','/web/markdown-preview.js','/web/assets/milkdown/source-editor.js'])expect((await request.get(path)).status(),path).toBe(404);
 });

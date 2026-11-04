@@ -1,8 +1,9 @@
+import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 
 async function open(page,source){
-  await page.goto('/web/markdown-lab.html');await expect(page.locator('#markdown-toolbar button')).toHaveCount(8);
+  await openEditorFixture(page);await expect(page.locator('#markdown-toolbar')).toBeAttached();
   await page.locator('#markdown-file').setInputFiles({name:'fidelity.md',mimeType:'text/markdown',buffer:Buffer.from(source)});
   await expect(page.locator('#markdown-status')).toContainText('Opened locally');await page.locator('#markdown-rich').click();
   await expect(page.locator('#markdown-formatted [role=textbox]')).toBeVisible();
@@ -32,7 +33,7 @@ test('duplicate paragraphs and inserted blocks retain the correct untouched sour
 });
 
 test('a changed block boundary stays parseable without normalizing a distant list',async({page})=>{
-  await page.goto('/web/markdown-lab.html');
+  await openEditorFixture(page);
   const source='# Heading\nParagraph.\n\n+ Keep __this__ list\n';
   await page.evaluate(async source=>{
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
@@ -54,13 +55,13 @@ test('a changed block boundary stays parseable without normalizing a distant lis
 
 test('entering formatted mode never repairs or deletes authored HTML source implicitly',async({page})=>{
   const source='\uFEFF---\r\ntitle: Keep HTML\r\n---\r\n\r\n<br />\r\n\r\nOriginal text\r\n';
-  await page.goto('/web/markdown-lab.html');await expect(page.locator('#markdown-toolbar button')).toHaveCount(8);
+  await openEditorFixture(page);await expect(page.locator('#markdown-toolbar')).toBeAttached();
   await page.locator('#markdown-file').setInputFiles({name:'source.md',mimeType:'text/markdown',buffer:Buffer.from(source)});await expect(page.locator('#markdown-status')).toContainText('Opened locally');
-  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');expect(await download(page)).toBe(source);
+  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-formatted')).toBeVisible();expect(await download(page)).toBe(source);
 });
 
 test('long-note dirty checks avoid serialization while explicit Markdown remains cached',async({page})=>{
-  await page.goto('/web/markdown-lab.html');
+  await openEditorFixture(page);
   await page.evaluate(async()=>{
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
     const root=document.createElement('div');root.id='fidelity-performance';document.body.append(root);
@@ -80,7 +81,7 @@ test('long-note dirty checks avoid serialization while explicit Markdown remains
 });
 
 test('long-note input reaches the next animation frame within the typing budget',async({page,browser})=>{
-  await page.goto('/web/markdown-lab.html');await page.evaluate(async()=>{
+  await openEditorFixture(page);await page.evaluate(async()=>{
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js'),root=document.createElement('div');root.id='typing-performance';document.body.append(root);
     const value=Array.from({length:350},(_,index)=>'Paragraph '+index+' __retains its authored formatting__ '+('text '.repeat(20))).join('\n\n')+'\n';
     globalThis.typingEditor=await createMarkdownEditor({root,value,label:'Typing performance',taskLabel:value=>value,escape:()=>{}});globalThis.typingSamples=[];
