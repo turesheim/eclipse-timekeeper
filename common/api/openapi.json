@@ -16900,7 +16900,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VaultPathInput"
+                "$ref": "#/components/schemas/VaultFolderInput"
               }
             }
           }
@@ -16928,6 +16928,28 @@
           },
           {
             "$ref": "#/components/parameters/IfNoneMatchStarRequired"
+          },
+          {
+            "name": "createdAt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 40,
+              "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+            }
+          },
+          {
+            "name": "modifiedAt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 40,
+              "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+            }
           }
         ],
         "responses": {
@@ -17740,6 +17762,74 @@
             "$ref": "#/components/responses/503"
           }
         }
+      }
+    },
+    "/notes/export": {
+      "get": {
+        "operationId": "exportNotes",
+        "summary": "Prepare a private ZIP of every active note, configured journal/event folders and assets",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "A consistent owner-private snapshot with exact bytes, portable paths and timestamp metadata. Recently deleted content, account data and authentication secrets are excluded. Preparation and private download follow the account export mechanism."
       }
     }
   },
@@ -31917,7 +32007,7 @@
           "createdAt": {
             "type": "string",
             "format": "date-time",
-            "description": "Time this entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries without a recorded creation time omit this field."
+            "description": "Original creation time when supplied by import; otherwise the time the entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries with unknown creation times omit this field."
           }
         }
       },
@@ -32068,7 +32158,12 @@
           "createdAt": {
             "type": "string",
             "format": "date-time",
-            "description": "Time this entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries without a recorded creation time omit this field."
+            "description": "Original creation time when supplied by import; otherwise the time the entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries with unknown creation times omit this field."
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original last content modification time, retained on restore when present."
           }
         }
       },
@@ -32459,6 +32554,32 @@
           }
         ],
         "description": "Account-owned font-size CSS fragment. Null uses application defaults. Omitted profile edits preserve it. The browser validates the named font properties before applying this inert text."
+      },
+      "VaultFolderInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Portable NFC collection-relative path, at most 1,024 UTF-8 bytes and 32 segments."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "maxLength": 40,
+            "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "maxLength": 40,
+            "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+          }
+        }
       }
     },
     "parameters": {

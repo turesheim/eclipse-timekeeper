@@ -8,8 +8,14 @@ Save folder settings before importing a vault whose layout uses those folders.
 
 Under **Import notes**, choose the local vault root with **Choose vault folder**.
 Timekeeper reviews the relative paths before uploading. Hidden configuration
-folders, nonportable paths and oversized files are skipped; existing files are
-listed as conflicts. Choose **Import new files** after reviewing the list.
+folders and nonportable paths are skipped; existing files are listed as conflicts.
+The review lists each oversized file with its byte size and the applicable server
+limit (by default 1,000,000 bytes for Markdown and 16,000,000 for other files).
+Uncheck individual files or an entire folder to exclude them. Folder checkboxes
+show a mixed state when only some descendants are selected. Choose **Import new
+files** after reviewing the list. A Bootstrap progress bar counts the selected
+items as they complete, including failed attempts; retry starts a fresh progress
+count and does not upload files that already completed.
 Markdown and attachment bytes are uploaded unchanged, and recognized journal
 dates/weeks retain their associations. Day labels are independent and are kept.
 
@@ -19,6 +25,46 @@ completed files; **Retry** attempts only failed files. Account navigation is
 blocked while writes are running. Leaving a pending review requires confirming
 that the unsent selection can be discarded. No local filesystem path or private
 file selection is persisted in browser storage.
+
+### Exporting notes and preserving dates
+
+Under **My Account → Notes → Export notes**, choose **Prepare archive**, then
+**Download archive**, just as under **Your data**. The private ZIP is one consistent
+account snapshot with exact active Markdown, journal/event notes, assets and empty
+folders at their configured relative paths. Hiding the journal in navigation does
+not exclude it from export. Recently deleted items, credentials and other account
+records are excluded. Match the journal/event/asset folder preferences before
+importing into another account if it uses a different layout.
+
+ZIP entries carry available creation and modification times. The auxiliary
+`.timekeeper-notes.json` file preserves their full precision; a UUID suffix avoids
+colliding with an existing source filename. Extract the ZIP and choose its root
+for folder import. Timekeeper recognizes the auxiliary metadata, excludes it from
+uploads, and preserves dates and empty folders. A source file with the same name
+is kept as a normal file. Invalid or ambiguous metadata blocks review. Original
+creation dates follow relative paths; a checksum detects content edited after the
+snapshot and uses that file's current modification time instead. Existing server
+files and existing folder dates remain unchanged.
+
+Browsers expose `lastModified` but not filesystem creation dates. A folder import
+without metadata therefore preserves the available modification time and records
+when each new entry joined Timekeeper. To keep creation dates for an existing
+local vault, download the manual sync client from the same account page and run:
+
+```sh
+python3 webdav_sync.py --folder "/path/to/vault" --prepare-import-metadata
+```
+
+This performs no synchronization and requires no URL or token. It reads the files
+and writes only the private auxiliary metadata file, which can be removed after
+import. It preserves nanosecond modification times and filesystem birth times
+where the OS provides them (including macOS); POSIX `ctime` is never used as a
+creation date. It refuses symlinks, checks for concurrent source changes, and
+refuses to overwrite an unrelated file occupying the metadata filename. `--include-obsidian` includes configuration when
+also enabled in the target account. Timekeeper exports already include metadata
+and do not need this preparation step. The helper scans at most 10,000 entries;
+`--max-file-bytes` sets its bounded per-file limit. The browser review still
+applies the target server's own limits.
 
 The Notes editor and file tree use a bounded area above the workspace menu,
 matching Today. Long source and formatted documents scroll within the editor.
@@ -33,7 +79,8 @@ and Recently deleted list. **Expand all folders** loads every visible level;
 **Collapse all folders** also cancels an unfinished expansion. These actions keep
 an open editor's draft. Hidden journal folders are excluded from expansion.
 
-New collection entries record their creation time, which survives editing,
+New collection entries record their creation time (or the original source time
+supplied by import), which survives editing,
 renaming, recovery and account-archive round trips. Older entries without a
 recorded creation time remain unknown rather than receiving an invented date.
 Drag the divider, or focus it and use arrow keys, to resize navigation. On a

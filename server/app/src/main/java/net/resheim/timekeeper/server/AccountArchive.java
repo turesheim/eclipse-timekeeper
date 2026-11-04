@@ -39,9 +39,12 @@ class AccountArchive {
         if(Files.getFileStore(folder).supportsFileAttributeView("posix")) Files.setPosixFilePermissions(folder,PosixFilePermissions.fromString("rwx------"));
         return folder;
     }
-    Download download(TokenRegistry.Principal principal) {
+    @FunctionalInterface private interface Writer {void write(Connection connection,String owner,Path file)throws SQLException,IOException;}
+    Download download(TokenRegistry.Principal principal) {return download(principal,"timekeeper-account.zip",this::write);}
+    Download notesDownload(TokenRegistry.Principal principal) {return download(principal,"timekeeper-notes.zip",VaultExport::write);}
+    private Download download(TokenRegistry.Principal principal,String filename,Writer writer) {
         for(int attempt=0;;attempt++) {
-            try {return snapshot(principal);}
+            try {return snapshot(principal,filename,writer);}
             catch(RuntimeException failure) {
                 if(attempt>=15 || !snapshotConflict(failure)) throw failure;
                 // A concurrent authenticated read can update last-seen metadata
@@ -59,10 +62,10 @@ class AccountArchive {
             if(cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
         return false;
     }
-    private Download snapshot(TokenRegistry.Principal principal) {
+    private Download snapshot(TokenRegistry.Principal principal,String filename,Writer writer) {
         Path folder=null,file=null;
         try {
-            folder=privateDirectory();file=folder.resolve("timekeeper-account.zip");
+            folder=privateDirectory();file=folder.resolve(filename);
             try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
                 // Account/profile changes do not all acquire the business-owner lock.
                 // MVCC gives every file the same snapshot, including management metadata.
@@ -74,7 +77,7 @@ class AccountArchive {
                     principal=tokens.recheck(principal);
                     if(!principal.permissions().contains("read")) throw new ApiFailure(403,"FORBIDDEN");
                     accounts.guard(connection,principal);
-                    write(connection,principal.owner(),file);
+                    writer.write(connection,principal.owner(),file);
                     connection.commit();
                 }catch(Throwable failure) {connection.rollback();throw failure;}
             }

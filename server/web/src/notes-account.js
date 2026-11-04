@@ -1,6 +1,7 @@
 import {t} from './i18n.js';
 import {node,field,form,section} from './account-ui.js';
 import {NotesFolderImport} from './notes-folder-import.js';
+import {archiveDownload} from './archive-download.js';
 
 const changed=()=>document.dispatchEvent(new Event('timekeeper:notes-changed'));
 
@@ -33,9 +34,11 @@ export async function renderNotesAccount(view){
     get busy(){return view.busy;},set busy(value){view.busy=value;card.setAttribute('aria-busy',String(value));},
     controls(){importer?.controls();},changed(){view.dirty.add(card);},clean(){view.clean(card);},
     fail(error){if(error.status===401)view.signOut(error.message);},
-    async reload(){if(!importer.rows.some(row=>['ready','failed'].includes(row.status)))view.clean(card);changed();}
+    async reload(){if(!importer.pending())view.clean(card);changed();}
   };
   importer=new NotesFolderImport(owner);importer.controls();view.cleanup.add(()=>importer.reset());
+  const downloads=section(view,t('notes.export_title'));downloads.append(node('p',t('notes.export_help')));
+  archiveDownload(view,downloads,{path:'/notes/export',fileName:`timekeeper-notes-${new Date().toISOString().slice(0,10)}.zip`});
   const connection=section(view,t('notes.webdav_url'));
   connection.append(node('code',new URL('/dav/notes/',location.origin).href,'notes-webdav-url'),node('p',t('notes.webdav_credentials'),'hint'));
   const tokens=node('a',t('notes.webdav_tokens'),'btn btn-outline-secondary');tokens.href='#account/tokens';

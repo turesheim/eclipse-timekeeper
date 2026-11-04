@@ -679,12 +679,17 @@ owner-scoped point indexes; `vault_child` relations provide indexed directory
 membership. Moves update paths and memberships under the same owner transaction
 used by all canonical note writers. Metadata queries never fetch attachment data.
 
-New entries also record an immutable `createdAt` timestamp for their creation in
-the collection. It survives content edits, moves, deletion/recovery and logical
+New entries also record a `createdAt` timestamp, using an original source creation
+time supplied during create-only import, or otherwise their creation in the
+collection. It survives content edits, moves, deletion/recovery and logical
 account archives. Entries predating this metadata may omit it; reads and moves do
 not invent a creation date. File `modifiedAt` remains the canonical content's
-modification time. Clients can sort complete metadata listings without reading
-document bodies.
+modification time. A create-only import can supply this original modification
+time atomically with the new bytes; its canonical validator and derived index are
+refreshed together. Subsequent edits use the normal server modification time.
+Logical account archives and portable Notes ZIP metadata preserve available
+creation and modification dates. Clients can sort complete metadata listings
+without reading document bodies.
 
 `VAULT_CONTENT` holds exact general-file bytes, checksum, size and content version.
 DAY_NOTE, WEEK_NOTE, EVENT_NOTE and JOURNAL_ASSET remain the sole live sources for

@@ -58,7 +58,7 @@ final class DayNotes {
         if(value.path("version").asLong()==0||value.path("deleted").asBoolean())return null;
         return document(date,value);
     }
-    private static byte[] document(LocalDate date,ObjectNode value){
+    static byte[] document(LocalDate date,ObjectNode value){
         if(value.has("markdown"))return value.path("markdown").asText().getBytes(StandardCharsets.UTF_8);
         return JournalMarkdown.render(date+".md",null,value.path("text").asText(),value.path("body").asText());
     }

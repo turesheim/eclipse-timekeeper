@@ -1259,7 +1259,7 @@
   "notes.import_folder": "Importer mappe",
   "notes.choose_folder": "Velg rotmappe for hvelvet",
   "notes.import_apply": "Importer nye filer",
-  "notes.import_help": "Velg den lokale rotmappen. Mappestrukturen beholdes, og konfigurerte mapper for dagbok og hendelser beholder tilknytningene sine. Skjulte konfigurasjonsmapper og for store filer hoppes over. Eksisterende filer overskrives aldri. Filene importeres enkeltvis; fullførte importer beholdes ved avbrudd.",
+  "notes.import_help": "Velg roten til det lokale hvelvet, og velg deretter filer og mapper som skal importeres. Mappestier og koblinger til dagbok og hendelser beholdes. Eksisterende filer overskrives aldri. Fullførte importer beholdes ved avbrudd.",
   "notes.import_reviewing": "Kontrollerer filer …",
   "notes.import_reviewed": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
   "notes.import_ready": "Ny fil",
@@ -1303,5 +1303,17 @@
   "notes.sort_created_asc": "Opprettet (eldste først)",
   "notes.sort_created_desc": "Opprettet (nyeste først)",
   "notes.sort_modified_asc": "Endret (eldste først)",
-  "notes.sort_modified_desc": "Endret (nyeste først)"
+  "notes.sort_modified_desc": "Endret (nyeste først)",
+  "notes.import_limits": "Markdown-filer kan inneholde opptil {{markdown}} byte, andre filer opptil {{file}} byte. Større filer hoppes over og vises nedenfor med størrelse og grense.",
+  "notes.import_oversized": "{{size}} byte overskrider grensen på {{limit}} byte.",
+  "notes.import_hidden": "Skjulte filer og konfigurasjonsmapper hoppes over med mindre de er med i eksportmetadata eller er aktivert i notatinnstillingene.",
+  "notes.import_invalid_path": "Dette er ikke en portabel sti i den valgte mappen.",
+  "notes.import_excluded": "Utelatt",
+  "notes.import_progress_label": "Fremdrift for notatimport",
+  "notes.import_progress_count": "{{count}} av {{total}} valgte elementer behandlet",
+  "notes.import_metadata_invalid": "Notatenes tidsstempelmetadata er ugyldige eller tvetydige. Opprett dem på nytt, eller fjern metadatafilen for å importere med filenes endringsdatoer.",
+  "notes.import_metadata_changed": "Innholdet ble endret etter tidsstempeløyeblikksbildet. Filens nåværende endringstid brukes.",
+  "notes.export_title": "Eksporter notater",
+  "notes.export_help": "Opprett en ZIP-fil med alle aktive notater, dagbok- og hendelsesmapper og vedlegg. Markdown og relative stier beholdes nøyaktig. Tidsstempelmetadata bevarer opprettelses- og endringsdatoer ved import av den utpakkede mappen. Nylig slettede elementer og kontodata tas ikke med.",
+  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Eksportmetadata fra Timekeeper bevarer disse datoene. For et eksisterende lokalt hvelv kan den manuelle klienten opprette tidsstempelmetadata før du velger mappen."
 }

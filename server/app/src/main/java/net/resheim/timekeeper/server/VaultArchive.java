@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Portable logical records plus checksummed bytes; no database indexes or authority. */
 final class VaultArchive {
-    private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt");
+    private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt");
     private static final Set<String> SETTINGS_FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder");
     @FunctionalInterface interface File {void accept(String path,byte[] bytes)throws IOException;}
     static boolean owns(String name){return name!=null&&name.matches("vault/(content|recycle)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin");}
@@ -49,9 +49,9 @@ final class VaultArchive {
         if(vault.path("entries").size()>250000||vault.path("files").size()>500000)throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
         for(var value:vault.path("entries")){
             if(!value.isObject()||!ENTRY_FIELDS.containsAll(names(value))||!names(value).containsAll(Set.of("id","path","kind","parentId","deleted"))||!value.path("deleted").isBoolean())throw ApiFailure.validation();
-            if(value.has("createdAt")){
-                if(!value.path("createdAt").isTextual())throw ApiFailure.validation();
-                try{java.time.Instant.parse(value.path("createdAt").asText());}catch(java.time.format.DateTimeParseException invalid){throw ApiFailure.validation();}
+            for(String date:List.of("createdAt","modifiedAt"))if(value.has(date)){
+                if(!value.path(date).isTextual())throw ApiFailure.validation();
+                VaultImportDates.parse(value.path(date).asText(),null);
             }
             UUID id=identifier(value.path("id").asText());identifier(value.path("parentId").asText());
             var path=new VaultPath(value.path("path").asText());if(!path.value().equals(value.path("path").asText())||entries.put(id,((ObjectNode)value).deepCopy())!=null)throw ApiFailure.validation();
@@ -137,6 +137,7 @@ final class VaultArchive {
                 }
                 index.install(VaultCollection.id(entry),entry);
                 if(snapshot!=null)index.content(VaultCollection.id(entry),snapshot,retained);
+                if(entry.has("modifiedAt"))new VaultImportDates(null,java.time.Instant.parse(entry.path("modifiedAt").asText())).apply(store,index.get(VaultCollection.id(entry)));
                 if(!VaultCollection.id(entry).equals(VaultIndex.ROOT))state.changed(retained,1,false);
             }
             if(!used.equals(files.keySet()))throw ApiFailure.validation();

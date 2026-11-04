@@ -15,7 +15,10 @@ public class VaultResource {
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     @Inject RequestIdentity identity;
+    @Inject ContractInputs inputs;
+    @Inject AccountArchive archives;
     @Context UriInfo uri;
+    @Context io.vertx.ext.web.RoutingContext routing;
     private VaultCollection vault(){return new VaultCollection(store,limits);}
     private static UUID uuid(String input){if(input==null)throw ApiFailure.validation();try{var value=UUID.fromString(input);if(!value.toString().equals(input))throw ApiFailure.validation();return value;}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}}
     private Response tx(Supplier<Response> operation){return store.authenticated(identity,()->{
@@ -28,6 +31,16 @@ public class VaultResource {
     }
     @GET public Response info(){ContractInputs.queries(uri.getQueryParameters());return tx(()->{
         var value=object().put("rootId",VaultIndex.ROOT.toString()).put("snapshot",vault().generation());value.set("settings",new VaultSettings(store).get());value.set("limits",limits.snapshot());return Response.ok(value).build();});}
+    @GET @Path("/export") @Produces("application/zip") public Response export(){
+        ContractInputs.queries(uri.getQueryParameters());
+        // Finish lazy catalogue initialization before opening the independent
+        // repeatable-read export snapshot; never nest its authorization locks.
+        store.authenticated(identity,()->{vault().initialize();return null;});
+        var file=archives.notesDownload(identity.principal());routing.addEndHandler(ignored->file.close());
+        StreamingOutput body=output->{try(file){java.nio.file.Files.copy(file.file(),output);}};
+        return Response.ok(body,"application/zip").header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Length",file.length())
+                .header("Content-Disposition","attachment; filename=\"timekeeper-notes-"+java.time.LocalDate.now(java.time.ZoneOffset.UTC)+".zip\"").build();
+    }
     @GET @Path("/revisions") public Response revisions(@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source);
         return tx(()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
@@ -48,12 +61,14 @@ public class VaultResource {
         return tx(()->Response.ok(vault().page(directory,query==null&&uri.getQueryParameters().containsKey("query")?"":query,"true".equals(trash),start,count,snapshot)).build());
     }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
-        ContractInputs.queries(uri.getQueryParameters());fields(input,"path");var path=new VaultPath(input.path("path").asText());
-        return tx(()->{var collection=vault();var entry=collection.mkdir(path);return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
+        ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("VaultFolderInput",input);var path=new VaultPath(value.path("path").asText());
+        var dates=VaultImportDates.parse(value.has("createdAt")?value.path("createdAt").asText():null,value.has("modifiedAt")?value.path("modifiedAt").asText():null);
+        return tx(()->{var collection=vault();var entry=dates.apply(store,collection.mkdir(path));return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
     }
-    @PUT @Path("/files") @Consumes("application/octet-stream") public Response create(@QueryParam("path")String name,@HeaderParam("If-None-Match")String none,byte[] bytes){
-        ContractInputs.queries(uri.getQueryParameters(),"path");if(!"*".equals(none))throw new ApiFailure(428,"PRECONDITION_REQUIRED");var path=new VaultPath(name);
-        return tx(()->{var collection=vault();var entry=collection.put(path,null,true,bytes);return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
+    @PUT @Path("/files") @Consumes("application/octet-stream") public Response create(@QueryParam("path")String name,@HeaderParam("If-None-Match")String none,
+            @QueryParam("createdAt")String created,@QueryParam("modifiedAt")String modified,byte[] bytes){
+        ContractInputs.queries(uri.getQueryParameters(),"path","createdAt","modifiedAt");if(!"*".equals(none))throw new ApiFailure(428,"PRECONDITION_REQUIRED");var path=new VaultPath(name);var dates=VaultImportDates.parse(created,modified);
+        return tx(()->{var collection=vault();var entry=dates.apply(store,collection.put(path,null,true,bytes));return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
     }
     @GET @Path("/entries/{id}") public Response entry(@PathParam("id")String id){ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.get(entry);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
     @GET @Path("/entries/{id}/content") @Produces("application/octet-stream") public Response content(@PathParam("id")String id){

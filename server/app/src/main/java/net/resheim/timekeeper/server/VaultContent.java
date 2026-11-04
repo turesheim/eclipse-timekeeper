@@ -55,7 +55,7 @@ final class VaultContent {
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),TYPE,id,version)!=1)throw new ApiFailure(412,"STALE_VERSION");
         return publicValue(value);
     }
-    private static byte[] bytes(ObjectNode value){
+    static byte[] bytes(ObjectNode value){
         try{
             if(!value.path("data").isTextual())throw new IllegalStateException("Invalid canonical vault content");
             byte[] bytes=Base64.getDecoder().decode(value.path("data").asText());
