@@ -28,7 +28,7 @@ applyTranslations();
 const entry=document.querySelector('script[data-timekeeper-entry]').dataset.timekeeperEntry;
 await import(entry);
 
-// Reports, Administration and the Markdown lab also refresh account sizes when
+// Reports and Administration also refresh account sizes when
 // returning to the tab. The API pins the owner so a switched/expired session
 // clears its old font preference rather than showing another account's sizes.
 document.addEventListener('visibilitychange', async () => {
