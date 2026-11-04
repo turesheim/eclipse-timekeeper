@@ -175,7 +175,7 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
       await expect(summary).toBeVisible();await expect(entry).toBeVisible();
       const a=await summary.boundingBox(),b=await entry.boundingBox();expect(Math.abs(a.height-b.height)).toBeLessThan(1);
       expect(a.height).toBe(50);
-      await expect(summary).toHaveCSS('font-size',width<=767?'12px':'12.8px');
+      await expect(summary).toHaveCSS('font-size',await resolvedLength(page,width<=767?'--font-calendar-card-mobile':'--font-calendar-card'));
       for(const card of [summary,entry]) {
         await expect(card.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');
         for(const time of await card.locator('.calendar-summary-time').all())await expect(time).toHaveCSS('font-weight','400');
@@ -195,3 +195,4 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
     for(const [kind,value] of [['work-sessions',session],['clients',client]])if(value){const current=await api(request,'GET','/'+kind+'/'+value.id);await api(request,'DELETE','/'+kind+'/'+value.id,undefined,{'If-Match':current.headers().etag});}
   }
 });
+import {resolvedLength} from './style-metrics.js';

@@ -1,4 +1,5 @@
 import {tooltipFor} from './tooltips.js';
+import {resolvedLength} from './style-metrics.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -110,7 +111,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
     await page.setViewportSize({width:1440,height:1200});
-    await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12.8px');
+    await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size',await resolvedLength(page,'--font-calendar-card'));
     await expect(page.locator('#today-planned-tasks')).toContainText('Scheduled review');
     await expect(page.locator('#today-active-tasks')).toHaveCount(0);
     await expect(page.locator('#today-month-grid [data-date]')).toHaveCount(35);
@@ -160,7 +161,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect(await page.locator('.today-month-day').evaluateAll(days=>days.every(day=>day.scrollHeight<=day.clientHeight+1))).toBe(true);
     await expect(page.locator('#today-note-editor .dialog-actions')).toHaveCSS('border-top-width','0px');
     await captureScreenshot(page,{path:'test-results/today-desktop.png'});
-    await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12px');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size',await resolvedLength(page,'--font-calendar-card-mobile'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
     await page.locator('#today-month-grid [data-week="2025-W20"]').click();
@@ -194,7 +195,7 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
       for(const mode of ['Formatted','Markdown source']) {
         await page.locator('#today-note-editor').getByRole('button',{name:mode,exact:true}).click();
         const editor=page.locator('#today-note-editor');
-        await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();return Math.abs(nav.y-(a.y+a.height)-8);}).toBeLessThan(2);
+        await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-(a.y+a.height)-gap);}).toBeLessThan(2);
         const content=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');
         await expect(content).toBeVisible();expect(await content.evaluate(value=>value.scrollHeight>value.clientHeight)).toBe(true);
         const actions=await editor.locator('.dialog-actions').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(actions.y+actions.height).toBeLessThanOrEqual(nav.y);

@@ -75,11 +75,12 @@ test('bottom navigation uses compact desktop spacing while preserving touch safe
       for(const name of ['Today','Calendar','Week','Workweek','Activities','Clients','Projects'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
       if(width>=1024){
         await bar.getByRole('button',{name:'Today',exact:true}).click();
-        await expect.poll(async()=>{const note=await page.locator('#today-note-editor').boundingBox(),nav=await bar.boundingBox();return Math.abs(nav.y-note.y-note.height-8);}).toBeLessThan(2);
+        await expect.poll(async()=>{const note=await page.locator('#today-note-editor').boundingBox(),nav=await bar.boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-note.y-note.height-gap);}).toBeLessThan(2);
         await bar.getByRole('button',{name:'Week',exact:true}).click();
-        await expect.poll(async()=>{const calendar=await page.locator('#calendar-panel .calendar-scroll').boundingBox(),nav=await bar.boundingBox();return Math.abs(nav.y-calendar.y-calendar.height-8);}).toBeLessThan(2);
+        await expect.poll(async()=>{const calendar=await page.locator('#calendar-panel .calendar-scroll').boundingBox(),nav=await bar.boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-calendar.y-calendar.height-gap);}).toBeLessThan(2);
       }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }finally{await context.close();}
   }
 });
+import {resolvedLength} from './style-metrics.js';
