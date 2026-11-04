@@ -60,14 +60,11 @@ logical compatibility fence; no table or engine migration is introduced.
 
 ## Manual WebDAV interoperability
 
-The actual unmodified Obsidian 1.14.5/MySync 3.0.7 desktop release was exercised
-against nested vaults over verified HTTPS. It handles guarded Markdown/PDF edits,
-first-import and concurrent conflicts, delete/recreate, selected remote roots and
-offline retry. It normalizes edited text to LF, skips unknown extensions such as
-`.bin`, and does not issue MOVE. These are client limits, not lossless whole-vault
-or stable-identity rename claims. The packaged Python POSIX helper synchronizes
+The packaged Python POSIX helper synchronizes
 arbitrary file bytes with explicit review, guarded MOVE/deletion, private retained
 copies and an interrupted-operation journal. It is manual, with no scheduler.
+It supports an Obsidian vault as an ordinary folder of Markdown and attachments.
+Third-party synchronization plugins are outside the supported workflow.
 
 Released davfs2 1.6.1-1 rejected a conditional delete (428) and remains unsupported
 for full synchronization. rclone/Cyberduck/Remotely Save retain their previously

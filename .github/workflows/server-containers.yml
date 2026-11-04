@@ -194,38 +194,6 @@ jobs:
             server/target/passkey-replica-acceptance.json
             server/target/archive-replica-acceptance.json
 
-  verify-journal-client:
-    name: Real Obsidian MySync interoperability
-    needs: [changes, prepare]
-    if: needs.changes.outputs.full == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-python@v7.0.0
-        with:
-          python-version: '3.13'
-      - uses: actions/download-artifact@v8.0.2
-        with:
-          name: server-compose
-          path: server/target/mysync-input
-      - name: Load the exact shared deployment image
-        run: |
-          (cd server/target/mysync-input && sha256sum -c checksums.sha256)
-          docker load -i server/target/mysync-input/timekeeper-images-linux-amd64.tar.gz
-          docker tag "timekeeper-server:sha-$GITHUB_SHA" timekeeper-server:test
-      - name: Build checksum-verified released desktop client
-        run: docker build -t timekeeper-mysync-client:obsidian-1.14.5-mysync-3.0.7 server/scripts/clients/mysync
-      - name: Verify guarded two-way journal synchronization over HTTPS
-        run: python server/scripts/mysync_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA"
-      - name: Verify hierarchical Notes vault with the released plugin
-        run: python server/scripts/mysync_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA" --vault --output server/target/acceptance/mysync-vault.json
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: journal-client-acceptance
-          if-no-files-found: error
-          path: server/target/acceptance/mysync*.json
-
   verify-synology-native:
     name: Synology native (${{ matrix.group }})
     needs: [changes, prepare]
@@ -423,13 +391,13 @@ jobs:
             server/target/synology/*.png
 
   publish:
-    needs: [changes, prepare, smoke, verify, verify-journal-client, verify-synology, verify-synology-native, package-web-preview]
+    needs: [changes, prepare, smoke, verify, verify-synology, verify-synology-native, package-web-preview]
     if: >-
       !cancelled() && github.event_name == 'push' &&
       needs.prepare.result == 'success' && needs.smoke.result == 'success' &&
       ((needs.changes.outputs.full == 'false' && needs.package-web-preview.result == 'success') ||
        (needs.changes.outputs.full == 'true' &&
-        needs.verify.result == 'success' && needs.verify-journal-client.result == 'success' &&
+        needs.verify.result == 'success' &&
         needs.verify-synology.result == 'success' && needs.verify-synology-native.result == 'success'))
     concurrency:
       group: containers-publish-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}

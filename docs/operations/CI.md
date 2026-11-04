@@ -58,6 +58,10 @@ assertions or production authentication limits change. Each shard uploads its ow
 `web-acceptance-<index>` artifact; all shards must pass the aggregate gate.
 Additional HTTPS/passkey/recovery checks run once on the first shard.
 
+Notes synchronization is verified through the packaged manual WebDAV client
+over HTTPS. CI does not build Obsidian or test third-party synchronization
+plugins; these are outside the supported client workflow.
+
 Native Synology acceptance runs in seven independent groups (at most four in
 parallel), alongside PostgreSQL/package validation: installer controls, early/late
 interrupted schema upgrades, schema restore, early/late source migrations and the
