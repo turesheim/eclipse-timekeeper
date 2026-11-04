@@ -35,7 +35,7 @@ test('hostile description HTML cannot execute, load resources, add UI attributes
   const button=await setup(page,'<script>window.tooltipInjection=true</script><style>body{display:none}</style><img src="https://untrusted.example.test/image" onerror="window.tooltipInjection=true"><iframe src="https://untrusted.example.test/frame"></iframe><svg><image href="https://untrusted.example.test/svg"/></svg><math><mtext>Hidden</mtext></math><form action="https://untrusted.example.test/form"><input autofocus></form><template><img src="https://untrusted.example.test/template"></template><p id="login" class="btn" style="color:red" data-tk-tooltip="" onclick="window.tooltipInjection=true">Safe text</p><a href="jav&#x61;script:alert(1)" target="_self">Bad script</a><a href="data:text/html,bad">Bad data</a><a href="/api/v1/me">Relative</a><a href="//untrusted.example.test/relative">Scheme relative</a><a href="https://example.org/ok" ping="https://untrusted.example.test/ping" download>Safe link</a>');
   const tip=await show(page,button),description=tip.locator('.tooltip-description');
   await expect(description.locator('script,style,img,iframe,svg,math,form,input,template')).toHaveCount(0);await expect(description.locator('[id],[class],[style],[data-tk-tooltip],[onclick],[onerror],[autofocus],[ping],[download]')).toHaveCount(0);
-  for(const name of ['Bad script','Bad data','Relative','Scheme relative'])await expect(description.locator('a').filter({hasText:name})).not.toHaveAttribute('href');
+  for(const name of ['Bad script','Bad data','Relative','Scheme relative'])await expect(description.getByText(name,{exact:true})).not.toHaveAttribute('href');
   await expect(description.getByRole('link')).toHaveCount(1);await expect(description.getByRole('link')).toHaveText('Safe link');
   await page.clock.runFor(1000);expect(await page.evaluate(()=>!!window.tooltipInjection)).toBe(false);expect(loads).toEqual([]);expect(errors).toEqual([]);
 });
@@ -57,7 +57,8 @@ test('passive tooltip stays the same over another hint and focuses only after fi
   await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
   await page.clock.runFor(3999);await expect(tip).not.toBeFocused();await page.clock.runFor(1);await expect(tip).toBeFocused();await expect(tip).toHaveAttribute('role','dialog');await expect(tip).toHaveAttribute('aria-label','Review');await expect(tip).toHaveCSS('pointer-events','auto');
   const before=await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop);await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(before);
-  const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
+  // axe schedules work with browser timers; exact dwell assertions are done.
+  await page.clock.resume();const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
   await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(button).toBeFocused();await expect(button).not.toHaveAttribute('aria-describedby');
 });
 
