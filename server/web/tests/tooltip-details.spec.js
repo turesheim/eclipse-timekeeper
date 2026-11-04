@@ -53,9 +53,9 @@ test('passive tooltip stays the same over another hint and focuses only after fi
     const below=document.createElement('button');below.id='under-tooltip';below.title='Underlying hint';below.textContent='Underlying control';below.style.position='fixed';below.style.left=(box.x+box.width/2-30)+'px';below.style.top=(box.y+box.height/2-10)+'px';document.body.append(below);
     window.tooltipRemovals=0;new MutationObserver(changes=>{for(const change of changes)for(const node of change.removedNodes)if(node instanceof Element&&node.classList.contains('timekeeper-tooltip'))window.tooltipRemovals++;}).observe(document.body,{childList:true});
   },{box});
-  await pointAt(page,tip);await page.clock.runFor(1000);await expect(tip).toHaveAttribute('id',id);expect(await page.evaluate(()=>window.tooltipRemovals)).toBe(0);await expect(tip).toHaveAttribute('role','tooltip');await expect(tip).not.toBeFocused();
+  await pointAt(page,tip);await page.clock.runFor(1000);await expect(tip).toHaveAttribute('id',id);expect(await page.evaluate(()=>window.tooltipRemovals)).toBe(0);await expect(tip).toHaveAttribute('role','tooltip');await expect(tip.locator('.tooltip-inner')).not.toBeFocused();
   await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
-  await page.clock.runFor(3999);await expect(tip).not.toBeFocused();await page.clock.runFor(1);await expect(tip).toBeFocused();await expect(tip).toHaveAttribute('role','dialog');await expect(tip).toHaveAttribute('aria-label','Review');await expect(tip).toHaveCSS('pointer-events','auto');
+  await page.clock.runFor(3999);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await page.clock.runFor(1);await expect(tip.locator('.tooltip-inner')).toBeFocused();await expect(tip).toHaveAttribute('role','dialog');await expect(tip).toHaveAttribute('aria-label','Review');await expect(tip).toHaveCSS('pointer-events','auto');
   const before=await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop);await page.mouse.wheel(0,200);await expect.poll(()=>tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(before);
   // axe schedules work with browser timers; exact dwell assertions are done.
   await page.clock.resume();const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
@@ -64,12 +64,12 @@ test('passive tooltip stays the same over another hint and focuses only after fi
 
 test('leaving the tooltip cancels its focus countdown and a new hover starts a full countdown',async({page})=>{
   const button=await setup(page),tip=await show(page,button);await pointAt(page,tip);await page.clock.runFor(4900);
-  await button.hover();await page.clock.runFor(200);await expect(tip).not.toBeFocused();await pointAt(page,tip);await page.clock.runFor(4999);await expect(tip).not.toBeFocused();await page.clock.runFor(1);await expect(tip).toBeFocused();
+  await button.hover();await page.clock.runFor(200);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await pointAt(page,tip);await page.clock.runFor(4999);await expect(tip.locator('.tooltip-inner')).not.toBeFocused();await page.clock.runFor(1);await expect(tip.locator('.tooltip-inner')).toBeFocused();
   await page.mouse.move(0,0);await page.clock.runFor(1000);await expect(tip).toBeVisible();await page.locator('#event-hint').evaluate(node=>{node.hidden=true;});await expect(tip).toHaveCount(0);
 });
 
 test('keyboard focus opens details with F2 and live refreshes preserve the focused link and scrolled content',async({page,browserName})=>{
-  const button=await setup(page,'<a href="https://example.org/first">First link</a>'+('<p>Long detail</p>').repeat(80));await button.focus();await page.clock.runFor(850);const tip=page.locator('.timekeeper-tooltip');await expect(tip).toBeVisible();await page.keyboard.press('F2');await expect(tip).toBeFocused();
+  const button=await setup(page,'<a href="https://example.org/first">First link</a>'+('<p>Long detail</p>').repeat(80));await button.focus();await page.clock.runFor(850);const tip=page.locator('.timekeeper-tooltip');await expect(tip).toBeVisible();await page.keyboard.press('F2');await expect(tip.locator('.tooltip-inner')).toBeFocused();
   await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');const link=tip.getByRole('link',{name:'First link'});await expect(link).toBeFocused();
   await tip.locator('.tooltip-inner').evaluate(node=>{node.scrollTop=100;});await page.evaluate(()=>window.updateEventDescription('<a href="https://example.org/new">Updated link</a>'));await expect(link).toBeFocused();expect(await tip.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBe(100);
   await page.keyboard.press('Escape');await expect(button).toBeFocused();await expect(tip).toHaveCount(0);await page.mouse.move(0,0);await show(page,button);await expect(page.locator('.timekeeper-tooltip')).toContainText('Updated link');
@@ -77,6 +77,6 @@ test('keyboard focus opens details with F2 and live refreshes preserve the focus
 
 test('Escape closes a focused tooltip without closing its native dialog, and disposal cancels pending focus',async({page})=>{
   const button=await setup(page);await button.evaluate(node=>{const dialog=document.createElement('dialog');dialog.append(node);document.body.append(dialog);dialog.showModal();});
-  const tip=await show(page,button);await pointAt(page,tip);await page.clock.runFor(5000);await expect(tip).toBeFocused();await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(page.locator('dialog[open]')).toBeVisible();await expect(button).toBeFocused();
+  const tip=await show(page,button);await pointAt(page,tip);await page.clock.runFor(5000);await expect(tip.locator('.tooltip-inner')).toBeFocused();await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(page.locator('dialog[open]')).toBeVisible();await expect(button).toBeFocused();
   await page.mouse.move(0,0);const reopened=await show(page,button);await pointAt(page,reopened);await page.clock.runFor(4000);await page.locator('dialog[open]').evaluate(node=>node.close());await page.clock.runFor(2000);await expect(reopened).toHaveCount(0);await expect(page.locator('dialog[open]')).toHaveCount(0);
 });

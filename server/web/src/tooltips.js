@@ -34,10 +34,11 @@ function focusTooltip(){
   const {tip,node}=active;
   if(!active.interactive){
     active.previousFocus=document.activeElement;active.interactive=true;
-    tip.classList.add('is-interactive');tip.tabIndex=0;tip.setAttribute('role','dialog');
+    tip.classList.add('is-interactive');tip.setAttribute('role','dialog');
+    tip.querySelector('.tooltip-inner').tabIndex=0;
     tip.setAttribute('aria-label',tip.querySelector('.tooltip-heading,.tooltip-caption')?.textContent||node.getAttribute('aria-label')||node.textContent);
   }
-  tip.focus({preventScroll:true});
+  tip.querySelector('.tooltip-inner').focus({preventScroll:true});
 }
 function dwell(){
   clearTimeout(leaveTimer);cancelPending();

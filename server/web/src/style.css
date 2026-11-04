@@ -46,8 +46,8 @@ body { background: #f3f6f5; }
 .timekeeper-tooltip .tooltip-inner { text-align: start; border: 1px solid var(--line); box-shadow: 0 .2rem .7rem #0003; max-height: min(32rem, 65vh); overflow: auto; overflow-wrap: anywhere; }
 .timekeeper-tooltip.is-interactive { pointer-events: auto; }
 .timekeeper-tooltip.is-interactive .tooltip-inner { overscroll-behavior: contain; }
-.timekeeper-tooltip.is-interactive:focus { outline: none; }
-.timekeeper-tooltip.is-interactive:focus-visible .tooltip-inner { outline: 2px solid var(--accent); outline-offset: 2px; }
+.timekeeper-tooltip.is-interactive .tooltip-inner:focus { outline: none; }
+.timekeeper-tooltip.is-interactive .tooltip-inner:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tooltip-caption, .tooltip-detail, .tooltip-heading, .tooltip-project { display: flex; align-items: baseline; gap: .4rem; white-space: pre-wrap; }
 .timekeeper-tooltip .icon { flex: 0 0 1em; }
 .tooltip-heading, .tooltip-project, .tooltip-session-title { font-weight: 600; }
