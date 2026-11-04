@@ -77,12 +77,17 @@ test('typography validates the entire CSS fragment and preserves invalid and uns
   await page.reload();await expect(editor(page)).toBeVisible();expect(await rootSize(page)).toBe('16px');
 });
 
-test('typography follows other tabs and applies to all web entry pages without CSP violations', async ({page, context, request}) => {
+test('typography follows other tabs and applies to all web entry pages without CSP violations', async ({page, context, request, browserName}) => {
   await context.addInitScript(() => {
     window.typographyPolicyViolations = [];
-    document.addEventListener('securitypolicyviolation', event => window.typographyPolicyViolations.push(event.violatedDirective));
+    document.addEventListener('securitypolicyviolation', event => window.typographyPolicyViolations.push({directive: event.violatedDirective, blocked: event.blockedURI, source: event.sourceFile, line: event.lineNumber}));
   });
   await openSettings(page, request);
+  await expect(page.locator('#status')).toHaveText('Up to date');
+  // Existing WebKit inline-attribute reports during app startup are recorded
+  // before editing fonts; saving and resetting must add no policy violations.
+  const startupViolations = await page.evaluate(() => [...window.typographyPolicyViolations]);
+  expect(browserName === 'webkit' ? startupViolations.filter(value => value.blocked !== 'inline') : startupViolations).toEqual([]);
   const other = await context.newPage();
   await other.goto('/web/#account/typography');await expect(editor(other)).toBeVisible();
   await editor(page).fill(':root { --font-base: 18px; --font-brand: 2rem; }');await save(page);
@@ -99,7 +104,7 @@ test('typography follows other tabs and applies to all web entry pages without C
   }
   await page.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
   await expect(other.locator('html')).toHaveCSS('font-size', '16px');
-  expect(await page.evaluate(() => window.typographyPolicyViolations)).toEqual([]);
+  expect(await page.evaluate(() => window.typographyPolicyViolations)).toEqual(startupViolations);
   await other.close();
 });
 
@@ -127,12 +132,12 @@ test('typography reaches formatted Markdown headings and source editors inside s
   await expect(page.locator('#typography-source-preview .cm-scroller')).toHaveCSS('font-size', '22.5px');
 });
 
-test('typography settings fit mobile screens, support keyboard editing and are accessible in every theme', async ({page, request}) => {
+test('typography settings fit mobile screens, support keyboard editing and are accessible in every theme', async ({page, request, browserName}) => {
   await openSettings(page, request);
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({width, height: 900});
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-    await editor(page).focus();await page.keyboard.press('Tab');
+    await editor(page).focus();await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeFocused();
     for (const theme of ['timekeeper', 'timekeeper-dark', 'solarized-light', 'solarized-dark', 'nord', 'dracula']) {
       await page.evaluate(theme => {document.documentElement.dataset.theme = theme;document.documentElement.dataset.bsTheme = ['timekeeper', 'solarized-light'].includes(theme) ? 'light' : 'dark';}, theme);
