@@ -112,6 +112,21 @@ test('typography recovers from invalid stored CSS and reports unavailable storag
   await expect(editor(page)).toHaveValue(draft);expect(await rootSize(page)).toBe('16px');
 });
 
+test('typography reaches formatted Markdown headings and source editors inside shadow roots', async ({page, request}) => {
+  await openSettings(page, request);
+  await editor(page).fill(':root { --font-base: 18px; --font-markdown-h1: 2rem; --font-markdown-source: 1.25rem; }');await save(page);
+  await page.goto('/web/markdown-lab.html');
+  await page.getByRole('button', {name: 'Formatted', exact: true}).click();
+  await expect(page.locator('.ProseMirror h1')).toHaveCSS('font-size', '36px');
+  await page.evaluate(async () => {
+    const {createSourceEditor} = await import('/web/assets/milkdown/source-editor.js');
+    const root = document.createElement('div');root.id = 'typography-source-preview';document.querySelector('main').append(root);
+    const source = createSourceEditor({root, value: '# Source text', label: 'Typography source preview', changed() {}});
+    await source.ready;
+  });
+  await expect(page.locator('#typography-source-preview .cm-scroller')).toHaveCSS('font-size', '22.5px');
+});
+
 test('typography settings fit mobile screens, support keyboard editing and are accessible in every theme', async ({page, request}) => {
   await openSettings(page, request);
   for (const width of [1440, 390, 320]) {

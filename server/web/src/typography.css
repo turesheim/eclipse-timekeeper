@@ -130,6 +130,8 @@
   --font-calendar-card-mobile: .75rem;
 
   /* Markdown and journal editors */
+  /* Markdown source editor text and line numbers, including split view. */
+  --font-markdown-source: .9rem;
   /* Level 1 heading in formatted Markdown notes. */
   --font-markdown-h1: 1.7rem;
   /* Level 2 heading in formatted Markdown notes. */

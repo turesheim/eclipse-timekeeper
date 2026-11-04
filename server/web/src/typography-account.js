@@ -16,6 +16,7 @@ export async function renderTypography(view) {
   editor.autocapitalize = 'off';editor.setAttribute('autocorrect', 'off');
   editor.setAttribute('aria-describedby', `${description.id} ${help.id}`);
   editor.value = preferences.read() ?? defaults;
+  editor.setSelectionRange(0, 0);
   const feedback = node('p', '', 'form-feedback');feedback.setAttribute('role', 'status');
   const save = node('button', t('typography.save'), 'btn btn-primary');save.type = 'submit';
   const dirty = () => {
@@ -35,7 +36,7 @@ export async function renderTypography(view) {
   });
   const reset = button(t('typography.reset'), () => {
     if (!view.valid()) return;
-    try {preferences.reset();editor.value = defaults;view.clean(value);editor.removeAttribute('aria-invalid');feedback.textContent = t('typography.reset_done');}
+    try {preferences.reset();editor.value = defaults;editor.setSelectionRange(0, 0);view.clean(value);editor.removeAttribute('aria-invalid');feedback.textContent = t('typography.reset_done');}
     catch (error) {message(error);}
   });
   const actions = node('div', undefined, 'd-flex flex-wrap gap-2');actions.append(save, reset);
