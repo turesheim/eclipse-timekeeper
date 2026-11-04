@@ -1300,5 +1300,21 @@
   "focus.search_clients": "Søk etter kunder",
   "focus.no_clients": "Ingen kunder funnet",
   "focus.apply": "Bruk",
-  "markdown.table_keys": "Tabelltaster (når denne knappen har fokus): piltaster setter inn rader/kolonner; Skift+piltaster flytter dem. Tilbake sletter raden; Delete sletter kolonnen; Skift+Delete sletter tabellen. L, C og R justerer kolonnen til venstre, midten og høyre. Angre gjenoppretter forrige endring."
+  "markdown.table_keys": "Tabelltaster (når denne knappen har fokus): piltaster setter inn rader/kolonner; Skift+piltaster flytter dem. Tilbake sletter raden; Delete sletter kolonnen; Skift+Delete sletter tabellen. L, C og R justerer kolonnen til venstre, midten og høyre. Angre gjenoppretter forrige endring.",
+  "notes.import_folder": "Importer mappe",
+  "notes.choose_folder": "Velg rotmappe for hvelvet",
+  "notes.import_apply": "Importer nye filer",
+  "notes.import_help": "Velg den lokale rotmappen. Mappestrukturen beholdes, og konfigurerte mapper for dagbok og hendelser beholder tilknytningene sine. Skjulte konfigurasjonsmapper og for store filer hoppes over. Eksisterende filer overskrives aldri. Filene importeres enkeltvis; fullførte importer beholdes ved avbrudd.",
+  "notes.import_reviewing": "Kontrollerer filer …",
+  "notes.import_reviewed": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
+  "notes.import_ready": "Ny fil",
+  "notes.import_conflict": "Finnes allerede eller er i konflikt",
+  "notes.import_skipped": "Hoppet over",
+  "notes.import_imported": "Importert",
+  "notes.import_failed": "Mislyktes — kan prøves igjen",
+  "notes.import_progress": "Importerer {{path}} …",
+  "notes.import_done": "Importerte {{count}} filer. Filer i konflikt er uendret.",
+  "notes.import_title": "Importer notater",
+  "notes.settings_saved": "Notatinnstillingene er lagret.",
+  "notes.import_files": "Valgte filer"
 }

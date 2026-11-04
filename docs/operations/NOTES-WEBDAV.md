@@ -1,5 +1,28 @@
 # Notes and manual vault synchronization
 
+## Account settings and importing a folder
+
+Open **My Account → Notes** to configure journal, event and attachment folders,
+hide the journal from Notes navigation, or change configuration synchronization.
+Save folder settings before importing a vault whose layout uses those folders.
+
+Under **Import notes**, choose the local vault root with **Choose vault folder**.
+Timekeeper reviews the relative paths before uploading. Hidden configuration
+folders, nonportable paths and oversized files are skipped; existing files are
+listed as conflicts. Choose **Import new files** after reviewing the list.
+Markdown and attachment bytes are uploaded unchanged, and recognized journal
+dates/weeks retain their associations. Day labels are independent and are kept.
+
+Files import individually with create-only guards. Files created by another
+client after review are also treated as conflicts. Interrupted imports retain
+completed files; **Retry** attempts only failed files. Account navigation is
+blocked while writes are running. Leaving a pending review requires confirming
+that the unsent selection can be discarded. No local filesystem path or private
+file selection is persisted in browser storage.
+
+The Notes editor and file tree use a bounded area above the workspace menu,
+matching Today. Long source and formatted documents scroll within the editor.
+
 The **Notes** tab presents an account-private folder tree and the shared Markdown
 editor. Search matches names and paths; expand folders to load their children.
 Drag the divider, or focus it and use arrow keys, to resize navigation. On a
@@ -7,7 +30,7 @@ phone, use the folder button to open navigation. Rename/move preserves a
 resource's identity. Recently deleted items retain their bytes and can be
 restored if their destination is available. Trash counts against storage limits.
 
-**Hide journal folder** in Notes settings is a saved account preference. It hides
+**Hide journal folder** under **My Account → Notes** is a saved account preference. It hides
 the configured journal folder and its descendants from navigation, search and
 trash, including after a journal-folder rename. Existing editor drafts remain
 open. Today, Calendar, journal links, images and WebDAV synchronization continue

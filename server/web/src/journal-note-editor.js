@@ -36,7 +36,7 @@ export class JournalNoteEditor {
     if(!this.markdown)return;
     const ready=!!this.note&&!this.busy,write=ready&&this.writable&&!this.stale;
     if(this.markdown.readOnly===write)this.markdown.setReadOnly(!write);
-    this.save.disabled=!write||this.markdown.loading;
+    this.save.disabled=!write||this.markdown.loading||!this.dirty();
     this.delete.disabled=!write||!this.note?.version||this.note?.deleted;
     this.closeButton.disabled=!!this.busy;
     this.cancel.disabled=!!this.busy;
@@ -75,7 +75,7 @@ export class JournalNoteEditor {
   }
   reset(){this.close(true);this.positions.clear();this.positionSession=null;}
   async commit(){
-    if(!this.note||this.busy||this.stale||!this.writable||this.markdown.loading)return;
+    if(!this.note||this.busy||this.stale||!this.writable||this.markdown.loading||!this.dirty())return;
     const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.hidden=false;return;}
     this.busy=true;this.status.textContent=t('journal.saving');this.controls();
     const generation=this.generation;

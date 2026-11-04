@@ -54,7 +54,7 @@ export class TrackDayNotes {
     if(this.editor!==editor)throw new Error('Editor closed');
     return 'assets/'+filename;
   }
-  changed(){if(this.editor)this.savedStatus.textContent=t(this.dirty()?'journal.unsaved':'journal.saved');}
+  changed(){if(this.editor)this.savedStatus.textContent=t(this.dirty()?'journal.unsaved':'journal.saved');this.controls();}
   requestClose(){if(this.editor?.busy||this.dirty()&&!confirm(t('journal.discard')))return;if(this.inline){if(this.editor)void this.loadEditor(this.editor);}else this.closeEditor();}
   closeEditor(){if(!this.inline)this.dialog.close();this.finishEditor();}
   finishEditor(){
@@ -137,7 +137,7 @@ export class TrackDayNotes {
     this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.writable;
     const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
     if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
-    this.save.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
+    this.save.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable||!this.dirty();
     this.delete.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!editor.present||!this.writable;
     this.cancel.disabled=editor.busy;
     if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
@@ -234,7 +234,7 @@ export class TrackDayNotes {
   }
   async commit(){
     const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
-    if(this.markdown.loading)return;
+    if(this.markdown.loading||!this.dirty())return;
     const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.scrollIntoView({block:'nearest'});return;}
     const text=this.text.value.trim();editor.sent={};
     if(text!==editor.originalText)Object.assign(editor.sent,{text,labelVersion:editor.labelVersion});
