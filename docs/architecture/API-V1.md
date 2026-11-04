@@ -1147,7 +1147,8 @@ return 412/428; deployment quota growth returns 507. Day labels are independent.
 
 The create-only file endpoint accepts optional `createdAt` and `modifiedAt` query
 parameters; the folder endpoint accepts the same optional fields in
-`VaultFolderInput`. They are validated RFC 3339 instants and applied atomically to
+`VaultFolderInput`. They are validated RFC 3339 instants, normalized to UTC within
+years 0001–9999, and applied atomically to
 the new namespace entry and its canonical content, with the resulting content
 validator refreshed before replying. They cannot retime an existing file, bypass
 If-None-Match, change a day label, or add an artificial content revision. Normal
@@ -1160,7 +1161,7 @@ cleanup and download mechanism as `/data/account/export`. It contains active
 portable paths and exact bytes, including configured journal/event folders and
 assets, but no trash or account authority. Its `timekeeper-notes-v1` auxiliary
 metadata records `path`, `kind` (`FILE`/`FOLDER`), optional `createdAt`/`modifiedAt`,
-and file `bytes`/`sha256`. It normally uses `.timekeeper-notes.json`, with a UUID
+and file `bytes`/`sha256`. It normally uses `timekeeper-notes-metadata.json`, with a UUID
 suffix on collision. ZIP timestamp fields are also populated; the metadata
 preserves nanosecond precision and empty folder dates across extraction/import.
 

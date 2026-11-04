@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Portable active Notes files, written inside the shared private export snapshot. */
 final class VaultExport {
-    static final String MANIFEST=".timekeeper-notes.json",FORMAT="timekeeper-notes-v1";
+    static final String MANIFEST="timekeeper-notes-metadata.json",FORMAT="timekeeper-notes-v1";
     static void write(Connection connection,String owner,Path target)throws SQLException,IOException{
         var manifest=object().put("format",FORMAT);var files=manifest.putArray("entries");var names=new java.util.HashSet<String>();
         try(var zip=new ZipOutputStream(Files.newOutputStream(target),StandardCharsets.UTF_8)){
@@ -45,7 +45,7 @@ final class VaultExport {
                 zip.putNextEntry(item);zip.write(bytes);zip.closeEntry();files.add(metadata);
             });
             String metadataName=MANIFEST;
-            while(names.contains(new VaultPath(metadataName).key()))metadataName=".timekeeper-notes-"+java.util.UUID.randomUUID()+".json";
+            while(names.contains(new VaultPath(metadataName).key()))metadataName="timekeeper-notes-metadata-"+java.util.UUID.randomUUID()+".json";
             zip.putNextEntry(new ZipEntry(metadataName));zip.write(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest));zip.closeEntry();
         }
     }

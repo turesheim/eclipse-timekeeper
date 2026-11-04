@@ -91,7 +91,10 @@ export class NotesFolderImport {
     const active=()=>generation===this.generation&&session===owner.session&&owner.valid();
     try{
       this.metadata=await readNotesMetadata(files);if(!active())return;
-      this.rows=folderImportPlan(files,{metadata:this.metadata,includeConfig:owner.info.settings.syncObsidianConfig});this.buildTree();this.render();
+      this.rows=folderImportPlan(files,{metadata:this.metadata,includeConfig:owner.info.settings.syncObsidianConfig});
+      const selectedPaths=new Set(this.rows.map(row=>key(row.path)));
+      for(const entry of this.metadata?.entries.values()||[])if(entry.kind==='FILE'&&!selectedPaths.has(key(entry.path)))this.rows.push({path:entry.path,status:'skipped',selected:false,reason:t('notes.import_not_present')});
+      this.buildTree();this.render();
       const folders=new Set();
       for(const row of [...this.folders.values()].filter(row=>row.explicit)){
         if(!active())return;

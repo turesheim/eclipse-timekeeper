@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 
 VERSION='1.1'
 DAV='{DAV:}'
-IMPORT_METADATA='.timekeeper-notes.json'
+IMPORT_METADATA='timekeeper-notes-metadata.json'
 
 class SyncError(Exception):pass
 def digest(data):return hashlib.sha256(data).hexdigest()
@@ -384,7 +384,7 @@ def prepare_import_metadata(folder,maximum=16_000_000,include_config=False):
         nonlocal skipped
         for entry in sorted(os.scandir(fd),key=lambda value:value.name):
             if not prefix and entry.name==IMPORT_METADATA:continue
-            if not prefix and re.fullmatch(r'\.timekeeper-notes-[a-f0-9-]{36}\.json',entry.name):raise SyncError('This folder already contains export timestamp metadata; import it directly instead')
+            if not prefix and re.fullmatch(r'timekeeper-notes-metadata-[a-f0-9-]{36}\.json',entry.name):raise SyncError('This folder already contains export timestamp metadata; import it directly instead')
             if entry.name.startswith('.') and not (include_config and key(entry.name)=='.obsidian'):
                 skipped+=1;continue
             path=portable((prefix+'/' if prefix else '')+entry.name)

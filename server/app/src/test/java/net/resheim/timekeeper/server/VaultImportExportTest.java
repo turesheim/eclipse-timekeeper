@@ -61,7 +61,7 @@ class VaultImportExportTest {
         store.transaction("a",()->{var vault=new VaultCollection(store,limits);vault.put(new VaultPath(VaultExport.MANIFEST),null,true,bytes("A real user file"));return null;});
         try(var download=archives.notesDownload(principal);var zip=new ZipFile(download.file().toFile())){
             assertArrayEquals(bytes("A real user file"),zip.getInputStream(zip.getEntry(VaultExport.MANIFEST)).readAllBytes());
-            var metadata=zip.stream().filter(entry->entry.getName().matches("\\.timekeeper-notes-[a-f0-9-]{36}\\.json")).findFirst().orElseThrow();
+            var metadata=zip.stream().filter(entry->entry.getName().matches("timekeeper-notes-metadata-[a-f0-9-]{36}\\.json")).findFirst().orElseThrow();
             assertEquals(VaultExport.FORMAT,parse(new String(zip.getInputStream(metadata).readAllBytes(),StandardCharsets.UTF_8)).path("format").asText());
         }
     }
@@ -70,7 +70,7 @@ class VaultImportExportTest {
         var created=given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).queryParam("createdAt",CREATED).queryParam("modifiedAt",MODIFIED).body(bytes("HTTP body")).put("/api/v1/notes/files");
         assertEquals(201,created.statusCode());assertEquals(CREATED,created.jsonPath().getString("createdAt"));assertEquals(MODIFIED,created.jsonPath().getString("modifiedAt"));
         assertEquals(412,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).queryParam("modifiedAt","2024-01-01T00:00:00Z").body(bytes("Wrong")).put("/api/v1/notes/files").statusCode());
-        assertEquals(422,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path","Invalid.md").queryParam("createdAt","not-a-date").body(bytes("Wrong")).put("/api/v1/notes/files").statusCode());
+        for(String invalid:List.of("not-a-date","0000-01-01T00:00:00Z","0001-01-01T00:00:00+14:00","9999-12-31T23:59:59-14:00"))assertEquals(422,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path","Invalid.md").queryParam("createdAt",invalid).body(bytes("Wrong")).put("/api/v1/notes/files").statusCode());
         assertEquals(404,given().header("Authorization","Bearer test-a").queryParam("path","Invalid.md").get("/api/v1/notes/resolve").statusCode());
         assertEquals(401,given().get("/api/v1/notes/export").statusCode());
         var download=given().header("Authorization","Bearer test-read").get("/api/v1/notes/export");assertEquals(200,download.statusCode());assertTrue(download.contentType().startsWith("application/zip"));assertTrue(download.header("Cache-Control").contains("no-store"));assertTrue(download.header("Content-Disposition").contains("timekeeper-notes-"));

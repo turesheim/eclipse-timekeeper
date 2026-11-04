@@ -1319,5 +1319,6 @@
   "notes.import_reviewed_other": "{{count}} new files ready to import. Review the list before continuing.",
   "notes.import_done_other": "Imported {{count}} files. Conflicts were left unchanged.",
   "notes.import_reviewed_one": "{{count}} new file ready to import. Review the list before continuing.",
-  "notes.import_done_one": "Imported {{count}} file. Conflicts were left unchanged."
+  "notes.import_done_one": "Imported {{count}} file. Conflicts were left unchanged.",
+  "notes.import_not_present": "This file was not provided by the folder picker. It may be hidden or no longer present; nothing will be uploaded."
 }

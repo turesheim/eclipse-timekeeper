@@ -1319,5 +1319,6 @@
   "notes.import_reviewed_other": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
   "notes.import_done_other": "Importerte {{count}} filer. Filer i konflikt er uendret.",
   "notes.import_reviewed_one": "{{count}} ny fil er klar til import. Se gjennom listen før du fortsetter.",
-  "notes.import_done_one": "Importerte {{count}} fil. Konflikter ble beholdt uendret."
+  "notes.import_done_one": "Importerte {{count}} fil. Konflikter ble beholdt uendret.",
+  "notes.import_not_present": "Denne filen ble ikke oppgitt av mappevelgeren. Den kan være skjult eller ikke lenger finnes. Ingenting blir lastet opp."
 }

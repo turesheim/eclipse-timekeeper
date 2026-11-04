@@ -49,7 +49,7 @@ test('selecting files and folders limits uploads, explains oversized files and r
 
 test('prepared ZIP download reimports exact notes, assets, empty folders and nanosecond dates into another private account',async({page,request})=>{
   const first=await setup(page,request),dates={createdAt:'2020-01-02T03:04:05.123456789Z',modifiedAt:'2021-02-03T04:05:06.987654321Z'},root=await mkdtemp(join(tmpdir(),'notes-roundtrip-'));
-  const files=new Map([['Notes/Exact.md',Buffer.from('---\r\ncustom: x\r\n---\r\n[[Link]]  \r\n')],['journal/2026-11-04.md',Buffer.from('- [ ] Exact journal\r\n')],['journal/2026-W45.md',Buffer.from('Week\r\n')],['journal/assets/raw.bin',Buffer.from([0,255,4])],['.timekeeper-notes.json',Buffer.from('A real user file')]]);
+  const files=new Map([['Notes/Exact.md',Buffer.from('---\r\ncustom: x\r\n---\r\n[[Link]]  \r\n')],['journal/2026-11-04.md',Buffer.from('- [ ] Exact journal\r\n')],['journal/2026-W45.md',Buffer.from('Week\r\n')],['journal/assets/raw.bin',Buffer.from([0,255,4])],['timekeeper-notes-metadata.json',Buffer.from('A real user file')]]);
   try{
     await first.api('POST','/notes/folders',{path:'Empty',...dates});for(const [path,body]of files)await put(first.api,path,body,dates);
     const downloads=page.locator('#account-content section').filter({has:page.getByRole('heading',{name:'Export notes',exact:true})});await downloads.getByRole('button',{name:'Prepare archive',exact:true}).click();
@@ -68,10 +68,21 @@ test('prepared ZIP download reimports exact notes, assets, empty folders and nan
 test('invalid timestamp metadata blocks import and cancelling an in-flight review sends no writes',async({page,request})=>{
   const {client,card}=await setup(page,request),root=await mkdtemp(join(tmpdir(),'notes-review-'));let release;
   try{
-    await writeFile(join(root,'Exact.md'),'Body');await writeFile(join(root,'.timekeeper-notes.json'),'invalid metadata');await choose(page,card,root);await expect(card).toContainText('timestamp metadata is invalid');await expect(card.getByRole('button',{name:'Import new files',exact:true})).toBeDisabled();
-    await rm(join(root,'.timekeeper-notes.json'));let blocked=false;const hold=new Promise(resolve=>{release=resolve;}),writes=[];
+    await writeFile(join(root,'Exact.md'),'Body');await writeFile(join(root,'timekeeper-notes-metadata.json'),'invalid metadata');await choose(page,card,root);await expect(card).toContainText('timestamp metadata is invalid');await expect(card.getByRole('button',{name:'Import new files',exact:true})).toBeDisabled();
+    await rm(join(root,'timekeeper-notes-metadata.json'));let blocked=false;const hold=new Promise(resolve=>{release=resolve;}),writes=[];
     await page.route('**/api/v1/notes/resolve?**',async route=>{blocked=true;await hold;await route.continue();});page.on('request',request=>{if(request.url().includes('/api/v1/notes')&&request.method()!=='GET')writes.push(request.method());});
     await choose(page,card,root);await expect.poll(()=>blocked).toBe(true);await card.getByRole('button',{name:'Cancel',exact:true}).click();release();await expect(card.locator('.notes-import-review')).not.toBeVisible();await expect(card.getByRole('button',{name:'Choose vault folder',exact:true})).toBeEnabled();
     await page.unrouteAll({behavior:'wait'});expect((await resolve(client,'Exact.md')).status()).toBe(404);expect(writes).toEqual([]);
   }finally{release?.();await page.unrouteAll({behavior:'wait'});await rm(root,{recursive:true,force:true});}
+});
+
+test('files named by export metadata but absent from the folder selection are identified and never fabricated',async({page,request})=>{
+  const {client,card}=await setup(page,request),root=await mkdtemp(join(tmpdir(),'notes-missing-'));
+  try{
+    await writeFile(join(root,'Real.md'),'Body');
+    await writeFile(join(root,'timekeeper-notes-metadata.json'),JSON.stringify({format:'timekeeper-notes-v1',entries:[{path:'.private.md',kind:'FILE',bytes:0,sha256:'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}]}));
+    await choose(page,card,root);await expect(card).toContainText('1 new file ready to import');
+    const missing=card.locator('.notes-import-row').filter({hasText:'.private.md'});await expect(missing).toContainText('not provided by the folder picker');await expect(missing.getByRole('checkbox')).toBeDisabled();
+    await card.getByRole('button',{name:'Import new files',exact:true}).click();await expect(card).toContainText('Imported 1 file.');expect((await resolve(client,'Real.md')).ok()).toBe(true);expect((await resolve(client,'.private.md')).status()).toBe(404);
+  }finally{await rm(root,{recursive:true,force:true});}
 });

@@ -11,7 +11,7 @@ record VaultImportDates(Instant createdAt,Instant modifiedAt) {
     private static Instant date(String value){
         if(value==null)return null;
         if(value.length()>40||!value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T.*"))throw ApiFailure.validation();
-        try{return Instant.parse(value);}catch(DateTimeParseException invalid){throw ApiFailure.validation();}
+        try{var instant=Instant.parse(value);int year=instant.atOffset(java.time.ZoneOffset.UTC).getYear();if(year<1||year>9999)throw ApiFailure.validation();return instant;}catch(DateTimeParseException invalid){throw ApiFailure.validation();}
     }
     ObjectNode apply(ServerStore store,ObjectNode entry){
         if(createdAt==null&&modifiedAt==null)return entry;

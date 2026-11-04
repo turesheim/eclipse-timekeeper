@@ -2,13 +2,13 @@ import {fileSha256} from './file-sha256.js';
 import {t} from './i18n.js';
 
 export const NOTES_METADATA_FORMAT='timekeeper-notes-v1';
-export const notesMetadataName=name=>/^\.timekeeper-notes(?:-[a-f0-9-]{36})?\.json$/.test(name);
+export const notesMetadataName=name=>/^timekeeper-notes-metadata(?:-[a-f0-9-]{36})?\.json$/.test(name);
 const key=path=>path.toUpperCase().toLowerCase().normalize('NFC');
 const validDate=value=>{
   if(typeof value!=='string'||value.length>40)return false;
   const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);if(!match)return false;
   const [,year,month,day,hour,minute,second]=match.map(Number),leap=year%4===0&&(year%100!==0||year%400===0);
-  return year>0&&month>=1&&month<=12&&day>=1&&day<=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1]&&hour<24&&minute<60&&second<60&&Number.isFinite(Date.parse(value));
+  return year>0&&month>=1&&month<=12&&day>=1&&day<=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1]&&hour<24&&minute<60&&second<60&&Number.isFinite(Date.parse(value))&&new Date(value).getUTCFullYear()>=1&&new Date(value).getUTCFullYear()<=9999;
 };
 const validPath=path=>typeof path==='string'&&path===path.normalize('NFC')&&path.length>0&&new TextEncoder().encode(path).length<=1024&&path.split('/').length<=32&&!path.split('/').some(part=>!part||part==='.'||part==='..'||/[<>:"\\|?*\u0000-\u001f\u007f]/.test(part)||/[. ]$/.test(part)||new TextEncoder().encode(part).length>255||/^(CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³])$/i.test(part.split('.')[0].trimEnd()));
 export function parseNotesMetadata(value){

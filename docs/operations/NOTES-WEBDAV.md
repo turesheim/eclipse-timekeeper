@@ -37,8 +37,10 @@ records are excluded. Match the journal/event/asset folder preferences before
 importing into another account if it uses a different layout.
 
 ZIP entries carry available creation and modification times. The auxiliary
-`.timekeeper-notes.json` file preserves their full precision; a UUID suffix avoids
-colliding with an existing source filename. Extract the ZIP and choose its root
+`timekeeper-notes-metadata.json` file preserves their full precision; a UUID suffix avoids
+colliding with an existing source filename. Its visible name also works with Safari's
+folder picker, which omits dotfiles. Files recorded by metadata but absent from the
+selection are listed as skipped; no missing bytes are fabricated. Extract the ZIP and choose its root
 for folder import. Timekeeper recognizes the auxiliary metadata, excludes it from
 uploads, and preserves dates and empty folders. A source file with the same name
 is kept as a normal file. Invalid or ambiguous metadata blocks review. Original

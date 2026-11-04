@@ -64,14 +64,14 @@ test('import metadata preserves nanosecond dates and uses current modification t
   assert.equal(parseNotesMetadata(value).get('exact.md').createdAt,creation);
   assert.deepEqual((await importedFileDates(chosenFile('Exact.md','Original\r\n'),entry)).dates,{createdAt:creation,modifiedAt:modification});
   const edited=await importedFileDates(chosenFile('Exact.md','Edited'),entry);assert.equal(edited.changed,true);assert.deepEqual(edited.dates,{createdAt:creation,modifiedAt:'2026-01-01T00:00:00.000Z'});
-  for(const bad of ['2021-02-30T00:00:00Z','0000-01-01T00:00:00Z','not-a-date'])assert.throws(()=>parseNotesMetadata({...value,entries:[{...entry,createdAt:bad}]}));
+  for(const bad of ['2021-02-30T00:00:00Z','0000-01-01T00:00:00Z','0001-01-01T00:00:00+14:00','9999-12-31T23:59:59-14:00','not-a-date'])assert.throws(()=>parseNotesMetadata({...value,entries:[{...entry,createdAt:bad}]}));
   assert.throws(()=>parseNotesMetadata({...value,entries:[entry,{...entry,path:'exact.md'}]}));
 });
 test('export metadata cannot hide a source file using the same conventional metadata filename',async()=>{
-  const original=chosenFile('.timekeeper-notes.json','A real user file'),metadataName='.timekeeper-notes-00000000-0000-0000-0000-000000000001.json';
+  const original=chosenFile('timekeeper-notes-metadata.json','A real user file'),metadataName='timekeeper-notes-metadata-00000000-0000-0000-0000-000000000001.json';
   const transport=chosenFile(metadataName,JSON.stringify({format:'timekeeper-notes-v1',entries:[manifestEntry(original.name,'A real user file')]}));
   const metadata=await readNotesMetadata([original,transport]),rows=folderImportPlan([original,transport],{metadata});
   assert.equal(metadata.file,transport);assert.equal(rows.length,1);assert.equal(rows[0].file,original);assert.equal(rows[0].status,'ready');
-  const independent=chosenFile('.timekeeper-notes-00000000-0000-0000-0000-000000000002.json',JSON.stringify({format:'timekeeper-notes-v1',entries:[]}));
+  const independent=chosenFile('timekeeper-notes-metadata-00000000-0000-0000-0000-000000000002.json',JSON.stringify({format:'timekeeper-notes-v1',entries:[]}));
   await assert.rejects(()=>readNotesMetadata([transport,independent]));
 });
