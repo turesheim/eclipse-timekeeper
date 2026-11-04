@@ -1,4 +1,3 @@
-import {Api} from './api.js';
 import {setLocale,applyTranslations} from './i18n.js';
 import {installTooltips} from './tooltips.js';
 installTooltips();
@@ -12,6 +11,8 @@ try {
   const session=await fetch('/api/v1/auth/session',options());
   if(session.ok) {
     const account = await session.json();setLocale(account.locale);
+    // Api builds locale-sensitive sorters when first evaluated.
+    const {Api} = await import('./api.js');
     const api = new Api(null, undefined, account);
     try {
       const profile = await api.request('/me');
@@ -33,6 +34,7 @@ await import(entry);
 document.addEventListener('visibilitychange', async () => {
   const preferences = window.timekeeperTypography, owner = preferences?.profile()?.data.ownerId;
   if (document.hidden || !owner) return;
+  const {Api} = await import('./api.js');
   const api = new Api(null, undefined, {ownerId: owner});
   try {preferences.receive(await api.request('/me'));}
   catch (error) {if (error.status === 401 && preferences.profile()?.data.ownerId === owner) preferences.disconnect();}
