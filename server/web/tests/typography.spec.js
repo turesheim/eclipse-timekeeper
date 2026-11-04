@@ -131,10 +131,14 @@ test('typography follows confirmed peer changes and all web entry pages without 
   await editor(page).fill(':root { --font-base: 20px; --font-brand: 2rem; }');await save(page);await saved(page);
   await expect(other.locator('html')).toHaveCSS('font-size', '20px');await expect(editor(other)).toHaveValue(draft);
   await editor(other).fill(await editor(page).inputValue());
-  for (const path of ['/admin/', '/web/project-report.html', '/web/#notes']) {
+  for (const path of ['/admin/', '/web/project-report.html', '/web/']) {
     await other.goto(path);await expect(other.locator('html')).toHaveCSS('font-size', '20px');
     await expect(other.locator('.brand')).toHaveCSS('font-size', '40px');
-    const mainPage=path==='/web/#notes';if(mainPage)await expect(other.locator('#notes-panel')).toBeVisible();
+    const mainPage=path==='/web/';
+    if(mainPage){
+      await expect(other.locator('#workspace')).toBeVisible();
+      await other.locator('[data-tab=notes]').click();await expect(other.locator('#notes-panel')).toBeVisible();
+    }
     // A full main-page reload has the same startup baseline as the initial
     // sign-in page; separate entry pages must still have no policy violations.
     expect(await other.evaluate(() => window.typographyPolicyViolations),path).toEqual(mainPage?startup:[]);
