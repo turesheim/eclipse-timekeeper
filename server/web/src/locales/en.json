@@ -1279,7 +1279,7 @@
   "notes.webdav_concurrency": "Preview changes with the manual client before applying them. Existing files require their current ETag for updates or deletion; conflicting versions are retained for review.",
   "typography.title": "Font sizes",
   "typography.description": "Edit the commented CSS below to change text sizes. These preferences are saved to your account on the server and follow you when you sign in from another browser or device.",
-  "typography.help": "Start with --font-base: 100% to follow the browser default, or use a pixel value such as 18px to set the size of 1rem. Other rem values scale from it; em values scale from the surrounding text. Edit values inside :root, keeping the property names. Remove a property to use its default. Changes apply after the server confirms your save. Reset saves the defaults to your account.",
+  "typography.help": "The default is --font-base: 14px. Use --font-base: 100% to follow the browser default, or use a pixel value such as 18px to set the size of 1rem. Other rem values scale from it; em values scale from the surrounding text. Edit values inside :root, keeping the property names. Remove a property to use its default. Changes apply after the server confirms your save. Reset saves the defaults to your account.",
   "typography.css": "Font size CSS",
   "typography.save": "Save font sizes",
   "typography.reset": "Reset font sizes",
@@ -1290,5 +1290,18 @@
   "typography.error.duplicate": "The font property {{name}} occurs more than once. Keep one value for each property.",
   "typography.error.value": "Enter a valid, nonzero CSS font size for {{name}}, such as 0.9rem or 14px. CSS math is supported; references and other CSS declarations are not.",
   "typography.error.base": "Set --font-base to a positive percentage or pixel value, such as 100% or 18px. This defines the size of 1rem.",
-  "typography.error.load": "The default font size CSS could not be loaded. Reload this page to try again."
+  "typography.error.load": "The default font size CSS could not be loaded. Reload this page to try again.",
+  "notes.navigation_actions": "Note navigation actions",
+  "notes.create_actions": "Create notes",
+  "notes.organize_actions": "Organize notes",
+  "notes.browse_actions": "Browse notes",
+  "notes.sort": "Sort notes",
+  "notes.collapse_all": "Collapse all folders",
+  "notes.expand_all": "Expand all folders",
+  "notes.sort_name_asc": "Name (A–Z)",
+  "notes.sort_name_desc": "Name (Z–A)",
+  "notes.sort_created_asc": "Created (oldest first)",
+  "notes.sort_created_desc": "Created (newest first)",
+  "notes.sort_modified_asc": "Modified (oldest first)",
+  "notes.sort_modified_desc": "Modified (newest first)"
 }

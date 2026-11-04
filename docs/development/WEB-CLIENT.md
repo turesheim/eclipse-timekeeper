@@ -349,8 +349,9 @@ comment explaining where it is used. This stylesheet is the source of the
 application defaults; components reference its properties instead of repeating
 font-size values.
 
-`--font-base: 100%` follows the browser's default font size, usually 16px. Set it
-to a percentage or a pixel value such as `18px` to change the size of **1rem**.
+The application defaults to `--font-base: 14px` throughout its web entry pages.
+Set it to `100%` to follow the browser's default, or another percentage/pixel value
+to change the size of **1rem**.
 Other `rem` sizes and rem-based spacing scale with it. `em` sizes remain relative
 to their surrounding text. Separate properties cover desktop/mobile variants,
 Calendar and Week labels, Today cards, tables, forms, tooltips, Notes and

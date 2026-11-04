@@ -6,8 +6,8 @@
 :root {
 
   /* Base and shared controls */
-  /* Base size for 1rem. 100% follows your browser default (usually 16px). Use px or %. Increasing this also scales rem-based spacing and controls. */
-  --font-base: 100%;
+  /* Base size for 1rem; the application default is 14px. Use 100% to follow your browser default. Increasing this also scales rem-based spacing and controls. */
+  --font-base: 14px;
   /* Default body text and navigation labels. */
   --font-body: 1rem;
   /* Standard button text. */

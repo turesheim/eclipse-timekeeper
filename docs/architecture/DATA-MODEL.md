@@ -679,6 +679,13 @@ owner-scoped point indexes; `vault_child` relations provide indexed directory
 membership. Moves update paths and memberships under the same owner transaction
 used by all canonical note writers. Metadata queries never fetch attachment data.
 
+New entries also record an immutable `createdAt` timestamp for their creation in
+the collection. It survives content edits, moves, deletion/recovery and logical
+account archives. Entries predating this metadata may omit it; reads and moves do
+not invent a creation date. File `modifiedAt` remains the canonical content's
+modification time. Clients can sort complete metadata listings without reading
+document bodies.
+
 `VAULT_CONTENT` holds exact general-file bytes, checksum, size and content version.
 DAY_NOTE, WEEK_NOTE, EVENT_NOTE and JOURNAL_ASSET remain the sole live sources for
 typed entries. `VAULT_RECYCLE` retains deleted legacy bytes, associated with the
@@ -695,7 +702,7 @@ File content validators are canonical ETags; structural API operations use the
 separate entry validator (`entryEtag`) so a stale rename/delete cannot act on a
 new path while a body save can still address the stable ID. Directory validators
 include namespace generation. DAV resource IDs derive from collection and entry
-identity, survive MOVE and aliases, and distinguish a replaced collection. This
+identity, survive MOVE, and distinguish a replaced collection. This
 uses the resource-id property described by [RFC 5842, section 3.1](https://www.rfc-editor.org/rfc/rfc5842#section-3.1); it does not add BIND/UNBIND.
 
 Schema 10 is a logical compatibility fence: older writers lack namespace hooks

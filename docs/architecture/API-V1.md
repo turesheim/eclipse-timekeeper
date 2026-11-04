@@ -1136,12 +1136,17 @@ reads/writes raw canonical bytes with the content ETag. Metadata includes `etag`
 (content validator) and `entryEtag` (structural validator). Metadata responses
 carry entryEtag in the HTTP ETag header; content responses carry the content
 validator. Use entryEtag for PUT `/path`, DELETE entry and POST `/restore`.
+New entries include `createdAt`, the immutable time they were added to the
+collection. Existing entries with no recorded creation date omit it. It is
+preserved by editing, moving, recovery and account archives. `modifiedAt` describes
+the canonical file content. Clients sort after following every metadata page;
+unknown dates can be placed after known dates without fetching file bytes.
 Conflicting destinations are never overwritten. Stale/missing preconditions
 return 412/428; deployment quota growth returns 507. Day labels are independent.
 
 The hierarchical `/dav/notes/` collection exposes the same sources,
 with guarded PUT/DELETE/MOVE, MKCOL, strong ETags and stable DAV resource-id.
-Existing flat aliases remain available. Account archives use v4 with ZIP uploads
+Daily, weekly and event notes share this hierarchy. Account archives use v4 with ZIP uploads
 up to 1 GiB and JSON up to 256 MiB; archive.json remains separately bounded.
 The [OpenAPI](../../common/api/openapi.json) defines complete shapes and paths.
 See [Notes setup and transition](../operations/NOTES-WEBDAV.md).

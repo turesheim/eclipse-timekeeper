@@ -22,6 +22,14 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_note_creation_dates_are_optional_valid_timestamps_in_metadata_and_archives(self):
+        for schema in ('VaultEntry', 'AccountArchiveVaultEntry'):
+            field = CONTRACT['components']['schemas'][schema]['properties']['createdAt']
+            self.assertTrue(Draft202012Validator(field, format_checker=FormatChecker()).is_valid('2026-11-04T10:30:00Z'))
+            for invalid in ('yesterday', 123, None):
+                self.assertFalse(Draft202012Validator(field, format_checker=FormatChecker()).is_valid(invalid))
+            self.assertNotIn('createdAt', CONTRACT['components']['schemas'][schema]['required'])
+
     def test_journal_visibility_is_optional_and_boolean_in_settings_and_archives(self):
         for value in (True, False):
             self.assertTrue(validator('VaultSettingsInput').is_valid({'hideJournalFolder': value}))
