@@ -156,6 +156,9 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
       catch (error) {
         if (current !== generation) return;
         if (active) {reset(errorText(error));return;}
+        // Bootstrap may have loaded a profile just before the session expired.
+        // A failed restore must leave the public sign-in page at default sizes.
+        window.timekeeperTypography?.disconnect();
         const token = savedToken();
         if (token) {try {await exchange(token, current);return;} catch (failure) {$('login-error').textContent = errorText(failure);}}
         try {

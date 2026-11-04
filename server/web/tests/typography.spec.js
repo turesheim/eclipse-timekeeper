@@ -104,6 +104,17 @@ test('account typography persists in another browser and stays isolated when sig
   } finally {await otherContext.close();}
 });
 
+test('a session expiring between profile bootstrap and restore clears account font sizes from sign-in', async ({page, request}) => {
+  await openSettings(page, request);await editor(page).fill(':root { --font-base: 18px; }');await save(page);await saved(page);
+  let reads = 0;
+  await page.route('**/api/v1/auth/session', route => {
+    if (++reads === 1) return route.continue();
+    return route.fulfill({status: 401, contentType: 'application/json', body: JSON.stringify({code: 'UNAUTHENTICATED'})});
+  });
+  await page.reload();await expect(page.locator('#login')).toBeVisible();
+  await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+});
+
 test('typography follows confirmed peer changes and all web entry pages without adding CSP violations', async ({page, context, request, browserName}) => {
   await context.addInitScript(() => {
     window.typographyPolicyViolations = [];
