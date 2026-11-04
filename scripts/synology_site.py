@@ -37,14 +37,16 @@ def preview(repo, output, base):
         if (not re.fullmatch('[a-f0-9]{40}', commit) or
             not release.trusted_run(run, repo, branch, commit, 'server-containers.yml') or not ancestor(commit)):
             continue
-        if not {'verify', 'Synology candidate and PostgreSQL 17'}.issubset(release.passed_jobs(repo, run['id'])):
+        jobs = release.passed_jobs(repo, run['id'])
+        if not ({'verify', 'Synology candidate and PostgreSQL 17'}.issubset(jobs) or release.WEB_PREVIEW_JOBS.issubset(jobs)):
             continue  # Runs before Synology support, or documentation-only runs.
         try:
-            artifact = release.candidate_artifact(repo, run['id'], branch, commit)
+            artifact = release.candidate_artifact(repo, run['id'], branch, commit, allow_web_preview=True)
         except release.CandidateUnavailable:
             continue
         try:
-            matrix = release.matrix_run(repo, branch, commit)
+            web_preview = artifact['name'] == release.WEB_PREVIEW_ARTIFACT
+            matrix = release.matrix_run(repo, branch, commit, web_preview=web_preview)
         except ValueError:
             continue  # The matching matrix must finish successfully too.
         with tempfile.TemporaryDirectory(prefix='timekeeper-preview-site-') as temp:
@@ -62,7 +64,8 @@ def preview(repo, output, base):
             for path in (package, package.with_suffix('.spk.sha256'), package.with_suffix('.json')):
                 shutil.copyfile(path, output / path.name)
         return {'available': True, 'commit': commit, 'version': checked['version'],
-                'run': run['id'], 'matrixRun': matrix, 'artifact': artifact['id'], 'sha256': checked['sha256']}
+                'run': run['id'], 'matrixRun': matrix, 'artifact': artifact['id'], 'sha256': checked['sha256'],
+                'validation': 'web-smoke' if web_preview else 'full'}
     return {'available': False, 'reason': 'No complete, unexpired main candidate and matching matrix are available.'}
 
 

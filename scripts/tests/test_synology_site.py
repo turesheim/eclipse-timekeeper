@@ -73,6 +73,21 @@ class SynologySiteTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'artifact SHA-256'):
             self.build(True)
 
+    def test_web_preview_updates_the_channel_without_claiming_database_certification(self):
+        self.fixture.artifact['name']=site.release.WEB_PREVIEW_ARTIFACT
+        self.fixture.container_jobs=set(site.release.WEB_PREVIEW_JOBS)
+        self.fixture.matrix_jobs={'Server','Packaging and channel tests','PR validation'}|{f'Web ({index}/4)' for index in range(1,5)}
+        result=self.build(preview=True)
+        self.assertTrue(result['preview']['available']);self.assertEqual('web-smoke',result['preview']['validation'])
+        self.assertFalse(result['stable']['available'])
+        self.fixture.matrix_jobs.remove('PR validation')
+        self.assertFalse(self.build(preview=True)['preview']['available'])
+
+    def test_preview_supports_the_current_sharded_full_build(self):
+        self.fixture.matrix_jobs=(set(site.release.MATRIX_JOBS)-{'Web'})|{f'Web ({index}/4)' for index in range(1,5)}
+        result=self.build(preview=True)
+        self.assertTrue(result['preview']['available']);self.assertEqual('full',result['preview']['validation'])
+
     def test_stable_catalog_requires_complete_report_and_links_to_immutable_release_asset(self):
         self.publish_fixture()
         result = self.build()

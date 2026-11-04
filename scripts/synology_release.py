@@ -13,12 +13,14 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server/scripts'))
 from promote_synology import preview, promote
-from p2_release import download_testing_artifact, gh
+from p2_release import download_testing_artifact, gh, web_checks_passed
 
 ACCEPTANCE = 'timekeeper-dsm-acceptance.json'
 EVIDENCE = 'timekeeper-dsm-release.json'
 # Preserve access to already-tested installers from before the artifact rename.
 INSTALLER_ARTIFACT_NAMES = {'synology-installer', 'synology-preview-candidate'}
+WEB_PREVIEW_ARTIFACT = 'synology-web-preview'
+WEB_PREVIEW_JOBS = {'Synology web preview', 'Deployment startup and bundled web', 'Build shared server image'}
 # A server-only main build deliberately skips the Eclipse platform matrix.
 # NAS promotion still requires every server, web, packaging and publication gate.
 MATRIX_JOBS = {'API-contract', 'Server', 'Web', 'Packaging and channel tests',
@@ -71,22 +73,30 @@ def passed_jobs(repo, run_id):
 
 def require_jobs(repo, run_id, required):
     passed = passed_jobs(repo, run_id)
-    if not required.issubset(passed):
-        raise ValueError('Required jobs did not pass: ' + ', '.join(sorted(required - passed)))
+    missing = required - passed
+    if 'Web' in required:
+        if web_checks_passed(passed):
+            missing.discard('Web')
+        else:
+            missing.add('Web')
+    if missing:
+        raise ValueError('Required jobs did not pass: ' + ', '.join(sorted(missing)))
 
 
-def candidate_artifact(repo, run_id, branch, commit):
+def candidate_artifact(repo, run_id, branch, commit, allow_web_preview=False):
     run = api(repo, f'actions/runs/{run_id}')
     if run.get('id') != run_id or not trusted_run(run, repo, branch, commit, 'server-containers.yml'):
         raise ValueError('Candidate must come from a successful main Server containers push at the release commit')
-    require_jobs(repo, run_id, {'verify', 'Synology candidate and PostgreSQL 17'})
+    names = INSTALLER_ARTIFACT_NAMES | ({WEB_PREVIEW_ARTIFACT} if allow_web_preview else set())
     found = [artifact for artifact in pages(repo, f'actions/runs/{run_id}/artifacts?per_page=100', 'artifacts')
-             if artifact['name'] in INSTALLER_ARTIFACT_NAMES and not artifact['expired']]
+             if artifact['name'] in names and not artifact['expired']]
     if not found:
         raise CandidateUnavailable('A unique, unexpired Synology candidate artifact is required')
     if len(found) != 1:
         raise ValueError('Ambiguous Synology candidate artifacts')
     artifact = found[0]
+    required = WEB_PREVIEW_JOBS if artifact['name'] == WEB_PREVIEW_ARTIFACT else {'verify', 'Synology candidate and PostgreSQL 17'}
+    require_jobs(repo, run_id, required)
     source = artifact.get('workflow_run', {})
     if source.get('id') != run_id or source.get('head_sha') != commit or source.get('head_branch') != branch:
         raise ValueError('Candidate artifact source differs from its successful workflow')
@@ -95,11 +105,12 @@ def candidate_artifact(repo, run_id, branch, commit):
     return artifact
 
 
-def matrix_run(repo, branch, commit):
+def matrix_run(repo, branch, commit, web_preview=False):
     runs = pages(repo, f'actions/workflows/build.yml/runs?head_sha={commit}&event=push&status=success&per_page=100', 'workflow_runs')
     for run in sorted(runs, key=lambda item: item['id']):
         if trusted_run(run, repo, branch, commit, 'build.yml'):
-            require_jobs(repo, run['id'], MATRIX_JOBS)
+            required = {'Server', 'Web', 'Packaging and channel tests', 'PR validation'} if web_preview else MATRIX_JOBS
+            require_jobs(repo, run['id'], required)
             return run['id']
     raise ValueError('A successful main build matrix at the release commit is required')
 
