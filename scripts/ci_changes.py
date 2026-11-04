@@ -77,13 +77,21 @@ def sensitive_path(path):
     return True
 
 
+def desktop_path(path):
+    # Server and CI/deployment tooling do not compile into the Eclipse client.
+    # Shared code, root build inputs and unknown product paths still select all
+    # desktop platforms. Release/nightly/manual/full overrides do so separately.
+    return not path.startswith(('server/', 'scripts/', '.github/'))
+
+
 def select_jobs(event, event_name, ref, head):
     paths = changed_paths(event, event_name, ref, head)
     product = [p for p in (paths or []) if not documentation(p)]
     override = any(label.get('name') == 'ci:full' for label in event.get('pull_request', {}).get('labels', []))
     sensitive = any(sensitive_path(p) for p in product)
     # Main uses the same selection as PRs. Nightly/manual/tag runs certify everything.
-    full = paths is None or override or bool(sensitive)
+    certify_all = paths is None or override
+    full = certify_all or bool(sensitive)
     code = full or bool(product)
     web_paths = [p for p in product if p.startswith('server/web/')]
     backend = any(not p.startswith('server/web/') for p in product)
@@ -91,7 +99,8 @@ def select_jobs(event, event_name, ref, head):
     return {
         'code': code,
         'full': full,
-        'eclipse': full,
+        'eclipse': certify_all or any(desktop_path(p) for p in product),
+        'remote_eclipse': full,
         'server': code,  # The exact packaged server supplies browser fixtures.
         'server_tests': full or backend,
         'api': full or backend,
