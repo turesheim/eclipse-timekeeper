@@ -11,6 +11,7 @@ function clear() {
   $('report-title').textContent=t('ui.work_sessions');document.title=t('project_report.title');
 }
 function failure(error) {
+  if (error.status === 401) window.timekeeperTypography?.disconnect();
   clear();$('report-status').textContent='';$('report-error').textContent=error.status===401?t('project_report.sign_in'):error.status===404?t('project_report.not_found'):error.message;
   $('report-sign-in').hidden=error.status!==401;
 }
@@ -20,11 +21,12 @@ async function load() {
   try {
     if(!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(projectId||''))throw new Error(t('project_report.invalid'));
     session?.close();session=new Api(null,undefined,owner===null?{}:{ownerId:owner});
-    const api=session,{data:account}=await api.request('/auth/session');owner=account.ownerId;
+    const api=session,{data:account}=await api.request('/auth/session');owner=account.ownerId;window.timekeeperTypography?.connect(owner);
     const [project,profile,clients,sessions]=await Promise.all([
       api.request('/projects/'+projectId),api.request('/me'),api.page('/clients'),api.page('/work-sessions',{projectId})
     ]);
     if(current!==generation||api!==session)return;
+    window.timekeeperTypography?.receive(profile);
     const zone=profile.data.zoneId,asOf=new Date().toISOString(),clientName=id=>clients.items.find(client=>client.id===id)?.name||t('ui.unassigned');
     const values=[...sessions.items].sort((a,b)=>{const left=instantNanos(a.start),right=instantNanos(b.start);return left<right?1:left>right?-1:a.id.localeCompare(b.id);});
     let total=0n;const rows=[];

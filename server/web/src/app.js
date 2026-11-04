@@ -180,8 +180,9 @@ const auth = authentication({
   },
   async connect(session, account) {
     api = session;accountName = account.displayName;canWrite = account.permissions.includes('write');
-    const { data: profile } = await session.initializeTimeZone();
+    const profileReply = await session.initializeTimeZone(), profile = profileReply.data;
     if (session !== api) return;
+    window.timekeeperTypography?.receive(profileReply);
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     today.initialize(dailyNoteDateFromSearch(location.search)||dateInZone(Date.now(),profile.zoneId));
@@ -237,6 +238,7 @@ async function refresh() {
       // A save may have queued another read while this older snapshot was in
       // flight. Publish only the final snapshot before enabling dependent forms.
       if (reloadAgain) continue;
+      window.timekeeperTypography?.receive(current.profile);
       snapshot = current;snapshotAt = performance.now();activeAsOf = instantNanos(current.report.generatedAt);connected = true;
       render();setStatus(i18nText("ui.up_to_date"), 'ready');
       void refreshServerInfo(session);

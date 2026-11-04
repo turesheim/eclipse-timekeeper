@@ -200,6 +200,13 @@ class ContractTest(unittest.TestCase):
         for schema in ('Profile', 'ProfileInput', 'AuthSession'):
             self.assertNotIn('locale', CONTRACT['components']['schemas'][schema].get('required', []))
 
+    def test_typography_is_an_optional_nullable_bounded_profile_preference(self):
+        for css in (None, ':root { --font-base: 18px; }', 'x' * 65536):
+            validator('ProfileInput').validate({'zoneId': 'Europe/Oslo', 'typographyCss': css})
+        validator('ProfileInput').validate({'zoneId': 'Europe/Oslo'})
+        for css in (1, [], {}, 'x' * 65537):
+            self.assertFalse(validator('ProfileInput').is_valid({'zoneId': 'Europe/Oslo', 'typographyCss': css}))
+
     def test_optional_project_icons_are_bounded_metadata(self):
         for icon in ('code', 'globe', 'hammer', 'rocket', 'airplane-engines', 'calendar3', 'phone', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})

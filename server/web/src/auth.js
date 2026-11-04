@@ -50,14 +50,14 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
   }
   async function attach(data, current) {
     if (current !== generation) return;
-    const session = new Api(null, undefined, data);active = session;forgetToken();
+    const session = new Api(null, undefined, data);active = session;window.timekeeperTypography?.connect(data.ownerId);forgetToken();
     $('login-form').reset();mode();$('login-error').textContent = '';
     if ((await connect(session, data)) === false) return;
     if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus);
   }
   function reset(message = '', retry = null, {restoring = false} = {}) {
     loginPasskey.cancel();passkeyState(false);
-    ++generation;active?.close();active = null;closeAccount();clear({restoring});
+    ++generation;active?.close();active = null;window.timekeeperTypography?.disconnect();closeAccount();clear({restoring});
     recovery?.close();
     $('login-form').reset();
     if (retry) {$('auth-mode').value = retry.mode;$('username').value = retry.username;}
@@ -156,6 +156,9 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
       catch (error) {
         if (current !== generation) return;
         if (active) {reset(errorText(error));return;}
+        // Bootstrap may have loaded a profile just before the session expired.
+        // A failed restore must leave the public sign-in page at default sizes.
+        window.timekeeperTypography?.disconnect();
         const token = savedToken();
         if (token) {try {await exchange(token, current);return;} catch (failure) {$('login-error').textContent = errorText(failure);}}
         try {

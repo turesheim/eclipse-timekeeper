@@ -341,6 +341,53 @@ web controls. All styles and checkbox/radio assets are bundled locally.
 settings, persistence, cross-tab updates and unavailable storage. It captures
 desktop and mobile previews for every theme under `server/web/test-results/`.
 
+## Font sizes
+
+Open **My Account → Font sizes** to edit the font properties from
+`server/web/src/typography.css`. Every property has a descriptive name and a
+comment explaining where it is used. This stylesheet is the source of the
+application defaults; components reference its properties instead of repeating
+font-size values.
+
+`--font-base: 100%` follows the browser's default font size, usually 16px. Set it
+to a percentage or a pixel value such as `18px` to change the size of **1rem**.
+Other `rem` sizes and rem-based spacing scale with it. `em` sizes remain relative
+to their surrounding text. Separate properties cover desktop/mobile variants,
+Calendar and Week labels, Today cards, tables, forms, tooltips, Notes and
+formatted Markdown heading levels. CSS math expressions such as `clamp()` and
+`calc()` are supported for these other sizes.
+
+Changes apply after **Save font sizes** is confirmed by the server. The editor
+accepts one `:root` block with the named font properties and CSS comments; it
+reports invalid properties or values without replacing the draft or saved
+settings. Omitting a property uses its application default. **Reset font sizes**
+saves a null preference and restores the commented defaults.
+
+The CSS fragment is stored in the signed-in user's profile as `typographyCss`,
+using `GET /me` and versioned `PUT /me` updates. It follows the account across
+browsers and devices, and applies to tracking, Administration, reports and the
+shared Markdown editor. Signed-out pages use application defaults. Signing out or switching
+accounts clears the previous user's sizes; old responses cannot restore them.
+Old browser-wide typography values are ignored. Read-only sessions can view the
+preference but cannot change it.
+
+The existing profile change feed updates other tracking tabs. Returning to a tab
+also reloads the owned profile. Clean editors follow confirmed peer changes;
+unsaved drafts retain their original version so stale saves preserve the draft
+and offer **Reload current values**. Failed or uncertain writes retain the draft
+and never silently retry the save. Other profile edits and holiday resets
+preserve typography, and resetting typography preserves other preferences. As
+with language and holiday preferences, account archives do not currently carry
+this preference; full instance backups retain the account's profile records.
+
+The early `typography.js` script validates and applies only declared font
+properties through the CSS object model, preserving the existing Content
+Security Policy. Stored CSS is bounded inert text, never an HTML or stylesheet
+injection. `tests/typography.spec.js` checks persistence across browser contexts,
+account isolation, reset, rem scaling, failed/stale writes, read-only sessions,
+Norwegian labels, keyboard navigation and accessible desktop/mobile layouts
+across all six themes.
+
 ## Design baseline
 
 The main views share a fixed bottom navigation bar, with an icon for each view.

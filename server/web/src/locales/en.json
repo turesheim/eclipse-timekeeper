@@ -1276,5 +1276,19 @@
   "notes.webdav_tokens": "Manage API tokens",
   "notes.download_client": "Download manual sync client",
   "notes.webdav_naming": "Daily and weekly notes are in the configured journal folder; calendar event notes are in the events folder. Other Markdown notes and attachments share the same collection.",
-  "notes.webdav_concurrency": "Preview changes with the manual client before applying them. Existing files require their current ETag for updates or deletion; conflicting versions are retained for review."
+  "notes.webdav_concurrency": "Preview changes with the manual client before applying them. Existing files require their current ETag for updates or deletion; conflicting versions are retained for review.",
+  "typography.title": "Font sizes",
+  "typography.description": "Edit the commented CSS below to change text sizes. These preferences are saved to your account on the server and follow you when you sign in from another browser or device.",
+  "typography.help": "Start with --font-base: 100% to follow the browser default, or use a pixel value such as 18px to set the size of 1rem. Other rem values scale from it; em values scale from the surrounding text. Edit values inside :root, keeping the property names. Remove a property to use its default. Changes apply after the server confirms your save. Reset saves the defaults to your account.",
+  "typography.css": "Font size CSS",
+  "typography.save": "Save font sizes",
+  "typography.reset": "Reset font sizes",
+  "typography.saved": "Font sizes saved to your account.",
+  "typography.reset_done": "Default font sizes restored.",
+  "typography.error.syntax": "Use one :root { ... } block containing font properties and optional CSS comments. Keep the CSS under 64 KiB.",
+  "typography.error.property": "Unknown font property: {{name}}. Use the names from the default CSS.",
+  "typography.error.duplicate": "The font property {{name}} occurs more than once. Keep one value for each property.",
+  "typography.error.value": "Enter a valid, nonzero CSS font size for {{name}}, such as 0.9rem or 14px. CSS math is supported; references and other CSS declarations are not.",
+  "typography.error.base": "Set --font-base to a positive percentage or pixel value, such as 100% or 18px. This defines the size of 1rem.",
+  "typography.error.load": "The default font size CSS could not be loaded. Reload this page to try again."
 }

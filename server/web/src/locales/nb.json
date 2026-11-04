@@ -1276,5 +1276,19 @@
   "notes.webdav_tokens": "Administrer API-tokener",
   "notes.download_client": "Last ned manuell synkroniseringsklient",
   "notes.webdav_naming": "Dags- og ukenotater ligger i den valgte dagbokmappen; kalenderhendelsesnotater ligger i hendelsesmappen. Andre Markdown-notater og vedlegg ligger i samme samling.",
-  "notes.webdav_concurrency": "Se gjennom endringene i den manuelle klienten før du utfører dem. Eksisterende filer krever gjeldende ETag ved endring eller sletting; versjoner med konflikter beholdes for gjennomgang."
+  "notes.webdav_concurrency": "Se gjennom endringene i den manuelle klienten før du utfører dem. Eksisterende filer krever gjeldende ETag ved endring eller sletting; versjoner med konflikter beholdes for gjennomgang.",
+  "typography.title": "Skriftstørrelser",
+  "typography.description": "Rediger CSS-en med kommentarer nedenfor for å endre tekststørrelser. Innstillingene lagres på kontoen din på serveren og følger deg når du logger inn fra en annen nettleser eller enhet.",
+  "typography.help": "Begynn med --font-base: 100% for å følge nettleserens standard, eller bruk en pikselverdi som 18px for å angi størrelsen på 1rem. Andre rem-verdier skaleres fra denne; em-verdier skaleres fra teksten rundt. Rediger verdier inne i :root, og behold egenskapsnavnene. Fjern en egenskap for å bruke standardverdien. Endringer tas i bruk når serveren bekrefter lagringen. Tilbakestilling lagrer standardverdiene på kontoen din.",
+  "typography.css": "CSS for skriftstørrelser",
+  "typography.save": "Lagre skriftstørrelser",
+  "typography.reset": "Tilbakestill skriftstørrelser",
+  "typography.saved": "Skriftstørrelsene er lagret på kontoen din.",
+  "typography.reset_done": "Standard skriftstørrelser er gjenopprettet.",
+  "typography.error.syntax": "Bruk én :root { ... }-blokk med skriftegenskaper og eventuelle CSS-kommentarer. Hold CSS-en under 64 KiB.",
+  "typography.error.property": "Ukjent skriftegenskap: {{name}}. Bruk navnene fra standard-CSS-en.",
+  "typography.error.duplicate": "Skriftegenskapen {{name}} forekommer flere ganger. Behold én verdi for hver egenskap.",
+  "typography.error.value": "Angi en gyldig CSS-skriftstørrelse større enn null for {{name}}, som 0.9rem eller 14px. CSS-beregninger støttes; referanser og andre CSS-deklarasjoner støttes ikke.",
+  "typography.error.base": "Sett --font-base til en positiv prosent- eller pikselverdi, som 100% eller 18px. Dette angir størrelsen på 1rem.",
+  "typography.error.load": "Standard-CSS-en for skriftstørrelser kunne ikke lastes. Last inn siden på nytt for å prøve igjen."
 }

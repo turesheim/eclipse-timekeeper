@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 let session = null,account = null,view = null,generation = 0,acceptedHash = '';
 accountMenu($('account-menu'));
 function dispose() {++generation;for (const cleanup of view?.cleanup || []) cleanup();view = null;}
-function clear() {dispose();session?.close();session = null;account = null;$('account-content').replaceChildren();$('account-content').setAttribute('aria-busy', 'false');$('account-navigation').replaceChildren();$('account-navigation').hidden = true;$('account-identity').textContent = '';$('users-link').hidden = true;$('account-error').replaceChildren();}
+function clear() {window.timekeeperTypography?.disconnect();dispose();session?.close();session = null;account = null;$('account-content').replaceChildren();$('account-content').setAttribute('aria-busy', 'false');$('account-navigation').replaceChildren();$('account-navigation').hidden = true;$('account-identity').textContent = '';$('users-link').hidden = true;$('account-error').replaceChildren();}
 function signedOut(message = i18nText("ui.sign_in_with_an_administrator_account_to_continue")) {
   clear();$('session').hidden = true;$('status').textContent = i18nText("ui.sign_in_required");
   $('account-content').append(node('p', message), link(i18nText("ui.sign_in_to_administration"), '/web/#administration', "btn btn-primary"));
@@ -49,7 +49,11 @@ async function initialize() {
   const bootstrap = new Api();
   try {
     const { data } = await bootstrap.request('/auth/session');if (current !== generation) return;
-    account = data;session = new Api(null, undefined, data);$('session').hidden = false;$('owner').textContent = account.displayName;
+    account = data;session = new Api(null, undefined, data);
+    window.timekeeperTypography?.connect(data.ownerId);
+    const profile = await session.request('/me');if (current !== generation) return;
+    window.timekeeperTypography?.receive(profile);
+    $('session').hidden = false;$('owner').textContent = account.displayName;
     $('account-identity').textContent = i18nText("ui.signed_in_as", { value0: account.username || account.displayName });
     if (!account.administrator || !account.permissions?.includes('write')) {forbidden();return;}
     $('users-link').hidden = false;$('account-navigation').hidden = false;await show(route(), false);
