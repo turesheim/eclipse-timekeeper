@@ -4,6 +4,7 @@
 .markdown-toolbar-separator { flex: 0 0 1px; align-self: stretch; min-height: 2rem; margin-block: .25rem; background: var(--bs-border-color); }
 .markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
+.markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
 .journal-formatted:not([hidden]), .journal-formatted > div, .journal-formatted .milkdown { display: flex; flex-direction: column; }
 .journal-formatted :is(.ProseMirror,.milkdown), .journal-formatted > div { flex: 1; min-width: 0; }
 .journal-formatted:has(.ProseMirror:focus-visible) { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
@@ -49,7 +50,6 @@
 .journal-dialog .journal-note-label { max-width: 36rem; }
 .journal-dialog .hint { margin-bottom: .25rem; }
 .journal-dialog .markdown-toolbar button { flex: none; min-height: 2.75rem; }
-.journal-dialog .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
 .journal-dialog .ProseMirror, .journal-dialog textarea { min-height: clamp(16rem, 43dvh, 36rem); }
 .journal-dialog textarea { font-family: var(--bs-font-monospace); resize: vertical; }
 .journal-recovery { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem; }

@@ -42,6 +42,11 @@
       <resource><directory>src/main/build-info</directory><filtering>true</filtering></resource>
       <resource><directory>src/main/resources</directory></resource>
       <resource>
+        <directory>${project.basedir}/../scripts</directory>
+        <targetPath>META-INF/resources/web/tools</targetPath>
+        <includes><include>webdav_sync.py</include></includes>
+      </resource>
+      <resource>
         <directory>${project.basedir}/../web/src</directory>
         <targetPath>META-INF/resources/web</targetPath>
         <excludes><exclude>admin/**</exclude><exclude>**/__pycache__/**</exclude></excludes>

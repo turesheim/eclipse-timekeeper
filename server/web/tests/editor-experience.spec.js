@@ -114,7 +114,9 @@ test('shared controls remain keyboard accessible and fit narrow screens in every
     expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
   await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-mobile.png'});
-  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Source editor tools',exact:true}).click();await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-mobile.png'});
+  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
+  await expect(page.locator('#experience-body')).toBeVisible();await expect(page.locator('#experience-field .markdown-source-tools')).toHaveCount(0);await expect(page.locator('#experience-field .cm-editor')).toHaveCount(0);
+  await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-source-mobile.png'});
 });
 test('rich undo and redo span a source edit, including a change of Markdown spelling',async({page})=>{
   await field(page,'Title\n=====\n\nOriginal.\n');const original=await page.evaluate(()=>globalThis.field.value());await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();

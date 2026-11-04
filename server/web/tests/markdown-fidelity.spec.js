@@ -57,7 +57,7 @@ test('entering formatted mode never repairs or deletes authored HTML source impl
   const source='\uFEFF---\r\ntitle: Keep HTML\r\n---\r\n\r\n<br />\r\n\r\nOriginal text\r\n';
   await openEditorFixture(page);await expect(page.locator('#markdown-toolbar')).toBeAttached();
   await page.locator('#markdown-file').setInputFiles({name:'source.md',mimeType:'text/markdown',buffer:Buffer.from(source)});await expect(page.locator('#markdown-status')).toContainText('Opened locally');
-  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');expect(await download(page)).toBe(source);
+  await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-formatted')).toBeVisible();expect(await download(page)).toBe(source);
 });
 
 test('long-note dirty checks avoid serialization while explicit Markdown remains cached',async({page})=>{

@@ -167,9 +167,9 @@ jobs:
     - name: Verify email recovery through HTTPS and actual SMTP delivery
       if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
-    - name: Verify Journal WebDAV help and instance backups through HTTPS
+    - name: Verify Notes WebDAV help and instance backups through HTTPS
       if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
-      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection|instance backup Administration'
+      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Notes shows WebDAV|read-only accounts can view the WebDAV connection|instance backup Administration'
     - name: Verify passkey enrollment and label validation over HTTPS
       if: needs.Changes.outputs.full == 'true' && matrix.shard == 1
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --passkeys --spec passkeys.spec.js

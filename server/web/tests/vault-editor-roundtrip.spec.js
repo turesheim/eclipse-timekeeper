@@ -27,7 +27,7 @@ test('packaged manual client round-trips a representative vault after a formatte
     ['Notes/Unknown.md',Buffer.from('Before.\n\n:::custom\nUnknown extension.\n\n<div data-keep="true">Harmless HTML.</div>\n\nAfter.\n')],['Notes/Attachments.md',Buffer.from('[Read the attachment](../journal/assets/notes.txt)\n')],['Notes/Empty.md',Buffer.alloc(0)],
     ['journal/assets/pixel.png',Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jI1sAAAAASUVORK5CYII=','base64')],['journal/assets/notes.txt',Buffer.from('Synthetic vault attachment.\r\n')]
   ]);
-  const base=[process.env.TIMEKEEPER_WEB_DAV_CLIENT,'--url',origin+'/dav/vault/','--folder',folder,'--state-dir',state];if(origin.startsWith('http:'))base.push('--allow-loopback-http');if(process.env.TIMEKEEPER_WEB_CA_FILE)base.push('--ca-file',process.env.TIMEKEEPER_WEB_CA_FILE);
+  const base=[process.env.TIMEKEEPER_WEB_DAV_CLIENT,'--url',origin+'/dav/notes/','--folder',folder,'--state-dir',state];if(origin.startsWith('http:'))base.push('--allow-loopback-http');if(process.env.TIMEKEEPER_WEB_CA_FILE)base.push('--ca-file',process.env.TIMEKEEPER_WEB_CA_FILE);
   const sync=async extra=>JSON.parse((await execute('python3',[...base,...extra],{env:{...process.env,WEBDAV_TOKEN:token},timeout:45000,maxBuffer:1_000_000})).stdout);
   try{
     for(const [path,bytes]of files){await mkdir(dirname(join(folder,path)),{recursive:true});await writeFile(join(folder,path),bytes);}

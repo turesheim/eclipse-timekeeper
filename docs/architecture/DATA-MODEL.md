@@ -575,12 +575,12 @@ The time-overlap calculation does not create a persistent association.
 
 ## Server day notes and WebDAV
 
-The canonical HTTP collection `/dav/journal/` and its legacy
-`/remote.php/webdav/` alias address these same owner-scoped resources, including
-`assets/`. They share token authorization, data, ETags and guarded mutations.
+The canonical HTTP collection `/dav/notes/` addresses the same owner-scoped
+resources through the configured journal, event and assets folders. It shares
+token authorization, data, ETags and guarded mutations with the REST interfaces.
 
 The server has a separate physical schema from embedded Eclipse storage
-(`ServerSchema.CURRENT` is 9). Day notes and their deletion markers reuse
+(`ServerSchema.CURRENT` is 10). Day notes and their deletion markers reuse
 `tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
 PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
 These are logical row types, not extra SQL tables or Eclipse JPA entities.
@@ -631,7 +631,7 @@ The note bodies and complete Markdown documents are readable to the server.
 Protect their database, temporary files, backups and exports as described in
 [journal storage protection](../operations/JOURNAL-STORAGE.md). See the
 [day-note API](API-V1.md#private-day-labels-and-markdown-bodies) and
-[WebDAV guide](../operations/JOURNAL-WEBDAV.md) for write,
+[WebDAV guide](../operations/NOTES-WEBDAV.md) for write,
 conflict and authorization behavior.
 
 ### Prospective day-label/note history

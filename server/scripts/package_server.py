@@ -79,7 +79,6 @@ def package(output, tag, commit):
               'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
-              'docs/operations/JOURNAL-WEBDAV.md': 'JOURNAL-WEBDAV.md',
               'docs/operations/NOTES-WEBDAV.md': 'NOTES-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
