@@ -60,7 +60,7 @@ async function field(page,value,formatted=true,catalog=[]){
   await page.evaluate(async({value,formatted,catalog})=>{
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
     const resources=catalog.length?{allowsAsset:()=>false,allowsLink:()=>false,complete:async query=>catalog.filter(entry=>entry.path.toLowerCase().includes(query.toLowerCase())),resolveWiki:async()=>catalog[0],openWiki:async()=>{}}:undefined;
-    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources);
+    globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources,{sourceTools:true});
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
   },{value,formatted,catalog});
 }

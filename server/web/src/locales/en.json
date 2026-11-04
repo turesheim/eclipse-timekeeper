@@ -1300,5 +1300,21 @@
   "focus.search_clients": "Search clients",
   "focus.no_clients": "No matching clients",
   "focus.apply": "Apply",
-  "markdown.table_keys": "Table keyboard controls (while this button is focused): arrows insert rows/columns; Shift+arrows move them. Backspace deletes the row; Delete deletes the column; Shift+Delete deletes the table. L, C and R align the column. Undo restores the previous edit."
+  "markdown.table_keys": "Table keyboard controls (while this button is focused): arrows insert rows/columns; Shift+arrows move them. Backspace deletes the row; Delete deletes the column; Shift+Delete deletes the table. L, C and R align the column. Undo restores the previous edit.",
+  "notes.import_folder": "Import folder",
+  "notes.choose_folder": "Choose vault folder",
+  "notes.import_apply": "Import new files",
+  "notes.import_help": "Select the local vault root. Folder paths are retained; the configured journal and event folders keep their associations. Hidden configuration folders and oversized files are skipped. Existing files are never overwritten. Files import individually; completed imports are retained if interrupted.",
+  "notes.import_reviewing": "Reviewing files…",
+  "notes.import_reviewed": "{{count}} new files ready to import. Review the list before continuing.",
+  "notes.import_ready": "New file",
+  "notes.import_conflict": "Already exists or conflicts",
+  "notes.import_skipped": "Skipped",
+  "notes.import_imported": "Imported",
+  "notes.import_failed": "Failed — retry available",
+  "notes.import_progress": "Importing {{path}}…",
+  "notes.import_done": "Imported {{count}} files. Conflicts were left unchanged.",
+  "notes.import_title": "Import notes",
+  "notes.settings_saved": "Notes settings saved.",
+  "notes.import_files": "Selected files"
 }

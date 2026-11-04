@@ -17,12 +17,11 @@ async function loadEngine(){if(!engine)engine=await import('./assets/milkdown/mi
 
 /** One in-memory Markdown field. Neither drafts nor bodies enter browser storage. */
 export class MarkdownField {
-  constructor(root,onChange,onState,prefix='journal',onUpload,resources){
-    Object.assign(this,{root,onChange,onState,onUpload,resources,generation:0,readOnly:true});root.classList.add('markdown-editor');
+  constructor(root,onChange,onState,prefix='journal',onUpload,resources,{sourceTools=false}={}){
+    Object.assign(this,{root,onChange,onState,onUpload,resources,sourceTools,generation:0,readOnly:true});root.classList.add('markdown-editor');
     this.modes=node('div',undefined,'btn-group markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
     this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
-    this.normalization=node('p',t('journal.normalization'),'hint');this.normalization.id=prefix+'-markdown-normalization';
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
     this.tools=node('div',undefined,'btn-group markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
     this.blockTrigger=iconButton(button(),'paragraph',t('markdown.block_style'));this.blockTrigger.classList.add('markdown-block-trigger');
@@ -87,7 +86,7 @@ export class MarkdownField {
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-description',t('markdown.tab_help'));this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar flex-nowrap align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
-    root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
+    root.append(this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>this.controls()));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
@@ -162,13 +161,11 @@ export class MarkdownField {
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
     if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
     this.tools.hidden=this.rich.hidden||this.readOnly;this.separator.hidden=this.tools.hidden;
-    this.normalization.hidden=this.rich.hidden||this.readOnly;
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
     if(!formatted)this.closeBlockMenu();
     if(this.sourceExtras)this.sourceExtras.hidden=formatted;this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
-    this.normalization.hidden=!formatted||this.readOnly;
     this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
@@ -207,7 +204,7 @@ export class MarkdownField {
     const host=node('div');host.inert=true;this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
-      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
+      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;host.inert=false;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}
