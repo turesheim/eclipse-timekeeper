@@ -12,13 +12,24 @@ layout change does not need the full deployment matrix repeated on GitHub.
 | Known web feature | Web unit/asset checks and the feature's browser scenarios |
 | Shared or unrecognized web behavior | Web unit/asset checks and complete ordinary browser suite |
 | Ordinary Java server endpoint | Server tests, packaged HTTP/recovery checks, API contracts and ordinary browser suite |
-| Database, authentication, dependencies, packaging, CI or unrecognized product paths | Full validation, including platform, HTTPS, containers and Synology checks |
+| Server/web database, authentication, dependencies, packaging or CI/deployment tooling | Full server, HTTPS, Linux installed-client, container and Synology validation; no desktop platform matrix |
+| Eclipse client, shared code/API, root Maven/wrapper inputs or unrecognized product paths | Full validation, including the Linux/macOS/Windows desktop matrix |
 
 Known feature unions stay selected even when they contain more than six suites.
 Changes to
 browser fixtures/helpers run the complete ordinary browser suite. Deleted/renamed
 code remains part of selection. Unavailable or empty comparison history selects
 full validation rather than silently skipping checks.
+
+Server validation and desktop platform certification have independent selection
+flags. A sensitive server change still runs the Linux **Installed client tests**
+against its packaged server, without recompiling the unchanged desktop product
+on macOS or Windows. Mixed changes that include Eclipse/shared code or root build
+inputs retain the complete desktop matrix. CI/deployment tooling is covered by
+its tooling checks and full server validation; use **ci:full** when changing the
+desktop build steps themselves or when cross-platform behavior is uncertain.
+Server-only site updates reuse the existing verified Eclipse package rather than
+publishing an Eclipse package without its platform certification.
 
 ## Full validation
 
@@ -110,8 +121,9 @@ branch protection settings.
 ## Maintaining selection
 
 `scripts/ci_changes.py` owns path classification and the small feature-to-browser
-mapping. Unmapped web features run the ordinary browser suite. Unknown non-web
-paths and sensitive changes run full validation. No arbitrary paths or shell
+mapping. Unmapped web features run the ordinary browser suite. Unknown product
+paths retain desktop certification; sensitive server/CI changes retain full server
+validation. No arbitrary paths or shell
 commands from PR data are executed as browser selection arguments.
 
 Run the selector/aggregate, release-tooling and workflow checks locally:
@@ -124,4 +136,5 @@ actionlint .github/workflows/build.yml .github/workflows/server-containers.yml
 The tooling tests cover realistic PR/main paths, full overrides, failed history,
 code moved into documentation, complete/disjoint shard coverage, bounded browser
 arguments, native schema coverage, and unexpected skipped or failed required jobs.
-Use full CI when changing the selector or workflows.
+Changes to selection or workflows must pass these regression and workflow checks.
+Use **ci:full** when changing desktop build behavior or when platform impact is uncertain.

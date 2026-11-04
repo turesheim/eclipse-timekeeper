@@ -10,7 +10,7 @@ def failures(needs):
         return ['Changes']
     selected = changes['outputs']
     jobs = {'API-contract': 'api', 'Server': 'server', 'Web': 'web', 'Build': 'eclipse',
-            'Remote-Eclipse': 'eclipse', 'Containers': 'containers', 'Publication': 'site'}
+            'Remote-Eclipse': 'remote_eclipse', 'Containers': 'containers', 'Publication': 'site'}
     if any(selected.get(flag) not in ('true', 'false') for flag in set(jobs.values())):
         return ['Invalid validation selection']
     expected = {name for name, flag in jobs.items() if selected[flag] == 'true'} | {'Publication-tooling'}
