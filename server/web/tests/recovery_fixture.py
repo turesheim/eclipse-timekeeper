@@ -50,7 +50,7 @@ class RecoveryFixture:
                         self.end_headers();self.wfile.write(data)
                     except (BrokenPipeError,ConnectionResetError):pass
                     finally:connection.close()
-                do_GET=do_POST=do_PUT=do_DELETE=do_OPTIONS=do_HEAD=relay
+                do_GET=do_POST=do_PUT=do_DELETE=do_OPTIONS=do_HEAD=do_PROPFIND=do_MKCOL=do_MOVE=relay
             class ProxyServer(http.server.ThreadingHTTPServer):request_queue_size=128
             proxy=ProxyServer(('127.0.0.1',0),Proxy)
             key=directory/'fixture-key.pem';certificate=directory/'fixture-cert.pem'
