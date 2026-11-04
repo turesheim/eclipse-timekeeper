@@ -3,10 +3,13 @@ import {node, button, section} from './account-ui.js';
 
 export async function renderTypography(view) {
   const preferences = window.timekeeperTypography;
-  let defaults;
-  try {defaults = await preferences.defaults();}
-  catch {throw new Error(t('typography.error.load'));}
+  const [profile, defaults] = await Promise.all([
+    view.session.request('/me'),
+    preferences.defaults().catch(() => {throw new Error(t('typography.error.load'));})
+  ]);
   if (!view.valid()) return;
+  preferences.receive(profile);
+  let loaded = preferences.profile() ?? profile;
   const card = section(view, t('typography.title'));
   const description = node('p', t('typography.description'), 'hint');description.id = 'typography-description';
   const help = node('p', t('typography.help'), 'hint');help.id = 'typography-help';
@@ -15,34 +18,47 @@ export async function renderTypography(view) {
   editor.id = 'typography-css';label.htmlFor = editor.id;editor.spellcheck = false;
   editor.autocapitalize = 'off';editor.setAttribute('autocorrect', 'off');
   editor.setAttribute('aria-describedby', `${description.id} ${help.id}`);
-  editor.value = preferences.read() ?? defaults;
-  editor.setSelectionRange(0, 0);
+  editor.value = loaded.data.typographyCss ?? defaults;editor.setSelectionRange(0, 0);
   const feedback = node('p', '', 'form-feedback');feedback.setAttribute('role', 'status');
   const save = node('button', t('typography.save'), 'btn btn-primary');save.type = 'submit';
-  const dirty = () => {
-    if (editor.value === (preferences.read() ?? defaults)) view.clean(value);
+  editor.addEventListener('input', () => {
+    if (editor.value === (loaded.data.typographyCss ?? defaults)) view.clean(value);
     else view.dirty.add(value);
     feedback.textContent = '';editor.removeAttribute('aria-invalid');
-  };
-  editor.addEventListener('input', dirty);
-  const message = error => {
-    feedback.textContent = error.typographyCode ? t('typography.error.' + error.typographyCode, error.values) : t('typography.error.storage');
-    if (error.typographyCode) {editor.setAttribute('aria-invalid', 'true');editor.focus();}
-  };
-  value.addEventListener('submit', event => {
-    event.preventDefault();if (!view.valid()) return;
-    try {preferences.save(editor.value);view.clean(value);editor.removeAttribute('aria-invalid');feedback.textContent = t('typography.saved');}
-    catch (error) {message(error);}
   });
-  const reset = button(t('typography.reset'), () => {
+  async function persist(css) {
+    if (css !== null) try {preferences.validate(css);}
+    catch (error) {editor.setAttribute('aria-invalid', 'true');editor.focus();throw new Error(t('typography.error.' + error.typographyCode, error.values));}
+    const reply = await view.session.request('/me', {
+      method: 'PUT', etag: loaded.etag, body: {zoneId: loaded.data.zoneId, typographyCss: css}
+    });
     if (!view.valid()) return;
-    try {preferences.reset();editor.value = defaults;editor.setSelectionRange(0, 0);view.clean(value);editor.removeAttribute('aria-invalid');feedback.textContent = t('typography.reset_done');}
-    catch (error) {message(error);}
-  });
+    loaded = reply;preferences.receive(reply);
+    editor.value = css ?? defaults;if (css === null) editor.setSelectionRange(0, 0);
+    view.clean(value);editor.removeAttribute('aria-invalid');
+    feedback.textContent = t(css === null ? 'typography.reset_done' : 'typography.saved');
+    void view.refreshProfile(reply).catch(() => {});
+  }
+  async function change(css, submit) {
+    if (!view.valid() || view.busy) return;
+    save.disabled = true;reset.disabled = true;
+    try {await view.run(() => persist(css), {submit, feedback, write: true});}
+    finally {if (view.valid()) save.disabled = reset.disabled = !view.canWrite || view.uncertain;}
+  }
+  value.addEventListener('submit', event => {event.preventDefault();void change(editor.value, save);});
+  const reset = button(t('typography.reset'), () => void change(null, reset));
+  save.disabled = reset.disabled = !view.canWrite;
   const actions = node('div', undefined, 'd-flex flex-wrap gap-2');actions.append(save, reset);
   value.append(label, editor, help, feedback, actions);card.append(description, value);
-  // Clean editors follow other tabs; an unsaved draft remains available to edit.
-  const changed = () => {if (view.valid() && !view.dirty.has(value)) editor.value = preferences.read() ?? defaults;};
+  // Confirmed peer changes update clean editors. Dirty editors keep their ETag
+  // and draft so a stale save is handled by the shared account form lifecycle.
+  const changed = () => {
+    const latest = preferences.profile();
+    if (!view.valid() || view.dirty.has(value) || latest?.data.ownerId !== view.session.owner) return;
+    loaded = latest;
+    const text = loaded.data.typographyCss ?? defaults;
+    if (editor.value !== text) {editor.value = text;editor.setSelectionRange(0, 0);}
+  };
   window.addEventListener('timekeeper-typography-change', changed);
   view.cleanup.add(() => window.removeEventListener('timekeeper-typography-change', changed));
 }

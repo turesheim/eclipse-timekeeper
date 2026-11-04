@@ -356,24 +356,36 @@ Calendar and Week labels, Today cards, tables, forms, tooltips, Notes and
 formatted Markdown heading levels. CSS math expressions such as `clamp()` and
 `calc()` are supported for these other sizes.
 
-Changes apply when **Save font sizes** succeeds. The editor accepts one `:root`
-block with the named font properties and CSS comments; it reports invalid
-properties or values without replacing the draft or saved settings. Omitting a
-property uses its application default. **Reset font sizes** immediately clears
-the saved fragment and restores the commented defaults.
+Changes apply after **Save font sizes** is confirmed by the server. The editor
+accepts one `:root` block with the named font properties and CSS comments; it
+reports invalid properties or values without replacing the draft or saved
+settings. Omitting a property uses its application default. **Reset font sizes**
+saves a null preference and restores the commented defaults.
 
-Like themes, sizes are saved in this browser and shared across its Timekeeper
-accounts and tabs, including sign-in, Administration, reports and the Markdown
-lab. They do not sync to another browser or enter account archives. Read-only
-sessions can change this browser preference. Storage failures preserve the draft
-and previous sizes; invalid stored CSS falls back to defaults. Clean editors
-follow changes from other tabs while unsaved drafts stay intact. The early
-`typography.js` script applies only the declared font properties through the CSS
-object model, preserving the existing Content Security Policy.
+The CSS fragment is stored in the signed-in user's profile as `typographyCss`,
+using `GET /me` and versioned `PUT /me` updates. It follows the account across
+browsers and devices, and applies to tracking, Administration, reports and the
+Markdown lab. Signed-out pages use application defaults. Signing out or switching
+accounts clears the previous user's sizes; old responses cannot restore them.
+Old browser-wide typography values are ignored. Read-only sessions can view the
+preference but cannot change it.
 
-`tests/typography.spec.js` checks saving, reset, rem scaling, validation,
-persistence, cross-tab updates, read-only sessions, Norwegian labels, keyboard
-navigation and accessible desktop/mobile layouts across all six themes.
+The existing profile change feed updates other tracking tabs. Returning to a tab
+also reloads the owned profile. Clean editors follow confirmed peer changes;
+unsaved drafts retain their original version so stale saves preserve the draft
+and offer **Reload current values**. Failed or uncertain writes retain the draft
+and never silently retry the save. Other profile edits and holiday resets
+preserve typography, and resetting typography preserves other preferences. As
+with language and holiday preferences, account archives do not currently carry
+this preference; full instance backups retain the account's profile records.
+
+The early `typography.js` script validates and applies only declared font
+properties through the CSS object model, preserving the existing Content
+Security Policy. Stored CSS is bounded inert text, never an HTML or stylesheet
+injection. `tests/typography.spec.js` checks persistence across browser contexts,
+account isolation, reset, rem scaling, failed/stale writes, read-only sessions,
+Norwegian labels, keyboard navigation and accessible desktop/mobile layouts
+across all six themes.
 
 ## Design baseline
 

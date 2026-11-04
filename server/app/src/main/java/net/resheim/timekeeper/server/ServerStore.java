@@ -254,7 +254,9 @@ public class ServerStore {
         try (var statement = statement("SELECT o.zone_id,o.version,l.locale FROM tk_owner o LEFT JOIN tk_locale l ON l.owner_id=o.id WHERE o.id=?",owner()); var rows = statement.executeQuery()) {
             if (!rows.next()) throw new IllegalStateException("Missing owner");
             var value = object(); value.put("ownerId",owner()); value.put("zoneId",rows.getString(1)); value.put("version",rows.getLong(2));value.put("locale",rows.getString(3));
-            value.put("holidayCountry",find("PROFILE_PREF",PROFILE_PREFERENCES).map(preferences->preferences.path("holidayCountry").asText(null)).orElse(null));return value;
+            var preferences=find("PROFILE_PREF",PROFILE_PREFERENCES);
+            value.put("holidayCountry",preferences.map(saved->saved.path("holidayCountry").asText(null)).orElse(null));
+            value.put("typographyCss",preferences.map(saved->saved.path("typographyCss").asText(null)).orElse(null));return value;
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     public ObjectNode updateProfile(String zone) {
@@ -264,20 +266,25 @@ public class ServerStore {
         return updateProfile(zone,updateLocale,locale,false,null);
     }
     public ObjectNode updateProfile(String zone,boolean updateLocale,String locale,boolean updateHolidays,String holidayCountry) {
+        return updateProfile(zone,updateLocale,locale,updateHolidays,holidayCountry,false,null);
+    }
+    public ObjectNode updateProfile(String zone,boolean updateLocale,String locale,boolean updateHolidays,String holidayCountry,boolean updateTypography,String typographyCss) {
         var profile = profile(); long version = profile.get("version").asLong();
         if (update("UPDATE tk_owner SET zone_id=?,version=? WHERE id=? AND version=?",zone,version+1,owner(),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
         if(updateLocale) {
             if(locale==null) update("DELETE FROM tk_locale WHERE owner_id=?",owner());
             else if(update("UPDATE tk_locale SET locale=? WHERE owner_id=?",locale,owner())==0) update("INSERT INTO tk_locale(owner_id,locale) VALUES(?,?)",owner(),locale);
         }
-        if(updateHolidays) {
-            // Owner-scoped preferences use the same internal JSON storage as
-            // calendar subscriptions; no work records or schema changes are needed.
+        if(updateHolidays || updateTypography) {
+            // Merge independent account preferences under the profile version
+            // check. Resetting one preference must preserve the others.
+            var preferences=(ObjectNode)find("PROFILE_PREF",PROFILE_PREFERENCES).map(JsonNode::deepCopy).orElseGet(JsonValues::object);
+            preferences.put("id",PROFILE_PREFERENCES.toString()).put("ownerId",owner()).put("version",0);
+            if(updateHolidays) {if(holidayCountry==null) preferences.remove("holidayCountry");else preferences.put("holidayCountry",holidayCountry);}
+            if(updateTypography) {if(typographyCss==null) preferences.remove("typographyCss");else preferences.put("typographyCss",typographyCss);}
             update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type='PROFILE_PREF' AND id=?",owner(),PROFILE_PREFERENCES);
-            if(holidayCountry!=null) {
-                var preferences=object().put("id",PROFILE_PREFERENCES.toString()).put("ownerId",owner()).put("version",0).put("holidayCountry",holidayCountry);
+            if(preferences.has("holidayCountry") || preferences.has("typographyCss"))
                 update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,'PROFILE_PREF',?,0,?)",owner(),PROFILE_PREFERENCES,preferences.toString());
-            }
         }
         change("PROFILE","UPDATED",owner()); return profile();
     }

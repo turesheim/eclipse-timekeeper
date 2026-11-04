@@ -18172,6 +18172,9 @@
           },
           "holidayCountry": {
             "$ref": "#/components/schemas/HolidayCountry"
+          },
+          "typographyCss": {
+            "$ref": "#/components/schemas/TypographyCss"
           }
         },
         "required": [
@@ -18583,6 +18586,9 @@
           },
           "holidayCountry": {
             "$ref": "#/components/schemas/HolidayCountry"
+          },
+          "typographyCss": {
+            "$ref": "#/components/schemas/TypographyCss"
           }
         },
         "required": [
@@ -32431,6 +32437,18 @@
             "const": 1000
           }
         }
+      },
+      "TypographyCss": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 65536
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Account-owned font-size CSS fragment. Null uses application defaults. Omitted profile edits preserve it. The browser validates the named font properties before applying this inert text."
       }
     },
     "parameters": {

@@ -2,50 +2,60 @@ import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
 import {captureScreenshot} from './screenshots.js';
+import {browserRequest} from './browser-request.js';
+import {openAccountMenu} from './navigation.js';
 
-const storageKey = 'timekeeper.typography';
-async function openSettings(page, request) {
+async function createUser(request) {
   const username = 'typography-' + randomUUID().slice(0, 8), password = 'Private typography test passphrase';
   const response = await request.post('/api/v1/admin/users', {
     headers: {Authorization: `Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},
     data: {username, password, displayName: username, email: username + '@example.org', administrator: false}
   });
-  expect(response.ok()).toBeTruthy();
-  await page.goto('/web/#account/typography');
-  await page.locator('#auth-mode').selectOption('login');
-  await page.locator('#username').fill(username);await page.locator('#password').fill(password);
+  expect(response.ok()).toBeTruthy();return {...(await response.json()).user, username, password};
+}
+async function signIn(page, user) {
+  await page.goto('/web/#account/typography');await page.locator('#auth-mode').selectOption('login');
+  await page.locator('#username').fill(user.username);await page.locator('#password').fill(user.password);
   await page.locator('#login-form button[type=submit]').click();
   await expect(page.getByRole('link', {name: 'Font sizes', exact: true})).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByLabel('Font size CSS')).toBeVisible();
+  await expect(editor(page)).toBeVisible();
 }
+async function openSettings(page, request) {const user = await createUser(request);await signIn(page, user);return user;}
 const editor = page => page.getByLabel('Font size CSS');
 const save = page => page.getByRole('button', {name: 'Save font sizes', exact: true}).click();
-const rootSize = page => page.locator('html').evaluate(element => getComputedStyle(element).fontSize);
+async function saved(page) {await expect(page.locator('.form-feedback')).toHaveText('Font sizes saved to your account.');}
+async function profile(page) {return (await browserRequest(page).get('/api/v1/me')).json();}
+async function putProfile(page, body) {
+  const current = await browserRequest(page).get('/api/v1/me'), auth = await (await browserRequest(page).get('/api/v1/auth/session')).json();
+  return browserRequest(page).put('/api/v1/me', {
+    headers: {'If-Match': current.headers().etag, 'X-CSRF-Token': auth.csrf, 'X-Timekeeper-Owner': Buffer.from(auth.ownerId).toString('base64url')},
+    data: {zoneId: (await current.json()).zoneId, ...body}
+  });
+}
 
-test('typography CSS changes the rem base and named text roles only after saving', async ({page, request}) => {
+test('typography CSS changes the rem base and named text roles only after the account save succeeds', async ({page, request}) => {
   await openSettings(page, request);
-  const defaults = await editor(page).inputValue();
-  expect(defaults).toContain('--font-base: 100%;');
+  const defaults = await editor(page).inputValue();expect(defaults).toContain('--font-base: 100%;');
   expect(defaults).toContain('Level 1 heading in formatted Markdown notes.');
   await editor(page).fill(defaults.replace('--font-base: 100%;', '--font-base: 112.5%;')
     .replace('--font-section-heading: 1.25rem;', '--font-section-heading: 1.5rem;')
     .replace('--font-input: 1rem;', '--font-input: 1.125rem;'));
-  expect(await rootSize(page)).toBe('16px');
-  await save(page);await expect(page.locator('#account-content')).toContainText('Font sizes saved in this browser.');
-  expect(await rootSize(page)).toBe('18px');
+  await expect(page.locator('html')).toHaveCSS('font-size', '16px');await save(page);await saved(page);
+  await expect(page.locator('html')).toHaveCSS('font-size', '18px');
   await expect(page.locator('.account-card h2')).toHaveCSS('font-size', '27px');
+  expect((await profile(page)).typographyCss).toContain('--font-base: 112.5%;');
   await page.getByRole('link', {name: 'Profile', exact: true}).click();
   await expect(page.getByLabel('Account username', {exact: true})).toHaveCSS('font-size', '20.25px');
   await page.getByRole('link', {name: 'Font sizes', exact: true}).click();
   await expect(editor(page)).toHaveValue(/--font-base: 112.5%;/);
   await page.reload();await expect(editor(page)).toHaveValue(/--font-base: 112.5%;/);
-  expect(await rootSize(page)).toBe('18px');
+  await expect(page.locator('html')).toHaveCSS('font-size', '18px');
 });
 
 test('typography validates the entire CSS fragment and preserves invalid and unsaved drafts', async ({page, request}) => {
   await openSettings(page, request);
   const valid = ':root { /* A larger base. */ --font-base: 18px; --font-hint: 1rem; }';
-  await editor(page).fill(valid);await save(page);
+  await editor(page).fill(valid);await save(page);await saved(page);
   for (const [css, message] of [
     [':root { --font-unknown: 1rem; }', 'Unknown font property: --font-unknown'],
     [':root { --font-base: 1rem; }', 'Set --font-base to a positive percentage or pixel value'],
@@ -58,43 +68,56 @@ test('typography validates the entire CSS fragment and preserves invalid and uns
     [':root { --font-hint: 1rem; } body { display: none; }', 'Use one :root'],
     [':root { /* unfinished comment --font-hint: 1rem; }', 'Use one :root']
   ]) {
-    await editor(page).fill(css);await save(page);
-    await expect(page.locator('.form-feedback')).toContainText(message);
+    await editor(page).fill(css);await save(page);await expect(page.locator('.form-feedback')).toContainText(message);
     await expect(editor(page)).toHaveValue(css);await expect(editor(page)).toHaveAttribute('aria-invalid', 'true');
-    expect(await rootSize(page)).toBe('18px');
-    expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBe(valid);
+    await expect(page.locator('html')).toHaveCSS('font-size', '18px');expect((await profile(page)).typographyCss).toBe(valid);
   }
-  page.once('dialog', dialog => dialog.dismiss());
-  await page.getByRole('link', {name: 'Profile', exact: true}).click();
+  page.once('dialog', dialog => dialog.dismiss());await page.getByRole('link', {name: 'Profile', exact: true}).click();
   await expect(page).toHaveURL(/#account\/typography$/);await expect(editor(page)).toBeVisible();
-  await editor(page).fill(':root { --font-base: 20px; }');await save(page);
+  await editor(page).fill(':root { --font-base: 20px; }');await save(page);await saved(page);
   await expect(page.locator('#account-identity')).toHaveCSS('font-size', '17.5px');
-  expect(await rootSize(page)).toBe('20px');
   await page.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
-  expect(await rootSize(page)).toBe('16px');
-  await expect(editor(page)).toHaveValue(/--font-base: 100%;/);
-  expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull();
-  await page.reload();await expect(editor(page)).toBeVisible();expect(await rootSize(page)).toBe('16px');
+  await expect(page.locator('.form-feedback')).toHaveText('Default font sizes restored.');
+  await expect(page.locator('html')).toHaveCSS('font-size', '16px');await expect(editor(page)).toHaveValue(/--font-base: 100%;/);
+  expect((await profile(page)).typographyCss).toBeNull();
+  await page.reload();await expect(editor(page)).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '16px');
 });
 
-test('typography follows other tabs and applies to all web entry pages without CSP violations', async ({page, context, request, browserName}) => {
+test('account typography persists in another browser and stays isolated when signing out and switching users', async ({page, request, browser}) => {
+  const user = await openSettings(page, request), css = ':root { --font-base: 18px; }';
+  await editor(page).fill(css);await save(page);await saved(page);
+  const previous = await profile(page);
+  const otherContext = await browser.newContext({baseURL: new URL(page.url()).origin, ignoreHTTPSErrors: true});
+  try {
+    const other = await otherContext.newPage();await signIn(other, user);
+    await expect(other.locator('html')).toHaveCSS('font-size', '18px');await expect(editor(other)).toHaveValue(css);
+    const second = await createUser(request);
+    await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click();
+    await expect(page.locator('#login')).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+    await signIn(page, second);await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+    expect((await profile(page)).typographyCss).toBeNull();
+    await page.evaluate(data => window.timekeeperTypography.receive({data}), previous);
+    await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+    await expect(other.locator('html')).toHaveCSS('font-size', '18px');
+    await other.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
+    await expect(other.locator('html')).toHaveCSS('font-size', '16px');
+  } finally {await otherContext.close();}
+});
+
+test('typography follows confirmed peer changes and all web entry pages without adding CSP violations', async ({page, context, request, browserName}) => {
   await context.addInitScript(() => {
     window.typographyPolicyViolations = [];
-    document.addEventListener('securitypolicyviolation', event => window.typographyPolicyViolations.push({directive: event.violatedDirective, blocked: event.blockedURI, source: event.sourceFile, line: event.lineNumber}));
+    document.addEventListener('securitypolicyviolation', event => window.typographyPolicyViolations.push({directive: event.violatedDirective, blocked: event.blockedURI}));
   });
-  await openSettings(page, request);
-  await expect(page.locator('#status')).toHaveText('Up to date');
-  // Existing WebKit inline-attribute reports during app startup are recorded
-  // before editing fonts; saving and resetting must add no policy violations.
-  const startupViolations = await page.evaluate(() => [...window.typographyPolicyViolations]);
-  expect(browserName === 'webkit' ? startupViolations.filter(value => value.blocked !== 'inline') : startupViolations).toEqual([]);
-  const other = await context.newPage();
-  await other.goto('/web/#account/typography');await expect(editor(other)).toBeVisible();
-  await editor(page).fill(':root { --font-base: 18px; --font-brand: 2rem; }');await save(page);
-  await expect(other.locator('html')).toHaveCSS('font-size', '18px');
-  await expect(editor(other)).toHaveValue(':root { --font-base: 18px; --font-brand: 2rem; }');
+  await openSettings(page, request);await expect(page.locator('#status')).toHaveText('Up to date');
+  const startup = await page.evaluate(() => [...window.typographyPolicyViolations]);
+  expect(browserName === 'webkit' ? startup.filter(value => value.blocked !== 'inline') : startup).toEqual([]);
+  const other = await context.newPage();await other.goto('/web/#account/typography');await expect(editor(other)).toBeVisible();
+  const css = ':root { --font-base: 18px; --font-brand: 2rem; }';
+  await editor(page).fill(css);await save(page);await saved(page);
+  await expect(other.locator('html')).toHaveCSS('font-size', '18px');await expect(editor(other)).toHaveValue(css);
   const draft = ':root { --font-base: 19px; }';await editor(other).fill(draft);
-  await editor(page).fill(':root { --font-base: 20px; --font-brand: 2rem; }');await save(page);
+  await editor(page).fill(':root { --font-base: 20px; --font-brand: 2rem; }');await save(page);await saved(page);
   await expect(other.locator('html')).toHaveCSS('font-size', '20px');await expect(editor(other)).toHaveValue(draft);
   await editor(other).fill(await editor(page).inputValue());
   for (const path of ['/admin/', '/web/project-report.html', '/web/markdown-lab.html']) {
@@ -103,31 +126,58 @@ test('typography follows other tabs and applies to all web entry pages without C
     expect(await other.evaluate(() => window.typographyPolicyViolations)).toEqual([]);
   }
   await page.getByRole('button', {name: 'Reset font sizes', exact: true}).click();
+  await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await other.bringToFront();await other.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(other.locator('html')).toHaveCSS('font-size', '16px');
-  expect(await page.evaluate(() => window.typographyPolicyViolations)).toEqual(startupViolations);
-  await other.close();
+  expect(await page.evaluate(() => window.typographyPolicyViolations)).toEqual(startup);await other.close();
 });
 
-test('typography recovers from invalid stored CSS and reports unavailable storage without losing the draft', async ({page, request}) => {
-  await page.addInitScript(key => localStorage.setItem(key, ':root { --font-base: 30px; background: red; }'), storageKey);
-  await openSettings(page, request);expect(await rootSize(page)).toBe('16px');
-  const draft = ':root { --font-base: 18px; }';await editor(page).fill(draft);
-  await page.evaluate(() => {Storage.prototype.setItem = () => {throw new DOMException('Unavailable', 'SecurityError');};});
-  await save(page);await expect(page.locator('.form-feedback')).toContainText('Allow browser storage for Timekeeper');
-  await expect(editor(page)).toHaveValue(draft);expect(await rootSize(page)).toBe('16px');
+test('stale and uncertain account font saves keep the draft and never overwrite or retry a peer change', async ({page, request}) => {
+  await openSettings(page, request);const draft = ':root { --font-base: 19px; }';await editor(page).fill(draft);
+  const peer = ':root { --font-base: 20px; }';expect((await putProfile(page, {typographyCss: peer})).ok()).toBeTruthy();
+  await expect(page.locator('html')).toHaveCSS('font-size', '20px');await save(page);
+  await expect(page.locator('.form-feedback')).toContainText('Your draft is kept');await expect(editor(page)).toHaveValue(draft);
+  expect((await profile(page)).typographyCss).toBe(peer);
+  page.once('dialog', dialog => dialog.accept());await page.getByRole('button', {name: 'Reload current values', exact: true}).click();
+  await expect(editor(page)).toHaveValue(peer);await editor(page).fill(draft);
+  let writes = 0;await page.route('**/api/v1/me', route => {
+    if (route.request().method() !== 'PUT') return route.continue();writes++;return route.abort('failed');
+  });
+  await save(page);await expect(page.locator('.form-feedback')).toContainText('The outcome is unknown');
+  await expect(editor(page)).toHaveValue(draft);await expect(page.locator('html')).toHaveCSS('font-size', '20px');
+  await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeDisabled();
+  await expect(page.getByRole('button', {name: 'Reset font sizes', exact: true})).toBeDisabled();
+  expect((await profile(page)).typographyCss).toBe(peer);expect(writes).toBe(1);
+});
+
+test('account typography ignores legacy browser-wide CSS and works with browser storage unavailable', async ({page, request}) => {
+  const user = await createUser(request);
+  await page.addInitScript(() => {
+    localStorage.setItem('timekeeper.typography', ':root { --font-base: 30px; }');
+    Storage.prototype.getItem = Storage.prototype.setItem = () => {throw new DOMException('Unavailable', 'SecurityError');};
+  });
+  await signIn(page, user);await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  const css = ':root { --font-base: 18px; }';await editor(page).fill(css);await save(page);await saved(page);
+  await page.reload();await expect(editor(page)).toHaveValue(css);await expect(page.locator('html')).toHaveCSS('font-size', '18px');
+});
+
+test('invalid CSS stored through the profile API remains inert and can be corrected in the editor', async ({page, request}) => {
+  await openSettings(page, request);const invalid = ':root { --font-base: 30px; background: red; } body { display: none; }';
+  expect((await putProfile(page, {typographyCss: invalid})).ok()).toBeTruthy();await page.reload();
+  await expect(editor(page)).toHaveValue(invalid);await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+  await editor(page).fill(':root { --font-base: 18px; }');await save(page);await saved(page);
+  await expect(page.locator('html')).toHaveCSS('font-size', '18px');
 });
 
 test('typography reaches formatted Markdown headings and source editors inside shadow roots', async ({page, request}) => {
   await openSettings(page, request);
-  await editor(page).fill(':root { --font-base: 18px; --font-markdown-h1: 2rem; --font-markdown-source: 1.25rem; }');await save(page);
-  await page.goto('/web/markdown-lab.html');
-  await page.getByRole('button', {name: 'Formatted', exact: true}).click();
+  await editor(page).fill(':root { --font-base: 18px; --font-markdown-h1: 2rem; --font-markdown-source: 1.25rem; }');await save(page);await saved(page);
+  await page.goto('/web/markdown-lab.html');await page.getByRole('button', {name: 'Formatted', exact: true}).click();
   await expect(page.locator('.ProseMirror h1')).toHaveCSS('font-size', '36px');
   await page.evaluate(async () => {
     const {createSourceEditor} = await import('/web/assets/milkdown/source-editor.js');
     const root = document.createElement('div');root.id = 'typography-source-preview';document.querySelector('main').append(root);
-    const source = createSourceEditor({root, value: '# Source text', label: 'Typography source preview', changed() {}});
-    await source.ready;
+    const source = createSourceEditor({root, value: '# Source text', label: 'Typography source preview', changed() {}});await source.ready;
   });
   await expect(page.locator('#typography-source-preview .cm-scroller')).toHaveCSS('font-size', '22.5px');
 });
@@ -135,8 +185,7 @@ test('typography reaches formatted Markdown headings and source editors inside s
 test('typography settings fit mobile screens, support keyboard editing and are accessible in every theme', async ({page, request, browserName}) => {
   await openSettings(page, request);
   for (const width of [1440, 390, 320]) {
-    await page.setViewportSize({width, height: 900});
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await page.setViewportSize({width, height: 900});expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await editor(page).focus();await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeFocused();
     for (const theme of ['timekeeper', 'timekeeper-dark', 'solarized-light', 'solarized-dark', 'nord', 'dracula']) {
@@ -148,17 +197,22 @@ test('typography settings fit mobile screens, support keyboard editing and are a
   }
 });
 
-test('read-only sessions can save browser typography and Norwegian settings are localized', async ({page}) => {
-  await page.goto('/web/#account/typography');await page.locator('#auth-mode').selectOption('token');
-  await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_READ_TOKEN);
-  await page.locator('#login-form button[type=submit]').click();await expect(editor(page)).toBeVisible();
-  await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeEnabled();
-  await editor(page).fill(':root { --font-base: 18px; }');await save(page);expect(await rootSize(page)).toBe('18px');
-  await page.evaluate(async () => {const {setLocale} = await import('/web/i18n.js');setLocale('nb-NO');location.hash = '#account/profile';});
-  await expect(page.getByRole('link', {name: 'Skriftstørrelser', exact: true})).toBeVisible();
-  await page.getByRole('link', {name: 'Skriftstørrelser', exact: true}).click();
-  await expect(page.getByLabel('CSS for skriftstørrelser')).toBeVisible();
-  await expect(page.getByRole('button', {name: 'Lagre skriftstørrelser', exact: true})).toBeEnabled();
-  await page.getByRole('button', {name: 'Tilbakestill skriftstørrelser', exact: true}).click();
-  await expect(page.locator('.form-feedback')).toHaveText('Standard skriftstørrelser er gjenopprettet.');
+test('read-only sessions use saved account typography but cannot change it and Norwegian settings are localized', async ({page, request}) => {
+  const headers = {Authorization: `Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
+  async function seed(css) {
+    const current = await request.get('/api/v1/me', {headers});
+    const response = await request.put('/api/v1/me', {headers: {...headers, 'If-Match': current.headers().etag}, data: {zoneId: (await current.json()).zoneId, typographyCss: css}});
+    expect(response.ok()).toBeTruthy();
+  }
+  await seed(':root { --font-base: 18px; }');
+  try {
+    await page.goto('/web/#account/typography');await page.locator('#auth-mode').selectOption('token');
+    await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('#login-form button[type=submit]').click();
+    await expect(editor(page)).toBeVisible();await expect(page.locator('html')).toHaveCSS('font-size', '18px');
+    await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeDisabled();
+    await expect(page.getByRole('button', {name: 'Reset font sizes', exact: true})).toBeDisabled();
+    await page.evaluate(async () => {const {setLocale} = await import('/web/i18n.js');setLocale('nb-NO');location.hash = '#account/profile';});
+    await page.getByRole('link', {name: 'Skriftstørrelser', exact: true}).click();await expect(page.getByLabel('CSS for skriftstørrelser')).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Lagre skriftstørrelser', exact: true})).toBeDisabled();
+  } finally {await seed(null);}
 });

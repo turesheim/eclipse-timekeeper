@@ -1,10 +1,9 @@
-// This classic script runs after typography.css and before the page is painted.
-// Only the font variables declared in that stylesheet can be saved or applied.
+// Only the font variables declared in typography.css can be applied. Saved CSS
+// comes from the authenticated account profile, never from browser storage.
 (() => {
-  const storageKey = 'timekeeper.typography';
   const stylesheet = document.getElementById('typography-defaults');
   const properties = new Set([...stylesheet.sheet.cssRules[0].style].filter(name => name.startsWith('--font-')));
-  let current = null, defaults;
+  let current = null, defaults, owner = null, profile = null;
 
   function invalid(code, values = {}) {
     const error = new Error(code);error.typographyCode = code;error.values = values;throw error;
@@ -36,33 +35,35 @@
   }
   function apply(text) {
     const values = text === null ? new Map() : parse(text);
-    for (const name of properties) document.documentElement.style.removeProperty(name);
-    for (const [name, value] of values) document.documentElement.style.setProperty(name, value);
-    current = text;
+    if (text !== current) {
+      for (const name of properties) document.documentElement.style.removeProperty(name);
+      for (const [name, value] of values) document.documentElement.style.setProperty(name, value);
+      current = text;
+    }
     window.dispatchEvent(new Event('timekeeper-typography-change'));
   }
   window.timekeeperTypography = {
     read: () => current,
+    profile: () => profile,
+    validate: parse,
+    connect(nextOwner) {
+      if (owner === nextOwner) return;
+      owner = nextOwner;profile = null;apply(null);
+    },
+    disconnect() {owner = null;profile = null;apply(null);},
+    receive(reply) {
+      const next = reply?.data;
+      // Slow replies from a previous account or profile version have no effect.
+      if (!owner || next?.ownerId !== owner || profile && next.version < profile.data.version) return;
+      profile = reply;
+      try {apply(next.typographyCss ?? null);}
+      catch {apply(null);}
+    },
     async defaults() {
       defaults ??= fetch(stylesheet.href, {credentials: 'same-origin', redirect: 'error'})
         .then(response => {if (!response.ok) throw new Error('Unable to load typography.css');return response.text();})
         .catch(error => {defaults = null;throw error;});
       return defaults;
-    },
-    save(text) {
-      parse(text);
-      // A failed storage write keeps both the draft and the previous sizes.
-      localStorage.setItem(storageKey, text);apply(text);
-    },
-    reset() {localStorage.removeItem(storageKey);apply(null);}
+    }
   };
-  try {
-    const saved = localStorage.getItem(storageKey);
-    if (saved !== null) apply(saved);
-  } catch { /* Unavailable storage or an invalid saved fragment uses defaults. */ }
-  window.addEventListener('storage', event => {
-    if (event.key !== storageKey && event.key !== null) return;
-    try {apply(event.key === null ? null : event.newValue);}
-    catch {apply(null);}
-  });
 })();
