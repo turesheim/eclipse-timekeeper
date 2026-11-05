@@ -68,6 +68,7 @@ class RecentNotesTest {
         });
     }
     @Test void emptyHttpReadsDoNotMaterializeBusinessRecordsOrChangeRevision(){
+        clock.set(Instant.parse("2026-11-05T10:00:00Z"));
         var before=store.transaction("b",()->{
             assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());assertTrue(store.list(VaultIndex.ENTRY).isEmpty());
             try(var query=store.statement("SELECT COUNT(*) FROM tk_resource WHERE owner_id=?",store.owner());var rows=query.executeQuery()){assertTrue(rows.next());return new long[]{rows.getLong(1),store.revision()};}
