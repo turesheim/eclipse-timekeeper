@@ -4,12 +4,39 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('webdav_sync',Path(__file__).resolve().parents[1]/'webdav_sync.py')
 sync=importlib.util.module_from_spec(spec);spec.loader.exec_module(sync)
 
 class ManualSyncTests(unittest.TestCase):
+    def test_import_metadata_keeps_precise_modification_dates_without_inventing_posix_creation_dates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'Notes').mkdir();source=root/'Notes'/'Exact.md';source.write_bytes(b'Original\r\n');(root/'Empty').mkdir();(root/'.git').mkdir();(root/'.git'/'private').write_text('ignored')
+            os.utime(source,ns=(1_612_325_106_987_654_321,1_612_325_106_987_654_321))
+            real_fstat=os.fstat
+            def posix_stat(fd):
+                value=real_fstat(fd);return SimpleNamespace(**{name:getattr(value,name) for name in dir(value) if name.startswith('st_') and name not in ('st_birthtime','st_birthtime_ns')})
+            with patch.object(sync.os,'fstat',side_effect=posix_stat):result=sync.prepare_import_metadata(root)
+            data=json.loads((root/sync.IMPORT_METADATA).read_text());rows={row['path']:row for row in data['entries']}
+            self.assertEqual(3,result['entries']);self.assertEqual('2021-02-03T04:05:06.987654321Z',rows['Notes/Exact.md']['modifiedAt']);self.assertNotIn('createdAt',rows['Notes/Exact.md']);self.assertEqual('FOLDER',rows['Empty']['kind']);self.assertNotIn('.git/private',rows);self.assertEqual(b'Original\r\n',source.read_bytes())
+            sync.prepare_import_metadata(root);self.assertNotIn(sync.IMPORT_METADATA,{row['path'] for row in json.loads((root/sync.IMPORT_METADATA).read_text())['entries']})
+    def test_import_metadata_preserves_available_birthtime_and_refuses_unsafe_source_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'vault';root.mkdir();source=root/'Exact.md';source.write_text('Text');real_fstat=os.fstat
+            def birth_stat(fd):
+                value=real_fstat(fd);fields={name:getattr(value,name) for name in dir(value) if name.startswith('st_')};fields['st_birthtime_ns']=1_577_934_245_123_456_789;return SimpleNamespace(**fields)
+            with patch.object(sync.os,'fstat',side_effect=birth_stat):sync.prepare_import_metadata(root)
+            self.assertEqual('2020-01-02T03:04:05.123456789Z',json.loads((root/sync.IMPORT_METADATA).read_text())['entries'][0]['createdAt'])
+            original=(root/sync.IMPORT_METADATA).read_bytes();outside=Path(directory)/'outside';outside.write_text('Private');(root/'link').symlink_to(outside)
+            with self.assertRaises(sync.SyncError):sync.prepare_import_metadata(root)
+            self.assertEqual(original,(root/sync.IMPORT_METADATA).read_bytes());self.assertEqual('Private',outside.read_text())
+    def test_import_metadata_never_overwrites_an_unrelated_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);target=root/sync.IMPORT_METADATA;target.write_text('User file')
+            with self.assertRaises(sync.SyncError):sync.prepare_import_metadata(root)
+            self.assertEqual('User file',target.read_text())
     def test_missing_root_and_incomplete_xml_are_not_valid_empty_remote_scans(self):
         remote=sync.Remote('https://example.invalid/dav/notes/','client','synthetic-token')
         for xml in [b'<D:multistatus xmlns:D="DAV:"></D:multistatus>',b'<D:multistatus xmlns:D="DAV:"><D:response>']:

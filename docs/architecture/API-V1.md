@@ -1136,13 +1136,34 @@ reads/writes raw canonical bytes with the content ETag. Metadata includes `etag`
 (content validator) and `entryEtag` (structural validator). Metadata responses
 carry entryEtag in the HTTP ETag header; content responses carry the content
 validator. Use entryEtag for PUT `/path`, DELETE entry and POST `/restore`.
-New entries include `createdAt`, the immutable time they were added to the
-collection. Existing entries with no recorded creation date omit it. It is
+New entries include `createdAt`, the original creation time supplied by import,
+or otherwise the time they were added to the collection. Existing entries with
+no recorded creation date omit it. It is
 preserved by editing, moving, recovery and account archives. `modifiedAt` describes
 the canonical file content. Clients sort after following every metadata page;
 unknown dates can be placed after known dates without fetching file bytes.
 Conflicting destinations are never overwritten. Stale/missing preconditions
 return 412/428; deployment quota growth returns 507. Day labels are independent.
+
+The create-only file endpoint accepts optional `createdAt` and `modifiedAt` query
+parameters; the folder endpoint accepts the same optional fields in
+`VaultFolderInput`. They are validated RFC 3339 instants, normalized to UTC within
+years 0001–9999, and applied atomically to
+the new namespace entry and its canonical content, with the resulting content
+validator refreshed before replying. They cannot retime an existing file, bypass
+If-None-Match, change a day label, or add an artificial content revision. Normal
+content edits advance modification time and preserve creation time. Account
+archives retain both dates when present; older archives remain accepted.
+
+`GET /notes/export` requires read permission and prepares a private ZIP using the
+same authorization recheck, restore fence, repeatable-read snapshot, temporary-file
+cleanup and download mechanism as `/data/account/export`. It contains active
+portable paths and exact bytes, including configured journal/event folders and
+assets, but no trash or account authority. Its `timekeeper-notes-v1` auxiliary
+metadata records `path`, `kind` (`FILE`/`FOLDER`), optional `createdAt`/`modifiedAt`,
+and file `bytes`/`sha256`. It normally uses `timekeeper-notes-metadata.json`, with a UUID
+suffix on collision. ZIP timestamp fields are also populated; the metadata
+preserves nanosecond precision and empty folder dates across extraction/import.
 
 The hierarchical `/dav/notes/` collection exposes the same sources,
 with guarded PUT/DELETE/MOVE, MKCOL, strong ETags and stable DAV resource-id.

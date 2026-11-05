@@ -63,5 +63,8 @@ test('read-only accounts can view the WebDAV connection',async({browser})=>{
     await expect(page.locator('#account-page .notes-webdav-url')).toHaveText(new URL('/dav/notes/',base()).href);
     await expect(page.getByRole('button',{name:'Add client'})).toHaveCount(0);
     await expect(page.getByRole('button',{name:'Save synchronization settings'})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Choose vault folder',exact:true})).toBeDisabled();
+    const downloads=page.locator('#account-content section').filter({has:page.getByRole('heading',{name:'Export notes',exact:true})});
+    await downloads.getByRole('button',{name:'Prepare archive',exact:true}).click();await expect(downloads.getByRole('link',{name:'Download archive',exact:true})).toBeVisible();
   }finally{await context.close();}
 });

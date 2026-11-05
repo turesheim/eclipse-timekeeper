@@ -26,6 +26,10 @@ final class VaultIndex {
         var saved=write(ENTRY,ROOT,value);point(pathId(VaultPath.root()),PATH,object().put("key","").put("entryId",ROOT.toString()).put("active",true));return saved;
     }
     ObjectNode get(UUID id){return copy(store.find(ENTRY,id).orElseThrow(ApiFailure::notFound));}
+    ObjectNode dates(UUID id,java.time.Instant created,java.time.Instant modified){
+        var value=get(id);if(created!=null)value.put("createdAt",created.toString());if(modified!=null)value.put("modifiedAt",modified.toString());
+        return write(ENTRY,id,value);
+    }
     ObjectNode at(VaultPath path,boolean deleted){
         var pointer=store.find(PATH,pathId(path)).orElse(null);if(pointer==null)return null;
         if(!pointer.path("key").asText().equals(path.key()))throw ApiFailure.conflict();

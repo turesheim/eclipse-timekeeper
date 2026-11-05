@@ -22,6 +22,17 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_note_import_dates_are_optional_create_inputs_and_notes_export_is_an_owner_private_zip(self):
+        value={'path':'Empty','createdAt':'2020-01-02T03:04:05.123456789Z','modifiedAt':'2021-02-03T04:05:06.987654321Z'}
+        self.assertTrue(validator('VaultFolderInput').is_valid(value))
+        self.assertTrue(validator('VaultFolderInput').is_valid({'path':'Empty'}))
+        for invalid in ({**value,'createdAt':None},{**value,'modifiedAt':'yesterday'},{**value,'ownerId':'other'}):
+            self.assertFalse(validator('VaultFolderInput').is_valid(invalid))
+        query={item['name']:item for item in CONTRACT['paths']['/notes/files']['put']['parameters'] if 'name' in item}
+        for date in ('createdAt','modifiedAt'):
+            self.assertFalse(query[date]['required']);self.assertEqual('date-time',query[date]['schema']['format'])
+        export=CONTRACT['paths']['/notes/export']['get']
+        self.assertEqual('read',export['x-required-permission']);self.assertIn('application/zip',export['responses']['200']['content'])
     def test_note_creation_dates_are_optional_valid_timestamps_in_metadata_and_archives(self):
         for schema in ('VaultEntry', 'AccountArchiveVaultEntry'):
             field = CONTRACT['components']['schemas'][schema]['properties']['createdAt']
@@ -672,7 +683,7 @@ class ContractTest(unittest.TestCase):
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
             'listNoteRevisions', 'getNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries',
-            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'moveNoteEntry', 'restoreNoteEntry',
+            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'moveNoteEntry', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'undoWorkSessionChange', 'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',

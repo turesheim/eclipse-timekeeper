@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Preview and manually synchronize a POSIX folder using guarded standard WebDAV."""
 import argparse
+from datetime import datetime, timezone
 import base64
 import fcntl
 import getpass
@@ -20,8 +21,9 @@ from urllib.parse import quote, unquote, urljoin, urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 import xml.etree.ElementTree as ET
 
-VERSION='1.0'
+VERSION='1.1'
 DAV='{DAV:}'
+IMPORT_METADATA='timekeeper-notes-metadata.json'
 
 class SyncError(Exception):pass
 def digest(data):return hashlib.sha256(data).hexdigest()
@@ -364,14 +366,87 @@ def synchronize(args,token):
         if control is not None:control.close()
         local.close()
 
+def prepare_import_metadata(folder,maximum=16_000_000,include_config=False):
+    """Read-only source scan plus one private, derived timestamp metadata file."""
+    local=Local(folder,maximum,include_config);rows=[];seen=set();skipped=0;temporary=None
+    def instant(nanoseconds):
+        seconds,fraction=divmod(nanoseconds,1_000_000_000)
+        value=datetime.fromtimestamp(seconds,timezone.utc)
+        return f'{value.year:04d}-{value.month:02d}-{value.day:02d}T{value.hour:02d}:{value.minute:02d}:{value.second:02d}'+('.'+str(fraction).zfill(9).rstrip('0') if fraction else '')+'Z'
+    def dates(value):
+        result={'modifiedAt':instant(value.st_mtime_ns)}
+        birth=getattr(value,'st_birthtime_ns',None)
+        if birth is None and hasattr(value,'st_birthtime'):birth=round(value.st_birthtime*1_000_000_000)
+        if birth is not None:result['createdAt']=instant(birth)
+        # POSIX ctime is a metadata-change time, never a substitute for birthtime.
+        return result
+    def visit(fd,prefix=''):
+        nonlocal skipped
+        for entry in sorted(os.scandir(fd),key=lambda value:value.name):
+            if not prefix and entry.name==IMPORT_METADATA:continue
+            if not prefix and re.fullmatch(r'timekeeper-notes-metadata-[a-f0-9-]{36}\.json',entry.name):raise SyncError('This folder already contains export timestamp metadata; import it directly instead')
+            if entry.name.startswith('.') and not (include_config and key(entry.name)=='.obsidian'):
+                skipped+=1;continue
+            path=portable((prefix+'/' if prefix else '')+entry.name)
+            if key(path) in seen:raise SyncError('Review a case or Unicode collision before preparing import metadata')
+            seen.add(key(path));value=entry.stat(follow_symlinks=False)
+            if stat.S_ISLNK(value.st_mode):raise SyncError('Symlinks are refused; no paths outside the selected folder are followed')
+            if stat.S_ISDIR(value.st_mode):
+                child=os.open(entry.name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+                try:
+                    before=os.fstat(child);visit(child,path);after=os.fstat(child)
+                    if (before.st_ino,before.st_mtime_ns)!=(after.st_ino,after.st_mtime_ns):raise SyncError('A folder changed during the scan; prepare import metadata again')
+                    rows.append({'path':path,'kind':'FOLDER',**dates(before)})
+                finally:os.close(child)
+            elif stat.S_ISREG(value.st_mode):
+                if value.st_size>maximum:skipped+=1;continue
+                source=os.open(entry.name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=fd)
+                with os.fdopen(source,'rb') as stream:
+                    before=os.fstat(stream.fileno());digest_value=hashlib.sha256();length=0
+                    if not stat.S_ISREG(before.st_mode):raise SyncError('Local special files are not supported')
+                    while chunk:=stream.read(1024*1024):
+                        length+=len(chunk)
+                        if length>maximum:raise SyncError('A file grew beyond the size limit during the scan')
+                        digest_value.update(chunk)
+                    after=os.fstat(stream.fileno())
+                    if (before.st_ino,before.st_size,before.st_mtime_ns)!=(after.st_ino,after.st_size,after.st_mtime_ns) or length!=after.st_size:raise SyncError('A file changed during the scan; prepare import metadata again')
+                    rows.append({'path':path,'kind':'FILE','bytes':length,'sha256':digest_value.hexdigest(),**dates(before)})
+            else:raise SyncError('Local special files are not supported')
+            if len(rows)>10000:raise SyncError('Import metadata preparation is limited to 10,000 entries')
+    try:
+        try:
+            old=json.loads(local.read(IMPORT_METADATA))
+            if old.get('format')!='timekeeper-notes-v1' or not isinstance(old.get('entries'),list):raise SyncError('The timestamp metadata filename is occupied by another file; it was not changed')
+        except FileNotFoundError:pass
+        except (ValueError,AttributeError):raise SyncError('The timestamp metadata filename is occupied by another file; it was not changed') from None
+        before=os.fstat(local.fd);visit(local.fd);local.check()
+        if before.st_mtime_ns!=os.fstat(local.fd).st_mtime_ns:raise SyncError('The selected folder changed during the scan; prepare import metadata again')
+        temporary='.timekeeper-import-'+secrets.token_hex(16)+'.tmp'
+        descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=local.fd)
+        with os.fdopen(descriptor,'w',encoding='utf-8') as output:
+            json.dump({'format':'timekeeper-notes-v1','entries':sorted(rows,key=lambda row:row['path'])},output,ensure_ascii=False,indent=2);output.write('\n');output.flush();os.fsync(output.fileno())
+        local.check();os.replace(temporary,IMPORT_METADATA,src_dir_fd=local.fd,dst_dir_fd=local.fd);temporary=None;os.fsync(local.fd)
+        return {'metadata':IMPORT_METADATA,'entries':len(rows),'skipped':skipped}
+    finally:
+        if temporary is not None:
+            try:os.unlink(temporary,dir_fd=local.fd)
+            except FileNotFoundError:pass
+        local.close()
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--version',action='version',version=VERSION)
-    parser.add_argument('--url',required=True);parser.add_argument('--folder',required=True);parser.add_argument('--state-dir',required=True);parser.add_argument('--username',default='webdav');parser.add_argument('--ca-file')
+    parser.add_argument('--url');parser.add_argument('--folder',required=True);parser.add_argument('--state-dir');parser.add_argument('--username',default='webdav');parser.add_argument('--ca-file')
+    parser.add_argument('--prepare-import-metadata',action='store_true',help='Prepare source modification and available creation dates for the browser folder import; no server connection')
     parser.add_argument('--apply',metavar='REVIEW_SHA256');parser.add_argument('--allow-deletes',action='store_true');parser.add_argument('--resume',action='store_true');parser.add_argument('--include-obsidian',action='store_true');parser.add_argument('--allow-loopback-http',action='store_true')
     parser.add_argument('--max-file-bytes',type=int,default=16_000_000);parser.add_argument('--prefer-local',action='append',default=[]);parser.add_argument('--prefer-remote',action='append',default=[])
     args=parser.parse_args()
     if args.max_file_bytes<1 or args.max_file_bytes>1_000_000_000:parser.error('Choose a positive bounded file-size limit')
+    if args.prepare_import_metadata:
+        if args.url or args.state_dir or args.apply or args.resume or args.allow_deletes or args.prefer_local or args.prefer_remote:parser.error('Timestamp preparation is separate from synchronization')
+    elif not args.url or not args.state_dir:parser.error('--url and --state-dir are required for synchronization')
     try:
+        if args.prepare_import_metadata:
+            print(json.dumps(prepare_import_metadata(args.folder,args.max_file_bytes,args.include_obsidian),ensure_ascii=False,indent=2));return 0
         for path in args.prefer_local+args.prefer_remote:portable(path)
         if set(args.prefer_local)&set(args.prefer_remote):raise SyncError('Choose only one version of each conflicting path')
         token=os.environ.get('WEBDAV_TOKEN') or getpass.getpass('WebDAV API token: ')

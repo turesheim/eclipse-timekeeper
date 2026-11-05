@@ -1,4 +1,6 @@
 import {folderImportPlan} from '../src/notes-folder-import.js';
+import {parseNotesMetadata,readNotesMetadata,importedFileDates} from '../src/notes-import-metadata.js';
+import {createHash} from 'node:crypto';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {relativeNotePath,rasterType,notesEntryVisible} from '../src/notes-links.js';
@@ -49,4 +51,27 @@ test('folder import strips only the chosen root and retains journal, event and b
 test('configuration, traversal and case/Unicode collisions cannot be imported as new files',()=>{
   const rows=folderImportPlan(['Vault/.obsidian/plugins/main.js','Vault/.git/config','Vault/../secret','Vault/A.md','Vault/a.md','Vault/Å.md','Vault/Å.md','single.md'].map(file));
   assert.ok(rows.slice().every(row=>row.status!=='ready'));assert.equal(rows.filter(row=>row.status==='conflict').length,4);
+});
+test('portable folder aliases cannot silently merge different source directories',()=>{
+  const rows=folderImportPlan(['Vault/Notes/A.md','Vault/NOTES/B.md','Vault/Notes/C.md'].map(file));
+  assert.ok(rows.every(row=>row.status==='conflict'&&!row.selected));
+});
+const creation='2020-01-02T03:04:05.123456789Z',modification='2021-02-03T04:05:06.987654321Z';
+const manifestEntry=(path,body)=>({path,kind:'FILE',bytes:Buffer.byteLength(body),sha256:createHash('sha256').update(body).digest('hex'),createdAt:creation,modifiedAt:modification});
+const chosenFile=(name,body)=>{const value=new File([body],name,{lastModified:Date.parse('2026-01-01T00:00:00Z')});Object.defineProperty(value,'webkitRelativePath',{value:'Vault/'+name});return value;};
+test('import metadata preserves nanosecond dates and uses current modification time after a content edit',async()=>{
+  const entry=manifestEntry('Exact.md','Original\r\n'),value={format:'timekeeper-notes-v1',entries:[entry]};
+  assert.equal(parseNotesMetadata(value).get('exact.md').createdAt,creation);
+  assert.deepEqual((await importedFileDates(chosenFile('Exact.md','Original\r\n'),entry)).dates,{createdAt:creation,modifiedAt:modification});
+  const edited=await importedFileDates(chosenFile('Exact.md','Edited'),entry);assert.equal(edited.changed,true);assert.deepEqual(edited.dates,{createdAt:creation,modifiedAt:'2026-01-01T00:00:00.000Z'});
+  for(const bad of ['2021-02-30T00:00:00Z','0000-01-01T00:00:00Z','0001-01-01T00:00:00+14:00','9999-12-31T23:59:59-14:00','not-a-date'])assert.throws(()=>parseNotesMetadata({...value,entries:[{...entry,createdAt:bad}]}));
+  assert.throws(()=>parseNotesMetadata({...value,entries:[entry,{...entry,path:'exact.md'}]}));
+});
+test('export metadata cannot hide a source file using the same conventional metadata filename',async()=>{
+  const original=chosenFile('timekeeper-notes-metadata.json','A real user file'),metadataName='timekeeper-notes-metadata-00000000-0000-0000-0000-000000000001.json';
+  const transport=chosenFile(metadataName,JSON.stringify({format:'timekeeper-notes-v1',entries:[manifestEntry(original.name,'A real user file')]}));
+  const metadata=await readNotesMetadata([original,transport]),rows=folderImportPlan([original,transport],{metadata});
+  assert.equal(metadata.file,transport);assert.equal(rows.length,1);assert.equal(rows[0].file,original);assert.equal(rows[0].status,'ready');
+  const independent=chosenFile('timekeeper-notes-metadata-00000000-0000-0000-0000-000000000002.json',JSON.stringify({format:'timekeeper-notes-v1',entries:[]}));
+  await assert.rejects(()=>readNotesMetadata([transport,independent]));
 });
