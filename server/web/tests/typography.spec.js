@@ -202,6 +202,8 @@ test('typography settings fit mobile screens, support keyboard editing and are a
   await openSettings(page, request);
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({width, height: 900});expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    const bounds=await editor(page).boundingBox(),heading=await page.locator('.account-card h2').boundingBox();expect(Math.abs(bounds.width-heading.width)).toBeLessThan(2);
+    await expect(page.locator('.css-editor')).toHaveClass(/is-highlighted/);
     await editor(page).focus();await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeFocused();
     for (const theme of ['timekeeper', 'timekeeper-dark', 'solarized-light', 'solarized-dark', 'nord', 'dracula']) {
@@ -211,6 +213,28 @@ test('typography settings fit mobile screens, support keyboard editing and are a
     await page.evaluate(() => {document.documentElement.dataset.theme = 'timekeeper';document.documentElement.dataset.bsTheme = 'light';});
     await captureScreenshot(page, {path: `test-results/typography-${width}.png`, fullPage: true});
   }
+});
+
+test('CSS colors keep native text editing, literal source and scrolling aligned across widths',async({page,request})=>{
+  await openSettings(page,request);const field=editor(page),mirror=page.locator('.css-editor-highlight');
+  await expect(mirror.locator('.hljs-comment').first()).toBeAttached();await expect(mirror).toHaveAttribute('aria-hidden','true');
+  const source='/* <img src=x onerror="window.cssExecuted=true"> */\n:root {\n  --font-base: 14px;\n  --font-hint: clamp(.875rem, 1vw, 1rem);\n}\n';
+  await field.fill(source);await expect(mirror).toContainText('--font-base');await expect(mirror.locator('img,script')).toHaveCount(0);expect(await page.evaluate(()=>window.cssExecuted)).toBeUndefined();
+  await field.press('ControlOrMeta+End');await field.press('x');await field.press('Backspace');await expect(field).toHaveValue(source);await field.press('ControlOrMeta+z');await expect(field).toHaveValue(source+'x');await field.press('ControlOrMeta+Shift+z');await expect(field).toHaveValue(source);
+  await field.selectText();expect(await field.evaluate(node=>node.selectionEnd-node.selectionStart)).toBe(source.length);
+  const long='/* A wrapped comment with enough words to exercise matching native textarea and syntax mirror wrapping. */\n'.repeat(120)+source;await field.fill(long);
+  for(const width of [1440,320]){
+    await page.setViewportSize({width,height:900});await field.press('ControlOrMeta+End');
+    await expect.poll(()=>field.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+    await expect.poll(async()=>Math.abs(await field.evaluate(node=>node.scrollTop)-await mirror.evaluate(node=>node.scrollTop))).toBeLessThan(2);
+    const metrics=await field.evaluate(node=>{const pre=node.parentElement.querySelector('pre'),a=getComputedStyle(node),b=getComputedStyle(pre);return {same:['fontFamily','fontSize','lineHeight','padding','whiteSpace','overflowWrap','tabSize'].every(key=>a[key]===b[key]),width:Math.abs(node.clientWidth-pre.getBoundingClientRect().width),caret:a.caretColor};});expect(metrics.same).toBe(true);expect(metrics.width).toBeLessThan(2);expect(metrics.caret).not.toBe('rgba(0, 0, 0, 0)');
+  }
+  await page.emulateMedia({forcedColors:'active'});await expect(mirror).toHaveCSS('visibility','hidden');expect(await field.evaluate(node=>getComputedStyle(node).color)).not.toBe('rgba(0, 0, 0, 0)');await expect(field).toHaveValue(long);
+});
+
+test('CSS editing and saving remain available if syntax coloring cannot load',async({page,request})=>{
+  await page.route('**/assets/milkdown/code-highlight.js*',route=>route.abort('failed'));await openSettings(page,request);
+  const source=':root { --font-base: 18px; }';await editor(page).fill(source);await expect(page.locator('.css-editor')).not.toHaveClass(/is-highlighted/);expect(await editor(page).evaluate(node=>getComputedStyle(node).color)).not.toBe('rgba(0, 0, 0, 0)');await save(page);await saved(page);expect((await profile(page)).typographyCss).toBe(source);
 });
 
 test('read-only sessions use saved account typography but cannot change it and Norwegian settings are localized', async ({page, request}) => {

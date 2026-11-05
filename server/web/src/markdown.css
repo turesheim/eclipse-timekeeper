@@ -104,11 +104,13 @@
 .markdown-code-language { position: fixed; inset: auto; margin: 0; padding: .5rem; border: 1px solid var(--bs-border-color); border-radius: .4rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
 .markdown-code-language label { display: flex; flex-direction: column; gap: .25rem; }
 .markdown-code-language input { width: 12rem; max-width: calc(100vw - 3rem); background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; }
-.markdown-code-block :is(.hljs-keyword,.hljs-operator,.hljs-selector-tag) { color: color-mix(in srgb, var(--bs-primary-text-emphasis) 60%, var(--bs-body-color)); font-weight: 600; }
-.markdown-code-block :is(.hljs-string,.hljs-regexp,.hljs-addition) { color: color-mix(in srgb, var(--bs-success-text-emphasis) 60%, var(--bs-body-color)); }
-.markdown-code-block :is(.hljs-number,.hljs-literal,.hljs-deletion) { color: color-mix(in srgb, var(--bs-danger-text-emphasis) 60%, var(--bs-body-color)); }
-.markdown-code-block :is(.hljs-comment,.hljs-meta,.hljs-quote) { color: var(--bs-secondary-color); font-style: italic; }
-.markdown-code-block :is(.hljs-attr,.hljs-attribute,.hljs-title,.hljs-selector-class,.hljs-built_in,.hljs-symbol) { color: var(--bs-info-text-emphasis); }
+:is(.markdown-code-block,.css-editor-highlight) :is(.hljs-keyword,.hljs-operator,.hljs-selector-tag) { color: color-mix(in srgb, var(--bs-primary-text-emphasis) 60%, var(--bs-body-color)); }
+:is(.markdown-code-block,.css-editor-highlight) :is(.hljs-string,.hljs-regexp,.hljs-addition) { color: color-mix(in srgb, var(--bs-success-text-emphasis) 60%, var(--bs-body-color)); }
+:is(.markdown-code-block,.css-editor-highlight) :is(.hljs-number,.hljs-literal,.hljs-deletion) { color: color-mix(in srgb, var(--bs-danger-text-emphasis) 60%, var(--bs-body-color)); }
+:is(.markdown-code-block,.css-editor-highlight) :is(.hljs-comment,.hljs-meta,.hljs-quote) { color: var(--bs-secondary-color); }
+:is(.markdown-code-block,.css-editor-highlight) :is(.hljs-attr,.hljs-attribute,.hljs-title,.hljs-selector-class,.hljs-selector-pseudo,.hljs-built_in,.hljs-symbol) { color: var(--bs-info-text-emphasis); }
+.markdown-code-block :is(.hljs-keyword,.hljs-operator,.hljs-selector-tag) { font-weight: 600; }
+.markdown-code-block :is(.hljs-comment,.hljs-meta,.hljs-quote) { font-style: italic; }
 .markdown-actions-trigger { flex: none; }
 .markdown-actions-menu { position: fixed; inset: auto; margin: 0; max-width: min(24rem,calc(100vw - 1rem)); max-height: min(30rem,calc(100dvh - 1rem)); overflow: auto; }
 .markdown-actions-menu:popover-open { display: block; }
