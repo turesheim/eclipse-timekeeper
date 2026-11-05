@@ -206,3 +206,55 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
     const note=await api(request,'GET','/day-notes/'+date);await api(request,'PUT','/day-notes/'+date,{text:'',body:''},{'If-Match':note.headers().etag});
   }
 });
+
+for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and grouped date controls in ${locale}`,async({browser,request})=>{
+  const original=await(await api(request,'GET','/me')).json();
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale}),page=await context.newPage();
+  let running;
+  try{
+    if(original.locale!==null){const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId,locale:null},{'If-Match':profile.headers().etag});}
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
+    await expect(page.locator('#today-note-editor')).toBeVisible();await expect(page.locator('html')).toHaveAttribute('lang',locale);
+    await page.locator('#today-date').fill('2026-10-26');
+    await expect(page.locator('#today-date')).toHaveAccessibleName(locale==='nb-NO'?'Dato':'Date');await expect(page.locator('label[for="today-date"]')).toHaveClass(/visually-hidden/);
+    const navigator=page.getByRole('toolbar',{name:locale==='nb-NO'?'Datonavigering':'Day navigation',exact:true});
+    await expect(navigator.getByRole('group')).toHaveCount(1);await expect(navigator.getByRole('button')).toHaveCount(3);await expect(navigator.locator('.btn-group')).toHaveCount(1);
+    const originalBrand=await page.evaluate(()=>document.documentElement.style.getPropertyValue('--font-brand'));
+    const check=async(width,font,heading=null,brand=originalBrand)=>{
+      if(page.viewportSize()?.width!==width||page.viewportSize()?.height!==1000)await page.setViewportSize({width,height:1000});
+      await page.evaluate(({font,heading,brand})=>{const root=document.documentElement;root.style.setProperty('--font-base',font+'px');heading?root.style.setProperty('--font-section-heading',heading):root.style.removeProperty('--font-section-heading');brand?root.style.setProperty('--font-brand',brand):root.style.removeProperty('--font-brand');scrollTo(0,0);},{font,heading,brand});
+      const gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));
+      // Font-only changes must redock both columns without a synthetic resize.
+      await expect.poll(()=>page.evaluate(gap=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector('#workspace-navigation').getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},gap)).toBeLessThan(2);
+      const geometry=await page.evaluate(()=>{
+        const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),controls=rect('.today-date-navigation'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect('#workspace-navigation'),main=rect('.today-main'),session=rect('#work-session');
+        return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,headerRight:toolbar.right,controlsRight:controls.right,controlsTop:controls.top,controlsCenter:controls.top+controls.height/2,titleTop:title.top,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,columnGap:parseFloat(getComputedStyle(document.querySelector('.today-toolbar')).columnGap),overflow:document.documentElement.scrollWidth>innerWidth};
+      });
+      expect(geometry.overflow,`${locale}: viewport ${width}px, base font ${font}px, heading ${heading||'default'}, brand ${brand||'default'}`).toBe(false);
+      if(width>650){
+        expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.columnGap+geometry.headerRight)/2)).toBeLessThan(2);
+        expect(Math.abs(geometry.titleCenterY-geometry.controlsCenter)).toBeLessThan(2);
+      }else{
+        expect(geometry.titleBottom).toBeLessThanOrEqual(geometry.controlsTop+1);
+        expect(Math.abs(geometry.titleCenterX-(geometry.mainLeft+geometry.mainRight)/2)).toBeLessThan(2);
+      }
+      if(width>1050){
+        expect(Math.abs(geometry.sidebarTop-geometry.headerTop)).toBeLessThan(1);
+        expect(geometry.sidebarTop-geometry.sessionBottom).toBeGreaterThanOrEqual(0);expect(geometry.sidebarTop-geometry.sessionBottom).toBeLessThanOrEqual(gap+1);
+        expect(geometry.sidebarBottom).toBeLessThanOrEqual(geometry.dockTop-gap+1);
+      }else expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.editorBottom);
+      for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);}
+    };
+    for(const [width,font,heading,brand]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[650,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20],[320,20,null,'2rem']])await check(width,font,heading,brand);
+    running=await(await api(request,'POST','/work-sessions',{summary:'Running session with a deliberately long title to exercise wrapping',start:new Date(Date.now()-3600000).toISOString(),end:null})).json();
+    await page.locator('#refresh').click();await expect(page.locator('#session-stop')).toBeVisible();
+    for(const [width,font]of [[1440,14],[1051,20],[320,20],[390,14]])await check(width,font);
+    await captureScreenshot(page,{path:`test-results/today-layout-${locale}-mobile.png`});
+    await check(1440,14);await captureScreenshot(page,{path:`test-results/today-layout-${locale}-desktop.png`});
+    expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+  }finally{
+    await context.close();
+    if(running){const current=await api(request,'GET','/work-sessions/'+running.id);await api(request,'DELETE','/work-sessions/'+running.id,undefined,{'If-Match':current.headers().etag});}
+    const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId,locale:original.locale??null},{'If-Match':current.headers().etag});
+  }
+});

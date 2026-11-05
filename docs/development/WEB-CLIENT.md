@@ -137,8 +137,13 @@ The inline journal uses the same saved day note and conflict handling as
 Calendar and Week. Unsaved changes require confirmation before selecting
 another date. On narrow screens the sidebar follows the journal.
 
-The Today date navigator uses the same heading alignment as Calendar, with a
-compact date field and no separate timezone caption.
+The Today sidebar starts alongside the date navigator, directly below the work
+session card. Its height and the editor's height are measured independently to
+the fixed bottom menu; font changes and wrapping headings update both measures.
+The date field has an accessible, visually hidden label. Previous, today and
+next-day controls form a grouped toolbar, and the date heading is centered in
+the remaining main-column space. On narrow screens the heading moves above
+the controls. There is no separate timezone caption.
 
 The mini calendar uses compact rows and navigation buttons. Dots beneath day and
 week numbers indicate saved notes. The weekly editor has a top-right close button
