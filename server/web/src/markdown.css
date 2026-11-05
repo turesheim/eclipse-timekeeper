@@ -2,6 +2,7 @@
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .markdown-editor .markdown-modes, .markdown-editor .markdown-tools { flex: none; flex-wrap: nowrap; gap: 0; margin: 0; }
 .markdown-editor .markdown-tools { flex-wrap: wrap; max-width: 100%; }
+.markdown-editor .markdown-tools > button { flex: none; }
 .markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
 .markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
@@ -95,11 +96,11 @@
 .markdown-code-block { position: relative; border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
 .markdown-code-controls { position: absolute; inset-block-start: .4rem; inset-inline-end: .5rem; display: flex; align-items: center; z-index: 1; font-size: var(--font-markdown-code-control); }
 .markdown-code-controls > button { border: 0; background: var(--bs-tertiary-bg); color: var(--bs-body-color); min-height: 1.75rem; padding: .2rem .3rem; font: inherit; }
-.markdown-code-controls > button:first-child { max-width: 4.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: .25rem 0 0 .25rem; }
+.markdown-code-controls > button:first-child { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: .25rem 0 0 .25rem; }
 .markdown-code-controls > button:last-of-type { width: 1.75rem; border-radius: 0 .25rem .25rem 0; }
 .markdown-code-controls > button:hover { color: var(--bs-primary-text-emphasis); }
 .markdown-code-block pre { margin: 0; }
-.markdown-code-block pre::before { content: ''; float: inline-end; inline-size: 6.5rem; block-size: 1.5rem; }
+.markdown-code-block pre::before { content: ''; float: inline-end; inline-size: 10rem; block-size: 1.5rem; }
 .markdown-code-language { position: fixed; inset: auto; margin: 0; padding: .5rem; border: 1px solid var(--bs-border-color); border-radius: .4rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
 .markdown-code-language label { display: flex; flex-direction: column; gap: .25rem; }
 .markdown-code-language input { width: 12rem; max-width: calc(100vw - 3rem); background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; }
