@@ -47,6 +47,7 @@ class RecentNotesTest {
             events.saveDocument(key,etag(events.get(key)),EventNotes.document(event));
             var recent=new RecentNotes(store,limits);var first=recent.page(0,2,null);inputs.validate("RecentNotesPage",first);
             assertEquals("Notes/Later today.md",first.path("items").get(0).path("path").asText());assertEquals("EVENT",first.path("items").get(1).path("kind").asText());
+            assertEquals("Meeting",first.path("items").get(1).path("title").asText());
             assertFalse(first.toString().contains("private body"));assertFalse(first.toString().contains("meeting note"));
             assertEquals(7,first.path("days").asInt());assertEquals("2026-10-30",first.path("fromDate").asText());assertEquals("2026-11-05",first.path("toDate").asText());
             String snapshot=first.path("snapshot").asText();var second=recent.page(2,2,snapshot);assertEquals("Notes/A.md",second.path("items").get(0).path("path").asText());assertEquals("Notes/B.md",second.path("items").get(1).path("path").asText());
@@ -99,11 +100,30 @@ class RecentNotesTest {
     }
     @Test void httpReadsAreOwnerPrivateAndAllowReadOnlyTokens(){
         var path="Recent-"+UUID.randomUUID()+".md";
-        assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).body(bytes("secret body")).put("/api/v1/notes/files").statusCode());
-        var reader=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=1");assertEquals(200,reader.statusCode());assertTrue(reader.header("Cache-Control").contains("no-store"));assertEquals(path,reader.jsonPath().getString("items[0].path"));inputs.validate("RecentNotesPage",parse(reader.asString()));
+        assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).body(bytes("# Owner only title\n\nsecret body")).put("/api/v1/notes/files").statusCode());
+        var reader=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=1");assertEquals(200,reader.statusCode());assertTrue(reader.header("Cache-Control").contains("no-store"));assertEquals(path,reader.jsonPath().getString("items[0].path"));assertEquals("Owner only title",reader.jsonPath().getString("items[0].title"));assertFalse(reader.asString().contains("secret body"));inputs.validate("RecentNotesPage",parse(reader.asString()));
         assertEquals(0,given().header("Authorization","Bearer test-b").get("/api/v1/notes/recent").jsonPath().getList("items").size());
         assertEquals(401,given().get("/api/v1/notes/recent").statusCode());assertEquals(428,given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?offset=1").statusCode());
         assertEquals(422,given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=0").statusCode());
         var settings=given().header("Authorization","Bearer test-read").get("/api/v1/notes/settings");assertEquals(403,given().header("Authorization","Bearer test-read").header("If-Match",settings.header("ETag")).contentType("application/json").body("{\"recentNotesDays\":1}").put("/api/v1/notes/settings").statusCode());
+    }
+    @Test void displayTitlesFollowCanonicalNotesWithoutMutatingBytesVersionsOrReadGuards(){
+        store.transaction("note-titles-owner",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();
+            String text="---\ntitle: Ignored metadata title\n---\n\n## Project **review**\n\nPrivate body\n";
+            var entry=vault.put(new VaultPath("document.md"),null,true,bytes(text));
+            String contentTag=vault.tag(entry),metadataTag=vault.metadataTag(entry),snapshot=vault.generation();long revision=store.revision();
+            var metadata=vault.metadata(entry);inputs.validate("VaultEntry",metadata);assertEquals("Project review",metadata.path("title").asText());
+            assertArrayEquals(bytes(text),vault.read(entry));assertEquals(contentTag,vault.tag(entry));assertEquals(metadataTag,vault.metadataTag(entry));assertEquals(snapshot,vault.generation());assertEquals(revision,store.revision());
+            assertFalse(metadata.has("body"));assertFalse(metadata.toString().contains("Private body"));
+            var recent=new RecentNotes(store,limits).page(0,2,null);assertEquals("Project review",recent.path("items").get(0).path("title").asText());
+            var saved=vault.put(VaultCollection.path(entry),contentTag,false,bytes("First replacement\n=================\n\nBody\n"));
+            assertEquals("First replacement",vault.metadata(saved).path("title").asText());
+            vault.delete(saved,vault.tag(saved));var trash=vault.get(VaultCollection.id(saved));assertEquals("First replacement",vault.metadata(trash).path("title").asText());
+            var restored=vault.restore(trash,vault.tag(trash));assertEquals("First replacement",vault.metadata(restored).path("title").asText());
+            assertFalse(vault.metadata(vault.put(new VaultPath("plain.md"),null,true,bytes("No heading"))).has("title"));
+            assertFalse(vault.metadata(vault.put(new VaultPath("journal/2026-11-05.md"),null,true,bytes("# Journal heading"))).has("title"));
+            return null;
+        });
     }
 }

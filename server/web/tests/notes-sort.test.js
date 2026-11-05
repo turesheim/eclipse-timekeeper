@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {sortedNotes} from '../src/notes-sort.js';
+import {noteTitle} from '../src/note-title.js';
 
 const row=(path,createdAt,modifiedAt,kind='MARKDOWN')=>({id:path,path,kind,createdAt,modifiedAt});
 const paths=rows=>rows.map(value=>value.path);
@@ -21,4 +22,11 @@ test('equal or invalid dates retain deterministic alphabetical ordering and resp
   const rows=[row('Å.md',null,'invalid'),row('A.md',null,'invalid'),row('Æ.md',null,'invalid')];
   assert.deepEqual(paths(sortedNotes(rows,'modified-desc','nb-NO')),['A.md','Æ.md','Å.md']);
   assert.deepEqual(paths(sortedNotes(rows,'invalid','nb-NO')),['A.md','Æ.md','Å.md']);
+});
+test('display titles sort naturally with stable path ties and filename fallbacks',()=>{
+  const rows=[{...row('events/id-2.md'),title:'Review 10'},{...row('Notes/z.md'),title:'Review 2'},row('Notes/Archive',null,null,'FOLDER'),{...row('Notes/a.md'),title:'Review 2'}];
+  assert.deepEqual(paths(sortedNotes(rows)),['Notes/Archive','Notes/a.md','Notes/z.md','events/id-2.md']);
+  assert.deepEqual(paths(sortedNotes(rows,'name-desc')),['Notes/Archive','events/id-2.md','Notes/z.md','Notes/a.md']);
+  assert.equal(noteTitle(rows[0]),'Review 10');assert.equal(noteTitle(row('Notes/plain.md')),'plain.md');
+  assert.equal(noteTitle({...row('Notes/plain.md'),title:' '},'Notes/plain.md'),'Notes/plain.md');
 });

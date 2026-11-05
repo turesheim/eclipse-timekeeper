@@ -6,6 +6,7 @@ import {icon,iconButton} from './icons.js';
 import {relativeNotePath,rasterType,notesEntryVisible} from './notes-links.js';
 import {vaultEditorResources} from './vault-editor-resources.js';
 import {imagePreview} from './image-preview.js';
+import {noteTitle} from './note-title.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const action=(label,run,name)=>{const value=node('button',name?'':label,'btn btn-outline-secondary');value.type='button';if(name)iconButton(value,name,label);value.addEventListener('click',run);return value;};
@@ -128,7 +129,7 @@ export class NotesView {
       if(search||this.showTrash){const listed=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
       else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),listed=await this.list({parentId:parent},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&(expandAll||expanded.has(row.id))){expanded.add(row.id);pending.push(row.id);}}}}
       if(session!==this.session||current!==this.loadGeneration)return;this.expanded=expanded;this.children=children;this.entries=entries;this.paint();if(!this.stale)this.error.hidden=true;
-      if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=this.note.path;}}
+      if(this.note){const reply=await session.request('/notes/entries/'+this.note.id);if(session!==this.session||current!==this.loadGeneration)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}}
     }catch(error){if(session===this.session&&current===this.loadGeneration){if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.expandAllRequested=false;this.controls();}}
   }
@@ -137,7 +138,8 @@ export class NotesView {
     const focused=this.tree.querySelector(':focus')?.dataset.id;this.tree.replaceChildren();
     const append=(parent,host)=>{for(const entry of sortedNotes(this.children.get(parent)||[],this.sortOrder,getLocale())){
       const folder=entry.kind==='FOLDER',row=node('div',undefined,'notes-tree-row');row.setAttribute('role','treeitem');row.setAttribute('aria-selected',String(this.note?.id===entry.id));row.dataset.id=entry.id;row.tabIndex=-1;
-      const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.path);pick.append(icon(folder?'folder':'file-earmark-text'),node('span',parent==='search'?entry.path:entry.path.split('/').at(-1)));row.append(pick);
+      const title=noteTitle(entry,parent==='search'?entry.path:entry.path.split('/').at(-1));
+      const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.title?title+' · '+entry.path:entry.path);pick.append(icon(folder?'folder':'file-earmark-text'),node('span',title));row.append(pick);
       row.addEventListener('focus',()=>{for(const item of this.tree.querySelectorAll('[role=treeitem]'))item.tabIndex=item===row?0:-1;});
       if(folder&&!this.showTrash){row.setAttribute('aria-expanded',String(this.expanded.has(entry.id)));if(this.expanded.has(entry.id)){const group=node('div');group.setAttribute('role','group');append(entry.id,group);row.append(group);}}host.append(row);
     }};append(this.children.has('search')?'search':this.info.rootId,this.tree);
@@ -160,7 +162,7 @@ export class NotesView {
       const metadata={...reply.data};let text='',imageBlob=null;
       if(metadata.kind!=='FOLDER'&&!metadata.deleted){const content=await session.request('/notes/entries/'+id+'/content',{binary:'application/octet-stream'});if(content.etag!==metadata.etag)throw new Error(t('notes.stale'));if(session!==this.session||current!==this.generation)return;
         if(['MARKDOWN','DAY','WEEK','EVENT'].includes(metadata.kind))text=textDecoder.decode(await content.data.arrayBuffer());else{this.binary=true;if(rasterType(new Uint8Array(await content.data.slice(0,12).arrayBuffer())))imageBlob=content.data;}}
-      if(session!==this.session||current!==this.generation)return;this.note=metadata;this.original=text;this.documentTitle.textContent=metadata.path;this.markdown.setValue(text);this.error.hidden=true;
+      if(session!==this.session||current!==this.generation)return;this.note=metadata;this.original=text;this.documentTitle.textContent=noteTitle(metadata,metadata.path);this.markdown.setValue(text);this.error.hidden=true;
       if(imageBlob){this.selectedImage=imagePreview({alt:metadata.path.split('/').at(-1),load:async()=>imageBlob,active:()=>session===this.session&&current===this.generation});this.preview.append(this.selectedImage.dom);}
       this.empty.textContent=metadata.deleted?t('notes.deleted'):this.binary?t('notes.binary'):t('notes.select');this.binary||=metadata.kind==='FOLDER';this.root.classList.remove('notes-drawer-open');this.toggle.setAttribute('aria-expanded','false');this.controls();this.paint();if(this.positions.has(id))await this.markdown.restorePosition(this.positions.get(id));
     }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
@@ -168,7 +170,7 @@ export class NotesView {
   async commit(){
     if(this.save.disabled)return;const session=this.session,current=this.generation,body=this.markdown.value();this.busy=true;this.controls();this.status.textContent=t('journal.saving');
     try{const reply=await session.request('/notes/entries/'+this.note.id+'/content',{method:'PUT',etag:this.note.etag,rawBody:new TextEncoder().encode(body)});if(session!==this.session||current!==this.generation)return;
-      this.note={...reply.data,etag:reply.etag};this.original=body;this.error.hidden=true;this.callbacks.onChanged?.();
+      this.note={...reply.data,etag:reply.etag};this.documentTitle.textContent=noteTitle(this.note,this.note.path);this.original=body;this.error.hidden=true;this.callbacks.onChanged?.();
     }catch(error){if(session===this.session&&current===this.generation){this.stale=true;this.fail(error);}}
     finally{if(session===this.session&&current===this.generation){this.busy=false;this.controls();}}
   }

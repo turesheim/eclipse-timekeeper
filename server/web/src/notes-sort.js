@@ -1,3 +1,5 @@
+import {noteTitle} from './note-title.js';
+
 export const noteSortOrders=[
   {value:'name-asc',field:'name',direction:1,label:'notes.sort_name_asc',icon:'sort-alpha-down'},
   {value:'name-desc',field:'name',direction:-1,label:'notes.sort_name_desc',icon:'sort-alpha-up'},
@@ -11,7 +13,7 @@ export const noteSortOrders=[
 export function sortedNotes(entries,order='name-asc',locale='en-GB'){
   const sort=noteSortOrders.find(value=>value.value===order)||noteSortOrders[0];
   const names=new Intl.Collator(locale,{numeric:true,sensitivity:'base'});
-  const name=(a,b)=>names.compare(a.path,b.path)||a.id.localeCompare(b.id);
+  const name=(a,b)=>names.compare(noteTitle(a,a.path),noteTitle(b,b.path))||names.compare(a.path,b.path)||a.id.localeCompare(b.id);
   return [...entries].sort((a,b)=>{
     const folders=Number(b.kind==='FOLDER')-Number(a.kind==='FOLDER');if(folders)return folders;
     if(sort.field==='name')return name(a,b)*sort.direction;

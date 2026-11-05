@@ -1,6 +1,7 @@
 import {wikiReference} from './wiki-links.js';
 import {revisionDiff} from './revision-diff.js';
 import {t} from './i18n.js';
+import {noteTitle} from './note-title.js';
 import {iconButton} from './icons.js';
 import {headingAnchor} from './wiki-links.js';
 const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
@@ -88,7 +89,7 @@ export function buildExperience(field){
     if(query===lastQuery)return;lastQuery=query;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
     const add=(label,run)=>{const button=el('button',label);button.type='button';button.className='btn btn-light';button.setAttribute('role','option');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{if(f.readOnly)return;suggestions.hidden=true;run();});suggestions.append(button);};
     if(slash){for(const name of ['heading','list','ordered','tasks','quote','code_block','table','hr'])if(t('markdown.'+name).toLocaleLowerCase().includes(slash.query.toLocaleLowerCase()))add(t('markdown.'+name),()=>f.editor.replaceSlash(name));}
-    if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query,{assetsOnly:wiki.embed}).then(entries=>{if(current!==completion||f.readOnly)return;for(const entry of entries)add(entry.path,()=>f.editor.insertWiki(wiki,entry.path.replace(/\.md$/i,'')));suggestions.hidden=!suggestions.children.length;place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});}).catch(()=>{});
+    if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query,{assetsOnly:wiki.embed}).then(entries=>{if(current!==completion||f.readOnly)return;for(const entry of entries)add(entry.title?noteTitle(entry)+' · '+entry.path:entry.path,()=>f.editor.insertWiki(wiki,entry.path.replace(/\.md$/i,'')));suggestions.hidden=!suggestions.children.length;place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});}).catch(()=>{});
     suggestions.hidden=!suggestions.children.length;if(!suggestions.hidden)place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});
   };
   f.rich.addEventListener('compositionend',()=>queueMicrotask(()=>f.updateExperience()));

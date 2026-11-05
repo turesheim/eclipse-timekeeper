@@ -32211,6 +32211,13 @@
             "type": "string",
             "format": "date-time",
             "description": "Original creation time when supplied by import; otherwise the time the entry was created in the Notes collection. Retained across edits, moves and recovery. Older entries with unknown creation times omit this field."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "readOnly": true,
+            "description": "Display title: the associated event title for EVENT notes, or the first nonempty document-level Markdown heading for MARKDOWN notes, as plain text. Omitted when unavailable; clients fall back to the filename/path. This does not change paths, canonical bytes or write validators."
           }
         }
       },

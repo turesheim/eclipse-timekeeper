@@ -25,7 +25,10 @@ final class VaultCollection {
     String tag(JsonNode entry,String snapshot){return folder(entry)?etag(object().put("entry",etag(entry)).put("generation",snapshot)):entry.path("contentTag").asText();}
     String metadataTag(JsonNode entry){return folder(entry)?tag(entry):etag(entry);}
     ObjectNode metadata(ObjectNode entry){return metadata(entry,folder(entry)?generation():null);}
-    private ObjectNode metadata(ObjectNode entry,String snapshot){String tag=tag(entry,snapshot);return entry.deepCopy().put("etag",tag).put("entryEtag",folder(entry)?tag:etag(entry));}
+    private ObjectNode metadata(ObjectNode entry,String snapshot){
+        String tag=tag(entry,snapshot);var result=entry.deepCopy().put("etag",tag).put("entryEtag",folder(entry)?tag:etag(entry));
+        String title=new NoteTitles(store).get(entry);if(!title.isBlank())result.put("title",title);return result;
+    }
     ObjectNode page(UUID parent,String query,boolean trash,int offset,int count,String snapshot){
         if(offset<0||count<1||count>limits.pageSize())throw ApiFailure.validation();
         String current=generation();if(snapshot!=null&&!current.equals(snapshot))throw new ApiFailure(412,"STALE_VERSION");
