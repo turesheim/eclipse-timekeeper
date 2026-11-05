@@ -220,15 +220,16 @@ test('CSS colors keep native text editing, literal source and scrolling aligned 
   await expect(mirror.locator('.hljs-comment').first()).toBeAttached();await expect(mirror).toHaveAttribute('aria-hidden','true');
   const source='/* <img src=x onerror="window.cssExecuted=true"> */\n:root {\n  --font-base: 14px;\n  --font-hint: clamp(.875rem, 1vw, 1rem);\n}\n';
   await field.fill(source);await expect(mirror).toContainText('--font-base');await expect(mirror.locator('img,script')).toHaveCount(0);expect(await page.evaluate(()=>window.cssExecuted)).toBeUndefined();
-  await field.press('ControlOrMeta+End');await field.press('x');await field.press('ControlOrMeta+z');await expect(field).not.toHaveValue(source+'x');await field.press('ControlOrMeta+Shift+z');await expect(field).toHaveValue(source+'x');await field.press('Backspace');await expect(field).toHaveValue(source);
+  await field.press('x');await field.press('ControlOrMeta+z');await expect(field).not.toHaveValue(source+'x');await field.press('ControlOrMeta+Shift+z');await expect(field).toHaveValue(source+'x');await field.press('Backspace');await expect(field).toHaveValue(source);
   await field.selectText();expect(await field.evaluate(node=>node.selectionEnd-node.selectionStart)).toBe(source.length);
   const long='/* A wrapped comment with enough words to exercise matching native textarea and syntax mirror wrapping. */\n'.repeat(120)+source;await field.fill(long);
   for(const width of [1440,320]){
-    await page.setViewportSize({width,height:900});await field.press('ControlOrMeta+End');
+    await page.setViewportSize({width,height:900});await field.hover();await page.mouse.wheel(0,800);
     await expect.poll(()=>field.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     await expect.poll(async()=>Math.abs(await field.evaluate(node=>node.scrollTop)-await mirror.evaluate(node=>node.scrollTop))).toBeLessThan(2);
     const metrics=await field.evaluate(node=>{const pre=node.parentElement.querySelector('pre'),a=getComputedStyle(node),b=getComputedStyle(pre);return {same:['fontFamily','fontSize','lineHeight','padding','whiteSpace','overflowWrap','tabSize'].every(key=>a[key]===b[key]),width:Math.abs(node.clientWidth-pre.getBoundingClientRect().width),caret:a.caretColor};});expect(metrics.same).toBe(true);expect(metrics.width).toBeLessThan(2);expect(metrics.caret).not.toBe('rgba(0, 0, 0, 0)');
   }
+  await page.evaluate(()=>document.documentElement.dir='rtl');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await field.evaluate(node=>Math.abs(node.parentElement.querySelector('pre').getBoundingClientRect().left-node.getBoundingClientRect().left-node.clientLeft))).toBeLessThan(2);await expect(field).toHaveValue(long);
   await page.emulateMedia({forcedColors:'active'});await expect(mirror).toHaveCSS('visibility','hidden');expect(await field.evaluate(node=>getComputedStyle(node).color)).not.toBe('rgba(0, 0, 0, 0)');await expect(field).toHaveValue(long);
 });
 
