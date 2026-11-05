@@ -503,6 +503,15 @@ small, .small { font-size: var(--font-small); }
 code, pre { font-size: var(--font-code); }
 .timekeeper-tooltip { --bs-tooltip-font-size: var(--font-tooltip); }
 .typography-editor { font-family: var(--bs-font-monospace); font-size: var(--font-css-editor); min-height: 24rem; height: 60vh; resize: vertical; tab-size: 2; }
+.account-card .typography-form { max-width: none; }
+.css-editor { position: relative; min-width: 0; margin-block-start: .4rem; direction: ltr; }
+.css-editor textarea { margin-top: 0; }
+.css-editor :is(textarea,pre) { font-family: var(--bs-font-monospace); font-size: var(--font-css-editor); font-weight: 400; font-style: normal; font-variant-ligatures: none; line-height: 1.5; letter-spacing: normal; tab-size: 2; white-space: pre-wrap; overflow-wrap: break-word; }
+.css-editor-highlight { position: absolute; z-index: 1; pointer-events: none; user-select: none; box-sizing: border-box; max-width: calc(100% - 2 * var(--bs-border-width)); max-height: calc(100% - 2 * var(--bs-border-width)); margin: 0; border: 0; overflow: hidden; color: var(--bs-body-color); background: var(--bs-body-bg); }
+.css-editor-highlight span { font-weight: inherit; font-style: inherit; }
+.css-editor.is-highlighted textarea { position: relative; z-index: 2; color: transparent; background-color: transparent; caret-color: var(--bs-body-color); }
+.css-editor.is-highlighted textarea::selection { color: var(--bs-body-color); background: var(--bs-primary-bg-subtle); }
+@media(forced-colors: active) { .css-editor.is-highlighted textarea { color: CanvasText; background: Canvas; caret-color: CanvasText; }.css-editor-highlight { visibility: hidden; } }
 
 .today-recent-list { display: grid; gap: .35rem; }
 .today-recent-note { display: grid; width: 100%; min-width: 0; text-align: start; }

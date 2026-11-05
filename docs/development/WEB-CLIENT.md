@@ -355,6 +355,16 @@ comment explaining where it is used. This stylesheet is the source of the
 application defaults; components reference its properties instead of repeating
 font-size values.
 
+The CSS editor fills the available account-card width and colors selectors,
+properties, values and comments using the shared highlight.js bundle and theme
+palette. Its native text area owns the caret, selection, clipboard and Undo/Redo;
+syntax is a literal, non-interactive display excluded from assistive technology.
+Scrolling, wrapping and resizing follow the native control. Coloring never
+changes the source or applies unsaved CSS. Loading failures and forced-color
+modes retain a readable native text field.
+
+![Full-width account CSS editor with syntax colors](../assets/screenshots/font-sizes.png)
+
 The application defaults to `--font-base: 14px` throughout its web entry pages.
 Set it to `100%` to follow the browser's default, or another percentage/pixel value
 to change the size of **1rem**.
