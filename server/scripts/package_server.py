@@ -87,6 +87,7 @@ def package(output, tag, commit):
         'docs/assets/screenshots/day-notes-editor.png': 'images/day-notes-editor.png',
         'docs/assets/screenshots/journal-editor-mobile.png': 'images/journal-editor-mobile.png',
         'docs/assets/screenshots/mermaid-editor.png': 'images/mermaid-editor.png',
+        'docs/assets/screenshots/font-sizes.png': 'images/font-sizes.png',
         'docs/assets/screenshots/journal-heading-menu-mobile.png': 'images/journal-heading-menu-mobile.png',
         'docs/assets/screenshots/week-day-note-editor-mobile.png': 'images/week-day-note-editor-mobile.png',
         'docs/assets/screenshots/about-references-desktop.png': 'images/about-references-desktop.png',
