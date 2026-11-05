@@ -31,7 +31,7 @@ test('code uses highlight.js in a compact badge, preserving source, copy and lan
   for(const width of [1440,320]){
     await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
-      expect((await new AxeBuilder({page}).include('#presentation-editor').analyze()).violations).toEqual([]);
+      expect((await new AxeBuilder({page}).include('#presentation-editor').analyze()).violations,`${theme} at ${width}px`).toEqual([]);
     }
     await captureScreenshot(page,{path:`test-results/editor-code-presentation-${width}.png`,fullPage:true});
   }
