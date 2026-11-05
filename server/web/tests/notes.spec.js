@@ -45,7 +45,7 @@ test('Notes account imports a vault with review, guarded conflicts and exact fil
     await card.getByRole('button',{name:'Retry',exact:true}).click();await expect(card).toContainText('Imported 4 files.');expect(uploads.filter(path=>path==='journal/'+day+'.md')).toHaveLength(1);await page.unroute('**/api/v1/notes/files?**');
     for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/assets/pixel.png',png],['Notes/Keep.md','Server original'],['Notes/Race.md','Concurrent server file']]){const entry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path}))).json();expect(Buffer.from(await(await api('GET','/notes/entries/'+entry.id+'/content')).body()).equals(Buffer.from(bytes))).toBe(true);}
     expect((await(await api('GET','/day-labels/'+day)).json()).text).toBe('Independent label');expect((await(await api('GET','/week-notes/2026-W45')).json()).body).toBe('# Week\r\n');
-    await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#notes-title')).toBeVisible();
+    await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#notes-panel')).toBeVisible();await expect(page.locator('#notes-document-title')).toBeVisible();
   }finally{await rm(root,{recursive:true,force:true});}
 });
 

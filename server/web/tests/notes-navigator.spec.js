@@ -104,7 +104,7 @@ test('navigator toolbar and sort menu fit desktop and mobile themes with compact
     const tops=await navigation.locator('.notes-navigation-tools > .btn-group').evaluateAll(groups=>groups.map(group=>group.getBoundingClientRect().top));expect(Math.max(...tops)-Math.min(...tops)).toBeLessThan(2);
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
-      await navigation.getByRole('button',{name:'Sort notes',exact:true}).click();expect((await new AxeBuilder({page}).include('#notes-navigation').analyze()).violations).toEqual([]);
+      await navigation.getByRole('button',{name:'Sort notes',exact:true}).click();expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
       const box=await page.getByRole('menu',{name:'Sort notes',exact:true}).boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
       await page.keyboard.press('Escape');
     }

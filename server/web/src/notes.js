@@ -81,6 +81,9 @@ export class NotesView {
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
     document.addEventListener('timekeeper:notes-changed',()=>{this.info=null;this.folder=null;if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
+    // CSS can hide a focused control before matchMedia's change event, leaving
+    // activeElement at body. Remember actual focus so the toggle can receive it.
+    document.addEventListener('focusin',event=>{this.navigationFocused=this.navigation.contains(event.target)||event.target===this.resize;});
     this.narrow.addEventListener('change',()=>{this.root.classList.remove('notes-drawer-open');this.navigationState();});this.navigationState();this.controls();
   }
   dirty(){return !!this.note&&!this.binary&&!this.markdown.matches(this.original);}
@@ -94,10 +97,11 @@ export class NotesView {
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
   reset(){this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
   navigationState(){
+    const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
     this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);
     const visible=this.narrow.matches?this.root.classList.contains('notes-drawer-open'):!this.navCollapsed;
     this.toggle.setAttribute('aria-expanded',String(visible));
-    if(!visible){this.closeSortMenu(false);if(this.navigation.contains(document.activeElement)||document.activeElement===this.resize)this.toggle.focus();}
+    if(!visible){this.closeSortMenu(false);if(this.visible&&focused)this.toggle.focus();}
     this.fit();
   }
   fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top+scrollY,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0;this.root.style.setProperty('--notes-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');}
