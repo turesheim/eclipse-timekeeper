@@ -37,7 +37,7 @@ export function buildExperience(field){
   });f.deleteRevisionButton.disabled=true;
   const historyActions=el('div');historyActions.className='dialog-actions';historyActions.append(applyRevision,f.deleteRevisionButton,closeHistory);
   f.historyDialog.append(historyTitle,el('p',t('markdown.revision_help')),historyList,historyStatus,diff,historyActions);f.root.append(f.historyDialog);
-  f.historyDialog.addEventListener('close',()=>{++historyGeneration;++selectionGeneration;});
+  f.historyDialog.addEventListener('close',()=>{if(!f.historyDialog.open){++historyGeneration;++selectionGeneration;}});
   const showComparison=(value,button)=>{
     chosen=value;diff.replaceChildren();const comparison=revisionDiff(f.value(),value.text);
     for(const hunk of comparison.hunks){
