@@ -743,8 +743,8 @@ calendar day in the account time zone. Existing stored settings and account
 archives without the field use 7. The preference is included in full account
 archives, but not notes-only ZIP exports.
 
-`GET /api/v1/notes/recent` reads owner-private index metadata without loading
-document or attachment bytes. It includes active Markdown and event notes edited
+`GET /api/v1/notes/recent` returns owner-private index metadata rather than
+document or attachment bodies. It includes active Markdown and event notes edited
 from the first local midnight through the end of today, excluding the configured
 journal subtree, day/week notes, assets, folders and trash. Results sort by edit
 instant descending, then normalized path and identity. The pagination snapshot
