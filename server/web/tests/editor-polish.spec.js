@@ -1,3 +1,4 @@
+import {noteEntry} from './note-entry.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -17,7 +18,7 @@ async function setup(page,request){
  const api=async(method,path,data,headers={})=>{const reply=await client.fetch('/api/v1'+path,{method,data,headers:{'X-CSRF-Token':identity.csrf,...headers}});expect(reply.ok(),`${method} ${path}: ${reply.status()}`).toBe(true);return reply;};
  await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});return api;
 }
-async function open(page,path){await page.locator('[data-tab=notes]').click();const tree=page.locator('#notes-navigation');await tree.getByRole('button',{name:'Notes',exact:true}).click();await tree.getByRole('button',{name:path,exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText(path);}
+async function open(page,path){await page.locator('[data-tab=notes]').click();const tree=page.locator('#notes-navigation');await noteEntry(tree,'Notes').click();await noteEntry(tree,path).click();await expect(noteEntry(tree,path).locator('..')).toHaveAttribute('aria-selected','true');}
 const upload=(api,path,body)=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
 
 test('shared toolbar groups resources and file actions while keeping source labels accessible and previews usable',async({page,request})=>{
@@ -29,7 +30,7 @@ test('shared toolbar groups resources and file actions while keeping source labe
  await toolbar.getByRole('button',{name:'Formatted',exact:true}).click();await page.locator('#notes-formatted .ProseMirror').click();await expect(page.locator('#notes-formatted')).toHaveCSS('outline-style','none');
  for(const width of [1440,1280]){await page.setViewportSize({width,height:900});for(const button of await resources.getByRole('button').all())await expect(button).toBeInViewport();for(const button of await files.getByRole('button').all())await expect(button).toBeInViewport();}
  await captureScreenshot(page,{path:'test-results/notes-grouped-toolbar.png'});
- await page.locator('#notes-navigation').getByRole('button',{name:'Notes/asset.bin',exact:true}).click();await expect(page.locator('#notes-panel .notes-file-tools').getByRole('group',{name:'Document actions',exact:true})).toBeVisible();await page.getByRole('button',{name:'Rename or move',exact:true}).click();await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
+ await noteEntry(page.locator('#notes-navigation'),'Notes/asset.bin').click();await expect(page.locator('#notes-panel .notes-file-tools').getByRole('group',{name:'Document actions',exact:true})).toBeVisible();await page.getByRole('button',{name:'Rename or move',exact:true}).click();await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
  for(const width of [1440,390,320]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });
 
@@ -70,7 +71,7 @@ test('late cursor preferences cannot cross an account boundary or logout',async(
 test('read-only accounts can inspect revisions but cannot delete them or change cursor preferences',async({page,request})=>{
  const path='Read-only-history-'+randomUUID()+'.md',headers={Authorization:`Bearer ${token}`};expect((await request.get('/api/v1/notes',{headers})).status()).toBe(200);
  const first=await request.put('/api/v1/notes/files?'+new URLSearchParams({path}),{headers:{...headers,'Content-Type':'application/octet-stream','If-None-Match':'*'},data:Buffer.from('Before')});expect(first.status()).toBe(201);const entry=await first.json();expect((await request.put('/api/v1/notes/entries/'+entry.id+'/content',{headers:{...headers,'Content-Type':'application/octet-stream','If-Match':entry.etag},data:Buffer.from('After')})).status()).toBe(200);
- await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();await page.locator('#notes-navigation').getByRole('button',{name:path,exact:true}).click();
+ await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),path).click();
  await page.locator('#notes-panel').getByRole('button',{name:'Note revisions',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Note revisions',exact:true});await dialog.getByRole('button',{name:/Version 1/}).click();await expect(dialog.locator('.markdown-diff-removed')).toContainText('Before');await expect(dialog.getByRole('button',{name:'Delete selected revision',exact:true})).toBeDisabled();await expect(dialog.getByRole('button',{name:'Use as unsaved draft',exact:true})).toBeDisabled();await dialog.getByRole('button',{name:'Close',exact:true}).click();
  await page.evaluate(()=>location.hash='#account/notes');await expect(page.getByLabel('Editor cursor',{exact:true})).toBeDisabled();
 });

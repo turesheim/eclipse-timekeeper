@@ -1123,6 +1123,14 @@ corresponding private staging capacity.
 
 ## Notes collection API (schema 10)
 
+Notes entry metadata includes an optional read-only `title`: the associated event
+title for event notes, or the first nonempty document-level Markdown heading
+(ATX or Setext) for ordinary notes. Heading formatting is reduced to plain text;
+frontmatter, code examples and quoted headings do not supply a document title.
+Titles are bounded to 4,096 characters. Clients fall back to the filename/path
+when no title is available. Title reads do not modify canonical Markdown bytes,
+filenames, note versions or write validators.
+
 `GET /notes` initializes the owner collection and returns root ID, settings,
 limits and namespace snapshot. `/notes/settings` supports ETag-guarded partial
 updates. `GET /notes/entries` lists a parent directory, filename/path search or

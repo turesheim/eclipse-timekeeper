@@ -1074,6 +1074,12 @@ widths; other engines check their naturally reported inset.
 
 ## Notes collections
 
+Notes navigation, editor headings and Today’s Recent notes use the API’s display
+title: event titles for event notes and the first document heading for ordinary
+notes, with filename/path fallbacks. Name sorting follows the displayed title.
+Collection paths remain available for identification and keep their existing
+synchronization and link semantics.
+
 The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
 tree. It supports desktop resizing, keyboard tree navigation, a mobile drawer,
 file/folder creation, guarded rename/deletion/recovery and collection settings.

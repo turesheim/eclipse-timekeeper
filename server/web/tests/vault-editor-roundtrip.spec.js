@@ -1,3 +1,4 @@
+import {noteEntry} from './note-entry.js';
 import {appendEditorText} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID,createHash} from 'node:crypto';
@@ -40,7 +41,7 @@ test('packaged manual client round-trips a representative vault after a formatte
     await expect(page.locator('#session-new')).toBeDisabled();await expect(page.locator('#refresh')).toBeEnabled();
     await page.unroute(reportReads);await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');
     await expect(page.locator('#session-new')).toBeEnabled();
-    await page.locator('[data-tab=notes]').click();await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await page.locator('#notes-navigation').getByRole('button',{name:'journal',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'journal/2026-11-02.md',exact:true}).click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+    await page.locator('[data-tab=notes]').click();await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'journal').click();await noteEntry(page.locator('#notes-navigation'),'journal/2026-11-02.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
     const paragraph=page.locator('#notes-formatted p').filter({hasText:'Edit this paragraph.'});await appendEditorText(paragraph,' Reviewed.');await expect(paragraph).toHaveText('Edit this paragraph. Reviewed.');await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
     const review=await sync([]);expect(review.conflicts).toEqual([]);expect(review.actions.some(action=>action.operation==='pull'&&action.path==='journal/2026-11-02.md')).toBe(true);expect((await sync(['--apply',review.review])).applied).toBe(true);
     files.set('journal/2026-11-02.md',Buffer.from(journal.replace('Edit this paragraph.','Edit this paragraph. Reviewed.')));
@@ -48,7 +49,7 @@ test('packaged manual client round-trips a representative vault after a formatte
     const updatedEvent=Buffer.concat([files.get(eventPath),Buffer.from('Reviewed from the vault.\n')]);await writeFile(join(folder,eventPath),updatedEvent);const eventReview=await sync([]);expect(eventReview.conflicts).toEqual([]);expect((await sync(['--apply',eventReview.review])).applied).toBe(true);files.set(eventPath,updatedEvent);
     const eventEntry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:eventPath}))).json(),eventHistory=await(await api('GET','/notes/revisions?'+new URLSearchParams({sourceType:eventEntry.sourceType,sourceId:eventEntry.sourceId}))).json();expect(eventHistory.items).toHaveLength(1);
     expect((await sync([])).actions).toEqual([]);
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();await page.locator('#notes-navigation').getByRole('button',{name:'journal',exact:true}).click();await page.locator('#notes-navigation').getByRole('button',{name:'journal/2026-11-02.md',exact:true}).click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#notes-formatted')).toContainText('Edit this paragraph. Reviewed.');
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'journal').click();await noteEntry(page.locator('#notes-navigation'),'journal/2026-11-02.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#notes-formatted')).toContainText('Edit this paragraph. Reviewed.');
     await cp(folder,'test-results/representative-vault',{recursive:true});await writeFile('test-results/representative-vault-check.json',JSON.stringify({files:[...files].map(([path,bytes])=>({path,sha256:digest(bytes)})),manualClient:'packaged webdav_sync.py',obsidianReopen:'pending native UI access'},null,2)+'\n');
   }finally{await rm(directory,{recursive:true,force:true});}
 });
