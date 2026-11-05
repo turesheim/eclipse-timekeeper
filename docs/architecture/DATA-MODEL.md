@@ -751,3 +751,8 @@ instant descending, then normalized path and identity. The pagination snapshot
 binds the collection generation, day range, time zone and preference; subsequent
 pages require it in `If-Match`. Midnight and time-zone changes invalidate pages
 even when no note has changed.
+
+An empty Recent notes read does not initialize the collection or create business
+records. This preserves the strict empty-target restore check after a user opens
+Today on a fresh installation. Existing canonical event notes are indexed on the
+first recent-list read when the collection has not yet been initialized.

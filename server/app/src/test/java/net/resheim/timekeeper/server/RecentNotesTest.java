@@ -67,6 +67,32 @@ class RecentNotesTest {
             assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(0,1,zone)).status);return null;
         });
     }
+    @Test void emptyHttpReadsDoNotMaterializeBusinessRecordsOrChangeRevision(){
+        var before=store.transaction("b",()->{
+            assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());assertTrue(store.list(VaultIndex.ENTRY).isEmpty());
+            try(var query=store.statement("SELECT COUNT(*) FROM tk_resource WHERE owner_id=?",store.owner());var rows=query.executeQuery()){assertTrue(rows.next());return new long[]{rows.getLong(1),store.revision()};}
+            catch(java.sql.SQLException failure){throw new IllegalStateException(failure);}
+        });
+        var response=given().header("Authorization","Bearer test-b").get("/api/v1/notes/recent");assertEquals(200,response.statusCode());assertTrue(response.jsonPath().getList("items").isEmpty());
+        store.transaction("b",()->{
+            assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());assertTrue(store.find(VaultSettings.TYPE,VaultSettings.ID).isEmpty());assertTrue(store.list(VaultIndex.ENTRY).isEmpty());assertEquals(before[1],store.revision());
+            try(var query=store.statement("SELECT COUNT(*) FROM tk_resource WHERE owner_id=?",store.owner());var rows=query.executeQuery()){assertTrue(rows.next());assertEquals(before[0],rows.getLong(1));}
+            catch(java.sql.SQLException failure){throw new IllegalStateException(failure);}return null;
+        });
+    }
+    @Test void preCollectionEventNotesAreBackfilledWhileJournalOnlyAccountsStayUnmaterialized(){
+        clock.set(Instant.parse("2026-11-05T10:00:00Z"));
+        store.transaction("recent-legacy-events",()->{
+            var key=new EventNotes.Key(UUID.randomUUID(),"cd".repeat(32));var events=new EventNotes(store);
+            var value=object().put("subscriptionId",key.subscription().toString()).put("eventKey",key.event()).put("body","Existing event");value.set("event",object().put("uid","uid").put("recurrenceId","").put("title","Existing meeting"));events.saveDocument(key,etag(events.get(key)),EventNotes.document(value));
+            assertFalse(new VaultState(store,limits).get().path("initialized").asBoolean());var recent=new RecentNotes(store,limits).page(0,2,null);
+            assertEquals(1,recent.path("items").size());assertEquals("EVENT",recent.path("items").get(0).path("kind").asText());return null;
+        });
+        store.transaction("recent-legacy-journal",()->{
+            var notes=new DayNotes(store);var day=DayNotes.date("2026-11-05");notes.saveDocument(day,etag(notes.getContent(day)),bytes("Journal body"));
+            assertTrue(new RecentNotes(store,limits).page(0,2,null).path("items").isEmpty());assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());return null;
+        });
+    }
     @Test void httpReadsAreOwnerPrivateAndAllowReadOnlyTokens(){
         var path="Recent-"+UUID.randomUUID()+".md";
         assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).body(bytes("secret body")).put("/api/v1/notes/files").statusCode());
