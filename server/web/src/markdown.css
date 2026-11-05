@@ -52,9 +52,9 @@
 .journal-dialog textarea { font-family: var(--bs-font-monospace); resize: vertical; }
 .journal-recovery { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem; }
 .journal-dialog details pre { max-height: 10rem; overflow: auto; }
-.journal-dialog .dialog-actions { flex: none; flex-wrap: wrap; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); padding-block: .75rem 0; margin: 0; }
-.journal-dialog .dialog-actions [role="status"] { margin-inline-end: auto; text-align: start; }
-@media(max-width: 480px) { .journal-dialog .dialog-actions [role="status"] { flex-basis: 100%; margin: 0; } }
+.journal-dialog > form > .dialog-actions { flex: none; flex-wrap: wrap; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); padding-block: .75rem 0; margin: 0; }
+.journal-dialog > form > .dialog-actions [role="status"] { margin-inline-end: auto; text-align: start; }
+@media(max-width: 480px) { .journal-dialog > form > .dialog-actions [role="status"] { flex-basis: 100%; margin: 0; } }
 .journal-inline { display: flex; flex: 1; padding: clamp(.75rem,2vw,1.25rem); }
 .journal-inline form { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .journal-inline .journal-content { display: flex; flex-direction: column; flex: 1; overflow: visible; }
@@ -65,8 +65,8 @@
 .journal-inline .journal-formatted { background: var(--bs-body-bg); }
 .journal-inline .ProseMirror, .journal-inline textarea { flex: 1; min-height: 22rem; }
 .journal-inline textarea { font-family: var(--bs-font-monospace); resize: vertical; }
-.journal-inline .dialog-actions { position: sticky; bottom: var(--workspace-nav-height); z-index: 1; flex-wrap: wrap; padding-block: .75rem; margin-top: .75rem; background: var(--bs-body-bg); border-top: 0; }
-.journal-inline .dialog-actions [role="status"] { margin-inline-end: auto; }
+.journal-inline > form > .dialog-actions { position: sticky; bottom: var(--workspace-nav-height); z-index: 1; flex-wrap: wrap; padding-block: .75rem; margin-top: .75rem; background: var(--bs-body-bg); border-top: 0; }
+.journal-inline > form > .dialog-actions [role="status"] { margin-inline-end: auto; }
 
 /* Today uses a bounded editing viewport above the fixed workspace navigation. */
 .today-journal .journal-inline form { min-height: 0; }
@@ -75,7 +75,7 @@
 .today-journal :is(.journal-formatted,.journal-source):not([hidden]) { min-height: 0; overflow: hidden; }
 .today-journal .journal-formatted :is(.milkdown), .today-journal .journal-formatted > div { min-height: 0; }
 .today-journal .journal-inline :is(.ProseMirror,textarea) { min-height: 0; overflow-y: auto; resize: none; }
-.today-journal .journal-inline .dialog-actions { position: static; flex-shrink: 0; margin-top: 0; padding-bottom: 0; }
+.today-journal .journal-inline > form > .dialog-actions { position: static; flex-shrink: 0; margin-top: 0; padding-bottom: 0; }
 .markdown-source-fragment { border: 1px dashed var(--bs-border-color); border-radius: .4rem; padding: .5rem; margin-block: .75rem; background: var(--bs-tertiary-bg); }
 .markdown-source-fragment label { display: block; font-size: var(--font-markdown-fragment-label); color: var(--bs-secondary-color); }
 .markdown-source-fragment textarea { display: block; width: 100%; min-height: 5rem; font-family: var(--bs-font-monospace); background: var(--bs-body-bg); color: var(--bs-body-color); border: 0; resize: vertical; }

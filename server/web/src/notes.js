@@ -98,7 +98,7 @@ export class NotesView {
     this.download.hidden=!this.note||this.note.kind!=='BINARY'&&this.note.kind!=='ASSET'||this.note.deleted;this.download.disabled=!!this.busy;
     this.empty.hidden=!!this.selectedImage||!!this.note&&!this.binary&&!this.note.deleted;this.preview.hidden=!this.selectedImage;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
     const host=this.markdown.root.hidden?this.fileTools:this.markdown.toolbar;if(this.documentTools.parentElement!==host){if(host===this.fileTools)host.prepend(this.documentTools);else host.insertBefore(this.documentTools,this.markdown.overflow);}
-    this.documentTools.hidden=!this.note;this.fileTools.hidden=this.documentTools.parentElement!==this.fileTools&&this.recover.hidden&&this.download.hidden;
+    this.documentTools.hidden=!this.note;this.fileTools.hidden=!this.note||this.documentTools.parentElement!==this.fileTools&&this.recover.hidden&&this.download.hidden;
     if(this.note&&!this.busy)this.status.textContent=this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
   }
   fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}

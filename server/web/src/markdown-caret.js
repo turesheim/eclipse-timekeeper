@@ -49,7 +49,7 @@ export class MarkdownCaret {
     if(!rect){this.hide();return;}const root=f.root.getBoundingClientRect();
     if(rect.left<Math.max(0,root.left,rect.box.left)-1||rect.left+rect.width>Math.min(innerWidth,root.right,rect.box.right)+1||rect.top<Math.max(0,root.top,rect.box.top)-1||rect.top+rect.height>Math.min(innerHeight,root.bottom,rect.box.bottom)+1){this.hide();return;}
     const target=source?active:active.closest('.ProseMirror');if(!target){this.hide();return;}
-    if(this.target!==target){this.target?.removeAttribute('data-markdown-caret-fallback');this.target=target;}target.setAttribute('data-markdown-caret-fallback','');
+    if(this.target!==target){this.target?.removeAttribute('data-markdown-caret-fallback');this.target=target;}if(!target.hasAttribute('data-markdown-caret-fallback'))target.setAttribute('data-markdown-caret-fallback','');
     const height=shape==='underscore'?2:rect.height,top=shape==='underscore'?rect.top+rect.height-height:rect.top,key=[shape,rect.left,top,rect.width,height].join('|');
     Object.assign(this.overlay.style,{left:rect.left+'px',top:top+'px',width:rect.width+'px',height:height+'px',color:rect.color});this.overlay.dataset.shape=shape;this.overlay.hidden=false;
     if(key!==this.position){for(const animation of this.overlay.getAnimations())animation.currentTime=0;this.position=key;}

@@ -54,7 +54,9 @@ test('cursor preferences preserve drafts and ordinary Backspace in source and fo
   await expect(panel.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
  }
  await panel.getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#notes-formatted .ProseMirror');await rich.locator('p').last().click();await rich.press('End');const original=await rich.innerText();await rich.press('z');await rich.press('Backspace');await expect(rich).toHaveText(original.replace(/\s+/g,' '),{useInnerText:true});
- if(!await page.evaluate(()=>CSS.supports('caret-shape','block')))await expect(panel.locator('.markdown-caret')).toBeVisible();await captureScreenshot(page,{path:'test-results/editor-cursor-block.png'});
+ if(!await page.evaluate(()=>CSS.supports('caret-shape','block')))await expect(panel.locator('.markdown-caret')).toBeVisible();
+ await panel.locator('[data-command=tasks]').click();await rich.press('End');await rich.press('Enter');await expect(rich.locator('input[type=checkbox]')).toHaveCount(2);await page.keyboard.type('cursor');await page.keyboard.press('Backspace');await expect(rich.locator('li').last()).toContainText('curso');
+ if(!await page.evaluate(()=>CSS.supports('caret-shape','block')))await expect(panel.locator('.markdown-caret')).toBeVisible();await page.setViewportSize({width:1440,height:900});await page.evaluate(()=>scrollTo(0,0));await panel.locator('.markdown-caret').evaluate(node=>{for(const animation of node.getAnimations()){animation.pause();animation.currentTime=0;}});await captureScreenshot(page,{path:'test-results/editor-cursor-block.png',caret:'initial'});
  expect((await new AxeBuilder({page}).include('#notes-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
 });
 

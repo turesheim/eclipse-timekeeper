@@ -53,7 +53,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-note-editor #today-note-text')).toHaveCount(0);
     expect(await dayLabel.locator('input').evaluate(input=>input.form?.id)).toBe('today-note-form');
     const toolbar=page.locator('#today-note-editor').getByRole('toolbar',{name:'Formatting',exact:true});
-    await expect(toolbar).toHaveClass(/btn-toolbar/);await expect(toolbar.locator('.btn-group')).toHaveCount(2);
+    await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting','Note tools'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('separator')).toHaveCount(0);
     await expect(page.locator('#today-journal-formatted')).toHaveCSS('border-top-width','0px');
     await expect(page.locator('#today-date-choose')).toHaveAccessibleName('Choose date');
     await expect(page.locator('#today-previous')).toHaveAccessibleName('Previous day');
@@ -159,7 +159,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);
     expect(await page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(0);
     expect(await page.locator('.today-month-day').evaluateAll(days=>days.every(day=>day.scrollHeight<=day.clientHeight+1))).toBe(true);
-    await expect(page.locator('#today-note-editor .dialog-actions')).toHaveCSS('border-top-width','0px');
+    await expect(page.locator('#today-note-form > .dialog-actions')).toHaveCSS('border-top-width','0px');
     await captureScreenshot(page,{path:'test-results/today-desktop.png'});
     await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size',await resolvedLength(page,'--font-calendar-card-mobile'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
@@ -198,7 +198,7 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
         await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-(a.y+a.height)-gap);}).toBeLessThan(2);
         const content=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');
         await expect(content).toBeVisible();expect(await content.evaluate(value=>value.scrollHeight>value.clientHeight)).toBe(true);
-        const actions=await editor.locator('.dialog-actions').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(actions.y+actions.height).toBeLessThanOrEqual(nav.y);
+        const actions=await editor.locator('#today-note-form > .dialog-actions').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(actions.y+actions.height).toBeLessThanOrEqual(nav.y);
       }
     }
     await captureScreenshot(page,{path:'test-results/today-bounded-editor-mobile.png'});
