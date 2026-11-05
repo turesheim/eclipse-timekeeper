@@ -285,3 +285,7 @@ removes that historical snapshot after confirmation; the current saved note and
 unsaved draft remain intact. Read-only accounts can compare versions. Large
 comparisons show an explicit display limit, and exact BOM/line-ending-only
 changes are shown as escaped source.
+
+![Grouped editor and document actions](../assets/screenshots/notes-grouped-toolbar.png)
+
+![Coloured revision comparison](../assets/screenshots/note-revision-diff.png)
