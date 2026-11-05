@@ -29,7 +29,7 @@ export class TrackDayNotes {
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
     this.content=node('div',undefined,'journal-content');this.content.append(this.title);
     if(this.labelRoot){this.text.setAttribute('form',this.form.id);this.text.disabled=true;label.classList.add('visually-hidden');const marker=icon('tag');marker.title=t('day_notes.text');this.labelRoot.append(label,this.text,marker);}else this.content.append(label,this.text);
-    this.content.append(this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
+    this.content.append(this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);this.form.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor

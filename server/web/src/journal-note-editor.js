@@ -25,7 +25,7 @@ export class JournalNoteEditor {
     this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.remove());
     this.save=button(t('ui.save'),'btn btn-primary');this.save.addEventListener('click',()=>void this.commit());
     actions.append(this.status,this.cancel,this.delete,this.save);
-    this.dialog.append(heading,this.error,host,actions);root.append(this.dialog);
+    this.dialog.append(heading,this.error,host,actions);root.append(this.dialog);this.dialog.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
     guardDayNoteNavigation(this.dialog,()=>!this.busy&&(!this.dirty()||confirm(t('journal.discard'))),()=>this.close(true));
     this.dialog.addEventListener('close',()=>{if(!root.closest('[hidden]')){const origin=this.context?.originSelector?root.querySelector(this.context.originSelector):this.origin;if(origin?.isConnected)origin.focus();}});

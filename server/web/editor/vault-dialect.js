@@ -2,7 +2,26 @@ import {$node,$remark} from '@milkdown/kit/utils';
 import {wikiReference} from '../src/wiki-links.js';
 import {t} from '../src/i18n.js';
 
-export function vaultDialect({unsupported,resources,readOnly}){
+export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
+  // Render the safe anchor subset of authored HTML through the normal link
+  // schema. An inert template only reads attributes/text; no user DOM is mounted.
+  const anchor=(html,closed=false)=>{
+    if(!/^<a(?:\s|>)/i.test(html))return null;
+    const template=document.createElement('template');template.innerHTML=html+(closed?'':'</a>');
+    const element=template.content.firstChild;
+    if(template.content.childNodes.length!==1||element?.nodeType!==1||element.localName!=='a'||[...element.childNodes].some(child=>child.nodeType!==3))return null;
+    const url=element.getAttribute('href');if(!linkAllowed(url))return null;
+    return {type:'link',url,title:element.getAttribute('title')||null,children:[{type:'text',value:element.textContent}]};
+  };
+  const inlineLinks=children=>{
+    const result=[];
+    for(let i=0;i<children.length;i++){
+      const child=children[i],link=child.type==='html'?anchor(child.value):null;
+      const end=link?children.findIndex((value,index)=>index>i&&value.type==='html'&&/^<\/a\s*>$/i.test(value.value)):-1;
+      if(end>i){result.push({...link,children:children.slice(i+1,end),position:{start:child.position.start,end:children[end].position.end}});i=end;}else result.push(child);
+    }
+    return result;
+  };
   const inlineBreak=$node('inline_break',()=>({inline:true,group:'inline',atom:true,
     leafText:()=> '\n',toDOM:()=>['br'],
     parseMarkdown:{match:node=>node.type==='inlineBreak',runner:(state,_node,type)=>state.addNode(type)},
@@ -33,9 +52,10 @@ export function vaultDialect({unsupported,resources,readOnly}){
     parseMarkdown:{match:node=>node.type==='callout',runner:(state,node,type)=>state.openNode(type,{marker:node.marker,title:node.title}).next(node.children).closeNode()},
     toMarkdown:{match:node=>node.type.name==='callout',runner:(state,node)=>state.openNode('callout',undefined,{marker:node.attrs.marker,title:node.attrs.title}).next(node.content).closeNode()}
   }));
-  const convert=node=>{
-    if(node.children)node={...node,children:node.children.map(child=>node.type==='paragraph'&&child.type==='html'&&/^<br\s*\/?>$/i.test(child.value.trim())
-      ?{type:'inlineBreak',position:child.position}:convert(child))};
+  const convert=(node,block=false)=>{
+    if(block&&node.type==='html'&&/<\/a\s*>\s*$/i.test(node.value)){const link=anchor(node.value,true);if(link)return {type:'paragraph',children:[link],position:node.position};}
+    if(node.children)node={...node,children:inlineLinks(node.children.map(child=>node.type==='paragraph'&&child.type==='html'&&/^<br\s*\/?>$/i.test(child.value.trim())
+      ?{type:'inlineBreak',position:child.position}:convert(child)))};
     if(node.type!=='blockquote'||node.children?.[0]?.type!=='paragraph')return node;
     const first=node.children[0],text=first.children?.[0];if(text?.type!=='text')return node;
     const match=/^(\[![A-Za-z]+\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;
@@ -51,7 +71,7 @@ export function vaultDialect({unsupported,resources,readOnly}){
     parseMarkdown:{match:node=>node.type==='sourceFragment',runner:(state,node,type)=>state.addNode(type,{value:node.value})},
     toMarkdown:{match:node=>node.type.name==='source_fragment',runner:(state,node)=>state.addNode('sourceFragment',undefined,node.attrs.value)}
   }));
-  const project=(tree,source)=>({...tree,children:tree.children.map(convert).map(node=>unsupported(node)?{type:'sourceFragment',value:source.slice(node.position.start.offset,node.position.end.offset),position:node.position}:node)});
+  const project=(tree,source)=>({...tree,children:tree.children.map(node=>convert(node,true)).map(node=>unsupported(node)?{type:'sourceFragment',value:source.slice(node.position.start.offset,node.position.end.offset),position:node.position}:node)});
   const guard=$remark('timekeeperSourceFragments',()=>function(){
     (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+'\n'+body.split('\n').map(line=>'> '+line).join('\n');}}});
     return (tree,file)=>{tree.children=project(tree,String(file)).children;};

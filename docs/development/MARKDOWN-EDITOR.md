@@ -24,14 +24,20 @@ the separate About prototype and its scratchpad controls have been retired.
   Switching modes retains the rich document/history when it can be reconciled.
 - `src/markdown-experience.js` adds resource-aware completion, existing-asset
   selection, image properties and guarded revision comparison through the same
-  component. Cursor and scroll positions remain in memory while the host is open.
+  component. `src/markdown-actions.js` groups these and host document actions in
+  one keyboard-accessible popover. Cursor and scroll positions remain in memory
+  while the host is open; new Notes documents initially open formatted.
 - `editor/code-highlight.js` supplies read-only language parsers for code-block
   decorations. It lazy-loads only for code content, preserving the block's
-  authored source. CodeMirror provides language support; no CodeMirror editing
-  view, source history or search interface is mounted.
-- Mermaid fences lazy-load the local renderer. Their preview is an inert SVG
-  image; script and external-resource requests are rejected. Raw HTML is never
-  inserted as executable document content.
+  authored source. Pinned highlight.js grammars supply validated decoration
+  ranges; unknown languages and fences over 200,000 characters remain plain.
+  The top-right badge groups language selection and copying. Theme surfaces stay
+  unchanged; token foregrounds blend existing semantic and body-text colors.
+- Mermaid fences use an atomic presentation node and lazy-load the local
+  renderer. Formatted mode shows only an inert SVG image; Markdown source edits
+  its complete fenced text. Script and external-resource requests are rejected.
+  Safe HTML anchors project through the normal link schema; authored HTML is
+  never inserted as executable document content.
 
 The component retains private drafts in memory. Clearing a host or ending its
 session destroys the formatted projection and clears its source. Save remains
@@ -54,7 +60,8 @@ Maven packages their generated local ESM/CSS under `src/assets/milkdown`.
 There is no runtime bundler, Node service or external editor CDN.
 `vendor-editor.mjs` follows the actual bundle graph and records complete licenses
 and dependency versions. Unknown or missing licenses fail generation. About's
-CodeMirror attribution follows the pinned language package used by highlighting.
+highlight.js attribution includes its pinned version and complete BSD-3-Clause
+license. The obsolete direct CodeMirror/Lezer language dependencies are removed.
 
 Deterministic uncompressed sizes are recorded in `assets/milkdown/sizes.json`;
 the generation log also reports local gzip estimates. Compare that metadata
@@ -75,3 +82,6 @@ actual authenticated persistence. Manual-client acceptance verifies guarded
 folder synchronization and browser edits against the packaged server over HTTPS.
 The [#515 verification record](../verification/MARKDOWN-EDITOR-515.md) separates
 historical measurements from current implementation and platform coverage.
+
+The [#548 presentation verification](../verification/MARKDOWN-EDITOR-548.md)
+records the subsequent code badge, link, diagram and note-action coverage.

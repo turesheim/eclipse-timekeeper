@@ -15,7 +15,7 @@ test('Markdown editor lazily loads local formatting and preserves exact mode rou
   await page.locator('#markdown-rich').click();const rich=page.getByRole('textbox',{name:'Note body',exact:true});await expect(rich).toBeVisible();
   for(const selector of ['h1','strong','em','del','ul','ol','blockquote','pre code','table'])await expect(page.locator('#markdown-formatted '+selector).first()).toBeVisible();
   await expect(page.getByRole('checkbox',{name:'Task: Follow up'})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Task: Completed'})).toBeChecked();
-  await page.locator('#markdown-formatted a').click();await expect(page).toHaveURL(/editor-fixture\.html$/);
+  const href=await page.locator('#markdown-formatted a').getAttribute('href');await page.context().route(href,route=>route.fulfill({contentType:'text/html',body:'<title>Linked page</title>'}));const opened=page.waitForEvent('popup');await page.locator('#markdown-formatted a').click();await(await opened).close();await expect(page).toHaveURL(/editor-fixture\.html$/);
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toBeFocused();expect(await downloaded(page)).toBe(original);
   await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#markdown-source')).toBeFocused();
   await expect(page.locator('#day-label')).toHaveValue('Ferie');expect(await downloaded(page)).toBe(original);
@@ -29,8 +29,8 @@ test('Markdown rich edits, tasks, undo and source edits keep semantic content an
   await expect(page.locator('#markdown-body')).toHaveValue(/[-*] \[x\] Follow up/);const output=await downloaded(page);expect(output.startsWith(original.slice(0,original.indexOf('# Sunday')))).toBe(true);expect(output).toContain('[[This is a code example, not a wikilink]]');
   await page.locator('#markdown-body').fill('# New note\n\nPreserve **this**.\n');await page.locator('#markdown-rich').click();
   const paragraph=page.locator('#markdown-formatted p').first();await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' More.');
-  await page.locator('#markdown-toolbar').getByRole('button',{name:'Undo',exact:true}).click();await expect(paragraph).not.toContainText('More.');
-  await page.locator('#markdown-toolbar').getByRole('button',{name:'Redo',exact:true}).click();await expect(paragraph).toContainText('More.');
+  await page.keyboard.press('ControlOrMeta+z');await expect(paragraph).not.toContainText('More.');
+  await page.keyboard.press('ControlOrMeta+Shift+z');await expect(paragraph).toContainText('More.');
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(/Preserve \*\*this\*\*\. More\./);
   await downloaded(page);
 });
@@ -107,7 +107,7 @@ test('Mermaid fences render as inert SVG previews and preserve editable Markdown
   await page.locator('#markdown-body').fill(source);
   await page.locator('#markdown-rich').click();
   const diagram=page.locator('.markdown-mermaid-block');await expect(diagram).toBeVisible();
-  await expect(diagram.locator('pre')).toHaveAttribute('data-language','mermaid');
+  await expect(diagram.locator('pre,code,textarea')).toHaveCount(0);
   const image=diagram.getByRole('img',{name:'Mermaid diagram preview'});await expect(image).toBeVisible();
   await expect.poll(()=>image.evaluate(element=>element.complete?element.naturalWidth:0)).toBeGreaterThan(0);
   expect(requested.some(url=>url.includes('/assets/mermaid/mermaid.js'))).toBe(true);

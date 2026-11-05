@@ -1,0 +1,2 @@
+# Generated grammar strings contain significant trailing whitespace.
+/src/assets/milkdown/code-highlight.js -whitespace linguist-generated=true

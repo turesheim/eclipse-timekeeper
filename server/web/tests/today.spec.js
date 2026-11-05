@@ -53,7 +53,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-note-editor #today-note-text')).toHaveCount(0);
     expect(await dayLabel.locator('input').evaluate(input=>input.form?.id)).toBe('today-note-form');
     const toolbar=page.locator('#today-note-editor').getByRole('toolbar',{name:'Formatting',exact:true});
-    await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting','Note tools'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('separator')).toHaveCount(0);
+    await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('button',{name:'Note tools',exact:true})).toHaveCount(1);await expect(toolbar.getByRole('separator')).toHaveCount(0);
     await expect(page.locator('#today-journal-formatted')).toHaveCSS('border-top-width','0px');
     await expect(page.locator('#today-date-choose')).toHaveAccessibleName('Choose date');
     await expect(page.locator('#today-previous')).toHaveAccessibleName('Previous day');

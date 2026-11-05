@@ -1,27 +1,23 @@
-import {highlightTree,classHighlighter} from '@lezer/highlight';
-import {StreamLanguage} from '@codemirror/language';
-import {markdownLanguage} from '@codemirror/lang-markdown';
-import {jsxLanguage,tsxLanguage} from '@codemirror/lang-javascript';
-import {pythonLanguage} from '@codemirror/lang-python';
-import {jsonLanguage} from '@codemirror/lang-json';
-import {StandardSQL} from '@codemirror/lang-sql';
-import {javaLanguage} from '@codemirror/lang-java';
-import {htmlLanguage} from '@codemirror/lang-html';
-import {cssLanguage} from '@codemirror/lang-css';
-import {shell} from '@codemirror/legacy-modes/mode/shell';
-import {yaml} from '@codemirror/legacy-modes/mode/yaml';
-const languages=[
-  {name:'javascript',alias:['js','jsx'],language:jsxLanguage},
-  {name:'typescript',alias:['ts','tsx'],language:tsxLanguage},
-  {name:'java',language:javaLanguage},{name:'python',alias:['py'],language:pythonLanguage},
-  {name:'json',language:jsonLanguage},{name:'sql',language:StandardSQL.language},
-  {name:'html',alias:['htm'],language:htmlLanguage},{name:'css',language:cssLanguage},
-  {name:'shell',alias:['bash','sh','zsh'],language:StreamLanguage.define(shell)},
-  {name:'yaml',alias:['yml'],language:StreamLanguage.define(yaml)},{name:'markdown',alias:['md'],language:markdownLanguage}
-];
-const language=name=>{const key=String(name).trim().split(/\s+/)[0].toLowerCase();return languages.find(value=>value.name===key||value.alias?.includes(key))?.language||null;};
-// Shared with the rich editor's code decorations, loaded only for code content.
+import hljs from 'highlight.js';
+
+// Highlight decorations never replace ProseMirror's editable DOM or source.
+// Keep unusually large fences responsive; their complete text remains editable.
+const maximum=200_000;
+const entities={amp:'&',lt:'<',gt:'>',quot:'"','#x27':"'"};
+const decode=value=>value.replace(/&(amp|lt|gt|quot|#x27);/g,(_,name)=>entities[name]);
 export function highlightCode(text,name){
-  const support=language(String(name||'').toLowerCase());if(!support)return [];
-  const spans=[];highlightTree(support.parser.parse(text),classHighlighter,(from,to,className)=>spans.push({from,to,className}));return spans;
+  const language=String(name||'').trim().split(/\s+/)[0].toLowerCase();
+  if(!language||!hljs.getLanguage(language)||text.length>maximum)return [];
+  try{
+    const html=hljs.highlight(text,{language,ignoreIllegals:true}).value,spans=[],stack=[];
+    let offset=0,last=0;
+    const append=end=>{const length=decode(html.slice(last,end)).length,classes=[...new Set(stack.flat())];if(length&&classes.length)spans.push({from:offset,to:offset+length,className:classes.join(' ')});offset+=length;};
+    // Only consume highlight.js's generated span tags. User HTML is escaped by
+    // the highlighter, and never parsed or inserted as markup. This also keeps
+    // CRLF and UTF-16 offsets intact for selections and backspace in code blocks.
+    for(const match of html.matchAll(/<(\/?)(?:span)(?: class="([\w -]+)")?>/g)){
+      append(match.index);if(match[1])stack.pop();else stack.push((match[2]||'').split(/\s+/).filter(value=>/^(?:hljs-[\w-]+|[\w-]+_)$/.test(value)));last=match.index+match[0].length;
+    }
+    append(html.length);return offset===text.length?spans:[];
+  }catch{return [];}
 }

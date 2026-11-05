@@ -331,6 +331,7 @@ test('saved day notes reopen Mermaid previews without changing the fenced source
     expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
     await menu(page);const image=dialog(page).getByRole('img',{name:'Mermaid diagram preview'});
     await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(element=>element.complete?element.naturalWidth:0)).toBeGreaterThan(0);
+    await dialog(page).screenshot({path:'test-results/journal-mermaid-editor.png'});
     await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#journal-body')).toHaveValue(body);
   }finally{await owner.close();}
 });
@@ -444,7 +445,7 @@ test('journal toolbar creates the full evaluated Markdown subset and validates l
     await draft('First item');await action('Numbered list').click();await expect(rich.locator('ol li')).toHaveText('First item');
     await draft('Follow up');await action('Task list').click();await expect(rich.getByRole('checkbox')).not.toBeChecked();await rich.getByRole('checkbox').check();await action('Markdown source').click();await expect(page.locator('#journal-body')).toHaveValue(/\[x\] Follow up/);
     await action('Formatted').click();await draft('Selected link');page.once('dialog',prompt=>prompt.accept('https://example.com/journal'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','https://example.com/journal');
-    const address=page.url();await rich.locator('a').click();expect(page.url()).toBe(address);await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('mailto:journal@example.org'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
+    const address=page.url();await page.context().route('https://example.com/journal',route=>route.fulfill({body:'Journal link'}));const popupPromise=page.waitForEvent('popup');await rich.locator('a').click();const popup=await popupPromise;await expect(popup).toHaveURL('https://example.com/journal');await popup.close();expect(page.url()).toBe(address);await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('mailto:journal@example.org'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
     await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('javascript:alert(1)'));await action('Link').click();await expect(dialog(page)).toContainText('Use an HTTP(S)');await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
     await draft('Plain paragraph');
     for(let level=1;level<=6;level++){
@@ -453,7 +454,7 @@ test('journal toolbar creates the full evaluated Markdown subset and validates l
     }
     await action('Text style').click();await dialog(page).getByRole('menuitemradio',{name:'Plain text',exact:true}).click();await expect(rich.locator('h1,h2,h3,h4,h5,h6')).toHaveCount(0);await expect(rich.locator('p')).toHaveText('Plain paragraph');
     await rich.press('ControlOrMeta+A');await action('Horizontal rule').click();await expect(rich.locator('hr')).toHaveCount(1);await expect(rich).toContainText('Plain paragraph');
-    await action('Undo').click();await expect(rich.locator('hr')).toHaveCount(0);await action('Redo').click();await expect(rich.locator('hr')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+z');await expect(rich.locator('hr')).toHaveCount(0);await page.keyboard.press('ControlOrMeta+Shift+z');await expect(rich.locator('hr')).toHaveCount(1);
     await action('Markdown source').click();await expect(page.locator('#journal-body')).toHaveValue(/Plain paragraph[\s\S]*(?:\*\*\*|---|___)/);
   }finally{await owner.close();}
 });
@@ -466,7 +467,7 @@ test('journal text-style menu supports keyboard selection and Escape without clo
     const choices=dialog(page).getByRole('menuitemradio');await expect(choices).toHaveCount(7);await expect(choices.first()).toBeFocused();await choices.first().press('ArrowDown');await expect(choices.nth(1)).toBeFocused();
     await choices.nth(1).press('Escape');await expect(dialog(page)).toBeVisible();await expect(styles).toBeFocused();await expect(styles).toHaveAttribute('aria-expanded','false');
     await styles.press('ArrowUp');await expect(choices.last()).toBeFocused();await choices.last().press('Enter');await expect(rich.locator('h6')).toHaveCount(1);await expect(rich).toBeFocused();
-    await page.setViewportSize({width:320,height:740});await dialog(page).getByRole('button',{name:'More formatting',exact:true}).click();await styles.click();await expect(choices.last()).toBeInViewport();
+    await page.setViewportSize({width:320,height:740});await styles.click();await expect(choices.last()).toBeInViewport();
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#track-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
@@ -490,14 +491,14 @@ test('Week day headings open shared daily notes with one toolbar and right-align
       return bounds&&heading?Math.abs(bounds.x+bounds.width-heading.x-heading.width):Infinity;
     }).toBeLessThanOrEqual(4);
     await entry.click();await expect(editor).toBeVisible();await expect(editor.locator('#week-journal-formatted .ProseMirror')).toHaveText('A shared note');await expect(page.locator('dialog[open]')).toHaveCount(1);
-    const toolbar=editor.getByRole('toolbar',{name:'Formatting',exact:true});await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting','Note tools'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('group',{name:'Editing mode',exact:true}).getByRole('button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveCount(0);
+    const toolbar=editor.getByRole('toolbar',{name:'Formatting',exact:true});await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('button',{name:'Note tools',exact:true})).toHaveCount(1);await expect(toolbar.getByRole('group',{name:'Editing mode',exact:true}).getByRole('button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveCount(0);
     for(const name of ['Clear note body','Download Markdown'])await expect(editor.getByRole('button',{name,exact:true})).toHaveCount(0);await expect(editor.getByText('Editing help',{exact:true})).toHaveCount(0);
     const rich=editor.locator('.ProseMirror');await rich.fill('Edited from Week');await editor.locator('#week-note-text').fill('Week label');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).not.toBeVisible();await expect(entry).toBeFocused();
     const previous=await entry.elementHandle();await page.evaluate(()=>document.querySelector('#refresh').click());
     await expect.poll(()=>entry.evaluate((node,old)=>node!==old,previous)).toBe(true);await expect(entry).toBeFocused();await previous.dispose();
     expect((await(await api('GET','/day-notes/'+date)).json()).body).toContain('Edited from Week');expect((await(await api('GET','/work-sessions')).json()).items).toEqual(before.items);
     await page.locator('[data-tab=track]').click();await month(page);await note(page).click();await expect(dialog(page).locator('.ProseMirror')).toHaveText('Edited from Week');await expect(page.locator('#track-note-text')).toHaveValue('Week label');await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
-    await page.locator('[data-tab=calendar]').click();await page.setViewportSize({width:320,height:740});await entry.click();await expect(editor).toBeVisible();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toBeVisible();await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich).toBeVisible();await toolbar.getByRole('button',{name:'More formatting',exact:true}).click();await expect(toolbar.getByRole('group',{name:'Note tools',exact:true})).toBeInViewport();await expect(toolbar.locator('.markdown-tools button').first()).toBeInViewport();
+    await page.locator('[data-tab=calendar]').click();await page.setViewportSize({width:320,height:740});await entry.click();await expect(editor).toBeVisible();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toBeVisible();await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich).toBeVisible();await expect(toolbar.getByRole('button',{name:'Note tools',exact:true})).toBeInViewport();await expect(toolbar.locator('.markdown-tools button').first()).toBeInViewport();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#week-note-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/week-day-note-editor-mobile.png'});
     const ids=await page.locator('[id]').evaluateAll(nodes=>nodes.map(node=>node.id));expect(ids.filter((id,index)=>ids.indexOf(id)!==index)).toEqual([]);
   } finally {await owner.close();}

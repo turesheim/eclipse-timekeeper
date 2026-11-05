@@ -1,3 +1,4 @@
+import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {readFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
@@ -72,13 +73,13 @@ test('document Save buttons follow actual edits and undo across Notes, Today and
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Changes.md').click();
   const save=page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true});await expect(save).toBeDisabled();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(save).toBeDisabled();
   await expect(page.locator('#notes-panel .markdown-outline')).toHaveCount(0);await expect(page.getByText('Formatting may normalize Markdown.',{exact:true})).toHaveCount(0);
-  await appendEditorText(page.locator('#notes-formatted p'),' Edited.');await expect(save).toBeEnabled();await page.locator('#notes-panel').getByRole('button',{name:'Undo',exact:true}).click();await expect(save).toBeDisabled();
+  await appendEditorText(page.locator('#notes-formatted p'),' Edited.');await expect(save).toBeEnabled();await page.keyboard.press('ControlOrMeta+z');await expect(save).toBeDisabled();
   await appendEditorText(page.locator('#notes-formatted p'),' Saved edit.');await save.click();await expect(save).toBeDisabled();
   await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-04');const daily=page.locator('#today-note-editor'),dailySave=daily.getByRole('button',{name:'Save',exact:true});await expect(daily.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');await expect(dailySave).toBeDisabled();
-  await appendEditorText(daily.locator('.ProseMirror p').first(),'Day draft');await expect(dailySave).toBeEnabled();await daily.getByRole('button',{name:'Undo',exact:true}).click();await expect(dailySave).toBeDisabled();
+  await appendEditorText(daily.locator('.ProseMirror p').first(),'Day draft');await expect(dailySave).toBeEnabled();await page.keyboard.press('ControlOrMeta+z');await expect(dailySave).toBeDisabled();
   await page.locator('#today-note-text').fill('Label only');await expect(dailySave).toBeEnabled();await page.locator('#today-note-text').fill('');await expect(dailySave).toBeDisabled();
   await page.locator('#today-month-grid [data-week]').first().click();const weekly=page.locator('#today-week-note-editor'),weeklySave=weekly.getByRole('button',{name:'Save',exact:true});await expect(weekly.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');await expect(weeklySave).toBeDisabled();
-  await appendEditorText(weekly.locator('.ProseMirror p').first(),'Week draft');await expect(weeklySave).toBeEnabled();await weekly.getByRole('button',{name:'Undo',exact:true}).click();await expect(weeklySave).toBeDisabled();
+  await appendEditorText(weekly.locator('.ProseMirror p').first(),'Week draft');await expect(weeklySave).toBeEnabled();await page.keyboard.press('ControlOrMeta+z');await expect(weeklySave).toBeDisabled();
 });
 
 test('ordinary typed characters can be backspaced in Notes and Today WYSIWYG',async({page,request})=>{
@@ -100,12 +101,12 @@ test('Notes preserves exact source, keeps drafts across tabs and rejects stale s
   const created=await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(original),{'Content-Type':'application/octet-stream','If-None-Match':'*'});const entry=await created.json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
   await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
-  await expect(page.locator('#notes-body')).toBeVisible();await expect(page.locator('#notes-body')).toHaveValue('[[Other note]]  \n![[image.png]]\n');
+  await notesSource(page);await expect(page.locator('#notes-body')).toBeVisible();await expect(page.locator('#notes-body')).toHaveValue('[[Other note]]  \n![[image.png]]\n');
   await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
   const unedited=await api('GET','/notes/entries/'+entry.id+'/content');expect(Buffer.from(await unedited.body()).equals(Buffer.from(original))).toBe(true);
-  await page.locator('#notes-body').fill('Draft kept in memory');await page.locator('[data-tab=today]').click();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-body')).toHaveValue('Draft kept in memory');
+  await(await notesSource(page)).fill('Draft kept in memory');await page.locator('[data-tab=today]').click();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-body')).toHaveValue('Draft kept in memory');
   await page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer')).toContainText('Saved');
-  await page.locator('#notes-body').fill('Concurrent local draft');
+  await(await notesSource(page)).fill('Concurrent local draft');
   const current=await api('GET','/notes/entries/'+entry.id+'/content');await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from('Remote edit'),{'Content-Type':'application/octet-stream','If-Match':current.headers().etag});
   await page.locator('.notes-footer button').evaluate(button=>{if(!button.disabled)button.click();});await expect(page.locator('#notes-panel .alert').first()).toBeVisible();await expect(page.locator('#notes-body')).toHaveValue('Concurrent local draft');
   expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Remote edit');
@@ -114,10 +115,10 @@ test('Notes preserves exact source, keeps drafts across tabs and rejects stale s
 test('Notes supports nested creation, keyboard resize, rename and recovery on mobile',async({page,request})=>{
   await setup(page,request);await page.locator('.notes-resize').focus();const before=await page.locator('.notes-resize').getAttribute('aria-valuenow');await page.keyboard.press('ArrowRight');expect(await page.locator('.notes-resize').getAttribute('aria-valuenow')).not.toBe(before);
   await page.locator('#notes-panel').getByRole('button',{name:'New note',exact:true}).click();await page.locator('#notes-path').fill('Notes/New.md');await page.getByRole('dialog',{name:'New note',exact:true}).getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Notes/New.md');
-  await page.locator('#notes-body').fill('Body');await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer')).toContainText('Saved');
-  await page.getByRole('button',{name:'Rename or move',exact:true}).click();await page.locator('#notes-path').fill('Notes/Renamed.md');await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Renamed.md');
-  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Delete file or folder',exact:true}).click();await expect(page.locator('#notes-body')).not.toBeVisible();
-  await page.locator('#notes-panel').getByRole('button',{name:'Recently deleted',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes/Renamed.md').click();await page.getByRole('button',{name:'Restore deleted item',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue('Body');
+  await(await notesSource(page)).fill('Body');await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer')).toContainText('Saved');
+  await clickNoteAction(page,page.locator('#notes-panel'),'Rename or move');await page.locator('#notes-path').fill('Notes/Renamed.md');await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Renamed.md');
+  page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Delete file or folder');await expect(page.locator('#notes-body')).not.toBeVisible();
+  await page.locator('#notes-panel').getByRole('button',{name:'Recently deleted',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes/Renamed.md').click();await clickNoteAction(page,page.locator('#notes-panel'),'Restore deleted item');await expect(page.locator('#notes-body')).toHaveValue('Body');
   await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-navigation')).not.toBeVisible();await page.locator('.notes-drawer-toggle').click();await expect(page.locator('#notes-navigation')).toBeVisible();await page.locator('#notes-search').fill('Renamed');await expect(noteEntry(page.locator('#notes-navigation'),'Notes/Renamed.md')).toBeVisible();
   expect(await page.locator('#workspace-navigation [data-tab]').evaluateAll(buttons=>buttons.every(button=>Math.abs(button.getBoundingClientRect().top-buttons[0].getBoundingClientRect().top)<1))).toBe(true);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -171,7 +172,7 @@ test('uploaded images appear immediately and remain visible after saving and reo
   await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
   const stored=await(await api('GET','/notes/resolve?path=Notes%2FUpload.md')).json();
   const body=await(await api('GET','/notes/entries/'+stored.id+'/content')).text();expect(body).toContain('uploaded%20pixel.png');expect(body).not.toContain('blob:');
-  await page.getByRole('button',{name:'Reload from server',exact:true}).click();
+  await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');
   await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
   await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
 });
@@ -184,7 +185,7 @@ test('selecting a raster asset replaces the editor with an authenticated image p
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
   await noteEntry(page.locator('#notes-navigation'),'Notes').click();
   await noteEntry(page.locator('#notes-navigation'),'Notes/Preview.md').click();
-  await page.locator('#notes-body').fill('Unsaved draft');page.once('dialog',dialog=>dialog.dismiss());
+  await(await notesSource(page)).fill('Unsaved draft');page.once('dialog',dialog=>dialog.dismiss());
   await noteEntry(page.locator('#notes-navigation'),'Notes/preview.png').click();
   await expect(page.locator('#notes-body')).toHaveValue('Unsaved draft');
   page.once('dialog',dialog=>dialog.accept());await noteEntry(page.locator('#notes-navigation'),'Notes/preview.png').click();
@@ -204,7 +205,7 @@ test('Notes can hide the configured journal without losing drafts or journal acc
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
   await noteEntry(page.locator('#notes-navigation'),'journal').click();
   await noteEntry(page.locator('#notes-navigation'),'journal/'+day+'.md').click();
-  await page.locator('#notes-body').fill('Private unsaved draft');
+  await(await notesSource(page)).fill('Private unsaved draft');
   await page.evaluate(()=>location.hash='#account/notes');await expect(page.locator('#account-navigation a[href=\"#account/notes\"]')).toHaveAttribute('aria-current','page');
   await expect(page.getByLabel('Hide journal folder',{exact:true})).not.toBeChecked();
   await page.getByLabel('Hide journal folder',{exact:true}).check();
@@ -239,7 +240,7 @@ test('revision comparison restores an unsaved draft and leaves stale-write guard
   const api=await setup(page,request),created=await api('PUT','/notes/files?path=Notes%2FHistory.md',Buffer.from('First version.\r\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'}),entry=await created.json();
   await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from('Second version.\n'),{'Content-Type':'application/octet-stream','If-Match':entry.etag});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/History.md').click();
-  await page.locator('#notes-panel').getByRole('button',{name:'Note revisions',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Note revisions',exact:true});await dialog.getByRole('button',{name:/Version 1/}).click();await expect(dialog.locator('.markdown-diff-removed')).toContainText('First version.');await expect(dialog.locator('.markdown-diff-added')).toContainText('Second version.');
+  await clickNoteAction(page,page.locator('#notes-panel'),'Note revisions');const dialog=page.getByRole('dialog',{name:'Note revisions',exact:true});await dialog.getByRole('button',{name:/Version 1/}).click();await expect(dialog.locator('.markdown-diff-removed')).toContainText('First version.');await expect(dialog.locator('.markdown-diff-added')).toContainText('Second version.');
   await dialog.getByRole('button',{name:'Use as unsaved draft',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue('First version.\n');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Second version.\n');
   await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('First version.\r\n');
 });
@@ -258,8 +259,8 @@ test('existing assets and image properties keep portable paths across Notes and 
   await api('PUT','/notes/files?path=Notes%2FAssets.md',Buffer.from('Assets.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Assets.md').click();
   await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await page.locator('#notes-formatted p').click();await page.keyboard.press(process.platform==='darwin'?'Meta+ArrowRight':'End');
-  await page.locator('#notes-panel').getByRole('button',{name:'Existing vault asset',exact:true}).click();const picker=page.getByRole('dialog',{name:'Existing vault asset',exact:true});await picker.getByRole('button',{name:'Notes/pixel.png',exact:true}).click();
-  const image=page.locator('#notes-formatted img[data-wiki-embed]');await expect.poll(()=>image.evaluate(node=>node.naturalWidth)).toBe(1);await image.click();await page.locator('#notes-panel').getByRole('button',{name:'Image properties',exact:true}).click();const properties=page.getByRole('dialog',{name:'Image properties',exact:true});await properties.getByLabel('Width in pixels',{exact:true}).fill('48');await properties.getByRole('button',{name:'Save',exact:true}).click();
+  await clickNoteAction(page,page.locator('#notes-panel'),'Existing vault asset');const picker=page.getByRole('dialog',{name:'Existing vault asset',exact:true});await picker.getByRole('button',{name:'Notes/pixel.png',exact:true}).click();
+  const image=page.locator('#notes-formatted img[data-wiki-embed]');await expect.poll(()=>image.evaluate(node=>node.naturalWidth)).toBe(1);await image.click();await clickNoteAction(page,page.locator('#notes-panel'),'Image properties');const properties=page.getByRole('dialog',{name:'Image properties',exact:true});await properties.getByLabel('Width in pixels',{exact:true}).fill('48');await properties.getByRole('button',{name:'Save',exact:true}).click();
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();expect(await page.locator('#notes-body').inputValue()).toContain('![[Notes/pixel.png|48]]');
   const save=page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true});await save.click();await expect(save).toBeDisabled();
   await api('PUT','/notes/files?path=journal%2F2026-11-03.md',Buffer.from('![Shared image](../Notes/pixel.png)\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
@@ -270,6 +271,6 @@ test('existing assets and image properties keep portable paths across Notes and 
 
 test('an unavailable save retains the draft and leaves the server version intact',async({page,request})=>{
   const api=await setup(page,request),entry=await(await api('PUT','/notes/files?path=Notes%2FOffline.md',Buffer.from('Server original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
-  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Offline.md').click();await page.locator('#notes-body').fill('Draft retained through a failed save');
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Offline.md').click();await(await notesSource(page)).fill('Draft retained through a failed save');
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#notes-panel > .alert')).toBeVisible();await expect(page.locator('#notes-body')).toHaveValue('Draft retained through a failed save');await page.unroute('**/api/v1/notes/entries/*/content');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Server original');
 });

@@ -5,11 +5,11 @@ import {codeTools} from './code-tools.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
-import {commonmark,docSchema,paragraphSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
+import {commonmark,docSchema,paragraphSchema,linkSchema,codeBlockSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
-import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
+import {Plugin,TextSelection,NodeSelection} from '@milkdown/kit/prose/state';
 import {isInTable} from '@milkdown/kit/prose/tables';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
 import {dailyNoteDate,dailyNoteHref,dayNoteNavigation} from '../src/journal-links.js';
@@ -50,7 +50,7 @@ const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type=
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
-  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).map(([key,entry])=>[key,semantic(entry)]));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).sort(([left],[right])=>left<right?-1:left>right?1:0).map(([key,entry])=>[key,semantic(entry)]));
   return typeof value==='string'?value.replace(/\r\n?/g,'\n'):value;
 };
 function syncDOMSelection(view,root){
@@ -74,12 +74,27 @@ function taskItem(node,view,getPos,taskLabel){
   return {dom,contentDOM,update(value){if(value.type!==node.type)return false;paint(value);return true;},stopEvent:event=>event.target===checkbox,ignoreMutation:mutation=>mutation.type==='attributes'&&(mutation.target===checkbox||mutation.target===dom)};
 }
 let diagrams;
+// A diagram is an atomic presentation of its fenced source. There is no hidden
+// editable code region for keyboard navigation or Backspace to enter.
+const mermaidDiagram=$node('mermaid_diagram',()=>({group:'block',atom:true,selectable:true,
+  attrs:{value:{default:'',validate:'string'}},leafText:node=>node.attrs.value,toDOM:()=>['div',{'data-mermaid-diagram':''}],
+  parseMarkdown:{match:node=>node.type==='code'&&String(node.lang).toLowerCase()==='mermaid',runner:(state,node,type)=>state.addNode(type,{value:node.value})},
+  toMarkdown:{match:node=>node.type.name==='mermaid_diagram',runner:(state,node)=>state.addNode('code',undefined,node.attrs.value,{lang:'mermaid'})}
+}));
+const diagramPresentation=$prose(()=>new Plugin({appendTransaction:(transactions,_before,state)=>{
+  if(!transactions.some(transaction=>transaction.docChanged))return null;
+  const blocks=[];state.doc.descendants((node,pos)=>{if(node.type.name==='code_block'&&String(node.attrs.language).toLowerCase()==='mermaid')blocks.push({node,pos});});if(!blocks.length)return null;
+  const tr=state.tr,selected=blocks.find(({node,pos})=>state.selection.from>=pos&&state.selection.to<=pos+node.nodeSize);
+  for(const {node,pos}of blocks.reverse())tr.replaceWith(pos,pos+node.nodeSize,state.schema.nodes.mermaid_diagram.create({value:node.textContent}));
+  if(selected)tr.setSelection(NodeSelection.create(tr.doc,tr.mapping.map(selected.pos)));
+  return tr;
+}}));
 function mermaidBlock(node){
-  const dom=document.createElement('div'),pre=document.createElement('pre'),code=document.createElement('code'),preview=document.createElement('div'),status=document.createElement('p'),image=document.createElement('img');
-  dom.className='markdown-mermaid-block';pre.dataset.language=node.attrs.language;pre.append(code);
+  const dom=document.createElement('div'),preview=document.createElement('div'),status=document.createElement('p'),image=document.createElement('img');
+  dom.className='markdown-mermaid-block';dom.contentEditable='false';
   preview.className='markdown-mermaid-preview';status.setAttribute('role','status');
   image.alt=t('markdown.mermaid_diagram');image.hidden=true;
-  preview.append(status,image);dom.append(pre,preview);
+  preview.append(status,image);dom.append(preview);
   let timer,generation=0,source;
   const schedule=value=>{
     if(value===source)return;source=value;const current=++generation;clearTimeout(timer);image.hidden=true;image.removeAttribute('src');
@@ -97,8 +112,8 @@ function mermaidBlock(node){
       }catch{if(current===generation)status.textContent=t('markdown.mermaid_invalid');}
     },300);
   };
-  schedule(node.textContent);
-  return {dom,contentDOM:code,update(value){if(value.type!==node.type||String(value.attrs.language).toLowerCase()!=='mermaid')return false;schedule(value.textContent);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:mutation=>preview.contains(mutation.target),stopEvent:event=>preview.contains(event.target)};
+  schedule(node.attrs.value);
+  return {dom,update(value){if(value.type!==node.type)return false;schedule(value.attrs.value);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:()=>true};
 }
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles}){
   let emptyMarker;do{emptyMarker='<!-- timekeeper-empty-'+crypto.randomUUID()+' -->';}while(value.includes(emptyMarker));
@@ -107,7 +122,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const code=codeTools(()=>readOnly);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
-  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly});
+  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
   const changePlugin=$prose(()=>new Plugin({state:{init:()=>null,apply:transaction=>{for(const target of targets)target.selection=target.selection.map(transaction.mapping);return null;}},filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
     if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
@@ -115,6 +130,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
     ctx.update(paragraphSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toMarkdown:{...schema.toMarkdown,runner:(state,node)=>{if(node.content.size)schema.toMarkdown.runner(state,node);else state.openNode('paragraph').addNode('html',undefined,emptyMarker).closeNode();}}};});
+    ctx.update(linkSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toDOM:mark=>{const [tag,attributes,...content]=schema.toDOM(mark);return [tag,{...attributes,tabindex:'0'},...content];}};});
+    ctx.update(codeBlockSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,parseMarkdown:{...schema.parseMarkdown,match:node=>node.type==='code'&&String(node.lang).toLowerCase()!=='mermaid'}};});
     ctx.update(remarkStringifyOptionsCtx,options=>({...options,resourceLink:true,rule:'-',ruleRepetition:3,ruleSpaces:false}));
     ctx.set(editorViewOptionsCtx,{
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
@@ -126,21 +143,21 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         if(event.key.toLowerCase()==='v'&&(event.metaKey||event.ctrlKey))plainPaste=event.shiftKey;
 
         const foot=event.target?.closest?.('[data-footnote-reference]');if(foot&&['Enter',' '].includes(event.key)){event.preventDefault();foot.click();return true;}
-        const link=event.target?.closest?.('a[data-day-note-date]');
-        if(event.key==='Enter'&&dailyNoteDate(link?.dataset.dayNoteDate)){
+        const link=event.target?.closest?.('a[href]');
+        if(event.key==='Enter'&&link){
           event.preventDefault();link.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:event.ctrlKey,metaKey:event.metaKey}));return true;
         }
         if(event.key==='Escape'){escape();return true;}return false;
       },
-      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:(node,view,getPos)=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):code.nodeView(node,view,getPos),image:node=>{
+      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:code.nodeView,mermaid_diagram:mermaidBlock,image:node=>{
         if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
         else dom.textContent=node.attrs.alt||'';
         return {dom};
       }},
-      // Ordinary clicks edit text. A platform modifier opens only web links,
-      // including authenticated journal attachments, without changing the draft.
+      // Following a link leaves the document unchanged. Local note navigation
+      // still delegates to the owner-aware resource adapter and its draft guard.
       handleDOMEvents:{click:(_view,event)=>{
         const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
@@ -155,11 +172,11 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           return true;
         }
         event.preventDefault();const href=link.getAttribute('href');
-        if(href?.startsWith('#')&&(event.metaKey||event.ctrlKey||readOnly)){let wanted=href.slice(1);try{wanted=decodeURIComponent(wanted);}catch{}let found=false;view.state.doc.descendants((node,pos)=>{if(!found&&node.type.name==='heading'&&headingAnchor(node.textContent)===headingAnchor(wanted)){found=true;view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos+1))).scrollIntoView());}});if(!found)root.dispatchEvent(new CustomEvent('timekeeper:markdown-link-error',{bubbles:true,detail:t('markdown.heading_missing',{heading:wanted})}));return true;}
-        if(event.button===0&&(event.metaKey||event.ctrlKey||readOnly)&&resources?.allowsLink(href)){Promise.resolve(resources.openLink(href,link)).catch(error=>root.dispatchEvent(new CustomEvent('timekeeper:markdown-link-error',{bubbles:true,detail:error.message})));return true;}
-        if(event.button===0&&(event.metaKey||event.ctrlKey||readOnly)&&safeLink(href)){
+        if(event.button===0&&href?.startsWith('#')){let wanted=href.slice(1);try{wanted=decodeURIComponent(wanted);}catch{}let found=false;view.state.doc.descendants((node,pos)=>{if(!found&&node.type.name==='heading'&&headingAnchor(node.textContent)===headingAnchor(wanted)){found=true;view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos+1))).scrollIntoView());}});if(!found)root.dispatchEvent(new CustomEvent('timekeeper:markdown-link-error',{bubbles:true,detail:t('markdown.heading_missing',{heading:wanted})}));return true;}
+        if(event.button===0&&resources?.allowsLink(href)){Promise.resolve(resources.openLink(href,link)).catch(error=>root.dispatchEvent(new CustomEvent('timekeeper:markdown-link-error',{bubbles:true,detail:error.message})));return true;}
+        if(event.button===0&&safeLink(href)){
           const url=new URL(safeAsset(href)?'/api/v1/journal-assets/'+href.slice(7):href,location.href);
-          if(['http:','https:'].includes(url.protocol))window.open(url.href,'_blank','noopener,noreferrer');
+          if(['http:','https:'].includes(url.protocol))window.open(url.href,'_blank','noopener,noreferrer');else if(url.protocol==='mailto:')location.assign(url.href);
         }
         return true;
       }},
@@ -193,7 +210,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
