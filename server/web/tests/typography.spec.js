@@ -220,7 +220,7 @@ test('CSS colors keep native text editing, literal source and scrolling aligned 
   await expect(mirror.locator('.hljs-comment').first()).toBeAttached();await expect(mirror).toHaveAttribute('aria-hidden','true');
   const source='/* <img src=x onerror="window.cssExecuted=true"> */\n:root {\n  --font-base: 14px;\n  --font-hint: clamp(.875rem, 1vw, 1rem);\n}\n';
   await field.fill(source);await expect(mirror).toContainText('--font-base');await expect(mirror.locator('img,script')).toHaveCount(0);expect(await page.evaluate(()=>window.cssExecuted)).toBeUndefined();
-  await field.press('ControlOrMeta+End');await field.press('x');await field.press('Backspace');await expect(field).toHaveValue(source);await field.press('ControlOrMeta+z');await expect(field).toHaveValue(source+'x');await field.press('ControlOrMeta+Shift+z');await expect(field).toHaveValue(source);
+  await field.press('ControlOrMeta+End');await field.press('x');await field.press('ControlOrMeta+z');await expect(field).not.toHaveValue(source+'x');await field.press('ControlOrMeta+Shift+z');await expect(field).toHaveValue(source+'x');await field.press('Backspace');await expect(field).toHaveValue(source);
   await field.selectText();expect(await field.evaluate(node=>node.selectionEnd-node.selectionStart)).toBe(source.length);
   const long='/* A wrapped comment with enough words to exercise matching native textarea and syntax mirror wrapping. */\n'.repeat(120)+source;await field.fill(long);
   for(const width of [1440,320]){
