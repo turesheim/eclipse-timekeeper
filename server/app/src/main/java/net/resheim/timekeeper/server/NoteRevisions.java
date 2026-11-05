@@ -41,14 +41,24 @@ final class NoteRevisions {
     private void remove(JsonNode value){store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),TYPE,uuid(value.path("id")));}
     private ObjectNode metadata(JsonNode value){var result=((ObjectNode)value).deepCopy();result.remove(List.of("data","ownerId","version"));return result;}
     ObjectNode list(VaultSources.Ref ref){var result=object().put("retainedPerNote",PER_NOTE).put("accountByteBudget",ACCOUNT_BYTES).put("accountRevisionLimit",ACCOUNT_RECORDS).put("prospective",true);var items=result.putArray("items");values(ref).forEach(value->items.add(metadata(value)));return result;}
-    ObjectNode get(VaultSources.Ref ref,UUID revision){
-        var value=store.find(TYPE,revision).orElseThrow(ApiFailure::notFound);if(!matches(value,ref))throw ApiFailure.notFound();
+    record Snapshot(ObjectNode body,String etag){}
+    private JsonNode find(VaultSources.Ref ref,UUID revision){
+        var value=store.find(TYPE,revision).orElseThrow(ApiFailure::notFound);if(!matches(value,ref))throw ApiFailure.notFound();return value;
+    }
+    void delete(VaultSources.Ref ref,UUID revision,String expected){
+        var value=find(ref,revision);long version=ApiReplies.match(value,expected);
+        if(store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=? AND version=?",store.owner(),TYPE,revision,version)!=1)throw new ApiFailure(412,"STALE_VERSION");
+        store.change("PROFILE","UPDATED",store.owner());
+    }
+    ObjectNode get(VaultSources.Ref ref,UUID revision){return snapshot(ref,revision).body();}
+    Snapshot snapshot(VaultSources.Ref ref,UUID revision){
+        var value=find(ref,revision);
         byte[] bytes=Base64.getDecoder().decode(value.path("data").asText());if(bytes.length!=value.path("byteLength").asLong()||!ArchiveJournalFiles.digest(bytes).equals(value.path("sha256").asText()))throw new IllegalStateException("Invalid note revision");
         String markdown=VaultContent.markdown(bytes,store.vaultLimits().markdownBytes());String body=switch(ref.type()){
             case DayNotes.TYPE->{try{yield JournalMarkdown.parseOpaque(ref.key()+".md",bytes).body();}catch(Exception invalid){throw new IllegalStateException("Invalid day revision",invalid);}}
             case EventNotes.TYPE->EventNotes.parse(ref.key(),bytes).body();
             default->markdown;
         };
-        return metadata(value).put("markdown",markdown).put("body",body);
+        return new Snapshot(metadata(value).put("markdown",markdown).put("body",body),etag(value));
     }
 }

@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 /** Portable logical records plus checksummed bytes; no database indexes or authority. */
 final class VaultArchive {
     private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt");
-    private static final Set<String> SETTINGS_FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder","recentNotesDays");
+    private static final Set<String> SETTINGS_FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder","recentNotesDays","editorCursor");
     @FunctionalInterface interface File {void accept(String path,byte[] bytes)throws IOException;}
     static boolean owns(String name){return name!=null&&name.matches("vault/(content|recycle)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin");}
     private static String filename(String type,UUID id){return "vault/"+(type.equals(VaultContent.TYPE)?"content":"recycle")+"/"+id+".bin";}
@@ -26,7 +26,7 @@ final class VaultArchive {
         });
     }
     static void metadata(Connection connection,String owner,JsonGenerator json)throws SQLException,IOException{
-        json.writeObjectFieldStart("vault");json.writeNumberField("format",1);var settings=object().put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false).put("hideJournalFolder",false).put("recentNotesDays",VaultSettings.RECENT_DAYS);
+        json.writeObjectFieldStart("vault");json.writeNumberField("format",1);var settings=object().put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false).put("hideJournalFolder",false).put("recentNotesDays",VaultSettings.RECENT_DAYS).put("editorCursor","default");
         AccountArchive.records(connection,owner,VaultSettings.TYPE,value->settings.setAll(logical(value,SETTINGS_FIELDS)));json.writeObjectField("settings",settings);
         json.writeArrayFieldStart("entries");AccountArchive.records(connection,owner,VaultIndex.ENTRY,value->json.writeTree(logical(value,ENTRY_FIELDS)));json.writeEndArray();
         json.writeArrayFieldStart("files");files(connection,owner,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));json.writeEndArray();json.writeEndObject();
@@ -116,7 +116,7 @@ final class VaultArchive {
     }
     static void restore(Path archive,JsonNode vault,ServerStore store){
         if(vault.isMissingNode()||vault.path("entries").isEmpty())return;
-        var entries=graph(vault);var settings=new VaultSettings(store);var restored=((ObjectNode)vault.path("settings")).deepCopy();if(!restored.has("hideJournalFolder"))restored.put("hideJournalFolder",false);if(!restored.has("recentNotesDays"))restored.put("recentNotesDays",VaultSettings.RECENT_DAYS);settings.save(etag(settings.get()),restored);
+        var entries=graph(vault);var settings=new VaultSettings(store);var restored=((ObjectNode)vault.path("settings")).deepCopy();if(!restored.has("hideJournalFolder"))restored.put("hideJournalFolder",false);if(!restored.has("recentNotesDays"))restored.put("recentNotesDays",VaultSettings.RECENT_DAYS);if(!restored.has("editorCursor"))restored.put("editorCursor","default");settings.save(etag(settings.get()),restored);
         var files=new HashMap<String,JsonNode>();for(var file:vault.path("files"))files.put(file.path("path").asText(),file);var used=new HashSet<String>();
         var ordered=new ArrayList<>(entries.values());ordered.sort(Comparator.comparingInt(value->VaultCollection.path(value).segments().size()));
         var index=new VaultIndex(store);var state=new VaultState(store,store.vaultLimits());

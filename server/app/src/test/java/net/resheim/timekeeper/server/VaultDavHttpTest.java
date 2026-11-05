@@ -23,6 +23,22 @@ class VaultDavHttpTest {
         var snapshot=api("test-read").get("/api/v1/notes/revisions/"+revision+query);assertEquals(200,snapshot.statusCode());assertEquals(first,snapshot.jsonPath().getString("markdown"));assertEquals(404,api("test-b").get("/api/v1/notes/revisions"+query).statusCode());assertEquals(404,api("test-b").get("/api/v1/notes/revisions/"+revision+query).statusCode());assertEquals(401,given().header("Origin","https://timekeeper.example.test").get("/api/v1/notes/revisions"+query).statusCode());
         assertEquals(403,client("test-read").header("If-Match",entry.jsonPath().getString("etag")).body(first).put(ROOT+path).statusCode());assertEquals(second,client("test-a").get(ROOT+path).asString());
     }
+    @Test void deletingOneRevisionRequiresItsGuardAndPreservesLiveContentAndOtherOwners(){
+        String path="Delete-history-"+UUID.randomUUID()+".md",first="First\r\n",second="Current\n";
+        assertEquals(201,client("test-a").header("If-None-Match","*").body(first).put(ROOT+path).statusCode());
+        String old=client("test-a").get(ROOT+path).header("ETag");assertEquals(204,client("test-a").header("If-Match",old).body(second).put(ROOT+path).statusCode());
+        var entry=api("test-a").queryParam("path",path).get("/api/v1/notes/resolve");String query="?sourceType="+entry.jsonPath().getString("sourceType")+"&sourceId="+entry.jsonPath().getString("sourceId");
+        var history=api("test-a").get("/api/v1/notes/revisions"+query);String revision=history.jsonPath().getString("items[0].id"),url="/api/v1/notes/revisions/"+revision+query;
+        var snapshot=api("test-read").get(url);assertEquals(200,snapshot.statusCode());String tag=snapshot.header("ETag");assertNotNull(tag);
+        String current=client("test-a").get(ROOT+path).header("ETag");assertEquals(428,api("test-a").delete(url).statusCode());assertEquals(412,api("test-a").header("If-Match","\"stale\"").delete(url).statusCode());
+        assertEquals(403,api("test-read").header("If-Match",tag).delete(url).statusCode());assertEquals(404,api("test-b").header("If-Match",tag).delete(url).statusCode());
+        String other="Other-history-"+UUID.randomUUID()+".md";assertEquals(201,client("test-a").header("If-None-Match","*").body("Other note").put(ROOT+other).statusCode());
+        String otherSource=api("test-a").queryParam("path",other).get("/api/v1/notes/resolve").jsonPath().getString("sourceId");
+        assertEquals(404,api("test-a").header("If-Match",tag).delete("/api/v1/notes/revisions/"+revision+"?sourceType=VAULT_CONTENT&sourceId="+otherSource).statusCode());
+        assertEquals(204,api("test-a").header("If-Match",tag).delete(url).statusCode());assertEquals(404,api("test-a").get(url).statusCode());assertEquals(0,api("test-a").get("/api/v1/notes/revisions"+query).jsonPath().getList("items").size());
+        var live=client("test-a").get(ROOT+path);assertEquals(second,live.asString());assertEquals(current,live.header("ETag"));
+        assertEquals(204,client("test-a").header("If-Match",current).body("Next").put(ROOT+path).statusCode());assertEquals(1,api("test-a").get("/api/v1/notes/revisions"+query).jsonPath().getList("items").size());
+    }
     @Test void removedNamespacesAreNotAliasesOrRedirects(){
         for(String path:java.util.List.of("/dav/journal/","/dav/journal/assets/","/dav/vault/","/remote.php/webdav/","/remote.php/webdav/vault/","/remote.php/webdav/notes/")){
             for(String method:java.util.List.of("GET","HEAD","PROPFIND","PUT")){

@@ -158,7 +158,7 @@ test('composition keeps Unicode text and does not accept a slash command on comp
   await expect(page.locator('#experience-formatted p')).toHaveText('/日本語');await expect(page.locator('#experience-formatted :is(h1,h2,h3,h4,h5,h6)')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('日本語');
 });
 test('revision comparison exposes line-ending-only changes',async({page})=>{
-  await openEditorFixture(page);const diff=await page.evaluate(async()=>{const {lineComparison}=await import('/web/note-revisions.js');return lineComparison('Same.\n','Same.\r\n');});expect(diff).toContain('\\r\\n');expect(diff).toContain('- ');expect(diff).toContain('+ ');
+  await openEditorFixture(page);const diff=await page.evaluate(async()=>{const {revisionDiff}=await import('/web/revision-diff.js');return revisionDiff('Same.\n','Same.\r\n').hunks[0].rows;});expect(diff.map(row=>row.kind)).toEqual(['removed','added']);expect(diff[0].text).toContain('\\r\\n');
 });
 
 test('formatted checklists stay editable without extra formatting panels',async({page})=>{

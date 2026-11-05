@@ -29,6 +29,17 @@ class VaultSettingsTest {
         });
         store.transaction("recent-settings-other",()->{assertEquals(7,new VaultSettings(store).get().path("recentNotesDays").asInt());return null;});
     }
+    @Test void cursorIsTypedGuardedOwnerPrivateAndDefaultsForOlderSettings(){
+        store.transaction("cursor-settings",()->{
+            var settings=new VaultSettings(store);assertEquals("default",settings.get().path("editorCursor").asText());
+            for(String cursor:List.of("line","underscore","solid","default")){
+                var value=settings.save(etag(settings.get()),object().put("editorCursor",cursor));assertEquals(cursor,value.path("editorCursor").asText());assertEquals(etag(value),etag(settings.save(etag(value),object().put("editorCursor",cursor))));
+            }
+            for(var input:List.of(object().put("editorCursor","block"),object().put("editorCursor",1),object().putNull("editorCursor")))assertEquals(422,assertThrows(ApiFailure.class,()->settings.save(etag(settings.get()),input)).status);
+            var old=settings.get();old.remove("editorCursor");store.update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=?",old.toString(),store.owner(),VaultSettings.TYPE,VaultSettings.ID);assertEquals("default",settings.get().path("editorCursor").asText());return null;
+        });
+        store.transaction("other-cursor",()->{assertEquals("default",new VaultSettings(store).get().path("editorCursor").asText());return null;});
+    }
     @Test void journalVisibilityIsAnOwnerPrivateGuardedBooleanPreference(){
         var tag=store.transaction("visibility",()->{
             var settings=new VaultSettings(store);assertFalse(settings.get().path("hideJournalFolder").asBoolean());

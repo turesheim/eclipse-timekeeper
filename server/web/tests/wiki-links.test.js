@@ -1,6 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {wikiReference,wikiCandidates,headingAnchor} from '../src/wiki-links.js';
-import {lineComparison} from '../src/note-revisions.js';
 test('wiki targets remain vault-local and preserve aliases and image dimensions',()=>{
   for(const value of ['https://example.org/x','../secret','/root','a\\b','a\nb'])assert.equal(wikiReference(value),null);
   assert.deepEqual(wikiReference('Notes/Øving#Choices|caption'),{path:'Notes/Øving',heading:'Choices',label:'caption',width:null,height:null});
@@ -10,4 +9,3 @@ test('wiki resolution reports ambiguities and uses portable case folding',()=>{
   const entries=[{path:'Notes/Øving.md',kind:'MARKDOWN'},{path:'Other/Øving.md',kind:'MARKDOWN'},{path:'Deleted.md',kind:'MARKDOWN',deleted:true}];
   assert.equal(wikiCandidates(entries,'Øving','Root.md').length,2);assert.equal(wikiCandidates(entries,'notes/øVING','Root.md')[0].path,'Notes/Øving.md');assert.equal(wikiCandidates(entries,'#Local','Notes/Øving.md')[0].path,'Notes/Øving.md');assert.equal(wikiCandidates(entries,'Deleted').length,0);
 });
-test('revision comparison distinguishes current draft from selected content without HTML',()=>{assert.equal(lineComparison('Keep\nNew\nEnd','Keep\nOld\nEnd'),'  Keep\n- Old\n+ New\n  End');});

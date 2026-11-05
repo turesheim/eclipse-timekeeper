@@ -7,7 +7,8 @@ const changed=()=>document.dispatchEvent(new Event('timekeeper:notes-changed'));
 
 /** Notes preferences and guarded, browser-selected vault imports share account lifecycle. */
 export async function renderNotesAccount(view){
-  const [settings,info]=await Promise.all([view.session.request('/notes/settings'),view.session.request('/notes')]);
+  const info=await view.session.request('/notes');if(!view.valid())return;
+  const settings=await view.session.request('/notes/settings');
   if(!view.valid())return;
   const fields={},checks={},numbers={};
   const preferences=form(view,t('notes.settings'),t('ui.save'),async()=>{
@@ -25,6 +26,7 @@ export async function renderNotesAccount(view){
     const wrap=node('div',undefined,'form-check my-3'),input=node('input',undefined,'form-check-input'),caption=node('label',t(label),'form-check-label'),hint=node('p',t(help),'hint');
     input.type='checkbox';input.id='notes-preference-'+name;input.checked=!!settings.data[name];caption.htmlFor=input.id;hint.id=input.id+'-help';input.setAttribute('aria-describedby',hint.id);wrap.append(input,caption);preferences.value.append(wrap,hint);checks[name]=input;
   }
+  fields.editorCursor=field(preferences.value,t('notes.editor_cursor'),settings.data.editorCursor,{choices:['default','line','underscore','solid'].map(value=>[value,t('notes.cursor_'+value)])});
   const recent=field(preferences.value,t('notes.recent_days'),settings.data.recentNotesDays,{type:'number'});recent.min='1';recent.max='3650';recent.step='1';numbers.recentNotesDays=recent;
   const recentHelp=node('p',t('notes.recent_days_help'),'hint');recentHelp.id=recent.id+'-help';recent.setAttribute('aria-describedby',recentHelp.id);preferences.value.append(recentHelp);
   for(const input of [...Object.values(fields),...Object.values(checks),...Object.values(numbers)])input.disabled=!view.canWrite;

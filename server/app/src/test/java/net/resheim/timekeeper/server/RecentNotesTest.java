@@ -74,12 +74,15 @@ class RecentNotesTest {
             try(var query=store.statement("SELECT COUNT(*) FROM tk_resource WHERE owner_id=?",store.owner());var rows=query.executeQuery()){assertTrue(rows.next());return new long[]{rows.getLong(1),store.revision()};}
             catch(java.sql.SQLException failure){throw new IllegalStateException(failure);}
         });
+        var initialSettings=given().header("Authorization","Bearer test-b").get("/api/v1/notes/settings");assertEquals(200,initialSettings.statusCode());
         var response=given().header("Authorization","Bearer test-b").get("/api/v1/notes/recent");assertEquals(200,response.statusCode());assertTrue(response.jsonPath().getList("items").isEmpty());
         store.transaction("b",()->{
             assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());assertTrue(store.find(VaultSettings.TYPE,VaultSettings.ID).isEmpty());assertTrue(store.list(VaultIndex.ENTRY).isEmpty());assertEquals(before[1],store.revision());
             try(var query=store.statement("SELECT COUNT(*) FROM tk_resource WHERE owner_id=?",store.owner());var rows=query.executeQuery()){assertTrue(rows.next());assertEquals(before[0],rows.getLong(1));}
             catch(java.sql.SQLException failure){throw new IllegalStateException(failure);}return null;
         });
+        var saved=given().header("Authorization","Bearer test-b").header("If-Match",initialSettings.header("ETag")).contentType("application/json").body("{\"editorCursor\":\"solid\"}").put("/api/v1/notes/settings");assertEquals(200,saved.statusCode());assertEquals("solid",saved.jsonPath().getString("editorCursor"));
+        assertEquals(412,given().header("Authorization","Bearer test-b").header("If-Match",initialSettings.header("ETag")).contentType("application/json").body("{\"editorCursor\":\"line\"}").put("/api/v1/notes/settings").statusCode());
     }
     @Test void preCollectionEventNotesAreBackfilledWhileJournalOnlyAccountsStayUnmaterialized(){
         clock.set(Instant.parse("2026-11-05T10:00:00Z"));

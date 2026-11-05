@@ -44,15 +44,23 @@ public class VaultResource {
     }
     @GET @Path("/revisions") public Response revisions(@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source);
-        return tx(()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
+        return tx(false,()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
     }
     @GET @Path("/revisions/{revisionId}") public Response revision(@PathParam("revisionId")String revision,@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
-        return tx(()->{var history=new NoteRevisions(store);return Response.ok(history.get(history.reference(type,id),version)).build();});
+        return tx(false,()->{var history=new NoteRevisions(store);var snapshot=history.snapshot(history.reference(type,id),version);return Response.ok(snapshot.body()).header("ETag",snapshot.etag()).build();});
     }
-    @GET @Path("/settings") public Response settings(){ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,new VaultSettings(store).get(),null).response());}
+    @DELETE @Path("/revisions/{revisionId}") public Response deleteRevision(@PathParam("revisionId")String revision,@QueryParam("sourceType")String type,@QueryParam("sourceId")String source,@HeaderParam("If-Match")String match){
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
+        return tx(false,()->{var history=new NoteRevisions(store);history.delete(history.reference(type,id),version,match);return Response.noContent().build();});
+    }
+    @GET @Path("/settings") public Response settings(){ContractInputs.queries(uri.getQueryParameters());return tx(false,()->ApiReplies.resource(200,new VaultSettings(store).get(),null).response());}
     @GET @Path("/resolve") public Response resolve(@QueryParam("path")String path){ContractInputs.queries(uri.getQueryParameters(),"path");var target=new VaultPath(path);return tx(()->{var collection=vault();var value=collection.get(target);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
-    @PUT @Path("/settings") @Consumes("application/json") public Response settings(@HeaderParam("If-Match")String match,JsonNode input){ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,vault().configure(match,input),null).response());}
+    @PUT @Path("/settings") @Consumes("application/json") public Response settings(@HeaderParam("If-Match")String match,JsonNode input){ContractInputs.queries(uri.getQueryParameters());return tx(false,()->{
+        // Check the caller's representation before derived folder initialization
+        // can migrate the default assets path, all under the same owner lock.
+        ApiReplies.match(new VaultSettings(store).get(),match);var collection=vault();collection.initialize();
+        return ApiReplies.resource(200,collection.configure(etag(new VaultSettings(store).get()),input),null).response();});}
     @GET @Path("/entries") public Response entries(@QueryParam("parentId")String parent,@QueryParam("query")String query,@QueryParam("trash")String trash,
             @QueryParam("offset")String offset,@QueryParam("limit")String limit,@HeaderParam("If-Match")String snapshot){
         ContractInputs.queries(uri.getQueryParameters(),"parentId","query","trash","offset","limit");
