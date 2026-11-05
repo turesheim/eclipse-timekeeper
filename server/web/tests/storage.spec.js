@@ -28,7 +28,7 @@ test('Storage shows retained categories and administrator quota changes apply wi
   expect((await api.put('/api/v1/notes/files?path=image.bin',{headers:{...admin.headers,'If-None-Match':'*','Content-Type':'application/octet-stream'},data:Buffer.alloc(7)})).status()).toBe(201);
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
   await expect(page.getByRole('progressbar',{name:'Ordinary notes',exact:true})).toHaveAttribute('aria-valuetext','4 B of 5 GB');await expect(page.getByRole('progressbar',{name:'Attachments and other files',exact:true})).toHaveAttribute('aria-valuetext','7 B of 5 GB');
-  expect((await api.delete('/api/v1/notes/entries/'+(await note.json()).id,{headers:{...admin.headers,'If-Match':note.headers().etag}})).status()).toBe(200);
+  expect((await api.delete('/api/v1/notes/entries/'+(await note.json()).id,{headers:{...admin.headers,'If-Match':note.headers().etag}})).status()).toBe(204);
   await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(page.getByRole('progressbar',{name:'Trash',exact:true})).toHaveAttribute('aria-valuetext','4 B of 5 GB');await expect(page.getByRole('progressbar',{name:'Storage per account',exact:true})).toHaveAttribute('aria-valuetext','11 B of 5 GB');
   const defaults=await api.get('/api/v1/admin/notes/limits');
   try{
