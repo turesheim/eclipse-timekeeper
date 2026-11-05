@@ -33,6 +33,23 @@ The shared component serves Notes, Today and daily, weekly and event-note dialog
   local icon-font rendering. Visual review covers the compact toolbar, code badge
   and diagram-only presentation; screenshots are included in the user guide.
 
+## Shared-batch and tooltip regression
+
+The exact six-spec CI batch plus the tooltip suite passes locally: 69 Chromium
+cases. A further 19 WebKit-over-HTTPS menu, import and tooltip cases pass, as do
+all 141 unit/vendor checks.
+
+Menu rows show their full labels without duplicate hints. The keyboard regression
+opens a navigator tooltip behind the menu, advances the tooltip delay with the
+virtual clock, then verifies that one Escape closes the active menu and restores
+its trigger. A background hint cannot consume a native popover's Escape key;
+hints inside a native dialog retain their existing dismissal behavior.
+
+Import acceptance uses private test-scoped accounts pinned to Europe/Oslo.
+Calendar/journal cases may change their own account zone without changing import
+activity splitting, records or job history. Exact entry counts, nanosecond totals,
+repeat detection, resumed writes and whole-job Undo assertions remain in place.
+
 Tests use test-only routes for isolated component fixtures. The application ships
 no editor demo or external runtime dependency. Browser automation does not certify
 physical mobile keyboards, native screen readers or native Obsidian rendering;
