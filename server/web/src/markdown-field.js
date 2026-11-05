@@ -88,6 +88,11 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.toolbar.append(this.modes,this.tools);
     root.append(this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
+    this.toolbar.addEventListener('keydown',event=>{
+      if(event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||!this.editor||this.readOnly||this.loading)return;
+      const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return;
+      event.preventDefault();this.editor.command(key==='y'||event.shiftKey?'redo':'undo',undefined,false);
+    });
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>this.controls()));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());

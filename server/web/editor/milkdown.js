@@ -50,7 +50,7 @@ const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type=
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
-  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).map(([key,entry])=>[key,semantic(entry)]));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).sort(([left],[right])=>left<right?-1:left>right?1:0).map(([key,entry])=>[key,semantic(entry)]));
   return typeof value==='string'?value.replace(/\r\n?/g,'\n'):value;
 };
 function syncDOMSelection(view,root){

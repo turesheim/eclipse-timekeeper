@@ -107,7 +107,7 @@ test('Mermaid fences render as inert SVG previews and preserve editable Markdown
   await page.locator('#markdown-body').fill(source);
   await page.locator('#markdown-rich').click();
   const diagram=page.locator('.markdown-mermaid-block');await expect(diagram).toBeVisible();
-  await expect(diagram.locator('pre')).toHaveAttribute('data-language','mermaid');
+  await expect(diagram.locator('pre,code,textarea')).toHaveCount(0);
   const image=diagram.getByRole('img',{name:'Mermaid diagram preview'});await expect(image).toBeVisible();
   await expect.poll(()=>image.evaluate(element=>element.complete?element.naturalWidth:0)).toBeGreaterThan(0);
   expect(requested.some(url=>url.includes('/assets/mermaid/mermaid.js'))).toBe(true);

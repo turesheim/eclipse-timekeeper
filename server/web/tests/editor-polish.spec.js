@@ -34,7 +34,7 @@ test('Notes opens formatted and keeps document actions in a compact keyboard-acc
  await captureScreenshot(page,{path:'test-results/notes-compact-toolbar.png'});
  await toolbar.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveAccessibleName('Note body');await expect(page.locator('#notes-body').locator('..').locator('label')).toHaveClass(/visually-hidden/);await page.locator('#notes-body').focus();await expect(page.locator('#notes-body')).toHaveCSS('box-shadow','none');
  await toolbar.getByRole('button',{name:'Formatted',exact:true}).click();await page.locator('#notes-formatted .ProseMirror').click();await expect(page.locator('#notes-formatted')).toHaveCSS('outline-style','none');
- await noteEntry(page.locator('#notes-navigation'),'Notes/asset.bin').click();await expect(page.locator('#notes-panel .notes-file-tools').getByRole('button',{name:'Note tools',exact:true})).toBeVisible();await clickNoteAction(page,panel,'Rename or move');await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.setViewportSize({width:1440,height:900});await noteEntry(page.locator('#notes-navigation'),'Notes/asset.bin').click();await expect(page.locator('#notes-panel .notes-file-tools').getByRole('button',{name:'Note tools',exact:true})).toBeVisible();await clickNoteAction(page,panel,'Rename or move');await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
 });
 
 test('coloured revision hunks are literal, and deleting a selected revision preserves the live note and draft',async({page,request})=>{

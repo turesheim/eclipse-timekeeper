@@ -6,6 +6,10 @@ export async function noteActions(page,scope){
   const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu).toBeVisible();return menu;
 }
 export async function clickNoteAction(page,scope,name){await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();}
+export async function notesSource(page){
+  await page.locator('#notes-panel button[aria-controls="notes-body"]').click();
+  const body=page.locator('#notes-body');await expect(body).toBeVisible();return body;
+}
 
 
 /** Select the paragraph end explicitly: End has different native macOS semantics. */
