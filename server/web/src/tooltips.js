@@ -118,7 +118,9 @@ export function installTooltips() {
     pointerFocus=false;cancelFocus();
     if(event.key==='F2'&&active&&inside(event.target)){event.preventDefault();focusTooltip();return;}
     if(event.key==='Escape'&&active){
-      const previous=active,restore=previous.tip.contains(document.activeElement);dismissed=previous.node;hideTooltip();
+      const previous=active,restore=previous.tip.contains(document.activeElement),popover=event.target.closest?.('[popover]:popover-open');dismissed=previous.node;hideTooltip();
+      // A hint behind an open native popover must not consume its Escape key.
+      if(popover&&!popover.contains(previous.node))return;
       // Escape dismisses this popup before a containing native dialog.
       event.preventDefault();event.stopPropagation();
       if(restore){const focus=visible(previous.previousFocus)&&previous.previousFocus!==document.body?previous.previousFocus:previous.node;focus.focus({preventScroll:true});}
