@@ -69,6 +69,8 @@ theme’s foreground colors; backgrounds remain unchanged. Unknown languages and
 unusually large fences stay plain so editing remains responsive. About lists the
 pinned highlight.js version and its complete BSD license.
 
+![Code language and copy badge with theme-aware syntax colors](../assets/screenshots/markdown-code-presentation.png)
+
 In formatted mode, a Mermaid fence shows only its locally generated diagram.
 Use **Markdown source** to edit the diagram text. The diagram is an atomic editor
 node, so navigation cannot enter hidden code. Its complete original fenced source
@@ -143,7 +145,8 @@ Read-only accounts can navigate, preview and compare but cannot edit or upload.
 
 ## Verification and limits
 
-See the [completion audit](../verification/MARKDOWN-EDITOR-515.md) for actual
+See the [presentation verification](../verification/MARKDOWN-EDITOR-548.md) and
+[completion audit](../verification/MARKDOWN-EDITOR-515.md) for actual
 browser/platform evidence, pending manual checks and representative-vault
 results. Automated accessibility checks and emulated mobile viewports do not
 certify a physical mobile keyboard, assistive technology or Obsidian rendering.
