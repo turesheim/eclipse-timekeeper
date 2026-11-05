@@ -17,7 +17,10 @@ import io.restassured.specification.RequestSpecification;
 class JournalAssetHttpTest {
     public static class Profile implements QuarkusTestProfile {
         public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:journal_asset_http",
-                "timekeeper.auth.public-origin","https://timekeeper.example.test");}
+                "timekeeper.auth.public-origin","https://timekeeper.example.test",
+                // Exercise the configured byte boundary without allocating the
+                // deployment's attachment-sized buffer in the shared test JVM.
+                "timekeeper.notes.max-file-bytes","1024","timekeeper.notes.max-markdown-bytes","512");}
     }
     @jakarta.inject.Inject VaultLimits limits;
     private RequestSpecification dav(String token){
@@ -68,7 +71,11 @@ class JournalAssetHttpTest {
         assertEquals(404,dav("test-a").get(root+"other/file.png").statusCode());
         assertEquals(400,api("test-a").header("If-None-Match","*").contentType("application/json")
                 .body("{\"data\":\"not base64!\"}").put("/api/v1/journal-assets/bad.png").statusCode());
+        byte[] boundary=new byte[limits.fileBytes()];
+        assertEquals(201,dav("test-a").header("If-None-Match","*").body(boundary).put(root+"boundary.bin").statusCode());
+        assertArrayEquals(boundary,dav("test-a").get(root+"boundary.bin").asByteArray());
         assertEquals(413,dav("test-a").header("If-None-Match","*").body(new byte[limits.fileBytes()+1])
                 .put(root+"oversized.bin").statusCode());
+        assertEquals(404,dav("test-a").get(root+"oversized.bin").statusCode());
     }
 }

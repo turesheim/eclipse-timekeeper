@@ -5,6 +5,8 @@ import static io.restassured.RestAssured.given;
 import static net.resheim.timekeeper.server.JsonValues.*;
 import static net.resheim.timekeeper.server.AccountStore.*;
 import java.nio.file.*;
+import java.net.URI;
+import java.net.http.*;
 import java.time.Instant;
 import java.util.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,6 +39,7 @@ class ServiceSettingsTest {
     @Inject PasskeyRealm realm;
     @Inject RecoveryMail mail;
     @Inject VaultLimits limits;
+    @io.quarkus.test.common.http.TestHTTPResource URI baseUri;
     @TempDir Path temporary;
     record Browser(String cookie,String csrf,String owner) { }
     private Response call(Browser browser,String method,String path,JsonNode input,String etag,boolean csrf) {
@@ -98,9 +101,19 @@ class ServiceSettingsTest {
     private JsonNode initialQuota(Response response){return parse(response.asString());}
     @Test void largerDefaultFilesPassTheHttpBoundaryAndStorageIsReadableWithoutWritePermission() throws Exception {
         var admin=setup();
-        var upload=given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-None-Match","*").contentType("application/octet-stream").body(new byte[21*1024*1024]).put("/api/v1/notes/files?path=large.bin");
-        assertEquals(201,upload.statusCode(),upload.asString());
-        var bytes=given().header("Cookie",admin.cookie()).get("/api/v1/notes/entries/"+parse(upload.asString()).path("id").asText()+"/content");assertEquals(200,bytes.statusCode());assertEquals(21*1024*1024,bytes.asByteArray().length);
+        // Keep a real upload above the former HTTP/JSON ceiling, but stream the
+        // test client's bytes rather than retaining multiple attachment copies.
+        var payload=temporary.resolve("large.bin");
+        try(var output=Files.newOutputStream(payload)){var block=new byte[8192];for(int i=0;i<21*128;i++)output.write(block);}
+        try(var client=HttpClient.newHttpClient()){
+            var upload=client.send(HttpRequest.newBuilder(baseUri.resolve("/api/v1/notes/files?path=large.bin"))
+                    .header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-None-Match","*").header("Content-Type","application/octet-stream")
+                    .PUT(HttpRequest.BodyPublishers.ofFile(payload)).build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(201,upload.statusCode(),upload.body());
+            var downloaded=temporary.resolve("download.bin");var response=client.send(HttpRequest.newBuilder(baseUri.resolve("/api/v1/notes/entries/"+parse(upload.body()).path("id").asText()+"/content"))
+                    .header("Cookie",admin.cookie()).GET().build(),HttpResponse.BodyHandlers.ofFile(downloaded));
+            assertEquals(200,response.statusCode());assertEquals(-1,Files.mismatch(payload,downloaded));
+        }
         var tokenInput=object().put("name","Storage reader");tokenInput.putArray("permissions").add("read");tokenInput.putNull("expiresAt");var token=success(call(admin,"POST","/auth/tokens",tokenInput,null,true),201).path("token").asText();
         var reply=given().header("Authorization","Bearer "+token).get("/api/v1/notes/storage");var usage=success(reply,200);assertEquals(21*1024*1024,usage.path("usage").path("bytes").asLong());assertTrue(reply.header("Cache-Control").contains("no-store"));
         assertEquals(401,given().get("/api/v1/notes/storage").statusCode());
