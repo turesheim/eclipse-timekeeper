@@ -27,9 +27,10 @@ test('Notes opens formatted and keeps document actions in a compact keyboard-acc
  const panel=page.locator('#notes-panel'),toolbar=panel.locator('.markdown-toolbar'),trigger=toolbar.getByRole('button',{name:'Note tools',exact:true});
  await expect(panel.locator('.ProseMirror')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toHaveAttribute('aria-pressed','true');await expect(panel.locator('#notes-body')).toBeHidden();await expect(panel.locator('.notes-footer button')).toBeDisabled();
  await expect(toolbar.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('menuitem')).toHaveCount(0);
+ await page.clock.install();
  for(const width of [1440,320]){
   await page.setViewportSize({width,height:900});await trigger.focus();await trigger.press('ArrowDown');const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu.getByRole('menuitem').first()).toBeFocused();await expect(menu.getByRole('menuitem',{name:'Rename or move',exact:true})).toBeInViewport();await expect(menu.getByRole('menuitem',{name:'Note revisions',exact:true})).toBeInViewport();
-  expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);await page.keyboard.press('Escape');await expect(trigger).toBeFocused();await expect(menu).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);await page.clock.runFor(1000);await page.keyboard.press('Escape');await expect(trigger).toBeFocused();await expect(menu).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }
  await captureScreenshot(page,{path:'test-results/notes-compact-toolbar.png'});
  await toolbar.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveAccessibleName('Note body');await expect(page.locator('#notes-body').locator('..').locator('label')).toHaveClass(/visually-hidden/);await page.locator('#notes-body').focus();await expect(page.locator('#notes-body')).toHaveCSS('box-shadow','none');

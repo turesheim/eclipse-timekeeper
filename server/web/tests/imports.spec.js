@@ -1,6 +1,6 @@
 import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
-import {test,expect} from '@playwright/test';
+import {test as base,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
@@ -8,12 +8,29 @@ import AxeBuilder from '@axe-core/playwright';
 
 const fixture = fileURLToPath(new URL('./fixtures/toggl/detailed-member-stop.csv',import.meta.url));
 const legacyFixture = fileURLToPath(new URL('./fixtures/toggl/legacy-user-end.csv',import.meta.url));
-const token = process.env.TIMEKEEPER_WEB_TOKEN;
+// Each import owns its timezone, records and job history. Shard neighbours can
+// change their own profile without changing activity day splitting in this suite.
+const tokens=new WeakMap(),tokenFor=subject=>tokens.get(subject);
+const test=base.extend({
+  importToken:async({},use)=>{
+    const token=randomBytes(32).toString('base64url'),registryPath=process.env.TIMEKEEPER_WEB_REGISTRY;
+    const registry=JSON.parse(readFileSync(registryPath,'utf8'));
+    registry.push({ownerId:'import-test-'+randomUUID(),sha256:createHash('sha256').update(token).digest('hex'),permissions:['read','write']});
+    writeFileSync(registryPath,JSON.stringify(registry));await use(token);
+  },
+  request:async({request,importToken},use)=>{
+    tokens.set(request,importToken);const headers={Authorization:`Bearer ${importToken}`};
+    const profile=await request.get('/api/v1/me',{headers});expect(profile.status()).toBe(200);
+    expect((await request.put('/api/v1/me',{headers:{...headers,'If-Match':profile.headers().etag},data:{zoneId:'Europe/Oslo'}})).status()).toBe(200);
+    await use(request);
+  },
+  page:async({page,importToken,request},use)=>{tokens.set(page,importToken);await use(page);}
+});
 async function api(request,path) {
-  const response = await request.get('/api/v1'+path,{headers:{Authorization:`Bearer ${token}`}});expect(response.status()).toBe(200);return response.json();
+  const response = await request.get('/api/v1'+path,{headers:{Authorization:`Bearer ${tokenFor(request)}`}});expect(response.status()).toBe(200);return response.json();
 }
 async function login(page) {
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(tokenFor(page));
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
 }
@@ -89,8 +106,8 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
   const complete = await api(request,`/imports/jobs/${job.id}`);expect(complete.nextBatch).toBe(3);expect(complete.importedNanos).toBe('201000000000');
   const collection=mode==='WORK_SESSION' ? 'work-sessions' : 'activities',records=mode==='WORK_SESSION' ? 'workSessions' : 'activities';
   const activity = imported[records].find(value=>value.summary==='Bulk row 0');
-  const current = await request.get('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`}});const body = await current.json();
-  const changed = await request.put('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk entry',...(mode==='WORK_SESSION' ? {clientId:body.clientId} : {labelIds:body.labelIds})}});expect(changed.status()).toBe(200);
+  const current = await request.get('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${tokenFor(request)}`}});const body = await current.json();
+  const changed = await request.put('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${tokenFor(request)}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk entry',...(mode==='WORK_SESSION' ? {clientId:body.clientId} : {labelIds:body.labelIds})}});expect(changed.status()).toBe(200);
   const history = page.getByRole('heading',{name:'Import history',exact:true}).locator('..');
   await history.getByRole('button',{name:'Undo import',exact:true}).click();await page.getByRole('button',{name:'Confirm Undo',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Review records retained or changed since import',exact:true})).toBeVisible();
@@ -166,7 +183,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
 
 
 for(const reuse of [false,true]) test(`Toggl Legacy export ${reuse ? 'maps to an existing client' : 'creates the source client'} independently of its project`,async({page,request})=>{
-  const headers={Authorization:`Bearer ${token}`};let destination;
+  const headers={Authorization:`Bearer ${tokenFor(request)}`};let destination;
   if(reuse) {
     const response=await request.post('/api/v1/clients',{headers,data:{name:'Legacy destination '+randomUUID().slice(0,8),color:'#176653'}});
     expect(response.status()).toBe(201);destination=await response.json();
@@ -203,7 +220,7 @@ for(const reuse of [false,true]) test(`Toggl Legacy export ${reuse ? 'maps to an
 });
 
 for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several source clients to an existing client and Undo preserves it`,async({page,request})=>{
-  const suffix=randomUUID().slice(0,8),headers={Authorization:`Bearer ${token}`};
+  const suffix=randomUUID().slice(0,8),headers={Authorization:`Bearer ${tokenFor(request)}`};
   const created=await request.post('/api/v1/clients',{headers,data:{name:'Existing destination '+suffix,color:'#176653'}});expect(created.status()).toBe(201);
   const destination=await created.json();
   const projectReply=await request.post('/api/v1/projects',{headers,data:{name:'Existing delivery '+suffix,clientId:destination.id}});expect(projectReply.status()).toBe(201);const destinationProject=await projectReply.json(),before=await api(request,'/data/export');

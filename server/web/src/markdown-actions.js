@@ -15,6 +15,9 @@ export function buildActionsMenu(field){
     for(const button of menu.querySelectorAll('button'))if(!bound.has(button)){
       bound.add(button);const label=button.getAttribute('aria-label')||button.title;
       if(label){const text=document.createElement('span');text.textContent=label;button.append(text);}
+      // The menu already exposes the full label. A second tooltip would consume
+      // Escape before it reaches the menu's keyboard handler.
+      button.removeAttribute('title');delete button.dataset.tkTooltip;delete button.dataset.tkTooltipComposite;
       button.className='dropdown-item';button.setAttribute('role','menuitem');button.tabIndex=-1;
       button.addEventListener('click',()=>f.closeActions(),{capture:true});
     }
