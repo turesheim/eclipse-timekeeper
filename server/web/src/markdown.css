@@ -1,13 +1,11 @@
 .markdown-toolbar { overflow-x: auto; margin-block: .75rem; padding: .2rem; }
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .markdown-editor .markdown-modes, .markdown-editor .markdown-tools { flex: none; flex-wrap: nowrap; gap: 0; margin: 0; }
-.markdown-toolbar-separator { flex: 0 0 1px; align-self: stretch; min-height: 2rem; margin-block: .25rem; background: var(--bs-border-color); }
 .markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
 .markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
 .journal-formatted:not([hidden]), .journal-formatted > div, .journal-formatted .milkdown { display: flex; flex-direction: column; }
 .journal-formatted :is(.ProseMirror,.milkdown), .journal-formatted > div { flex: 1; min-width: 0; }
-.journal-formatted:has(.ProseMirror:focus-visible) { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
 .markdown-editor .ProseMirror:focus-visible { outline: none; box-shadow: none; }
 .markdown-editor .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
 .markdown-editor .ProseMirror h1 { font-size: var(--font-markdown-h1); }
@@ -91,7 +89,7 @@
 @media(max-width:600px) {
   .markdown-editor .markdown-toolbar { flex-wrap: wrap !important; overflow: visible; }
   .markdown-overflow { display: inline-flex; }
-  .markdown-editor .markdown-toolbar:not([data-expanded=true]) .markdown-tools, .markdown-editor .markdown-toolbar:not([data-expanded=true]) .markdown-toolbar-separator { display: none; }
+  .markdown-editor .markdown-toolbar:not([data-expanded=true]) :is(.markdown-tools,.markdown-document-tools) { display: none; }
   .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { flex: 1 1 100%; flex-wrap: wrap; }
 }
 .markdown-code-block { border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
@@ -121,3 +119,21 @@
 }
 
 /* The split pane owns scrolling; nested rich-editor overflow would bypass synchronization. */
+
+.markdown-resource-tools,.markdown-document-tools { flex: none; }
+.markdown-editor .journal-source textarea:focus { outline: none; box-shadow: none; }
+.markdown-revision-diff > span { display: block; white-space: pre-wrap; overflow-wrap: anywhere; padding-inline: .5rem; }
+.markdown-diff-added { color: var(--bs-success-text-emphasis); background: var(--bs-success-bg-subtle); }
+.markdown-diff-removed { color: var(--bs-danger-text-emphasis); background: var(--bs-danger-bg-subtle); }
+.markdown-diff-hunk { color: var(--bs-info-text-emphasis); background: var(--bs-info-bg-subtle); margin-block-start: .5rem; }
+
+.markdown-editor :is(textarea,.ProseMirror) { caret-shape: var(--markdown-caret-shape,auto); }
+[data-editor-cursor="line"] { --markdown-caret-shape: bar; }
+[data-editor-cursor="underscore"] { --markdown-caret-shape: underscore; }
+[data-editor-cursor="solid"] { --markdown-caret-shape: block; }
+.markdown-editor [data-markdown-caret-fallback] { caret-color: transparent !important; }
+.markdown-caret { position: fixed; z-index: 2; pointer-events: none; user-select: none; background: currentColor; animation: markdown-caret-blink 1s step-end infinite; }
+.markdown-caret[data-shape="solid"] { opacity: .5; }
+.markdown-caret-mirror { position: fixed; inset: 0 auto auto 0; height: auto; box-sizing: border-box; border: 0; visibility: hidden; pointer-events: none; user-select: none; }
+@keyframes markdown-caret-blink { 50% { opacity: 0; } }
+@media(prefers-reduced-motion: reduce) { .markdown-caret { animation: none; } }

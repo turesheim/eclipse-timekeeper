@@ -1326,5 +1326,20 @@
   "today.no_recent_notes": "Ingen notater er endret i den valgte perioden.",
   "today.more_notes": "Flere notater",
   "notes.recent_days": "Nylige notater: antall dager",
-  "notes.recent_days_help": "Vis notater endret i dette antallet kalenderdager, inkludert i dag, i I dag-visningen. Bruker tidssonen på kontoen din. Dagboknotater er utelatt. Velg 1–3650 dager; standardverdien er 7."
+  "notes.recent_days_help": "Vis notater endret i dette antallet kalenderdager, inkludert i dag, i I dag-visningen. Bruker tidssonen på kontoen din. Dagboknotater er utelatt. Velg 1–3650 dager; standardverdien er 7.",
+  "markdown.note_tools": "Notatverktøy",
+  "notes.document_actions": "Dokumenthandlinger",
+  "markdown.delete_revision": "Slett valgt versjon",
+  "markdown.delete_revision_confirm": "Slette denne tidligere versjonen?",
+  "markdown.revision_deleted": "Versjonen er slettet.",
+  "markdown.revision_delete_uncertain": "Slettingen kan være fullført. Lukk og åpne versjonslisten på nytt for å oppdatere den.",
+  "markdown.diff_added": "Lagt til",
+  "markdown.diff_removed": "Fjernet",
+  "markdown.no_differences": "Ingen forskjeller.",
+  "markdown.diff_truncated": "Sammenligningen er for stor til å vises i sin helhet. Kilden og utkastet er uendret.",
+  "notes.editor_cursor": "Markør i editoren",
+  "notes.cursor_default": "Standard",
+  "notes.cursor_line": "Strek",
+  "notes.cursor_underscore": "Understrek",
+  "notes.cursor_solid": "Fylt blokk"
 }

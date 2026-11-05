@@ -1326,5 +1326,20 @@
   "today.no_recent_notes": "No notes edited in the configured day range.",
   "today.more_notes": "More notes",
   "notes.recent_days": "Recent notes: number of days",
-  "notes.recent_days_help": "Show notes edited during this many calendar days, including today, in Today. Uses your account time zone. Journal notes are excluded. Choose 1–3650 days; the default is 7."
+  "notes.recent_days_help": "Show notes edited during this many calendar days, including today, in Today. Uses your account time zone. Journal notes are excluded. Choose 1–3650 days; the default is 7.",
+  "markdown.note_tools": "Note tools",
+  "notes.document_actions": "Document actions",
+  "markdown.delete_revision": "Delete selected revision",
+  "markdown.delete_revision_confirm": "Delete this historical revision?",
+  "markdown.revision_deleted": "Revision deleted.",
+  "markdown.revision_delete_uncertain": "Deletion may have completed. Close and reopen revisions to refresh the list.",
+  "markdown.diff_added": "Added",
+  "markdown.diff_removed": "Removed",
+  "markdown.no_differences": "No differences.",
+  "markdown.diff_truncated": "This comparison is too large to display in full. The source and draft are unchanged.",
+  "notes.editor_cursor": "Editor cursor",
+  "notes.cursor_default": "Default",
+  "notes.cursor_line": "Line",
+  "notes.cursor_underscore": "Underscore",
+  "notes.cursor_solid": "Solid block"
 }

@@ -16558,7 +16558,8 @@
           "507": {
             "$ref": "#/components/responses/507"
           }
-        }
+        },
+        "description": "Reads account settings without initializing the note namespace or creating business records."
       },
       "put": {
         "operationId": "updateNotesSettings",
@@ -16636,7 +16637,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Validates If-Match before initializing derived default folders, under the same owner transaction. A first edit can use the ETag from an uninitialized settings read."
       }
     },
     "/notes/resolve": {
@@ -17741,6 +17743,14 @@
                   "$ref": "#/components/schemas/NoteRevisionContent"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Immutable revision representation; required to delete this revision.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "400": {
@@ -17762,6 +17772,79 @@
             "$ref": "#/components/responses/503"
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteNoteRevision",
+        "summary": "Delete one retained revision without changing the current note",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_NOTE",
+                "WEEK_NOTE",
+                "EVENT_NOTE",
+                "VAULT_CONTENT"
+              ]
+            }
+          },
+          {
+            "name": "sourceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "revisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "204": {
+            "description": "Historical revision deleted. The current note and its save guard are unchanged."
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "description": "Permanently deletes the selected owner/source-bound historical snapshot. Requires the ETag returned when reading that revision. The current note body/version and independent day label are unchanged."
       }
     },
     "/notes/export": {
@@ -31938,6 +32021,17 @@
             "maximum": 3650,
             "default": 7,
             "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+          },
+          "editorCursor": {
+            "type": "string",
+            "enum": [
+              "default",
+              "line",
+              "underscore",
+              "solid"
+            ],
+            "default": "default",
+            "description": "Text cursor shape in formatted and Markdown source editors. Uses a visual fallback when native caret shapes are unavailable."
           }
         }
       },
@@ -31996,6 +32090,17 @@
             "maximum": 3650,
             "default": 7,
             "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+          },
+          "editorCursor": {
+            "type": "string",
+            "enum": [
+              "default",
+              "line",
+              "underscore",
+              "solid"
+            ],
+            "default": "default",
+            "description": "Text cursor shape in formatted and Markdown source editors. Uses a visual fallback when native caret shapes are unavailable."
           }
         }
       },
@@ -32341,6 +32446,17 @@
                 "maximum": 3650,
                 "default": 7,
                 "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+              },
+              "editorCursor": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "line",
+                  "underscore",
+                  "solid"
+                ],
+                "default": "default",
+                "description": "Text cursor shape in formatted and Markdown source editors. Uses a visual fallback when native caret shapes are unavailable."
               }
             }
           },

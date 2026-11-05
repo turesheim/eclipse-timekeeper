@@ -32,11 +32,11 @@ class VaultArchiveTest {
             var events=new EventNotes(store);var value=object().put("subscriptionId",event.subscription().toString()).put("eventKey",event.event()).put("body","Event body");value.set("event",object().put("uid","uid").put("recurrenceId","2026-10-30T10:00:00Z").put("title","Meeting"));events.saveDocument(event,etag(events.get(event)),EventNotes.document(value));
             new JournalAssets(store).save("legacy.bin",null,binary);
             vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Journal"));
-            vault.configure(etag(new VaultSettings(store).get()),object().put("assetsFolder","assets").put("hideJournalFolder",true).put("recentNotesDays",12));return null;
+            vault.configure(etag(new VaultSettings(store).get()),object().put("assetsFolder","assets").put("hideJournalFolder",true).put("recentNotesDays",12).put("editorCursor","solid"));return null;
         });
         try(var download=archives.download(principal);var zip=new ZipFile(download.file().toFile())){
             var snapshot=AccountArchiveInput.read(download.file(),"application/zip");inputs.validate("AccountArchiveSnapshot",snapshot);
-            assertTrue(snapshot.path("vault").path("settings").path("hideJournalFolder").asBoolean());assertEquals(12,snapshot.path("vault").path("settings").path("recentNotesDays").asInt());
+            assertTrue(snapshot.path("vault").path("settings").path("hideJournalFolder").asBoolean());assertEquals("solid",snapshot.path("vault").path("settings").path("editorCursor").asText());assertEquals(12,snapshot.path("vault").path("settings").path("recentNotesDays").asInt());
             assertEquals(AccountArchive.FORMAT,snapshot.path("format").asText());assertTrue(zip.getEntry("archive.json").getSize()<20000);
             assertFalse(snapshot.path("vault").toString().contains("ownerId"));assertFalse(snapshot.path("vault").toString().contains("data\""));
             store.transaction("b",()->{
@@ -46,17 +46,17 @@ class VaultArchiveTest {
                 assertEquals(creation.get("note"),vault.get(identities.get("note")).path("createdAt").asText());
                 assertEquals("2021-02-03T04:05:06.123456789Z",vault.get(identities.get("note")).path("modifiedAt").asText());
                 assertArrayEquals(binary,JournalAssets.bytes(new JournalAssets(store).get("legacy.bin")));assertEquals("Private/Journal",new VaultSettings(store).get().path("journalFolder").asText());
-                assertEquals(12,new VaultSettings(store).get().path("recentNotesDays").asInt());assertEquals("assets",new VaultSettings(store).get().path("assetsFolder").asText());assertTrue(new VaultSettings(store).get().path("hideJournalFolder").asBoolean());vault.initialize();
+                assertEquals("solid",new VaultSettings(store).get().path("editorCursor").asText());assertEquals(12,new VaultSettings(store).get().path("recentNotesDays").asInt());assertEquals("assets",new VaultSettings(store).get().path("assetsFolder").asText());assertTrue(new VaultSettings(store).get().path("hideJournalFolder").asBoolean());vault.initialize();
                 assertArrayEquals(binary,vault.read(vault.get(new VaultPath("assets/legacy.bin"))));
                 var deleted=vault.get(identities.get("trash"));assertTrue(deleted.path("deleted").asBoolean());vault.restore(deleted,vault.tag(deleted));assertArrayEquals(document,vault.read(vault.get(identities.get("trash"))));
                 var day=vault.get(identities.get("day"));assertTrue(day.path("deleted").asBoolean());vault.restore(day,vault.tag(day));assertArrayEquals(document,new DayNotes(store).document(DayNotes.date("2026-10-30")));
                 assertEquals("Independent label",new DayLabels(store).get(DayNotes.date("2026-10-30")).path("text").asText());assertEquals("Event body",new EventNotes(store).get(event).path("body").asText());return null;
             });
-            var oldSnapshot=snapshot.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)oldSnapshot.path("vault").path("settings")).remove("recentNotesDays");inputs.validate("AccountArchiveSnapshot",oldSnapshot);
+            var oldSnapshot=snapshot.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)oldSnapshot.path("vault").path("settings")).remove(List.of("recentNotesDays","editorCursor"));inputs.validate("AccountArchiveSnapshot",oldSnapshot);
             store.transaction("legacy-recent-import",()->{
-                var vault=new VaultCollection(store,limits);vault.initialize();vault.configure(etag(new VaultSettings(store).get()),object().put("recentNotesDays",30));
+                var vault=new VaultCollection(store,limits);vault.initialize();vault.configure(etag(new VaultSettings(store).get()),object().put("recentNotesDays",30).put("editorCursor","underscore"));
                 VaultArchive.prepare(oldSnapshot.path("vault"),store);new DayLabels(store).restore(oldSnapshot.path("dayLabels"));ArchiveJournalFiles.restore(download.file(),oldSnapshot.path("journalFiles"),store,true);VaultArchive.restore(download.file(),oldSnapshot.path("vault"),store);
-                assertEquals(7,new VaultSettings(store).get().path("recentNotesDays").asInt());return null;
+                assertEquals(7,new VaultSettings(store).get().path("recentNotesDays").asInt());assertEquals("default",new VaultSettings(store).get().path("editorCursor").asText());return null;
             });
             assertThrows(ApiFailure.class,()->store.transaction("b",()->{VaultArchive.prepare(snapshot.path("vault"),store);return null;}));
         }

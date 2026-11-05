@@ -1,3 +1,4 @@
+import {editorPreferences} from './editor-preferences.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale, localeForPreference } from './i18n.js';
@@ -182,7 +183,7 @@ const auth = authentication({
     api = session;accountName = account.displayName;canWrite = account.permissions.includes('write');
     const profileReply = await session.initializeTimeZone(), profile = profileReply.data;
     if (session !== api) return;
-    window.timekeeperTypography?.receive(profileReply);
+    window.timekeeperTypography?.receive(profileReply);editorPreferences.connect(session,error=>auth.clear(errorText(error)));
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     today.initialize(dailyNoteDateFromSearch(location.search)||dateInZone(Date.now(),profile.zoneId));
@@ -198,6 +199,7 @@ const auth = authentication({
     return refresh();
   },
   clear({restoring = false} = {}) {
+    editorPreferences.reset();
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';

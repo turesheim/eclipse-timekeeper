@@ -756,3 +756,24 @@ An empty Recent notes read does not initialize the collection or create business
 records. This preserves the strict empty-target restore check after a user opens
 Today on a fresh installation. Existing canonical event notes are indexed on the
 first recent-list read when the collection has not yet been initialized.
+
+`VAULT_SETTINGS.editorCursor` is an optional account preference: `default`, `line`,
+`underscore` or `solid`. Existing rows and older account archives default to
+`default`; full account archives retain the preference. It applies to every
+shared formatted and Markdown source editor. No cursor or draft state is stored
+in browser storage.
+
+Reading `/api/v1/notes/settings` does not initialize the collection. A guarded
+settings update validates the caller's representation before initializing any
+derived default folders, inside the same owner transaction. The first edit can
+therefore use the ETag of an uninitialized settings read. The Notes account page
+initializes its explicit collection information before loading its settings
+representation; a default folder migration cannot make that form immediately
+stale.
+
+`GET /api/v1/notes/revisions/{revisionId}` returns an ETag bound to the immutable
+owner/source-specific snapshot. `DELETE` at the same path requires write access,
+the same source identity and that ETag in `If-Match`. It removes only the retained
+revision, freeing its history budget. Current document bytes, content version,
+independent day label and live save guard remain intact. Revision deletion never
+applies or saves the editor's draft.

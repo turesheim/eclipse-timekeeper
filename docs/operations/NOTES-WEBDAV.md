@@ -271,3 +271,17 @@ ZIP uploads are bounded to 1 GiB, archive JSON to 256 MiB and extracted content 
 limits. Encrypted full-instance backup retains every owner's canonical records,
 derived indexes, history and resolved configuration, including these quota
 properties. Continue to test restores and keep a pre-upgrade backup.
+
+The **Editor cursor** setting in **My Account → Notes** chooses the default,
+line, underscore or solid block cursor for all shared note editors. Changes
+apply to the current account's editors without changing their text or drafts.
+Browsers with native cursor shapes use them; others use a visual overlay outside
+the editable document, with native text input and selection preserved.
+
+The **Note revisions** toolbar button compares a selected retained version with
+the current draft using coloured unified differences. **Use as unsaved draft**
+keeps the normal guarded save step. **Delete selected revision** permanently
+removes that historical snapshot after confirmation; the current saved note and
+unsaved draft remain intact. Read-only accounts can compare versions. Large
+comparisons show an explicit display limit, and exact BOM/line-ending-only
+changes are shown as escaped source.
