@@ -2,7 +2,6 @@ import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {openEditorFixture} from './editor-fixture.js';
 import {appendEditorText,noteActions} from './editor-interactions.js';
-import {captureScreenshot} from './screenshots.js';
 
 async function open(page,value){
   await openEditorFixture(page);
@@ -27,13 +26,14 @@ test('code uses highlight.js in a compact badge, preserving source, copy and lan
   await badge.getByRole('button',{name:'Copy code',exact:true}).click();await expect.poll(()=>page.evaluate(()=>globalThis.copiedCode)).toBe(yaml.replaceAll('\n','\r\n'));expect(await page.evaluate(()=>globalThis.presentation.value())).toBe(original);
   await badge.getByRole('button',{name:/^Code language:/}).click();const language=page.getByRole('dialog',{name:'Code language',exact:true}).getByRole('combobox',{name:'Code language',exact:true});await language.fill('yml');await language.press('Enter');
   expect(await page.evaluate(()=>globalThis.presentation.value())).toContain('```yml');await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.presentation.value())).toBe(original);
+  await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));expect(await badge.locator('.bi-copy').evaluate(node=>getComputedStyle(node,'::before').fontFamily)).toContain('bootstrap-icons');
   await expect(root.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);
   for(const width of [1440,320]){
     await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#presentation-editor').analyze()).violations,`${theme} at ${width}px`).toEqual([]);
     }
-    await captureScreenshot(page,{path:`test-results/editor-code-presentation-${width}.png`,fullPage:true});
+    await page.evaluate(()=>{document.documentElement.dataset.theme='timekeeper';document.documentElement.dataset.bsTheme='light';});await root.screenshot({path:`test-results/editor-code-presentation-${width}.png`});
   }
 });
 

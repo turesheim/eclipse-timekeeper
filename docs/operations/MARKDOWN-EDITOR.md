@@ -19,8 +19,8 @@ The formatted dialect is CommonMark/GFM: paragraphs, H1–H6, emphasis, strong,
 strikethrough, links, quotations, horizontal rules, nested/task lists, tables and
 fenced code. Enter creates a paragraph; Shift+Enter creates a hard line break.
 An ordinary newline in Markdown is a soft break. Newly formatted rules use `---`.
-Unknown extensions, raw HTML, reference-style links and code fences with extra
-metadata remain inert, editable source fragments. Their HTML is never executed.
+Unknown extensions, HTML other than safe anchors, reference-style links and code
+fences with extra metadata remain inert, editable source fragments. Their HTML is never executed.
 
 Vault extensions include:
 
