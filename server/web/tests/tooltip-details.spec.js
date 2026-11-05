@@ -9,7 +9,8 @@ async function setup(page,description='Meeting details',title='Review'){
     const {richTooltip,installTooltips}=await import('/web/tooltips.js');
     const {calendarEventTooltip}=await import('/web/tooltip-content.js');installTooltips();
     const button=document.createElement('button');button.id='event-hint';button.textContent='Event details';
-    button.style.position='fixed';button.style.left='200px';button.style.top='300px';document.body.prepend(button);
+    // Keep the fixture target in its own row as editor toolbar groups wrap.
+    const row=document.createElement('div');row.style.margin='1rem 200px';row.append(button);document.body.prepend(row);
     window.updateEventDescription=value=>richTooltip(button,()=>calendarEventTooltip({title,description:value,start:'2026-11-04T10:00:00Z',end:'2026-11-04T11:00:00Z'},'UTC'));
     window.updateEventDescription(description);
   },{description,title});
