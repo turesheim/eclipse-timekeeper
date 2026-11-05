@@ -22,7 +22,7 @@ export function buildExperience(field){
   f.imageProperties=action('markdown.image_properties',()=>{imageDetails=f.editor?.imageDetails();if(f.readOnly||!imageDetails)return;imageError.textContent='';for(const name of ['alt','width','height'])imageFields[name].value=imageDetails[name]||'';embed.checked=!!imageDetails.embed;embed.disabled=!!imageDetails.embed||!f.resources?.canonicalAsset;dimensions();f.imageDialog.showModal();imageFields.alt.focus();},'image');f.resourceTools.append(f.imageProperties);
   imageForm.addEventListener('submit',event=>{event.preventDefault();if(f.readOnly)return;const generation=f.generation;void(async()=>{try{const path=embed.checked&&!imageDetails.embed?await f.resources.canonicalAsset(imageDetails.path):imageDetails.path;if(generation!==f.generation)return;const payload={...Object.fromEntries(Object.entries(imageFields).map(([key,input])=>[key,input.value])),embed:embed.checked,path};if(!f.editor?.command('image_properties',payload))throw new Error(t('markdown.invalid_image'));f.imageDialog.close();}catch(error){imageError.textContent=error.message;}})();});
   f.historyDialog=el('dialog');f.historyDialog.className='app-dialog markdown-history-dialog';f.historyDialog.setAttribute('aria-label',t('markdown.revisions'));
-  const historyTitle=el('h2',t('markdown.revisions')),historyList=el('div'),historyStatus=el('p'),diff=el('pre');historyList.className='markdown-revision-list';historyStatus.setAttribute('role','status');diff.className='markdown-revision-diff';diff.setAttribute('aria-label',t('markdown.comparison'));
+  const historyTitle=el('h2',t('markdown.revisions')),historyList=el('div'),historyStatus=el('p'),diff=el('pre');historyList.className='markdown-revision-list';historyStatus.setAttribute('role','status');diff.className='markdown-revision-diff';diff.tabIndex=0;diff.setAttribute('role','region');diff.setAttribute('aria-label',t('markdown.comparison'));
   let chosen,historyBusy=false,historyGeneration=0,selectionGeneration=0,historyCurrent=()=>false;
   const applyRevision=action('markdown.restore_draft',()=>{if(f.readOnly||historyBusy||!chosen)return;const text=chosen.text;f.historyDialog.close();f.setValue(text);f.onChange();});applyRevision.disabled=true;f.applyRevision=applyRevision;
   const closeHistory=action('ui.close',()=>f.historyDialog.close());
@@ -48,7 +48,7 @@ export function buildExperience(field){
       }
     }
     if(!comparison.hunks.length)diff.textContent=t('markdown.no_differences');
-    historyStatus.textContent=comparison.truncated?t('markdown.diff_truncated'):t('markdown.comparison_legend');
+    diff.scrollTop=0;historyStatus.textContent=comparison.truncated?t('markdown.diff_truncated'):t('markdown.comparison_legend');
     for(const choice of historyList.children)choice.setAttribute('aria-pressed',String(choice===button));f.updateExperience();
   };
   f.historyButton=action('markdown.revisions',async()=>{
