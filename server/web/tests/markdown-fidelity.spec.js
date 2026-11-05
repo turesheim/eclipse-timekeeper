@@ -16,8 +16,8 @@ test('editing one paragraph retains untouched Markdown spelling, blank lines, mi
   await open(page,source);expect(await download(page)).toBe(source);
   const paragraph=page.locator('#markdown-formatted p').filter({hasText:'Edit this paragraph.'});await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' More.');
   expect(await download(page)).toBe(source.replace('Edit this paragraph.','Edit this paragraph. More.'));
-  await page.locator('#markdown-toolbar').getByRole('button',{name:'Undo',exact:true}).click();expect(await download(page)).toBe(source);
-  await page.locator('#markdown-toolbar').getByRole('button',{name:'Redo',exact:true}).click();
+  await page.keyboard.press('ControlOrMeta+z');expect(await download(page)).toBe(source);
+  await page.keyboard.press('ControlOrMeta+Shift+z');
   const changed=source.replace('Edit this paragraph.','Edit this paragraph. More.');expect(await download(page)).toBe(changed);
   await page.locator('#markdown-source').click();await page.locator('#markdown-rich').click();expect(await download(page)).toBe(changed);
 });

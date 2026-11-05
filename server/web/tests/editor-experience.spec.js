@@ -92,13 +92,13 @@ test('callouts and footnotes render, remain editable and preserve Markdown refer
   await page.locator('.markdown-callout input').fill('New decision');await page.locator('.markdown-callout input').press('Tab');const edited=await source(page);expect(edited).toContain('> [!NOTE] New decision');expect(edited).toContain('[^one]: A **useful** footnote.');
 });
 test('code blocks expose language and copy controls and highlight without replacing their source',async({page})=>{
-  const value='~~~js\nconst answer = 42;\n~~~\n';await engine(page,value);await expect(page.locator('#experience-editor .tok-keyword')).toContainText('const');expect(await source(page)).toBe(value);
-  await page.getByRole('combobox',{name:'Code language',exact:true}).fill('javascript');await page.getByRole('combobox',{name:'Code language',exact:true}).press('Tab');expect(await source(page)).toContain('```javascript');await expect(page.getByRole('button',{name:'Copy code',exact:true})).toBeVisible();
+  const value='~~~js\nconst answer = 42;\n~~~\n';await engine(page,value);await expect(page.locator('#experience-editor .hljs-keyword')).toContainText('const');expect(await source(page)).toBe(value);
+  await page.getByRole('button',{name:'Code language',exact:true}).click();await page.getByRole('combobox',{name:'Code language',exact:true}).fill('javascript');await page.getByRole('combobox',{name:'Code language',exact:true}).press('Enter');expect(await source(page)).toContain('```javascript');await expect(page.getByRole('button',{name:'Copy code',exact:true})).toBeVisible();
 });
 test('switching to source and back without edits keeps rich undo history',async({page})=>{
   await field(page,'Original.\n');await page.locator('#experience-formatted p').click();await page.keyboard.press('End');await page.keyboard.type(' Added.');
   const text=await page.evaluate(()=>globalThis.field.value());expect(text).toContain('Added.');await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();
-  await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
+  await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe('Original.\n');
 });
 test('multi-file upload retry keeps completed files and does not move an unrelated caret',async({page})=>{
   await field(page,'One.\n\nTwo.\n');await page.locator('#experience-formatted .ProseMirror').focus();await page.evaluate(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('#experience-formatted p'));range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});await expect.poll(()=>page.evaluate(()=>globalThis.field.editor.context().text)).toBe('One.');
@@ -108,7 +108,7 @@ test('multi-file upload retry keeps completed files and does not move an unrelat
   await page.locator('#experience-formatted .ProseMirror').pressSequentially(' Kept caret.');await expect(page.locator('#experience-formatted p').last()).toContainText('Two. Kept caret.');await expect(page.locator('#experience-formatted p').first().locator('a')).toHaveCount(2);
 });
 test('shared controls remain keyboard accessible and fit narrow screens in every theme',async({page})=>{
-  await page.setViewportSize({width:390,height:844});await field(page,'# Heading\n\n- [ ] Task\n\nParagraph.\n');await page.locator('#experience-field').getByRole('button',{name:'More formatting',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});await field(page,'# Heading\n\n- [ ] Task\n\nParagraph.\n');
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
     expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -121,7 +121,7 @@ test('shared controls remain keyboard accessible and fit narrow screens in every
 test('rich undo and redo span a source edit, including a change of Markdown spelling',async({page})=>{
   await field(page,'Title\n=====\n\nOriginal.\n');const original=await page.evaluate(()=>globalThis.field.value());await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
   const changed=original.replace('Original.','__Changed__.');await page.locator('#experience-body').fill(changed);await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
-  await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(original);await page.locator('#experience-field').getByRole('button',{name:'Redo',exact:true}).click();expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
+  await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(original);await page.keyboard.press('ControlOrMeta+Shift+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
   await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#experience-body').fill(original);await page.locator('#experience-field').getByRole('button',{name:'Formatted',exact:true}).click();expect(await page.evaluate(value=>globalThis.field.matches(value),original)).toBe(true);
 });
 test('editing around authored break HTML never mistakes it for an empty editor paragraph',async({page})=>{
@@ -191,7 +191,7 @@ test('existing Table button supports keyboard structure edits without extra cont
   await button.dispatchEvent('keydown',{key:'ArrowDown'});expect(await page.evaluate(()=>globalThis.field.value())).toBe(before);
   await page.evaluate(()=>globalThis.field.setReadOnly(false));await button.focus();await button.press('Shift+Delete');await expect(page.locator('#experience-formatted table')).toHaveCount(0);
   expect(await page.evaluate(()=>globalThis.field.value())).toContain('Before.');expect(await page.evaluate(()=>globalThis.field.value())).toContain('After.');
-  await page.locator('#experience-field').getByRole('button',{name:'Undo',exact:true}).click();await expect(page.locator('#experience-formatted table')).toHaveCount(1);
+  await page.keyboard.press('ControlOrMeta+z');await expect(page.locator('#experience-formatted table')).toHaveCount(1);
   await expect(page.locator('.markdown-structured, .markdown-context-menu')).toHaveCount(0);
 });
 

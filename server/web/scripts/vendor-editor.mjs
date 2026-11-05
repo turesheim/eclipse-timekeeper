@@ -22,14 +22,14 @@ for(const input of Object.keys(result.metafile.inputs)){
 let notices='Complete licenses for packages included in the locally bundled Markdown editor.\n';
 const inventory=[];
 for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,'en'))){
-  if(!['MIT','ISC'].includes(pkg.license))throw new Error(`Review license for ${pkg.name}: ${pkg.license}`);
+  if(!['MIT','ISC','BSD-3-Clause'].includes(pkg.license))throw new Error(`Review license for ${pkg.name}: ${pkg.license}`);
   const licenses=(await readdir(pkg.directory)).filter(file=>/^(licen[cs]e|copying)(\.|$)/i.test(file)).sort();
   if(!licenses.length)throw new Error('Missing license: '+pkg.name);
   inventory.push({name:pkg.name,version:pkg.version,license:pkg.license});
   for(const license of licenses)notices+=`\n\n${pkg.name}@${pkg.version} / ${license}\n\n`+await readFile(join(pkg.directory,license),'utf8');
 }
 const target=join(root,'src/assets/milkdown');
-files.push([join(target,'CODEMIRROR-LICENSE'),await readFile(join(root,'node_modules/@codemirror/language/LICENSE'))]);
+files.push([join(target,'HIGHLIGHT-LICENSE'),await readFile(join(root,'node_modules/highlight.js/LICENSE'))]);
 files.push([join(target,'LICENSE'),await readFile(join(root,'node_modules/@milkdown/kit/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n']);
 const sizes=result.outputFiles.map(file=>({file:file.path.split('/').at(-1),bytes:file.contents.length,gzipBytes:gzipSync(file.contents).length}));
 // Gzip estimates vary across zlib versions. Only deterministic raw sizes belong

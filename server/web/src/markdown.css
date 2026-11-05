@@ -18,8 +18,7 @@
 .markdown-editor .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
 .markdown-editor .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
 .markdown-editor .ProseMirror .markdown-mermaid-block { margin-block: 1rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; overflow: hidden; }
-.markdown-editor .ProseMirror .markdown-mermaid-block pre { margin: 0; border-radius: 0; }
-.markdown-mermaid-preview { padding: .5rem; border-top: 1px solid var(--bs-border-color); background: var(--bs-body-bg); }
+.markdown-mermaid-preview { padding: .5rem; background: var(--bs-body-bg); }
 .markdown-mermaid-preview p:empty { display: none; }
 .markdown-mermaid-preview p { margin: .25rem; color: var(--bs-secondary-color); }
 .markdown-mermaid-preview img { display: block; max-width: 100%; height: auto; margin-inline: auto; }
@@ -85,23 +84,31 @@
 .markdown-suggestions { position: fixed; z-index: 1080; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; border-radius: .4rem; box-shadow: 0 .25rem .75rem #0002; max-width: calc(100vw - 1rem); }
 .markdown-suggestions { display: flex; flex-direction: column; max-height: 12rem; overflow: auto; width: 17rem; }
 .markdown-suggestions button { text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.markdown-overflow { display: none; }
 .markdown-editor button[aria-pressed=true] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
-@media(max-width:600px) {
-  .markdown-editor .markdown-toolbar { flex-wrap: wrap !important; overflow: visible; }
-  .markdown-overflow { display: inline-flex; }
-  .markdown-editor .markdown-toolbar:not([data-expanded=true]) :is(.markdown-tools,.markdown-document-tools) { display: none; }
-  .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { flex: 1 1 100%; flex-wrap: wrap; }
-}
-.markdown-code-block { border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
-.markdown-code-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .25rem .5rem; background: var(--bs-tertiary-bg); font-size: var(--font-markdown-code-control); }
-.markdown-code-controls input { width: 8rem; margin-inline-start: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); }
-.markdown-code-controls button { border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); color: var(--bs-body-color); padding: .25rem .5rem; border-radius: .25rem; }
+@media(max-width:600px) { .markdown-editor .markdown-toolbar { flex-wrap: wrap !important; overflow: visible; } }
+/* The compact code badge leaves the existing theme surface unchanged. */
+.markdown-code-block { position: relative; border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
+.markdown-code-controls { position: absolute; inset-block-start: .4rem; inset-inline-end: .5rem; display: flex; align-items: center; z-index: 1; font-size: var(--font-markdown-code-control); }
+.markdown-code-controls > button { border: 0; background: var(--bs-tertiary-bg); color: var(--bs-body-color); min-height: 1.75rem; padding: .2rem .3rem; font: inherit; }
+.markdown-code-controls > button:first-child { max-width: 4.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: .25rem 0 0 .25rem; }
+.markdown-code-controls > button:last-of-type { width: 1.75rem; border-radius: 0 .25rem .25rem 0; }
+.markdown-code-controls > button:hover { color: var(--bs-primary-text-emphasis); }
 .markdown-code-block pre { margin: 0; }
-.tok-keyword,.tok-operator { color: var(--bs-body-color); font-weight: 600; }
-.tok-string,.tok-regexp { color: var(--bs-body-color); text-decoration: underline; text-decoration-style: dotted; }
-.tok-number,.tok-bool,.tok-null { color: var(--bs-danger-text-emphasis); }
-.tok-comment,.tok-meta { color: var(--bs-body-color); font-style: italic; }
+.markdown-code-block pre::before { content: ''; float: inline-end; inline-size: 6.5rem; block-size: 1.5rem; }
+.markdown-code-language { position: fixed; inset: auto; margin: 0; padding: .5rem; border: 1px solid var(--bs-border-color); border-radius: .4rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
+.markdown-code-language label { display: flex; flex-direction: column; gap: .25rem; }
+.markdown-code-language input { width: 12rem; max-width: calc(100vw - 3rem); background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; }
+.markdown-code-block :is(.hljs-keyword,.hljs-operator,.hljs-selector-tag) { color: color-mix(in srgb, var(--bs-primary-text-emphasis) 60%, var(--bs-body-color)); font-weight: 600; }
+.markdown-code-block :is(.hljs-string,.hljs-regexp,.hljs-addition) { color: var(--bs-success-text-emphasis); }
+.markdown-code-block :is(.hljs-number,.hljs-literal,.hljs-deletion) { color: color-mix(in srgb, var(--bs-danger-text-emphasis) 60%, var(--bs-body-color)); }
+.markdown-code-block :is(.hljs-comment,.hljs-meta,.hljs-quote) { color: var(--bs-secondary-color); font-style: italic; }
+.markdown-code-block :is(.hljs-attr,.hljs-attribute,.hljs-title,.hljs-selector-class,.hljs-built_in,.hljs-symbol) { color: var(--bs-info-text-emphasis); }
+.markdown-actions-trigger { flex: none; }
+.markdown-actions-menu { position: fixed; inset: auto; margin: 0; max-width: min(24rem,calc(100vw - 1rem)); max-height: min(30rem,calc(100dvh - 1rem)); overflow: auto; }
+.markdown-actions-menu:popover-open { display: block; }
+.markdown-actions-menu .dropdown-item { display: flex; align-items: center; gap: .75rem; white-space: normal; min-height: 2.75rem; }
+.markdown-actions-menu .dropdown-item > .icon { flex: none; }
+.markdown-actions-group + .markdown-actions-group { border-block-start: 1px solid var(--bs-border-color); margin-block-start: .25rem; padding-block-start: .25rem; }
 .markdown-callout { border-inline-start: .25rem solid var(--bs-info); background: var(--bs-info-bg-subtle); padding: .5rem .75rem; margin-block: .75rem; }
 .markdown-callout > div:first-child { display: flex; gap: .5rem; align-items: center; }
 .markdown-callout > div:first-child button { border: 0; background: transparent; color: var(--bs-info-text-emphasis); font-weight: 700; }
@@ -114,14 +121,9 @@
 .markdown-history-dialog { width: min(60rem,calc(100vw - 1rem)); }
 .markdown-revision-list { display: flex; flex-wrap: wrap; gap: .25rem; max-height: 10rem; overflow: auto; margin-block: .5rem; }
 .markdown-revision-diff { max-height: 45vh; overflow: auto; padding: .75rem; border: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); color: var(--bs-body-color); white-space: pre-wrap; }
-@media(max-width:600px) {
-  .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-tools { display: grid; grid-template-columns: repeat(auto-fill,minmax(2.75rem,1fr)); }
-  .markdown-editor .markdown-toolbar[data-expanded=true] .markdown-block-trigger { grid-column: span 2; justify-content: center; }
-}
 
 /* The split pane owns scrolling; nested rich-editor overflow would bypass synchronization. */
 
-.markdown-resource-tools,.markdown-document-tools { flex: none; }
 .markdown-editor .journal-source textarea:focus { outline: none; box-shadow: none; }
 .markdown-revision-diff > span { display: block; white-space: pre-wrap; overflow-wrap: anywhere; padding-inline: .5rem; }
 .markdown-diff-added { color: var(--bs-success-text-emphasis); background: var(--bs-success-bg-subtle); }
@@ -138,5 +140,3 @@
 .markdown-caret-mirror { position: fixed; inset: 0 auto auto 0; height: auto; box-sizing: border-box; border: 0; visibility: hidden; pointer-events: none; user-select: none; }
 @keyframes markdown-caret-blink { 50% { opacity: 0; } }
 @media(prefers-reduced-motion: reduce) { .markdown-caret { animation: none; } }
-
-.markdown-context-tools { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: .5rem; max-width: 100%; }

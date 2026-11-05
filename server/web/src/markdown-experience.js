@@ -4,13 +4,15 @@ import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
 import {iconButton} from './icons.js';
 import {headingAnchor} from './wiki-links.js';
+import {buildActionsMenu} from './markdown-actions.js';
 const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
 const action=(key,run,glyph)=>{const button=el('button',glyph?'':t(key));button.type='button';button.className='btn btn-outline-secondary';if(glyph)iconButton(button,glyph,t(key));button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',run);return button;};
 /** UI around the shared schema; all mutations still pass through its read-only guard. */
 export function buildExperience(field){
   const f=field;
+  buildActionsMenu(f);
   f.retryButton=action('ui.retry',()=>void f.retryUpload?.());f.retryButton.hidden=true;f.status.after(f.retryButton);
-  f.resourceTools=el('div');f.resourceTools.className='btn-group markdown-resource-tools';f.resourceTools.setAttribute('role','group');f.resourceTools.setAttribute('aria-label',t('markdown.note_tools'));f.toolbar.append(f.resourceTools);
+  f.resourceTools=el('div');f.resourceTools.setAttribute('role','group');f.resourceTools.setAttribute('aria-label',t('markdown.note_tools'));f.addActionsGroup(f.resourceTools);
   f.assetDialog=el('dialog');f.assetDialog.className='app-dialog markdown-asset-dialog';f.assetDialog.setAttribute('aria-label',t('markdown.existing_asset'));
   const assetHeading=el('h2',t('markdown.existing_asset')),assetSearch=el('input');assetSearch.type='search';assetSearch.className='form-control';assetSearch.setAttribute('aria-label',t('notes.search'));const assetList=el('div');assetList.className='markdown-asset-list';const closeAsset=action('ui.close',()=>f.assetDialog.close());f.assetDialog.append(assetHeading,assetSearch,assetList,closeAsset);f.root.append(f.assetDialog);
   let assetGeneration=0;
@@ -66,7 +68,6 @@ export function buildExperience(field){
     }catch(error){if(valid())historyStatus.textContent=error.message;}
   },'clock-history');f.resourceTools.append(f.historyButton);
   f.scrollToHeading=heading=>{if(!heading)return;const target=f.editor?.outline().find(item=>headingAnchor(item.text)===headingAnchor(heading));if(target){f.editor.scrollTo(target.pos);return true;}f.status.textContent=t('markdown.heading_missing',{heading});return false;};
-  f.overflow=action('markdown.more',()=>{const open=f.toolbar.dataset.expanded!=='true';f.toolbar.dataset.expanded=String(open);f.overflow.setAttribute('aria-expanded',String(open));},'three-dots');f.overflow.classList.add('markdown-overflow');f.overflow.setAttribute('aria-expanded','false');f.toolbar.append(f.overflow);
   const suggestions=el('div');suggestions.className='markdown-suggestions';suggestions.hidden=true;suggestions.setAttribute('role','listbox');suggestions.setAttribute('aria-label',t('markdown.suggestions'));f.root.append(suggestions);f.suggestions=suggestions;
   let completion=0,lastQuery;
   const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
@@ -77,6 +78,7 @@ export function buildExperience(field){
     f.imageProperties.disabled=f.readOnly||!f.editor?.imageDetails();
     f.historyButton.disabled=!f.resources?.revisions;
     f.assetPicker.disabled=f.readOnly||!f.resources?.complete;
+    f.syncActions();
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
     const tableKeys=!!f.editor?.context().table&&!f.readOnly&&!f.loading;
     if(f.tableButton.dataset.tableKeys!==String(tableKeys)){

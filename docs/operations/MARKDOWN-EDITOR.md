@@ -37,8 +37,10 @@ Vault extensions include:
 Type `[[` for note completion; `![[` suggests assets. Exact vault/relative paths
 take priority over a unique filename. Missing and ambiguous references are
 reported visibly; rename/move does not rewrite other files' links. Hover or focus
-a wiki reference for its preview. Normal web/relative Markdown links open with
-Command/Ctrl-click in an editable note; read-only links open on an ordinary click.
+a wiki reference for its preview. Ordinary clicks follow web, local Markdown and
+wiki links in formatted notes. Safe HTML anchors use the same link handling;
+script attributes are not rendered. Web links open separately. A focused link
+can also be followed with Enter.
 Unsafe schemes and paths leaving the vault are rejected. Obsidian plugins,
 transclusions of entire Markdown notes and executable HTML are not supported.
 
@@ -47,21 +49,30 @@ transclusions of entire Markdown notes and executable HTML are not supported.
 The heading menu selects plain text or H1–H6. Toolbar tooltips name each action
 and available shortcut; active formatting is indicated. Use the main toolbar to
 format a selection. Type `/` at the start of a paragraph for commands.
-On narrow screens, **More formatting** reveals the remaining actions. Returning
-to a note retains its in-memory cursor and scroll position while the session
-remains open.
+Formatting actions wrap on narrow screens. **Note tools** opens a keyboard-
+accessible menu for existing attachments, image properties, revisions and document
+actions such as rename, delete and reload. Returning to a note retains its
+in-memory mode, cursor and scroll position while the session remains open.
+Notes open in formatted mode by default.
 
 Use Command/Ctrl+B for bold, Command/Ctrl+I for italic, and Command/Ctrl+Z for undo.
-Redo uses Command/Ctrl+Shift+Z (or the toolbar). Mode changes retain rich history;
+Redo uses Command/Ctrl+Shift+Z. Undo and Redo have no toolbar buttons. Mode changes retain rich history;
 source edits become history boundaries when returning to formatted mode.
 
 Markdown source uses a plain text area. Tab indents by two spaces; Escape followed
 by Tab leaves the text area. Source modes do not add a separate tools row.
 
-Code blocks have a language field and a copy button. Highlighting supports
-JavaScript/TypeScript, Java, Python, JSON, SQL, HTML, CSS, shell, YAML and Markdown;
-unknown languages stay plain. Mermaid fences retain editable source and render
-a local preview. External diagram resources are rejected.
+Code blocks combine the language indicator and copy action in a compact badge
+at the top right. Choose the language indicator to change the fence language.
+Syntax coloring uses the locally bundled highlight.js grammars and the current
+theme’s foreground colors; backgrounds remain unchanged. Unknown languages and
+unusually large fences stay plain so editing remains responsive. About lists the
+pinned highlight.js version and its complete BSD license.
+
+In formatted mode, a Mermaid fence shows only its locally generated diagram.
+Use **Markdown source** to edit the diagram text. The diagram is an atomic editor
+node, so navigation cannot enter hidden code. Its complete original fenced source
+is retained through mode changes and saves. External diagram resources are rejected.
 
 Use the main toolbar for lists and tables. Tab in a table moves between cells.
 Tab-separated clipboard data can create a table. To use advanced table operations
@@ -87,7 +98,7 @@ On macOS, forward Delete is Fn+Delete. Focus stays on the button for repeated
 operations. Header rows cannot be moved
 into the table body or deleted separately. Row insertion before the header is
 ignored; select a body row to insert before it. Keyboard operations act on one
-cell at a time, even after a row move selects the row. Toolbar Undo restores a
+cell at a time, even after a row move selects the row. The Undo shortcut restores a
 structural edit; saving remains
 explicit. In lists, Tab/Shift+Tab indent/outdent and Enter continues the list.
 

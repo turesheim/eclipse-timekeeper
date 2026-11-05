@@ -53,7 +53,7 @@ export class MarkdownField {
     for(const [name,glyph] of [
       ['bold','type-bold'],['italic','type-italic'],['strike','type-strikethrough'],
       ['inline_code','code'],['code_block','code-square'],['list','list-ul'],['ordered','list-ol'],['tasks','list-check'],
-      ['link','link-45deg'],['quote','quote'],['table','table'],['hr','hr'],['undo','arrow-counterclockwise'],['redo','arrow-clockwise']
+      ['link','link-45deg'],['quote','quote'],['table','table'],['hr','hr']
     ]){
       const action=iconButton(button(),glyph,t('markdown.'+name));action.dataset.command=name;const shortcuts={bold:'Mod+B',italic:'Mod+I',undo:'Mod+Z',redo:'Mod+Shift+Z'};if(shortcuts[name])action.title+=' ('+shortcuts[name]+')';
       action.addEventListener('mousedown',event=>event.preventDefault());action.addEventListener('click',()=>{
@@ -144,6 +144,7 @@ export class MarkdownField {
   }
   showBlockMenu(last=false){
     if(this.readOnly||this.loading||!this.editor)return;
+    this.closeActions();
     this.paintBlockStyle();if(!this.blockMenu.matches(':popover-open'))this.blockMenu.showPopover();this.positionBlockMenu();
     (last?this.blockMenu.lastElementChild:this.blockMenu.querySelector('[aria-checked="true"]')||this.blockMenu.firstElementChild).focus();
   }
@@ -171,6 +172,7 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.closeActions?.();
     this.caret?.clear();
     this.sourcePosition=null;
     this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();

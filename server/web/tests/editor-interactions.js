@@ -1,5 +1,13 @@
 import {expect,test} from '@playwright/test';
 
+export async function noteActions(page,scope){
+  const trigger=scope.getByRole('button',{name:'Note tools',exact:true});
+  if(await trigger.getAttribute('aria-expanded')!=='true')await trigger.click();
+  const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu).toBeVisible();return menu;
+}
+export async function clickNoteAction(page,scope,name){await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();}
+
+
 /** Select the paragraph end explicitly: End has different native macOS semantics. */
 export async function appendEditorText(paragraph,text){
   await expect(paragraph).toBeVisible();
