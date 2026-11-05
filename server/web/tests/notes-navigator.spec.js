@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {captureScreenshot} from './screenshots.js';
+import {noteEntry} from './note-entry.js';
 
 async function setup(page,request){
   const username='navigator-'+randomUUID().slice(0,8),password='Private navigator test passphrase';
@@ -70,7 +71,7 @@ test('collapsing navigation gives the editor the full width while preserving its
   await page.setViewportSize({width:1440,height:900});
   const {api}=await setup(page,request);await put(api,'Notes/Review.md','# Project review\n\nNotes for the next release.\n');
   const navigation=page.locator('#notes-navigation'),toggle=page.locator('.notes-drawer-toggle'),editor=page.locator('.notes-editor'),title=page.locator('#notes-document-title'),resize=page.getByRole('separator',{name:'Resize notes navigation'});
-  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes/Review.md',exact:true}).click();
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Review.md').click();
   await expect(title).toHaveText('Project review');await expect(toggle).toHaveAttribute('aria-expanded','true');
   for(const property of ['font-family','font-size','font-weight'])await expect(title).toHaveCSS(property,await page.locator('#notes-title').evaluate((node,property)=>getComputedStyle(node).getPropertyValue(property),property));
   expect((await title.boundingBox()).y+(await title.boundingBox()).height).toBeLessThan((await editor.boundingBox()).y);
