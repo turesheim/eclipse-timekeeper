@@ -1321,5 +1321,10 @@
   "notes.import_done_other": "Imported {{count}} files. Conflicts were left unchanged.",
   "notes.import_reviewed_one": "{{count}} new file ready to import. Review the list before continuing.",
   "notes.import_done_one": "Imported {{count}} file. Conflicts were left unchanged.",
-  "notes.import_not_present": "This file was not provided by the folder picker. It may be hidden or no longer present; nothing will be uploaded."
+  "notes.import_not_present": "This file was not provided by the folder picker. It may be hidden or no longer present; nothing will be uploaded.",
+  "today.recent_notes": "Recent notes",
+  "today.no_recent_notes": "No notes edited in the configured day range.",
+  "today.more_notes": "More notes",
+  "notes.recent_days": "Recent notes: number of days",
+  "notes.recent_days_help": "Show notes edited during this many calendar days, including today, in Today. Uses your account time zone. Journal notes are excluded. Choose 1–3650 days; the default is 7."
 }

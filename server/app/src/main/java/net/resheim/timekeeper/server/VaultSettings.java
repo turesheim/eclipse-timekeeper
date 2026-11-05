@@ -7,15 +7,16 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Settings for the account's collection, independent of canonical note bodies. */
 final class VaultSettings {
+    static final int RECENT_DAYS=7, MAX_RECENT_DAYS=3650;
     static final String TYPE="VAULT_SETTINGS";
     static final UUID ID=ImportLedger.identifier("vault","settings");
     private static final List<String> ROOTS=List.of("journalFolder","eventsFolder","assetsFolder");
-    private static final Set<String> FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder");
+    private static final Set<String> FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder","recentNotesDays");
     private final ServerStore store;
     VaultSettings(ServerStore store){this.store=store;}
-    ObjectNode get(){return store.find(TYPE,ID).map(value->{var result=((ObjectNode)value).deepCopy();if(!result.has("hideJournalFolder"))result.put("hideJournalFolder",false);return result;}).orElseGet(()->object()
+    ObjectNode get(){return store.find(TYPE,ID).map(value->{var result=((ObjectNode)value).deepCopy();if(!result.has("recentNotesDays"))result.put("recentNotesDays",RECENT_DAYS);if(!result.has("hideJournalFolder"))result.put("hideJournalFolder",false);return result;}).orElseGet(()->object()
             .put("id",ID.toString()).put("ownerId",store.owner()).put("version",0)
-            .put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false).put("hideJournalFolder",false));}
+            .put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false).put("hideJournalFolder",false).put("recentNotesDays",RECENT_DAYS));}
     static boolean configurationPath(VaultPath path){return path.segments().stream().anyMatch(segment->VaultPath.searchKey(segment).equals(".obsidian"));}
     boolean allowed(VaultPath path){return !configurationPath(path)||get().path("syncObsidianConfig").asBoolean();}
     /** The service moves indexed roots in the same owner transaction as this write. */
@@ -33,6 +34,11 @@ final class VaultSettings {
             if(!input.path(field).isBoolean())throw ApiFailure.validation();
             changed|=value.path(field).asBoolean()!=input.path(field).asBoolean();
             value.put(field,input.path(field).asBoolean());
+        }
+        if(input.has("recentNotesDays")){
+            var days=input.path("recentNotesDays");
+            if(!days.isIntegralNumber()||!days.canConvertToInt()||days.asInt()<1||days.asInt()>MAX_RECENT_DAYS)throw ApiFailure.validation();
+            changed|=value.path("recentNotesDays").asInt()!=days.asInt();value.put("recentNotesDays",days.asInt());
         }
         var journal=new VaultPath(value.path("journalFolder").asText());var events=new VaultPath(value.path("eventsFolder").asText());
         if(journal.beneath(events)||events.beneath(journal))throw ApiFailure.validation();

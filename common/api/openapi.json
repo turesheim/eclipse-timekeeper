@@ -17831,6 +17831,90 @@
         ],
         "description": "A consistent owner-private snapshot with exact bytes, portable paths and timestamp metadata. Recently deleted content, account data and authentication secrets are excluded. Preparation and private download follow the account export mechanism."
       }
+    },
+    "/notes/recent": {
+      "get": {
+        "operationId": "listRecentNotes",
+        "summary": "List recently edited notes excluding journal notes",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 20
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatchOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentNotesPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "description": "Metadata only, ordered by modification instant descending and then portable path and identity. The configured recentNotesDays window includes the entire current civil day in the account time zone. Excludes folders, assets, deleted entries and the configured journal subtree. Includes event notes. Pagination requires the first page snapshot in If-Match after offset zero; changes to the collection, day, time zone or preference invalidate it."
+      }
     }
   },
   "components": {
@@ -31847,6 +31931,13 @@
             "type": "boolean",
             "default": false,
             "description": "Hide the configured journal folder and its descendants from Notes navigation, search and trash. Journal views, image references and synchronization remain available."
+          },
+          "recentNotesDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650,
+            "default": 7,
+            "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
           }
         }
       },
@@ -31898,6 +31989,13 @@
             "type": "boolean",
             "default": false,
             "description": "Hide the configured journal folder and its descendants from Notes navigation, search and trash. Journal views, image references and synchronization remain available."
+          },
+          "recentNotesDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650,
+            "default": 7,
+            "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
           }
         }
       },
@@ -32236,6 +32334,13 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Hide the configured journal folder and its descendants from Notes navigation, search and trash. Journal views, image references and synchronization remain available."
+              },
+              "recentNotesDays": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3650,
+                "default": 7,
+                "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
               }
             }
           },
@@ -32578,6 +32683,51 @@
             "format": "date-time",
             "maxLength": 40,
             "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+          }
+        }
+      },
+      "RecentNotesPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "snapshot",
+          "items",
+          "days",
+          "zoneId",
+          "fromDate",
+          "toDate"
+        ],
+        "properties": {
+          "snapshot": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VaultEntry"
+            }
+          },
+          "nextOffset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650,
+            "default": 7,
+            "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+          },
+          "zoneId": {
+            "type": "string"
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
           }
         }
       }

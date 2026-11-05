@@ -503,3 +503,7 @@ small, .small { font-size: var(--font-small); }
 code, pre { font-size: var(--font-code); }
 .timekeeper-tooltip { --bs-tooltip-font-size: var(--font-tooltip); }
 .typography-editor { font-family: var(--bs-font-monospace); font-size: var(--font-css-editor); min-height: 24rem; height: 60vh; resize: vertical; tab-size: 2; }
+
+.today-recent-list { display: grid; gap: .35rem; }
+.today-recent-note { display: grid; width: 100%; min-width: 0; text-align: start; }
+.today-recent-note > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

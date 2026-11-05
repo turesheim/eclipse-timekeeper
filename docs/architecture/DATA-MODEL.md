@@ -736,3 +736,23 @@ Existing day-note audit events remain metadata evidence and are not replaced.
 Portable account/Markdown archives retain their existing allowlist; full instance
 backups include the revision records. History begins prospectively and is never
 presented as a record of changes before installation.
+
+`VAULT_SETTINGS.recentNotesDays` controls the Today sidebar's Recent notes list.
+It defaults to 7 and accepts integers from 1 through 3650, counting the current
+calendar day in the account time zone. Existing stored settings and account
+archives without the field use 7. The preference is included in full account
+archives, but not notes-only ZIP exports.
+
+`GET /api/v1/notes/recent` returns owner-private index metadata rather than
+document or attachment bodies. It includes active Markdown and event notes edited
+from the first local midnight through the end of today, excluding the configured
+journal subtree, day/week notes, assets, folders and trash. Results sort by edit
+instant descending, then normalized path and identity. The pagination snapshot
+binds the collection generation, day range, time zone and preference; subsequent
+pages require it in `If-Match`. Midnight and time-zone changes invalidate pages
+even when no note has changed.
+
+An empty Recent notes read does not initialize the collection or create business
+records. This preserves the strict empty-target restore check after a user opens
+Today on a fresh installation. Existing canonical event notes are indexed on the
+first recent-list read when the collection has not yet been initialized.

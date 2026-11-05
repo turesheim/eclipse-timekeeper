@@ -21,8 +21,9 @@ public class VaultResource {
     @Context io.vertx.ext.web.RoutingContext routing;
     private VaultCollection vault(){return new VaultCollection(store,limits);}
     private static UUID uuid(String input){if(input==null)throw ApiFailure.validation();try{var value=UUID.fromString(input);if(!value.toString().equals(input))throw ApiFailure.validation();return value;}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}}
-    private Response tx(Supplier<Response> operation){return store.authenticated(identity,()->{
-        vault().initialize();return Response.fromResponse(operation.get()).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();
+    private Response tx(Supplier<Response> operation){return tx(true,operation);}
+    private Response tx(boolean initialize,Supplier<Response> operation){return store.authenticated(identity,()->{
+        if(initialize)vault().initialize();return Response.fromResponse(operation.get()).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();
     });}
     private static void fields(JsonNode input,String...allowed){
         if(input==null||!input.isObject())throw ApiFailure.validation();var fields=Set.of(allowed);
@@ -59,6 +60,11 @@ public class VaultResource {
         UUID directory=parent==null?VaultIndex.ROOT:uuid(parent);
         int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,limits.pageSize(),1,limits.pageSize());
         return tx(()->Response.ok(vault().page(directory,query==null&&uri.getQueryParameters().containsKey("query")?"":query,"true".equals(trash),start,count,snapshot)).build());
+    }
+    @GET @Path("/recent") public Response recent(@QueryParam("offset")String offset,@QueryParam("limit")String limit,@HeaderParam("If-Match")String snapshot){
+        ContractInputs.queries(uri.getQueryParameters(),"offset","limit");
+        int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,Math.min(20,limits.pageSize()),1,limits.pageSize());
+        return tx(false,()->Response.ok(new RecentNotes(store,limits).page(start,count,snapshot)).build());
     }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("VaultFolderInput",input);var path=new VaultPath(value.path("path").asText());
