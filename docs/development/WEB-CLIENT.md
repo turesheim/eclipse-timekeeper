@@ -1103,6 +1103,10 @@ the folder drawer; selecting a document closes the drawer. The toggle reports
 its current state to assistive technology and retains focus when a viewport
 change hides the focused navigation control.
 
+![Notes workspace with a compact, resizable folder tree](../assets/screenshots/notes-workspace-expanded.png)
+
+![Notes editor using the full workspace width](../assets/screenshots/notes-workspace-collapsed.png)
+
 The tree supports desktop resizing, keyboard tree navigation, a mobile drawer,
 file/folder creation, guarded rename/deletion/recovery and collection settings.
 Drafts remain in memory across tab changes and are discarded only after review.

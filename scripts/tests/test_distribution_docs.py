@@ -83,7 +83,7 @@ class DistributionDocumentationTest(unittest.TestCase):
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('net/resheim/timekeeper/server/InstancePreboot.class',b'Fixture bootstrap')
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
-            for name in ('day-notes-desktop.png','day-notes-editor.png','journal-editor-mobile.png','mermaid-editor.png','font-sizes.png','about-references-desktop.png','work-session-editor-delete-confirm.png','holiday-preferences-mobile.png',
+            for name in ('day-notes-desktop.png','day-notes-editor.png','journal-editor-mobile.png','mermaid-editor.png','font-sizes.png','notes-workspace-expanded.png','notes-workspace-collapsed.png','about-references-desktop.png','work-session-editor-delete-confirm.png','holiday-preferences-mobile.png',
                          'public-holidays-desktop.png','public-holidays-details-mobile.png',
                          'calendar-subscriptions-desktop.png','calendar-subscriptions-details-mobile.png',
                          'locale-norwegian-account.png','locale-norwegian-administration.png',
