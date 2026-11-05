@@ -66,7 +66,35 @@ test('expand and collapse cover nested folders, exclude a hidden journal and can
   expect(parents).not.toContain(journal.id);await expect(page.locator('#notes-body')).toHaveValue('Retain this draft.');
 });
 
-test('navigator toolbar and sort menu fit desktop and mobile themes with the shared 14px default',async({page,request})=>{
+test('collapsing navigation gives the editor the full width while preserving its draft and navigator width',async({page,request})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const {api}=await setup(page,request);await put(api,'Notes/Review.md','# Project review\n\nNotes for the next release.\n');
+  const navigation=page.locator('#notes-navigation'),toggle=page.locator('.notes-drawer-toggle'),editor=page.locator('.notes-editor'),title=page.locator('#notes-document-title'),resize=page.getByRole('separator',{name:'Resize notes navigation'});
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes/Review.md',exact:true}).click();
+  await expect(title).toHaveText('Project review');await expect(toggle).toHaveAttribute('aria-expanded','true');
+  for(const property of ['font-family','font-size','font-weight'])await expect(title).toHaveCSS(property,await page.locator('#notes-title').evaluate((node,property)=>getComputedStyle(node).getPropertyValue(property),property));
+  expect((await title.boundingBox()).y+(await title.boundingBox()).height).toBeLessThan((await editor.boundingBox()).y);
+  await expect.poll(()=>navigation.locator('.notes-tree-pick').first().evaluate(node=>parseFloat(getComputedStyle(document.documentElement).fontSize)-parseFloat(getComputedStyle(node).fontSize))).toBeCloseTo(2,1);
+  await captureScreenshot(page,{path:'test-results/notes-workspace-expanded.png',fullPage:false});
+  await resize.focus();await resize.press('End');await expect(resize).toHaveAttribute('aria-valuenow','480');
+  const expandedWidth=(await editor.boundingBox()).width;
+  await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('Unsaved layout draft.');
+  await toggle.focus();await toggle.press('Enter');await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(navigation).toBeHidden();await expect(resize).toBeHidden();
+  await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-(await page.locator('.notes-layout').boundingBox()).width)).toBeLessThan(2);
+  expect((await editor.boundingBox()).width).toBeGreaterThan(expandedWidth);
+  await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
+  await captureScreenshot(page,{path:'test-results/notes-workspace-collapsed.png',fullPage:false});
+  await toggle.press('Space');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toHaveAttribute('aria-valuenow','480');
+  await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-expandedWidth)).toBeLessThan(2);await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
+  // A viewport change must not leave focus in navigation that is now hidden.
+  await page.locator('#notes-search').focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await toggle.press('Enter');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toBeHidden();
+  await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await toggle.click();await page.setViewportSize({width:390,height:844});await toggle.click();await expect(navigation).toBeVisible();await page.locator('#notes-search').focus();
+  await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
+});
+
+test('navigator toolbar and sort menu fit desktop and mobile themes with compact tree text',async({page,request})=>{
   await setup(page,request);const navigation=page.locator('#notes-navigation');
   await expect(page.locator('html')).toHaveCSS('font-size','14px');await expect(page.locator('body')).toHaveCSS('font-size','14px');
   for(const width of [1440,390,320]){
