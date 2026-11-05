@@ -1,6 +1,7 @@
 .markdown-toolbar { overflow-x: auto; margin-block: .75rem; padding: .2rem; }
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .markdown-editor .markdown-modes, .markdown-editor .markdown-tools { flex: none; flex-wrap: nowrap; gap: 0; margin: 0; }
+.markdown-editor .markdown-tools { flex-wrap: wrap; max-width: 100%; }
 .markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
 .markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
@@ -137,3 +138,5 @@
 .markdown-caret-mirror { position: fixed; inset: 0 auto auto 0; height: auto; box-sizing: border-box; border: 0; visibility: hidden; pointer-events: none; user-select: none; }
 @keyframes markdown-caret-blink { 50% { opacity: 0; } }
 @media(prefers-reduced-motion: reduce) { .markdown-caret { animation: none; } }
+
+.markdown-context-tools { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: .5rem; max-width: 100%; }

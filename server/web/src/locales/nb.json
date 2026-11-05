@@ -1237,7 +1237,7 @@
   "markdown.revisions": "Notatversjoner",
   "markdown.comparison": "Sammenligning av versjoner",
   "markdown.restore_draft": "Bruk som ulagret utkast",
-  "markdown.revision_help": "Versjoner beholdes fra nå av, opptil 20 per notat, 1000 per konto og 8 MB innhold per konto. Et valg endrer bare dette utkastet. Lagring kontrollerer fortsatt gjeldende versjon. Utkast finnes bare i denne fanen.",
+  "markdown.revision_help": "Sammenlign en lagret versjon med det gjeldende utkastet. «Bruk som ulagret utkast» henter teksten tilbake; lagre notatet for å beholde endringen. Historikken beholder opptil 20 versjoner per notat, 1000 per konto og 8 MB til sammen.",
   "markdown.comparison_legend": "− valgt versjon, + gjeldende utkast",
   "markdown.server_version": "Sammenlign lagret serverversjon",
   "markdown.no_revisions": "Ingen tidligere versjoner er registrert.",
