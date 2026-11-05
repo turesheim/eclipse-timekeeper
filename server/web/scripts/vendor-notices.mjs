@@ -8,6 +8,7 @@ const components=[
   {id:'@milkdown/kit',name:'Milkdown',homepage:'https://milkdown.dev/',license:'MIT',directory:'milkdown',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
   {id:'mermaid',name:'Mermaid',homepage:'https://mermaid.js.org/',license:'MIT',directory:'mermaid',notices:'/web/assets/mermaid/THIRD-PARTY-LICENSES.txt'},
   {id:'bootstrap',name:'Bootstrap',homepage:'https://getbootstrap.com/',license:'MIT',directory:'bootstrap',notices:'/web/assets/bootstrap/THIRD-PARTY-LICENSES.txt'},
+  {id:'dompurify',name:'DOMPurify',homepage:'https://github.com/cure53/DOMPurify',license:'Apache-2.0',directory:'dompurify',copyright:'(c) Cure53 and other contributors'},
   {id:'bootstrap-icons',name:'Bootstrap Icons',homepage:'https://icons.getbootstrap.com/',license:'MIT',directory:'bootstrap-icons'},
   {id:'i18next',name:'i18next',homepage:'https://www.i18next.com/',license:'MIT',directory:'i18next'},
   {id:'date-holidays',name:'date-holidays',homepage:'https://github.com/commenthol/date-holidays',license:'ISC / CC BY-SA 3.0',directory:'date-holidays',notices:'/web/assets/date-holidays/THIRD-PARTY-LICENSES.txt'}
@@ -17,7 +18,7 @@ for(const {id,directory,licenseFile='LICENSE',...component} of components){
   const upstream=JSON.parse(await readFile(new URL(`node_modules/${id}/package.json`,root)));
   if(upstream.version!==manifest.devDependencies[id])throw new Error('Expected the pinned version of '+id);
   const license=await readFile(new URL(`src/assets/${directory}/${licenseFile}`,root),'utf8');
-  const copyright=license.match(/^Copyright (?:\(c\)\s*)?\d[^\r\n]*/mi)?.[0];
+  const copyright=component.copyright||license.match(/^Copyright (?:\(c\)\s*)?\d[^\r\n]*/mi)?.[0];
   if(!copyright)throw new Error('Missing copyright notice for '+id);
   notices.push({...component,version:upstream.version,copyright,licenseUrl:`/web/assets/notices/${directory}-${licenseFile}.txt`});
   files.push([new URL(`src/assets/notices/${directory}-${licenseFile}.txt`,root),license]);

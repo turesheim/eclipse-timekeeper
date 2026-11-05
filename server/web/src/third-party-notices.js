@@ -45,6 +45,14 @@ export const thirdPartyNotices=[
     "licenseUrl": "/web/assets/notices/bootstrap-LICENSE.txt"
   },
   {
+    "name": "DOMPurify",
+    "homepage": "https://github.com/cure53/DOMPurify",
+    "license": "Apache-2.0",
+    "copyright": "(c) Cure53 and other contributors",
+    "version": "3.4.17",
+    "licenseUrl": "/web/assets/notices/dompurify-LICENSE.txt"
+  },
+  {
     "name": "Bootstrap Icons",
     "homepage": "https://icons.getbootstrap.com/",
     "license": "MIT",
