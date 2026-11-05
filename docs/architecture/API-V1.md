@@ -1131,6 +1131,34 @@ Titles are bounded to 4,096 characters. Clients fall back to the filename/path
 when no title is available. Title reads do not modify canonical Markdown bytes,
 filenames, note versions or write validators.
 
+`GET /notes/storage` requires read permission and returns owner-private logical
+usage without initializing an unused collection. It includes effective `limits`,
+`usage` (`bytes`, `entries`, `files`, `folders`), six `categories` (`NOTES`, `DAY`,
+`WEEK`, `EVENT`, `ATTACHMENTS`, `TRASH`) with bytes/entry counts, and
+`largestMarkdownBytes`/`largestAttachmentBytes`. Retained trash counts toward
+both quotas; the virtual root does not. Active folders count toward total entries
+but not a byte category. Category bars compare with the shared total allowance.
+It is a no-store metadata response and never returns note bodies or paths.
+
+`GET /admin/notes/limits` returns effective and deployment-default quotas,
+`version`, `configured`, `canEdit`, and `maximumUploadBytes`, with a strong ETag
+and no-store caching. `PUT /admin/notes/limits` accepts exactly
+`{limits: {fileBytes, markdownBytes, totalBytes, entries}, currentPassword}`.
+It requires a genuine administrator account session, fresh password proof,
+CSRF protection for browser sessions and If-Match (428/412 for absent/stale
+validators). API-token sessions cannot write. Values must be whole bytes/counts,
+positive, with `markdownBytes ≤ fileBytes ≤ totalBytes`, at least four entries,
+at most 1 GB/file and 1,000,000 entries. Increasing the file limit beyond the
+HTTP upload ceiling returns 422 `VAULT_HTTP_LIMIT`. No-op saves keep the ETag.
+
+Quota settings are installation-wide with their own durable version. They take
+effect across instances immediately and do not activate pending authentication
+or SMTP settings, advance the authentication epoch, or sign out browser sessions.
+Saved overrides win over deployment defaults and survive encrypted instance
+backup/restore. Account archives cannot change server policy. The defaults are
+160,000,000 bytes/file, 10,000,000 bytes/ordinary Markdown file, 5,000,000,000
+bytes/account and 100,000 files/folders; metadata pages remain 200.
+
 `GET /notes` initializes the owner collection and returns root ID, settings,
 limits and namespace snapshot. `/notes/settings` supports ETag-guarded partial
 updates. `GET /notes/entries` lists a parent directory, filename/path search or
@@ -1151,7 +1179,7 @@ preserved by editing, moving, recovery and account archives. `modifiedAt` descri
 the canonical file content. Clients sort after following every metadata page;
 unknown dates can be placed after known dates without fetching file bytes.
 Conflicting destinations are never overwritten. Stale/missing preconditions
-return 412/428; deployment quota growth returns 507. Day labels are independent.
+return 412/428; account quota growth returns 507. Day labels are independent.
 
 The create-only file endpoint accepts optional `createdAt` and `modifiedAt` query
 parameters; the folder endpoint accepts the same optional fields in

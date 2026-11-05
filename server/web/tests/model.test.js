@@ -1,5 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {storageRatio,storageBytes} from '../src/storage-format.js';
+test('storage meters retain actual usage text while clamping over-quota widths',()=>{
+  assert.equal(storageRatio(0,5000000000),0);assert.equal(storageRatio(2500000000,5000000000),50);assert.equal(storageRatio(6000000000,5000000000),100);
+  assert.equal(storageRatio(11,5000000000),0);assert.equal(storageRatio(1,3),33.33);
+  assert.equal(storageBytes(5000000000,'en-GB'),'5 GB');assert.equal(storageBytes(160000000,'en-GB'),'160 MB');assert.equal(storageBytes(0,'en-GB'),'0 B');assert.equal(storageBytes(1500000,'nb-NO'),'1,5 MB');
+});
 import {dateTimeFormat,numberFormat} from '../src/formatters.js';
 import {monthCalendar} from '../src/month-model.js';
 import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets, instantText} from '../src/model.js';

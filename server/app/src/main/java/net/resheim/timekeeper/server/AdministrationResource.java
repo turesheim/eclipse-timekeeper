@@ -17,6 +17,8 @@ public class AdministrationResource {
     @Inject BrowserOrigins origins;
     @Inject RecoveryMail recoveryMail;
     @Inject ServiceSettings settings;
+    @Inject NotesLimitSettings notesLimits;
+    @Inject InstanceAdministrator administrators;
     @ConfigProperty(name="quarkus.datasource.db-kind",defaultValue="h2") String databaseType;
     @Context UriInfo uri;
     @Context HttpHeaders headers;
@@ -36,6 +38,15 @@ public class AdministrationResource {
         reply.data().put("databaseType",databaseType);
         return Response.ok(reply.data()).header("ETag",reply.etag()).header("Cache-Control","no-store").build();
     }
+    @GET @Path("/notes/limits") public Response notesLimits(){
+        ContractInputs.queries(uri.getQueryParameters());return notesLimitsReply(notesLimits.get(identity.principal()));
+    }
+    @PUT @Path("/notes/limits") public Response notesLimits(@HeaderParam("If-Match")String match,JsonNode body){
+        origin();ContractInputs.queries(uri.getQueryParameters());var input=inputs.validate("AdministrationNotesLimitsInput",body);
+        try{return notesLimitsReply(notesLimits.save(administrators.verify(identity.principal(),input.path("currentPassword").asText()),match,input.path("limits")));}
+        finally{((com.fasterxml.jackson.databind.node.ObjectNode)input).remove("currentPassword");}
+    }
+    private Response notesLimitsReply(NotesLimitSettings.Reply reply){return Response.ok(reply.data()).header("ETag",reply.etag()).header("Cache-Control","no-store").build();}
     @GET @Path("/users") public JsonNode users() {ContractInputs.queries(uri.getQueryParameters());return accounts.users(identity.principal());}
     @POST @Path("/users") public Response user(JsonNode body) {
         origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("UserCreateInput",body);

@@ -11,6 +11,19 @@ spec=importlib.util.spec_from_file_location('webdav_sync',Path(__file__).resolve
 sync=importlib.util.module_from_spec(spec);spec.loader.exec_module(sync)
 
 class ManualSyncTests(unittest.TestCase):
+    def test_entry_bound_can_be_adjusted_without_allowing_partial_scans(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'one.md').write_text('One');(root/'two.md').write_text('Two')
+            local=sync.Local(root,max_entries=1)
+            try:
+                with self.assertRaises(sync.SyncError):local.scan()
+            finally:local.close()
+            with self.assertRaises(sync.SyncError):sync.prepare_import_metadata(root,max_entries=1)
+            self.assertFalse((root/sync.IMPORT_METADATA).exists())
+            local=sync.Local(root,max_entries=2)
+            try:self.assertEqual(2,len(local.scan()))
+            finally:local.close()
+            self.assertEqual(2,sync.prepare_import_metadata(root,max_entries=2)['entries'])
     def test_import_metadata_keeps_precise_modification_dates_without_inventing_posix_creation_dates(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);(root/'Notes').mkdir();source=root/'Notes'/'Exact.md';source.write_bytes(b'Original\r\n');(root/'Empty').mkdir();(root/'.git').mkdir();(root/'.git'/'private').write_text('ignored')

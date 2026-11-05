@@ -51,7 +51,9 @@ class ServiceSettings {
         return item.asText();
     }
     private static void validate(ObjectNode value,String password) {
-        var fields=new HashSet<String>();value.fieldNames().forEachRemaining(fields::add);if(!FIELDS.equals(fields)) throw ApiFailure.validation();
+        var fields=new HashSet<String>();value.fieldNames().forEachRemaining(fields::add);
+        if(fields.remove(VaultLimits.SETTINGS_KEY))NotesLimitSettings.validateStored(value.get(VaultLimits.SETTINGS_KEY));
+        if(!FIELDS.equals(fields)) throw ApiFailure.validation();
         for(String field:List.of("passkeysEnabled","emailRecoveryEnabled","smtpTls")) if(!value.path(field).isBoolean()) throw ApiFailure.validation();
         if(!value.path("originEpoch").canConvertToLong() || value.path("originEpoch").asLong()<0) throw ApiFailure.validation();
         if(!value.path("publicOrigin").isNull()) {
@@ -92,6 +94,7 @@ class ServiceSettings {
                 validate(initial,initialPassword);
                 execute(c,"INSERT INTO tk_service_settings(id,version,active_version,saved,effective,saved_smtp_password,effective_smtp_password) VALUES(1,0,0,?,?,?,?)",initial.toString(),initial.toString(),initialPassword,initialPassword);
             } else if(recover) {
+                if(current.effective().has(VaultLimits.SETTINGS_KEY))initial.set(VaultLimits.SETTINGS_KEY,current.effective().get(VaultLimits.SETTINGS_KEY).deepCopy());
                 long configured=Long.parseLong(config("timekeeper.auth.origin-epoch","1"));
                 long required=nextEpoch(c,current.saved().path("originEpoch").asLong());
                 if(configured<required) throw new IllegalStateException("Service settings recovery requires an explicitly newer authentication origin epoch");
@@ -154,6 +157,7 @@ class ServiceSettings {
                 .put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",value.version()!=value.active())
                 .put("smtpPasswordConfigured",value.savedPassword()!=null && !value.savedPassword().isEmpty())
                 .put("effectiveSmtpPasswordConfigured",value.effectivePassword()!=null && !value.effectivePassword().isEmpty());
-        result.set("saved",value.saved().deepCopy());result.set("effective",value.effective().deepCopy());return new Reply(result,tag(value.version()));
+        var saved=value.saved().deepCopy();var effective=value.effective().deepCopy();saved.remove(VaultLimits.SETTINGS_KEY);effective.remove(VaultLimits.SETTINGS_KEY);
+        result.set("saved",saved);result.set("effective",effective);return new Reply(result,tag(value.version()));
     }
 }

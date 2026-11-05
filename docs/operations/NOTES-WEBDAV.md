@@ -16,7 +16,7 @@ Under **Import notes**, choose the local vault root with **Choose vault folder**
 Timekeeper reviews the relative paths before uploading. Hidden configuration
 folders and nonportable paths are skipped; existing files are listed as conflicts.
 The review lists each oversized file with its byte size and the applicable server
-limit (by default 1,000,000 bytes for Markdown and 16,000,000 for other files).
+limit (by default 10,000,000 bytes for ordinary Markdown and 160,000,000 for other files).
 Uncheck individual files or an entire folder to exclude them. Folder checkboxes
 show a mixed state when only some descendants are selected. Choose **Import new
 files** after reviewing the list. A Bootstrap progress bar counts the selected
@@ -70,7 +70,7 @@ where the OS provides them (including macOS); POSIX `ctime` is never used as a
 creation date. It refuses symlinks, checks for concurrent source changes, and
 refuses to overwrite an unrelated file occupying the metadata filename. `--include-obsidian` includes configuration when
 also enabled in the target account. Timekeeper exports already include metadata
-and do not need this preparation step. The helper scans at most 10,000 entries;
+and do not need this preparation step. The helper defaults to at most 100,000 entries (adjust with `--max-entries`);
 `--max-file-bytes` sets its bounded per-file limit. The browser review still
 applies the target server's own limits.
 
@@ -242,18 +242,41 @@ older binaries must not write canonical notes without the new namespace hooks.
 Use the documented offline/native/Compose upgrade and rollback procedures.
 No Cassandra, CouchDB or extra service is introduced.
 
-Deployment properties (not writable account settings):
+**Administration → Notes** lets an administrator change the four storage quotas.
+Changes apply immediately to every account and server instance, without a restart.
+Saving requires an account sign-in and current administrator password; API tokens
+cannot change these limits. Concurrent saves are guarded by ETag.
+
+Deployment properties supply defaults until the administrator saves an override:
 
 | Property | Default |
 | --- | ---: |
-| `timekeeper.notes.max-file-bytes` | 16,000,000 |
-| `timekeeper.notes.max-markdown-bytes` | 1,000,000 |
-| `timekeeper.notes.max-total-bytes` | 500,000,000 |
-| `timekeeper.notes.max-entries` | 10,000 |
+| `timekeeper.notes.max-file-bytes` | 160,000,000 |
+| `timekeeper.notes.max-markdown-bytes` | 10,000,000 |
+| `timekeeper.notes.max-total-bytes` | 5,000,000,000 |
+| `timekeeper.notes.max-entries` | 100,000 |
 | `timekeeper.notes.max-page-size` | 200 |
 
-If increasing per-file limits, also configure the HTTP body limit and plan
-client/archive capacity; changing a Notes quota does not raise HTTP limits.
+The four quotas are per account. Files and folders, including retained Trash,
+count toward the entry limit; the virtual root does not. Pagination remains 200
+and is a deployment setting. Saved overrides take precedence over environment
+variables and are retained by encrypted instance backup/restore.
+
+**My Account → Storage** shows total bytes, file/folder counts, and progress bars
+for ordinary notes, daily notes, weekly notes, event notes, attachments/other files
+and Trash. Category bars share the account allowance rather than having separate
+quotas. The largest Markdown file and attachment are compared to their respective
+file limits. Usage describes logical retained collection data, not database or
+backup disk size. Opening the page does not initialize an unused collection.
+
+The HTTP body default is `200M` (200 MiB), enough for the default 160 MB file
+limit. The administrator form refuses increases above the configured upload
+ceiling. To allow larger files, an operator must first increase
+`quarkus.http.limits.max-body-size` (or `QUARKUS_HTTP_LIMITS_MAX_BODY_SIZE`) and any
+reverse-proxy limit. The configurable file ceiling is 1,000,000,000 bytes; the
+entry ceiling is 1,000,000. The manual helper defaults to 160 MB per file and
+100,000 entries; use `--max-file-bytes` and `--max-entries` for a different server
+policy. Changing Notes quotas does not enlarge portable archive limits.
 
 Historical canonical notes are indexed without truncating over-limit content;
 further growth fails with 507 until usage is reduced. Native journal/event limits
@@ -265,7 +288,7 @@ component, 1,024 per path, and at most 32 components.
 Account archive v4 includes logical paths/IDs/settings/associations and separate
 checksummed content/recovery files, plus existing canonical journal and label
 records. It reads v1–v3 too. Restore requires a pristine general Notes collection
-and enforces target deployment quotas; it refuses implicit collection merges.
+and enforces the target server’s current quotas; it refuses implicit collection merges.
 ZIP uploads are bounded to 1 GiB, archive JSON to 256 MiB and extracted content to
 3 GiB. A deployment with larger quotas must plan for those portable archive
 limits. Encrypted full-instance backup retains every owner's canonical records,

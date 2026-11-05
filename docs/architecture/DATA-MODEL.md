@@ -777,3 +777,10 @@ the same source identity and that ETag in `If-Match`. It removes only the retain
 revision, freeing its history budget. Current document bytes, content version,
 independent day label and live save guard remain intact. Revision deletion never
 applies or saves the editor's draft.
+
+Notes quota overrides are an installation-wide `notesLimits` object in the
+`saved` and `effective` JSON of `tk_service_settings`. Its independent version
+and four byte/count values are updated atomically without changing the outer
+service settings version, active version or authentication epoch. No table or
+schema-version change is needed. Encrypted instance backups retain the object;
+account archives do not carry authority to alter it.

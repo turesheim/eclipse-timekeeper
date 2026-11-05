@@ -4,17 +4,19 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.quarkus.runtime.configuration.MemorySize;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /** Body-limit errors occur before JAX-RS; keep the API's problem representation. */
 @ApplicationScoped
 public class HttpFailures {
-    static final long LIMIT=20L*1024*1024;
+    @ConfigProperty(name="quarkus.http.limits.max-body-size") MemorySize maximum;
     void routes(@Observes Router router) {
         // Quarkus' Content-Length check ends the response directly, without failure handlers.
         router.route("/api/v1/*").order(Integer.MIN_VALUE).handler(context -> {
             String length=context.request().getHeader("Content-Length");
             if(length!=null) {
-                try {if(Long.parseLong(length)>LIMIT) {tooLarge(context);return;}}
+                try {if(!maximum.isNegative()&&Long.parseLong(length)>maximum.asLongValue()) {tooLarge(context);return;}}
                 catch(NumberFormatException ignored) { /* The HTTP decoder handles malformed lengths. */ }
             }
             context.next();

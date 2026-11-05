@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,truncate,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
@@ -26,10 +26,14 @@ const resolve=async(client,path)=>client.get('/api/v1/notes/resolve?'+new URLSea
 test('selecting files and folders limits uploads, explains oversized files and reports real progress accessibly',async({page,request})=>{
   const {api,client,card}=await setup(page,request),root=await mkdtemp(join(tmpdir(),'notes-selection-'));let release;
   try{
+    const maximum=(await(await api('GET','/notes')).json()).limits.markdownBytes,bytes=new Intl.NumberFormat('en-GB');
     for(const folder of ['Notes','SkipFolder','.git'])await mkdir(join(root,folder));
-    for(const [path,body]of [['Notes/Included.md','Keep'],['Notes/Skip.md','Exclude'],['SkipFolder/Nested.md','Exclude folder'],['.git/config','Hidden'],['Notes/Oversized.md','x'.repeat(1_000_001)]])await writeFile(join(root,path),body);
+    for(const [path,body]of [['Notes/Included.md','Keep'],['Notes/Skip.md','Exclude'],['SkipFolder/Nested.md','Exclude folder'],['.git/config','Hidden'],['Notes/Oversized.md','']])await writeFile(join(root,path),body);
+    // The review must skip files above the server's actual limit. A sparse file
+    // exercises that boundary without materializing a quota-sized test buffer.
+    await truncate(join(root,'Notes/Oversized.md'),maximum+1);
     await choose(page,card,root);await expect(card).toContainText('3 new files ready to import');
-    const oversized=card.locator('.notes-import-row').filter({hasText:'Oversized.md'});await expect(oversized).toContainText('1,000,001 bytes exceeds the 1,000,000-byte limit');await expect(oversized.getByRole('checkbox')).toBeDisabled();
+    const oversized=card.locator('.notes-import-row').filter({hasText:'Oversized.md'});await expect(oversized).toContainText(`${bytes.format(maximum+1)} bytes exceeds the ${bytes.format(maximum)}-byte limit`);await expect(oversized.getByRole('checkbox')).toBeDisabled();
     await card.getByRole('checkbox',{name:'SkipFolder/',exact:true}).uncheck();await card.getByRole('checkbox',{name:'Notes/Skip.md',exact:true}).uncheck();expect(await card.getByRole('checkbox',{name:'Notes/',exact:true}).evaluate(input=>input.indeterminate)).toBe(true);
     const hold=new Promise(resolve=>{release=resolve;}),uploads=[];
     await page.route('**/api/v1/notes/files?**',async route=>{uploads.push(new URL(route.request().url()).searchParams.get('path'));await hold;await route.continue();});

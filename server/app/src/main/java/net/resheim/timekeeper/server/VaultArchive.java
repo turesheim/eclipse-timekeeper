@@ -31,9 +31,8 @@ final class VaultArchive {
         json.writeArrayFieldStart("entries");AccountArchive.records(connection,owner,VaultIndex.ENTRY,value->json.writeTree(logical(value,ENTRY_FIELDS)));json.writeEndArray();
         json.writeArrayFieldStart("files");files(connection,owner,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));json.writeEndArray();json.writeEndObject();
     }
-    static byte[] read(ZipFile zip,JsonNode file)throws IOException{
+    static byte[] read(ZipFile zip,JsonNode file,int maximum)throws IOException{
         String path=file.path("path").asText();long size=file.path("bytes").asLong(-1);
-        int maximum=org.eclipse.microprofile.config.ConfigProvider.getConfig().getOptionalValue("timekeeper.notes.max-file-bytes",Integer.class).orElse(16000000);
         if(!owns(path)||size<0||size>maximum||size>=Integer.MAX_VALUE)throw ApiFailure.validation();var entry=zip.getEntry(path);
         if(entry==null||entry.isDirectory()||entry.getSize()!=size)throw ApiFailure.validation();
         try(var stream=zip.getInputStream(entry)){byte[] bytes=stream.readNBytes((int)size+1);if(bytes.length!=size||!ArchiveJournalFiles.digest(bytes).equals(file.path("sha256").asText()))throw ApiFailure.validation();return bytes;}
@@ -41,7 +40,7 @@ final class VaultArchive {
     static Set<String> verify(ZipFile zip,JsonNode vault)throws IOException{
         if(!vault.isObject()||vault.path("format").asInt()!=1||!names(vault).equals(Set.of("format","settings","entries","files"))||!vault.path("entries").isArray()||!vault.path("files").isArray())throw ApiFailure.validation();
         var paths=new HashSet<String>();
-        for(var file:vault.path("files")){if(!names(file).equals(Set.of("path","bytes","sha256"))||!paths.add(file.path("path").asText()))throw ApiFailure.validation();read(zip,file);}
+        for(var file:vault.path("files")){if(!names(file).equals(Set.of("path","bytes","sha256"))||!paths.add(file.path("path").asText()))throw ApiFailure.validation();read(zip,file,VaultLimits.MAXIMUM_FILE);}
         graph(vault);return paths;
     }
     private static Map<UUID,ObjectNode> graph(JsonNode vault){
@@ -127,11 +126,11 @@ final class VaultArchive {
                 if(!VaultCollection.folder(entry)){
                     var ref=VaultSources.fromEntry(entry);var source=new VaultSources(store,store.vaultLimits(),ref);var current=source.snapshot();
                     if(ref.type().equals(VaultContent.TYPE)){
-                        String filename=filename(VaultContent.TYPE,ref.id());var file=files.get(filename);if(file==null||!used.add(filename))throw ApiFailure.validation();byte[] bytes=read(zip,file);retained=bytes.length;
+                        String filename=filename(VaultContent.TYPE,ref.id());var file=files.get(filename);if(file==null||!used.add(filename))throw ApiFailure.validation();byte[] bytes=read(zip,file,store.vaultLimits().fileBytes());retained=bytes.length;
                         if(current.version()>0)throw ApiFailure.conflict();source.write(current.tag(),bytes,entry.path("kind").asText().equals("MARKDOWN"));if(deleted)source.delete(source.snapshot().tag());
                     }else if(deleted){
                         if(!current.deleted()&&current.version()>0)throw ApiFailure.conflict();String filename=filename(VaultRecycle.TYPE,VaultCollection.id(entry));var file=files.get(filename);if(file==null||!used.add(filename))throw ApiFailure.validation();
-                        byte[] bytes=read(zip,file);retained=bytes.length;source.write(current.tag(),bytes,true);source.delete(source.snapshot().tag());new VaultRecycle(store).retain(VaultCollection.id(entry),source.snapshot().version(),bytes);
+                        byte[] bytes=read(zip,file,store.vaultLimits().fileBytes());retained=bytes.length;source.write(current.tag(),bytes,true);source.delete(source.snapshot().tag());new VaultRecycle(store).retain(VaultCollection.id(entry),source.snapshot().version(),bytes);
                     }else{if(current.deleted())throw ApiFailure.validation();retained=current.byteLength();}
                     snapshot=source.snapshot();
                 }

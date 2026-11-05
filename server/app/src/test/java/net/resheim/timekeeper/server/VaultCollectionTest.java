@@ -14,6 +14,36 @@ class VaultCollectionTest {
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     private byte[] bytes(String value){return value.getBytes(StandardCharsets.UTF_8);}
+    @Test void storageReadsArePrivateDoNotInitializeAndIncludeLegacyContent(){
+        store.transaction("storage-empty",()->{
+            long revision=store.revision();var usage=new VaultStorage(store,limits).get();
+            assertEquals(0,usage.path("usage").path("bytes").asLong());assertEquals(0,usage.path("usage").path("entries").asInt());
+            assertTrue(store.list(VaultIndex.ENTRY).isEmpty());assertFalse(new VaultState(store,limits).get().path("initialized").asBoolean());assertEquals(revision,store.revision());return null;
+        });
+        store.transaction("storage-legacy",()->{
+            new JournalAssets(store).save("legacy.png",null,new byte[]{1,2,3});long revision=store.revision();
+            var usage=new VaultStorage(store,limits).get();assertEquals(3,usage.path("usage").path("bytes").asLong());assertEquals(1,usage.path("usage").path("entries").asInt());assertEquals(3,usage.path("largestAttachmentBytes").asInt());
+            assertTrue(store.list(VaultIndex.ENTRY).isEmpty());assertEquals(revision,store.revision());return null;
+        });
+        store.transaction("storage-other",()->{assertEquals(0,new VaultStorage(store,limits).get().path("usage").path("bytes").asLong());return null;});
+    }
+    @Test void storageCategoriesAndTrashMatchQuotaCountersWithoutChangingVersions(){
+        store.transaction("storage-categories",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();
+            var note=vault.put(new VaultPath("ordinary.md"),null,true,bytes("note"));
+            vault.put(new VaultPath("image.bin"),null,true,new byte[7]);
+            vault.put(new VaultPath("journal/2026-11-05.md"),null,true,bytes("daily"));
+            vault.put(new VaultPath("journal/2026-W45.md"),null,true,bytes("weekly"));
+            var before=new VaultState(store,limits).get();long revision=store.revision();var report=new VaultStorage(store,limits).get();
+            assertEquals(before.path("totalBytes").asLong(),report.path("usage").path("bytes").asLong());assertEquals(before.path("entries").asLong(),report.path("usage").path("entries").asLong());
+            var categories=new HashMap<String,Long>();report.path("categories").forEach(row->categories.put(row.path("kind").asText(),row.path("bytes").asLong()));
+            assertEquals(4L,categories.get("NOTES"));assertEquals(7L,categories.get("ATTACHMENTS"));assertEquals(6L,categories.get("WEEK"));assertTrue(categories.get("DAY")>=5);
+            assertEquals(report.path("usage").path("bytes").asLong(),categories.values().stream().mapToLong(Long::longValue).sum());
+            assertEquals(before,new VaultState(store,limits).get());assertEquals(revision,store.revision());assertEquals(4,report.path("usage").path("files").asInt());assertEquals(3,report.path("usage").path("folders").asInt());
+            vault.delete(note,vault.tag(note));var deleted=new VaultStorage(store,limits).get();assertEquals(report.path("usage"),deleted.path("usage"));
+            assertEquals(4,deleted.path("categories").get(5).path("bytes").asInt());assertEquals(0,deleted.path("categories").get(0).path("bytes").asInt());return null;
+        });
+    }
     @Test void nestedMovesAndRecoveryPreserveIdentityBytesAndGuardAgainstChangedDescendants(){
         store.transaction("nested",()->{
             var vault=new VaultCollection(store,limits);vault.initialize();var folder=vault.mkdir(new VaultPath("Notes"));

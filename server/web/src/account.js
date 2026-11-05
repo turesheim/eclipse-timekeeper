@@ -9,8 +9,10 @@ import { renderPasskeys } from './passkeys.js';
 import { renderAccountData } from './account-data.js';
 import {renderTypography} from './typography-account.js';
 import {renderNotesAccount} from './notes-account.js';
+import {renderStorage} from './storage-account.js';
 
 export async function renderAccount(view, part) {
+  if(part==='storage'){await renderStorage(view);return;}
   if (part === 'typography') {await renderTypography(view);return;}
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
   if (!view.valid()) return;

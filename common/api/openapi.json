@@ -17998,6 +17998,227 @@
         },
         "description": "Metadata only, ordered by modification instant descending and then portable path and identity. The configured recentNotesDays window includes the entire current civil day in the account time zone. Excludes folders, assets, deleted entries and the configured journal subtree. Includes event notes. Pagination requires the first page snapshot in If-Match after offset zero; changes to the collection, day, time zone or preference invalidate it."
       }
+    },
+    "/admin/notes/limits": {
+      "get": {
+        "operationId": "getAdministrationNotesLimits",
+        "summary": "Read installation-wide Notes quotas",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrationNotesLimits"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque version required by If-Match on saves."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator-only quotas, independent of authentication/SMTP activation. Changes require a write-capable account session, fresh current-password proof and If-Match. Overrides apply immediately across replicas, persist across restarts and are included in encrypted full-instance backup. Account archives do not change installation policy."
+      },
+      "put": {
+        "operationId": "updateAdministrationNotesLimits",
+        "summary": "Update installation-wide Notes quotas immediately",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrationNotesLimits"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque version required by If-Match on saves."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator-only quotas, independent of authentication/SMTP activation. Changes require a write-capable account session, fresh current-password proof and If-Match. Overrides apply immediately across replicas, persist across restarts and are included in encrypted full-instance backup. Account archives do not change installation policy.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdministrationNotesLimitsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/storage": {
+      "get": {
+        "operationId": "getNotesStorage",
+        "summary": "Read private Notes storage usage and current quotas",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesStorage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "description": "Read-only logical usage, including retained Trash and journal/event content. Category bars share the account allowance; there are no separate per-category quotas. Counts exclude the virtual root and include files and folders in Trash. Reading never initializes an unused namespace or changes versions."
+      }
     }
   },
   "components": {
@@ -32237,19 +32458,23 @@
         "properties": {
           "fileBytes": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "default": 160000000
           },
           "markdownBytes": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "default": 10000000
           },
           "totalBytes": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "default": 5000000000
           },
           "entries": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "default": 100000
           },
           "pageSize": {
             "type": "integer",
@@ -32851,6 +33076,194 @@
           "toDate": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "NotesQuotaValues": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fileBytes",
+          "markdownBytes",
+          "totalBytes",
+          "entries"
+        ],
+        "properties": {
+          "fileBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "default": 160000000
+          },
+          "markdownBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "default": 10000000
+          },
+          "totalBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "default": 5000000000
+          },
+          "entries": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 1000000,
+            "default": 100000
+          }
+        }
+      },
+      "AdministrationNotesLimitsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "limits",
+          "currentPassword"
+        ],
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/NotesQuotaValues"
+          },
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true
+          }
+        }
+      },
+      "AdministrationNotesLimits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "limits",
+          "defaults",
+          "canEdit",
+          "configured",
+          "maximumUploadBytes"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/NotesQuotaValues"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/NotesQuotaValues"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "maximumUploadBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          }
+        }
+      },
+      "NotesStorage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ownerId",
+          "limits",
+          "usage",
+          "categories",
+          "largestMarkdownBytes",
+          "largestAttachmentBytes"
+        ],
+        "properties": {
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/VaultLimits"
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bytes",
+              "entries",
+              "files",
+              "folders"
+            ],
+            "properties": {
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "entries": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "files": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "folders": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "categories": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "bytes",
+                "entries"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "NOTES",
+                    "DAY",
+                    "WEEK",
+                    "EVENT",
+                    "ATTACHMENTS",
+                    "TRASH"
+                  ]
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "entries": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              }
+            }
+          },
+          "largestMarkdownBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "largestAttachmentBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         }
       }

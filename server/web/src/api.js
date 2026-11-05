@@ -8,6 +8,7 @@ const messages = {
   VAULT_SPECIAL_FOLDER:'notes.error_special_folder',
   VAULT_ASSOCIATION_MOVE:'notes.error_association',
   VAULT_QUOTA:'notes.error_quota',
+  VAULT_HTTP_LIMIT:'storage.error_http_limit',
   VAULT_IMPORT_NOT_EMPTY:'notes.error_import_not_empty',
   VAULT_FILE_TOO_LARGE:'notes.error_file_size',
   INSTANCE_RESTORE_MATERIAL_REQUIRED: 'backups.error_material_required',

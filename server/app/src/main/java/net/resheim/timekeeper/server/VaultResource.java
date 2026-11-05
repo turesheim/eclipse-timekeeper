@@ -74,6 +74,9 @@ public class VaultResource {
         int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,Math.min(20,limits.pageSize()),1,limits.pageSize());
         return tx(false,()->Response.ok(new RecentNotes(store,limits).page(start,count,snapshot)).build());
     }
+    @GET @Path("/storage") public Response storage(){
+        ContractInputs.queries(uri.getQueryParameters());return tx(false,()->Response.ok(new VaultStorage(store,limits).get()).header("Cache-Control","no-store").build());
+    }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("VaultFolderInput",input);var path=new VaultPath(value.path("path").asText());
         var dates=VaultImportDates.parse(value.has("createdAt")?value.path("createdAt").asText():null,value.has("modifiedAt")?value.path("modifiedAt").asText():null);
