@@ -46,6 +46,7 @@ test('note views use event titles and document headings while paths and Markdown
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const upload=async(path,text)=>(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   const ordinaryText='---\ntitle: Metadata is not the headline\n---\n\n```markdown\n# Example only\n```\n\n## Project **review**\n\nPrivate body\n';
+  const prefix=ordinaryText.slice(0,ordinaryText.indexOf('\n---\n')+5);
   const ordinary=await upload('Notes/document.md',ordinaryText),plain=await upload('Notes/plain.md','Plain body without a heading.');
   const subscription=randomUUID(),eventKey='cd'.repeat(32),title='Planning <img src=x onerror="window.noteTitleExecuted=true"> & review';
   const eventPath='events/event-'+subscription+'-'+eventKey+'.md',eventText='---\ntimekeeper-event: '+JSON.stringify({subscriptionId:subscription,eventKey,event:{uid:'private-title-test',recurrenceId:'',title}})+'\n---\n# Different note heading\n\nDecisions\n';
@@ -55,11 +56,11 @@ test('note views use event titles and document headings while paths and Markdown
   await expect(recent.locator('img')).toHaveCount(0);expect(await page.evaluate(()=>window.noteTitleExecuted)).toBeUndefined();
   await recent.locator(`[data-recent-note="${event.id}"]`).click();await expect(page.locator('#notes-document-title')).toHaveText(title);const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'events',exact:true}).click();await expect(noteEntry(navigation,eventPath)).toHaveText(title);
   await navigation.getByRole('button',{name:'Notes',exact:true}).click();await expect(noteEntry(navigation,ordinary.path)).toHaveText('Project review');await noteEntry(navigation,ordinary.path).click();await expect(page.locator('#notes-document-title')).toHaveText('Project review');
-  await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue(ordinaryText);
+  await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue(ordinaryText.slice(prefix.length));
   const updated='# Updated review\n\nThe filename stays document.md.\n';await page.locator('#notes-body').fill(updated);await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Updated review');await expect(noteEntry(navigation,ordinary.path)).toHaveText('Updated review');
   await noteEntry(navigation,plain.path).click();await expect(page.locator('#notes-document-title')).toHaveText(plain.path);
   await page.locator('[data-tab=today]').click();await expect(recent.locator(`[data-recent-note="${ordinary.id}"] strong`)).toHaveText('Updated review');
-  expect(await(await api('GET','/notes/entries/'+ordinary.id+'/content')).text()).toBe(updated);expect(await(await api('GET','/notes/entries/'+event.id+'/content')).text()).toBe(eventText);
+  expect(await(await api('GET','/notes/entries/'+ordinary.id+'/content')).text()).toBe(prefix+updated);expect(await(await api('GET','/notes/entries/'+event.id+'/content')).text()).toBe(eventText);
   expect((await new AxeBuilder({page}).include('.today-sidebar').analyze()).violations).toEqual([]);
   await page.setViewportSize({width:1440,height:900});await captureScreenshot(page,{path:'test-results/note-display-titles.png',fullPage:false});
 });
