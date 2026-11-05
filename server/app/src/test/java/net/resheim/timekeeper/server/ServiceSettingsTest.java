@@ -36,6 +36,7 @@ class ServiceSettingsTest {
     @Inject BrowserOrigins origins;
     @Inject PasskeyRealm realm;
     @Inject RecoveryMail mail;
+    @Inject VaultLimits limits;
     @TempDir Path temporary;
     record Browser(String cookie,String csrf,String owner) { }
     private Response call(Browser browser,String method,String path,JsonNode input,String etag,boolean csrf) {
@@ -64,6 +65,64 @@ class ServiceSettingsTest {
         return value.put("currentPassword",PASSWORD).put("smtpPasswordAction","PRESERVE");
     }
     private Response save(Browser browser,ObjectNode input,Response previous) {return call(browser,"PUT","/admin/settings",input,previous.header("ETag"),true);}
+    private Response noteLimits(Browser browser){return call(browser,"GET","/admin/notes/limits",null,null,false);}
+    private Response noteLimits(Browser browser,Response previous,ObjectNode values){var body=object().put("currentPassword",PASSWORD);body.set("limits",values);return call(browser,"PUT","/admin/notes/limits",body,previous.header("ETag"),true);}
+    @Test void notesQuotasAreLiveSharedDurableAndIndependentOfPendingAuthenticationSettings() throws Exception {
+        var admin=setup();var defaults=noteLimits(admin);var initial=success(defaults,200);
+        assertEquals(160_000_000,initial.path("limits").path("fileBytes").asInt());assertEquals(10_000_000,initial.path("limits").path("markdownBytes").asInt());assertEquals(5_000_000_000L,initial.path("limits").path("totalBytes").asLong());assertEquals(100_000,initial.path("limits").path("entries").asInt());
+        var pending=save(admin,input(current(admin)).put("smtpPort",2525),current(admin));var before=success(pending,200);assertTrue(before.path("restartRequired").asBoolean());
+        var values=object().put("fileBytes",1_000_000).put("markdownBytes",100_000).put("totalBytes",2_000_000L).put("entries",100);
+        var saved=noteLimits(admin,defaults,values);assertEquals(values.toString(),success(saved,200).path("limits").toString());assertEquals("no-store",saved.header("Cache-Control"));
+        assertEquals(before,success(current(admin),200));assertTrue(settings.available());assertEquals(200,call(admin,"GET","/auth/session",null,null,false).statusCode());
+        var replica=new VaultLimits();replica.accounts=accounts;replica.fileBytes=160_000_000;replica.markdownBytes=10_000_000;replica.totalBytes=5_000_000_000L;replica.entries=100_000;
+        assertEquals(2_000_000,replica.totalBytes());assertEquals(1_000_000,limits.fileBytes());assertEquals(values,limits.current().json());
+        assertEquals(412,noteLimits(admin,defaults,values).statusCode());
+        var noOp=noteLimits(admin,saved,values);assertEquals(saved.header("ETag"),noOp.header("ETag"));
+        settings.initialize();realm.initialize();var renewed=login();assertEquals(values.toString(),success(noteLimits(renewed),200).path("limits").toString());assertEquals(2525,success(current(renewed),200).path("effective").path("smtpPort").asInt());
+    }
+    @Test void notesQuotaSavesRequireFreshAdministratorAccountAuthorityCsrfAndValidBounds() throws Exception {
+        var admin=setup();var previous=noteLimits(admin);var values=(ObjectNode)success(previous,200).path("limits");
+        var body=object().put("currentPassword",PASSWORD);body.set("limits",values);
+        assertEquals(403,call(admin,"PUT","/admin/notes/limits",body,previous.header("ETag"),false).statusCode());
+        assertEquals(428,call(admin,"PUT","/admin/notes/limits",body,null,true).statusCode());
+        assertEquals(422,call(admin,"PUT","/admin/notes/limits",body.deepCopy().put("currentPassword","wrong"),previous.header("ETag"),true).statusCode());
+        for(var invalid:List.of(values.deepCopy().put("entries",3),values.deepCopy().put("entries",1.5),values.deepCopy().put("fileBytes",0),values.deepCopy().put("markdownBytes",200_000_000),values.deepCopy().put("totalBytes",100))){
+            assertTrue(Set.of(400,422).contains(noteLimits(admin,previous,invalid).statusCode()));
+        }
+        var tooLarge=values.deepCopy().put("fileBytes",500_000_000);var rejected=noteLimits(admin,previous,tooLarge);assertEquals(422,rejected.statusCode());assertEquals("VAULT_HTTP_LIMIT",parse(rejected.asString()).path("code").asText());
+        var tokenInput=object().put("name","Quota reader");tokenInput.putArray("permissions").add("read").add("write");tokenInput.putNull("expiresAt");var token=success(call(admin,"POST","/auth/tokens",tokenInput,null,true),201);
+        var derived=browser(given().header("Authorization","Bearer "+token.path("token").asText()).post("/api/v1/auth/token-login"));
+        assertFalse(success(noteLimits(derived),200).path("canEdit").asBoolean());assertEquals(403,noteLimits(derived,previous,values).statusCode());
+        assertEquals(initialQuota(previous),initialQuota(noteLimits(admin)));
+    }
+    private JsonNode initialQuota(Response response){return parse(response.asString());}
+    @Test void largerDefaultFilesPassTheHttpBoundaryAndStorageIsReadableWithoutWritePermission() throws Exception {
+        var admin=setup();
+        var upload=given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-None-Match","*").contentType("application/octet-stream").body(new byte[21*1024*1024]).put("/api/v1/notes/files?path=large.bin");
+        assertEquals(201,upload.statusCode(),upload.asString());
+        var bytes=given().header("Cookie",admin.cookie()).get("/api/v1/notes/entries/"+parse(upload.asString()).path("id").asText()+"/content");assertEquals(200,bytes.statusCode());assertEquals(21*1024*1024,bytes.asByteArray().length);
+        var tokenInput=object().put("name","Storage reader");tokenInput.putArray("permissions").add("read");tokenInput.putNull("expiresAt");var token=success(call(admin,"POST","/auth/tokens",tokenInput,null,true),201).path("token").asText();
+        var reply=given().header("Authorization","Bearer "+token).get("/api/v1/notes/storage");var usage=success(reply,200);assertEquals(21*1024*1024,usage.path("usage").path("bytes").asLong());assertTrue(reply.header("Cache-Control").contains("no-store"));
+        assertEquals(401,given().get("/api/v1/notes/storage").statusCode());
+        success(call(admin,"POST","/admin/users",object().put("username","storage-peer").put("password",PASSWORD).put("displayName","Peer").put("email","storage-peer@example.org").put("administrator",false),null,true),201);
+        var peer=browser(call(null,"POST","/auth/login",object().put("username","storage-peer").put("password",PASSWORD).put("remember",false),null,false));
+        assertEquals(0,success(call(peer,"GET","/notes/storage",null,null,false),200).path("usage").path("bytes").asLong());
+        assertEquals(403,noteLimits(peer).statusCode());assertEquals(403,noteLimits(peer,noteLimits(admin),(ObjectNode)parse(noteLimits(admin).asString()).path("limits")).statusCode());
+    }
+    @Test void raisingNotesQuotasImmediatelyUnblocksBothStorageAndEntryGrowth() throws Exception {
+        var admin=setup();var tiny=object().put("fileBytes",128).put("markdownBytes",64).put("totalBytes",128).put("entries",4);
+        var current=noteLimits(admin,noteLimits(admin),tiny);success(current,200);success(call(admin,"GET","/notes",null,null,false),200);
+        var upload=given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-None-Match","*").contentType("application/octet-stream").body(new byte[64]).put("/api/v1/notes/files?path=a.bin");assertEquals(201,upload.statusCode());
+        assertEquals(507,given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-None-Match","*").contentType("application/octet-stream").body(new byte[64]).put("/api/v1/notes/files?path=b.bin").statusCode());
+        current=noteLimits(admin,current,tiny.deepCopy().put("entries",5));success(current,200);
+        assertEquals(201,given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-None-Match","*").contentType("application/octet-stream").body(new byte[64]).put("/api/v1/notes/files?path=b.bin").statusCode());
+        String path="/api/v1/notes/entries/"+parse(upload.asString()).path("id").asText()+"/content";
+        String contentTag=given().header("Cookie",admin.cookie()).get(path).header("ETag");
+        assertEquals(507,given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-Match",contentTag).contentType("application/octet-stream").body(new byte[65]).put(path).statusCode());
+        success(noteLimits(admin,current,tiny.deepCopy().put("entries",5).put("totalBytes",256)),200);
+        assertEquals(200,given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-Match",contentTag).contentType("application/octet-stream").body(new byte[65]).put(path).statusCode());
+        var storage=success(call(admin,"GET","/notes/storage",null,null,false),200);assertEquals(129,storage.path("usage").path("bytes").asLong());assertEquals(5,storage.path("usage").path("entries").asInt());
+    }
     @Test void savesAreVersionedRedactedPendingAndPreserveReplaceOrClearOnlyTheWriteOnlySecret() throws Exception {
         var admin=setup();var previous=current(admin);var first=success(previous,200);assertTrue(first.path("canEdit").asBoolean());assertFalse(first.path("restartRequired").asBoolean());
         String secret="A private SMTP fixture password";var body=input(previous).put("smtpPort",2525).put("smtpPasswordAction","REPLACE").put("smtpPassword",secret);

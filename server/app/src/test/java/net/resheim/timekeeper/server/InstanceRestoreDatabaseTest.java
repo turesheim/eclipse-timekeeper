@@ -50,6 +50,21 @@ class InstanceRestoreDatabaseTest {
     private InstanceRestoreDatabase.Applied apply(Connection c,InstanceRestoreFence.Exclusive lock,InstanceBackupArchive.Verified archive,Target target) throws Exception {
         c.setAutoCommit(false);return InstanceRestoreDatabase.apply(c,lock,archive,deployment,"bootstrap",target.operation(),target.version(),root,generation,now);
     }
+    @Test void encryptedInstanceRestoreRetainsIndependentNotesQuotaOverrides() throws Exception {
+        var quotas=new VaultLimits.Values(160_000_000,10_000_000,6_000_000_000L,120_000);
+        try(var archive=archive(source->{
+            for(String column:List.of("saved","effective")){
+                var settings=(com.fasterxml.jackson.databind.node.ObjectNode)parse(value(source,"SELECT "+column+" FROM tk_service_settings WHERE id=1"));settings.set(VaultLimits.SETTINGS_KEY,quotas.json().put("version",7));
+                execute(source,"UPDATE tk_service_settings SET "+column+"=? WHERE id=1",settings.toString());
+            }
+        });var c=DriverManager.getConnection("jdbc:h2:"+directory.resolve("quota-target"))){
+            var target=bootstrap(c);
+            try(var lock=InstanceRestoreFence.exclusive(c)){
+                apply(c,lock,archive,target);c.commit();
+                var restored=NotesLimitSettings.read(c,false,new VaultLimits.Values(1000,500,10000,8));assertEquals(7,restored.version());assertEquals(quotas,restored.values());
+            }
+        }
+    }
     @Test void appliesSourceDataAndCredentialsButPreservesTargetEvidenceAndKeepsRecoveryPending() throws Exception {
         try(var archive=archive();var c=DriverManager.getConnection("jdbc:h2:"+directory.resolve("target"))) {
             var target=bootstrap(c);var old=new InstanceRestoreFence();old.initialize(c);

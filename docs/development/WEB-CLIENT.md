@@ -1089,3 +1089,17 @@ The editor fills the active area above navigation. Source preserves unknown
 metadata/wiki syntax; relative images are authenticated raster previews, never
 executable SVG/HTML. See [Notes manual and user guide](../operations/NOTES-WEBDAV.md)
 for supported external workflows and Markdown preservation limits.
+
+### Account storage and administrator Notes quotas
+
+**My Account → Storage** is available with read permission. It reads
+`/notes/storage`, showing overall byte/count meters, category meters sharing the
+account allowance, and the largest file sizes against their file limits. Trash
+is included. Progress values clamp to 100% when a quota is reduced below usage;
+accessible value text retains actual usage. Refresh reads new metadata without
+initializing a collection or fetching file bodies. Labels and numbers are localized.
+
+**Administration → Notes** edits the four installation-wide quotas using a current
+administrator password and conditional PUT. Values use decimal GB/MB units. Saves
+apply immediately without authentication/SMTP activation. API-token sessions see
+current values but cannot edit. Failed/stale saves preserve the form draft.

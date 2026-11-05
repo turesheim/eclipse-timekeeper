@@ -47,7 +47,7 @@ final class InstanceDatabaseImage {
     private static Table table(String name,String columns){return new Table(name,List.of(columns.split(" ")));}
     private static final JsonFactory JSON=JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-        .streamReadConstraints(StreamReadConstraints.builder().maxStringLength(128*1024*1024).build()).build();
+        .streamReadConstraints(StreamReadConstraints.builder().maxStringLength(JsonValues.STORED_STRING_LIMIT).build()).build();
 
     /** One cross-table snapshot: PostgreSQL repeatable-read, H2 serializable. */
     static void write(Connection snapshot,OutputStream output) throws SQLException,IOException {

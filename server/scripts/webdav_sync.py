@@ -44,11 +44,11 @@ class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):raise SyncError('WebDAV redirects are refused; use the final trusted HTTPS collection URL')
 
 class Remote:
-    def __init__(self,url,username,token,ca=None,allow_http=False,maximum=16_000_000,include_config=False):
+    def __init__(self,url,username,token,ca=None,allow_http=False,maximum=160_000_000,include_config=False,max_entries=100_000):
         value=urlsplit(url)
         if value.username or value.password or value.query or value.fragment or not value.hostname or not value.path.startswith('/'):raise SyncError('Use a collection URL without credentials, query or fragment')
         if value.scheme!='https' and not (allow_http and value.scheme=='http' and value.hostname in ('127.0.0.1','::1')):raise SyncError('Verified HTTPS is required; plaintext loopback requires an explicit test-only option')
-        self.url=url.rstrip('/')+'/';self.authority=(value.scheme,value.netloc);self.root=self.parts(value.path);self.maximum=maximum;self.include_config=include_config
+        self.url=url.rstrip('/')+'/';self.authority=(value.scheme,value.netloc);self.root=self.parts(value.path);self.maximum=maximum;self.include_config=include_config;self.max_entries=max_entries
         self.owner=None;self.owner_checked=False
         self.opener=build_opener(NoRedirect(),HTTPSHandler(context=ssl.create_default_context(cafile=ca)))
         self.authorization='Basic '+base64.b64encode((username+':'+token).encode()).decode()
@@ -113,7 +113,7 @@ class Remote:
                 if ignored(relative,self.include_config):continue
                 if relative in rows or key(relative) in keys:raise SyncError('Review a case or Unicode collision before synchronizing')
                 rows[relative]=record;keys.add(key(relative))
-                if len(rows)>10000:raise SyncError('Collection exceeds this manual helper’s 10,000-entry limit')
+                if len(rows)>self.max_entries:raise SyncError('Collection exceeds the configured client entry limit')
         if root is None:raise SyncError('The selected WebDAV root is missing; refusing an empty scan')
         if depth=='infinity':
             for relative in rows:
@@ -141,10 +141,10 @@ class Remote:
         self.request('DELETE',path,headers={'If-Match':root['etag']})
 
 class Local:
-    def __init__(self,folder,maximum=16_000_000,include_config=False):
+    def __init__(self,folder,maximum=160_000_000,include_config=False,max_entries=100_000):
         path=Path(folder).absolute()
         if path.is_symlink() or not path.is_dir():raise SyncError('The selected local folder is unavailable or is a symlink')
-        self.path=path.resolve();self.maximum=maximum;self.include_config=include_config
+        self.path=path.resolve();self.maximum=maximum;self.include_config=include_config;self.max_entries=max_entries
         self.fd=os.open(self.path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW);value=os.fstat(self.fd);self.identity=[value.st_dev,value.st_ino]
     def close(self):os.close(self.fd)
     def check(self):
@@ -184,7 +184,7 @@ class Local:
                         finally:os.close(child)
                     elif stat.S_ISREG(value.st_mode):rows[path]={'kind':'file','disk':disk,'sha256':digest(self.read(disk))}
                     else:raise SyncError('Local special files are not supported')
-                    if len(rows)>10000:raise SyncError('Collection exceeds this manual helper’s 10,000-entry limit')
+                    if len(rows)>self.max_entries:raise SyncError('Collection exceeds the configured client entry limit')
         visit(self.fd,'');self.check();return rows
     def mkdir(self,path):
         parent,name=self.parent(path)
@@ -329,10 +329,10 @@ def execute(action,local,remote,rows,control):
     else:raise SyncError('Unknown synchronization operation')
 
 def synchronize(args,token):
-    local=Local(args.folder,args.max_file_bytes,args.include_obsidian);control=None
+    local=Local(args.folder,args.max_file_bytes,args.include_obsidian,getattr(args,'max_entries',100_000));control=None
     try:
         control=Control(args.state_dir,local)
-        remote=Remote(args.url,args.username,token,args.ca_file,args.allow_loopback_http,args.max_file_bytes,args.include_obsidian)
+        remote=Remote(args.url,args.username,token,args.ca_file,args.allow_loopback_http,args.max_file_bytes,args.include_obsidian,getattr(args,'max_entries',100_000))
         if 'binding' in control.state:remote.owner=control.state['binding']['owner'];remote.owner_checked=True
         baseline=control.state['entries'];local_rows=local.scan();root,remote_rows=remote.scan(baseline,control.state.get('rootResourceId'));scan_config={'includeObsidian':args.include_obsidian}
         if baseline and not control.state.get('rootResourceId'):raise SyncError('This baseline predates stable collection identity; preserve it and review a fresh synchronization profile')
@@ -366,9 +366,9 @@ def synchronize(args,token):
         if control is not None:control.close()
         local.close()
 
-def prepare_import_metadata(folder,maximum=16_000_000,include_config=False):
+def prepare_import_metadata(folder,maximum=160_000_000,include_config=False,max_entries=100_000):
     """Read-only source scan plus one private, derived timestamp metadata file."""
-    local=Local(folder,maximum,include_config);rows=[];seen=set();skipped=0;temporary=None
+    local=Local(folder,maximum,include_config,max_entries);rows=[];seen=set();skipped=0;temporary=None
     def instant(nanoseconds):
         seconds,fraction=divmod(nanoseconds,1_000_000_000)
         value=datetime.fromtimestamp(seconds,timezone.utc)
@@ -412,7 +412,7 @@ def prepare_import_metadata(folder,maximum=16_000_000,include_config=False):
                     if (before.st_ino,before.st_size,before.st_mtime_ns)!=(after.st_ino,after.st_size,after.st_mtime_ns) or length!=after.st_size:raise SyncError('A file changed during the scan; prepare import metadata again')
                     rows.append({'path':path,'kind':'FILE','bytes':length,'sha256':digest_value.hexdigest(),**dates(before)})
             else:raise SyncError('Local special files are not supported')
-            if len(rows)>10000:raise SyncError('Import metadata preparation is limited to 10,000 entries')
+            if len(rows)>max_entries:raise SyncError('Import metadata exceeds the configured client entry limit')
     try:
         try:
             old=json.loads(local.read(IMPORT_METADATA))
@@ -438,15 +438,16 @@ def main():
     parser.add_argument('--url');parser.add_argument('--folder',required=True);parser.add_argument('--state-dir');parser.add_argument('--username',default='webdav');parser.add_argument('--ca-file')
     parser.add_argument('--prepare-import-metadata',action='store_true',help='Prepare source modification and available creation dates for the browser folder import; no server connection')
     parser.add_argument('--apply',metavar='REVIEW_SHA256');parser.add_argument('--allow-deletes',action='store_true');parser.add_argument('--resume',action='store_true');parser.add_argument('--include-obsidian',action='store_true');parser.add_argument('--allow-loopback-http',action='store_true')
-    parser.add_argument('--max-file-bytes',type=int,default=16_000_000);parser.add_argument('--prefer-local',action='append',default=[]);parser.add_argument('--prefer-remote',action='append',default=[])
+    parser.add_argument('--max-entries',type=int,default=100_000);parser.add_argument('--max-file-bytes',type=int,default=160_000_000);parser.add_argument('--prefer-local',action='append',default=[]);parser.add_argument('--prefer-remote',action='append',default=[])
     args=parser.parse_args()
     if args.max_file_bytes<1 or args.max_file_bytes>1_000_000_000:parser.error('Choose a positive bounded file-size limit')
+    if args.max_entries<1 or args.max_entries>1_000_000:parser.error('Choose an entry limit from 1 to 1,000,000')
     if args.prepare_import_metadata:
         if args.url or args.state_dir or args.apply or args.resume or args.allow_deletes or args.prefer_local or args.prefer_remote:parser.error('Timestamp preparation is separate from synchronization')
     elif not args.url or not args.state_dir:parser.error('--url and --state-dir are required for synchronization')
     try:
         if args.prepare_import_metadata:
-            print(json.dumps(prepare_import_metadata(args.folder,args.max_file_bytes,args.include_obsidian),ensure_ascii=False,indent=2));return 0
+            print(json.dumps(prepare_import_metadata(args.folder,args.max_file_bytes,args.include_obsidian,getattr(args,'max_entries',100_000)),ensure_ascii=False,indent=2));return 0
         for path in args.prefer_local+args.prefer_remote:portable(path)
         if set(args.prefer_local)&set(args.prefer_remote):raise SyncError('Choose only one version of each conflicting path')
         token=os.environ.get('WEBDAV_TOKEN') or getpass.getpass('WebDAV API token: ')

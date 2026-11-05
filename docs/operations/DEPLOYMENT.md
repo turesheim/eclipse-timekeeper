@@ -283,3 +283,11 @@ verified pre-upgrade backup for rollback. [Notes deployment limits and manual
 sync](NOTES-WEBDAV.md) documents `TIMEKEEPER_NOTES_MAX_FILE_BYTES`,
 `TIMEKEEPER_NOTES_MAX_MARKDOWN_BYTES`, `TIMEKEEPER_NOTES_MAX_TOTAL_BYTES`,
 `TIMEKEEPER_NOTES_MAX_ENTRIES` and `TIMEKEEPER_NOTES_MAX_PAGE_SIZE`.
+
+The four Notes storage quotas can also be adjusted live in **Administration →
+Notes**. Their defaults are 160 MB/file, 10 MB/ordinary Markdown file, 5 GB/account
+and 100,000 files/folders. Saved administrator overrides take precedence over the
+four environment defaults and are shared through the database. Pagination remains
+a deployment setting. The HTTP body ceiling defaults to 200 MiB; larger file
+limits also require an operator to raise that ceiling and any proxy upload limit.
+**My Account → Storage** displays current effective allowances and logical usage.

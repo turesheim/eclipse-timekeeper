@@ -52,6 +52,7 @@ public class ServerStore {
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
+    Connection currentConnection(){var current=context.get();return current==null?null:current.connection();}
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
         DatabaseConfiguration.validate(jdbcUrl);

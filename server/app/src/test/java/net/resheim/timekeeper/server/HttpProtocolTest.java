@@ -59,7 +59,7 @@ class HttpProtocolTest {
     @Test void bodyLimitUsesAProblemResponseWithoutCreatingAnyRecord() throws Exception {
         var request=HttpRequest.newBuilder(baseUri.resolve("/api/v1/projects"))
                 .header("Authorization","Bearer test-a").header("Content-Type","application/json")
-                .expectContinue(true).POST(HttpRequest.BodyPublishers.ofString("{\"name\":\""+"x".repeat(21*1024*1024)+"\"}")).build();
+                .expectContinue(true).POST(HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofInputStream(java.io.InputStream::nullInputStream),201L*1024*1024)).build();
         try(var client=HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
             var response=client.send(request,HttpResponse.BodyHandlers.ofString());
             assertEquals(413,response.statusCode());

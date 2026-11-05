@@ -24,11 +24,16 @@ import net.resheim.eclipse.timekeeper.domain.*;
 /** Explicit immutable wire snapshots and persistence codecs, without JPA objects. */
 public final class JsonValues {
     public static final ObjectMapper MAPPER = new ObjectMapper();
+    // Canonical file records contain base64. Keep the larger bound private to
+    // persisted data; request JSON retains Jackson's normal parsing limits.
+    static final int STORED_STRING_LIMIT=4*((VaultLimits.MAXIMUM_FILE+2)/3)+1024*1024;
+    private static final ObjectMapper STORED=new ObjectMapper(com.fasterxml.jackson.core.JsonFactory.builder()
+            .streamReadConstraints(com.fasterxml.jackson.core.StreamReadConstraints.builder().maxStringLength(STORED_STRING_LIMIT).build()).build());
     private JsonValues() { }
     public static ObjectNode object() { return MAPPER.createObjectNode(); }
     public static ArrayNode array() { return MAPPER.createArrayNode(); }
     public static JsonNode parse(String text) {
-        try { return MAPPER.readTree(text); } catch (Exception e) { throw new IllegalStateException("Invalid stored JSON", e); }
+        try { return STORED.readTree(text); } catch (Exception e) { throw new IllegalStateException("Invalid stored JSON", e); }
     }
     public static JsonNode canonical(JsonNode value) {
         if (value.isObject()) {

@@ -22,6 +22,18 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_storage_usage_is_read_only_and_quota_edits_are_conditional_administrator_writes(self):
+        usage=CONTRACT['paths']['/notes/storage']['get']
+        self.assertEqual('read',usage['x-required-permission'])
+        self.assertEqual('#/components/schemas/NotesStorage',usage['responses']['200']['content']['application/json']['schema']['$ref'])
+        update=CONTRACT['paths']['/admin/notes/limits']['put']
+        self.assertEqual('write',update['x-required-permission'])
+        self.assertIn('412',update['responses']);self.assertIn('428',update['responses'])
+        limits={'fileBytes':160000000,'markdownBytes':10000000,'totalBytes':5000000000,'entries':100000}
+        self.assertTrue(validator('AdministrationNotesLimitsInput').is_valid({'limits':limits,'currentPassword':'administrator proof'}))
+        for invalid in ({'limits':limits},{'limits':{**limits,'entries':3},'currentPassword':'proof'},{'limits':{**limits,'fileBytes':1000000001},'currentPassword':'proof'},{'limits':{**limits,'ownerId':'other'},'currentPassword':'proof'}):
+            self.assertFalse(validator('AdministrationNotesLimitsInput').is_valid(invalid))
+
     def test_note_import_dates_are_optional_create_inputs_and_notes_export_is_an_owner_private_zip(self):
         value={'path':'Empty','createdAt':'2020-01-02T03:04:05.123456789Z','modifiedAt':'2021-02-03T04:05:06.987654321Z'}
         self.assertTrue(validator('VaultFolderInput').is_valid(value))
@@ -682,7 +694,7 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
-            'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes',
+            'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'getNotesStorage',
             'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'moveNoteEntry', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
@@ -694,7 +706,7 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
-            'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
+            'getAdministrationSettings', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}
