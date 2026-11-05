@@ -22,10 +22,10 @@ async function open(page,value){
 test('code uses highlight.js in a compact badge, preserving source, copy and language history',async({page})=>{
   const yaml='apiVersion: v1\nkind: Pod\nreplicas: 3 # desired pods\nenabled: true\nmetadata:\n  name: dnsutils\nspec:\n  image: busybox:1.7',original='---\r\nprivate: keep\r\n---\r\n\r\n~~~yaml\r\n'+yaml.replaceAll('\n','\r\n')+'\r\n~~~\r\n';
   const root=await open(page,original),block=root.locator('.markdown-code-block'),badge=block.locator('.markdown-code-controls');
-  await expect(block.locator('.hljs-attr').first()).toHaveText('apiVersion:');await expect(badge.getByRole('button',{name:'Code language',exact:true})).toHaveText('YAML');
+  await expect(block.locator('.hljs-attr').first()).toHaveText('apiVersion:');await expect(badge.getByRole('button',{name:/^Code language:/})).toHaveText('YAML');
   const bounds=await block.evaluate(node=>{const outer=node.getBoundingClientRect(),badge=node.querySelector('.markdown-code-controls').getBoundingClientRect();return {gap:outer.right-badge.right,top:badge.top-outer.top};});expect(bounds.gap).toBeGreaterThanOrEqual(0);expect(bounds.gap).toBeLessThan(20);expect(bounds.top).toBeLessThan(20);
   await badge.getByRole('button',{name:'Copy code',exact:true}).click();await expect.poll(()=>page.evaluate(()=>globalThis.copiedCode)).toBe(yaml.replaceAll('\n','\r\n'));expect(await page.evaluate(()=>globalThis.presentation.value())).toBe(original);
-  await badge.getByRole('button',{name:'Code language',exact:true}).click();const language=page.getByRole('dialog',{name:'Code language',exact:true}).getByRole('combobox',{name:'Code language',exact:true});await language.fill('yml');await language.press('Enter');
+  await badge.getByRole('button',{name:/^Code language:/}).click();const language=page.getByRole('dialog',{name:'Code language',exact:true}).getByRole('combobox',{name:'Code language',exact:true});await language.fill('yml');await language.press('Enter');
   expect(await page.evaluate(()=>globalThis.presentation.value())).toContain('```yml');await page.keyboard.press('ControlOrMeta+z');expect(await page.evaluate(()=>globalThis.presentation.value())).toBe(original);
   await expect(root.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);
   for(const width of [1440,320]){

@@ -85,7 +85,12 @@
 .markdown-suggestions { display: flex; flex-direction: column; max-height: 12rem; overflow: auto; width: 17rem; }
 .markdown-suggestions button { text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markdown-editor button[aria-pressed=true] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
-@media(max-width:600px) { .markdown-editor .markdown-toolbar { flex-wrap: wrap !important; overflow: visible; } }
+@media(max-width:600px) {
+  .markdown-editor .markdown-toolbar { display: grid; grid-template-columns: 1fr auto; overflow: visible; }
+  .markdown-editor .markdown-modes { grid-column: 1; grid-row: 1; }
+  .markdown-editor .markdown-actions-trigger { grid-column: 2; grid-row: 1; justify-self: end; }
+  .markdown-editor .markdown-tools { grid-column: 1 / -1; grid-row: 2; }
+}
 /* The compact code badge leaves the existing theme surface unchanged. */
 .markdown-code-block { position: relative; border: 1px solid var(--bs-border-color); border-radius: .4rem; margin-block: .75rem; overflow: hidden; }
 .markdown-code-controls { position: absolute; inset-block-start: .4rem; inset-inline-end: .5rem; display: flex; align-items: center; z-index: 1; font-size: var(--font-markdown-code-control); }

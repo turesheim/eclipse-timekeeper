@@ -5,6 +5,7 @@ const field=new MarkdownField(document.getElementById('markdown-field'),()=>{},(
 field.formatted.id='markdown-rich';field.source.id='markdown-source';
 field.status.id='markdown-status';field.tools.id='markdown-toolbar';
 field.metadata.id='markdown-metadata';field.frontmatterView.id='markdown-frontmatter';
+document.querySelector('main').addEventListener('keydown',event=>field.historyShortcut(event));
 field.setReadOnly(false);field.setValue('# Daily notes\n\n- [ ] Follow up\n');
 document.getElementById('markdown-file').addEventListener('change',async event=>{
   const file=event.target.files[0];if(!file)return;

@@ -88,11 +88,7 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.toolbar.append(this.modes,this.tools);
     root.append(this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
-    this.toolbar.addEventListener('keydown',event=>{
-      if(event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||!this.editor||this.readOnly||this.loading)return;
-      const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return;
-      event.preventDefault();this.editor.command(key==='y'||event.shiftKey?'redo':'undo',undefined,false);
-    });
+    this.toolbar.addEventListener('keydown',event=>this.historyShortcut(event));
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>this.controls()));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
@@ -100,6 +96,12 @@ export class MarkdownField {
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     buildExperience(this);this.caret=new MarkdownCaret(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
+  }
+  historyShortcut(event){
+    if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||!this.editor||this.readOnly||this.loading||!event.target.closest?.('button,[role=menuitem]'))return false;
+    const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return false;
+    event.preventDefault();event.stopPropagation();this.closeActions();
+    this.editor.command(key==='y'||event.shiftKey?'redo':'undo',undefined,!this.toolbar.contains(event.target));return true;
   }
   insertSource(text,from=this.text.selectionStart,to=this.text.selectionEnd){
     if(this.readOnly)return null;
