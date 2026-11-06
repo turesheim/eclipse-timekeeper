@@ -22,6 +22,26 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  Agent-quality:
+    name: Agent workflow quick checks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v7.0.0
+      with:
+        python-version: '3.13'
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+    - name: Check changed source and agent configuration
+      env:
+        QUALITY_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+      run: |
+        git rev-parse --verify "$QUALITY_BASE^{commit}" >/dev/null 2>&1 || QUALITY_BASE=HEAD
+        python3 scripts/quality.py --quick --base "$QUALITY_BASE"
+
   Changes:
     name: Select validation jobs
     runs-on: ubuntu-latest
@@ -260,9 +280,9 @@ jobs:
 
   Publication:
     name: Build website and update site
-    needs: [Changes, Build, API-contract, Server, Web, Remote-Eclipse, Publication-tooling]
+    needs: [Changes, Build, API-contract, Server, Web, Remote-Eclipse, Publication-tooling, Agent-quality]
     if: >-
-      !cancelled() && needs.Changes.result == 'success' &&
+      !cancelled() && needs.Changes.result == 'success' && needs.Agent-quality.result == 'success' &&
       needs.Changes.outputs.site == 'true' &&
       needs.Publication-tooling.result == 'success' &&
       (needs.Changes.outputs.api != 'true' || needs.API-contract.result == 'success') &&
@@ -397,7 +417,7 @@ jobs:
   Validation:
     name: PR validation
     if: always()
-    needs: [Changes, API-contract, Server, Web, Remote-Eclipse, Build, Publication-tooling, Publication, Containers]
+    needs: [Changes, API-contract, Server, Web, Remote-Eclipse, Build, Publication-tooling, Publication, Containers, Agent-quality]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1

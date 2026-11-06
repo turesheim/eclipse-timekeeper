@@ -1,0 +1,35 @@
+# The installed upstream skills target Bootstrap 6; this application pins 5.3.8.
+# Keep the files intact. Re-enable a migration skill for an explicitly scoped upgrade.
+[[skills.config]]
+name = "bootstrap-color-system"
+enabled = false
+[[skills.config]]
+name = "bootstrap-component"
+enabled = false
+[[skills.config]]
+name = "bootstrap-component-js"
+enabled = false
+[[skills.config]]
+name = "bootstrap-npm"
+enabled = false
+[[skills.config]]
+name = "bootstrap-parcel"
+enabled = false
+[[skills.config]]
+name = "bootstrap-utility-api"
+enabled = false
+[[skills.config]]
+name = "bootstrap-v4-v6-migration"
+enabled = false
+[[skills.config]]
+name = "bootstrap-v5-v6-migration"
+enabled = false
+[[skills.config]]
+name = "bootstrap-v6-install"
+enabled = false
+[[skills.config]]
+name = "bootstrap-vite"
+enabled = false
+[[skills.config]]
+name = "bootstrap-webpack"
+enabled = false

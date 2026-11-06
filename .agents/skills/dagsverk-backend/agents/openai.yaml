@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dagsverk Backend"
+  short_description: "Shared Java, API contracts and storage boundaries"

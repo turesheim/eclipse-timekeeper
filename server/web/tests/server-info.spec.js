@@ -59,7 +59,7 @@ test('About follows the saved Norwegian language and remains accessible in every
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
     await setTheme(page,theme);await page.locator('#account-menu > summary').click();
     await page.locator('#about-open').click();const dialog=page.locator('#server-info');
-    await expect(dialog.getByRole('heading',{name:'Om Timekeeper',exact:true})).toBeVisible();
+    await expect(dialog.getByRole('heading',{name:'Om Dagsverk',exact:true})).toBeVisible();
     await expect(dialog.getByRole('link',{name:'Kildekode',exact:true})).toBeVisible();
     const details=page.locator('#about-notices');if(await details.getAttribute('open')===null)await details.locator('summary').click();
     expect((await new AxeBuilder({page}).include('#server-info').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);

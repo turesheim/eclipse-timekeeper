@@ -193,7 +193,7 @@ for(const reuse of [false,true]) test(`Toggl Legacy export ${reuse ? 'maps to an
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(legacyFixture);
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await expect(page.locator('#account-content')).toContainText('7 source rows · 0 invalid');
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();
-  const client=page.getByLabel('Timekeeper client for Legacy client',{exact:true});await expect(client).toBeVisible();
+  const client=page.getByLabel('Dagsverk client for Legacy client',{exact:true});await expect(client).toBeVisible();
   await expect(page.getByLabel('New client name',{exact:true})).toHaveValue('Legacy client');
   await expect(page.getByLabel('New project name',{exact:true})).toHaveValue('Legacy project');
   if(reuse) await client.selectOption(destination.id);
@@ -235,12 +235,12 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   await expect(page.getByRole('heading',{name:'Client mappings',exact:true})).toBeVisible();
   const sources=['Toggl one','Toggl two',mode==='WORK_SESSION' ? 'Fallback project' : 'Entries without a client'];
   for(const source of sources) {
-    const select=page.getByLabel('Timekeeper client for '+source,{exact:true});
+    const select=page.getByLabel('Dagsverk client for '+source,{exact:true});
     await select.selectOption(destination.id);await expect(select).toHaveValue(destination.id);
     await expect(select.locator('..').locator('..').getByLabel('New client name',{exact:true})).toBeHidden();
   }
   // The choice can be changed back before committing; no destination is edited.
-  const first=page.getByLabel('Timekeeper client for Toggl one',{exact:true});await first.selectOption('');
+  const first=page.getByLabel('Dagsverk client for Toggl one',{exact:true});await first.selectOption('');
   await expect(first.locator('..').locator('..').getByLabel('New client name',{exact:true})).toBeVisible();
   await first.selectOption(destination.id);await expect(first).toHaveValue(destination.id);
   await expect(page.getByLabel('New client name',{exact:true}).filter({visible:true})).toHaveCount(0);

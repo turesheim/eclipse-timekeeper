@@ -198,7 +198,7 @@ export class Api {
       }
     } finally {
       const durationMs=Math.round(performance.now()-started);
-      if(durationMs>=5000)console.warn('Timekeeper synchronization slow',{durationMs,attempts});
+      if(durationMs>=5000)console.warn('Dagsverk synchronization slow',{durationMs,attempts});
     }
   }
   async changes(after) {

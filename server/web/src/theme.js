@@ -1,7 +1,7 @@
 // Applied before styles load so a saved dark theme does not flash a light page.
 (() => {
   const key='timekeeper.theme';
-  const themes=[['timekeeper','Timekeeper','light'],['timekeeper-dark','Timekeeper Dark','dark'],
+  const themes=[['timekeeper','Dagsverk','light'],['timekeeper-dark','Dagsverk Dark','dark'],
     ['solarized-light','Solarized Light','light'],['solarized-dark','Solarized Dark','dark'],
     ['nord','Nord','dark'],['dracula','Dracula','dark']];
   const normalize=value=>themes.some(([id])=>id===value) ? value:'timekeeper';

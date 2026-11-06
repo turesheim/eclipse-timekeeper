@@ -1,0 +1,53 @@
+{
+  "description": "Dagsverk agent workflow regression cases. Run relevant cases in disposable checkouts; assess outcomes, not wording.",
+  "cases": [
+    {
+      "id": "shared-midnight",
+      "prompt": "Use $dagsverk-change to investigate an incorrect daily duration for a work session crossing midnight in the account time zone. Reproduce the problem, fix it if confirmed and verify the affected clients.",
+      "expected_skills": ["dagsverk-change", "dagsverk-backend"],
+      "criteria": ["Establish expected account-local day boundaries before editing", "Do not invent a defect if the scenario already passes", "Keep shared logic canonical", "Verify both reactors if shared Java changes"]
+    },
+    {
+      "id": "web-filter",
+      "prompt": "Add client filtering to Workweek. Selecting a client shows only its sessions; clearing restores all clients. Totals match visible sessions. Support narrow screens and English/Norwegian. Preserve existing records and API behavior.",
+      "expected_skills": ["dagsverk-change", "dagsverk-web"],
+      "criteria": ["Inspect existing filtering behavior", "Implement observable filtering/clearing/totals behavior", "Preserve native modules and Bootstrap 5.3.8", "Verify relevant browser scenarios with synthetic data"]
+    },
+    {
+      "id": "api-isolation-review",
+      "prompt": "Use $dagsverk-review to review the API changes in this diff, especially whether a signed-in account can read or change another account's work. Report findings; leave the source unchanged.",
+      "expected_skills": ["dagsverk-review"],
+      "criteria": ["Follow authenticated ownership through reads and writes", "Distinguish demonstrated defects from questions", "Use file/line evidence", "Respect review-only scope"]
+    },
+    {
+      "id": "eclipse-responsive",
+      "prompt": "Investigate why switching to the remote backend can freeze the Eclipse view. Preserve local storage behavior and saved backend preferences, and verify the fix if a defect is confirmed.",
+      "expected_skills": ["dagsverk-change", "dagsverk-eclipse"],
+      "criteria": ["Inspect SWT and background Job boundaries", "Keep preference/bundle identifiers", "Exercise affected local and remote paths", "Report missing display/runtime prerequisites accurately"]
+    },
+    {
+      "id": "branding-compatibility",
+      "prompt": "Update a remaining user-visible Timekeeper label to Dagsverk while preserving existing saved settings and compatibility identifiers.",
+      "expected_skills": ["dagsverk-change"],
+      "criteria": ["Read current branding phase", "Update display copy without broad identifier replacement", "Preserve API headers, theme IDs, storage keys and formats", "Update relevant localized copy and generate resources when needed"]
+    },
+    {
+      "id": "documentation-only",
+      "prompt": "Correct a typo in the repository development guide. Keep this to a documentation edit.",
+      "unexpected_skills": ["dagsverk-backend", "dagsverk-web", "dagsverk-eclipse"],
+      "criteria": ["Make only the requested correction", "Avoid full product builds for an isolated prose edit", "Do not create planning or approval artifacts"]
+    },
+    {
+      "id": "existing-local-work",
+      "prompt": "Fix the supplied web defect. The checkout already contains unrelated edits; preserve them and verify only the task's affected components.",
+      "expected_skills": ["dagsverk-change", "dagsverk-web"],
+      "criteria": ["Record and preserve the initial changes", "Include every task file in scoped verification", "Do not attribute unrelated changes to the task", "Reject stale verification after further edits"]
+    },
+    {
+      "id": "advice-only",
+      "prompt": "Explain the difference between Dagsverk work sessions and activities. Do not change any files.",
+      "unexpected_skills": ["dagsverk-change", "dagsverk-eclipse", "dagsverk-web"],
+      "criteria": ["Explain using current architecture/domain sources", "Keep the task read-only", "Do not run product builds or create files"]
+    }
+  ]
+}

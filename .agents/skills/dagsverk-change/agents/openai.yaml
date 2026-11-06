@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dagsverk Change"
+  short_description: "Implement scoped changes with acceptance evidence"

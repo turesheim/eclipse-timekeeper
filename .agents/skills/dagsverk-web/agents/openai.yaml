@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dagsverk Web"
+  short_description: "Browser UI, localization and accessible interactions"

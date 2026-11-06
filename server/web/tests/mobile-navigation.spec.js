@@ -7,10 +7,10 @@ import {openAccountMenu} from './navigation.js';
 import {localDateTime} from '../src/model.js';
 import {randomUUID} from 'node:crypto';
 
-test('iOS home-screen metadata serves the bundled Timekeeper icon without sign-in',async({page})=>{
+test('iOS home-screen metadata serves the bundled Dagsverk icon without sign-in',async({page})=>{
   await page.goto('/web/');
   const icon=page.locator('link[rel="apple-touch-icon"]');await expect(icon).toHaveCount(1);await expect(icon).toHaveAttribute('sizes','256x256');
-  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute('content','Timekeeper');
+  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute('content','Dagsverk');
   const url=await icon.evaluate(node=>node.href);expect(new URL(url).pathname).toBe('/web/apple-touch-icon.png');
   const response=await browserRequest(page).get(url);expect(response.status()).toBe(200);expect(response.headers()['content-type']).toContain('image/png');
   const bytes=await response.body();expect(bytes.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');

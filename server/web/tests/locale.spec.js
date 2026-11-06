@@ -103,7 +103,7 @@ test('Norwegian administration and workspace navigation retain accessible narrow
     await page.goto('/admin/');await expect(page.getByRole('heading',{name:'Generelle innstillinger',exact:true})).toBeVisible();
     const settings=await browserRequest(page).get('/api/v1/admin/settings');expect(settings.status()).toBe(200);
     const status=(await settings.json()).restartRequired
-      ? 'Endringene er lagret. Start Timekeeper på nytt på alle serverinstanser for å ta dem i bruk. Nettleserøkter logges ut.'
+      ? 'Endringene er lagret. Start Dagsverk på nytt på alle serverinstanser for å ta dem i bruk. Nettleserøkter logges ut.'
       : 'Lagrede innstillinger er aktive.';
     await expect(page.locator('#account-content [role=status]').first()).toHaveText(status);
     await page.setViewportSize({width:390,height:844});

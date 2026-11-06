@@ -1,19 +1,23 @@
-# Timekeeper
+# Dagsverk
 
 [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
-Timekeeper is a self-hosted time-tracking application with a web client and
+Dagsverk (formerly Timekeeper) is a self-hosted time-tracking application with a web client and
 Eclipse plugins. Use the browser to track work for clients and projects, or
 track tasks from Eclipse with optional Mylyn integration. Eclipse can use local
 storage or connect to the same server account as the browser.
 
-**Timekeeper 2.0 is under development.** Current development builds are available
+**Dagsverk 2.0 is under development.** Current development builds are available
 through the testing update site and GitHub Actions artifacts described below.
 
 [Project website](https://turesheim.github.io/eclipse-timekeeper/) ·
 [Web client guide](docs/development/WEB-CLIENT.md) ·
 [Eclipse user guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Timekeeper-2.0-User-Guide) ·
 [Documentation index](docs/README.md)
+
+The product is gradually adopting the Dagsverk name. Existing Eclipse installation
+names, package IDs, configuration variables and download URLs retain Timekeeper
+for compatibility. See the [naming transition](docs/development/BRANDING.md).
 
 ## Web client
 
@@ -32,7 +36,7 @@ are tracked independently of work sessions; their time overlap provides context.
   totals. Start a task timer or record time manually, including taskless work.
 - **Clients and projects** organize your work with client colors and searchable
   project icons.
-- **Themes** include the original Timekeeper palette, Timekeeper Dark, Solarized
+- **Themes** include the original Dagsverk palette, Dagsverk Dark, Solarized
   Light/Dark, Nord and Dracula. Choose a theme in the account menu.
 - **Toggl Track import** maps source clients and projects to new or existing
   records and supports undoing a whole import. Prefer the Legacy CSV export
@@ -131,6 +135,9 @@ on Linux. Use `mvnw.cmd` on Windows. See the [repository guide](docs/development
 for focused and installed-client checks, [API v1](docs/architecture/API-V1.md) for
 the contract, and [release instructions](docs/development/RELEASING.md) for packaging.
 
+Agent-assisted development uses
+[project skills, hooks and shared quality checks](docs/development/AGENT-WORKFLOW.md).
+
 ## License
 
-Timekeeper is licensed under the [Eclipse Public License 2.0](LICENSE).
+Dagsverk is licensed under the [Eclipse Public License 2.0](LICENSE).
