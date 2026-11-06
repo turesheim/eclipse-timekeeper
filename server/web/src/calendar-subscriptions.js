@@ -12,6 +12,24 @@ const button=(label,action,classes='btn btn-outline-secondary')=>{const value=no
 const errorText=error=>error?.message||t('calendar.error.CALENDAR_CONNECTION_FAILED');
 export const calendarFailure=code=>t('calendar.error.'+code);
 
+function calendarSharingGuide() {
+  const guide=node('section',undefined,'calendar-sharing-guide'),title=node('h3',t('calendar.sharing.title'));title.id='calendar-sharing-title';guide.setAttribute('aria-labelledby',title.id);
+  guide.append(title,node('p',t('calendar.sharing.privacy'),'hint'));
+  for(const [provider,steps,url]of [
+    ['microsoft',3,'https://support.microsoft.com/en-gb/outlook/share-your-calendar-in-outlook-on-the-web'],
+    ['google',2,'https://support.google.com/calendar/answer/37648'],
+    ['apple',3,'https://support.apple.com/en-gb/guide/icloud/mm6b1a9479/icloud']
+  ]) {
+    const details=node('details'),list=node('ol');details.append(node('summary',t(`calendar.sharing.${provider}.title`)));
+    for(let step=1;step<=steps;step++)list.append(node('li',t(`calendar.sharing.${provider}.step${step}`)));
+    const help=node('a',t(`calendar.sharing.${provider}.help`));help.href=url;help.target='_blank';help.rel='noopener noreferrer';
+    const reference=node('p');reference.append(help);details.append(list,node('p',t(`calendar.sharing.${provider}.note`),'hint'),reference);guide.append(details);
+  }
+  const tasks=node('details');tasks.append(node('summary',t('calendar.sharing.tasks.title')));
+  for(const key of ['support','providers','setup'])tasks.append(node('p',t('calendar.sharing.tasks.'+key)));
+  guide.append(tasks);return guide;
+}
+
 export function styleCalendarEvent(element,event) {
   const imported=!!event.activityIds?.length,colors=clientColors(event.color);
   element.dataset.imported=String(imported);
@@ -28,7 +46,7 @@ export class CalendarSubscriptions {
     this.add=button(t('calendar.add'),()=>this.run(()=>this.edit()),'btn btn-primary');this.add.id='calendar-subscription-add';this.add.dataset.calendarAction='add';this.add.prepend(icon('calendar-plus'),' ');
     heading.append(this.title,this.add);this.list=node('ul',undefined,'calendar-subscription-list');this.list.id='calendar-subscription-list';
     this.message=node('p',undefined,'hint');this.message.id='calendar-subscriptions-message';this.message.setAttribute('role','status');
-    this.content=node('div',undefined,'calendar-subscriptions-content');this.content.id='calendar-subscriptions-content';this.content.append(node('p',t('calendar.explanation'),'hint'),this.list);this.panel.append(heading,this.content,this.message);
+    this.content=node('div',undefined,'calendar-subscriptions-content');this.content.id='calendar-subscriptions-content';this.content.append(node('p',t('calendar.explanation'),'hint'),node('p',t('calendar.sharing.setup')),this.list,calendarSharingGuide());this.panel.append(heading,this.content,this.message);
     this.allDay=node('section',undefined,'calendar-all-day-plans');this.allDay.hidden=true;this.allDay.setAttribute('aria-labelledby','calendar-all-day-title');
     root.querySelector('.calendar-scroll').before(this.allDay);
     this.dialog=node('dialog',undefined,'app-dialog shadow-lg');this.dialog.id='calendar-subscription-editor';this.dialog.setAttribute('aria-labelledby','calendar-subscription-editor-title');
