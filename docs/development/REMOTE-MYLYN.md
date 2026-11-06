@@ -35,6 +35,14 @@ late deactivation cannot stop the successor. It writes a custom Task List
 marker and waits for Mylyn's official externalization/save operation and
 persistent preferences before the test VM exits.
 
+Remote active tracking is also reconciled on the UI thread. A stop or switch
+from another client deactivates the current account's linked Mylyn task without
+issuing another server stop. Pending Mylyn tracking jobs protect a newly queued
+activation from an older cached snapshot. Offline/connecting snapshots and
+projections from other accounts never deactivate the current Task List task.
+The browser-peer phase asserts the actual Mylyn activation flag after a web
+stop and checks that the stopped interval's version changes only once.
+
 The second phase retains the first workspace (`deleteOsgiDataDirectory=false`)
 while launching a new Eclipse JVM and server JVM. It requires the saved marker,
 so recreating a projection does not satisfy the test. Activation must reuse the

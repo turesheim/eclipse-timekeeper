@@ -40,6 +40,7 @@ import net.resheim.eclipse.timekeeper.service.ServiceException;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.Project;
+import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
@@ -204,6 +205,8 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
             if(!TimekeeperUiPlugin.getDefault().isBackendReady()) {backendAvailable=false;return;}
 			var tasks = service.tasks();
 			var projects = service.projects();
+            if(TimekeeperUiPlugin.getDefault().isRemote())
+                MylynIntegration.getDefault().reconcileTracking(service.activeActivity(OwnerId.LOCAL));
 			backendAvailable = true;
 			if (mylynDirty.get() || backendDirty.get() || !tasks.equals(lastTasks) || !projects.equals(lastProjects)) {
 				lastTasks = tasks;

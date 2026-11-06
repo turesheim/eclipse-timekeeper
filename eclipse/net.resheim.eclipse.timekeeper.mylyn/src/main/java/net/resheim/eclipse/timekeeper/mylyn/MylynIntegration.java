@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.ui.TaskElementLabelProvider;
@@ -18,6 +19,7 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
+import net.resheim.eclipse.timekeeper.domain.Activity;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.Task;
@@ -46,6 +48,8 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	private ServiceRegistration<TaskIntegration> registration;
 	private MylynTaskSynchronizer synchronizer;
 	private TaskElementLabelProvider labels;
+    private final Set<Job> trackingOperations = new java.util.HashSet<>();
+    private boolean projectingTracking;
 
 	public static MylynIntegration getDefault() {
 		return instance;
@@ -152,9 +156,10 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	}
 
 	public void activated(ITask external) {
+        if(projectingTracking && org.eclipse.swt.widgets.Display.getCurrent()!=null) return;
         var ui=TimekeeperUiPlugin.getDefault();
         if(ui.isRemote() && org.eclipse.swt.widgets.Display.getCurrent()!=null) {
-            ui.runOperation("Track Mylyn task",()->{activated(external);return null;},value->{},this::reportFailure);return;
+            trackInWorker("Track Mylyn task",()->activated(external));return;
         }
 		Task task = resolve(external);
 		var service = service();
@@ -166,11 +171,12 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	}
 
 	public void deactivated(ITask external) {
+        if(projectingTracking && org.eclipse.swt.widgets.Display.getCurrent()!=null) return;
         var ui=TimekeeperUiPlugin.getDefault();
         var scope=MylynBackendScope.current();
         if(scope==null || scope.foreignProjection(external)) return;
         if(ui.isRemote() && org.eclipse.swt.widgets.Display.getCurrent()!=null) {
-            ui.runOperation("Stop Mylyn task",()->{deactivated(external);return null;},value->{},this::reportFailure);return;
+            trackInWorker("Stop Mylyn task",()->deactivated(external));return;
         }
 		// A late/duplicate deactivation must neither create a task nor stop its
 		// successor.
@@ -179,6 +185,27 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 		service.activeActivity(OwnerId.LOCAL).filter(activity -> id.filter(activity.taskId()::equals).isPresent())
 				.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(), activity.version())));
 	}
+
+    private void trackInWorker(String name,Runnable action) {
+        Job job=TimekeeperUiPlugin.getDefault().runOperation(name,()->{action.run();return null;},value->{},this::reportFailure);
+        if(job!=null) trackingOperations.add(job);
+    }
+
+    /** UI-thread projection of an acknowledged remote stop, without another stop command. */
+    void reconcileTracking(Optional<Activity> active) {
+        if(!TimekeeperUiPlugin.getDefault().isRemote()) return;
+        trackingOperations.removeIf(job->job.getState()==Job.NONE);
+        // A queued activation has not yet reached the cached server snapshot.
+        if(!trackingOperations.isEmpty()) return;
+        var current=TasksUi.getTaskActivityManager().getActiveTask();
+        var scope=MylynBackendScope.current();
+        if(current==null || scope==null || scope.foreignProjection(current)) return;
+        var id=service().findTask(reference(current).key()).map(Task::id).or(()->mapped(current));
+        if(id.isEmpty() || active.filter(activity->activity.taskId().equals(id.orElseThrow())).isPresent()) return;
+        projectingTracking=true;
+        try {TasksUi.getTaskActivityManager().deactivateTask(current);}
+        finally {projectingTracking=false;}
+    }
 
 	public Optional<ITask> linked(Task task) {
 		var scope=MylynBackendScope.current();

@@ -35,11 +35,27 @@ public class RemoteMylynTest {
             var firstProjection=MylynIntegration.getDefault().linked(first).orElseThrow();
             var secondProjection=MylynIntegration.getDefault().linked(second).orElseThrow();
             String marker=UUID.randomUUID().toString();
-            RemoteTestSupport.onUi(()->{
-                firstProjection.setAttribute("timekeeper.remote.restart-marker",marker);
-                org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().notifyElementChanged((org.eclipse.mylyn.internal.tasks.core.AbstractTask)firstProjection);
-                TasksUi.getTaskActivityManager().activateTask(firstProjection);return null;
-            });
+            var activationWorkerHeld=new java.util.concurrent.CountDownLatch(1);
+            var releaseActivationWorker=new java.util.concurrent.CountDownLatch(1);
+            RemoteTestSupport.onUi(()->{TimekeeperUiPlugin.getDefault().runRead("Hold worker before Mylyn activation",()->{
+                activationWorkerHeld.countDown();
+                try {if(!releaseActivationWorker.await(30,java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Activation fixture timed out");}
+                catch(InterruptedException interrupted) {Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}
+                return null;
+            },value->{},failure->{throw new AssertionError(failure);});return null;});
+            assertTrue(activationWorkerHeld.await(30,java.util.concurrent.TimeUnit.SECONDS));
+            try {
+                RemoteTestSupport.onUi(()->{
+                    firstProjection.setAttribute("timekeeper.remote.restart-marker",marker);
+                    org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().notifyElementChanged((org.eclipse.mylyn.internal.tasks.core.AbstractTask)firstProjection);
+                    TasksUi.getTaskActivityManager().activateTask(firstProjection);return null;
+                });
+                // Cross the one-second polling interval while the acknowledged
+                // server snapshot is still empty and activation is queued.
+                Thread.sleep(1500);
+                assertTrue("A pending activation must survive the older server snapshot",RemoteTestSupport.onUi(firstProjection::isActive));
+                assertTrue(api.activeActivity(OwnerId.LOCAL).isEmpty());
+            } finally {releaseActivationWorker.countDown();}
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).filter(a->a.taskId().equals(first.id())).isPresent(),"Mylyn activation did not start the linked remote task");
             var original=api.activeActivity(OwnerId.LOCAL).orElseThrow();assertEquals("remote-owner-a",original.ownerId().value());
             waitUiActive(first.id());
