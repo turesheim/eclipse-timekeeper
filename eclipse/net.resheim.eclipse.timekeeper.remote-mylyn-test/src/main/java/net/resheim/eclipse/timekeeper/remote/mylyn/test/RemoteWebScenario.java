@@ -62,9 +62,10 @@ final class RemoteWebScenario {
             var accepted=api.task(task.id()).orElseThrow();assertEquals(changed.version()+1,accepted.version());
             peer.command(Map.of("action","conflict","summary",nativeSummary,"draft",webDraft));assertEquals(accepted,api.task(task.id()).orElseThrow());
 
+            RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(accepted).isPresent(),"Browser-created task was not projected into Mylyn");
+            var projection=MylynIntegration.getDefault().linked(accepted).orElseThrow();
             awaitTree(project,accepted);tree.getTreeItem(project.name()).getNode(accepted.summary()).contextMenu("Activate task").click();
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).filter(a->a.taskId().equals(task.id())).isPresent(),"Native activation did not start browser-created task");
-            var projection=MylynIntegration.getDefault().linked(accepted).orElseThrow();
             assertTrue("The fixture must activate the actual Mylyn projection",RemoteTestSupport.onUi(projection::isActive));
             var nativeActive=api.activeActivity(OwnerId.LOCAL).orElseThrow();assertEquals("remote-owner-b",nativeActive.ownerId().value());
             peer.command(Map.of("action","observe-active"));peer.command(Map.of("action","stop"));
