@@ -497,7 +497,10 @@ allowlist preserves prose, lists, tables and links; it excludes scripts, styles,
 images, embedded resources, forms, custom attributes and non-HTML namespaces.
 Links allow only absolute HTTP(S), mailto and tel URLs and open with
 `noopener noreferrer`. Plain descriptions retain line breaks and linked web
-URLs. No remote description resources are fetched. Authored link/image titles inside the Markdown editor
+URLs. Event dialogs use the same renderer. Teams, Google Meet and Zoom links
+include a local icon and provider label. Unknown location links use a generic
+video icon. Provider recognition compares the actual URL hostname, so lookalike
+domains do not receive provider branding. No remote description resources are fetched. Authored link/image titles inside the Markdown editor
 are left untouched so hint enhancement cannot change saved notes.
 `tooltip-content.js` provides shared decorated session
 and calendar-event details. Each composite card owns one tooltip containing its
@@ -506,9 +509,9 @@ and duration do not create separate hints. The same builders serve Today, the
 monthly Calendar, Week and Workweek. Read-only summary cards are keyboard-focusable.
 Tooltips support hover, keyboard descriptions, Escape dismissal, hovering over
 the tooltip itself and scrolling long details. Hints open after 800 ms. Keeping
-the mouse inside a hint for five continuous seconds focuses it as a nonmodal
+the mouse inside a hint for three continuous seconds focuses it as a nonmodal
 details dialog, allowing selection, links and native scrolling. Leaving before
-five seconds resets the countdown. Keyboard users can press F2 from the focused
+three seconds resets the countdown. Keyboard users can press F2 from the focused
 hint source to enter details immediately; Escape closes details and restores
 focus. A focused popup stays open until focus leaves, it is dismissed, or its
 source disappears. Its content remains stable through live data refreshes;

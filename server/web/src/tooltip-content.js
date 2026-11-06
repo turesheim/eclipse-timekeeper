@@ -2,11 +2,11 @@ import {t} from './i18n.js';
 import {icon,projectIcon} from './icons.js';
 import {instantNanos,instantText,nanosText} from './model.js';
 import {calendarTodo,calendarItemWhen,calendarItemStatus} from './calendar-item.js';
-import {calendarDescription} from './tooltip-description.js';
+import {calendarDescription,calendarLocation} from './tooltip-description.js';
 
 const node=(tag,text,css)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(css)value.className=css;return value;};
 function line(glyph,text,css='tooltip-detail') {
-  const row=node('div',undefined,css);if(glyph){glyph.removeAttribute('title');row.append(glyph);}row.append(node('span',text));return row;
+  const row=node('div',undefined,css);if(glyph){glyph.removeAttribute('title');row.append(glyph);}row.append(text instanceof Node?text:node('span',text));return row;
 }
 function frame(title,glyph) {
   const root=node('div',undefined,'tooltip-details');root.append(line(glyph,title,'tooltip-heading'));return root;
@@ -33,7 +33,7 @@ export function calendarEventTooltip(event,zone) {
   if(event.clientName)root.append(line(icon('buildings'),event.clientName));
   if(event.calendarName&&event.calendarName!==event.clientName)root.append(line(icon('calendar'),event.calendarName));
   const status=calendarItemStatus(event);if(status)root.append(line(icon('info-circle'),status));
-  if(event.location)root.append(line(icon('geo-alt'),event.location));
+  if(event.location)root.append(line(icon('geo-alt'),calendarLocation(event.location)));
   if(event.description)root.append(calendarDescription(event.description));
   return root;
 }

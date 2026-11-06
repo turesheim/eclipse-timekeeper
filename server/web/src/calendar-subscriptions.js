@@ -1,4 +1,5 @@
 import {focusIncludes} from './focus-model.js';
+import {calendarDescription,calendarLocation} from './tooltip-description.js';
 import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
@@ -200,8 +201,8 @@ export class CalendarSubscriptions {
     const actions=node('div',undefined,'dialog-actions');actions.append(eventNoteButton(event,()=>void this.eventNoteEditor.open(event,this.scope,this.writable,this.data.profile.data.zoneId)),button(t('ui.close'),()=>this.details.close()),this.convert);
     this.details.append(title,node('p',this.eventDate(event)),node('p',event.clientName+' · '+event.calendarName,'hint'));
     if(calendarTodo(event))this.details.append(node('p',calendarItemStatus(event)));
-    if(event.location)this.details.append(node('p',t('calendar.location',{location:event.location})));
-    if(event.description)this.details.append(node('p',event.description,'calendar-description'));
+    if(event.location){const location=node('p');location.append(calendarLocation(t('calendar.location',{location:event.location})));this.details.append(location);}
+    if(event.description){const description=calendarDescription(event.description);description.classList.add('calendar-description');this.details.append(description);}
     this.details.append(this.detailNotice,actions);if(!this.details.open)this.details.showModal();actions.querySelector('button').focus();
   }
   reviewDetails() {
