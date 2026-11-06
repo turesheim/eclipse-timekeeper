@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import time
 from native_material import verify as verify_material
+from hyper_backup import verify as verify_hyper_backup
 
 ROOT = Path(__file__).resolve().parents[3]
 DB = ROOT/'server/app/src/main/resources/db'
@@ -257,6 +258,7 @@ def main():
             def material_sql(query):
                 return command('docker','exec','-i',name,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture','-v','ON_ERROR_STOP=1',input=query).stdout.strip()
             material_evidence=verify_material(command,name,folder,helper,read,material_sql,'37017:37017')
+            hyper_backup_evidence=verify_hyper_backup(command,name,folder,env_file,read,material_sql)
             # A separate malformed backup is refused without replacing restored data.
             command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/var/server/backups/corrupt.tar; chown 37017:37017 /var/packages/timekeeper/var/server/backups/corrupt.tar")
             helper('restore','/var/packages/timekeeper/var/server/backups/corrupt.tar',expected=1)
@@ -264,7 +266,7 @@ def main():
             if any(secret in log for secret in (master_password,application_password,code)):
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
             print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,'serverSchema':10,'canonicalSchemaFixture':True,
-                              **material_evidence,'packageAccountUid':37017,'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
+                              **material_evidence,**hyper_backup_evidence,'packageAccountUid':37017,'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
                               'upgradeSurvivesRemovedPackageLinks':True,'missingUpgradeStateRefused':True,
                               'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,
                               'nativeBackupRestore':True,'corruptRestoreRefused':True,'noPlaintextCredentialsInStatementLog':True}))

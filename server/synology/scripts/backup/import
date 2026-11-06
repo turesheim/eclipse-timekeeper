@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+. /usr/syno/bin/jsoncmd
+if ! "$(dirname "$0")/../timekeeper-dsm" hyper-backup-import; then
+    jerr "Dagsverk application restore failed. Keep the package stopped and follow the recovery instructions."
+    exit 1
+fi
+jout_begin
+joutstr "app_data_version" "1.0"
+jout_end
