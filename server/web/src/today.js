@@ -24,6 +24,17 @@ export class TodayView {
   constructor(root,callbacks){
     this.recentNotes=new RecentNotes(byId('today-recent-notes'),callbacks);
     this.root=root;this.callbacks=callbacks;this.dateInput=byId('today-date');this.grid=byId('today-month-grid');this.monthTitle=byId('today-month-title');this.journalRoot=byId('today-journal');
+    this.sidebar=root.querySelector('.today-sidebar');this.sidebar.id='today-sidebar';
+    this.sidebarResize=node('div',undefined,'today-resize');this.sidebarResize.tabIndex=0;
+    for(const [name,value]of Object.entries({role:'separator','aria-orientation':'vertical','aria-label':t('today.resize_sidebar'),'aria-controls':'today-sidebar','aria-valuemin':'180','aria-valuemax':'480','aria-valuenow':'196'}))this.sidebarResize.setAttribute(name,value);
+    this.sidebar.before(this.sidebarResize);
+    const width=value=>{this.sidebarWidth=Math.max(180,Math.min(480,value));root.style.setProperty('--today-sidebar-width',this.sidebarWidth+'px');this.sidebarResize.setAttribute('aria-valuenow',String(Math.round(this.sidebarWidth)));this.sizeEditor();};let drag=null;
+    this.sidebarResize.addEventListener('pointerdown',event=>{if(event.button!==0)return;event.preventDefault();this.sidebarResize.focus({preventScroll:true});drag={x:event.clientX,width:this.sidebar.getBoundingClientRect().width};this.sidebarResize.setPointerCapture(event.pointerId);});
+    this.sidebarResize.addEventListener('pointermove',event=>{if(drag&&this.sidebarResize.hasPointerCapture(event.pointerId))width(drag.width+drag.x-event.clientX);});
+    for(const type of ['pointerup','pointercancel'])this.sidebarResize.addEventListener(type,event=>{if(this.sidebarResize.hasPointerCapture(event.pointerId))this.sidebarResize.releasePointerCapture(event.pointerId);drag=null;});
+    this.sidebarResize.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();width(event.key==='Home'?180:event.key==='End'?480:this.sidebar.getBoundingClientRect().width+(event.key==='ArrowLeft'?20:-20));}});
+    document.addEventListener('focusin',event=>{this.sidebarResizeFocused=event.target===this.sidebarResize;});
+    matchMedia('(max-width:1050px)').addEventListener('change',event=>{if(event.matches&&root.offsetParent&&(document.activeElement===this.sidebarResize||this.sidebarResizeFocused&&document.activeElement===document.body))this.dateInput.focus({preventScroll:true});});
     this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged},{inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
@@ -84,6 +95,7 @@ export class TodayView {
     this.root.style.setProperty('--today-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');
     const sidebarTop=this.root.querySelector('.today-sidebar').getBoundingClientRect().top+scrollY;
     this.root.style.setProperty('--today-sidebar-height',Math.max(0,innerHeight-sidebarTop-navHeight)+'px');
+    if(this.sidebarResize.offsetParent)this.sidebarResize.setAttribute('aria-valuenow',String(Math.round(this.sidebar.getBoundingClientRect().width)));
   }
   paintMonth(){
     if(!this.data||!this.month)return;

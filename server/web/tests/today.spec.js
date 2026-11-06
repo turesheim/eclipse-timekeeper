@@ -15,6 +15,26 @@ async function api(request,method,path,data,headers={}){
   expect(response.ok(),`${method} ${path}: ${response.status()}`).toBe(true);return response;
 }
 
+test('Today sidebar resizes with pointer and keyboard while preserving the journal and mobile layout',async({page,request})=>{
+  const date='2026-09-14',original=(await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body,draft='Sidebar resize draft '+randomUUID();
+  try{
+    await page.setViewportSize({width:1440,height:1000});await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);
+    const resize=page.getByRole('separator',{name:'Resize Today sidebar',exact:true}),sidebar=page.locator('#today-sidebar'),journal=page.locator('#today-note-editor');await expect(resize).toBeVisible();await expect(resize).toHaveAttribute('aria-orientation','vertical');
+    await journal.getByRole('button',{name:'Markdown source',exact:true}).click();const body=page.locator('#today-journal-body');await body.fill(draft);
+    const start=await resize.boundingBox(),initial=(await sidebar.boundingBox()).width;await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2-100,start.y+start.height/2,{steps:4});await page.mouse.up();
+    await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(initial+100,0);await expect(body).toHaveValue(draft);
+    await resize.focus();await resize.press('End');await expect(resize).toHaveAttribute('aria-valuenow','480');await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(480,0);
+    await resize.press('ArrowRight');await expect(resize).toHaveAttribute('aria-valuenow','460');await resize.press('ArrowLeft');await expect(resize).toHaveAttribute('aria-valuenow','480');await resize.press('ArrowLeft');await expect(resize).toHaveAttribute('aria-valuenow','480');
+    await resize.press('Home');await expect(resize).toHaveAttribute('aria-valuenow','180');await resize.press('ArrowRight');await expect(resize).toHaveAttribute('aria-valuenow','180');await resize.press('End');
+    await expect(body).toHaveValue(draft);await expect.poll(async()=>(await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body).toBe(draft);
+    expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/today-sidebar-wide.png'});
+    await resize.focus();await page.setViewportSize({width:1000,height:844});await expect(resize).toBeHidden();await expect(page.locator('#today-date')).toBeFocused();
+    await page.setViewportSize({width:390,height:844});await expect(resize).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(body).toHaveValue(draft);await captureScreenshot(page,{path:'test-results/today-sidebar-mobile.png',fullPage:true});
+    await page.setViewportSize({width:1440,height:1000});await expect(resize).toBeVisible();await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(480,0);
+    await page.locator('[data-tab=calendar]').click();await page.locator('[data-tab=today]').click();await expect(resize).toHaveAttribute('aria-valuenow','480');await expect(body).toHaveValue(draft);
+  }finally{const current=await api(request,'GET','/day-notes/'+date+'/content');await api(request,'PUT','/day-notes/'+date+'/content',{body:original},{'If-Match':current.headers().etag});}
+});
+
 test('Today shows the selected journal, mini calendar, work sessions and imported all-day plans',async({page,request})=>{
   const original=await(await api(request,'GET','/me')).json(),date='2025-05-17',next='2025-05-18',meetingTitle='Team meeting with a deliberately long calendar event title for truncation';
   let client,project,session,secondSession,task;
