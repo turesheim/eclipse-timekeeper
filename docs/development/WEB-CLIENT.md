@@ -1100,7 +1100,9 @@ tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
 
-The navigation toggle is available at every screen size. On desktop, collapse
+The navigation toggle stays to the left of the Notes title at every screen
+size, including when navigation is collapsed or the phone drawer is open.
+On desktop, collapse
 it to give the editor the full workspace width; expanding restores its resized
 width without replacing the document, draft or editing mode. On phones it opens
 the folder drawer; selecting a document closes the drawer. The toggle reports

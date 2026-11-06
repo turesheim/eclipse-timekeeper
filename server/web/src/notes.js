@@ -24,7 +24,7 @@ export class NotesView {
       this.navigationState();
     },'layout-sidebar');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');
     this.documentTitle=node('h2',t('notes.select'),'notes-document-title');this.documentTitle.id='notes-document-title';
-    navigationHeading.append(this.title,this.toggle);heading.append(navigationHeading,this.documentTitle);
+    navigationHeading.append(this.toggle,this.title);heading.append(navigationHeading,this.documentTitle);
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.layout=node('div',undefined,'notes-layout');this.navigation=node('aside',undefined,'notes-navigation card');this.navigation.id='notes-navigation';this.navigation.setAttribute('aria-label',t('notes.navigation'));
     const tools=node('div',undefined,'btn-toolbar notes-navigation-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label',t('notes.navigation_actions'));
