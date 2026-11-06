@@ -1,5 +1,10 @@
 # Dagsverk
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="server/web/src/assets/branding/logo-dark.svg">
+  <img src="server/web/src/assets/branding/logo.svg" width="436" height="154" alt="Dagsverk">
+</picture>
+
 [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
 Dagsverk (formerly Timekeeper) is a self-hosted time-tracking application with a web client and
