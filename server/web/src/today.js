@@ -64,10 +64,10 @@ export class TodayView {
     if(!this.date)this.initialize(dateInZone(data.report.generatedAt,data.profile.data.zoneId));
     if(this.visible){this.pollEvents();this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}
   }
-  select(date,{confirmed=false}={}){
+  async select(date,{confirmed=false}={}){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date){this.dateInput.value=this.date;return false;}
     if(date===this.date){this.dateInput.value=this.date;return true;}
-    if(!confirmed&&!this.journal.canLeaveInline()){this.dateInput.value=this.date;return false;}
+    if(!confirmed&&!await this.journal.canLeaveInline()){this.dateInput.value=this.date;return false;}
     this.closePicker();this.closeEvent();this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;this.eventWarning=false;this.events=[];this.eventKey=null;++this.generation;
     this.paint();void this.loadEvents();if(dailyNoteDateFromSearch(location.search))history.replaceState(history.state,'',dailyNoteHref(date));return true;
   }

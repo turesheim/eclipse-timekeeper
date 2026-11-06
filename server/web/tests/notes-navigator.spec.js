@@ -1,3 +1,4 @@
+import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -41,7 +42,7 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
   ]){
     await toolbar.getByRole('button',{name:'Sort notes',exact:true}).click();await page.getByRole('menuitemradio',{name:label,exact:true}).click();
     await expect(rows).toHaveText(['Nested',...names.map(name=>name+'.md')]);await expect(page.locator('#notes-body')).toHaveValue('Unsaved navigator draft.');
-    await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
+    await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   }
   const sort=toolbar.getByRole('button',{name:'Sort notes',exact:true});await sort.focus();await sort.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Modified (newest first)',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(sort).toBeFocused();
   await sort.press('ArrowRight');await expect(toolbar.getByRole('button',{name:'Collapse all folders',exact:true})).toBeFocused();await page.keyboard.press('ArrowLeft');await expect(sort).toBeFocused();
@@ -83,7 +84,7 @@ test('collapsing navigation gives the editor the full width while preserving its
   await toggle.focus();await toggle.press('Enter');await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(navigation).toBeHidden();await expect(resize).toBeHidden();
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-(await page.locator('.notes-layout').boundingBox()).width)).toBeLessThan(2);
   expect((await editor.boundingBox()).width).toBeGreaterThan(expandedWidth);
-  await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
+  await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   await captureScreenshot(page,{path:'test-results/notes-workspace-collapsed.png',fullPage:false});
   await toggle.press('Space');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toHaveAttribute('aria-valuenow','480');
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-expandedWidth)).toBeLessThan(2);await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');

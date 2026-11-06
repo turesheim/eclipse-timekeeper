@@ -1,3 +1,4 @@
+import {saveMarkdown} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {appendEditorText} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
@@ -42,7 +43,7 @@ test('packaged manual client round-trips a representative vault after a formatte
     await page.unroute(reportReads);await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');
     await expect(page.locator('#session-new')).toBeEnabled();
     await page.locator('[data-tab=notes]').click();await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'journal').click();await noteEntry(page.locator('#notes-navigation'),'journal/2026-11-02.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
-    const paragraph=page.locator('#notes-formatted p').filter({hasText:'Edit this paragraph.'});await appendEditorText(paragraph,' Reviewed.');await expect(paragraph).toHaveText('Edit this paragraph. Reviewed.');await page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+    const paragraph=page.locator('#notes-formatted p').filter({hasText:'Edit this paragraph.'});await appendEditorText(paragraph,' Reviewed.');await expect(paragraph).toHaveText('Edit this paragraph. Reviewed.');await saveMarkdown(page.locator('#notes-panel'));
     const review=await sync([]);expect(review.conflicts).toEqual([]);expect(review.actions.some(action=>action.operation==='pull'&&action.path==='journal/2026-11-02.md')).toBe(true);expect((await sync(['--apply',review.review])).applied).toBe(true);
     files.set('journal/2026-11-02.md',Buffer.from(journal.replace('Edit this paragraph.','Edit this paragraph. Reviewed.')));
     for(const [path,bytes]of files){const actual=await readFile(join(folder,path));if(digest(actual)!==digest(bytes)&&path.endsWith('.md')){await writeFile('test-results/vault-expected.md',bytes);await writeFile('test-results/vault-actual.md',actual);expect(actual.toString('utf8'),path).toBe(bytes.toString('utf8'));}expect(digest(actual),path).toBe(digest(bytes));}

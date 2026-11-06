@@ -101,7 +101,7 @@ export class Api {
   constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) {this.#token = token?.trim() ?? null;this.#csrf = context.csrf;this.#owner = context.ownerId ?? null;this.fetcher = fetcher;}
   get owner() {return this.#owner;}
   close() {this.#closed = true;this.#token = '';this.#csrf = null;for (const request of this.#requests) request.abort();}
-  async request(path, { method = 'GET', body, rawBody, etag, noneMatch, key, timeout = 15000, binary = false, emptyResponse = false, undo = false, signal } = {}) {
+  async request(path, { method = 'GET', body, rawBody, etag, noneMatch, key, timeout = 15000, binary = false, emptyResponse = false, undo = false, signal, keepalive = false } = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     if (rawBody !== undefined && (body !== undefined || !(rawBody instanceof Uint8Array || rawBody instanceof Blob))) throw new TypeError('Use one JSON or binary request body');
     if (this.#token && (this.#token.length > 4096 || !/^[A-Za-z0-9._~+/-]+=*$/.test(this.#token))) throw new ApiError('INVALID_TOKEN', 401);
@@ -121,7 +121,7 @@ export class Api {
       if (noneMatch) headers["If-None-Match"] = noneMatch;
       if (key) headers["Idempotency-Key"] = key;
       if (undo) headers["X-Timekeeper-Undo"] = 'true';
-      const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
+      const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, ...(keepalive?{keepalive:true}:{}), redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
       if (binary && response.ok && (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase()!==binaryType) throw new ApiError('UNAVAILABLE');
       const data = response.status === 204 || emptyResponse && response.ok ? null : binary && response.ok ? await response.blob() : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);

@@ -5,7 +5,7 @@ import { emailRecovery } from './email-recovery.js';
 import { PasskeyCeremony, passkeysSupported, canceledPasskey } from './webauthn.js';
 
 const $ = (id) => document.getElementById(id);
-export function authentication({ connect, clear, updateAccount, refreshProfile, renderCalendars, renderLabels,renderFocus,beforeSignOut }) {
+export function authentication({ connect, clear, updateAccount, refreshProfile, renderCalendars, renderLabels,renderFocus,beforeSignOut,beforeNavigate }) {
   let active = null,generation = 0,recovery = null;
   let passkeysEnabled = false,passkeyBusy = false,passkeyStage = '',statusRequest = null;
   const errorText = (error) => error instanceof ApiError ? error.message : i18nText("ui.unable_to_sign_in_use_https_and_check_your_account_details");
@@ -53,7 +53,7 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
     const session = new Api(null, undefined, data);active = session;window.timekeeperTypography?.connect(data.ownerId);forgetToken();
     $('login-form').reset();mode();$('login-error').textContent = '';
     if ((await connect(session, data)) === false) return;
-    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus);
+    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, beforeNavigate);
   }
   function reset(message = '', retry = null, {restoring = false} = {}) {
     loginPasskey.cancel();passkeyState(false);
@@ -137,9 +137,9 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
     ++generation;loginPasskey.cancel();passkeyState(false);$('login-error').textContent = i18nText("ui.passkey_request_canceled");$('username').focus();
   });
   window.addEventListener('pagehide', () => {++generation;loginPasskey.cancel();});
-  $('sign-out').addEventListener('click', () => {
+  $('sign-out').addEventListener('click', async () => {
     const session = active;if (!session) return;
-    if(beforeSignOut&&!beforeSignOut())return;
+    if(beforeSignOut&&!await beforeSignOut()||session!==active)return;
     $('sign-out').disabled = true;
     void session.request('/auth/logout', { method: 'POST' }).then(() => {if (session === active) {forgetToken();reset();}}).catch((error) => {
       if (session !== active) return;

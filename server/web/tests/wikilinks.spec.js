@@ -43,17 +43,12 @@ test('journal links protect inline, weekly and modal drafts before navigation',a
       await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
     });
     await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await appendEditorText(rich(page).locator('p').last(),' Inline draft');
-    await confirmations.run('Cancel keyboard navigation and retain inline draft',[false],async()=>{await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');});
-    await expect(page.locator('#today-date')).toHaveValue('2026-10-30');await expect(rich(page)).toContainText('Inline draft');
-    await confirmations.run('Confirm inline draft discard',[true],()=>dateLink(rich(page),'2026-10-26').click());
-    await expect(page.locator('#today-date')).toHaveValue('2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toBe(original);
+    await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');await expect(page.locator('#today-date')).toHaveValue('2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toContain('Inline draft');
     await page.locator('#today-month-grid button[data-week="2026-W44"]').click();const weekly=page.locator('#today-week-note-editor');await expect(dateLink(weekly,'2026-10-30')).toBeVisible();await appendEditorText(weekly.locator('[role=textbox] p').last(),' Week draft');
-    await confirmations.run('Cancel weekly draft discard',[false],()=>dateLink(weekly,'2026-10-30').click());await expect(weekly).toBeVisible();await expect(weekly).toContainText('Week draft');
-    await confirmations.run('Confirm weekly draft discard',[true],()=>dateLink(weekly,'2026-10-30').click());await expect(weekly).not.toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');
+    await dateLink(weekly,'2026-10-30').click();await expect(weekly).toBeHidden();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');expect((await(await api('GET','/week-notes/2026-W44')).json()).body).toContain('Week draft');
     await page.locator('#today-date').fill('2026-10-26');await expect(rich(page)).toContainText('Target day');await appendEditorText(rich(page).locator('h1'),' Hidden draft');
     await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-10');await page.locator('button[data-track-note-date="2026-10-30"]').click();const daily=page.locator('#track-note-editor');await expect(dateLink(daily,'2026-10-27')).toBeVisible();await appendEditorText(daily.locator('[role=textbox] p').last(),' Modal draft');
-    await confirmations.run('Cancelling the second prompt preserves both drafts',[true,false],()=>dateLink(daily,'2026-10-27').click());await expect(daily).toBeVisible();await expect(daily).toContainText('Modal draft');
-    await confirmations.run('Both prompts must accept before navigating',[true,true],()=>dateLink(daily,'2026-10-27').click());await expect(daily).not.toBeVisible();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(page)).toContainText('Other day');expect(errors).toEqual([]);
+    await dateLink(daily,'2026-10-27').click();await expect(daily).toBeHidden();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(page)).toContainText('Other day');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toContain('Modal draft');expect((await(await api('GET','/day-notes/2026-10-26/content')).json()).body).toContain('Hidden draft');expect(errors).toEqual([]);
   }finally{confirmations.dispose();}
 });
 

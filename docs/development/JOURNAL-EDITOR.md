@@ -55,10 +55,11 @@ strikethrough, inline and fenced code, and validated link creation/editing.
 Paragraph returns a heading or code block to ordinary text. The formatting row
 scrolls horizontally when needed so mobile controls retain usable sizes.
 
-Stale writes retain both fields and disable Save. Downloading the draft and
+Stale writes retain both fields and stop autosave until reviewed. Downloading the draft and
 explicitly reloading the saved version provide a recovery path; reload asks
 before replacing a dirty draft. An unknown save result is checked with GET,
-without repeating PUT. Dismissal and browser unload guard unsaved content, and
+without repeating PUT. Dismissal flushes autosave; browser unload attempts a final write and guards
+unsaved content. Failed saves keep the editor open, and
 account routing cannot move behind an open modal. Logout clears source, rich
 content and metadata synchronously; asynchronous engine work has a generation
 guard and its own detached mount so it cannot resurrect old content.

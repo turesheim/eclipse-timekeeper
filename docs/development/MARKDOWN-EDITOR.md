@@ -33,6 +33,10 @@ the separate About prototype and its scratchpad controls have been retired.
   ranges; unknown languages and fences over 200,000 characters remain plain.
   The top-right badge groups language selection and copying. Theme surfaces stay
   unchanged; token foregrounds blend existing semantic and body-text colors.
+- Emoji shortcodes use a micromark token and an inline atom, preserving the
+  authored alias through source switches, undo and serialization. The pinned
+  local gemoji data is regenerated with `npm run vendor:emoji`; code, escapes
+  and URL destinations remain literal.
 - Mermaid fences use an atomic presentation node and lazy-load the local
   renderer. Formatted mode shows only an inert SVG image; Markdown source edits
   its complete fenced text. Script and external-resource requests are rejected.
@@ -40,8 +44,10 @@ the separate About prototype and its scratchpad controls have been retired.
   never inserted as executable document content.
 
 The component retains private drafts in memory. Clearing a host or ending its
-session destroys the formatted projection and clears its source. Save remains
-explicit, and a host compares actual changes before enabling Save. Body edits
+session destroys the formatted projection and clears its source. The shared `DocumentAutosave` queue serializes guarded host writes, drains edits
+made during a save and flushes before navigation. Writes are debounced for one
+second with a five-second typing deadline; failures keep the draft and block
+navigation. Unknown replies are reconciled by reads before further writes. Body edits
 and day labels use independent records and validators.
 
 ## Assets and licenses

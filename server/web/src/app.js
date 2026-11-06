@@ -58,17 +58,17 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
-document.addEventListener(vaultNoteNavigation,event=>{event.preventDefault();if(!api||!event.detail.guards.every(guard=>guard())||!notes.canLeave()||!today.journal.canLeaveInline())return;event.detail.leave.forEach(leave=>leave());tab('notes');void notes.select(event.detail.entry.id).then(async()=>{if(event.detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(event.detail.heading);});});
-document.addEventListener(dayNoteNavigation,event=>{
-  event.preventDefault();
-  const date=dailyNoteDate(event.detail?.date);if(!date||!api||!snapshot)return;
-  // Confirm every affected editor before closing any of them. A cancelled
-  // navigation keeps both a modal draft and the current Today draft intact.
-  if(!event.detail.guards.every(guard=>guard()))return;
-  if(date!==today.date&&!today.journal.canLeaveInline())return;
-  event.detail.leave.forEach(leave=>leave());
-  today.closeEvent();calendar.subscriptions.details.close();
-  if(today.select(date,{confirmed:true})){tab('today');history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
+async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
+document.addEventListener(vaultNoteNavigation,async event=>{
+  event.preventDefault();const session=api;if(!session||!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return;
+  event.detail.leave.forEach(leave=>leave());await tab('notes');await notes.select(event.detail.entry.id);
+  if(event.detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(event.detail.heading);
+});
+document.addEventListener(dayNoteNavigation,async event=>{
+  event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
+  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
+  event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
+  if(await today.select(date,{confirmed:true})){await tab('today');history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),
@@ -156,7 +156,8 @@ function readOnlyWhileDisconnected() {
   $('editor-delete-confirm').querySelector('[value=delete]').disabled = $('editor-delete').disabled;
   updateSessionActions();
 }
-function tab(name) {
+async function tab(name) {
+  const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return false;
   for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes']) $(`${item}-panel`).hidden = item !== name;
   if(name==='notes')notes.show();else notes.hide();
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
@@ -172,7 +173,8 @@ function tab(name) {
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
-  beforeSignOut:()=>notes.canLeave(),
+  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline(),
+  beforeNavigate:async()=>await notes.canLeave()&&await today.journal.canLeaveInline(),
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
@@ -187,7 +189,7 @@ const auth = authentication({
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     today.initialize(dailyNoteDateFromSearch(location.search)||dateInZone(Date.now(),profile.zoneId));
-    tab('today');
+    await tab('today');
     $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;$('sync-status').hidden = false;
     await refresh();startWatch(session);
   },

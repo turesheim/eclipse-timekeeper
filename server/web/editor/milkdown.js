@@ -1,3 +1,5 @@
+import {emojiPlugin} from './emoji.js';
+import {emojiFor} from '../src/emoji.js';
 import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
 import {closeHistory} from '@milkdown/kit/prose/history';
@@ -210,7 +212,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -326,6 +328,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       slash:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph')return null;const match=/^\/([\w-]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.start(),to:$from.pos}:null;},
       replaceSlash:(name,payload)=>{const {$from}=view.state.selection;view.dispatch(view.state.tr.delete($from.start(),$from.pos));return command(name,payload);},
       wikiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code)return null;const match=/(!?)\[\[([^\]\n]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[2],embed:!!match[1],from:$from.pos-match[0].length,to:$from.pos}:null;},
+      emojiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code||$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;const match=/(?:^|\s):([a-z0-9_+-]{1,40})$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.pos-match[1].length-1,to:$from.pos}:null;},
+      insertEmoji:(range,name)=>{if(readOnly||!emojiFor(name))return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.emoji_shortcode.create({name})));view.focus();return true;},
       insertWiki:(range,path)=>{if(readOnly)return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.vault_wikilink.create({value:path,embed:!!range.embed})));view.focus();return true;},
       headingLevel:()=>{
         const {from,to,$from}=view.state.selection;

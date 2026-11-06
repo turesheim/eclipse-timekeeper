@@ -1,3 +1,5 @@
+import {clickNoteAction} from './editor-interactions.js';
+import {saveMarkdown} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -249,7 +251,7 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     const editor=page.locator('#week-event-note-editor');await expect(editor).toBeVisible();await expect(editor).toContainText('Planned meeting');
     await editor.getByRole('button',{name:'Markdown source',exact:true}).click();
     const markdown='# Minutes\n\n- [ ] Follow up\n\n<https://example.org/a?q=1>\n\n---\n';
-    await editor.locator('textarea').fill(markdown);await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).toContainText('Saved');
+    await editor.locator('textarea').fill(markdown);await saveMarkdown(editor);await expect(editor).toContainText('Saved');
     const events=await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-11')).json(),event=events.items.find(value=>value.subscriptionId===subscription.id);
     expect(event.hasNote).toBe(true);const path='/event-notes/'+subscription.id+'/'+event.key;
     expect((await(await api('GET',path)).json()).body).toBe(markdown);
@@ -263,7 +265,7 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     await page.locator('#today-event-details').getByRole('button',{name:'Open event note',exact:true}).click();
     const todayEditor=page.locator('#today-event-note-editor');await expect(todayEditor).toBeVisible();await todayEditor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(todayEditor.locator('textarea')).toHaveValue(markdown);
     await captureScreenshot(page,{path:'test-results/calendar-event-note-editor.png',fullPage:false});
-    page.once('dialog',dialog=>dialog.accept());await todayEditor.getByRole('button',{name:'Delete note',exact:true}).click();await expect(todayEditor).toBeHidden();
+    page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,todayEditor,'Delete note');await expect(todayEditor).toBeHidden();
     expect((await(await api('GET',path)).json()).deleted).toBe(true);
     await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();await expect(today.locator('.bi-journal-text')).toHaveCount(0);
   }finally{await context.close();}

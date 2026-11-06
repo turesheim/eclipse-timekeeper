@@ -11,6 +11,13 @@ export async function notesSource(page){
   const body=page.locator('#notes-body');await expect(body).toBeVisible();return body;
 }
 
+/** Flush deterministically via the supported shortcut; autosave timing has its own scenarios. */
+export async function saveMarkdown(scope,{wait=true,close=false}={}){
+  await scope.getByRole('button',{name:/^(Formatted|Formatert)$/,exact:true}).press('ControlOrMeta+s');
+  if(wait)await expect(scope.locator('.dialog-actions > [role=status],.notes-footer > [role=status]')).toHaveText(/^(Saved|Lagret)$/);
+  if(close)await scope.getByRole('button',{name:/^(Close|Lukk)$/,exact:true}).click();
+}
+
 
 /** Select the paragraph end explicitly: End has different native macOS semantics. */
 export async function appendEditorText(paragraph,text){
