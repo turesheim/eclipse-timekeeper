@@ -1092,7 +1092,22 @@ Collection paths remain available for identification and keep their existing
 synchronization and link semantics.
 
 The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
-tree. It supports desktop resizing, keyboard tree navigation, a mobile drawer,
+tree. Folder and document names default to 2px smaller than the base text; the
+navigation and document headings share the Notes heading font setting. The
+document title sits above the editor card.
+
+The navigation toggle is available at every screen size. On desktop, collapse
+it to give the editor the full workspace width; expanding restores its resized
+width without replacing the document, draft or editing mode. On phones it opens
+the folder drawer; selecting a document closes the drawer. The toggle reports
+its current state to assistive technology and retains focus when a viewport
+change hides the focused navigation control.
+
+![Notes workspace with a compact, resizable folder tree](../assets/screenshots/notes-workspace-expanded.png)
+
+![Notes editor using the full workspace width](../assets/screenshots/notes-workspace-collapsed.png)
+
+The tree supports desktop resizing, keyboard tree navigation, a mobile drawer,
 file/folder creation, guarded rename/deletion/recovery and collection settings.
 Drafts remain in memory across tab changes and are discarded only after review.
 Account/session generations fence async responses; read-only clients cannot edit.

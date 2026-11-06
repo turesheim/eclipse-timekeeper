@@ -16,8 +16,14 @@ const textDecoder=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
 export class NotesView {
   constructor(root,callbacks){
     Object.assign(this,{root,callbacks,generation:0,positions:new Map(),entries:new Map(),children:new Map(),expanded:new Set(),writable:false,sortOrder:'name-asc',expandAllRequested:false});
-    const heading=node('div',undefined,'notes-heading');this.title=node('h2',t('notes.title'));this.title.id='notes-title';
-    this.toggle=action(t('notes.navigation'),()=>{this.root.classList.toggle('notes-drawer-open');this.toggle.setAttribute('aria-expanded',String(this.root.classList.contains('notes-drawer-open')));},'folder');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');this.toggle.setAttribute('aria-expanded','false');const headingActions=node('div',undefined,'notes-file-tools');headingActions.append(this.toggle);heading.append(this.title,headingActions);
+    this.narrow=matchMedia('(max-width:760px)');
+    const heading=node('div',undefined,'notes-heading'),navigationHeading=node('div',undefined,'notes-navigation-heading');this.title=node('h2',t('notes.title'));this.title.id='notes-title';
+    this.toggle=action(t('notes.navigation'),()=>{
+      if(this.narrow.matches)this.root.classList.toggle('notes-drawer-open');else this.navCollapsed=!this.navCollapsed;
+      this.navigationState();
+    },'layout-sidebar');this.toggle.classList.add('notes-drawer-toggle');this.toggle.setAttribute('aria-controls','notes-navigation');
+    this.documentTitle=node('h2',t('notes.select'),'notes-document-title');this.documentTitle.id='notes-document-title';
+    navigationHeading.append(this.title,this.toggle);heading.append(navigationHeading,this.documentTitle);
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.layout=node('div',undefined,'notes-layout');this.navigation=node('aside',undefined,'notes-navigation card');this.navigation.id='notes-navigation';this.navigation.setAttribute('aria-label',t('notes.navigation'));
     const tools=node('div',undefined,'btn-toolbar notes-navigation-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label',t('notes.navigation_actions'));
@@ -58,7 +64,7 @@ export class NotesView {
     this.resize.addEventListener('pointermove',event=>{if(this.resize.hasPointerCapture(event.pointerId))width(event.clientX-this.layout.getBoundingClientRect().left);});
     this.resize.addEventListener('pointerup',event=>this.resize.releasePointerCapture(event.pointerId));
     this.resize.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();width(event.key==='Home'?180:event.key==='End'?480:(this.navWidth||260)+(event.key==='ArrowLeft'?-20:20));}});
-    this.editor=node('section',undefined,'notes-editor card');this.editor.setAttribute('aria-labelledby','notes-document-title');this.documentTitle=node('h3',t('notes.select'));this.documentTitle.id='notes-document-title';
+    this.editor=node('section',undefined,'notes-editor card');this.editor.setAttribute('aria-labelledby','notes-document-title');
     const fileTools=this.fileTools=node('div',undefined,'notes-file-tools');this.rename=action(t('notes.move'),()=>this.pathDialog('move'),'edit');this.remove=action(t('notes.delete'),()=>void this.delete(),'delete');this.recover=action(t('notes.restore'),()=>void this.restore(),'arrow-counterclockwise');this.reloadNote=action(t('notes.reload'),()=>{if(this.canLeave())void this.select(this.note?.id,true);},'refresh');this.download=action(t('notes.download_attachment'),()=>void this.downloadAttachment(),'download');this.documentTools=node('div',undefined,'btn-group markdown-document-tools');this.documentTools.setAttribute('role','group');this.documentTools.setAttribute('aria-label',t('notes.document_actions'));this.documentTools.append(this.rename,this.remove,this.reloadNote,this.recover,this.download);
     const resources={...noteRevisionResources(()=>this.session,()=>({sourceType:this.note?.sourceType,sourceId:this.note?.sourceId}),{latest:async()=>{const session=this.session,id=this.note?.id;const reply=await session.request('/notes/entries/'+id+'/content',{binary:'application/octet-stream'});return {text:await reply.data.text(),etag:reply.etag};}}),...vaultEditorResources(()=>this.session,()=>this.note?.path||'',async(entry,heading)=>{await this.select(entry.id);if(heading)await this.markdown.showFormatted(false);this.markdown.scrollToHeading?.(heading);}),canonicalAsset:async reference=>(await this.resolveLink(reference)).path,allowsAsset:reference=>!!this.linkPath(reference),allowsLink:reference=>!!this.linkPath(reference),image:(reference,alt)=>this.image(reference,alt),openLink:reference=>void this.openLink(reference)};
     const host=node('div',undefined,'notes-markdown');this.markdown=new MarkdownField(host,()=>this.controls(),()=>{},'notes',(file,image)=>this.upload(file,image),resources);
@@ -66,7 +72,7 @@ export class NotesView {
     this.preview=node('div',undefined,'notes-image-preview');this.preview.hidden=true;
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.save=action(t('ui.save'),()=>void this.commit());this.save.className='btn btn-primary';const footer=node('div',undefined,'notes-footer');footer.append(this.status,this.save);
-    this.editor.append(this.documentTitle,fileTools,this.empty,host,this.preview,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
+    this.editor.append(fileTools,this.empty,host,this.preview,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
     this.dialog=node('dialog',undefined,'app-dialog');this.dialogTitle=node('h2');this.dialogTitle.id='notes-path-title';this.dialog.setAttribute('aria-labelledby',this.dialogTitle.id);
     this.form=node('form');const pathLabel=node('label',t('notes.path'),'form-label');this.pathInput=node('input',undefined,'form-control');this.pathInput.id='notes-path';this.pathInput.required=true;this.pathInput.maxLength=1024;pathLabel.htmlFor=this.pathInput.id;
     this.dialogError=node('p','','alert alert-danger');this.dialogError.hidden=true;this.dialogError.setAttribute('role','alert');
@@ -74,7 +80,11 @@ export class NotesView {
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
     document.addEventListener('timekeeper:notes-changed',()=>{this.info=null;this.folder=null;if(this.session)this.callbacks.onChanged?.();});
-    this.observer=new ResizeObserver(()=>this.fit());this.observer.observe(document.documentElement);window.addEventListener('resize',()=>this.fit());this.controls();
+    this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
+    // CSS can hide a focused control before matchMedia's change event, leaving
+    // activeElement at body. Remember actual focus so the toggle can receive it.
+    document.addEventListener('focusin',event=>{this.navigationFocused=this.navigation.contains(event.target)||event.target===this.resize;});
+    this.narrow.addEventListener('change',()=>{this.root.classList.remove('notes-drawer-open');this.navigationState();});this.navigationState();this.controls();
   }
   dirty(){return !!this.note&&!this.binary&&!this.markdown.matches(this.original);}
   canLeave(){return !this.busy&&(!this.dirty()||confirm(t('notes.discard')));}
@@ -85,7 +95,15 @@ export class NotesView {
   show(){this.visible=true;this.fit();if(this.session)void this.reload();}
   hide(){this.visible=false;}
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  reset(){this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  navigationState(){
+    const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
+    this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);
+    const visible=this.narrow.matches?this.root.classList.contains('notes-drawer-open'):!this.navCollapsed;
+    this.toggle.setAttribute('aria-expanded',String(visible));
+    if(!visible){this.closeSortMenu(false);if(this.visible&&focused)this.toggle.focus();}
+    this.fit();
+  }
   fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top+scrollY,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0;this.root.style.setProperty('--notes-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
@@ -164,7 +182,7 @@ export class NotesView {
         if(['MARKDOWN','DAY','WEEK','EVENT'].includes(metadata.kind))text=textDecoder.decode(await content.data.arrayBuffer());else{this.binary=true;if(rasterType(new Uint8Array(await content.data.slice(0,12).arrayBuffer())))imageBlob=content.data;}}
       if(session!==this.session||current!==this.generation)return;this.note=metadata;this.original=text;this.documentTitle.textContent=noteTitle(metadata,metadata.path);this.markdown.setValue(text);this.error.hidden=true;
       if(imageBlob){this.selectedImage=imagePreview({alt:metadata.path.split('/').at(-1),load:async()=>imageBlob,active:()=>session===this.session&&current===this.generation});this.preview.append(this.selectedImage.dom);}
-      this.empty.textContent=metadata.deleted?t('notes.deleted'):this.binary?t('notes.binary'):t('notes.select');this.binary||=metadata.kind==='FOLDER';this.root.classList.remove('notes-drawer-open');this.toggle.setAttribute('aria-expanded','false');this.controls();this.paint();if(this.positions.has(id))await this.markdown.restorePosition(this.positions.get(id));else if(!this.binary&&!metadata.deleted)await this.markdown.showFormatted(false);
+      this.empty.textContent=metadata.deleted?t('notes.deleted'):this.binary?t('notes.binary'):t('notes.select');this.binary||=metadata.kind==='FOLDER';this.root.classList.remove('notes-drawer-open');this.navigationState();this.controls();this.paint();if(this.positions.has(id))await this.markdown.restorePosition(this.positions.get(id));else if(!this.binary&&!metadata.deleted)await this.markdown.showFormatted(false);
     }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
   }
   async commit(){

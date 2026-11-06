@@ -196,8 +196,10 @@
   --font-week-holiday: .65rem;
 
   /* Notes workspace */
-  /* Selected note name above the Notes editor. */
-  --font-notes-heading: 1rem;
+  /* Navigation and selected document headings above the Notes workspace. */
+  --font-notes-heading: 1.25rem;
+  /* Folder and document names in the Notes navigation tree. */
+  --font-notes-navigation: calc(1rem - 2px);
 
   /* Theme preference */
   /* Theme preference label in My Account. */
