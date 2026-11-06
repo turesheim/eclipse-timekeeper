@@ -64,10 +64,13 @@ final class RemoteWebScenario {
 
             awaitTree(project,accepted);tree.getTreeItem(project.name()).getNode(accepted.summary()).contextMenu("Activate task").click();
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).filter(a->a.taskId().equals(task.id())).isPresent(),"Native activation did not start browser-created task");
+            var projection=MylynIntegration.getDefault().linked(accepted).orElseThrow();
+            assertTrue("The fixture must activate the actual Mylyn projection",RemoteTestSupport.onUi(projection::isActive));
             var nativeActive=api.activeActivity(OwnerId.LOCAL).orElseThrow();assertEquals("remote-owner-b",nativeActive.ownerId().value());
             peer.command(Map.of("action","observe-active"));peer.command(Map.of("action","stop"));
             RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().activeActivity(OwnerId.LOCAL).isEmpty());}catch(Exception pending) {return false;}},"Browser stop did not refresh installed tracking state");
-            assertTrue(api.activity(nativeActive.id()).orElseThrow().end().isPresent());
+            RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->!projection.isActive());}catch(Exception pending) {return false;}},"Browser stop left the Mylyn task active");
+            var stopped=api.activity(nativeActive.id()).orElseThrow();assertTrue(stopped.end().isPresent());assertEquals("Projecting the browser stop must not write again",nativeActive.version()+1,stopped.version());
             peer.command(Map.of("action","start"));
             RemoteTestSupport.waitFor(()->{try {return tree.getTreeItem(project.name()).getNode(accepted.summary()).contextMenu("Deactivate task").isEnabled();}catch(RuntimeException pending) {return false;}},"Browser start did not update native Deactivate action");
             var webActive=api.activeActivity(OwnerId.LOCAL).orElseThrow();assertEquals(task.id(),webActive.taskId());assertEquals(Set.of(label.id()),webActive.labelIds());
