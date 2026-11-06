@@ -134,7 +134,7 @@ sync and export as `YYYY-Www.md`, using the ISO week-based year. The sidebar
 groups work sessions by client and lists all-day and timed calendar events plus
 tasks scheduled for the selected date. Selecting a work session opens its editor.
 The inline journal uses the same saved day note and conflict handling as
-Calendar and Week. Unsaved changes require confirmation before selecting
+Calendar and Week. Pending changes are autosaved before selecting
 another date. On narrow screens the sidebar follows the journal.
 
 The Today sidebar starts alongside the date navigator, directly below the work
@@ -192,9 +192,8 @@ and navigation preserve the draft. A daily
 wiki link such as `[[2026-10-26]]` opens **Today** on that date with one click,
 including from day, week, event and vault notes. Command/Ctrl-click opens the
 requested date in another tab, and `/web/?day=2026-10-26` is a direct link.
-Daily links work in read-only notes too. Notes with unsaved changes require
-confirmation before changing the day or closing their dialog; cancelling keeps
-the drafts intact. Rich edits preserve the `[[YYYY-MM-DD]]` syntax. Code examples
+Daily links work in read-only notes too. Notes save pending changes before changing the day or closing their dialog; a
+failed save keeps the editor and its draft open. Rich edits preserve the `[[YYYY-MM-DD]]` syntax. Code examples
 and escaped brackets stay literal. Ordinary vault wikilinks support aliases,
 heading targets, completion and authenticated raster embeds with sizing.
 Unknown extensions remain inert editable source fragments, allowing surrounding
@@ -224,7 +223,9 @@ diagrams leave their Markdown source intact.
 The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
 Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
-Cancel leaves the saved note unchanged. Each note belongs to its calendar date
+Documents autosave after a one-second pause and at least every five seconds
+while typing. Navigation and closing wait for the newest draft; there are no
+document Save or Cancel buttons. Delete note is below Note revisions in Note tools. Each note belongs to its calendar date
 and account, including days without work. It follows the account across web
 sessions and devices, and remains on the same date after time-zone changes.
 Narrow screens wrap the label when needed. Day notes never affect timed work,
@@ -235,8 +236,8 @@ the body retains an existing badge. Empty-day add actions keep the existing
 hover/keyboard/long-press behavior. Read-only sessions can open saved bodies,
 switch modes; editing and task toggles remain disabled.
 
-Dirty dismissal asks before discarding either field. Failed saves keep the
-draft. A stale version disables Save and offers **Reload saved note**, with confirmation before replacing the draft. An
+Dismissal flushes both fields through their independent version guards. Failed
+saves keep the editor open with its draft. A stale version stops autosave and offers **Reload saved note**, with confirmation before replacing the draft. An
 unconfirmed write offers **Check saved result**: it reads the server and accepts
 a matching saved value without issuing another write. A differing saved value
 requires explicit reload/review. No source or draft is stored in browser storage,
@@ -1099,7 +1100,9 @@ tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
 
-The navigation toggle is available at every screen size. On desktop, collapse
+The navigation toggle stays to the left of the Notes title at every screen
+size, including when navigation is collapsed or the phone drawer is open.
+On desktop, collapse
 it to give the editor the full workspace width; expanding restores its resized
 width without replacing the document, draft or editing mode. On phones it opens
 the folder drawer; selecting a document closes the drawer. The toggle reports

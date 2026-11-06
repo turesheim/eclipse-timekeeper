@@ -1,3 +1,4 @@
+import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -41,7 +42,7 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
   ]){
     await toolbar.getByRole('button',{name:'Sort notes',exact:true}).click();await page.getByRole('menuitemradio',{name:label,exact:true}).click();
     await expect(rows).toHaveText(['Nested',...names.map(name=>name+'.md')]);await expect(page.locator('#notes-body')).toHaveValue('Unsaved navigator draft.');
-    await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
+    await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   }
   const sort=toolbar.getByRole('button',{name:'Sort notes',exact:true});await sort.focus();await sort.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Modified (newest first)',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(sort).toBeFocused();
   await sort.press('ArrowRight');await expect(toolbar.getByRole('button',{name:'Collapse all folders',exact:true})).toBeFocused();await page.keyboard.press('ArrowLeft');await expect(sort).toBeFocused();
@@ -67,10 +68,15 @@ test('expand and collapse cover nested folders, exclude a hidden journal and can
   expect(parents).not.toContain(journal.id);await expect(page.locator('#notes-body')).toHaveValue('Retain this draft.');
 });
 
-test('collapsing navigation gives the editor the full width while preserving its draft and navigator width',async({page,request})=>{
+test('navigation toggle stays left of Notes while collapse preserves the draft and navigator width',async({page,request})=>{
   await page.setViewportSize({width:1440,height:900});
   const {api}=await setup(page,request);await put(api,'Notes/Review.md','# Project review\n\nNotes for the next release.\n');
   const navigation=page.locator('#notes-navigation'),toggle=page.locator('.notes-drawer-toggle'),editor=page.locator('.notes-editor'),title=page.locator('#notes-document-title'),resize=page.getByRole('separator',{name:'Resize notes navigation'});
+  const toggleOffset=async()=>{
+    const label=page.locator('#notes-title');await expect(label).toBeVisible();const button=await toggle.boundingBox(),text=await label.boundingBox(),heading=await page.locator('.notes-heading').boundingBox();
+    expect(button.x+button.width).toBeLessThanOrEqual(text.x);expect(Math.abs(button.y+button.height/2-text.y-text.height/2)).toBeLessThan(1);return button.x-heading.x;
+  };
+  const originalOffset=await toggleOffset();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Review.md').click();
   await expect(title).toHaveText('Project review');await expect(toggle).toHaveAttribute('aria-expanded','true');
   for(const property of ['font-family','font-size','font-weight'])await expect(title).toHaveCSS(property,await page.locator('#notes-title').evaluate((node,property)=>getComputedStyle(node).getPropertyValue(property),property));
@@ -81,15 +87,19 @@ test('collapsing navigation gives the editor the full width while preserving its
   const expandedWidth=(await editor.boundingBox()).width;
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('Unsaved layout draft.');
   await toggle.focus();await toggle.press('Enter');await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(navigation).toBeHidden();await expect(resize).toBeHidden();
+  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-(await page.locator('.notes-layout').boundingBox()).width)).toBeLessThan(2);
   expect((await editor.boundingBox()).width).toBeGreaterThan(expandedWidth);
-  await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');await expect(page.locator('.notes-footer').getByRole('button',{name:'Save',exact:true})).toBeEnabled();
+  await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   await captureScreenshot(page,{path:'test-results/notes-workspace-collapsed.png',fullPage:false});
   await toggle.press('Space');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toHaveAttribute('aria-valuenow','480');
+  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-expandedWidth)).toBeLessThan(2);await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
   // A viewport change must not leave focus in navigation that is now hidden.
   await page.locator('#notes-search').focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await toggle.press('Enter');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toBeHidden();
+  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
   await toggle.click();await page.setViewportSize({width:390,height:844});await toggle.click();await expect(navigation).toBeVisible();await page.locator('#notes-search').focus();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');

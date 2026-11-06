@@ -124,12 +124,23 @@ subfolder. No external image URL is fetched automatically.
 
 ## Saving, conflicts and history
 
-Save status belongs to the host note. Failed uploads or save requests retain the
-draft. A stale save is rejected rather than overwriting another writer. Use
-**Revision history** to compare the current draft with a stored revision or the
-latest server version. Restoring places the chosen content in the draft; review
-and explicitly save it using the original write guard. Navigating away from an
-unsaved draft requires confirmation.
+Notes and daily, weekly and event-note documents save automatically after a
+one-second pause, at least every five seconds while typing, and before switching
+documents, dates, tabs or account pages, closing an editor, or signing out.
+**Saved**, **Unsaved changes** and **Saving…** show the current state. There are
+no document Save or Cancel buttons. Command/Ctrl+S can flush pending edits early.
+**Delete note** is in **Note tools**, directly below **Note revisions**.
+
+You can keep typing during a save. Navigation waits until the newest draft is
+saved. Failed saves retain the draft and keep the document open; use **Retry
+saving** for a rejected request, **Check saved result** after an uncertain reply,
+or **Reload saved note** to review a conflicting server version. Reload asks
+before replacing a dirty draft. An unknown result is read back before any further
+write, and stale edits never overwrite another writer.
+
+**Note revisions** compares the draft with a stored revision or current server
+version. Restoring a revision puts it in the editor and autosaves through the
+same concurrency guard as an ordinary edit.
 
 Revisions begin with the first content change after this feature is installed;
 they cannot recover previously lost content. The server retains at most 20
@@ -137,10 +148,10 @@ revisions per note and 1000 revisions/8 MB per account, evicting the oldest firs
 History excludes binary assets and independent day labels. It is server-local:
 portable account exports omit revisions; full instance backups include them.
 
-Autosave remains off: background writes during synchronization/conflict review
-would change the guarded manual-save contract. Drafts and remembered positions
-live in memory only. Reloading, closing the tab or logging out can discard them;
-there is no silent localStorage/sessionStorage copy of private note contents.
+Private drafts and remembered positions live in memory only, with no browser
+storage copy. Browser close/reload attempts a final save; if a save is still
+pending or failed, the browser warns before discarding it. A forced close or lost
+connection cannot guarantee delivery, so check for **Saved** before leaving.
 Read-only accounts can navigate, preview and compare but cannot edit or upload.
 
 ## Verification and limits
@@ -152,3 +163,13 @@ results. Automated accessibility checks and emulated mobile viewports do not
 certify a physical mobile keyboard, assistive technology or Obsidian rendering.
 The audit distinguishes implementation completion from native/manual checks
 that have not been performed.
+
+## Emoji shortcodes
+
+Type a standard shortcode such as `:smile:`, `:rocket:` or `:+1:` in formatted
+Markdown to show its Unicode emoji. Typing a partial name opens local suggestions;
+use Arrow Down and Enter or choose one with the pointer. Shortcodes remain intact
+in Markdown source and downloads. Escaped colons, code, unknown names and link
+destinations remain literal. Emoji also appear in note headings and navigation.
+The bundled gemoji catalog works without an external emoji service; custom Slack
+workspace emoji are not available.

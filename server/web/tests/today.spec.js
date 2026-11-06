@@ -1,3 +1,5 @@
+import {clickNoteAction} from './editor-interactions.js';
+import {saveMarkdown} from './editor-interactions.js';
 import {tooltipFor} from './tooltips.js';
 import {resolvedLength} from './style-metrics.js';
 import {test,expect} from '@playwright/test';
@@ -121,7 +123,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     const weekly=page.locator('#today-week-note-editor');await expect(weekly).toBeVisible();
     await weekly.getByRole('button',{name:'Markdown source',exact:true}).click();
     await page.locator('#weekly-journal-body').fill('# Weekly review\n');
-    await weekly.getByRole('button',{name:'Save',exact:true}).click();await expect(weekly).toContainText('Saved');
+    await saveMarkdown(weekly);await expect(weekly).toContainText('Saved');
     const weekSaved=await(await api(request,'GET','/week-notes/2025-W20')).json();expect(weekSaved.body).toBe('# Weekly review\n');
     await expect(weekly.getByRole('button',{name:'Download Markdown'})).toHaveCount(0);
     await weekly.getByRole('button',{name:'Close',exact:true}).click();
@@ -132,7 +134,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.locator('#today-note-text').fill('Review day');
     await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
     await page.locator('#today-journal-body').fill('# Today\n\nPlan the release.\n');
-    await page.locator('#today-note-editor').getByRole('button',{name:'Save',exact:true}).click();
+    await saveMarkdown(page.locator('#today-note-editor'));
     await expect(page.locator('#today-note-editor')).toContainText('Saved');
     const saved=await(await api(request,'GET','/day-notes/'+date)).json();expect(saved.text).toBe('Review day');expect(saved.body).toContain('Plan the release.');
     await expect(page.locator('#today-month-grid [data-date="2025-05-17"] .today-month-dot')).toHaveCount(1);
@@ -141,11 +143,8 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect((await(await api(request,'GET','/day-labels/'+date)).json()).text).toBe('Sidebar label');
     expect((await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body).toContain('Plan the release.');
     await page.locator('#today-note-text').fill('Unsaved change');
-    page.once('dialog',dialog=>dialog.dismiss());
-    await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(date);
-    await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
-    page.once('dialog',dialog=>dialog.accept());
     await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
+    expect((await(await api(request,'GET','/day-labels/'+date)).json()).text).toBe('Unsaved change');
     await expect(page.locator('#today-title')).toContainText('Sunday');
     await page.locator('#today-previous').click();await expect(page.locator('#today-date')).toHaveValue(date);
     await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
@@ -153,7 +152,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
     await expect(page.locator('#today-events')).toContainText('No calendar events');
     await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
-    await expect(page.locator('#today-note-text')).toHaveValue('Sidebar label');
+    await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
     await page.evaluate(()=>window.scrollTo(0,50));
     await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo(0,0));
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);
@@ -166,7 +165,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
     await page.locator('#today-month-grid [data-week="2025-W20"]').click();
     await expect(weekly).toContainText('Saved');
-    page.once('dialog',dialog=>dialog.accept());await weekly.getByRole('button',{name:'Delete note',exact:true}).click();
+    page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,weekly,'Delete note');
     await expect(weekly).not.toBeVisible();
     await expect(page.locator('#today-month-grid [data-week="2025-W20"] .today-month-dot')).toHaveCount(0);
   }finally{

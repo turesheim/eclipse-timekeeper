@@ -1,3 +1,5 @@
+import {clickNoteAction,noteActions} from './editor-interactions.js';
+import {saveMarkdown} from './editor-interactions.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
@@ -41,7 +43,7 @@ const note=(page,date='2026-05-17')=>page.locator(`[data-track-note-date="${date
 const day=(page,date='2026-05-17')=>page.locator(`[data-track-date="${date}"]`);
 const dialog=page=>page.locator('#track-note-editor');
 async function month(page){await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();}
-async function save(page,text){await page.locator('#track-note-text').fill(text);await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).not.toBeVisible();}
+async function save(page,text){await page.locator('#track-note-text').fill(text);await saveMarkdown(dialog(page),{close:true});await expect(dialog(page)).not.toBeVisible();}
 async function discard(page,action){page.once('dialog',prompt=>prompt.accept());await action();}
 async function menu(page,date='2026-05-17'){
   await expect(note(page,date)).toBeEnabled();await day(page,date).click({button:'right',position:{x:8,y:65}});await expect(page.getByRole('menu')).toBeVisible();
@@ -97,7 +99,7 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await month(page);
     await expect(day(page).locator('.track-holiday-label')).toContainText('Constitution Day');const total=await page.locator('#track-total').innerText(),original=await api('GET','/work-sessions/'+work.id);
     await menu(page);await save(page,'Ferie');await expect(note(page)).toHaveText('Ferie');await expect(day(page).locator('.track-holiday-label')).toContainText('Constitution Day');
-    await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Ferie');await page.locator('#track-note-text').fill('Canceled draft');await discard(page,()=>page.keyboard.press('Escape'));await expect(note(page)).toBeFocused();await expect(note(page)).toHaveText('Ferie');
+    await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Ferie');await page.locator('#track-note-text').fill('Canceled draft');await page.keyboard.press('Escape');await expect(note(page)).toBeFocused();await expect(note(page)).toHaveText('Canceled draft');
     await page.locator('#duration-format').dispatchEvent('change');await expect(note(page)).toBeFocused();
     await note(page).focus();await page.keyboard.press('Shift+F10');await expect(page.getByRole('menuitem')).toHaveText('Edit day note');await page.keyboard.press('Escape');await expect(note(page)).toBeFocused();
     await menu(page);await save(page,'Avspasering');await expect(note(page)).toHaveText('Avspasering');
@@ -115,20 +117,20 @@ test('deleting a day note preserves its label, ignores unrelated label edits, an
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page);
     const empty=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'First label',body:'First body'},{'If-Match':empty.headers().etag});await month(page);
-    await menu(page);const remove=dialog(page).getByRole('button',{name:'Delete note'});
-    await expect(remove).toBeEnabled();page.once('dialog',prompt=>prompt.dismiss());await remove.click();
+    await menu(page);const remove=(await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true});
+    await expect(remove).toBeEnabled();page.once('dialog',prompt=>prompt.dismiss());await clickNoteAction(page,dialog(page),'Delete note');
     await expect(dialog(page)).toBeVisible();expect((await(await api('GET','/day-notes/'+date)).json()).deleted).toBe(false);
-    page.once('dialog',prompt=>prompt.accept());await remove.click();await expect(dialog(page)).toBeHidden();
+    page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,dialog(page),'Delete note');await expect(dialog(page)).toBeHidden();
     const deletedValue=await(await api('GET','/day-notes/'+date)).json();expect(deletedValue.deleted).toBe(true);expect(deletedValue.text).toBe('First label');await expect(note(page)).toContainText('First label');
-    await note(page).click();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
-    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Restored body');await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).toBeHidden();
+    await note(page).click();await expect((await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true})).toBeDisabled();await page.keyboard.press('Escape');
+    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Restored body');await saveMarkdown(dialog(page),{close:true});await expect(dialog(page)).toBeHidden();
     const restored=await(await api('GET','/day-notes/'+date)).json();expect(restored.deleted).toBe(false);expect(restored.text).toBe('First label');expect(restored.version).toBeGreaterThan(deletedValue.version);
     await note(page).click();let current=await api('GET','/day-labels/'+date);await api('PUT','/day-labels/'+date,{text:'Changed elsewhere'},{'If-Match':current.headers().etag});
-    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();await expect(dialog(page)).toBeHidden();
+    page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,dialog(page),'Delete note');await expect(dialog(page)).toBeHidden();
     expect((await(await api('GET','/day-labels/'+date)).json()).text).toBe('Changed elsewhere');
-    current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'New note'},{'If-Match':current.headers().etag});await note(page).click();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeEnabled();
+    current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'New note'},{'If-Match':current.headers().etag});await note(page).click();await expect((await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true})).toBeEnabled();await page.keyboard.press('Escape');
     current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'Peer body'},{'If-Match':current.headers().etag});
-    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();await expect(dialog(page).getByRole('alert')).toBeVisible();
+    page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,dialog(page),'Delete note');await expect(dialog(page).getByRole('alert')).toBeVisible();
     expect((await(await api('GET','/day-notes/'+date+'/content')).json()).body).toBe('Peer body');
   }finally{await owner.close();}
 });
@@ -146,7 +148,7 @@ test('journal images and file attachments survive editing and remain available o
     const image=dialog(page).locator('.ProseMirror img[alt="photo.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
     await dialog(page).locator('input[type=file]:not([accept])').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('attached text')});
     await expect(dialog(page).locator('.ProseMirror a')).toContainText('notes.txt');
-    await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).toBeHidden();
+    await saveMarkdown(dialog(page),{close:true});await expect(dialog(page)).toBeHidden();
     const api=await apiFor(page),saved=await(await api('GET','/day-notes/2026-05-17')).json();
     const imagePath=saved.body.match(/!\[[^\]]*\]\((assets\/[a-f0-9-]+\.png)\)/)?.[1];
     const filePath=saved.body.match(/\[notes\.txt\]\((assets\/[a-f0-9-]+\.txt)\)/)?.[1];
@@ -187,9 +189,9 @@ test('Escape immediately releases the day-note editor before its queued close ev
       document.addEventListener('close',event=>{if(window.holdDayNoteClose&&event.target.id==='track-note-editor')event.stopImmediatePropagation();},true);
     });
     await signIn(page,await fresh(request));await month(page);await menu(page);await page.locator('#track-note-text').fill('Canceled draft');
-    await discard(page,()=>page.keyboard.press('Escape'));await expect(dialog(page)).toBeHidden();await expect(note(page)).toBeFocused();
-    await page.keyboard.press('Shift+F10');await expect(page.getByRole('menuitem')).toHaveText('Add day note');
-    await page.getByRole('menuitem').click();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toHaveValue('');
+    await page.keyboard.press('Escape');await expect(dialog(page)).toBeHidden();await expect(note(page)).toBeFocused();
+    await page.keyboard.press('Shift+F10');await expect(page.getByRole('menuitem')).toHaveText('Edit day note');
+    await page.getByRole('menuitem').click();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toHaveValue('Canceled draft');
     await page.evaluate(()=>{window.holdDayNoteClose=false;document.getElementById('track-note-editor').dispatchEvent(new Event('close'));});
     await expect(page.locator('#track-note-text')).toBeFocused();await expect(dialog(page)).toBeVisible();
   }finally{await owner.close();}
@@ -219,11 +221,11 @@ test('day notes keep a stale draft and require review after an unconfirmed save'
   const owner=await context(browser),page=await owner.newPage();
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);await test.step('Open initial editor',()=>menu(page));await page.locator('#track-note-text').fill('My draft');await test.step('Save from another client',()=>put(api,'2026-05-17','Peer update'));
-    await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(page.locator('#track-note-text')).toHaveValue('My draft');await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();
-    await discard(page,()=>dialog(page).getByRole('button',{name:'Cancel',exact:true}).click());await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Peer update');
+    await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(page.locator('#track-note-text')).toHaveValue('My draft');await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
+    await discard(page,()=>dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click());await dialog(page).getByRole('button',{name:'Close',exact:true}).click();await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Peer update');
     let writes=0;await page.route('**/api/v1/day-entries/2026-05-17',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
-    await page.locator('#track-note-text').fill('Committed once');await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();expect(writes).toBe(1);
-    await discard(page,()=>dialog(page).getByRole('button',{name:'Cancel',exact:true}).click());await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Committed once');expect(writes).toBe(1);
+    await page.locator('#track-note-text').fill('Committed once');await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toHaveCount(0);expect(writes).toBe(1);
+    await dialog(page).getByRole('button',{name:'Check saved result',exact:true}).click();await dialog(page).getByRole('button',{name:'Close',exact:true}).click();await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Committed once');expect(writes).toBe(1);
   }finally{await owner.close();}
 });
 
@@ -357,14 +359,13 @@ test('journal retains both drafts on conflicts, confirms dismissal and reload, a
   const owner=await context(browser),page=await owner.newPage();
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Private body draft');await page.locator('#track-note-text').fill('Draft label');
-    page.once('dialog',prompt=>prompt.dismiss());await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();await expect(dialog(page)).toBeVisible();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');
     const current=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{text:'Peer label',body:'Peer body'},{'If-Match':current.headers().etag});
-    await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(dialog(page).getByRole('alert')).toBeInViewport();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');await expect(page.locator('#track-note-text')).toHaveValue('Draft label');
+    await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(dialog(page).getByRole('alert')).toBeInViewport();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');await expect(page.locator('#track-note-text')).toHaveValue('Draft label');
     page.once('dialog',prompt=>prompt.dismiss());await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');
     await discard(page,()=>dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click());await expect(page.locator('#track-note-text')).toHaveValue('Peer label');await expect(page.locator('#journal-formatted .ProseMirror')).toHaveText('Peer body');
     let writes=0;await page.route('**/api/v1/day-entries/2026-05-17',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
-    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Committed body once');await page.locator('#track-note-text').fill('Committed label once');await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');
-    await dialog(page).getByRole('button',{name:'Check saved result',exact:true}).click();await expect(dialog(page)).toBeHidden();expect(writes).toBe(1);expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe('Committed body once');
+    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Committed body once');await page.locator('#track-note-text').fill('Committed label once');await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');
+    await dialog(page).getByRole('button',{name:'Check saved result',exact:true}).click();await expect(dialog(page)).toContainText('Saved');await dialog(page).getByRole('button',{name:'Close',exact:true}).click();await expect(dialog(page)).toBeHidden();expect(writes).toBe(1);expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe('Committed body once');
   }finally{await owner.close();}
 });
 
@@ -374,7 +375,7 @@ test('journal read-only viewing prevents body and task writes and clears sensiti
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');
     await api('PUT','/day-notes/2026-05-17',{body:'# Private journal\n\n- [ ] Private task\n'},{'If-Match':initial.headers().etag});const token=await(await api('POST','/auth/tokens',{name:'Journal viewer',permissions:['read'],expiresAt:null})).json();
     await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await month(read);await note(read).click();
-    await expect(read.locator('#journal-formatted .ProseMirror')).toHaveAttribute('contenteditable','false');await expect(dialog(read).getByRole('checkbox')).toBeDisabled();await expect(dialog(read).getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+    await expect(read.locator('#journal-formatted .ProseMirror')).toHaveAttribute('contenteditable','false');await expect(dialog(read).getByRole('checkbox')).toBeDisabled();await expect(dialog(read).getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
     const readBody=read.locator('#journal-formatted .ProseMirror'),original=await readBody.textContent();await readBody.focus();await readBody.press('Enter');await readBody.press('ControlOrMeta+B');await readBody.press('x');await expect(readBody).toHaveText(original);
     await dialog(read).getByRole('button',{name:'Markdown source',exact:true}).click();await expect(read.locator('#journal-body')).toHaveJSProperty('readOnly',true);await expect(read.locator('#track-note-text')).toHaveJSProperty('readOnly',true);
     await month(page);await menu(page);await expect(page.locator('#journal-formatted .ProseMirror')).toContainText('Private journal');await api('POST','/auth/logout');
@@ -392,11 +393,11 @@ test('journal formatted editing fits narrow screens and all themes with accessib
       await setTheme(page,theme);await note(page).tap();await expect(rich).toBeVisible();
       expect(await rich.locator('li[data-task="true"]').evaluate(row=>{const checkbox=row.querySelector('input').getBoundingClientRect(),range=document.createRange();range.selectNodeContents(row.querySelector('p'));const text=range.getClientRects()[0];return Math.abs(checkbox.y+checkbox.height/2-text.y-text.height/2);})).toBeLessThan(4);
       const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({theme,id:value.id,nodes:value.nodes.map(node=>({target:node.target,reason:node.failureSummary}))}))).toEqual([]);
-      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='dracula')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
+      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='dracula')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Close',exact:true}).click();
     }
     await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await page.setViewportSize({width:844,height:390});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeInViewport({ratio:.9});await page.setViewportSize({width:320,height:740});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeInViewport({ratio:.9});
-    await captureScreenshot(page,{path:'test-results/journal-editor-compact.png'});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
+    await page.setViewportSize({width:844,height:390});await expect(dialog(page).getByRole('button',{name:'Close',exact:true})).toBeInViewport({ratio:.9});await page.setViewportSize({width:320,height:740});await expect(dialog(page).getByRole('button',{name:'Close',exact:true})).toBeInViewport({ratio:.9});
+    await captureScreenshot(page,{path:'test-results/journal-editor-compact.png'});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toHaveCount(0);await dialog(page).getByRole('button',{name:'Close',exact:true}).click();await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
   }finally{await owner.close();}
 });
 
@@ -406,7 +407,7 @@ test('journal keeps source usable after an editor load failure and protects a dr
     let fail=true,failRead=true;await page.route('**/assets/milkdown/milkdown.js*',route=>fail?route.abort('failed'):route.continue());
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
     await page.route('**/api/v1/day-entries/2026-05-17',route=>failRead&&route.request().method()==='GET'?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());
-    await month(page);await note(page).click();await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(page.locator('#track-note-text')).toBeDisabled();await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();failRead=false;
+    await month(page);await note(page).click();await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(page.locator('#track-note-text')).toBeDisabled();await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toHaveCount(0);failRead=false;
     await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(dialog(page)).toContainText('could not be loaded');await expect(page.locator('#journal-body')).toHaveValue('Original source');
     await page.locator('#journal-body').fill('Retained source draft');await page.evaluate(()=>{location.hash='#account/profile';});await expect.poll(()=>page.evaluate(()=>location.hash)).toBe('');await expect(dialog(page)).toBeVisible();await expect(page.locator('#account-page')).toBeHidden();
     fail=false;await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#journal-formatted .ProseMirror')).toHaveText('Retained source draft');await save(page,'Retry worked');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe('Retained source draft');
@@ -428,7 +429,7 @@ test('journal controls use the account language and reject oversized UTF-8 draft
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
     await expect(page.locator('#journal-formatted .ProseMirror')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Tøm notatteksten',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Last ned Markdown',exact:true})).toHaveCount(0);await expect(await tooltipFor(dialog(page).getByRole('button',{name:'Formatert',exact:true}))).toContainText('Formatert');
-    await dialog(page).getByRole('button',{name:'Markdown-kilde',exact:true}).click();const value='ø'.repeat(100001);await page.locator('#journal-body').fill(value);await dialog(page).getByRole('button',{name:'Lagre',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('200 000');await expect(page.locator('#journal-body')).toHaveValue(value);
+    await dialog(page).getByRole('button',{name:'Markdown-kilde',exact:true}).click();const value='ø'.repeat(100001);await page.locator('#journal-body').fill(value);await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('200 000');await expect(page.locator('#journal-body')).toHaveValue(value);
     const saved=await api('GET','/day-notes/2026-05-17');expect((await saved.json()).version).toBe(0);
   }finally{await owner.close();}
 });
@@ -493,11 +494,11 @@ test('Week day headings open shared daily notes with one toolbar and right-align
     await entry.click();await expect(editor).toBeVisible();await expect(editor.locator('#week-journal-formatted .ProseMirror')).toHaveText('A shared note');await expect(page.locator('dialog[open]')).toHaveCount(1);
     const toolbar=editor.getByRole('toolbar',{name:'Formatting',exact:true});await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('button',{name:'Note tools',exact:true})).toHaveCount(1);await expect(toolbar.getByRole('group',{name:'Editing mode',exact:true}).getByRole('button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveCount(0);
     for(const name of ['Clear note body','Download Markdown'])await expect(editor.getByRole('button',{name,exact:true})).toHaveCount(0);await expect(editor.getByText('Editing help',{exact:true})).toHaveCount(0);
-    const rich=editor.locator('.ProseMirror');await rich.fill('Edited from Week');await editor.locator('#week-note-text').fill('Week label');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).not.toBeVisible();await expect(entry).toBeFocused();
+    const rich=editor.locator('.ProseMirror');await rich.fill('Edited from Week');await editor.locator('#week-note-text').fill('Week label');await saveMarkdown(editor,{close:true});await expect(editor).not.toBeVisible();await expect(entry).toBeFocused();
     const previous=await entry.elementHandle();await page.evaluate(()=>document.querySelector('#refresh').click());
     await expect.poll(()=>entry.evaluate((node,old)=>node!==old,previous)).toBe(true);await expect(entry).toBeFocused();await previous.dispose();
     expect((await(await api('GET','/day-notes/'+date)).json()).body).toContain('Edited from Week');expect((await(await api('GET','/work-sessions')).json()).items).toEqual(before.items);
-    await page.locator('[data-tab=track]').click();await month(page);await note(page).click();await expect(dialog(page).locator('.ProseMirror')).toHaveText('Edited from Week');await expect(page.locator('#track-note-text')).toHaveValue('Week label');await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.locator('[data-tab=track]').click();await month(page);await note(page).click();await expect(dialog(page).locator('.ProseMirror')).toHaveText('Edited from Week');await expect(page.locator('#track-note-text')).toHaveValue('Week label');await dialog(page).getByRole('button',{name:'Close',exact:true}).click();
     await page.locator('[data-tab=calendar]').click();await page.setViewportSize({width:320,height:740});await entry.click();await expect(editor).toBeVisible();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toBeVisible();await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich).toBeVisible();await expect(toolbar.getByRole('button',{name:'Note tools',exact:true})).toBeInViewport();await expect(toolbar.locator('.markdown-tools button').first()).toBeInViewport();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#week-note-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/week-day-note-editor-mobile.png'});
     const ids=await page.locator('[id]').evaluateAll(nodes=>nodes.map(node=>node.id));expect(ids.filter((id,index)=>ids.indexOf(id)!==index)).toEqual([]);
@@ -510,7 +511,7 @@ test('Week daily-note buttons respect read-only access and clear private bodies 
     await signInWithFixtureToken(page);const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'',body:'Private Week note'},{'If-Match':initial.headers().etag});
     const token=await(await api('POST','/auth/tokens',{name:'Week note reader',permissions:['read'],expiresAt:null})).json();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();
     await read.locator('[data-tab=calendar]').click();await read.locator('#calendar-date').fill(date);const entry=read.locator('[data-week-note-date="'+date+'"]'),editor=read.locator('#week-note-editor');await expect(entry).toBeEnabled();await expect(read.locator('[data-week-note-date="2026-05-11"]')).toBeDisabled();await entry.click();
-    await expect(editor.locator('.ProseMirror')).toHaveAttribute('contenteditable','false');await expect(editor.getByRole('button',{name:'Save',exact:true})).toBeDisabled();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toHaveJSProperty('readOnly',true);
+    await expect(editor.locator('.ProseMirror')).toHaveAttribute('contenteditable','false');await expect(editor.getByRole('button',{name:'Save',exact:true})).toHaveCount(0);await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toHaveJSProperty('readOnly',true);
     const readApi=await apiFor(read);await readApi('POST','/auth/logout');await expect(read.locator('#workspace')).toBeHidden();await expect(editor).not.toBeVisible();await expect(read.locator('#week-journal-body')).toHaveValue('');await expect(read.locator('#week-journal-formatted')).toBeEmpty();expect(await read.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Private Week note');
   } finally {await owner.close();await viewer.close();}
 });

@@ -1,3 +1,5 @@
+import {clickNoteAction} from './editor-interactions.js';
+import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
 const date='2026-05-17',label='Keep this day label';
 for(const view of ['today','track','week'])for(const mode of ['Formatted','Markdown source'])test(`independent day labels: ${view} ${mode} clear body preserves label`,async({page,request})=>{
@@ -13,22 +15,21 @@ for(const view of ['today','track','week'])for(const mode of ['Formatted','Markd
  await editor.getByRole('button',{name:mode,exact:true}).click();
  const body=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');await expect(body).toBeVisible();await body.click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.press('Backspace');
  await expect(field).toHaveValue(label);
- const sent=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/day-entries/'+date));await editor.getByRole('button',{name:'Save',exact:true}).click();const input=(await sent).postDataJSON();expect(input).not.toHaveProperty('text');expect(input).not.toHaveProperty('labelVersion');expect(input).toHaveProperty('noteVersion');expect(input.body).toBe('');
+ const sent=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/day-entries/'+date));await saveMarkdown(editor,{close:view!=='today'});const input=(await sent).postDataJSON();expect(input).not.toHaveProperty('text');expect(input).not.toHaveProperty('labelVersion');expect(input).toHaveProperty('noteVersion');expect(input.body).toBe('');
  await expect.poll(async()=>{const response=await read();return(await response.json()).body;}).toBe('');
  current=await read();const note=await current.json();expect(note.deleted).toBe(false);expect(note.body).toBe('');
  const list=await request.get('/api/v1/day-notes?fromDate='+date+'&toDate='+date,{headers});expect((await list.json()).items[0].text).toBe(label);
  if(view==='track')await page.locator('[data-track-note-date="'+date+'"]').click();
  if(view==='week')await page.locator('[data-week-note-date="'+date+'"]').click();
  await expect(field).toHaveValue(label);await field.fill('Unsaved label draft');
- page.once('dialog',prompt=>prompt.accept());await editor.getByRole('button',{name:'Delete note',exact:true}).click();
- await expect(editor).toBeVisible();await expect(field).toHaveValue('Unsaved label draft');
+ page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,editor,'Delete note');
+ if(view==='today'){await expect(editor).toBeVisible();await expect(field).toHaveValue('Unsaved label draft');}else await expect(editor).toBeHidden();
  await expect.poll(async()=>{const response=await read();return(await response.json()).deleted;}).toBe(true);
- current=await read();const deleted=await current.json();expect(deleted.text).toBe(label);
- await editor.getByRole('button',{name:'Save',exact:true}).click();
+ current=await read();const deleted=await current.json();expect(deleted.text).toBe('Unsaved label draft');
  await expect.poll(async()=>{const response=await read();return(await response.json()).text;}).toBe('Unsaved label draft');
  const after=await(await read()).json();expect(after.deleted).toBe(true);expect(after.version).toBe(deleted.version);
  const diagnostics=await request.get('/api/v1/day-notes/'+date+'/history',{headers});expect(diagnostics.ok()).toBe(true);
- const events=(await diagnostics.json()).items,last=events.at(-1);expect(last.source).toBe('REST_ENTRY');expect(last.client.authentication).toBe('BROWSER_SESSION');expect(last.client.tokenId).toBeTruthy();
+ const events=(await diagnostics.json()).items,last=events.findLast(event=>event.source==='REST_ENTRY');expect(last.source).toBe('REST_ENTRY');expect(last.client.authentication).toBe('BROWSER_SESSION');expect(last.client.tokenId).toBeTruthy();
  expect(last).not.toHaveProperty('body');expect(last).not.toHaveProperty('markdown');expect(last.client).not.toHaveProperty('digest');
 
 

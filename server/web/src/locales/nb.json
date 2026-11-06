@@ -1398,5 +1398,6 @@
   "calendar.sharing.tasks.support": "Gjøremål viser bare oppgaver når abonnementslenken inneholder iCalendar-gjøremål (VTODO). De er skrivebeskyttede: Oppdater statusen i kildeappen. De oppretter ikke oppgaver i Dagsverk og teller ikke som arbeidet tid.",
   "calendar.sharing.tasks.providers": "Microsoft To Do, Google Tasks og Apple Påminnelser er egne oppgavetjenester. Å publisere en kalender deler ikke automatisk disse listene med Dagsverk, selv om de vises i kalenderappen din.",
   "calendar.sharing.tasks.setup": "Hvis oppgaveappen tilbyr en iCalendar-lenke for oppgaver, legger du til abonnementslenken separat og velger Gjøremål. Uten en slik lenke kan du opprette en oppgave i Dagsverk eller legge inn en kalenderhendelse for det planlagte arbeidet.",
+  "journal.retry_save": "Prøv å lagre på nytt",
   "calendar.video_meeting": "Videomøte"
 }

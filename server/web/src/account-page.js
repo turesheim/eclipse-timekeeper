@@ -15,14 +15,15 @@ export function closeAccount() {
   $('account-page').hidden = true;$('account-content').replaceChildren();$('account-navigation').replaceChildren();
   $('account-error').replaceChildren();$('account-heading').textContent = '';$('account-identity').textContent = '';$('users-link').hidden = true;
 }
-export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus) {
-  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus };
+export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, beforeNavigate) {
+  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, beforeNavigate };
   $('users-link').hidden = !account.administrator || !account.permissions?.includes('write');
   await show(route(), false);
 }
 async function show(hash, ask = true) {
   if (!context) return;
   if (ask && !canLeave()) {restoreRoute();return;}
+  const before=context;if(ask&&context.beforeNavigate&&!await context.beforeNavigate()){restoreRoute();return;}if(context!==before)return;
   if (document.querySelector('dialog[open]')) {restoreRoute();return;}
   if (hash === '#administration' || hash.startsWith('#users')) {
     const legacy = /^#users(?:\/(?:new|[A-Za-z0-9_-]{1,1100}))?$/.test(hash) ? hash : '';
