@@ -1,0 +1,31 @@
+{
+  "description": "Dagsverk workspace context, quick checks and bounded verification reminder.",
+  "hooks": {
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/agent_hooks.py\"",
+        "timeout": 15,
+        "statusMessage": "Reading Dagsverk workspace context",
+        "additionalContextLimit": 1000
+      }]
+    }],
+    "PostToolUse": [{
+      "hooks": [{
+        "type": "command",
+        "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/agent_hooks.py\"",
+        "timeout": 30,
+        "statusMessage": "Checking changed Dagsverk files",
+        "additionalContextLimit": 1500
+      }]
+    }],
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/agent_hooks.py\"",
+        "timeout": 15,
+        "statusMessage": "Checking Dagsverk verification"
+      }]
+    }]
+  }
+}

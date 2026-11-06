@@ -1,9 +1,13 @@
-# Timekeeper for Eclipse [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
+# Dagsverk [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
-Timekeeper tracks work sessions, projects, tasks and activities in Eclipse or
+Dagsverk (formerly Timekeeper) tracks work sessions, projects, tasks and activities in Eclipse or
 through a standalone server with a bundled browser interface. Optional
 [Eclipse Mylyn](https://eclipse.org/mylyn/) integration also tracks local and
 connector-backed tasks.
+
+The [naming transition](development/BRANDING.md) preserves existing installation
+names and technical identifiers. For agent-assisted work, see
+[skills, hooks and quality checks](development/AGENT-WORKFLOW.md).
 
 Documentation is grouped by responsibility:
 

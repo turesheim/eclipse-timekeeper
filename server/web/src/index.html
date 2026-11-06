@@ -1,13 +1,13 @@
 <!DOCTYPE html><html lang="en"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Timekeeper</title>
+  <title>Dagsverk</title>
   <script src="./theme.js"></script>
   <link id="typography-defaults" rel="stylesheet" href="./typography.css">
   <script src="./typography.js"></script>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="256x256" href="./apple-touch-icon.png">
-  <meta name="apple-mobile-web-app-title" content="Timekeeper">
+  <meta name="apple-mobile-web-app-title" content="Dagsverk">
   <link rel="stylesheet" href="./assets/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="./assets/bootstrap-icons/bootstrap-icons.min.css">
   <link rel="stylesheet" href="./style.css">
@@ -19,11 +19,11 @@
 </head>
 <body>
   <a class="skip-link" href="#main-content"><span data-i18n="ui.skip_to_main_content">Skip to main content</span></a>
-  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div class="status-line" id="sync-status" hidden><button class="btn btn-link status-refresh" id="refresh" type="button" data-state="working" aria-label="Refresh" title="Refresh" data-i18n-aria-label="ui.refresh_0e9161" data-i18n-title="ui.refresh_0e9161"><span id="status-icon" aria-hidden="true"></span><span id="status" data-state="working" role="status" aria-live="polite"></span></button></div><div id="session" hidden=""><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu" data-i18n-aria-label="ui.account_menu" data-i18n-title="ui.account_menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account" data-i18n-aria-label="ui.account"><label class="focus-menu-field" for="focus-select"><span data-i18n="focus.title">Focus areas</span><select id="focus-select" class="form-select" aria-label="Focus area" data-i18n-aria-label="focus.area"></select></label><a class="btn btn-link" id="account" tabindex="0" href="#account/profile"><span data-i18n="ui.my_account">My Account</span></a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden=""><span data-i18n="ui.administration">Administration</span></a><button class="btn btn-link" id="sign-out" type="button"><span data-i18n="ui.sign_out">Sign out</span></button><button class="btn btn-link" id="about-open" type="button"><span data-i18n="ui.about">About</span></button></nav></details></div></header>
+  <header class="app-header"><a class="brand" href="./">Dagsverk <small>2.0</small></a><div class="status-line" id="sync-status" hidden><button class="btn btn-link status-refresh" id="refresh" type="button" data-state="working" aria-label="Refresh" title="Refresh" data-i18n-aria-label="ui.refresh_0e9161" data-i18n-title="ui.refresh_0e9161"><span id="status-icon" aria-hidden="true"></span><span id="status" data-state="working" role="status" aria-live="polite"></span></button></div><div id="session" hidden=""><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu" data-i18n-aria-label="ui.account_menu" data-i18n-title="ui.account_menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account" data-i18n-aria-label="ui.account"><label class="focus-menu-field" for="focus-select"><span data-i18n="focus.title">Focus areas</span><select id="focus-select" class="form-select" aria-label="Focus area" data-i18n-aria-label="focus.area"></select></label><a class="btn btn-link" id="account" tabindex="0" href="#account/profile"><span data-i18n="ui.my_account">My Account</span></a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden=""><span data-i18n="ui.administration">Administration</span></a><button class="btn btn-link" id="sign-out" type="button"><span data-i18n="ui.sign_out">Sign out</span></button><button class="btn btn-link" id="about-open" type="button"><span data-i18n="ui.about">About</span></button></nav></details></div></header>
   <div id="theme-settings" hidden><div class="theme-choice"><label for="theme"><span data-i18n="ui.theme">Theme</span></label><select class="form-select" id="theme"></select></div></div>
   <div id="duration-settings" hidden><label class="form-label duration-choice"><span data-i18n="ui.duration_format">Duration format</span><select class="form-select" id="duration-format" aria-label="Duration format" data-i18n-aria-label="ui.duration_format"><option value="clock" data-i18n="ui.hours_minutes_and_seconds">Hours, minutes and seconds</option><option value="decimal" data-i18n="ui.decimal_hours">Decimal hours</option></select></label></div>
   <main id="main-content" tabindex="-1">
-    <p id="startup" role="status" data-i18n="ui.loading_timekeeper">Loading Timekeeper…</p>
+    <p id="startup" role="status" data-i18n="ui.loading_timekeeper">Loading Dagsverk…</p>
     <section id="login" class="card login" hidden>
       <p class="eyebrow"><span data-i18n="ui.your_work_recorded">YOUR WORK, RECORDED</span></p><h1><span data-i18n="ui.make_time_count">Make time count.</span></h1>
       <p><span data-i18n="ui.track_work_and_manage_your_projects_in_the_browser">Track work and manage your projects in the browser.</span></p><p id="login-build" class="hint"></p>
@@ -36,7 +36,7 @@
         <label class="form-label" id="code-field" hidden=""><span data-i18n="ui.one_time_setup_or_recovery_code">One-time setup or recovery code</span><input class="form-control" id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled=""></label>
         <label class="form-label check" id="remember-field"><input class="form-check-input" id="remember" type="checkbox"> <span data-i18n="ui.remember_me_on_this_browser">Remember me on this browser</span></label>
         <label class="form-label" id="token-field" hidden=""><span data-i18n="ui.access_token">Access token</span><input class="form-control" id="token" type="password" autocomplete="off" disabled=""></label>
-        <p id="auth-hint" class="hint"><span data-i18n="ui.use_your_timekeeper_account_api_tokens_are_managed_after_signing_in">Use your Timekeeper account. API tokens are managed after signing in.</span></p>
+        <p id="auth-hint" class="hint"><span data-i18n="ui.use_your_timekeeper_account_api_tokens_are_managed_after_signing_in">Use your Dagsverk account. API tokens are managed after signing in.</span></p>
         <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit" disabled=""><span data-i18n="ui.sign_in">Sign in</span></button>
         <button class="btn btn-outline-secondary" id="passkey-sign-in" type="button" tabindex="0" disabled=""><span data-i18n="ui.sign_in_with_a_passkey">Sign in with a passkey</span></button>
         <button class="btn btn-outline-secondary" id="passkey-cancel" type="button" tabindex="0" hidden=""><span data-i18n="ui.cancel_passkey_request">Cancel passkey request</span></button>
@@ -153,7 +153,7 @@
     <div id="account-labels-home" hidden><section id="labels-panel" aria-labelledby="account-labels-title" hidden=""><div class="toolbar"><h2 id="account-labels-title"><span data-i18n="ui.labels">Labels</span></h2><button class="btn btn-primary" id="add-label"><span data-i18n="ui.new_label">New label</span></button></div><div id="labels" class="card table-wrap"></div></section></div>
   </main>
   <dialog class="app-dialog server-info shadow-lg" id="server-info" aria-labelledby="about-title">
-    <h2 id="about-title" tabindex="-1"><span data-i18n="ui.about_timekeeper">About Timekeeper</span></h2>
+    <h2 id="about-title" tabindex="-1"><span data-i18n="ui.about_timekeeper">About Dagsverk</span></h2>
     <p id="about-copyright">Copyright © 2014–2026 Torkild U. Resheim</p>
     <nav class="about-links" aria-label="Project references" data-i18n-aria-label="about.project_references">
       <a href="/web/assets/notices/timekeeper-LICENSE.txt" target="_blank" rel="noopener noreferrer">Eclipse Public License 2.0</a>

@@ -13,7 +13,7 @@ def failures(needs):
             'Remote-Eclipse': 'remote_eclipse', 'Containers': 'containers', 'Publication': 'site'}
     if any(selected.get(flag) not in ('true', 'false') for flag in set(jobs.values())):
         return ['Invalid validation selection']
-    expected = {name for name, flag in jobs.items() if selected[flag] == 'true'} | {'Publication-tooling'}
+    expected = {name for name, flag in jobs.items() if selected[flag] == 'true'} | {'Publication-tooling', 'Agent-quality'}
     return sorted(name for name in expected if needs.get(name, {}).get('result') != 'success')
 
 

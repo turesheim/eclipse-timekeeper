@@ -97,6 +97,12 @@ Test results are retained even when validation fails. The Synology job downloads
 installer is still identified by its `1.99.0-<revision>` version and metadata;
 the artifact name stays `synology-installer`.
 
+## Agent-assisted development
+
+See [the agent workflow](AGENT-WORKFLOW.md) for project skills, Codex hooks,
+acceptance criteria and the shared `python3 scripts/quality.py --affected`
+command. Product naming follows the [Dagsverk transition](BRANDING.md).
+
 ## Eclipse import
 
 Import existing Maven projects recursively from the repository root. Open

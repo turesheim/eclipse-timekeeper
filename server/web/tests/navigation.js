@@ -9,7 +9,7 @@ export async function openAccountMenu(page) {
 
 export async function openAbout(page) {
   await openAccountMenu(page);await page.getByRole('button',{name:'About',exact:true}).click();
-  await expect(page.getByRole('dialog',{name:'About Timekeeper',exact:true})).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'About Dagsverk',exact:true})).toBeVisible();
 }
 
 export async function setTimeZone(page, zone) {

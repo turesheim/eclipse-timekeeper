@@ -11,6 +11,23 @@ def documentation(path):
     return PurePosixPath(path).suffix.lower() == '.md' or path.startswith('docs/')
 
 
+def agent_tooling(path):
+    """Agent workflows have their own always-on validation job."""
+    return path.startswith((".agents/", ".codex/", "evals/agent/")) or path in {
+        "AGENTS.md", "skills-lock.json", "scripts/quality.py", "scripts/agent_hooks.py",
+        "scripts/tests/test_quality.py", "scripts/tests/test_agent_hooks.py",
+    }
+
+
+def product_paths(paths):
+    return [p for p in paths if not documentation(p) and not agent_tooling(p)]
+
+
+def validation_jobs(paths):
+    product = product_paths(paths)
+    return {"code": bool(product), "eclipse": any(desktop_path(p) for p in product)}
+
+
 def changed_paths(event, event_name, ref, head):
     if event_name not in ('push', 'pull_request') or ref.startswith('refs/tags/'):
         return None
@@ -86,7 +103,7 @@ def desktop_path(path):
 
 def select_jobs(event, event_name, ref, head):
     paths = changed_paths(event, event_name, ref, head)
-    product = [p for p in (paths or []) if not documentation(p)]
+    product = product_paths(paths or [])
     override = any(label.get('name') == 'ci:full' for label in event.get('pull_request', {}).get('labels', []))
     sensitive = any(sensitive_path(p) for p in product)
     # Main uses the same selection as PRs. Nightly/manual/tag runs certify everything.

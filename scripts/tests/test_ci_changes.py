@@ -16,6 +16,19 @@ ci, browser, result = (module(name) for name in ('ci_changes', 'ci_browser', 'ci
 
 
 class ChangesTest(unittest.TestCase):
+    def test_agent_tooling_has_separate_validation(self):
+        for path in ("AGENTS.md", ".codex/hooks.json", ".agents/skills/dagsverk-web/SKILL.md",
+                     "scripts/quality.py", "scripts/agent_hooks.py", "evals/agent/cases.json"):
+            with self.subTest(path=path):
+                self.assertEqual(ci.validation_jobs([path]), {"code": False, "eclipse": False})
+        self.assertEqual(ci.validation_jobs([".codex/hooks.json", "common/Record.java"]),
+                         {"code": True, "eclipse": True})
+
+    def test_agent_only_changes_do_not_select_product_jobs(self):
+        selected = self.select([".codex/hooks.json", "AGENTS.md"])
+        for key in ("code", "server", "web", "api", "eclipse", "remote_eclipse", "containers"):
+            self.assertFalse(selected[key], key)
+
     def select(self, paths, event=None, name='pull_request', ref='refs/pull/1/merge'):
         event = event or {'pull_request': {'base': {'sha': 'abc'}}}
         with patch.object(ci.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, ('\0'.join(paths)+'\0').encode(), b'')):
@@ -158,8 +171,12 @@ class ChangesTest(unittest.TestCase):
 
     def test_aggregate_rejects_skipped_selected_jobs_and_failed_selector(self):
         needs={'Changes':{'result':'success','outputs':{**{key:'false' for key in ('server','web','api','eclipse','remote_eclipse','containers','site')},'server':'true'}},
-               'Server':{'result':'success'},'Web':{'result':'skipped'},'Publication-tooling':{'result':'success'}}
+               'Server':{'result':'success'},'Web':{'result':'skipped'},'Publication-tooling':{'result':'success'}, 'Agent-quality':{'result':'success'}}
         self.assertEqual([],result.failures(needs))
+        for state in ('skipped','failure','cancelled'):
+            needs['Agent-quality']['result']=state
+            self.assertEqual(['Agent-quality'],result.failures(needs))
+        needs['Agent-quality']['result']='success'
         for state in ('skipped','failure','cancelled'):
             needs['Server']['result']=state;self.assertEqual(['Server'],result.failures(needs))
         needs['Changes']['result']='failure';self.assertEqual(['Changes'],result.failures(needs))
@@ -174,7 +191,7 @@ class ChangesTest(unittest.TestCase):
         outputs['remote_eclipse']='true'
         needs={'Changes':{'result':'success','outputs':outputs},
                'Remote-Eclipse':{'result':'success'},'Build':{'result':'skipped'},
-               'Publication-tooling':{'result':'success'}}
+               'Publication-tooling':{'result':'success'}, 'Agent-quality':{'result':'success'}}
         self.assertEqual([],result.failures(needs))
         for state in ('skipped','failure','cancelled'):
             needs['Remote-Eclipse']['result']=state

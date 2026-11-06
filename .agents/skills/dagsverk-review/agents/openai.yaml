@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dagsverk Review"
+  short_description: "Review correctness, regressions and acceptance gaps"

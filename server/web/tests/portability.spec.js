@@ -44,7 +44,7 @@ test('portability: private download, accessible review, stale review and duplica
   let profile=await own(page,'GET','/me');expect((await own(page,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag})).status()).toBe(200);
   const file=await download(page);profile=await own(page,'GET','/me');expect((await own(page,'PUT','/me',{zoneId:'UTC'},{'If-Match':profile.headers().etag})).status()).toBe(200);
   await page.reload();await expect(page.getByRole('heading',{name:'Download my data',exact:true})).toBeVisible();
-  await page.getByLabel('Timekeeper archive',{exact:true}).setInputFiles(file);await page.getByLabel('Restore the archived time zone',{exact:true}).check();await page.getByRole('button',{name:'Review archive',exact:true}).click();
+  await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByLabel('Restore the archived time zone',{exact:true}).check();await page.getByRole('button',{name:'Review archive',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Review archive',exact:true})).toBeVisible();await expect(page.getByText('Time zone: UTC → Europe/Oslo',{exact:true})).toBeVisible();
   const links=page.getByRole('table',{name:'Record links',exact:true});await expect(links.locator('tbody tr')).toHaveCount(3);await expect(links).toContainText('Work session projects');await expect(links.locator('tbody tr').filter({hasText:'Work session projects'})).toContainText('1');
   expect((await snapshot(page)).workSessions).toHaveLength(1);
@@ -60,13 +60,13 @@ test('portability: private download, accessible review, stale review and duplica
   const restored=await snapshot(page);expect(restored.workSessions).toHaveLength(2);const copy=restored.workSessions.find(value=>value.id!==user.session.id);expect(copy.start).toBe(user.session.start);expect(copy.end).toBe(user.session.end);expect(copy.projectId).not.toBe(user.session.projectId);
   expect(restored.projects.find(value=>value.id===copy.projectId).clientId).toBe(copy.clientId);expect(restored.clients.some(value=>value.name==='Peer edit retained')).toBe(true);expect(restored.zoneId).toBe('Europe/Oslo');
   expect(await (await own(page,'GET','/auth/account')).json()).toEqual(identity);
-  await page.reload();await page.getByLabel('Timekeeper archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();
+  await page.reload();await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Archive already restored',exact:true})).toBeVisible();expect((await snapshot(page)).workSessions).toHaveLength(2);
 });
 test('portability: a committed but lost restore reply is reconciled without another write',async({page,request})=>{
-  await account(page,request);const file=await download(page);await page.getByLabel('Timekeeper archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByRole('button',{name:'Import reviewed records',exact:true})).toBeEnabled();
+  await account(page,request);const file=await download(page);await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByRole('button',{name:'Import reviewed records',exact:true})).toBeEnabled();
   let writes=0;await page.route('**/api/v1/data/account/uploads/*/import',async route=>{writes++;expect((await route.fetch()).status()).toBe(201);await route.abort('failed');});
-  await page.getByRole('button',{name:'Import reviewed records',exact:true}).click();await expect(page.getByText('The import result is unknown. Check its result before continuing.',{exact:true})).toBeVisible();await expect(page.getByLabel('Timekeeper archive',{exact:true})).toBeDisabled();expect(writes).toBe(1);
+  await page.getByRole('button',{name:'Import reviewed records',exact:true}).click();await expect(page.getByText('The import result is unknown. Check its result before continuing.',{exact:true})).toBeVisible();await expect(page.getByLabel('Dagsverk archive',{exact:true})).toBeDisabled();expect(writes).toBe(1);
   await page.getByRole('button',{name:'Check import result',exact:true}).click();await expect(page.getByRole('heading',{name:'Archive restored',exact:true})).toBeVisible();expect(writes).toBe(1);expect((await snapshot(page)).workSessions).toHaveLength(2);
 });
 test('portability: upload resumes the next chunk after a lost reply, reload and file reselection',async({page,request})=>{
@@ -75,8 +75,8 @@ test('portability: upload resumes the next chunk after a lost reply, reload and 
   const file={name:'large-account.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(value))};let firstWrites=0,secondWrites=0;
   await page.route('**/api/v1/data/account/uploads/*/chunks/0',async route=>{firstWrites++;expect((await route.fetch()).status()).toBe(200);await route.abort('failed');});
   await page.route('**/api/v1/data/account/uploads/*/chunks/1',async route=>{secondWrites++;await route.continue();});
-  await page.getByLabel('Timekeeper archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByText('Upload paused. Select Review archive to resume safely.',{exact:true})).toBeVisible();expect(firstWrites).toBe(1);
-  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.getByLabel('Timekeeper archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByRole('button',{name:'Import reviewed records',exact:true})).toBeEnabled();expect(firstWrites).toBe(1);expect(secondWrites).toBe(1);
+  await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByText('Upload paused. Select Review archive to resume safely.',{exact:true})).toBeVisible();expect(firstWrites).toBe(1);
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByRole('button',{name:'Import reviewed records',exact:true})).toBeEnabled();expect(firstWrites).toBe(1);expect(secondWrites).toBe(1);
   await page.getByRole('button',{name:'Import reviewed records',exact:true}).click();await expect(page.getByRole('heading',{name:'Archive restored',exact:true})).toBeVisible();expect((await snapshot(page)).workSessions).toHaveLength(2);
 });
 test('portability: read-only sessions can download repeatedly while restore stays disabled',async({page})=>{
