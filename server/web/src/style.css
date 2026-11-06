@@ -149,7 +149,9 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-date-field { width: calc(10ch + 4.25rem + 2px); max-width: 100%; }
 .today-date-field .form-control { min-width: 0; margin-top: 0; font-variant-numeric: tabular-nums; }
 .today-date-field input::-webkit-calendar-picker-indicator { display: none; }
-.today-layout { display: grid; grid-template-columns: minmax(0,1fr) 14rem; align-items: start; gap: 1rem; }
+.today-layout { display: grid; grid-template-columns: minmax(0,1fr) 1rem minmax(180px,var(--today-sidebar-width,14rem)); align-items: start; }
+.today-resize { align-self: stretch; cursor: col-resize; touch-action: none; }
+.today-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .today-main, .today-journal, .today-sidebar { min-width: 0; }
 .today-journal { display: flex; flex-direction: column; }
 .today-journal > .journal-inline { height: calc(var(--today-editor-height, 32rem) - var(--workspace-content-gap)); min-height: 0; flex: none; }
@@ -187,7 +189,8 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-list .hint { margin: 0; font-size: var(--font-today-hint); }
 .today-summary > .hint { margin: .5rem 0 0; }
 @media(max-width: 1050px) {
-  .today-layout { grid-template-columns: minmax(0,1fr); }
+  .today-layout { grid-template-columns: minmax(0,1fr); gap: 1rem; }
+  .today-resize { display: none; }
   .today-sidebar { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media(max-width: 650px) {

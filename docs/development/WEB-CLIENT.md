@@ -140,6 +140,10 @@ another date. On narrow screens the sidebar follows the journal.
 The Today sidebar starts alongside the date navigator, directly below the work
 session card. Its height and the editor's height are measured independently to
 the fixed bottom menu; font changes and wrapping headings update both measures.
+Drag the separator between the journal and sidebar to resize it on desktop.
+When focused, Left/Right changes the width and Home/End selects its limits.
+The selected width survives day and tab changes in the current page. At narrow
+widths the sidebar stacks below the journal and the separator is hidden.
 The date field has an accessible, visually hidden label. Previous, today and
 next-day controls form a grouped toolbar, and the date heading is centered in
 the remaining main-column space. On narrow screens the heading moves above
