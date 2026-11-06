@@ -6,6 +6,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
+import {tooltipFor} from './tooltips.js';
 
 const fixture=()=>process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE;
 const base=()=>process.env.TIMEKEEPER_WEB_URL;
@@ -106,6 +107,33 @@ test('calendar subscriptions show client-coloured plans and create reviewed acti
     await planned(page,subscription).click();await expect(details.getByRole('button',{name:'Create activity',exact:true})).toBeDisabled();await expect(details).toContainText('already been created');await page.keyboard.press('Escape');
     const observed=await(await request.get(feed.control)).json();expect(observed.headers.Authorization).toBeUndefined();expect(observed.headers.Cookie).toBeUndefined();
     await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/calendar-subscriptions-desktop.png',fullPage:true});
+  }finally{await context.close();}
+});
+
+test('meeting links render with provider icons in event dialogs and tooltips without loading description resources',async({browser,request})=>{
+  const {page,context,client}=await setup(browser,request),loads=[];
+  page.on('request',request=>{if(request.url().includes('untrusted.example.test'))loads.push(request.url());});
+  try{
+    const teams='https://teams.microsoft.com/l/meetup-join/19%3ameeting?context=%7B%7D',meet='https://meet.google.com/abc-defg-hij',zoom='https://us02web.zoom.us/j/123456789?pwd=private';
+    const feed=await provider(request,[`UID:video-call\nDTSTART:20260504T083000Z\nDTEND:20260504T093000Z\nSUMMARY:Video call\nLOCATION:${teams}\nDESCRIPTION:<p><strong>Join remotely</strong></p><a href="${meet}">Join room</a> <a href="${zoom}">Join Zoom</a><img src="https://untrusted.example.test/image" onerror="window.calendarInjection=true"><a href="javascript:alert(1)">Unsafe</a>`,
+      'UID:generic-call\nDTSTART:20260504T110000Z\nDTEND:20260504T113000Z\nSUMMARY:Other video call\nLOCATION:https://video.example.test/room\nDESCRIPTION:Office <img> text and https://teams.microsoft.com.evil.example.test/join']);
+    await calendar(page);const subscription=await subscribe(page,client,feed),item=planned(page,subscription).filter({has:page.locator('strong',{hasText:/^Video call$/})});
+    const assertLinks=async host=>{
+      for(const [provider,href,glyph]of [['teams',teams,'microsoft-teams'],['google-meet',meet,'google'],['zoom',zoom,'camera-video-fill']]){
+        const link=host.locator(`[data-meeting-provider="${provider}"]`);await expect(link).toHaveAttribute('href',href);await expect(link.locator('.bi-'+glyph)).toHaveCount(1);await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel','noopener noreferrer');
+      }
+      await expect(host.locator('img,script,iframe')).toHaveCount(0);await expect(host.getByText('Unsafe',{exact:true})).not.toHaveAttribute('href');
+    };
+    await assertLinks(await tooltipFor(item));await page.keyboard.press('Escape');await item.click();const details=page.locator('#calendar-event-details');await assertLinks(details);await expect(details.locator('strong')).toHaveText('Join remotely');
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+      await details.getByRole('button',{name:'Close',exact:true}).click();await setTheme(page,theme);await page.setViewportSize({width:320,height:844});await item.click();await assertLinks(details);expect(await details.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
+      expect((await new AxeBuilder({page}).include('#calendar-event-details').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+    }
+    await captureScreenshot(page,{path:'test-results/calendar-meeting-links-mobile.png'});await details.getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:1280,height:900});
+    await planned(page,subscription).filter({hasText:'Other video call'}).click();await expect(details.locator('[data-meeting-provider=video] .bi-camera-video')).toHaveCount(1);await expect(details.locator('[data-meeting-provider=teams]')).toHaveCount(0);await expect(details.getByRole('link',{name:'https://teams.microsoft.com.evil.example.test/join',exact:true})).toBeVisible();await details.getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');await page.locator('#today-events button').filter({has:page.locator('strong',{hasText:/^Video call$/})}).click();const today=page.locator('#today-event-details');await assertLinks(today);await captureScreenshot(page,{path:'test-results/today-meeting-links.png'});
+    await context.route('https://meet.google.com/**',route=>route.fulfill({contentType:'text/html',body:'Meeting fixture'}));const opened=page.waitForEvent('popup');await today.locator('[data-meeting-provider=google-meet]').click();const popup=await opened;await popup.waitForLoadState();expect(await popup.evaluate(()=>window.opener)).toBeNull();await expect(popup.locator('body')).toHaveText('Meeting fixture');await popup.close();
+    expect(await page.evaluate(()=>!!window.calendarInjection)).toBe(false);expect(loads).toEqual([]);
   }finally{await context.close();}
 });
 

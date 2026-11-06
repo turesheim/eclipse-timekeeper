@@ -1,4 +1,5 @@
 import {RecentNotes} from './recent-notes.js';
+import {calendarDescription,calendarLocation} from './tooltip-description.js';
 import {richTooltip} from './tooltips.js';
 import {workSessionsTooltip,calendarEventTooltip} from './tooltip-content.js';
 import {dailyNoteDateFromSearch,dailyNoteHref} from './journal-links.js';
@@ -195,8 +196,8 @@ export class TodayView {
     const client=this.data.clients.find(value=>value.id===event.clientId);
     details.append(title,node('p',when),node('p',[client?.name||event.clientName,event.calendarName].filter(Boolean).join(' · '),'hint'));
     if(calendarTodo(event))details.append(node('p',calendarItemStatus(event)));
-    if(event.location)details.append(node('p',t('calendar.location',{location:event.location})));
-    if(event.description)details.append(node('p',event.description,'calendar-description'));
+    if(event.location){const location=node('p');location.append(calendarLocation(t('calendar.location',{location:event.location})));details.append(location);}
+    if(event.description){const description=calendarDescription(event.description);description.classList.add('calendar-description');details.append(description);}
     const actions=node('div',undefined,'dialog-actions'),close=node('button',t('ui.close'),'btn btn-outline-secondary');close.type='button';close.addEventListener('click',()=>details.close());actions.append(eventNoteButton(event,()=>void this.eventNoteEditor.open(event,this.scope,this.connected&&this.callbacks.canWrite(),this.data.profile.data.zoneId)),close);details.append(actions);
     details.showModal();close.focus();
   }
