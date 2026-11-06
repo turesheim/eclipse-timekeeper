@@ -1,5 +1,6 @@
 """Retention must preserve current work, versioned outputs and unrelated data."""
 import unittest
+import json
 from unittest.mock import patch
 
 import github_retention as retention
@@ -61,3 +62,24 @@ class RetentionTest(unittest.TestCase):
         protected = retention.versioned_manifests(versions, manifests.__getitem__)
         self.assertEqual({root,child}, protected)
         self.assertEqual([3], [item['id'] for item in retention.registry_plan(versions,protected)])
+
+    def test_retired_package_is_deleted_only_when_a_fresh_inventory_has_no_version_tags(self):
+        versions=[{'id':1,'name':'sha256:'+'a'*64,'metadata':{'container':{'tags':['edge']}}}]
+        calls=[]
+        fresh_tags=[]
+        def gh(*args):
+            calls.append(args)
+            if '--method' in args:return ''
+            if '/versions?' in args[1]:
+                result=json.loads(json.dumps(versions))
+                if sum('/versions?' in item[1] for item in calls)>1:result[0]['metadata']['container']['tags']+=fresh_tags
+                return json.dumps([result])
+            return json.dumps({'repository':{'full_name':'owner/repo'}})
+        with patch.object(retention,'gh',side_effect=gh):
+            result=retention.clean_registry('owner/repo',apply=True)
+            self.assertTrue(result['packageDeleted'])
+            self.assertEqual([1],result['deleted'])
+            self.assertEqual(1,len([item for item in calls if 'DELETE' in item]))
+            calls.clear();fresh_tags.append('2.0.0')
+            with self.assertRaisesRegex(ValueError,'version tag'):retention.clean_registry('owner/repo',apply=True)
+            self.assertFalse(any('DELETE' in item for item in calls))

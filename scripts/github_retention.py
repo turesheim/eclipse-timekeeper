@@ -122,7 +122,17 @@ def versioned_manifests(versions, inspect):
 def clean_registry(repo, apply=False):
     # The retired registry name is fixed. Never sweep an account's other packages.
     path = f"users/{repo.split('/')[0]}/packages/container/eclipse-timekeeper-server"
-    package = json.loads(gh('api', path))
+    try:
+        package = json.loads(gh('api', path))
+    except subprocess.CalledProcessError as failure:
+        try:
+            missing = str(json.loads(failure.output).get('status')) == '404'
+        except (ValueError, AttributeError, TypeError):
+            missing = False
+        if not missing:
+            raise
+        return {'package': 'eclipse-timekeeper-server', 'total': 0, 'selected': [],
+                'retained': [], 'deleted': [], 'absent': True}
     if package.get('repository', {}).get('full_name') != repo:
         raise ValueError('The retired container package is not linked to this repository')
     versions = [item for page in json.loads(gh('api', path+'/versions?per_page=100', '--paginate', '--slurp')) for item in page]
@@ -135,6 +145,16 @@ def clean_registry(repo, apply=False):
               'selected': [item['id'] for item in selected],
               'retained': [item['id'] for item in versions if item not in selected], 'deleted': []}
     if apply:
+        if not report['retained']:
+            fresh = [item for page in json.loads(gh('api', path+'/versions?per_page=100', '--paginate', '--slurp')) for item in page]
+            if len(registry_plan(fresh)) != len(fresh):
+                raise ValueError('A version tag was added after inventory; review a fresh plan')
+            # All versions are temporary. Retiring the package also removes its
+            # untagged manifests and avoids an empty obsolete package entry.
+            gh('api', path, '--method', 'DELETE')
+            report['deleted'] = [item['id'] for item in fresh]
+            report['packageDeleted'] = True
+            return report
         for item in selected:
             current = json.loads(gh('api', path+f"/versions/{item['id']}"))
             if not registry_plan([current], protected):
