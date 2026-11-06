@@ -70,7 +70,7 @@ def verify(command,database_container,folder,image):
         properties=dict(line.split('=',1) for line in (config/'runtime.properties').read_text().splitlines() if '=' in line)
         public_host=urlsplit(properties['timekeeper.auth.public-origin']).netloc
         web=command('docker','exec',name,'curl','-fsS','-H','Host: '+public_host,endpoint+'/web/')
-        if '<title>Timekeeper</title>' not in web.stdout:raise AssertionError('Public reverse-proxy Host did not serve the web client')
+        if '<title>Dagsverk</title>' not in web.stdout:raise AssertionError('Public reverse-proxy Host did not serve the Dagsverk web client')
         for host in (public_host,public_host.upper(),'localhost:8443','127.0.0.1:8080','[::1]:8080'):
             response=command('docker','exec',name,'curl','-fsS','-H','Host: '+host,endpoint+'/api/v1/auth/status')
             if 'setupRequired' not in json.loads(response.stdout):raise AssertionError('Allowed Host did not reach account status')
