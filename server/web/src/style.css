@@ -24,7 +24,7 @@
   --calendar-card-border-radius: .3rem;
   --calendar-client-border-width: 4px;
   --workspace-content-gap: .5rem;
-  /* Smaller text must not shrink standalone pointer targets below 44 CSS px. */
+  /* Bottom navigation keeps its larger pointer targets. */
   --control-target-size: max(44px, 2.75rem);
   --workspace-nav-bottom-inset: 0px;
   --workspace-nav-height: calc(max(64px, 4rem) + var(--workspace-nav-bottom-inset));
@@ -69,7 +69,8 @@ h1 { font-size: var(--font-page-title); letter-spacing: -.035em; }
 h2 { font-size: var(--font-section-heading); font-weight: 650; }
 h3 { font-size: var(--font-subsection-heading); font-weight: 650; }
 p { margin-block: .5rem; }
-.btn { --bs-btn-font-size: var(--font-button); --bs-btn-padding-y: .625rem; --bs-btn-font-weight: 600; min-height: var(--control-target-size); }
+.btn { --bs-btn-font-weight: 600; }
+.btn:not(.btn-sm):not(.btn-lg) { --bs-btn-font-size: var(--font-button); }
 .btn-primary {
   --bs-btn-bg: #176653; --bs-btn-border-color: #176653;
   --bs-btn-hover-bg: #104e3f; --bs-btn-hover-border-color: #104e3f;
@@ -367,7 +368,6 @@ button.calendar-summary-card:disabled { opacity: .65; }
   .track-client { flex-basis: 9rem; }
 }
 .icon { font-size: var(--font-icon); line-height: 1; display: inline-block; flex-shrink: 0; text-align: center; width: 1.25rem; }
-.icon-button, .tree-toggle { width: var(--control-target-size); height: var(--control-target-size); padding: 0; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
 .server-info { font-size: var(--font-server-info); overflow-wrap: anywhere; }
 #server-build { color: var(--muted); }
 .server-info dl { display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; margin-block: .5rem; }

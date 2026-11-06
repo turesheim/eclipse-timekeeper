@@ -262,7 +262,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
         expect(geometry.sidebarTop-geometry.sessionBottom).toBeGreaterThanOrEqual(0);expect(geometry.sidebarTop-geometry.sessionBottom).toBeLessThanOrEqual(gap+1);
         expect(geometry.sidebarBottom).toBeLessThanOrEqual(geometry.dockTop-gap+1);
       }else expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.editorBottom);
-      for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);}
+      for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);}
     };
     for(const [width,font,heading,brand]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[650,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20],[320,20,null,'2rem']])await check(width,font,heading,brand);
     running=await(await api(request,'POST','/work-sessions',{summary:'Running session with a deliberately long title to exercise wrapping',start:new Date(Date.now()-3600000).toISOString(),end:null})).json();

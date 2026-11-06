@@ -447,6 +447,9 @@ further writes until the records have been reviewed.
 ![Work-session deletion confirmation on a narrow screen](../assets/screenshots/work-session-editor-delete-confirm.png)
 
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
+Shared action buttons use Bootstrap's default padding and content-based sizing,
+including its small and large variants. Icon buttons use the same sizing rather
+than a fixed square. Standard button text still follows the account's font setting.
 The small application theme in `style.css` defines the green palette, typography,
 spacing and visible keyboard focus. The work-session card establishes the baseline:
 a client-color accent, summary, explicit running/stopped status, local times,

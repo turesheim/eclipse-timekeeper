@@ -19,9 +19,7 @@ async function iconTargets(page) {
   for(const button of await page.locator('.icon-button:visible,.tree-toggle:visible').all()) {
     expect(await button.getAttribute('aria-label')).toBeTruthy();
     await expect(await tooltipFor(button)).not.toBeEmpty();
-    // Dense daily time cells use 32px menu targets; standalone actions retain 44px.
-    const minimum=await button.evaluate(node=>!!node.closest('.week-session-interval')) ? 32:44;
-    const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(minimum);expect(box.height).toBeGreaterThanOrEqual(minimum);
+    const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);
   }
 }
 async function fixture(request) {
@@ -75,6 +73,9 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await expect(page.locator('#work-session-title')).toHaveText('Website planning');
       await expect(page.locator('#work-session-elapsed')).toHaveText('8h 0m');
       await expect(page.locator('#work-session')).toHaveCSS('border-top-color','rgb(103, 80, 164)');
+      // Shared actions follow Bootstrap sizing instead of the former 44px square.
+      const editBox=await page.locator('#session-edit').boundingBox();
+      expect(editBox.width).toBeLessThan(44);expect(editBox.height).toBeLessThan(44);
       await page.mouse.move(0,0);
       await captureScreenshot(page,{path:`test-results/design-work-session-${name}.png`,fullPage:false});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});

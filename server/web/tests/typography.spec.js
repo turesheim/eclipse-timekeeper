@@ -39,10 +39,12 @@ test('typography CSS changes the rem base and named text roles only after the ac
   expect(defaults).toContain('Level 1 heading in formatted Markdown notes.');
   await editor(page).fill(defaults.replace('--font-base: 14px;', '--font-base: 112.5%;')
     .replace('--font-section-heading: 1.25rem;', '--font-section-heading: 1.5rem;')
+    .replace('--font-button: 1rem;', '--font-button: 1.125rem;')
     .replace('--font-input: 1rem;', '--font-input: 1.125rem;'));
   await expect(page.locator('html')).toHaveCSS('font-size', '14px');await save(page);await saved(page);
   await expect(page.locator('html')).toHaveCSS('font-size', '18px');
   await expect(page.locator('.account-card h2')).toHaveCSS('font-size', '27px');
+  await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toHaveCSS('font-size', '20.25px');
   expect((await profile(page)).typographyCss).toContain('--font-base: 112.5%;');
   await page.getByRole('link', {name: 'Profile', exact: true}).click();
   await expect(page.getByLabel('Account username', {exact: true})).toHaveCSS('font-size', '20.25px');
