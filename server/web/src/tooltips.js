@@ -4,7 +4,7 @@ import Tooltip from './assets/bootstrap/tooltip.js';
 // except calendar descriptions, sanitized by tooltip-description.js.
 const content=new WeakMap();
 export const TOOLTIP_SHOW_DELAY=800;
-export const TOOLTIP_FOCUS_DELAY=5000;
+export const TOOLTIP_FOCUS_DELAY=3000;
 let showTimer,pending=null;
 function cancelPending(){clearTimeout(showTimer);pending=null;}
 function schedule(node,focus=null){
