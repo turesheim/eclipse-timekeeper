@@ -135,6 +135,15 @@ class ChangesTest(unittest.TestCase):
                      'server/app/src/main/java/net/DatabaseStore.java'):
             self.assertTrue(self.select([path],{'before':'abc'},'push','refs/heads/main')['container_full'])
 
+    def test_every_main_change_produces_a_synology_distribution_without_forcing_certification(self):
+        for paths in (['README.md'], ['.codex/hooks.json'], ['server/web/src/style.css'],
+                      ['server/app/src/main/java/net/ProjectResource.java']):
+            with self.subTest(paths=paths):
+                selected = self.select(paths, {'before': 'abc'}, 'push', 'refs/heads/main')
+                self.assertTrue(selected['synology_distribution'])
+                self.assertFalse(selected['full'])
+        self.assertFalse(self.select(['README.md'])['synology_distribution'])
+
     def test_browser_matrix_has_one_job_per_bounded_share(self):
         for size,expected in ((1,1),(6,1),(7,2),(19,4),(80,4)):
             rows=ci.browser_matrix(['fixture']*size)['include']

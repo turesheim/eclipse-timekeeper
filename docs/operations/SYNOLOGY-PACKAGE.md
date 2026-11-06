@@ -432,8 +432,8 @@ The Dagsverk packages used by migration acceptance are uploaded separately as
 An **incomplete** `dsm-acceptance-template.json` binds the real-NAS test record to
 that exact candidate. Automated CI does not fill in the manual test results.
 
-Web-only main builds use **Synology web preview** and upload
-`synology-web-preview` instead. This packages the exact image that passed
+Routine main builds use **Synology web preview** and upload
+`synology-installer` too. This packages the exact image that passed
 deployment startup and bundled-web checks, without repeating the database and
 native backup matrix. When preview publication is enabled, the preview channel
 also requires the matching commit's selected Build checks, every Web shard and
@@ -441,6 +441,13 @@ also requires the matching commit's selected Build checks, every Web shard and
 `validation: web-smoke`; fully certified candidates use `validation: full`.
 Web previews cannot be promoted to stable: stable publication still requires
 the full candidate and real-NAS acceptance.
+
+Every main build produces the installer, including documentation-only changes.
+The newest verified main SPK is also available at the rolling
+[Synology latest prerelease](https://github.com/turesheim/eclipse-timekeeper/releases/tag/synology-latest).
+Its old assets and older temporary SPK artifacts are removed after replacement.
+Versioned release assets are retained. The SPK bundles its image; installation
+does not require the retired GitHub container package.
 
 The installer artifact name describes its contents. Preview status remains in
 the SPK version (`1.99.0-<revision>`), provenance and repository channel. Release

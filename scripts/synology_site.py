@@ -45,7 +45,7 @@ def preview(repo, output, base):
         except release.CandidateUnavailable:
             continue
         try:
-            web_preview = artifact['name'] == release.WEB_PREVIEW_ARTIFACT
+            web_preview = not release.FULL_CANDIDATE_JOBS.issubset(jobs)
             matrix = release.matrix_run(repo, branch, commit, web_preview=web_preview)
         except ValueError:
             continue  # The matching matrix must finish successfully too.
