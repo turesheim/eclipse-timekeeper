@@ -42,6 +42,13 @@ body:has(#workspace:is([data-view=calendar],[data-view=today]):not([hidden])) {
 .calendar-create-preview{left:2px;right:2px;z-index:6;pointer-events:none;background:#17665320;border:2px dashed var(--accent);color:#104e3f;padding:.25rem;font-size: var(--font-week-create-preview);font-weight:650}
 
 .calendar-subscriptions-content>.hint{margin-top:.5rem}
+.calendar-sharing-guide{max-width:72ch;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.calendar-sharing-guide h3{font-size:1rem;margin:0}
+.calendar-sharing-guide details{border-bottom:1px solid var(--line)}
+.calendar-sharing-guide summary{cursor:pointer;font-weight:600;padding-block:.65rem}
+.calendar-sharing-guide ol{padding-inline-start:1.5rem}
+.calendar-sharing-guide li+li{margin-top:.5rem}
+.calendar-sharing-guide p{margin-block:.75rem}
 
 .calendar-task{padding:0;overflow:hidden}.calendar-activity-select{position:absolute;inset:0;width:100%;height:100%;display:block;text-align:left;padding:.2rem;color:inherit;background:transparent;border:0;line-height:1.1;font-size: var(--font-week-activity);overflow:hidden}.calendar-activity-select:hover,.calendar-activity-select:focus{color:inherit;background:transparent}.calendar-activity-select strong,.calendar-activity-select small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.calendar-task .calendar-recorded-marker{font-size: var(--font-week-recorded-marker)}.calendar-task .calendar-activity-task{position:absolute;top:.1rem;left:.2rem;right:.2rem;z-index:3;display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-height:1.3em;margin:0;pointer-events:none}.calendar-activity-task a{pointer-events:auto}.calendar-task.has-task .calendar-activity-select{padding-top:1.05rem}.calendar-activity-select:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 #calendar-subscription-editor,.calendar-event-details{overflow-wrap:anywhere}
