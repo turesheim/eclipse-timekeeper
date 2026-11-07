@@ -6,7 +6,11 @@ const maximum=200_000;
 const entities={amp:'&',lt:'<',gt:'>',quot:'"','#x27':"'"};
 const decode=value=>value.replace(/&(amp|lt|gt|quot|#x27);/g,(_,name)=>entities[name]);
 export function highlightCode(text,name){
-  const language=String(name||'').trim().split(/\s+/)[0].toLowerCase();
+  const fence=String(name||'').trim().split(/\s+/)[0].toLowerCase();
+  // The editor's Shell choice means a script. highlight.js calls its
+  // prompt-dependent console transcript grammar "shell"; keep that grammar
+  // available through its explicit console and shellsession aliases.
+  const language=fence==='shell'?'bash':fence;
   if(!language||!hljs.getLanguage(language)||text.length>maximum)return [];
   try{
     const html=hljs.highlight(text,{language,ignoreIllegals:true}).value,spans=[],stack=[];
