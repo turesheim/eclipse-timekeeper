@@ -7,6 +7,15 @@ on:
   release:
     types: [edited, deleted]
   workflow_dispatch:
+    inputs:
+      maintenance_only:
+        description: Clean Pages history and retired temporary container versions without deploying
+        type: boolean
+        default: false
+      apply_cleanup:
+        description: Apply the reviewed maintenance deletion plan
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,13 +30,14 @@ concurrency:
 jobs:
   build:
     if: >-
-      github.event_name != 'workflow_run' ||
+      !inputs.maintenance_only &&
+      (github.event_name != 'workflow_run' ||
       (github.event.workflow_run.conclusion == 'success' &&
        ((github.event.workflow_run.name != 'Build' && github.event.workflow_run.name != 'Server containers') ||
         (github.event.workflow_run.event == 'push' &&
          github.event.workflow_run.head_branch == github.event.repository.default_branch &&
          (github.event.workflow_run.name != 'Build' || github.event.workflow_run.head_sha == github.sha) &&
-         github.event.workflow_run.head_repository.full_name == github.repository)))
+         github.event.workflow_run.head_repository.full_name == github.repository))))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -90,6 +100,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      deployments: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -97,3 +108,50 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Retain recent Pages deployment history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/github_retention.py pages --repo "$GITHUB_REPOSITORY" --keep 3 --apply
+
+  maintenance:
+    name: Clean temporary packages and Pages history
+    if: github.event_name == 'workflow_dispatch' && inputs.maintenance_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      deployments: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.13'
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Inventory or clean the retired registry and Pages records
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY_CLEANUP: ${{ inputs.apply_cleanup }}
+        run: |
+          apply_args=()
+          if [ "$APPLY_CLEANUP" = "true" ]; then apply_args+=(--apply); fi
+          python3 scripts/github_retention.py registry --repo "$GITHUB_REPOSITORY" "${apply_args[@]}" --report target/retention/registry.json
+          python3 scripts/github_retention.py pages --repo "$GITHUB_REPOSITORY" --keep 3 "${apply_args[@]}" --report target/retention/pages.json
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: github-retention-report
+          path: target/retention/*.json

@@ -88,6 +88,13 @@ class SynologySiteTest(unittest.TestCase):
         result=self.build(preview=True)
         self.assertTrue(result['preview']['available']);self.assertEqual('full',result['preview']['validation'])
 
+    def test_uniform_installer_artifact_retains_its_smoke_validation_level(self):
+        self.fixture.container_jobs = set(site.release.WEB_PREVIEW_JOBS)
+        self.fixture.matrix_jobs = {'Server', 'Web', 'Packaging and channel tests', 'PR validation'}
+        result = self.build(preview=True)
+        self.assertTrue(result['preview']['available'])
+        self.assertEqual('web-smoke', result['preview']['validation'])
+
     def test_stable_catalog_requires_complete_report_and_links_to_immutable_release_asset(self):
         self.publish_fixture()
         result = self.build()

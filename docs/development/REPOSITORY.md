@@ -88,6 +88,11 @@ Both build workflows separate installable distributions from test results:
 | Server containers | `synology-test-results` | PostgreSQL 17 test reports and deployment acceptance results |
 
 For a DSM installation, download **synology-installer** from **Server containers**.
+Every main build, including UI-only and documentation-only changes, produces this
+artifact. **Synology latest** publishes the newest validated main SPK at the
+rolling `synology-latest` prerelease. That prerelease retains one build; versioned
+releases retain their assets. Older temporary SPK artifacts are removed after the
+replacement upload is verified.
 The Build workflow's Java ZIP is an alternative deployment format and contains
 no SPK. Earlier Build runs called this Java artifact `timekeeper-server`.
 
@@ -96,6 +101,9 @@ Test results are retained even when validation fails. The Synology job downloads
 `server-compose` from the same run and reuses its tested server image. A preview
 installer is still identified by its `1.99.0-<revision>` version and metadata;
 the artifact name stays `synology-installer`.
+
+CI bundles the application image into the SPK and deployment image archive. It no
+longer publishes the `eclipse-timekeeper-server` registry package.
 
 ## Agent-assisted development
 

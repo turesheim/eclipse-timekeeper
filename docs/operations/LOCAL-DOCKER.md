@@ -187,9 +187,8 @@ docker compose up -d --no-deps --wait --wait-timeout 180 api-1 api-2
 ```
 
 This development update can briefly interrupt requests. For rolling updates,
-use a server image in a registry: once the server image is published, set
-`TIMEKEEPER_SERVER_IMAGE=ghcr.io/turesheim/eclipse-timekeeper-server:edge` in
-`.env`, then run:
+publish your built image to a registry you manage, set
+`TIMEKEEPER_SERVER_IMAGE` in `.env` to that image, then run:
 
 ```sh
 sh update.sh
@@ -202,7 +201,7 @@ PostgreSQL stays running. Run `update.sh` again whenever you want to check for
 a newer image, or schedule it using your operating system's scheduler.
 
 The updater pulls from a registry; it cannot update the local-only
-`timekeeper-server:local` tag. `edge` follows tested main builds. For a fixed
-version, use an immutable `sha-<full-commit>` image tag. If GHCR access is denied,
-authenticate with `docker login ghcr.io` using an account with package access,
-or use the source-build setup above.
+`timekeeper-server:local` tag. CI no longer publishes the
+`eclipse-timekeeper-server` registry package. Use the source-build update above
+or load a newer `server-compose` image archive from CI. The Synology distribution
+contains its own immutable image.

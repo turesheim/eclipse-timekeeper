@@ -408,7 +408,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: write
     uses: ./.github/workflows/server-containers.yml
     with:
       h2_verified: true

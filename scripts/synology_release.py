@@ -21,6 +21,7 @@ EVIDENCE = 'timekeeper-dsm-release.json'
 INSTALLER_ARTIFACT_NAMES = {'synology-installer', 'synology-preview-candidate'}
 WEB_PREVIEW_ARTIFACT = 'synology-web-preview'
 WEB_PREVIEW_JOBS = {'Synology web preview', 'Deployment startup and bundled web', 'Build shared server image'}
+FULL_CANDIDATE_JOBS = {'verify', 'Synology candidate and PostgreSQL 17'}
 # A server-only main build deliberately skips the Eclipse platform matrix.
 # NAS promotion still requires every server, web, packaging and publication gate.
 MATRIX_JOBS = {'API-contract', 'Server', 'Web', 'Packaging and channel tests',
@@ -95,7 +96,11 @@ def candidate_artifact(repo, run_id, branch, commit, allow_web_preview=False):
     if len(found) != 1:
         raise ValueError('Ambiguous Synology candidate artifacts')
     artifact = found[0]
-    required = WEB_PREVIEW_JOBS if artifact['name'] == WEB_PREVIEW_ARTIFACT else {'verify', 'Synology candidate and PostgreSQL 17'}
+    # The installer name is stable across validation levels. Promotion still
+    # requires full certification; only preview consumers may accept smoke jobs.
+    passed = passed_jobs(repo, run_id)
+    required = (WEB_PREVIEW_JOBS if allow_web_preview and not FULL_CANDIDATE_JOBS.issubset(passed)
+                else FULL_CANDIDATE_JOBS)
     require_jobs(repo, run_id, required)
     source = artifact.get('workflow_run', {})
     if source.get('id') != run_id or source.get('head_sha') != commit or source.get('head_branch') != branch:
