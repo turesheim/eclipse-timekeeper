@@ -55,6 +55,7 @@ class SynologyPackageTest(unittest.TestCase):
               'precheckstartstop':'yes','checksum':checksum or hashlib.md5(payload,usedforsecurity=False).hexdigest()}
         if install_type is not None:info['install_type']=install_type
         files={name:b'#!/bin/sh\nexit 0\n' for name in REQUIRED}
+        files['scripts/backup/version']=b'1.0\n'
         files.update(migrations)
         helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
         files.update({'INFO':''.join(key+'='+json.dumps(value)+'\n' for key,value in info.items()).encode(),
@@ -105,6 +106,11 @@ class SynologyPackageTest(unittest.TestCase):
                 self.assertEqual(validate(package)['imageId'],provenance['imageId'])
                 self.assertEqual(package_id,validate(package)['package'])
                 with tarfile.open(package) as outer,tarfile.open(fileobj=io.BytesIO(outer.extractfile('package.tgz').read()),mode='r:gz') as inner:
+                    self.assertEqual(b'1.0\n',outer.extractfile('scripts/backup/version').read())
+                    for callback in ('export','import'):
+                        member=outer.getmember('scripts/backup/'+callback)
+                        self.assertTrue(member.mode & 0o111)
+                        self.assertIn(('hyper-backup-'+callback).encode(),outer.extractfile(member).read())
                     self.assertEqual((ROOT/'server/scripts/webdav_sync.py').read_bytes(),inner.extractfile('webdav_sync.py').read())
                     self.assertIn('/dav/notes/',inner.extractfile('NOTES-WEBDAV.md').read().decode())
                     guide=inner.extractfile('README.md').read().decode()

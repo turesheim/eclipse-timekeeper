@@ -16,6 +16,7 @@ from synology_acceptance import RECORD, content_digest, validate_record
 REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.tgz',
             'conf/privilege','conf/resource','WIZARD_UIFILES/install_uifile.sh',
             'scripts/timekeeper-dsm','scripts/release.json',
+            'scripts/backup/export','scripts/backup/import','scripts/backup/version',
             'scripts/migration/postgresql-shape.sql','scripts/migration/schema-v2-postgresql.shape',
             'scripts/migration/schema-v3-postgresql.shape','scripts/migration/schema-v4-postgresql.shape','scripts/migration/schema-v5-postgresql.shape','scripts/migration/schema-v6-postgresql.shape','scripts/migration/schema-v7-postgresql.shape','scripts/migration/schema-v8-postgresql.shape','scripts/migration/schema-v9-postgresql.shape','scripts/migration/schema-v10-postgresql.shape',
             'scripts/migration/recovery-v3.sql','scripts/migration/passkeys-v4.sql','scripts/migration/settings-v5.sql','scripts/migration/locale-v6.sql','scripts/migration/day-labels-v7.sql','scripts/migration/day-note-history-v8.sql','scripts/migration/instance-v9.sql','scripts/migration/notes-v10.sql',
@@ -79,6 +80,11 @@ def validate(path):
         for name in REQUIRED:
             if name.startswith('scripts/') and '/' not in name[len('scripts/'):] and name!='scripts/release.json' and not members[name].mode & 0o111:
                 raise ValueError('Package controller is not executable')
+        for name in ('export','import'):
+            if not members['scripts/backup/'+name].mode & 0o111:
+                raise ValueError('Hyper Backup application callback is not executable')
+        if read('scripts/backup/version')!=b'1.0\n':
+            raise ValueError('Unsupported Hyper Backup application data version')
         privilege=json.loads(read('conf/privilege'))
         if privilege!={'defaults':{'run-as':'package'},'username':package_id,'groupname':package_id}:
             raise ValueError('Installer must use the unprivileged package account')

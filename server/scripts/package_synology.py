@@ -114,6 +114,8 @@ def build(output, commit, image, revision, channel, package_id="timekeeper"):
             if source.is_file():
                 shutil.copyfile(source, outer/'scripts'/source.name)
                 (outer/'scripts'/source.name).chmod(0o755)
+        shutil.copytree(package/'scripts/backup', outer/'scripts/backup')
+        for name in ('export','import'):(outer/'scripts/backup'/name).chmod(0o755)
         (outer/'scripts/migration').mkdir()
         for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','schema-v9-postgresql.shape','schema-v10-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql','instance-v9.sql','notes-v10.sql'):
             shutil.copyfile(ROOT/'server/app/src/main/resources/db'/name,outer/'scripts/migration'/name)

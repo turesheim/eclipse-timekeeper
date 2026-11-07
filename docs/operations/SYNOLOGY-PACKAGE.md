@@ -250,6 +250,58 @@ and container; retained files and all 14 database table fingerprints were
 unchanged. This does not replace the remaining NAS acceptance scenarios required
 for stable publication.
 
+## Hyper Backup application backup
+
+The preview SPK includes Hyper Backup application callbacks. In Hyper Backup,
+create or edit a **Folders and Packages** task and select **Dagsverk** on the
+**Applications** page (or **Timekeeper** for the compatibility package). Select a
+destination, schedule, version retention and encryption in Hyper Backup. No
+shared folder selection, Dagsverk browser session or stored administrator password
+is needed. Real DSM application discovery and backup/restore acceptance remain
+required before this integration is described as supported.
+
+Each callback creates a fresh, complete native recovery archive, including all
+accounts, business data, attachments, settings and the active recovered security
+material. It uses the same archive and validation as the native commands below.
+This is separate from the encrypted `.tkbackup` download in Administration.
+**Enable Hyper Backup client-side encryption** when protecting the destination:
+the native archive contains plaintext credentials, and its confidentiality and
+retention are managed by Hyper Backup. Keep Hyper Backup's recovery key separately.
+
+Backup briefly stops the selected package and restarts it if it was running.
+An already stopped package stays stopped. PostgreSQL remains running and all
+other clients of the selected application database must be stopped. Only the
+selected package is controlled; other packages/databases are not stopped. A
+concurrent callback is refused. Failed exports are reported to Hyper Backup and
+do not publish a partial archive.
+
+Restore through Hyper Backup's **Data** restore workflow, choosing the backup
+version and application. The destination package must already be installed and
+provisioned with a compatible PostgreSQL 17 database. Restore replaces its
+application/account data using the existing offline transaction and checksums,
+while retaining the destination service role/password, address and port. It
+restores the matching active security material as part of the same maintenance
+workflow. If the package was running, successful restore starts it again. Failed
+restore leaves it stopped; follow native recovery below and retry the same backup.
+An interrupted restore retains a private `.hyper-backup-import-*.tar` under
+`server/backups` while its maintenance marker remains. Keep that archive and
+marker until recovery completes.
+
+The root callback handles only package lifecycle and Hyper Backup staging file
+descriptors. Archive creation and parsing run under the package's own numeric
+UID/GID, with a controlled environment. Dagsverk gains no Docker socket or host
+administrator access. Hyper Backup staging receives only the completed native
+archive; uploads, decrypted instance workspaces and uncommitted handoffs are
+excluded.
+
+Before stable publication, verify on the supported NAS that both package
+identities appear independently in Applications, callbacks receive DSM's actual
+request/privilege environment, successful backup preserves the original package
+state, and restore recovers data and active material. Also exercise a failed
+export, a corrupt import, interruption/retry, and destination recovery with a new
+service credential. Linux acceptance simulates DSM package lifecycle; it does not
+prove Hyper Backup UI integration.
+
 ## Native backup and restore
 
 Stop Timekeeper in Package Center before backing up or restoring. The maintenance

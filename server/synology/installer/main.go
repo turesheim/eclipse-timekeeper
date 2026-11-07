@@ -115,8 +115,12 @@ func ready(root string) error {
 	return nil
 }
 func run(action, root, target, releasePath string, env func(string) string, argument string) error {
-	if env("SYNOPKG_PKGNAME") != packageID {
+	hyper := action == "hyper-backup-export" || action == "hyper-backup-import"
+	if env("SYNOPKG_PKGNAME") != packageID && !(hyper && env("SYNOPKG_PKGNAME") == "") {
 		return errors.New("Run this helper through DSM Package Center")
+	}
+	if hyper {
+		return hyperBackup(action, env("SYNOPKG_BKP_INPUT"), root, releasePath)
 	}
 
 	if action == "wizard" {
@@ -126,6 +130,10 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 		return uninstallWizard(os.Stdout, root)
 	}
 	switch action {
+	case "application-export":
+		return applicationExport(root, os.Stdout)
+	case "application-import":
+		return applicationImport(root, releasePath, os.Stdin)
 	case "backup":
 		path, err := backup(root)
 		if err == nil {
@@ -223,7 +231,7 @@ func main() {
 		os.Exit(1)
 	}
 	if len(os.Args) < 2 || len(os.Args) > 3 || (len(os.Args) == 3 && os.Args[1] != "restore" && os.Args[1] != "import-postgresql18") {
-		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop, status, backup, restore /absolute/backup.tar, import-postgresql18 /absolute/migration.tar or cancel-empty-import")
+		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop, status, backup, restore /absolute/backup.tar, import-postgresql18 /absolute/migration.tar or cancel-empty-import; application backup callbacks are invoked by Hyper Backup")
 		os.Exit(2)
 	}
 	executable, err := os.Executable()

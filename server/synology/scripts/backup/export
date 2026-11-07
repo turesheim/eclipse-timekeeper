@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+. /usr/syno/bin/jsoncmd
+if ! "$(dirname "$0")/../timekeeper-dsm" hyper-backup-export; then
+    jerr "Dagsverk application backup failed. Check the package and PostgreSQL status."
+    exit 1
+fi
+jout_begin
+joutstr "app_data_version" "1.0"
+jout_end
