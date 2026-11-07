@@ -61,7 +61,10 @@ test('day note menus stay beside the press after scrolling and fit the viewport 
   try{
     await signIn(page,await fresh(request));await month(page);
     for(const date of ['2026-05-11','2026-05-31']){
-      const cell=day(page,date);await cell.evaluate(node=>node.scrollIntoView({block:'end',behavior:'instant'}));
+      // Align the row to the top so even the earlier date requires scrolling
+      // when the compact calendar controls leave it visible at the origin.
+      const cell=day(page,date);await cell.evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));
+      await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(0);
       // Calendar metadata can finish laying out between reading a viewport
       // position and pressing. Let Playwright verify a stable, exposed target,
       // then check placement against the actual press's viewport coordinates.
