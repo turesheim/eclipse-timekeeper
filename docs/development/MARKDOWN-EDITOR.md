@@ -31,6 +31,11 @@ the separate About prototype and its scratchpad controls have been retired.
   decorations. It lazy-loads only for code content, preserving the block's
   authored source. Pinned highlight.js grammars supply validated decoration
   ranges; unknown languages and fences over 200,000 characters remain plain.
+  `shell` fences use the Bash script grammar without requiring a prompt;
+  `console` and `shellsession` retain the prompt-aware transcript grammar.
+  Arrow Down from the last visual line, Arrow Right at the end, or clicking below
+  a final code block moves to following prose. An empty trailing caret paragraph
+  does not change the authored Markdown until text is entered.
   The top-right badge groups language selection and copying. Theme surfaces stay
   unchanged; token foregrounds blend existing semantic and body-text colors.
 - Emoji shortcodes use a micromark token and an inline atom, preserving the
