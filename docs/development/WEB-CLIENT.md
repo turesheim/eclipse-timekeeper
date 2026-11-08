@@ -1130,11 +1130,15 @@ widths; other engines check their naturally reported inset.
 
 Notes navigation, editor headings and Today’s Recent notes use the API’s display
 title: event titles for event notes and the first document heading for ordinary
-notes, with filename/path fallbacks. Name sorting follows the displayed title.
+notes, with the filename minus its `.md` suffix as the fallback. Folder names and
+other file extensions retain their literal names. Name sorting follows the displayed title.
 Collection paths remain available for identification and keep their existing
 synchronization and link semantics.
 
-Today’s Recent notes includes ordinary, event and daily/weekly journal notes.
+Today’s Recent notes includes ordinary, event and daily/weekly journal notes,
+excluding today's daily journal note in the account time zone. Entries use a
+single borderless title row without a path below it. The editable typography
+constant `--font-today-recent-note` controls their text size (default `.875rem`).
 Each title starts with a locally bundled file, calendar-event or journal icon;
 localized type text is available to screen readers and in the tooltip. Selection
 still uses the shared draft guard and opens the canonical document in Notes.

@@ -1142,13 +1142,16 @@ Notes entry metadata includes an optional read-only `title`: the associated even
 title for event notes, or the first nonempty document-level Markdown heading
 (ATX or Setext) for ordinary notes. Heading formatting is reduced to plain text;
 frontmatter, code examples and quoted headings do not supply a document title.
-Titles are bounded to 4,096 characters. Clients fall back to the filename/path
-when no title is available. Title reads do not modify canonical Markdown bytes,
+Titles are bounded to 4,096 characters. The browser falls back to the filename
+without its `.md` suffix when no title is available. Title reads do not modify canonical Markdown bytes,
 filenames, note versions or write validators.
 
 `GET /notes/recent` includes ordinary, event and daily/weekly journal note metadata
-within the configured account-local recent-edit window. It excludes folders,
-attachments and trash. Results use stable edit-time ordering and guarded snapshot
+within the configured account-local recent-edit window. It excludes today's
+daily journal note, identified by its canonical date in the account time zone,
+as well as folders, attachments and trash. The exclusion applies before paging,
+independently of the selected Today date or the configured journal folder.
+Results use stable edit-time ordering and guarded snapshot
 pagination; upgrading the selection policy also invalidates an older snapshot.
 An unused account stays uninitialized; existing canonical event/journal notes
 are indexed on the first recent-list read when needed.

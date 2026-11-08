@@ -30,9 +30,8 @@ final class RecentNotes {
         var settings=new VaultSettings(store).get();int days=settings.path("recentNotesDays").asInt();
         var window=window(store.now(),ZoneId.of(store.profile().path("zoneId").asText()),days);
         var vault=new VaultCollection(store,limits);
-        // Invalidate pages issued by the old journal-excluding selection policy
-        // even when the collection itself did not change during an upgrade.
-        var context=object().put("selectionVersion",2).put("generation",vault.generation()).put("days",days).put("zoneId",window.zone().getId())
+        // Fence pages from older selection policies even without document edits.
+        var context=object().put("selectionVersion",3).put("generation",vault.generation()).put("days",days).put("zoneId",window.zone().getId())
                 .put("fromDate",window.first().toString()).put("toDate",window.last().toString());
         String snapshot=etag(context);
         if(expected!=null)VaultCollection.match(snapshot,expected);
@@ -41,6 +40,7 @@ final class RecentNotes {
         Instant from=window.from(),until=window.until();
         var entries=new VaultIndex(store).search("",false).stream()
                 .filter(entry->Set.of("MARKDOWN","EVENT","DAY","WEEK").contains(entry.path("kind").asText()))
+                .filter(entry->!DayNotes.TYPE.equals(entry.path("sourceType").asText())||!DayNotes.id(window.last()).toString().equals(entry.path("sourceId").asText()))
                 .filter(entry->configuration||!VaultSettings.configurationPath(VaultCollection.path(entry)))
                 .filter(entry->{var modified=Instant.parse(entry.path("modifiedAt").asText());return !modified.isBefore(from)&&modified.isBefore(until);})
                 .sorted(Comparator.<ObjectNode,Instant>comparing(entry->Instant.parse(entry.path("modifiedAt").asText())).reversed()

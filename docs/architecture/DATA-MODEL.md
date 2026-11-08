@@ -746,12 +746,14 @@ archives, but not notes-only ZIP exports.
 `GET /api/v1/notes/recent` returns owner-private index metadata rather than
 document or attachment bodies. It includes active ordinary, event and daily/weekly
 journal notes edited from the first local midnight through the end of today,
-excluding assets, folders and trash. Journal dates do not determine eligibility;
-the edit instant does. Results sort by edit
+excluding assets, folders, trash and the daily journal note for the current
+account-local date. Other journal dates use the edit instant for eligibility.
+The exclusion uses the canonical source identity, so a custom journal folder or
+an ordinary document with the same filename does not change it. Results sort by edit
 instant descending, then normalized path and identity. The pagination snapshot
 binds the collection generation, day range, time zone and preference; subsequent
 pages require it in `If-Match`. The selection policy is versioned in the opaque
-snapshot, so an upgrade from the old journal-excluding policy invalidates pages.
+snapshot, so an upgrade of the selection policy invalidates pages.
 Midnight and time-zone changes invalidate pages
 even when no note has changed.
 

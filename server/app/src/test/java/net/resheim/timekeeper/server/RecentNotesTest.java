@@ -40,6 +40,7 @@ class RecentNotesTest {
             vault.put(new VaultPath("Notes/image.png"),null,true,new byte[]{0,1,2});
             var deleted=vault.put(new VaultPath("Notes/Deleted.md"),null,true,bytes("deleted"));vault.delete(deleted,vault.tag(deleted));
             vault.put(new VaultPath("journal/2026-11-05.md"),null,true,bytes("day"));vault.put(new VaultPath("journal/2026-W45.md"),null,true,bytes("week"));
+            vault.put(new VaultPath("journal/2026-11-04.md"),null,true,bytes("previous day"));
             vault.put(new VaultPath("journal/Private.md"),null,true,bytes("private journal"));
             vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Journal"));
             var key=new EventNotes.Key(UUID.randomUUID(),"ab".repeat(32));var events=new EventNotes(store);
@@ -51,10 +52,10 @@ class RecentNotesTest {
             assertFalse(first.toString().contains("private body"));assertFalse(first.toString().contains("meeting note"));
             assertEquals(7,first.path("days").asInt());assertEquals("2026-10-30",first.path("fromDate").asText());assertEquals("2026-11-05",first.path("toDate").asText());
             String snapshot=first.path("snapshot").asText();var second=recent.page(2,2,snapshot);
-            var oldContext=first.deepCopy();oldContext.remove(List.of("items","snapshot","nextOffset"));oldContext.put("generation",vault.generation());
+            var oldContext=first.deepCopy();oldContext.remove(List.of("items","snapshot","nextOffset"));oldContext.put("selectionVersion",2).put("generation",vault.generation());
             assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(2,2,etag(oldContext))).status);
             assertEquals("DAY",second.path("items").get(0).path("kind").asText());assertEquals("WEEK",second.path("items").get(1).path("kind").asText());
-            assertEquals("Private/Journal/2026-11-05.md",second.path("items").get(0).path("path").asText());
+            assertEquals("Private/Journal/2026-11-04.md",second.path("items").get(0).path("path").asText());
             var third=recent.page(4,2,snapshot);assertEquals("Private/Journal/Private.md",third.path("items").get(0).path("path").asText());assertEquals("Notes/A.md",third.path("items").get(1).path("path").asText());
             var last=recent.page(6,2,snapshot);assertEquals(2,last.path("items").size());assertEquals("Notes/B.md",last.path("items").get(0).path("path").asText());assertEquals("Notes/Boundary.md",last.path("items").get(1).path("path").asText());assertFalse(last.has("nextOffset"));
             assertEquals(428,assertThrows(ApiFailure.class,()->recent.page(2,2,null)).status);
@@ -71,6 +72,22 @@ class RecentNotesTest {
             String midnight=recent.page(0,1,null).path("snapshot").asText();store.updateProfile("UTC");assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(0,1,midnight)).status);
             String zone=recent.page(0,1,null).path("snapshot").asText();new VaultCollection(store,limits).configure(etag(new VaultSettings(store).get()),object().put("recentNotesDays",1));
             assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(0,1,zone)).status);return null;
+        });
+    }
+    @Test void todaysJournalIsExcludedByCanonicalIdentityInTheAccountZoneBeforePaging(){
+        clock.set(Instant.parse("2026-11-05T00:30:00Z"));
+        store.transaction("recent-today-identity",()->{
+            store.updateProfile("America/Los_Angeles");var vault=new VaultCollection(store,limits);vault.initialize();vault.mkdir(new VaultPath("Notes"));
+            vault.put(new VaultPath("journal/2026-11-04.md"),null,true,bytes("account today"));
+            vault.put(new VaultPath("journal/2026-11-05.md"),null,true,bytes("UTC today"));
+            vault.put(new VaultPath("Notes/2026-11-04.md"),null,true,bytes("ordinary document with today's name"));
+            vault.configure(etag(new VaultSettings(store).get()),object().put("journalFolder","Private/Diary"));
+            var recent=new RecentNotes(store,limits);var page=recent.page(0,2,null);
+            assertEquals(Set.of("Private/Diary/2026-11-05.md","Notes/2026-11-04.md"),new HashSet<>(List.of(page.path("items").get(0).path("path").asText(),page.path("items").get(1).path("path").asText())));
+            assertFalse(page.has("nextOffset"));String before=page.path("snapshot").asText();
+            store.updateProfile("UTC");assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(0,2,before)).status);
+            page=recent.page(0,2,null);assertTrue(page.path("items").toString().contains("Private/Diary/2026-11-04.md"));assertFalse(page.path("items").toString().contains("Private/Diary/2026-11-05.md"));
+            return null;
         });
     }
     @Test void emptyHttpReadsDoNotMaterializeBusinessRecordsOrChangeRevision(){
@@ -99,11 +116,11 @@ class RecentNotesTest {
             assertEquals(1,recent.path("items").size());assertEquals("EVENT",recent.path("items").get(0).path("kind").asText());return null;
         });
         store.transaction("recent-legacy-journal",()->{
-            var notes=new DayNotes(store);var day=DayNotes.date("2026-11-05");notes.saveDocument(day,etag(notes.getContent(day)),bytes("Journal body"));
+            var notes=new DayNotes(store);var day=DayNotes.date("2026-11-04");notes.saveDocument(day,etag(notes.getContent(day)),bytes("Journal body"));
             assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());
             var recent=new RecentNotes(store,limits).page(0,2,null);inputs.validate("RecentNotesPage",recent);
             assertEquals(1,recent.path("items").size());assertEquals("DAY",recent.path("items").get(0).path("kind").asText());
-            assertEquals("journal/2026-11-05.md",recent.path("items").get(0).path("path").asText());assertFalse(recent.toString().contains("Journal body"));return null;
+            assertEquals("journal/2026-11-04.md",recent.path("items").get(0).path("path").asText());assertFalse(recent.toString().contains("Journal body"));return null;
         });
         store.transaction("recent-legacy-week",()->{
             var notes=new WeekNotes(store);var week=WeekNotes.week("2020-W01");notes.saveDocument(week,etag(notes.get(week)),bytes("Weekly body"));

@@ -40,7 +40,7 @@ test('dragging a document into a folder preserves its draft, identity and conten
   const from=await source.boundingBox(),to=await target.boundingBox();await page.mouse.move(from.x+20,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+40,from.y+from.height/2,{steps:5});
   await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
   await page.mouse.move(to.x+20,to.y+to.height/2,{steps:10});await page.mouse.move(to.x+21,to.y+to.height/2);await page.mouse.up();
-  await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Archive/Review.md');await expect(page.locator('#notes-body')).toHaveValue(draft);
+  await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();await expect(page.locator('#notes-document-title')).toHaveText('Review');await expect(page.locator('#notes-body')).toHaveValue(draft);
   const moved=await(await api('GET','/notes/entries/'+entry.id)).json();expect(moved.path).toBe('Notes/Archive/Review.md');expect(moved.id).toBe(entry.id);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(draft);
   await expect(page.locator('#notes-panel').getByText('Moved to Notes/Archive/Review.md.',{exact:true})).toHaveAttribute('role','status');
   await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
