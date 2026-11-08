@@ -13,14 +13,13 @@ export function wikiCompletion(text,at){
 
 /** Source stays literal inside fences, indented code, inline code and destinations. */
 export function literalBracketContext(text,at){
-  let fence=null,line='';
+  let fence=null,line='',delimiter=0,onFence=false;
   for(const current of text.slice(0,at).split(/\r\n|\n|\r/)){
-    line=current;const marker=current.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
-    if(fence){if(marker&&marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;}
-    else if(marker&&!(/`/.test(marker[2])&&marker[1][0]==='`'))fence=marker[1];
+    line=current;onFence=false;const marker=current.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if(fence){onFence=true;if(marker&&marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;continue;}
+    if(marker&&!(/`/.test(marker[2])&&marker[1][0]==='`')){fence=marker[1];delimiter=0;onFence=true;continue;}
+    if(!current.trim())delimiter=0;
+    for(const match of current.matchAll(/`+/g)){if(!delimiter&&escapedBracket(current,match.index))continue;if(!delimiter)delimiter=match[0].length;else if(match[0].length===delimiter)delimiter=0;}
   }
-  if(fence||/^(?: {4}|\t)/.test(line)&&!/^\s*(?:[-+*]|\d+[.)])\s/.test(line))return true;
-  let delimiter=0;
-  for(const match of line.matchAll(/`+/g)){if(escapedBracket(line,match.index))continue;if(!delimiter)delimiter=match[0].length;else if(match[0].length===delimiter)delimiter=0;}
-  return !!delimiter||/\]\([^)]*$/.test(line)||escapedBracket(text,at)||text[at-1]==='['&&escapedBracket(text,at-1);
+  return !!(fence||onFence||/^(?: {4}|\t)/.test(line)&&!/^\s*(?:[-+*]|\d+[.)])\s/.test(line)||delimiter||/\]\([^)]*$/.test(line)||escapedBracket(text,at)||text[at-1]==='['&&escapedBracket(text,at-1));
 }

@@ -259,8 +259,10 @@ test('bracket assistance leaves code, escaped links and read-only documents lite
   for(const formatted of [true,false]){
     for(const code of ['```text\nliteral\n```\n','`literal`\n']){
       await field(page,code,formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');
-      if(formatted)await appendEditorText(edit.locator('code'),'[[]]');else{await edit.focus();await edit.evaluate(node=>{const at=node.value.indexOf('literal')+7;node.setSelectionRange(at,at);});await page.keyboard.type('[[]]');}
-      await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('literal[[]]');
+      if(formatted)await edit.locator('code').evaluate(node=>{node.closest('[contenteditable=true]').focus();const text=document.createTreeWalker(node,NodeFilter.SHOW_TEXT).nextNode(),range=document.createRange();range.setStart(text,3);range.collapse(true);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
+      else{await edit.focus();await edit.evaluate(node=>{const at=node.value.indexOf('literal')+3;node.setSelectionRange(at,at);});}
+      const literal=formatted?edit.locator('code'):edit;await page.keyboard.type('[');expect(await literal.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toContain('lit[eral');await page.keyboard.type('[');expect(await literal.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toContain('lit[[eral');
+      await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await page.keyboard.type('Design]]');await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('lit[[Design]]eral');
     }
     await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('\\[[Design]]');
     await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);
