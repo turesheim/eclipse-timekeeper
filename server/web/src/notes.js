@@ -81,10 +81,12 @@ export class NotesView {
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
     this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>!!this.session&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(this.editor,this.autosave);
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
-    document.addEventListener('timekeeper:notes-changed',()=>{this.info=null;this.folder=null;if(this.session)this.callbacks.onChanged?.();});
+    document.addEventListener('timekeeper:notes-changed',()=>{if(this.dragPending||this.dragged)this.reloadAfterDrag=true;else{this.info=null;this.folder=null;}if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
     window.visualViewport?.addEventListener('resize',()=>this.fit());
     this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
+    this.navigation.addEventListener('pointerdown',event=>{if(event.button===0&&event.target.closest?.('.notes-tree-pick')?.draggable)this.dragPending=true;});
+    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.dragPending&&!this.dragged)this.clearDrag();});
     this.navigation.addEventListener('dragstart',event=>{
       const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
       if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading){event.preventDefault();return;}
@@ -116,7 +118,11 @@ export class NotesView {
   show(){this.visible=true;window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
   hide(){this.visible=false;this.clearDrag();}
   clearDropTarget(){this.navigation.classList.remove('notes-drop-target');for(const node of this.navigation.querySelectorAll('.notes-drop-target'))node.classList.remove('notes-drop-target');}
-  clearDrag(){this.dragged=null;this.clearDropTarget();}
+  clearDrag(){
+    const refresh=this.reloadAfterDrag,session=this.session;this.dragged=null;this.dragPending=false;this.reloadAfterDrag=false;this.clearDropTarget();
+    // Let the associated click/drop finish before replacing any tree nodes.
+    if(refresh)setTimeout(()=>{if(this.visible&&this.session===session&&!this.busy)void this.reload();},0);
+  }
   dropTarget(event){
     const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.loading||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
     const source=this.entries.get(drag.id),row=event.target.closest?.('[role=treeitem]');
@@ -186,6 +192,7 @@ export class NotesView {
     return rows;
   }
   async reload(retry=0){
+    if(this.dragPending||this.dragged){this.reloadAfterDrag=true;return;}
     if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1,expandAll=this.expandAllRequested,expanded=new Set(this.expanded);this.loadGeneration=current;this.loading=true;this.controls();
     try{
       const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
@@ -199,6 +206,7 @@ export class NotesView {
   }
   paint(){
     if(!this.info)return;
+    if(this.dragPending||this.dragged){this.reloadAfterDrag=true;return;}
     const focused=this.tree.querySelector(':focus')?.dataset.id;this.tree.replaceChildren();
     const append=(parent,host)=>{for(const entry of sortedNotes(this.children.get(parent)||[],this.sortOrder,getLocale())){
       const folder=entry.kind==='FOLDER',row=node('div',undefined,'notes-tree-row');row.setAttribute('role','treeitem');row.setAttribute('aria-selected',String(this.note?.id===entry.id));row.dataset.id=entry.id;row.tabIndex=-1;

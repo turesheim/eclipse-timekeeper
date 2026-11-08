@@ -24,12 +24,17 @@ test('dragging a document into a folder preserves its draft, identity and conten
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   const source=noteEntry(navigation,'Notes/Review.md'),target=noteEntry(navigation,'Notes/Archive');await source.click();
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();const draft='Preserved drag-and-drop draft.\n';await page.locator('#notes-body').fill(draft);
-  await expect(source).toHaveAttribute('draggable','true');await source.dragTo(target);
+  await expect(source).toHaveAttribute('draggable','true');
+  const from=await source.boundingBox(),to=await target.boundingBox();await page.mouse.move(from.x+20,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+40,from.y+from.height/2,{steps:5});
+  await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
+  await page.mouse.move(to.x+20,to.y+to.height/2,{steps:10});await page.mouse.move(to.x+21,to.y+to.height/2);await page.mouse.up();
   await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Archive/Review.md');await expect(page.locator('#notes-body')).toHaveValue(draft);
   const moved=await(await api('GET','/notes/entries/'+entry.id)).json();expect(moved.path).toBe('Notes/Archive/Review.md');expect(moved.id).toBe(entry.id);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(draft);
   await expect(page.locator('#notes-panel').getByText('Moved to Notes/Archive/Review.md.',{exact:true})).toHaveAttribute('role','status');
   await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();
+  const movedSource=noteEntry(navigation,'Notes/Archive/Review.md'),box=await navigation.boundingBox();await movedSource.dragTo(navigation,{targetPosition:{x:10,y:box.height-10}});
+  await expect(noteEntry(navigation,'Review.md')).toBeVisible();expect((await(await api('GET','/notes/entries/'+entry.id)).json()).path).toBe('Review.md');await expect(page.locator('#notes-body')).toHaveValue(draft);
 });
 
 test('a conflicting document drop cannot replace either file',async({page,request})=>{
