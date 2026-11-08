@@ -34,7 +34,7 @@ export class NotesFolderImport {
     const overwriteLabel=node('label',t('notes.import_overwrite'));overwriteLabel.className='form-check-label';overwriteLabel.htmlFor=this.overwrite.id;
     const overwriteControl=node('div');overwriteControl.className='form-check';overwriteControl.append(this.overwrite,overwriteLabel);
     const overwriteHelp=node('p',t('notes.import_overwrite_help'));overwriteHelp.className='hint';
-    this.overwrite.addEventListener('change',()=>{for(const row of this.rows)if(row.existing&&!row.blocked&&!row.stale&&row.status!=='imported'){row.status=this.overwrite.checked?'ready':'conflict';row.selected=this.overwrite.checked;}this.owner.changed();this.reviewStatus();this.render();});
+    this.overwrite.addEventListener('change',()=>{for(const row of this.rows)if(row.existing&&!row.blocked&&!row.stale&&row.status!=='imported'){row.status=this.overwrite.checked?'ready':'conflict';row.selected=this.overwrite.checked&&!row.excluded;}this.owner.changed();this.reviewStatus();this.render();});
     this.button=button(t('notes.choose_folder'),()=>this.input.click());this.button.id='notes-import-folder';
     this.reviewPanel=node('div');this.reviewPanel.className='notes-import-review';this.reviewPanel.hidden=true;
     this.status=node('p');this.status.setAttribute('role','status');
@@ -76,7 +76,7 @@ export class NotesFolderImport {
         const entry=node('li'),line=node('div');line.className='notes-import-row';
         const label=node('label'),input=node('input');input.type='checkbox';input.className='form-check-input';input.setAttribute('aria-label',row.path+(row.folder?'/':''));
         const title=node('span',(row.path.split('/').at(-1)||row.file?.name)+(row.folder?'/':''));title.className='notes-import-path';label.append(input,title);line.append(label);row.checkbox=input;row.label=node('span');row.label.className='notes-import-status';line.append(row.label);entry.append(line);host.append(entry);
-        input.addEventListener('change',()=>{const select=value=>{if(eligible(value))value.selected=input.checked;for(const child of value.children||[])select(child);};select(row);this.owner.changed();this.reviewStatus();this.render();});
+        input.addEventListener('change',()=>{const select=value=>{value.excluded=!input.checked;if(eligible(value))value.selected=input.checked;for(const child of value.children||[])select(child);};select(row);this.owner.changed();this.reviewStatus();this.render();});
         if(row.folder){const list=node('ul');entry.append(list);append(row.children,list);}
       }
     };append(roots,this.list);this.tree=roots;

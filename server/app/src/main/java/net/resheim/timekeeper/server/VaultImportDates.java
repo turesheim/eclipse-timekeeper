@@ -23,8 +23,10 @@ record VaultImportDates(Instant createdAt,Instant modifiedAt,String createdAtSou
         try{var instant=Instant.parse(value);int year=instant.atOffset(java.time.ZoneOffset.UTC).getYear();if(year<1||year>9999)throw ApiFailure.validation();return instant;}catch(DateTimeParseException invalid){throw ApiFailure.validation();}
     }
     ObjectNode apply(ServerStore store,ObjectNode entry){
-        if(createdAt==null&&modifiedAt==null)return entry;
-        if(modifiedAt!=null&&!VaultCollection.folder(entry)){
+        boolean creationChanged=createdAt!=null&&(!createdAt.toString().equals(entry.path("createdAt").asText())||!createdAtSource.equals(entry.path("createdAtSource").asText()));
+        boolean modificationChanged=modifiedAt!=null&&!modifiedAt.toString().equals(entry.path("modifiedAt").asText());
+        if(!creationChanged&&!modificationChanged)return entry;
+        if(modificationChanged&&!VaultCollection.folder(entry)){
             var ref=VaultSources.fromEntry(entry);
             var value=((ObjectNode)store.find(ref.type(),ref.id()).orElseThrow(ApiFailure::notFound)).deepCopy();
             value.put("modifiedAt",modifiedAt.toString());
@@ -34,6 +36,6 @@ record VaultImportDates(Instant createdAt,Instant modifiedAt,String createdAtSou
                 throw new ApiFailure(412,"STALE_VERSION");
             entry=new VaultIndex(store).content(VaultCollection.id(entry),new VaultSources(store,store.vaultLimits(),ref).snapshot(),entry.path("retainedBytes").asLong());
         }
-        return new VaultIndex(store).dates(VaultCollection.id(entry),createdAt,modifiedAt,createdAtSource);
+        return new VaultIndex(store).dates(VaultCollection.id(entry),creationChanged?createdAt:null,modificationChanged?modifiedAt:null,createdAtSource);
     }
 }

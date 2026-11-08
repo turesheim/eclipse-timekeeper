@@ -102,7 +102,8 @@ public class VaultResource {
         ContractInputs.queries(uri.getQueryParameters(),"createdAt","modifiedAt","createdAtSource");UUID entry=uuid(id);var dates=VaultImportDates.parse(created,modified,source);
         return tx(()->{var collection=vault();var current=collection.get(entry);VaultCollection.match(collection.metadataTag(current),match);
             if(current.path("deleted").asBoolean()||VaultCollection.folder(current))throw new ApiFailure(412,"STALE_VERSION");
-            var saved=dates.apply(store,collection.put(VaultCollection.path(current),collection.tag(current),false,bytes));
+            var written=collection.put(VaultCollection.path(current),collection.tag(current),false,bytes);var saved=dates.apply(store,written);
+            if(!saved.equals(written)){new VaultState(store,limits).changed(0,0,false);store.change("PROFILE","UPDATED",store.owner());}
             return Response.ok(collection.metadata(saved)).header("ETag",collection.metadataTag(saved)).build();});
     }
     @PUT @Path("/entries/{id}/path") @Consumes("application/json") public Response move(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode input){

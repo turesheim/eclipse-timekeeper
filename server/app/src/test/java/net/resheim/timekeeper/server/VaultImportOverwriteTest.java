@@ -38,6 +38,15 @@ class VaultImportOverwriteTest {
         create("overwrite-quota-other.md");assertEquals(507,overwrite(entry,"test-a",tag,"x".repeat(4096)).statusCode());assertEquals("Original\r\n",content(entry));
         var changed=overwrite(entry,"test-a",tag,"Concurrent change");assertEquals(200,changed.statusCode());assertEquals(412,overwrite(entry,"test-a",tag,"Outdated import").statusCode());assertEquals("Concurrent change",content(entry));
     }
+    @Test void metadataOnlyReplacementInvalidatesPagesAndRepeatingItIsANoop(){
+        var entry=create("overwrite-metadata-only.md");
+        var first=given().header("Authorization","Bearer test-a").queryParam("limit",1).get("/api/v1/notes/entries");assertEquals(200,first.statusCode());String snapshot=first.jsonPath().getString("snapshot");
+        var saved=given().header("Authorization","Bearer test-a").header("If-Match",entry.path("entryEtag").asText()).contentType("application/octet-stream").queryParam("modifiedAt",MODIFIED).body(bytes("Original\r\n")).put("/api/v1/notes/entries/"+entry.path("id").asText()+"/import");
+        assertEquals(200,saved.statusCode());var updated=parse(saved.asString());assertEquals(entry.path("contentVersion"),updated.path("contentVersion"));assertEquals(MODIFIED,updated.path("modifiedAt").asText());
+        assertEquals(412,given().header("Authorization","Bearer test-a").header("If-Match",snapshot).queryParam("limit",1).queryParam("offset",1).get("/api/v1/notes/entries").statusCode());
+        var repeated=given().header("Authorization","Bearer test-a").header("If-Match",updated.path("entryEtag").asText()).contentType("application/octet-stream").queryParam("modifiedAt",MODIFIED).body(bytes("Original\r\n")).put("/api/v1/notes/entries/"+entry.path("id").asText()+"/import");
+        assertEquals(200,repeated.statusCode());assertEquals(updated.path("entryEtag").asText(),repeated.jsonPath().getString("entryEtag"));
+    }
     @Test void movesAndDeletionAfterReviewAreConflictsAndNativeLabelsRemainIndependent(){
         var moved=create("overwrite-move.md");String tag=moved.path("entryEtag").asText();
         store.transaction("a",()->{var vault=new VaultCollection(store,limits);var entry=vault.get(uuid(moved.path("id")));vault.move(entry,new VaultPath("overwrite-moved.md"),vault.tag(entry));return null;});
