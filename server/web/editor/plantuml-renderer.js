@@ -7,7 +7,9 @@ function next(){
   job.abort=()=>finish(new DOMException('Canceled','AbortError'));job.signal?.addEventListener('abort',job.abort,{once:true});
   if(job.signal?.aborted){job.abort();return;}
   try{
-    worker=new Worker(new URL('./assets/plantuml/worker.js',import.meta.url),{type:'module'});timer=setTimeout(()=>finish(failure()),15000);
+    // This controller is bundled into assets/milkdown/milkdown.js. The engine
+    // and worker remain lazy, with a fresh module realm for every attempt.
+    worker=new Worker(new URL('../plantuml/worker.js',import.meta.url),{type:'module'});timer=setTimeout(()=>finish(failure()),15000);
     worker.onerror=()=>finish(failure());worker.onmessage=event=>{
       if(event.data?.ready){clearTimeout(timer);timer=setTimeout(()=>finish(failure()),5000);worker.postMessage({source:job.source,dark:job.dark});return;}
       typeof event.data?.svg==='string'&&event.data.svg.length<=2_000_000?finish(null,event.data.svg):finish(failure());

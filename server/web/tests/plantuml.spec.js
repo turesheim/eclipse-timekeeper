@@ -69,6 +69,11 @@ test('a stalled PlantUML worker times out while the page stays responsive and th
   await page.unroute('**/assets/plantuml/worker.js');await page.evaluate(async value=>{plantumlField.setValue(value);await plantumlField.showFormatted();},fence(examples.activity));await rendered(root);
 });
 
+test('a later PlantUML preview recovers from a local renderer module load failure',async({page})=>{
+  const pattern='**/{plantuml.js,plantuml-engine.js}';await page.route(pattern,route=>route.abort('failed'));const root=await open(page,fence(examples.sequence));await expect(root.locator('.markdown-diagram-preview')).toContainText('could not be rendered');
+  await page.unroute(pattern);await page.evaluate(async value=>{plantumlField.setValue(value);await plantumlField.showFormatted();},fence(examples.activity));await rendered(root);expect(await source(page)).toBe(fence(examples.activity));
+});
+
 test('PlantUML SVG validation rejects active or oversized markup and strips links and source metadata',async({page})=>{
   await openEditorFixture(page);const result=await page.evaluate(async()=>{
     const {plantumlImage}=await import('/web/plantuml-svg.js'),wrap=body=>'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'+body+'</svg>',rejected=[];

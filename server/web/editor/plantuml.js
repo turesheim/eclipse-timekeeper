@@ -1,6 +1,7 @@
 import {$node,$prose} from '@milkdown/kit/utils';
 import {Plugin,NodeSelection} from '@milkdown/kit/prose/state';
 import {plantumlSourceAllowed,plantumlImage} from '../src/plantuml-svg.js';
+import {renderPlantUml} from './plantuml-renderer.js';
 import {t} from '../src/i18n.js';
 export const isPlantUml=language=>['plantuml','puml'].includes(String(language).toLowerCase());
 export const plantumlDiagram=$node('plantuml_diagram',()=>({group:'block',atom:true,selectable:true,
@@ -14,7 +15,6 @@ export const plantumlPresentation=$prose(()=>new Plugin({appendTransaction:(tran
   for(const {node,pos}of blocks.reverse())transaction.replaceWith(pos,pos+node.nodeSize,state.schema.nodes.plantuml_diagram.create({value:node.textContent,language:node.attrs.language}));
   if(selected)transaction.setSelection(NodeSelection.create(transaction.doc,transaction.mapping.map(selected.pos)));return transaction;
 }}));
-let renderer;
 export function plantumlBlock(initial){
   let node=initial,sourceKey,timer,generation=0,controller,url;
   const dom=document.createElement('div'),preview=document.createElement('div'),status=document.createElement('p'),image=document.createElement('img');
@@ -28,7 +28,6 @@ export function plantumlBlock(initial){
     status.textContent=t('markdown.plantuml_loading');controller=new AbortController();const signal=controller.signal;
     timer=setTimeout(async()=>{
       try{
-        renderer??=import(new URL('../../plantuml.js',import.meta.url).href);const {renderPlantUml}=await renderer;if(current!==generation||signal.aborted)return;
         const svg=await renderPlantUml(value,{dark,signal});if(current!==generation||signal.aborted)return;const blob=plantumlImage(svg);url=URL.createObjectURL(blob);image.src=url;image.hidden=false;status.textContent='';
       }catch{if(current===generation&&!signal.aborted)status.textContent=t('markdown.plantuml_invalid');}
     },200);
