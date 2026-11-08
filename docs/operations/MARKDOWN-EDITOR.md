@@ -60,6 +60,31 @@ Selections and edits remain in the current draft until the host saves it.
 
 ## Writing and source tools
 
+PlantUML fences (`plantuml` or `puml`) render as local diagram previews in
+Formatted mode, including read-only notes. For example:
+
+````markdown
+```plantuml
+@startuml
+Alice -> Bob: Plan
+Bob --> Alice: Done
+@enduml
+```
+````
+
+Switch to Markdown source to edit the diagram. Its authored fence, line endings
+and frontmatter remain unchanged until an edit is saved. Sequence, class and
+activity diagrams use the bundled official PlantUML engine and local Smetana
+layout; no PlantUML service or Graphviz installation is required. Previews
+follow the selected light/dark mode and fit narrow screens.
+
+Previews accept up to 10 KB of source. Files, includes, images, external themes
+and standard-library downloads are unavailable. Syntax errors, unsupported
+features, large output or a rendering timeout leave the source available for
+editing. Rendering runs in a bounded worker; replacing or clearing a document
+cancels its work and releases the preview image. Canonical notes and backups
+contain the source, without generated diagram files.
+
 The heading menu selects plain text or H1–H6. Toolbar tooltips name each action
 and available shortcut; active formatting is indicated. Use the main toolbar to
 format a selection. Type `/` at the start of a paragraph for commands.
