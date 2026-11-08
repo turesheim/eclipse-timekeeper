@@ -13,8 +13,8 @@ import org.commonmark.parser.Parser;
 final class NotesSearchText {
     private static final Parser MARKDOWN=Parser.builder().extensions(List.of(
             YamlFrontMatterExtension.create(),StrikethroughExtension.create())).build();
-    record Projection(String title,List<String> blocks){
-        Projection{blocks=List.copyOf(blocks);}
+    record Projection(String title,List<String> blocks,List<String> tags){
+        Projection{blocks=List.copyOf(blocks);tags=List.copyOf(tags);}
         String body(){return String.join("\n\n",blocks);}
         @Override public String toString(){return "NotesSearchText.Projection[blocks="+blocks.size()+"]";}
     }
@@ -25,7 +25,22 @@ final class NotesSearchText {
         catch(CharacterCodingException invalid){throw new IllegalArgumentException("Invalid search source encoding");}
         var document=MARKDOWN.parse(source.startsWith("\ufeff")?source.substring(1):source);
         var blocks=new ArrayList<String>();collect(document,blocks);
-        return new Projection(normalized(NoteTitles.heading(document)),blocks);
+        var tags=new ArrayList<String>();collectTags(document,tags);
+        return new Projection(normalized(NoteTitles.heading(document)),blocks,tags);
+    }
+    private static void collectTags(Node node,List<String> tags){
+        if(node instanceof YamlFrontMatterBlock||node instanceof FencedCodeBlock||node instanceof IndentedCodeBlock||node instanceof HtmlBlock)return;
+        if(node instanceof Paragraph||node instanceof Heading){
+            var text=new StringBuilder();node.accept(new AbstractVisitor(){
+                @Override public void visit(Text value){text.append(value.getLiteral());}
+                @Override public void visit(Code value){text.append(' ');}
+                @Override public void visit(Link value){text.append(' ');}
+                @Override public void visit(Image value){text.append(' ');}
+                @Override public void visit(SoftLineBreak value){text.append('\n');}
+                @Override public void visit(HardLineBreak value){text.append('\n');}
+            });String value=NotesHashtags.prose(text.toString());if(value.indexOf('#')>=0)tags.add(value);return;
+        }
+        for(var child=node.getFirstChild();child!=null;child=child.getNext())collectTags(child,tags);
     }
     private static void collect(Node node,List<String> blocks){
         if(node instanceof YamlFrontMatterBlock)return;

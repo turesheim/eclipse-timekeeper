@@ -210,6 +210,12 @@ export class NotesView {
     if(this.searchMode?.value==='content')this.tree?.replaceChildren();
   }
   contentSearch(){return this.searchMode.value==='content'&&!this.showTrash&&!!this.search.value.trim();}
+  async findTag(tag){
+    if(!this.session)return;this.searchMode.value='content';this.search.value='tag:'+tag;
+    this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');
+    this.navCollapsed=false;this.root.classList.add('notes-drawer-open');this.navigationState();
+    this.invalidateSearch();this.search.focus({preventScroll:true});await this.reload();
+  }
   async searchPage(session,current,cursor){
     const query=new URLSearchParams({q:this.search.value.trim(),limit:50});if(cursor)query.set('cursor',cursor);
     const reply=await session.request('/notes/search?'+query);if(session!==this.session||current!==this.loadGeneration)return null;

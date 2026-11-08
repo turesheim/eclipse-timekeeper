@@ -17,7 +17,7 @@ import org.apache.lucene.util.BytesRef;
 
 /** One replica's private owner index. Inputs must come from committed SQL snapshots. */
 final class NotesLuceneIndex implements AutoCloseable {
-    static final String FORMAT="notes-search-1";
+    static final String FORMAT="notes-search-2";
     static final int CHUNK=65_536,EXCERPT=320;
     private static final Sort ORDER=new Sort(SortField.FIELD_SCORE,new SortField("path_key",SortField.Type.STRING),new SortField("id",SortField.Type.STRING));
     private static final FieldType BODY;
@@ -97,6 +97,7 @@ final class NotesLuceneIndex implements AutoCloseable {
         document.add(new StoredField("source_type",source.sourceType()));document.add(new StoredField("source_id",source.sourceId().toString()));
         document.add(new StoredField("source_version",source.sourceVersion()));document.add(new StoredField("source_tag",source.sourceTag()));document.add(new StoredField("source_hash",source.sourceHash()));
         for(String block:source.text().blocks())document.add(new Field("body",block,BODY));
+        for(String prose:source.text().tags())document.add(new TextField("tag",prose,Field.Store.NO));
         String body=source.text().body();document.add(new StoredField("body_size",body.length()));
         // Stored chunks bound highlight reads even for a maximum-size document.
         // Overlap retains UTF-16 pairs without changing indexed offset positions.

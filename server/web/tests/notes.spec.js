@@ -24,6 +24,30 @@ async function setup(page,request){
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return api;
 }
 
+test('clicking a hashtag searches exact private tags and retains the current Notes draft',async({page,request})=>{
+  const api=await setup(page,request),put=async(path,value)=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(value),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  const current=await(await put('Notes/A-current.md','# Current\n\nA #OpenShift deployment.\n')).json();await put('Notes/B-tagged.md','# Another\n\nAlso #openshift.\n');await put('Notes/C-plain.md','OpenShift #OpenShiftTools `#OpenShift`');
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'tag:#openshift'}));return reply.status();},{timeout:30000}).toBe(200);
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/A-current.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
+  await appendEditorText(page.locator('#notes-formatted p'),' Keep this private draft.');await page.locator('#notes-formatted [data-hashtag="#openshift"]').click();
+  await expect(page.locator('#notes-search-mode')).toHaveValue('content');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');
+  const rows=page.locator('#notes-navigation .notes-tree > [role=treeitem]');await expect(rows).toHaveCount(2);await expect(rows.first()).toContainText('A-current.md');await expect(rows.last()).toContainText('B-tagged.md');await expect(page.locator('#notes-formatted')).toContainText('Keep this private draft.');
+  const read=await api('GET','/notes/entries/'+current.id+'/content');expect(await read.text()).not.toContain('Keep this private draft.');
+  await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true})).toHaveAttribute('aria-expanded','false');
+  await page.locator('#notes-formatted [data-hashtag="#openshift"]').focus();await page.locator('#notes-formatted [data-hashtag="#openshift"]').press('Enter');await expect(page.locator('#notes-search')).toBeVisible();await expect(rows).toHaveCount(2);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('a Today hashtag opens Notes tag search using the current private journal',async({page,request})=>{
+  const api=await setup(page,request),day='2026-11-03',entry=await api('GET','/day-notes/'+day+'/content');await api('PUT','/day-notes/'+day+'/content',{body:'A #OpenShift journal entry.'},{'If-Match':entry.headers().etag});
+  await expect.poll(async()=>{const response=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'tag:#openshift'}));return response.status();},{timeout:30000}).toBe(200);
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const tag=page.locator('#today-journal-formatted [data-hashtag="#openshift"]');await expect(tag).toHaveText('#OpenShift');await tag.focus();await tag.press('Enter');
+  await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');
+  await expect(page.locator('#notes-navigation .notes-tree > [role=treeitem]')).toHaveCount(1);
+  await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-11');await page.locator('[data-track-note-date="'+day+'"]').click();const dialog=page.locator('#track-note-editor');await expect(dialog).toBeVisible();
+  await dialog.locator('[data-hashtag="#openshift"]').click();await expect(dialog).toBeHidden();await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');await expect(page.locator('#notes-navigation .notes-tree > [role=treeitem]')).toHaveCount(1);
+});
+
 test('Notes account imports a vault with review, guarded conflicts and exact file bytes',async({page,request})=>{
   const {mkdtemp,mkdir,writeFile,rm}=await import('node:fs/promises'),{join}=await import('node:path'),{tmpdir}=await import('node:os');
   const api=await setup(page,request),root=await mkdtemp(join(tmpdir(),'timekeeper-notes-import-')),day='2026-11-02';
