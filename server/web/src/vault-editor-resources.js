@@ -3,6 +3,7 @@ import {imagePreview} from './image-preview.js';
 import {relativeNotePath} from './notes-links.js';
 import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
+import {hashtagKey,tagNavigation} from './hashtags.js';
 
 export const vaultNoteNavigation='timekeeper:vault-note-navigation';
 const fold=value=>value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
@@ -66,6 +67,7 @@ export function vaultEditorResources(session,origin=()=>'',open){
   };
   const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
   return {
+    searchTag:(value,source)=>{const tag=hashtagKey(value);if(!tag||!session()||source&&!source.isConnected)return;(source||document).dispatchEvent(new CustomEvent(tagNavigation,{bubbles:true,cancelable:true,detail:{tag,guards:[],leave:[]}}));},
     invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
     image:(reference,alt)=>previewImage(()=>resolveRelative(reference),alt),
     canonicalAsset:async reference=>(await resolveRelative(reference)).path,

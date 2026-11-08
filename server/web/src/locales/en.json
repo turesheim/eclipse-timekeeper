@@ -1450,7 +1450,7 @@
   "notes.search_results": "Results ordered by relevance.",
   "notes.search_none": "No matching notes.",
   "notes.search_changed": "Search results changed or expired. Search again for current results.",
-  "notes.search_invalid": "Use up to 32 words or complete phrases in double quotes (up to 512 characters).",
+  "notes.search_invalid": "Use up to 32 words, quoted phrases or tag:#name filters (up to 512 characters).",
   "notes.search_unavailable": "Content search is being prepared or is unavailable. Try again shortly; browsing files still works.",
   "notes.search_preparing": "Preparing content search…",
   "notes.added": "Added:",
@@ -1466,5 +1466,6 @@
   "markdown.plantuml_loading": "Rendering diagram…",
   "markdown.plantuml_too_large": "The diagram exceeds the 10 KB preview limit. Its Markdown source is preserved.",
   "markdown.plantuml_external": "Diagram previews cannot load files, images, themes or external resources. Its Markdown source is preserved.",
-  "markdown.plantuml_invalid": "The diagram could not be rendered. Edit its Markdown source to correct or simplify it."
+  "markdown.plantuml_invalid": "The diagram could not be rendered. Edit its Markdown source to correct or simplify it.",
+  "notes.search_tag": "Search notes for {{tag}}"
 }

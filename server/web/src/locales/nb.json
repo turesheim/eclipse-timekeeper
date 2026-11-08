@@ -1450,7 +1450,7 @@
   "notes.search_results": "Treff sortert etter relevans.",
   "notes.search_none": "Ingen samsvarende notater.",
   "notes.search_changed": "Søketreffene er endret eller utløpt. Søk på nytt for oppdaterte treff.",
-  "notes.search_invalid": "Bruk opptil 32 ord eller fullstendige fraser i doble anførselstegn (opptil 512 tegn).",
+  "notes.search_invalid": "Bruk opptil 32 ord, fraser i anførselstegn eller tag:#navn-filtre (opptil 512 tegn).",
   "notes.search_unavailable": "Innholdssøket klargjøres eller er utilgjengelig. Prøv igjen om litt. Du kan fortsatt bla i filene.",
   "notes.search_preparing": "Klargjør innholdssøk …",
   "notes.added": "Lagt til:",
@@ -1466,5 +1466,6 @@
   "markdown.plantuml_loading": "Tegner diagram…",
   "markdown.plantuml_too_large": "Diagrammet overskrider grensen på 10 KB for forhåndsvisning. Markdown-kilden er bevart.",
   "markdown.plantuml_external": "Forhåndsvisning av diagrammer kan ikke laste filer, bilder, temaer eller eksterne ressurser. Markdown-kilden er bevart.",
-  "markdown.plantuml_invalid": "Diagrammet kunne ikke tegnes. Rediger Markdown-kilden for å rette eller forenkle det."
+  "markdown.plantuml_invalid": "Diagrammet kunne ikke tegnes. Rediger Markdown-kilden for å rette eller forenkle det.",
+  "notes.search_tag": "Søk i notater etter {{tag}}"
 }

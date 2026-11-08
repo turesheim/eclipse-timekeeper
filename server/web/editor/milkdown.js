@@ -5,6 +5,7 @@ import {trackedDocument} from './tracked-document.js';
 import {closeHistory} from '@milkdown/kit/prose/history';
 import {codeTools} from './code-tools.js';
 import {plantumlDiagram,plantumlPresentation,plantumlBlock,isPlantUml} from './plantuml.js';
+import {hashtagPresentation} from './hashtags.js';
 import {bracketPairs} from './bracket-pairs.js';
 import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // This build-time entry is bundled to one local native ES module. The application
@@ -129,6 +130,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const cleanGenerated=value=>value.replaceAll(emptyMarker,'');
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
   const code=codeTools(()=>readOnly);
+  const hashtags=hashtagPresentation(resources);
   const brackets=bracketPairs(()=>readOnly,(view,transaction,at)=>{
     const position=transaction.doc.resolve(at),before=position.parent.textBetween(0,position.parentOffset,'','\ufffc'),match=/(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(before);if(!match)return;
     const from=at-match[0].length,node=wikiNode(view.state,match,from);if(!node)return;transaction.replaceWith(from,at,node).setSelection(TextSelection.near(transaction.doc.resolve(from+node.nodeSize)));
@@ -174,6 +176,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       // Following a link leaves the document unchanged. Local note navigation
       // still delegates to the owner-aware resource adapter and its draft guard.
       handleDOMEvents:{click:(_view,event)=>{
+        if(hashtags.click(event))return true;
         const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
         const date=dailyNoteDate(link.dataset.dayNoteDate);
@@ -225,7 +228,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;

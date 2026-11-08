@@ -146,6 +146,20 @@ link labels and code are indexed; YAML frontmatter and markup are excluded.
 Queries allow at most 512 UTF-16 code units and 32 analyzed terms. Punctuation
 acts as text separators; arbitrary Lucene query syntax is not available.
 
+Hashtags such as `#OpenShift` use the accent colour in Formatted mode. Click a
+tag, or focus it and press Enter, to list matching notes in the navigator. The
+search entry becomes `tag:#openshift` and uses Note contents mode. Editing the
+query can combine tags with ordinary words or quoted phrases. Tag matching is
+exact and case-insensitive, so an untagged word or `#OpenShiftTools` does not
+match `tag:#openshift`. The current Notes draft is retained.
+
+Tags support Unicode letters and numbers, underscores, hyphens and nested
+segments such as `#work/openshift`, up to 128 UTF-16 code units including `#`.
+Code, link and image labels/destinations, wikilink targets and frontmatter do
+not define tags. Markdown source retains ordinary editable text; no tag
+metadata or rewritten source is required. Existing private search caches
+rebuild automatically for the new tag format.
+
 Matches are ordered by relevance, with title and path matches boosted. Each
 result shows its title, path and a plain-text highlighted excerpt. **More results**
 loads the next page without reordering earlier matches. Changing a query keeps

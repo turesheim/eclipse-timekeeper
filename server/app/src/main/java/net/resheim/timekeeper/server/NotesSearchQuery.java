@@ -17,9 +17,9 @@ final class NotesSearchQuery {
         @Override public String toString(){return "NotesSearchQuery.Parsed[]";}
     }
     static Analyzer analyzer(){
-        var standard=new StandardAnalyzer();standard.setMaxTokenLength(MAX_CHARACTERS);
+        var standard=new StandardAnalyzer();standard.setMaxTokenLength(MAX_CHARACTERS);var tags=NotesHashtags.analyzer();
         return new AnalyzerWrapper(Analyzer.PER_FIELD_REUSE_STRATEGY){
-            @Override protected Analyzer getWrappedAnalyzer(String field){return standard;}
+            @Override protected Analyzer getWrappedAnalyzer(String field){return field.equals("tag")?tags:standard;}
             @Override protected TokenStreamComponents wrapComponents(String field,TokenStreamComponents components){
                 if(!field.equals("path"))return components;
                 int flags=WordDelimiterGraphFilter.GENERATE_WORD_PARTS|WordDelimiterGraphFilter.GENERATE_NUMBER_PARTS|WordDelimiterGraphFilter.PRESERVE_ORIGINAL;
@@ -27,7 +27,7 @@ final class NotesSearchQuery {
             }
             @Override public int getPositionIncrementGap(String field){return field.equals("body")||field.equals("path")?BLOCK_GAP:0;}
             @Override public int getOffsetGap(String field){return field.equals("body")||field.equals("path")?2:1;}
-            @Override public void close(){super.close();standard.close();}
+            @Override public void close(){super.close();standard.close();tags.close();}
         };
     }
     static Parsed parse(String input){
@@ -47,6 +47,14 @@ final class NotesSearchQuery {
                     }
                     if(!closed)throw ApiFailure.validation();
                 }else while(offset<text.length()&&!Character.isWhitespace(text.charAt(offset))&&text.charAt(offset)!='"')part.append(text.charAt(offset++));
+                if(!phrase&&part.toString().regionMatches(true,0,"tag:",0,4)){
+                    String value=part.substring(4),key=NotesHashtags.key(value);if(key==null||++count>MAX_TERMS)throw ApiFailure.validation();
+                    var tagged=new BooleanQuery.Builder().add(new ConstantScoreQuery(new TermQuery(new Term("tag",key))),BooleanClause.Occur.MUST);
+                    // Optional zero-weight body terms supply useful excerpt offsets;
+                    // only the exact tag field determines membership and ranking.
+                    var words=tokens(analyzer,value);if(!words.isEmpty())tagged.add(new BoostQuery(across(words),0),BooleanClause.Occur.SHOULD);
+                    required.add(tagged.build(),BooleanClause.Occur.MUST);continue;
+                }
                 var terms=tokens(analyzer,part.toString());count+=terms.size();if(count>MAX_TERMS)throw ApiFailure.validation();
                 if(phrase&&!terms.isEmpty())required.add(across(terms),BooleanClause.Occur.MUST);
                 else for(String term:terms)required.add(across(List.of(term)),BooleanClause.Occur.MUST);
