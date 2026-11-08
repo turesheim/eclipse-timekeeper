@@ -264,7 +264,7 @@ export class NotesView {
       const excerpt=this.searchExcerpts.get(entry.id);
       if(this.contentResults&&excerpt){
         pick.append(node('span',entry.path,'notes-search-path'));
-        const text=node('span',undefined,'notes-search-excerpt');text.id='notes-search-excerpt-'+entry.id;row.setAttribute('aria-describedby',text.id);pick.setAttribute('aria-describedby',text.id);let offset=0;
+        const text=node('span',undefined,'notes-search-excerpt');pick.removeAttribute('aria-label');let offset=0;
         for(const range of excerpt.highlights){text.append(document.createTextNode(excerpt.text.slice(offset,range.start)),node('mark',excerpt.text.slice(range.start,range.end)));offset=range.end;}
         text.append(document.createTextNode(excerpt.text.slice(offset)));pick.classList.add('notes-search-pick');pick.append(text);
       }

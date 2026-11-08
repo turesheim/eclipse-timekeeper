@@ -354,14 +354,15 @@ test('Notes content search finds body text, keeps relevance order and pages on d
 
 test('Notes content search rejects delayed old queries and explains unavailable or stale pages',async({page,request})=>{
   const api=await setup(page,request);const entry=await(await api('PUT','/notes/files?path=Notes%2FSearch.md',Buffer.from('# Search\n\nFresh body.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const routeHeaders={'X-Timekeeper-Owner':Buffer.from(entry.ownerId).toString('base64url')};
   let releaseOld,oldStarted;const held=new Promise(resolve=>releaseOld=resolve),started=new Promise(resolve=>oldStarted=resolve);
   const result=(text,nextCursor)=>({snapshot:'fixture-snapshot',items:[{entry,excerpt:{text,highlights:[{start:0,end:text.length}]}}],...(nextCursor?{nextCursor}:{})});
   await page.route('**/api/v1/notes/search?**',async route=>{
     const url=new URL(route.request().url()),q=url.searchParams.get('q');
-    if(q==='old'){oldStarted();await held;return route.fulfill({json:result('Old body.')});}
+    if(q==='old'){oldStarted();await held;return route.fulfill({headers:routeHeaders,json:result('Old body.')});}
     if(q==='unavailable')return route.fulfill({status:503,json:{error:{code:'NOTES_SEARCH_INDEXING',message:'Preparing'}}});
     if(url.searchParams.has('cursor'))return route.fulfill({status:412,json:{error:{code:'NOTES_SEARCH_SNAPSHOT_EXPIRED',message:'Changed'}}});
-    return route.fulfill({json:result('Fresh body.','fixture-cursor')});
+    return route.fulfill({headers:routeHeaders,json:result('Fresh body.','fixture-cursor')});
   });
   const navigation=page.locator('#notes-navigation');await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('old');await started;
   await page.locator('#notes-search').fill('fresh');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');releaseOld();await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');
@@ -373,13 +374,14 @@ test('Notes content search rejects delayed old queries and explains unavailable 
 
 test('Notes content paging leaves focus in the editor when the user moves there while waiting',async({page,request})=>{
   const api=await setup(page,request);const entry=await(await api('PUT','/notes/files?path=Notes%2FFocus.md',Buffer.from('# Focus\n\nBody result.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const routeHeaders={'X-Timekeeper-Owner':Buffer.from(entry.ownerId).toString('base64url')};
   let releaseMore,moreStarted;const held=new Promise(resolve=>releaseMore=resolve),started=new Promise(resolve=>moreStarted=resolve);
   const hit={entry,excerpt:{text:'Body result.',highlights:[{start:0,end:4}]}};
   await page.route('**/api/v1/notes/search?**',async route=>{
-    if(new URL(route.request().url()).searchParams.has('cursor')){moreStarted();await held;return route.fulfill({json:{snapshot:'fixture',items:[]}});}
-    return route.fulfill({json:{snapshot:'fixture',items:[hit],nextCursor:'fixture-cursor'}});
+    if(new URL(route.request().url()).searchParams.has('cursor')){moreStarted();await held;return route.fulfill({headers:routeHeaders,json:{snapshot:'fixture',items:[]}});}
+    return route.fulfill({headers:routeHeaders,json:{snapshot:'fixture',items:[hit],nextCursor:'fixture-cursor'}});
   });
-  const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes/Focus.md').locator('button.notes-tree-pick').click();const source=await notesSource(page);
+  const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Focus.md').click();const source=await notesSource(page);
   await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('body');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Body result.');
   const more=navigation.getByRole('button',{name:'More results',exact:true});await more.focus();await more.press('Enter');await started;await source.focus();releaseMore();
   await expect(more).toBeHidden();await expect(source).toBeFocused();

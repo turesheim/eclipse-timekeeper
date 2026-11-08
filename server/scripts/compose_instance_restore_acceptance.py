@@ -127,6 +127,7 @@ def search_ready(api, query):
     deadline=time.monotonic()+90
     while True:
         value,headers=api.request('GET','/notes/search?'+urlencode({'q':query}),expected=(200,503))
+        if isinstance(value,bytes):value=json.loads(value)
         if 'items' in value:
             if headers.get('Cache-Control')!='private, no-store':raise RuntimeError('Restored search response is cacheable')
             return value
