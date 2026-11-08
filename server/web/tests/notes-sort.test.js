@@ -27,6 +27,11 @@ test('display titles sort naturally with stable path ties and filename fallbacks
   const rows=[{...row('events/id-2.md'),title:'Review 10'},{...row('Notes/z.md'),title:'Review 2'},row('Notes/Archive',null,null,'FOLDER'),{...row('Notes/a.md'),title:'Review 2'}];
   assert.deepEqual(paths(sortedNotes(rows)),['Notes/Archive','Notes/a.md','Notes/z.md','events/id-2.md']);
   assert.deepEqual(paths(sortedNotes(rows,'name-desc')),['Notes/Archive','events/id-2.md','Notes/z.md','Notes/a.md']);
-  assert.equal(noteTitle(rows[0]),'Review 10');assert.equal(noteTitle(row('Notes/plain.md')),'plain.md');
-  assert.equal(noteTitle({...row('Notes/plain.md'),title:' '},'Notes/plain.md'),'Notes/plain.md');
+  assert.equal(noteTitle(rows[0]),'Review 10');assert.equal(noteTitle(row('Notes/plain.md')),'plain');
+  assert.equal(noteTitle({...row('Notes/plain.md'),title:' '}),'plain');
+  assert.equal(noteTitle(row('Notes/plain.md'),'Notes/plain.md'),'plain');
+  assert.equal(noteTitle(row('journal/2026-11-08.MD',null,null,'DAY')),'2026-11-08');
+  assert.equal(noteTitle(row('Notes/Archive.md',null,null,'FOLDER')),'Archive.md');
+  assert.equal(noteTitle(row('assets/diagram.svg',null,null,'ASSET')),'diagram.svg');
+  assert.equal(noteTitle({...row('Notes/plain.md'),title:'A title.md'}),'A title.md');
 });

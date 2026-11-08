@@ -40,7 +40,7 @@ test('dragging a document into a folder preserves its draft, identity and conten
   const from=await source.boundingBox(),to=await target.boundingBox();await page.mouse.move(from.x+20,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+40,from.y+from.height/2,{steps:5});
   await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
   await page.mouse.move(to.x+20,to.y+to.height/2,{steps:10});await page.mouse.move(to.x+21,to.y+to.height/2);await page.mouse.up();
-  await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();await expect(page.locator('#notes-document-title')).toHaveText('Notes/Archive/Review.md');await expect(page.locator('#notes-body')).toHaveValue(draft);
+  await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();await expect(page.locator('#notes-document-title')).toHaveText('Review');await expect(page.locator('#notes-body')).toHaveValue(draft);
   const moved=await(await api('GET','/notes/entries/'+entry.id)).json();expect(moved.path).toBe('Notes/Archive/Review.md');expect(moved.id).toBe(entry.id);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(draft);
   await expect(page.locator('#notes-panel').getByText('Moved to Notes/Archive/Review.md.',{exact:true})).toHaveAttribute('role','status');
   await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
@@ -123,7 +123,7 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
   });
   const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   const rows=navigation.locator(`[role=treeitem][data-id="${folder.id}"] > [role=group] > [role=treeitem] > button`);
-  await expect(rows).toHaveText(['Nested','Alpha.md','Beta.md','Zulu.md']);expect(new Set(offsets)).toEqual(new Set([0,1,2,3]));
+  await expect(rows).toHaveText(['Nested','Alpha','Beta','Zulu']);expect(new Set(offsets)).toEqual(new Set([0,1,2,3]));
   await navigation.getByRole('button',{name:'Notes/Alpha.md',exact:true}).click();await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('Unsaved navigator draft.');
   const toolbar=navigation.getByRole('toolbar',{name:'Note navigation actions'});await expect(toolbar.getByRole('group')).toHaveCount(3);
   const refresh=toolbar.getByRole('button',{name:'Refresh',exact:true}),trash=toolbar.getByRole('button',{name:'Recently deleted',exact:true});
@@ -134,13 +134,13 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
     ['Modified (oldest first)',['Beta','Zulu','Alpha']],['Modified (newest first)',['Alpha','Zulu','Beta']]
   ]){
     await toolbar.getByRole('button',{name:'Sort notes',exact:true}).click();await page.getByRole('menuitemradio',{name:label,exact:true}).click();
-    await expect(rows).toHaveText(['Nested',...names.map(name=>name+'.md')]);await expect(page.locator('#notes-body')).toHaveValue('Unsaved navigator draft.');
+    await expect(rows).toHaveText(['Nested',...names]);await expect(page.locator('#notes-body')).toHaveValue('Unsaved navigator draft.');
     await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   }
   const sort=toolbar.getByRole('button',{name:'Sort notes',exact:true});await sort.focus();await sort.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Modified (newest first)',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(sort).toBeFocused();
   await sort.press('ArrowRight');await expect(toolbar.getByRole('button',{name:'Collapse all folders',exact:true})).toBeFocused();await page.keyboard.press('ArrowLeft');await expect(sort).toBeFocused();
   await page.locator('#notes-search').fill('.md');await expect(toolbar.getByRole('button',{name:'Expand all folders',exact:true})).toBeDisabled();
-  await expect(navigation.locator('[role=treeitem] > button')).toHaveText(['Notes/Alpha.md','Notes/Zulu.md','Notes/Beta.md']);
+  await expect(navigation.locator('[role=treeitem] > button')).toHaveText(['Alpha','Zulu','Beta']);
 });
 
 test('expand and collapse cover nested folders, exclude a hidden journal and cancel stale expansion',async({page,request})=>{

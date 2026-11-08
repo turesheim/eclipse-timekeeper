@@ -54,7 +54,7 @@ export class RecentNotes {
         const [glyph,key]=entry.kind==='EVENT'?['calendar-event','notes.type_event']:['DAY','WEEK'].includes(entry.kind)?['journal-text','notes.type_journal']:['file-earmark-text','notes.type_ordinary'];
         const title=node('span',undefined,'today-recent-note-title');
         title.append(icon(glyph),node('span',t(key)+': ','visually-hidden'),node('strong',noteTitle(entry)));
-        action.append(title,node('span',entry.path,'hint'));
+        action.append(title);
         action.title=t(key)+'\n'+(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
         action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
         item.append(action);list.append(item);
