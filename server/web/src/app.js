@@ -1,5 +1,6 @@
 import {editorPreferences} from './editor-preferences.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
+import {hashtagKey,tagNavigation} from './hashtags.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale, localeForPreference } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { Api, ApiError } from './api.js';
@@ -62,6 +63,12 @@ const today = new TodayView($('today-panel'), {
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
+document.addEventListener(tagNavigation,async event=>{
+  event.preventDefault();const session=api,tag=hashtagKey(event.detail.tag);
+  if(!tag||!session||!await navigationGuards(event.detail.guards,session))return;
+  if($('workspace').dataset.view!=='notes'&&await tab('notes')===false||session!==api)return;
+  event.detail.leave.forEach(leave=>leave());await notes.findTag(tag);
+});
 document.addEventListener(vaultNoteNavigation,async event=>{
   event.preventDefault();const session=api;if(!session||!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());await tab('notes');await notes.select(event.detail.entry.id);

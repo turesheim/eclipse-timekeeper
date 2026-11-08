@@ -4,6 +4,7 @@ import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
 import {closeHistory} from '@milkdown/kit/prose/history';
 import {codeTools} from './code-tools.js';
+import {hashtagPresentation} from './hashtags.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
@@ -122,6 +123,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const cleanGenerated=value=>value.replaceAll(emptyMarker,'');
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
   const code=codeTools(()=>readOnly);
+  const hashtags=hashtagPresentation(resources);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
   const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
@@ -139,6 +141,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{
+        if(hashtags.keyDown(event))return true;
         // DOM reconciliation also calls this with an undispatched key event.
         // Its DOM already contains the edit; keep the model's pre-edit selection.
         if(event.target&&!event.isComposing)syncDOMSelection(_view,root);
@@ -161,6 +164,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       // Following a link leaves the document unchanged. Local note navigation
       // still delegates to the owner-aware resource adapter and its draft guard.
       handleDOMEvents:{click:(_view,event)=>{
+        if(hashtags.click(event))return true;
         const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
         const date=dailyNoteDate(link.dataset.dayNoteDate);
@@ -212,7 +216,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;

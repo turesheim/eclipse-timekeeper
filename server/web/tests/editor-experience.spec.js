@@ -8,12 +8,32 @@ async function engine(page,value,options={}){
   await openEditorFixture(page);
   await page.evaluate(async({value,options})=>{
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
+    if(options.tags){globalThis.searchedTags=[];options.resources={searchTag:tag=>globalThis.searchedTags.push(tag)};delete options.tags;}
     const root=document.createElement('div');root.id='experience-editor';document.body.append(root);
     globalThis.experience=await createMarkdownEditor({root,value,label:'Experience body',taskLabel:text=>text,escape:()=>{},...options});
   },{value,options});
   await expect(page.locator('#experience-editor .ProseMirror')).toBeVisible();
 }
 const source=page=>page.evaluate(()=>globalThis.experience.markdown());
+
+test('prose hashtags use accent links without changing Markdown or literal code and link content',async({page})=>{
+  const value='# Tag examples\n\nA #Open**Shift** deployment, #Cafe\u0301 and #work/cloud.\n\n`#literal` [#linked](https://example.org/#destination) [[#heading]]\n\n~~~text\n#code\n~~~\n';
+  await engine(page,value,{tags:true});const tags=page.locator('#experience-editor [data-hashtag]');await expect(tags).toHaveCount(3);expect(await source(page)).toBe(value);
+  await tags.first().click();expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift']);
+  const café=page.locator('[data-hashtag="#café"]');await café.focus();await café.press('Enter');expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift','#café']);expect(await source(page)).toBe(value);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    expect(await café.evaluate(node=>{const probe=document.createElement('span');probe.style.color='var(--accent)';node.after(probe);const expected=getComputedStyle(probe).color;probe.remove();return getComputedStyle(node).color===expected;})).toBe(true);
+    expect((await new AxeBuilder({page}).include('#experience-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+  }
+  await page.setViewportSize({width:390,height:844});await captureScreenshot(page,{path:'test-results/hashtag-accent-phone.png',fullPage:true});
+  await page.evaluate(()=>globalThis.experience.setReadOnly(true));await tags.last().click();expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.searchedTags.at(-1))).toBe('#work/cloud');
+});
+
+test('hashtag presentation follows typing and undo while source remains portable text',async({page})=>{
+  await engine(page,'An ordinary note.\n',{tags:true});await appendEditorText(page.locator('#experience-editor p'),' #NewTag');await expect(page.locator('[data-hashtag="#newtag"]')).toHaveText('#NewTag');
+  expect(await source(page)).toContain('#NewTag');await page.keyboard.press('ControlOrMeta+z');await expect(page.locator('[data-hashtag]')).toHaveCount(0);
+});
 
 test('Backspace deletes rich text and joins paragraphs at the caret',async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));

@@ -21,6 +21,19 @@ class NotesLuceneIndexTest {
     private static NotesLuceneIndex.Page search(NotesLuceneIndex index,String query,long generation,int limit,NotesLuceneIndex.Position position)throws IOException{
         return index.search(NotesSearchQuery.parse(query),generation,limit,position,false,null,5000);
     }
+    @Test void exactProseTagsStayDistinctFromWordsPrefixesCodeLinksAndMetadata()throws Exception{
+        try(var index=new NotesLuceneIndex(temporary.resolve("tags"),identity)){
+            index.put(source(1,"Notes/Tagged.md","A #Open**Shift** deployment and #Cafe\u0301 notes. #work/openshift #Straße"));
+            index.put(source(2,"Notes/Words.md","OpenShift #OpenShiftTools #work/openshift-extra"));
+            index.put(source(3,"Notes/Literal.md","---\ntag: '#OpenShift'\n---\n\n`#OpenShift` [#OpenShift](https://example.invalid/#OpenShift) ![#OpenShift](asset.png) [[#OpenShift]]\n\n~~~text\n#OpenShift\n~~~\n\n    #OpenShift\n"));
+            index.put(source(4,"Notes/Z-tagged.md","Another #openshift note."));ready(index,1);
+            for(String query:List.of("tag:#OPENSHIFT","TAG:#openshift"))assertEquals(List.of(new UUID(0,1),new UUID(0,4)),search(index,query,1,50,null).items().stream().map(NotesLuceneIndex.Hit::id).toList());
+            for(String query:List.of("tag:#CAFÉ","tag:#work/openshift","tag:#STRASSE","tag:#openshift deployment","tag:#openshift tag:#café"))assertEquals(List.of(new UUID(0,1)),search(index,query,1,50,null).items().stream().map(NotesLuceneIndex.Hit::id).toList());
+            var first=search(index,"tag:#openshift",1,1,null);assertNotNull(first.next());assertEquals(new UUID(0,4),search(index,"tag:#openshift",1,1,first.next()).items().getFirst().id());
+            index.put(source(1,"Notes/Tagged.md","Tag removed."));index.remove(new UUID(0,4));ready(index,2);assertTrue(search(index,"tag:#openshift",2,50,null).items().isEmpty());
+        }
+        for(String invalid:List.of("tag:","tag:openshift","tag:#","tag:#openshift*","tag:#"+"x".repeat(128)))assertThrows(ApiFailure.class,()->NotesSearchQuery.parse(invalid),invalid);
+    }
     @Test void onlyCommittedReadyGenerationsAreVisibleAndCloseDiscardsPendingWrites()throws Exception{
         Path path=temporary.resolve("commit");
         try(var index=new NotesLuceneIndex(path,identity)){

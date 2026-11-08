@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {splitMarkdown,needsSource,normalizeEditorMarkdown} from '../src/markdown-document.js';
+import {hashtagKey,hashtagRanges} from '../src/hashtags.js';
+test('hashtags use exact bounded Unicode keys and ignore word, URL and wikilink fragments',()=>{
+  assert.equal(hashtagKey('#Cafe\u0301'),'#café');assert.equal(hashtagKey('#Straße'),'#strasse');assert.equal(hashtagKey('#work/OpenShift'),'#work/openshift');
+  for(const value of ['#','#a*','#a//b','#'+'a'.repeat(128)])assert.equal(hashtagKey(value),null);
+  const text='🚀 #OpenShift (#Cafe\u0301) #work/Cloud words#no https://example.invalid/#no [[#heading]] ![[file#heading]]';
+  assert.deepEqual(hashtagRanges(text).map(range=>[text.slice(range.from,range.to),range.key]),[['#OpenShift','#openshift'],['#Cafe\u0301','#café'],['#work/Cloud','#work/cloud']]);
+});
 test('frontmatter is kept byte-for-byte outside the body, including BOM and CRLF',()=>{
   for(const value of ['---\ntags: [daily]\n---\n\n# Day\n','\uFEFF---\r\ntitle: Mandag\r\n...\r\n\r\nA note\r\n','---\n---\nBody','---\nkey: value\n---']){
     const parts=splitMarkdown(value);assert.ok(parts.frontmatter);assert.equal(parts.unterminated,false);assert.equal(parts.frontmatter+parts.body,value);

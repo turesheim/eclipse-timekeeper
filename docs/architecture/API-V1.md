@@ -1233,7 +1233,13 @@ journal/event notes independently from filename substring navigation. Its
 `NotesSearchPage` contains current entry metadata and bounded plain-text excerpts
 with UTF-16 highlight ranges, plus an opaque snapshot and optional continuation.
 All words are required across boosted title/path/body fields; double quotes form
-phrases. Query length is 512 UTF-16 code units and at most 32 analyzed terms.
+phrases. An unquoted `tag:#name` requires an exact prose hashtag and can be
+combined with words, phrases or other tags. Tag keys use NFC and case folding;
+each tag is at most 128 UTF-16 code units including `#`. Unicode letters,
+numbers, underscores, hyphens and slash-separated segments are supported.
+Code, link destinations/labels, image labels, YAML frontmatter and wikilink
+targets do not define tags. Query length is 512 UTF-16 code units and at most
+32 analyzed terms or tag filters.
 Default/capped page sizes are 50/200, and excerpts are at most 320 code units.
 Owner, deletion, configuration and hidden-journal filters precede pagination.
 
