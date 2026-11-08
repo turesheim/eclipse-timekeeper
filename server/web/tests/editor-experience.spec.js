@@ -214,12 +214,12 @@ test('completion choices keep readable rows and scroll to keyboard selection on 
     const list=page.locator('#experience-field .markdown-suggestions'),choices=list.getByRole('option');await expect(choices).toHaveCount(12);
     const sizes=await choices.evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return {height:node.getBoundingClientRect().height,natural:parseFloat(style.lineHeight)+parseFloat(style.paddingTop)+parseFloat(style.paddingBottom)};}));
     for(const size of sizes)expect(size.height,'A suggestion must show its complete line and padding').toBeGreaterThanOrEqual(size.natural-1);
-    expect(await list.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);
+    expect(await list.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);await captureScreenshot(page,{path:`test-results/completion-many-${width}.png`,fullPage:true});
     await page.keyboard.press('ArrowDown');await expect(choices.first()).toBeFocused();for(let index=1;index<12;index++)await page.keyboard.press('ArrowDown');await expect(choices.last()).toBeFocused();
     const visible=await choices.last().evaluate(node=>{const row=node.getBoundingClientRect(),parent=node.parentElement.getBoundingClientRect();return row.top>=parent.top&&row.bottom<=parent.bottom;});expect(visible).toBe(true);
     const label=await choices.last().textContent(),shortcode=label.match(/:[a-z0-9_+-]+:/)[0];await page.keyboard.press('Enter');await expect(list).toBeHidden();expect(await page.evaluate(()=>globalThis.field.value())).toContain(shortcode);
     await appendEditorText(rich.locator('p'),' :a');await expect(list).toBeVisible();await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(rich).toBeFocused();
-    await appendEditorText(rich.locator('p'),' :air');await expect(list).toBeVisible();expect(await choices.count()).toBeLessThan(12);
+    await appendEditorText(rich.locator('p'),' :airplane');await expect(choices).toHaveCount(2);await expect(list).toBeVisible();
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
