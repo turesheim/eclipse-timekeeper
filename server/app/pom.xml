@@ -5,6 +5,7 @@
   <parent><groupId>net.resheim.timekeeper.server</groupId><artifactId>timekeeper-server-parent</artifactId><version>2.0.0-SNAPSHOT</version></parent>
   <artifactId>timekeeper-server</artifactId>
   <properties>
+    <lucene.version>10.6.0</lucene.version>
     <git.commit.id.full>unknown</git.commit.id.full>
     <git.dirty>unknown</git.dirty>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
@@ -27,6 +28,9 @@
     <dependency><groupId>org.commonmark</groupId><artifactId>commonmark</artifactId><version>0.27.1</version></dependency>
     <dependency><groupId>org.commonmark</groupId><artifactId>commonmark-ext-yaml-front-matter</artifactId><version>0.27.1</version></dependency>
     <dependency><groupId>org.commonmark</groupId><artifactId>commonmark-ext-gfm-strikethrough</artifactId><version>0.27.1</version></dependency>
+    <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-core</artifactId><version>${lucene.version}</version></dependency>
+    <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-analysis-common</artifactId><version>${lucene.version}</version></dependency>
+    <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-highlighter</artifactId><version>${lucene.version}</version></dependency>
     <dependency><groupId>org.apache.httpcomponents.client5</groupId><artifactId>httpclient5</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-service</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>

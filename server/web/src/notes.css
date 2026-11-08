@@ -71,3 +71,9 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-import-path,.notes-import-status { overflow-wrap:anywhere; min-width:0; }
 .notes-import-status { color:var(--muted); }
 @media(max-width:480px) { .notes-import-row { grid-template-columns:minmax(0,1fr); gap:0; }.notes-import-status { padding-inline-start:1.5rem; } }
+
+#notes-search-mode { margin-bottom:.5rem; }
+.notes-search-pick { display:grid; grid-template-columns:auto minmax(0,1fr); }
+.notes-search-pick > span.notes-search-excerpt { grid-column:1 / -1; white-space:normal; overflow-wrap:anywhere; font-size:.9em; font-weight:400; }
+.notes-search-excerpt mark { color:var(--bs-emphasis-color); background:var(--bs-warning-bg-subtle); padding:0; }
+.notes-search-path { grid-column:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.9em; font-weight:400; color:var(--bs-secondary-color); }

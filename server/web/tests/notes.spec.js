@@ -331,6 +331,66 @@ test('opening a weekly note survives a metadata refresh between pointer down and
   await expect(page.locator('#today-week-note-editor')).toBeVisible();await expect(page.locator('#today-week-note-editor .ProseMirror')).toHaveAttribute('contenteditable','true');
 });
 
+test('Notes content search finds body text, keeps relevance order and pages on demand without replacing a draft',async({page,request})=>{
+  test.setTimeout(150000);const api=await setup(page,request),word='sparrow';
+  for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?path=Notes%2Fbinary.txt',Buffer.from(word),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:word}));return reply.status();},{timeout:30000}).toBe(200);
+  const navigation=page.locator('#notes-navigation'),rows=navigation.locator('.notes-tree > [role=treeitem]');
+  await page.locator('#notes-search').fill(word);await expect(navigation).toContainText('No matching files or folders.');
+  await page.locator('#notes-search-mode').selectOption('content');await expect(rows).toHaveCount(50);await expect(rows.first()).toContainText('Sparrow priority');
+  await expect(navigation.getByRole('button',{name:'Sort notes',exact:true})).toBeDisabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
+  await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await expect(rows).toHaveCount(50);
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:900});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
+      await captureScreenshot(page,{path:`test-results/notes-content-search-${theme}-${width}.png`});
+    }
+  }
+  await page.setViewportSize({width:1440,height:900});
+  await rows.first().locator('button').click();const source=await notesSource(page);await expect(source).toHaveValue(/Sparrow priority/);
+  await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
+  await source.fill('# Sparrow priority\n\nUnsaved private draft.');await page.locator('#notes-search').fill('absentword');await expect(navigation).toContainText('No matching notes.');await expect(source).toHaveValue('# Sparrow priority\n\nUnsaved private draft.');
+  await page.locator('#notes-search').fill(word);await expect(rows).toHaveCount(50);await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
+});
+
+test('Notes content search rejects delayed old queries and explains unavailable or stale pages',async({page,request})=>{
+  const api=await setup(page,request);const entry=await(await api('PUT','/notes/files?path=Notes%2FSearch.md',Buffer.from('# Search\n\nFresh body.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const routeHeaders={'X-Timekeeper-Owner':Buffer.from(entry.ownerId).toString('base64url')};
+  let releaseOld,oldStarted;const held=new Promise(resolve=>releaseOld=resolve),started=new Promise(resolve=>oldStarted=resolve);
+  const result=(text,nextCursor)=>({snapshot:'fixture-snapshot',items:[{entry,excerpt:{text,highlights:[{start:0,end:text.length}]}}],...(nextCursor?{nextCursor}:{})});
+  await page.route('**/api/v1/notes/search?**',async route=>{
+    const url=new URL(route.request().url()),q=url.searchParams.get('q');
+    if(q==='old'){oldStarted();await held;return route.fulfill({headers:routeHeaders,json:result('Old body.')});}
+    if(q==='unavailable')return route.fulfill({status:503,json:{error:{code:'NOTES_SEARCH_INDEXING',message:'Preparing'}}});
+    if(url.searchParams.has('cursor'))return route.fulfill({status:412,json:{error:{code:'NOTES_SEARCH_SNAPSHOT_EXPIRED',message:'Changed'}}});
+    return route.fulfill({headers:routeHeaders,json:result('Fresh body.','fixture-cursor')});
+  });
+  const navigation=page.locator('#notes-navigation');await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('old');await started;
+  await page.locator('#notes-search').fill('fresh');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');releaseOld();await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');
+  await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeFocused();await expect(navigation).toContainText('Search results changed or expired. Search again');await expect(navigation.locator('.notes-search-excerpt')).toHaveCount(0);
+  await page.locator('#notes-search').fill('unavailable');await expect(navigation).toContainText('Content search is being prepared or is unavailable');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeVisible();
+  await page.locator('#notes-search-mode').selectOption('filename');await page.locator('#notes-search').fill('Search.md');await expect(noteEntry(navigation,'Notes/Search.md')).toBeVisible();
+});
+
+
+test('Notes content paging leaves focus in the editor when the user moves there while waiting',async({page,request})=>{
+  const api=await setup(page,request);const entry=await(await api('PUT','/notes/files?path=Notes%2FFocus.md',Buffer.from('# Focus\n\nBody result.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const routeHeaders={'X-Timekeeper-Owner':Buffer.from(entry.ownerId).toString('base64url')};
+  let releaseMore,moreStarted;const held=new Promise(resolve=>releaseMore=resolve),started=new Promise(resolve=>moreStarted=resolve);
+  const hit={entry,excerpt:{text:'Body result.',highlights:[{start:0,end:4}]}};
+  await page.route('**/api/v1/notes/search?**',async route=>{
+    if(new URL(route.request().url()).searchParams.has('cursor')){moreStarted();await held;return route.fulfill({headers:routeHeaders,json:{snapshot:'fixture',items:[]}});}
+    return route.fulfill({headers:routeHeaders,json:{snapshot:'fixture',items:[hit],nextCursor:'fixture-cursor'}});
+  });
+  const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Focus.md').click();const source=await notesSource(page);
+  await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('body');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Body result.');
+  const more=navigation.getByRole('button',{name:'More results',exact:true});await more.focus();await more.press('Enter');await started;await source.focus();releaseMore();
+  await expect(more).toBeHidden();await expect(source).toBeFocused();
+});
+
 test('Notes folder overwrite is optional, previews replacements and preserves files changed after review',async({page,request})=>{
   const {mkdtemp,mkdir,writeFile,utimes,rm}=await import('node:fs/promises'),{join}=await import('node:path'),{tmpdir}=await import('node:os'),{createHash}=await import('node:crypto');
   const api=await setup(page,request),root=await mkdtemp(join(tmpdir(),'dagsverk-overwrite-')),createdAt='2020-01-02T03:04:05Z',modifiedAt='2021-02-03T04:05:06Z',sourceModified='2025-12-29T07:55:09.000Z';
