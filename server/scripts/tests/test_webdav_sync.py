@@ -41,7 +41,7 @@ class ManualSyncTests(unittest.TestCase):
             def birth_stat(fd):
                 value=real_fstat(fd);fields={name:getattr(value,name) for name in dir(value) if name.startswith('st_')};fields['st_birthtime_ns']=1_577_934_245_123_456_789;return SimpleNamespace(**fields)
             with patch.object(sync.os,'fstat',side_effect=birth_stat):sync.prepare_import_metadata(root)
-            self.assertEqual('2020-01-02T03:04:05.123456789Z',json.loads((root/sync.IMPORT_METADATA).read_text())['entries'][0]['createdAt'])
+            self.assertEqual('2020-01-02T03:04:05.123456789Z',json.loads((root/sync.IMPORT_METADATA).read_text())['entries'][0]['createdAt']);self.assertEqual('ORIGINAL',json.loads((root/sync.IMPORT_METADATA).read_text())['entries'][0]['createdAtSource'])
             original=(root/sync.IMPORT_METADATA).read_bytes();outside=Path(directory)/'outside';outside.write_text('Private');(root/'link').symlink_to(outside)
             with self.assertRaises(sync.SyncError):sync.prepare_import_metadata(root)
             self.assertEqual(original,(root/sync.IMPORT_METADATA).read_bytes());self.assertEqual('Private',outside.read_text())

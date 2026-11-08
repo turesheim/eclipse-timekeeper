@@ -185,6 +185,7 @@ export class NotesView {
     if(!this.note)this.status.textContent='';else if(!this.busy)this.status.textContent=this.saving?t('journal.saving'):this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
     this.timestamps.hidden=!this.note;
     for(const [field,time]of Object.entries(this.savedDates)){
+      if(field==='createdAt'){time.parentElement.firstChild.textContent=t(this.note?.createdAtSource==='ORIGINAL'?'notes.created':this.note?.createdAtSource==='ADDED'?'notes.added':'notes.created_or_added')+' ';time.parentElement.title=t('notes.creation_date_help');}
       const value=this.note?.[field],date=new Date(value||NaN),valid=Number.isFinite(date.getTime());time.parentElement.hidden=!valid;
       time.dateTime=valid?value:'';time.textContent=valid?dateTimeFormat(getLocale(),{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short',timeZone:this.zone||'UTC'}).format(date):'';
     }

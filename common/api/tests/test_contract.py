@@ -704,7 +704,7 @@ class ContractTest(unittest.TestCase):
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
             'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
-            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'moveNoteEntry', 'restoreNoteEntry', 'exportNotes',
+            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'importNoteBytes', 'moveNoteEntry', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'undoWorkSessionChange', 'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',

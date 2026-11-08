@@ -1260,7 +1260,7 @@
   "notes.import_folder": "Importer mappe",
   "notes.choose_folder": "Velg rotmappe for hvelvet",
   "notes.import_apply": "Importer nye filer",
-  "notes.import_help": "Velg roten til det lokale hvelvet, og velg deretter filer og mapper som skal importeres. Mappestier og koblinger til dagbok og hendelser beholdes. Eksisterende filer overskrives aldri. Fullførte importer beholdes ved avbrudd.",
+  "notes.import_help": "Velg roten til det lokale hvelvet, og velg deretter filene og mappene som skal importeres. Mappestier og tilknytninger til journal og hendelser beholdes. Eksisterende filer beholdes med mindre du slår på overskriving og velger dem. Fullførte importer beholdes ved avbrudd.",
   "notes.import_reviewing": "Kontrollerer filer …",
   "notes.import_reviewed": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
   "notes.import_ready": "Ny fil",
@@ -1316,7 +1316,7 @@
   "notes.import_metadata_changed": "Innholdet ble endret etter tidsstempeløyeblikksbildet. Filens nåværende endringstid brukes.",
   "notes.export_title": "Eksporter notater",
   "notes.export_help": "Opprett en ZIP-fil med alle aktive notater, dagbok- og hendelsesmapper og vedlegg. Markdown og relative stier beholdes nøyaktig. Tidsstempelmetadata bevarer opprettelses- og endringsdatoer ved import av den utpakkede mappen. Nylig slettede elementer og kontodata tas ikke med.",
-  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Eksportmetadata fra Dagsverk bevarer disse datoene. For et eksisterende lokalt hvelv kan den manuelle klienten opprette tidsstempelmetadata før du velger mappen.",
+  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Uten tidsstempelmetadata registreres det når en ny fil ble lagt til i Dagsverk. En erstatning beholder den eksisterende opprettelsesdatoen. Eksport fra Dagsverk inkluderer tidsstempelmetadata. For et lokalt hvelv kan den manuelle klienten klargjøre opprinnelige tidsstempler før du velger mappen.",
   "notes.import_reviewed_other": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
   "notes.import_done_other": "Importerte {{count}} filer. Filer i konflikt er uendret.",
   "notes.import_reviewed_one": "{{count}} ny fil er klar til import. Se gjennom listen før du fortsetter.",
@@ -1452,5 +1452,14 @@
   "notes.search_changed": "Søketreffene er endret eller utløpt. Søk på nytt for oppdaterte treff.",
   "notes.search_invalid": "Bruk opptil 32 ord eller fullstendige fraser i doble anførselstegn (opptil 512 tegn).",
   "notes.search_unavailable": "Innholdssøket klargjøres eller er utilgjengelig. Prøv igjen om litt. Du kan fortsatt bla i filene.",
-  "notes.search_preparing": "Klargjør innholdssøk …"
+  "notes.search_preparing": "Klargjør innholdssøk …",
+  "notes.added": "Lagt til:",
+  "notes.created_or_added": "Opprettet / lagt til:",
+  "notes.creation_date_help": "En opprinnelig opprettelsesdato vises når den er oppgitt. Ellers registrerer Dagsverk når elementet ble lagt til. Eldre elementer angir ikke alltid hvilken dato som er registrert.",
+  "notes.import_overwrite": "Overskriv eksisterende filer",
+  "notes.import_overwrite_help": "Eksisterende filer beholdes som standard. Slå på dette for å gjennomgå erstatninger. Filer som endres eller flyttes etter gjennomgangen, beholdes og rapporteres som konflikter.",
+  "notes.import_replace": "Vil erstatte eksisterende fil",
+  "notes.import_reviewed_overwrite": "{{count}} filer er valgt. Erstatninger: {{replacements}}. Gjennomgå før import.",
+  "notes.import_apply_selected": "Importer valgte filer",
+  "notes.import_reviewed_overwrite_one": "{{count}} fil er valgt. Erstatninger: {{replacements}}. Gjennomgå før import."
 }

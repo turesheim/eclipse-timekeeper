@@ -384,3 +384,35 @@ test('Notes content paging leaves focus in the editor when the user moves there 
   const more=navigation.getByRole('button',{name:'More results',exact:true});await more.focus();await more.press('Enter');await started;await source.focus();releaseMore();
   await expect(more).toBeHidden();await expect(source).toBeFocused();
 });
+
+test('Notes folder overwrite is optional, previews replacements and preserves files changed after review',async({page,request})=>{
+  const {mkdtemp,mkdir,writeFile,utimes,rm}=await import('node:fs/promises'),{join}=await import('node:path'),{tmpdir}=await import('node:os'),{createHash}=await import('node:crypto');
+  const api=await setup(page,request),root=await mkdtemp(join(tmpdir(),'dagsverk-overwrite-')),createdAt='2020-01-02T03:04:05Z',modifiedAt='2021-02-03T04:05:06Z',sourceModified='2025-12-29T07:55:09.000Z';
+  const put=async(path,text)=>await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const original=await put('Notes/Replace.md','Server original'),race=await put('Notes/Race.md','Server race original');const excluded=await put('Notes/Excluded.md','Keep this file');
+  try{
+    await mkdir(join(root,'Notes'));for(const [name,body]of [['Replace.md','Imported exact\r\n'],['Race.md','Do not overwrite a concurrent change'],['Excluded.md','Unselected replacement'],['New.md','New local file']]){await writeFile(join(root,'Notes',name),body);await utimes(join(root,'Notes',name),new Date(sourceModified),new Date(sourceModified));}
+    const body='Imported exact\r\n';await writeFile(join(root,'timekeeper-notes-metadata.json'),JSON.stringify({format:'timekeeper-notes-v1',entries:[{path:'Notes/Replace.md',kind:'FILE',bytes:Buffer.byteLength(body),sha256:createHash('sha256').update(body).digest('hex'),createdAt,createdAtSource:'ORIGINAL',modifiedAt}]}));
+    await page.evaluate(()=>location.hash='#account/notes');const card=page.locator('#account-content section').filter({has:page.getByRole('heading',{name:'Import notes',exact:true})}),overwrite=card.getByRole('checkbox',{name:'Overwrite existing files',exact:true});await expect(overwrite).not.toBeChecked();
+    const chooser=page.waitForEvent('filechooser');await card.getByRole('button',{name:'Choose vault folder',exact:true}).click();await(await chooser).setFiles(root);
+    await expect(card).toContainText('1 new file ready to import');await expect(card.locator('.notes-import-status').filter({hasText:'Already exists or conflicts'})).toHaveCount(3);
+    await card.getByRole('checkbox',{name:'Notes/',exact:true}).uncheck();await overwrite.check();await expect(card.getByRole('button',{name:'Import new files',exact:true})).toBeDisabled();await card.getByRole('checkbox',{name:'Notes/',exact:true}).check();await card.getByRole('checkbox',{name:'Notes/Excluded.md',exact:true}).uncheck();await expect(card).toContainText('3 files selected. Replacements: 2.');await expect(card.locator('.notes-import-status').filter({hasText:'Will replace existing file'})).toHaveCount(2);
+    await overwrite.uncheck();await expect(card).toContainText('1 new file ready to import');await overwrite.check();
+    for(const width of [390,1440]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/notes-overwrite-review-${width}.png`});}
+    await api('PUT','/notes/entries/'+race.id+'/content',Buffer.from('Concurrent server edit'),{'Content-Type':'application/octet-stream','If-Match':race.etag});
+    await card.getByRole('button',{name:'Import selected files',exact:true}).click();await expect(card).toContainText('Imported 2 files.');await expect(card.locator('.notes-import-status').filter({hasText:'Already exists or conflicts'})).toHaveCount(1);
+    const replaced=await(await api('GET','/notes/entries/'+original.id)).json(),added=await(await api('GET','/notes/resolve?path=Notes%2FNew.md')).json();
+    expect(replaced.id).toBe(original.id);expect(replaced.createdAt).toBe(createdAt);expect(replaced.createdAtSource).toBe('ORIGINAL');expect(replaced.modifiedAt).toBe(modifiedAt);expect(added.createdAtSource).toBe('ADDED');expect(Date.parse(added.modifiedAt)).toBe(Date.parse(sourceModified));
+    expect(await(await api('GET','/notes/entries/'+original.id+'/content')).text()).toBe(body);expect(await(await api('GET','/notes/entries/'+race.id+'/content')).text()).toBe('Concurrent server edit');expect(await(await api('GET','/notes/entries/'+excluded.id+'/content')).text()).toBe('Keep this file');
+    await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/New.md').click();await expect(page.locator('.notes-timestamps')).toContainText('Added:');
+    await noteEntry(page.locator('#notes-navigation'),'Notes/Replace.md').click();await expect(page.locator('.notes-timestamps')).toContainText('Created:');
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('Notes identifies unknown creation-date provenance without guessing from an older modification date',async({page,request})=>{
+  const api=await setup(page,request),createdAt='2026-11-05T06:20:24Z',modifiedAt='2025-12-29T07:55:09Z';
+  for(const [path,createdAtSource]of [['Notes/Legacy.md','UNKNOWN'],['Notes/Original.md','ORIGINAL']])await api('PUT','/notes/files?'+new URLSearchParams({path,createdAt,modifiedAt,createdAtSource}),Buffer.from('# Dates\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Legacy.md').click();await expect(page.locator('.notes-timestamps')).toContainText('Created / added:');
+  for(const width of [320,1440]){await page.setViewportSize({width,height:900});await expect(page.locator('.notes-timestamps time').first()).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  await noteEntry(page.locator('#notes-navigation'),'Notes/Original.md').click();await expect(page.locator('.notes-timestamps')).toContainText('Created:');await expect(page.locator('.notes-timestamps time').first()).toHaveAttribute('datetime',createdAt);
+});

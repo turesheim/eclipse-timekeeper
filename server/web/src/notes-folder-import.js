@@ -30,6 +30,11 @@ export class NotesFolderImport {
   constructor(owner){
     this.owner=owner;this.generation=0;this.rows=[];this.folders=new Map();
     this.input=node('input');this.input.type='file';this.input.multiple=true;this.input.setAttribute('webkitdirectory','');this.input.hidden=true;
+    this.overwrite=node('input');this.overwrite.type='checkbox';this.overwrite.className='form-check-input';this.overwrite.id='notes-import-overwrite';
+    const overwriteLabel=node('label',t('notes.import_overwrite'));overwriteLabel.className='form-check-label';overwriteLabel.htmlFor=this.overwrite.id;
+    const overwriteControl=node('div');overwriteControl.className='form-check';overwriteControl.append(this.overwrite,overwriteLabel);
+    const overwriteHelp=node('p',t('notes.import_overwrite_help'));overwriteHelp.className='hint';
+    this.overwrite.addEventListener('change',()=>{for(const row of this.rows)if(row.existing&&!row.blocked&&!row.stale&&row.status!=='imported'){row.status=this.overwrite.checked?'ready':'conflict';row.selected=this.overwrite.checked&&!row.excluded;}this.owner.changed();this.reviewStatus();this.render();});
     this.button=button(t('notes.choose_folder'),()=>this.input.click());this.button.id='notes-import-folder';
     this.reviewPanel=node('div');this.reviewPanel.className='notes-import-review';this.reviewPanel.hidden=true;
     this.status=node('p');this.status.setAttribute('role','status');
@@ -40,13 +45,17 @@ export class NotesFolderImport {
     const actions=node('div');actions.className='dialog-actions';actions.append(this.close,this.apply);
     const help=node('p',t('notes.import_limits',{markdown:number(owner.info.limits.markdownBytes),file:number(owner.info.limits.fileBytes)}));help.className='hint';
     const dates=node('p',t('notes.import_dates_help'));dates.className='hint';
-    this.reviewPanel.append(this.status,this.progress,this.list,actions);owner.root.append(node('p',t('notes.import_help')),help,dates,this.button,this.input,this.reviewPanel);
+    this.reviewPanel.append(this.status,this.progress,this.list,actions);owner.root.append(node('p',t('notes.import_help')),help,dates,overwriteControl,overwriteHelp,this.button,this.input,this.reviewPanel);
     this.input.addEventListener('change',()=>{const files=[...this.input.files];this.input.value='';if(files.length)void this.review(files);});
   }
   entries(){return [...this.rows,...this.folders.values()].filter(row=>!row.folder||row.explicit);}
   pending(){return this.entries().some(row=>row.selected&&eligible(row));}
   controls(){this.render();}
-  reset(){++this.generation;this.abort?.abort();this.rows=[];this.folders.clear();this.metadata=null;this.tree=[];this.processed=undefined;this.list.replaceChildren();this.reviewPanel.hidden=true;this.owner.clean();this.input.value='';this.working=this.applying=this.reviewFailed=false;this.status.textContent='';this.progress.hidden=true;this.render();}
+  reviewStatus(){
+    const selected=this.rows.filter(row=>row.selected&&eligible(row)),replacements=selected.filter(row=>row.existing).length;
+    this.status.textContent=t(replacements?'notes.import_reviewed_overwrite':'notes.import_reviewed',{count:selected.length,replacements});
+  }
+  reset(){this.overwrite.checked=false;++this.generation;this.abort?.abort();this.rows=[];this.folders.clear();this.metadata=null;this.tree=[];this.processed=undefined;this.list.replaceChildren();this.reviewPanel.hidden=true;this.owner.clean();this.input.value='';this.working=this.applying=this.reviewFailed=false;this.status.textContent='';this.progress.hidden=true;this.render();}
   buildTree(){
     this.folders=new Map();const roots=[];
     const folder=path=>{
@@ -57,8 +66,9 @@ export class NotesFolderImport {
     for(const row of this.rows){const parent=row.path.split('/').slice(0,-1).join('/');(parent?folder(parent).children:roots).push(row);}
     for(const value of this.metadata?.entries.values()||[]){
       if(value.kind!=='FOLDER'||value.path.split('/').some(part=>key(part)==='.obsidian')&&!this.owner.info.settings.syncObsidianConfig)continue;
-      Object.assign(folder(value.path),{explicit:true,dates:Object.fromEntries(['createdAt','modifiedAt'].filter(name=>value[name]).map(name=>[name,value[name]]))});
+      Object.assign(folder(value.path),{explicit:true,dates:Object.fromEntries(['createdAt','modifiedAt','createdAtSource'].filter(name=>value[name]).map(name=>[name,value[name]]))});
     }
+    for(const row of this.folders.values())if(row.dates?.createdAt&&!row.dates.createdAtSource)row.dates.createdAtSource='UNKNOWN';
     this.list.replaceChildren();
     const append=(rows,host)=>{
       rows.sort((a,b)=>Number(!!b.folder)-Number(!!a.folder)||a.path.localeCompare(b.path));
@@ -66,7 +76,7 @@ export class NotesFolderImport {
         const entry=node('li'),line=node('div');line.className='notes-import-row';
         const label=node('label'),input=node('input');input.type='checkbox';input.className='form-check-input';input.setAttribute('aria-label',row.path+(row.folder?'/':''));
         const title=node('span',(row.path.split('/').at(-1)||row.file?.name)+(row.folder?'/':''));title.className='notes-import-path';label.append(input,title);line.append(label);row.checkbox=input;row.label=node('span');row.label.className='notes-import-status';line.append(row.label);entry.append(line);host.append(entry);
-        input.addEventListener('change',()=>{const select=value=>{if(eligible(value))value.selected=input.checked;for(const child of value.children||[])select(child);};select(row);this.owner.changed();this.status.textContent=t('notes.import_reviewed',{count:this.rows.filter(value=>value.selected&&eligible(value)).length});this.render();});
+        input.addEventListener('change',()=>{const select=value=>{value.excluded=!input.checked;if(eligible(value))value.selected=input.checked;for(const child of value.children||[])select(child);};select(row);this.owner.changed();this.reviewStatus();this.render();});
         if(row.folder){const list=node('ul');entry.append(list);append(row.children,list);}
       }
     };append(roots,this.list);this.tree=roots;
@@ -74,15 +84,15 @@ export class NotesFolderImport {
   render(changed){
     const paint=row=>{
       if(!row.checkbox)return;
-      if(!row.folder){row.label.textContent=t('notes.import_'+(row.selected||!eligible(row)?row.status:'excluded'))+(row.reason?' · '+row.reason:'');row.checkbox.checked=!!row.selected;row.checkbox.disabled=!!this.working||!this.owner.writable||!eligible(row);return {total:eligible(row)||row.status==='imported'?1:0,selected:(eligible(row)||row.status==='imported')&&row.selected?1:0,editable:eligible(row)?1:0};}
+      if(!row.folder){row.label.textContent=t(row.selected&&eligible(row)&&row.existing?'notes.import_replace':'notes.import_'+(row.selected||!eligible(row)?row.status:'excluded'))+(row.reason?' · '+row.reason:'');row.checkbox.checked=!!row.selected;row.checkbox.disabled=!!this.working||!this.owner.writable||!eligible(row);return {total:eligible(row)||row.status==='imported'?1:0,selected:(eligible(row)||row.status==='imported')&&row.selected?1:0,editable:eligible(row)?1:0};}
       let total=row.explicit&&(eligible(row)||row.status==='imported')?1:0,selected=total&&row.selected?1:0,editable=row.explicit&&eligible(row)?1:0;
       for(const child of row.children){const value=paint(child);total+=value?.total||0;selected+=value?.selected||0;editable+=value?.editable||0;}
       row.checkbox.checked=total>0&&selected===total;row.checkbox.indeterminate=selected>0&&selected<total;row.checkbox.disabled=!!this.working||!this.owner.writable||!editable;
       row.label.textContent=row.explicit&&!eligible(row)?t('notes.import_'+row.status):'';return {total,selected,editable};
     };
     if(changed)paint(changed);else for(const row of this.tree||[])paint(row);
-    this.button.disabled=this.input.disabled=!!this.working||!this.owner.writable||this.owner.busy;this.close.disabled=!!this.applying;
-    const selected=this.entries().filter(row=>row.selected&&eligible(row));this.apply.textContent=t(selected.length&&selected.every(row=>row.status==='failed')?'ui.retry':'notes.import_apply');this.apply.disabled=!!this.working||this.reviewFailed||!this.owner.writable||!selected.length;
+    this.button.disabled=this.input.disabled=!!this.working||!this.owner.writable||this.owner.busy;this.close.disabled=!!this.applying;this.overwrite.disabled=!!this.working||!this.owner.writable||this.owner.busy;
+    const selected=this.entries().filter(row=>row.selected&&eligible(row));this.apply.textContent=t(selected.length&&selected.every(row=>row.status==='failed')?'ui.retry':selected.some(row=>row.existing)?'notes.import_apply_selected':'notes.import_apply');this.apply.disabled=!!this.working||this.reviewFailed||!this.owner.writable||!selected.length;
     if(!this.working&&!this.reviewFailed&&this.rows.length&&!this.progress.hidden)this.progress.setAttribute('aria-valuenow','100');
     if(this.processed!==undefined){const percent=this.total?Math.round(this.processed/this.total*100):0;this.progress.setAttribute('aria-valuenow',String(percent));this.progress.setAttribute('aria-valuetext',t('notes.import_progress_count',{count:this.processed,total:this.total}));this.bar.style.width=percent+'%';this.bar.textContent=percent+'%';}
   }
@@ -106,13 +116,15 @@ export class NotesFolderImport {
         const limit=/\.md$/i.test(row.path)?owner.info.limits.markdownBytes:owner.info.limits.fileBytes;
         if(row.file.size>limit){row.status='skipped';row.selected=false;row.reason=t('notes.import_oversized',{size:number(row.file.size),limit:number(limit)});continue;}
         const metadata=await importedFileDates(row.file,metadataEntry(this.metadata,row.path),{signal:this.abort.signal});if(!active())return;row.dates=metadata.dates;if(metadata.changed)row.reason=t('notes.import_metadata_changed');
-        try{await session.request('/notes/resolve?'+new URLSearchParams({path:row.path}));row.status='conflict';row.selected=false;}
+        try{const reply=await session.request('/notes/resolve?'+new URLSearchParams({path:row.path}));
+          if(reply.data.kind==='FOLDER'){row.status='conflict';row.selected=false;row.blocked=true;}
+          else{row.existing=reply.data;row.status=this.overwrite.checked?'ready':'conflict';row.selected=this.overwrite.checked;}}
         catch(error){if([403,422].includes(error.status)){row.status='skipped';row.selected=false;row.reason=error.message;continue;}if(error.status!==404)throw error;}
         if(!active())return;
         const parts=row.path.split('/');parts.pop();let path='';
-        for(const part of parts){path+=(path?'/':'')+part;if(folders.has(key(path)))continue;try{const reply=await session.request('/notes/resolve?'+new URLSearchParams({path}));if(reply.data.kind!=='FOLDER'){row.status='conflict';row.selected=false;}else folders.add(key(path));}catch(error){if(error.status!==404)throw error;}if(!active())return;}
+        for(const part of parts){path+=(path?'/':'')+part;if(folders.has(key(path)))continue;try{const reply=await session.request('/notes/resolve?'+new URLSearchParams({path}));if(reply.data.kind!=='FOLDER'){row.status='conflict';row.selected=false;row.blocked=true;}else folders.add(key(path));}catch(error){if(error.status!==404)throw error;}if(!active())return;}
       }
-      if(active())this.status.textContent=t('notes.import_reviewed',{count:this.rows.filter(row=>row.selected&&row.status==='ready').length});
+      if(active())this.reviewStatus();
     }catch(error){if(active()){this.status.textContent=error.message;this.reviewFailed=true;}}
     finally{if(active()){this.working=false;this.render();}}
   }
@@ -132,9 +144,12 @@ export class NotesFolderImport {
         if(!active())return;row.reason='';this.status.textContent=t('notes.import_progress',{path:row.path});
         try{
           await ensure(row.folder?row.path:row.path.split('/').slice(0,-1).join('/'));if(!active())return;
-          if(!row.folder)await session.request('/notes/files?'+new URLSearchParams({path:row.path,...row.dates}),{method:'PUT',noneMatch:'*',rawBody:row.file});
+          if(!row.folder){
+            if(row.existing)await session.request('/notes/entries/'+row.existing.id+'/import?'+new URLSearchParams(row.dates),{method:'PUT',etag:row.existing.entryEtag,rawBody:row.file});
+            else await session.request('/notes/files?'+new URLSearchParams({path:row.path,...row.dates}),{method:'PUT',noneMatch:'*',rawBody:row.file});
+          }
           if(!active())return;row.status='imported';
-        }catch(error){if(!active())return;row.status=[409,412].includes(error.status)?'conflict':'failed';row.reason=error.message;if(error.status===401){owner.fail(error);return;}}
+        }catch(error){if(!active())return;row.status=[404,409,412].includes(error.status)?'conflict':'failed';if(row.status==='conflict')row.stale=true;row.reason=error.message;if(error.status===401){owner.fail(error);return;}}
         this.processed++;this.render(row);
       }
       if(active()){this.status.textContent=t('notes.import_done',{count:this.rows.filter(row=>row.status==='imported').length});await owner.reload();}

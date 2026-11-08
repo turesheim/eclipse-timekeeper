@@ -22,12 +22,15 @@ final class VaultIndex {
         var current=store.find(ENTRY,ROOT);
         if(current.isPresent())return copy(current.get());
         var value=object().put("path","").put("kind",Kind.FOLDER.name()).put("parentId",ROOT.toString()).put("deleted",false)
-                .put("createdAt",store.now().toString()).put("modifiedAt",store.now().toString());
+                .put("createdAt",store.now().toString()).put("createdAtSource","ADDED").put("modifiedAt",store.now().toString());
         var saved=write(ENTRY,ROOT,value);point(pathId(VaultPath.root()),PATH,object().put("key","").put("entryId",ROOT.toString()).put("active",true));return saved;
     }
     ObjectNode get(UUID id){return copy(store.find(ENTRY,id).orElseThrow(ApiFailure::notFound));}
     ObjectNode dates(UUID id,java.time.Instant created,java.time.Instant modified){
-        var value=get(id);if(created!=null)value.put("createdAt",created.toString());if(modified!=null)value.put("modifiedAt",modified.toString());
+        return dates(id,created,modified,created==null?null:"ORIGINAL");
+    }
+    ObjectNode dates(UUID id,java.time.Instant created,java.time.Instant modified,String source){
+        var value=get(id);if(created!=null)value.put("createdAt",created.toString()).put("createdAtSource",source);if(modified!=null)value.put("modifiedAt",modified.toString());
         return write(ENTRY,id,value);
     }
     ObjectNode at(VaultPath path,boolean deleted){
@@ -57,7 +60,7 @@ final class VaultIndex {
         UUID entryId=UUID.randomUUID();
         if(sourceType!=null&&sourceId!=null&&referenced(sourceType,sourceId)!=null)throw ApiFailure.conflict();
         var value=object().put("path",target.value()).put("kind",kind.name()).put("parentId",id(parent).toString()).put("deleted",false)
-                .put("createdAt",store.now().toString()).put("modifiedAt",store.now().toString());
+                .put("createdAt",store.now().toString()).put("createdAtSource","ADDED").put("modifiedAt",store.now().toString());
         if(sourceType!=null){value.put("sourceType",sourceType).put("sourceId",Objects.requireNonNull(sourceId).toString()).put("sourceKey",Objects.requireNonNull(sourceKey));}
         var saved=write(ENTRY,entryId,value);link(saved);
         if(sourceType!=null)point(refId(sourceType,sourceId),REFERENCE,object().put("sourceType",sourceType).put("sourceId",sourceId.toString()).put("entryId",entryId.toString()));

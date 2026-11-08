@@ -1260,7 +1260,7 @@
   "notes.import_folder": "Import folder",
   "notes.choose_folder": "Choose vault folder",
   "notes.import_apply": "Import new files",
-  "notes.import_help": "Select the local vault root, then choose the files and folders to import. Folder paths and journal/event associations are retained. Existing files are never overwritten. Completed imports are retained if interrupted.",
+  "notes.import_help": "Select the local vault root, then choose the files and folders to import. Folder paths and journal/event associations are retained. Existing files are kept unless you enable overwrite and select them. Completed imports are retained if interrupted.",
   "notes.import_reviewing": "Reviewing files…",
   "notes.import_reviewed": "{{count}} new files ready to import. Review the list before continuing.",
   "notes.import_ready": "New file",
@@ -1316,7 +1316,7 @@
   "notes.import_metadata_changed": "Content changed after the timestamp snapshot; using the current file modification time.",
   "notes.export_title": "Export notes",
   "notes.export_help": "Prepare a ZIP containing all active notes, journal and event folders, and assets. Exact Markdown and relative paths are preserved. Timestamp metadata retains creation and modification dates when importing the extracted folder. Recently deleted items and account data are excluded.",
-  "notes.import_dates_help": "File modification dates are preserved. Browsers do not expose filesystem creation dates. Dagsverk export metadata preserves those dates; for an existing local vault, the manual client can prepare timestamp metadata before you choose the folder.",
+  "notes.import_dates_help": "File modification dates are preserved. Browsers do not expose filesystem creation dates. Without timestamp metadata, a new file records when it was added to Dagsverk; replacing a file keeps its existing creation date. Dagsverk exports include timestamp metadata. For a local vault, the manual client can prepare original timestamps before you choose the folder.",
   "notes.import_reviewed_other": "{{count}} new files ready to import. Review the list before continuing.",
   "notes.import_done_other": "Imported {{count}} files. Conflicts were left unchanged.",
   "notes.import_reviewed_one": "{{count}} new file ready to import. Review the list before continuing.",
@@ -1452,5 +1452,14 @@
   "notes.search_changed": "Search results changed or expired. Search again for current results.",
   "notes.search_invalid": "Use up to 32 words or complete phrases in double quotes (up to 512 characters).",
   "notes.search_unavailable": "Content search is being prepared or is unavailable. Try again shortly; browsing files still works.",
-  "notes.search_preparing": "Preparing content search…"
+  "notes.search_preparing": "Preparing content search…",
+  "notes.added": "Added:",
+  "notes.created_or_added": "Created / added:",
+  "notes.creation_date_help": "An original creation date is shown when supplied. Otherwise Dagsverk records when the item was added. Older entries may not identify which date was recorded.",
+  "notes.import_overwrite": "Overwrite existing files",
+  "notes.import_overwrite_help": "Existing files are kept by default. Enable this to review replacements. Files changed or moved after review are kept and reported as conflicts.",
+  "notes.import_replace": "Will replace existing file",
+  "notes.import_reviewed_overwrite": "{{count}} files selected. Replacements: {{replacements}}. Review before importing.",
+  "notes.import_apply_selected": "Import selected files",
+  "notes.import_reviewed_overwrite_one": "{{count}} file selected. Replacements: {{replacements}}. Review before importing."
 }
