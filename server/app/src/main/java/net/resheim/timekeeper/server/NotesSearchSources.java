@@ -35,7 +35,7 @@ final class NotesSearchSources {
             case "MARKDOWN"->projection.title();case "EVENT"->raw.eventTitle();default->"";
         };
         return new NotesLuceneIndex.Source(id,entry.path("path").asText(),entry.path("kind").asText(),entry.path("sourceType").asText(),uuid(entry.path("sourceId")),
-                raw.sourceVersion(),entry.path("contentTag").asText(),entry.path("sha256").asText(),title,projection);
+                raw.sourceVersion(),entry.path("contentTag").asText(),entry.path("sha256").asText(),raw.bytes().length,title,projection);
     }
     private Raw capture(UUID id){
         var found=store.find(VaultIndex.ENTRY,id).orElse(null);if(!eligible(found))return null;

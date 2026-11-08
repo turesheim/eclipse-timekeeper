@@ -15,7 +15,7 @@ class NotesLuceneIndexTest {
 
     private static NotesLuceneIndex.Source source(int number,String path,String markdown){
         var text=NotesSearchText.extract(markdown.getBytes(StandardCharsets.UTF_8));UUID id=new UUID(0,number);
-        return new NotesLuceneIndex.Source(id,path,"MARKDOWN","VAULT_FILE",id,1,"source-tag","source-hash",text.title(),text);
+        return new NotesLuceneIndex.Source(id,path,"MARKDOWN","VAULT_FILE",id,1,"source-tag","source-hash",markdown.getBytes(StandardCharsets.UTF_8).length,text.title(),text);
     }
     private static void ready(NotesLuceneIndex index,long generation)throws IOException{index.commit(new NotesLuceneIndex.Watermark(generation,true,null));}
     private static NotesLuceneIndex.Page search(NotesLuceneIndex index,String query,long generation,int limit,NotesLuceneIndex.Position position)throws IOException{

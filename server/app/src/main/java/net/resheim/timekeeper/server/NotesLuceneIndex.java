@@ -29,7 +29,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     record Watermark(long generation,boolean ready,UUID afterEntry){
         Watermark{if(generation<0||generation>9007199254740991L)throw new IllegalArgumentException("Invalid search watermark");}
     }
-    record Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,String title,NotesSearchText.Projection text){
+    record Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text){
         @Override public String toString(){return "NotesLuceneIndex.Source[id="+id+"]";}
     }
     record Position(float score,String pathKey,UUID id){
@@ -56,11 +56,12 @@ final class NotesLuceneIndex implements AutoCloseable {
     private Watermark watermark;
     private boolean closed;
 
-    NotesLuceneIndex(Path path,Identity identity)throws IOException{
+    NotesLuceneIndex(Path path,Identity identity)throws IOException{this(path,identity,new Watermark(0,false,null));}
+    NotesLuceneIndex(Path path,Identity identity,Watermark initial)throws IOException{
         this.identity=identity;privateDirectory(path);
         Directory opened=FSDirectory.open(path);Analyzer analysis=NotesSearchQuery.analyzer();IndexWriter writing=null;SearcherManager managed=null;
         try{
-            Watermark saved=new Watermark(0,false,null);
+            Watermark saved=initial;
             if(DirectoryReader.indexExists(opened))try(var reader=DirectoryReader.open(opened)){
                 var data=reader.getIndexCommit().getUserData();
                 for(var expected:identityData().entrySet())if(!expected.getValue().equals(data.get(expected.getKey())))throw new RebuildRequired();
@@ -81,6 +82,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     private Map<String,String> identityData(){return Map.of("format",FORMAT,"lucene",org.apache.lucene.util.Version.LATEST.toString(),"owner",identity.owner(),"collection",identity.collection().toString(),"epoch",identity.epoch().toString(),"restore",identity.restoreGeneration());}
     private Map<String,String> metadata(Watermark state){var values=new HashMap<>(identityData());values.put("generation",Long.toString(state.generation()));values.put("ready",Boolean.toString(state.ready()));values.put("after",state.afterEntry()==null?"":state.afterEntry().toString());return values;}
     Watermark watermark(){lock.readLock().lock();try{return watermark;}finally{lock.readLock().unlock();}}
+    Identity identity(){return identity;}
     void put(Source source)throws IOException{
         if(!Set.of("MARKDOWN","DAY","WEEK","EVENT").contains(source.kind()))throw new IllegalArgumentException("Unsupported search source");
         var document=new Document();String id=source.id().toString(),pathKey=VaultPath.searchKey(source.path());
