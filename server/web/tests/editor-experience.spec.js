@@ -252,3 +252,30 @@ test('generated bracket closers skip typed closers and empty pairs delete togeth
     await page.keyboard.type('[[Notes/Design]]');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]]');await page.keyboard.type(' tail');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]] tail');
   }
 });
+
+
+test('bracket assistance leaves code, escaped links and read-only documents literal',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    for(const code of ['```text\nliteral\n```\n','`literal`\n']){
+      await field(page,code,formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');
+      if(formatted)await appendEditorText(edit.locator('code'),'[[]]');else{await edit.focus();await edit.evaluate(node=>{const at=node.value.indexOf('literal')+7;node.setSelectionRange(at,at);});await page.keyboard.type('[[]]');}
+      await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('literal[[]]');
+    }
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('\\[[Design]]');
+    await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);
+    if(!formatted)await expect(edit).toHaveValue('\\[[Design]]');
+    await page.evaluate(()=>globalThis.field.setReadOnly(true));const before=await page.evaluate(()=>globalThis.field.value());await edit.focus();await page.keyboard.type('[[');expect(await page.evaluate(()=>globalThis.field.value())).toBe(before);
+  }
+});
+
+test('document assistance rejects delayed old results and clears them when its document changes',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'},{path:'Notes/Diary.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);await page.evaluate(catalog=>{globalThis.field.resources.complete=query=>query?Promise.resolve(catalog.filter(entry=>entry.path.includes(query))):new Promise(resolve=>globalThis.finishCompletion=()=>resolve(catalog));},catalog);
+    const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body'),list=page.locator('#experience-field .markdown-suggestions');await edit.click();await page.keyboard.type('[[');await page.waitForFunction(()=>!!globalThis.finishCompletion);
+    await page.keyboard.type('Des');await expect(list.getByRole('option')).toHaveCount(1);await expect(list).toContainText('Notes/Design.md');await page.evaluate(()=>globalThis.finishCompletion());await expect(list.getByRole('option')).toHaveCount(1);
+    await page.evaluate(async formatted=>{globalThis.finishCompletion=null;globalThis.field.setValue('');if(formatted)await globalThis.field.showFormatted();},formatted);await edit.click();await page.keyboard.type('[[');await page.waitForFunction(()=>!!globalThis.finishCompletion);
+    await page.evaluate(()=>{globalThis.field.setValue('A different private document.');globalThis.finishCompletion();});await expect(list).toBeHidden();await expect(list.getByRole('option')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toBe('A different private document.');
+  }
+});
