@@ -133,3 +133,10 @@ test('import date provenance survives exports without guessing from date order',
   const plain=await importedFileDates(file,null);assert.deepEqual(plain.dates,{modifiedAt:'2026-01-01T00:00:00.000Z'});
   assert.throws(()=>parseNotesMetadata({format:'timekeeper-notes-v1',entries:[{...entry,createdAtSource:'invented'}]}));
 });
+
+
+test('document completion narrows Unicode-equivalent titles and paths while excluding trash and folders',async()=>{
+  const entries=[{id:'path',path:'Notes/Blåbær.md',kind:'MARKDOWN'},{id:'title',path:'Notes/Design.md',title:'Café decisions',kind:'MARKDOWN'},{id:'deleted',path:'Notes/Café.md',kind:'MARKDOWN',deleted:true},{id:'folder',path:'Café',kind:'FOLDER'}];
+  const session={request:async path=>({data:path==='/notes'?collection():{items:entries}})},resources=vaultEditorResources(()=>session,()=> 'Notes/current.md');
+  assert.deepEqual((await resources.complete('CAFE\u0301')).map(entry=>entry.id),['title']);assert.deepEqual((await resources.complete('BLA\u030aBÆR')).map(entry=>entry.id),['path']);
+});

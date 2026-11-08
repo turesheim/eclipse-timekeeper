@@ -247,3 +247,91 @@ test('completion choices keep readable rows and scroll to keyboard selection on 
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/completion-readable-${width}.png`,fullPage:true});
   }
 });
+
+
+test('internal link assistance pairs brackets and completes a narrowed document in both modes',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',title:'Design decisions',kind:'MARKDOWN'},{path:'Notes/Diary.md',kind:'MARKDOWN'},{path:'Notes/Other.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[]]');
+    const list=page.locator('#experience-field .markdown-suggestions'),options=list.getByRole('option');await expect(options).toHaveCount(3);
+    await page.keyboard.type('Desx');await expect(options).toHaveCount(0);await page.keyboard.press('Backspace');await expect(options).toHaveCount(1);await expect(options.first()).toContainText('Notes/Design.md');
+    await page.keyboard.press('ArrowDown');await expect(options.first()).toBeFocused();await page.keyboard.press('Enter');await expect(list).toBeHidden();
+    const completed=await page.evaluate(()=>globalThis.field.value());expect(completed.trim()).toBe('[[Notes/Design]]');
+    if(formatted)await expect(edit.locator('[data-wiki-reference="Notes/Design"]')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+z');expect((await page.evaluate(()=>globalThis.field.value())).trim()).not.toBe('[[Notes/Design]]');await page.keyboard.press('ControlOrMeta+Shift+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(completed);
+    await captureScreenshot(page,{path:`test-results/internal-completion-${formatted?'formatted':'source'}.png`,fullPage:true});
+  }
+});
+
+test('generated bracket closers skip typed closers and empty pairs delete together',async({page})=>{
+  for(const formatted of [true,false]){
+    await field(page,'',formatted);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
+    await page.keyboard.press('Backspace');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');await page.keyboard.press('Backspace');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('');
+    await page.keyboard.type('[[Notes/Design]]');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]]');await page.keyboard.type(' tail');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]] tail');
+  }
+});
+
+
+test('bracket assistance leaves code, escaped links and read-only documents literal',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    for(const code of ['```text\nliteral\n```\n','`literal`\n']){
+      await field(page,code,formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');
+      if(formatted)await edit.locator('code').evaluate(node=>{node.closest('[contenteditable=true]').focus();const text=document.createTreeWalker(node,NodeFilter.SHOW_TEXT).nextNode(),range=document.createRange();range.setStart(text,3);range.collapse(true);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
+      else{await edit.focus();await edit.evaluate(node=>{const at=node.value.indexOf('literal')+3;node.setSelectionRange(at,at);});}
+      const literal=formatted?edit.locator('code'):edit;await page.keyboard.type('[');expect(await literal.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toContain('lit[eral');await page.keyboard.type('[');expect(await literal.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toContain('lit[[eral');
+      await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await page.keyboard.type('Design]]');await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('lit[[Design]]eral');
+    }
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('\\[[Design]]');
+    await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);
+    if(!formatted)await expect(edit).toHaveValue('\\[[Design]]');
+    await page.evaluate(()=>globalThis.field.setReadOnly(true));const before=await page.evaluate(()=>globalThis.field.value());await edit.focus();await page.keyboard.type('[[');expect(await page.evaluate(()=>globalThis.field.value())).toBe(before);
+  }
+});
+
+test('document assistance rejects delayed old results and clears them when its document changes',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'},{path:'Notes/Diary.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);await page.evaluate(catalog=>{globalThis.field.resources.complete=query=>query?Promise.resolve(catalog.filter(entry=>entry.path.includes(query))):new Promise(resolve=>globalThis.finishCompletion=()=>resolve(catalog));},catalog);
+    const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body'),list=page.locator('#experience-field .markdown-suggestions');await edit.click();await page.keyboard.type('[[');await page.waitForFunction(()=>!!globalThis.finishCompletion);
+    await page.keyboard.type('Des');await expect(list.getByRole('option')).toHaveCount(1);await expect(list).toContainText('Notes/Design.md');await page.evaluate(()=>globalThis.finishCompletion());await expect(list.getByRole('option')).toHaveCount(1);
+    await page.evaluate(async formatted=>{globalThis.finishCompletion=null;globalThis.field.setValue('');if(formatted)await globalThis.field.showFormatted();},formatted);await edit.click();await page.keyboard.type('[[');await page.waitForFunction(()=>!!globalThis.finishCompletion);
+    await page.evaluate(()=>{globalThis.field.setValue('A different private document.');globalThis.finishCompletion();});await expect(list).toBeHidden();await expect(list.getByRole('option')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toBe('A different private document.');
+  }
+});
+
+
+test('internal-link choices fit phones and remain accessible in every theme in both modes',async({page})=>{
+  const catalog=Array.from({length:20},(_,index)=>({path:'Notes/Document-'+index+'.md',title:'Document '+index,kind:'MARKDOWN'}));
+  await page.setViewportSize({width:390,height:844});
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
+    const list=page.locator('#experience-field .markdown-suggestions');await expect(list.getByRole('option')).toHaveCount(20);
+    const fits=await list.evaluate(node=>{const rect=node.getBoundingClientRect();return rect.left>=7&&rect.right<=innerWidth-7&&rect.top>=7&&rect.bottom<=innerHeight-7;});expect(fits).toBe(true);
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+    }
+    await captureScreenshot(page,{path:`test-results/internal-choices-phone-${formatted?'formatted':'source'}.png`,fullPage:true});
+    await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(edit).toBeFocused();
+  }
+});
+
+test('bracket pairing wraps a selection without losing its text and composition stays unpaired',async({page})=>{
+  for(const formatted of [true,false]){
+    await field(page,'Keep selected text.',formatted);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.focus();
+    await edit.evaluate(node=>{if(node instanceof HTMLTextAreaElement)node.setSelectionRange(5,13);else{const text=node.querySelector('p').firstChild,range=document.createRange();range.setStart(text,5);range.setEnd(text,13);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));}});
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('Keep [selected] text.');
+    await field(page,'',formatted,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);const composing=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await composing.click();await composing.dispatchEvent('compositionstart',{data:''});await page.keyboard.type('[[');
+    await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();expect(await composing.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[');await composing.dispatchEvent('compositionend',{data:'[['});
+  }
+});
+
+
+test('source bracket tracking cannot skip unrelated text after a formatted edit',async({page})=>{
+  await field(page,'',false);const source=page.locator('#experience-body');await source.click();await page.keyboard.type('[');await expect(source).toHaveValue('[]');
+  const host=page.locator('#experience-field');await host.getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#experience-formatted .ProseMirror');await rich.focus();await page.keyboard.press('ControlOrMeta+a');await page.keyboard.type('AB');
+  await host.getByRole('button',{name:'Markdown source',exact:true}).click();await source.evaluate(node=>node.setSelectionRange(1,1));await page.keyboard.type(']');expect(await page.evaluate(()=>globalThis.field.value())).toContain('A]B');
+});
