@@ -156,8 +156,8 @@
 @media(prefers-reduced-motion: reduce) { .markdown-caret { animation: none; } }
 
 .has-note-bookmark { position: relative; }
-.has-note-bookmark > .markdown-toolbar { padding-inline-end: 3.25rem; }
-.note-bookmark { position: absolute; inset-block-start: .2rem; inset-inline-end: .2rem; min-width: 2.75rem; min-height: 2.75rem; opacity: 0; z-index: 1; }
+.has-note-bookmark > .markdown-toolbar { padding-inline-end: calc(44px + .75rem); }
+.note-bookmark { position: absolute; inset-block-start: .2rem; inset-inline-end: .2rem; min-width: 44px; min-height: 44px; opacity: 0; z-index: 1; }
 .note-bookmark:is(:hover,:focus-visible,.is-bookmarked) { opacity: 1; }
 .note-bookmark.is-bookmarked > .bi-bookmark-x { display: none; }
 .note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark { display: none; }
