@@ -33,7 +33,8 @@ test('dragging a document into a folder preserves its draft, identity and conten
   await expect(page.locator('#notes-panel').getByText('Moved to Notes/Archive/Review.md.',{exact:true})).toHaveAttribute('role','status');
   await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();
-  const movedSource=noteEntry(navigation,'Notes/Archive/Review.md'),box=await navigation.boundingBox();await movedSource.dragTo(navigation,{targetPosition:{x:10,y:box.height-10}});
+  const movedSource=noteEntry(navigation,'Notes/Archive/Review.md');await movedSource.click();await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue(draft);
+  const box=await navigation.boundingBox();await movedSource.dragTo(navigation,{targetPosition:{x:10,y:box.height-10}});
   await expect(noteEntry(navigation,'Review.md')).toBeVisible();expect((await(await api('GET','/notes/entries/'+entry.id)).json()).path).toBe('Review.md');await expect(page.locator('#notes-body')).toHaveValue(draft);
 });
 
