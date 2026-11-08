@@ -4,6 +4,7 @@ import { t as i18nText } from "./i18n.js";import { dateInZone, instantNanos, ins
 import { monthCalendar, monthSessions, shiftMonth } from './month-model.js';
 import { iconButton, projectIcon, isProjectIcon } from './icons.js';
 import { MonthPicker } from './month-picker.js';
+import {dateNavigation} from './date-navigation.js';
 import {TrackHolidays} from './track-holidays.js';
 import {TrackDayNotes} from './track-day-notes.js';
 import {workSummaryCard} from './work-summary-card.js';
@@ -28,6 +29,7 @@ export class MonthTrack {
       button.addEventListener('click', () => this.select(shiftMonth(this.currentMonth(), offset)));
     }
     iconButton(root.querySelector('#track-today'), 'clock', i18nText("ui.current_month")).addEventListener('click', () => this.select(null));
+    dateNavigation(root.querySelector('.track-controls'),{input:this.input,choose:root.querySelector('#track-month-choose'),previous:root.querySelector('#track-previous'),current:root.querySelector('#track-today'),next:root.querySelector('#track-next'),previousLabel:i18nText('ui.previous_month'),currentLabel:i18nText('ui.current_month'),nextLabel:i18nText('ui.next_month'),chooseLabel:i18nText('ui.choose_month_and_year'),month:true});
     const choose = (report) => {
       try {
         if (this.input.value === this.currentMonth()) {this.input.setCustomValidity('');return;}

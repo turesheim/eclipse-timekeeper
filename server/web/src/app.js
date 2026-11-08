@@ -16,6 +16,7 @@ import { createProjectIconPicker } from './project-icon-picker.js';
 import { UndoNotice } from './undo.js';
 import { accountMenu } from './account-menu.js';
 import { periodSwipe } from './period-swipe.js';
+import {dateNavigation} from './date-navigation.js';
 import { shiftMonth } from './month-model.js';
 import {focusedSnapshot,focusedCurrentSession,focusIncludesActivity} from './focus-model.js';
 import {renderFocusSettings} from './focus-settings.js';
@@ -159,9 +160,9 @@ function readOnlyWhileDisconnected() {
 async function tab(name) {
   const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return false;
   for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes']) $(`${item}-panel`).hidden = item !== name;
-  if(name==='notes')notes.show();else notes.hide();
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
+  if(name==='notes')notes.show();else notes.hide();
   if (name !== 'track') track.hide();
   if (name === 'today') today.show();else today.hide();
   if (name !== 'week') weekSessions.hide();
@@ -756,6 +757,7 @@ window.addEventListener('pageshow', (event) => {if (event.persisted) void auth.i
 $('status-icon').append(icon('refresh'));
 iconButton($('collapse-activities'), 'collapse', i18nText("ui.hide_activities"));
 iconButton($('expand-activities'), 'expand', i18nText("ui.show_activities"));
-for (const [id, glyph, label] of [['week-previous', 'left', i18nText("ui.previous_week")], ['week-next', 'right', i18nText("ui.next_week")], ['add-activity', 'add', i18nText("ui.add_time")]]) iconButton($(id), glyph, label);
+dateNavigation($('week-toolbar').querySelector('.calendar-controls'),{input:$('week-date'),previous:$('week-previous'),current:$('week-today'),next:$('week-next'),previousLabel:i18nText('ui.previous_week'),currentLabel:i18nText('ui.today'),nextLabel:i18nText('ui.next_week')});
+iconButton($('add-activity'),'add',i18nText('ui.add_time'));
 $('stop').prepend(icon('stop'));
 void auth.initialize();

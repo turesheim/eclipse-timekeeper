@@ -1403,5 +1403,7 @@
   "calendar.sharing.tasks.setup": "Hvis oppgaveappen tilbyr en iCalendar-lenke for oppgaver, legger du til abonnementslenken separat og velger Gjøremål. Uten en slik lenke kan du opprette en oppgave i Dagsverk eller legge inn en kalenderhendelse for det planlagte arbeidet.",
   "journal.retry_save": "Prøv å lagre på nytt",
   "calendar.video_meeting": "Videomøte",
-  "today.resize_sidebar": "Endre bredden på sidepanelet i I dag"
+  "today.resize_sidebar": "Endre bredden på sidepanelet i I dag",
+  "ui.date_navigation": "Datonavigasjon",
+  "notes.moved": "Flyttet til {{path}}."
 }
