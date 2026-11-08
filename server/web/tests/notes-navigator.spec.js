@@ -34,7 +34,7 @@ test('dragging a document into a folder preserves its draft, identity and conten
   await navigation.getByRole('button',{name:'Notes',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   await expect(noteEntry(navigation,'Notes/Archive/Review.md')).toBeVisible();
   const movedSource=noteEntry(navigation,'Notes/Archive/Review.md');await movedSource.click();await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue(draft);
-  const box=await navigation.boundingBox();await movedSource.dragTo(navigation,{targetPosition:{x:10,y:box.height-10}});
+  await expect(movedSource).toHaveAttribute('draggable','true');const box=await navigation.boundingBox();await movedSource.dragTo(navigation,{targetPosition:{x:10,y:box.height-10}});
   await expect(noteEntry(navigation,'Review.md')).toBeVisible();expect((await(await api('GET','/notes/entries/'+entry.id)).json()).path).toBe('Review.md');await expect(page.locator('#notes-body')).toHaveValue(draft);
 });
 
@@ -44,6 +44,7 @@ test('a conflicting document drop cannot replace either file',async({page,reques
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   await expect(noteEntry(navigation,source.path)).toHaveAttribute('draggable','true');await noteEntry(navigation,source.path).dragTo(noteEntry(navigation,'Notes/Archive'));
   await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
   expect((await(await api('GET','/notes/entries/'+source.id)).json()).path).toBe(source.path);
   for(const [entry,text] of [[source,'Source stays intact.'],[target,'Destination stays intact.']])expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(text);
 });

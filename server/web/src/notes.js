@@ -89,7 +89,7 @@ export class NotesView {
     for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.dragPending&&!this.dragged)this.clearDrag();});
     this.navigation.addEventListener('dragstart',event=>{
       const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
-      if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading){event.preventDefault();return;}
+      if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading&&!this.dragPending){event.preventDefault();return;}
       this.dragged={id:entry.id,session:this.session,generation:this.generation};event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('application/x-timekeeper-note',entry.id);
     });
     this.navigation.addEventListener('dragover',event=>{
@@ -124,7 +124,7 @@ export class NotesView {
     if(refresh)setTimeout(()=>{if(this.visible&&this.session===session&&!this.busy)void this.reload();},0);
   }
   dropTarget(event){
-    const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.loading||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
+    const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
     const source=this.entries.get(drag.id),row=event.target.closest?.('[role=treeitem]');
     const folder=row?this.entries.get(row.dataset.id):{id:this.info.rootId,path:'',kind:'FOLDER'};
     if(!source||source.sourceType!=='VAULT_CONTENT'||!folder||folder.kind!=='FOLDER'||source.parentId===folder.id)return null;
@@ -133,7 +133,7 @@ export class NotesView {
   async moveDocument(drag,folder){
     if(!await this.canLeave()||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale)return;
     const entry=this.note?.id===drag.id?this.note:this.entries.get(drag.id);if(!entry||entry.deleted||entry.sourceType!=='VAULT_CONTENT')return;
-    const path=(folder.path?folder.path+'/':'')+entry.path.split('/').at(-1);this.busy=true;this.controls();
+    const path=(folder.path?folder.path+'/':'')+entry.path.split('/').at(-1);this.moveFailed=false;this.busy=true;this.controls();
     try{
       const reply=await drag.session.request('/notes/entries/'+entry.id+'/path',{method:'PUT',etag:entry.entryEtag,body:{path}});
       if(drag.session!==this.session||drag.generation!==this.generation)return;
@@ -142,11 +142,11 @@ export class NotesView {
       this.expanded.add(folder.id);this.busy=false;await this.reload();
       if(drag.session!==this.session||drag.generation!==this.generation)return;
       this.moveStatus.textContent=t('notes.moved',{path:reply.data.path});this.callbacks.onChanged?.();
-    }catch(error){if(drag.session===this.session&&drag.generation===this.generation)this.fail(error);}
+    }catch(error){if(drag.session===this.session&&drag.generation===this.generation){this.moveFailed=true;this.fail(error);}}
     finally{if(drag.session===this.session&&drag.generation===this.generation){this.busy=false;this.controls();}}
   }
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.autosave.reset();this.saving=false;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  reset(){this.moveFailed=false;this.autosave.reset();this.saving=false;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
   navigationState(){
     const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
     this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);
@@ -158,7 +158,7 @@ export class NotesView {
   fit(){if(!this.visible||!this.root.offsetParent)return;const viewport=window.visualViewport,bottom=viewport?viewport.offsetTop+viewport.height:innerHeight;document.documentElement.style.setProperty('--notes-viewport-height',bottom+'px');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
-    for(const pick of this.tree.querySelectorAll('.notes-tree-pick')){const entry=this.entries.get(pick.parentElement.dataset.id);pick.draggable=!!(entry&&this.writable&&!this.stale&&!this.busy&&!this.loading&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
+    for(const pick of this.tree.querySelectorAll('.notes-tree-pick')){const entry=this.entries.get(pick.parentElement.dataset.id);pick.draggable=!!(entry&&this.writable&&!this.stale&&!this.busy&&(!this.loading||this.dragPending||this.dragged)&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.retrySave.hidden=!this.saveFailed||!this.note||this.note.deleted;this.retrySave.textContent=t(this.uncertain?'journal.check_result':'journal.retry_save');this.retrySave.disabled=!!this.busy||!!this.saving||!this.writable||this.stale&&!this.uncertain;
     this.rename.disabled=this.remove.disabled=!write||this.saving||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;
@@ -199,7 +199,7 @@ export class NotesView {
       const search=this.search.value.trim();const children=new Map(),entries=new Map();
       if(search||this.showTrash){const listed=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
       else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),listed=await this.list({parentId:parent},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&(expandAll||expanded.has(row.id))){expanded.add(row.id);pending.push(row.id);}}}}
-      if(session!==this.session||current!==this.loadGeneration)return;this.expanded=expanded;this.children=children;this.entries=entries;this.paint();if(!this.stale)this.error.hidden=true;
+      if(session!==this.session||current!==this.loadGeneration)return;this.expanded=expanded;this.children=children;this.entries=entries;this.paint();if(!this.stale&&!this.moveFailed)this.error.hidden=true;
       if(this.note&&!this.saving){const inspected=this.note;const reply=await session.request('/notes/entries/'+inspected.id);if(session!==this.session||current!==this.loadGeneration)return;if(this.note!==inspected||this.saving)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}}
     }catch(error){if(session===this.session&&current===this.loadGeneration){if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.expandAllRequested=false;this.controls();}}
@@ -228,7 +228,7 @@ export class NotesView {
   async select(id,force=false){
     if(!id||this.busy||!force&&this.note?.id===id||!force&&!await this.canLeave())return;
     if(this.note&&!this.binary)this.positions.set(this.note.id,this.markdown.position());
-    this.autosave.reset();this.saveFailed=false;this.uncertain=null;const session=this.session,current=++this.generation;this.clearPreview();this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
+    this.moveFailed=false;this.autosave.reset();this.saveFailed=false;this.uncertain=null;const session=this.session,current=++this.generation;this.clearPreview();this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
     try{
       const reply=await session.request('/notes/entries/'+id);if(session!==this.session||current!==this.generation)return;
       const metadata={...reply.data};let text='',imageBlob=null;
