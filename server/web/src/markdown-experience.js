@@ -125,13 +125,13 @@ export function buildExperience(field){
   const editorKeys=event=>{
     if(event.isComposing||suggestions.hidden)return;
     if(event.key==='ArrowDown'){event.preventDefault();event.stopPropagation();suggestions.querySelector('button')?.focus();}
-    else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.dismissSuggestions();f.focus();}
+    else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.dismissSuggestions();if(!f.editor)f.escapeTab=true;f.focus();}
   };
   f.rich.addEventListener('keydown',editorKeys,true);f.text.addEventListener('keydown',editorKeys,true);
   suggestions.addEventListener('focusout',()=>queueMicrotask(()=>f.updateExperience()));
   suggestions.addEventListener('keydown',event=>{
     const buttons=[...suggestions.querySelectorAll('button')],index=buttons.indexOf(document.activeElement);
     if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();event.stopPropagation();buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}
-    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.dismissSuggestions();f.focus();}
+    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.dismissSuggestions();if(!f.editor)f.escapeTab=true;f.focus();}
   });
 }

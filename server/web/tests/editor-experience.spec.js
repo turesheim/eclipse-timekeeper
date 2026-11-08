@@ -281,3 +281,30 @@ test('document assistance rejects delayed old results and clears them when its d
     await page.evaluate(()=>{globalThis.field.setValue('A different private document.');globalThis.finishCompletion();});await expect(list).toBeHidden();await expect(list.getByRole('option')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toBe('A different private document.');
   }
 });
+
+
+test('internal-link choices fit phones and remain accessible in every theme in both modes',async({page})=>{
+  const catalog=Array.from({length:20},(_,index)=>({path:'Notes/Document-'+index+'.md',title:'Document '+index,kind:'MARKDOWN'}));
+  await page.setViewportSize({width:390,height:844});
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
+    const list=page.locator('#experience-field .markdown-suggestions');await expect(list.getByRole('option')).toHaveCount(20);
+    const fits=await list.evaluate(node=>{const rect=node.getBoundingClientRect();return rect.left>=7&&rect.right<=innerWidth-7&&rect.top>=7&&rect.bottom<=innerHeight-7;});expect(fits).toBe(true);
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+    }
+    await captureScreenshot(page,{path:`test-results/internal-choices-phone-${formatted?'formatted':'source'}.png`,fullPage:true});
+    await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(edit).toBeFocused();
+  }
+});
+
+test('bracket pairing wraps a selection without losing its text and composition stays unpaired',async({page})=>{
+  for(const formatted of [true,false]){
+    await field(page,'Keep selected text.',formatted);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.focus();
+    await edit.evaluate(node=>{if(node instanceof HTMLTextAreaElement)node.setSelectionRange(5,13);else{const text=node.querySelector('p').firstChild,range=document.createRange();range.setStart(text,5);range.setEnd(text,13);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));}});
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('Keep [selected] text.');
+    await field(page,'',formatted,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);const composing=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await composing.click();await composing.dispatchEvent('compositionstart',{data:''});await page.keyboard.type('[[');
+    await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();expect(await composing.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[');await composing.dispatchEvent('compositionend',{data:'[['});
+  }
+});
