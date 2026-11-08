@@ -316,6 +316,14 @@ public class ServerStore {
             while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
+    /** Bounded range reads use the existing owner/type/id resource primary key. */
+    List<JsonNode> list(String type,UUID first,UUID last,int limit) {
+        if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource batch");
+        var result=new ArrayList<JsonNode>();
+        try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id FETCH FIRST "+limit+" ROWS ONLY",owner(),type,first,last);var rows=statement.executeQuery()){
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     /** Indexed owner-private children without loading canonical document bytes. */
     List<JsonNode> children(String type,UUID parent,String kind) {
         var result=new ArrayList<JsonNode>();
@@ -516,6 +524,7 @@ public class ServerStore {
         if ("TASK".equals(type)) update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
         if ("ACTIVITY".equals(type)) update("DELETE FROM tk_active WHERE owner_id=? AND activity_id=?",owner(),id);
         if (update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=? AND version=?",owner(),type,id,existing.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
+        if(type.equals(VaultIndex.ENTRY))new NotesSearchChanges(this).changed(existing,null);
     }
     boolean related(String kind,String type,UUID id) {
         try (var statement = statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND kind=? AND to_type=? AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),kind,type,id); var rows = statement.executeQuery()) { return rows.next(); }

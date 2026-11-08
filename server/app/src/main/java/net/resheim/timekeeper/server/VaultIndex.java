@@ -156,6 +156,7 @@ final class VaultIndex {
         var value=data.deepCopy().put("id",id.toString()).put("ownerId",store.owner()).put("version",version+1);
         if(previous==null)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),type,id,version+1,value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),type,id,version)!=1)throw new ApiFailure(412,"STALE_VERSION");
+        if(type.equals(ENTRY))new NotesSearchChanges(store).changed(previous,value);
         return value;
     }
     private static ObjectNode copy(JsonNode value){return ((ObjectNode)value).deepCopy();}

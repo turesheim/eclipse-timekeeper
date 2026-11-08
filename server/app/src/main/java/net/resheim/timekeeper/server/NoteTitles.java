@@ -28,7 +28,10 @@ final class NoteTitles {
     static String heading(String markdown){
         if(markdown.startsWith("\ufeff"))markdown=markdown.substring(1);
         // Only document headings supply a title; quoted or code examples do not.
-        for(Node block=MARKDOWN.parse(markdown).getFirstChild();block!=null;block=block.getNext())if(block instanceof Heading){
+        return heading(MARKDOWN.parse(markdown));
+    }
+    static String heading(Node document){
+        for(Node block=document.getFirstChild();block!=null;block=block.getNext())if(block instanceof Heading){
             var text=new StringBuilder();block.accept(new AbstractVisitor(){
                 @Override public void visit(Text node){text.append(node.getLiteral());}
                 @Override public void visit(Code node){text.append(node.getLiteral());}

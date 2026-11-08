@@ -54,6 +54,7 @@ final class VaultSettings {
         value.put("version",version+1).put("modifiedAt",store.now().toString());
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),TYPE,ID,version+1,value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),TYPE,ID,version)!=1)throw new ApiFailure(412,"STALE_VERSION");
+        if(List.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder").stream().anyMatch(field->!Objects.equals(previous.get(field),value.get(field))))new NotesSearchChanges(store).scopeChanged();
         return value;
     }
 }
