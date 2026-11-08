@@ -8,6 +8,7 @@ import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
 import { iconButton } from './icons.js';
+import {dateNavigation} from './date-navigation.js';
 import {CalendarSubscriptions,styleCalendarEvent} from './calendar-subscriptions.js';
 import {TrackDayNotes} from './track-day-notes.js';
 import {publicHolidayCalendar,holidayRegion,selectedHolidayCountry} from './holidays.js';
@@ -35,6 +36,7 @@ export class WeekCalendar {
     this.controls.previous.addEventListener('click', () => callbacks.onDate(addDays(this.calendar.first, -7)));
     this.controls.next.addEventListener('click', () => callbacks.onDate(addDays(this.calendar.first, 7)));
     this.controls.today.addEventListener('click', () => callbacks.onDate(dateInZone(this.data.report.generatedAt, this.data.profile.data.zoneId)));
+    dateNavigation(root.querySelector('.calendar-controls'),{input:root.querySelector('#calendar-date'),previous:this.controls.previous,current:this.controls.today,next:this.controls.next,previousLabel:i18nText('ui.previous_week'),currentLabel:i18nText('ui.today'),nextLabel:i18nText('ui.next_week')});
     this.controls.copy.addEventListener('click', () => this.copy());
     this.controls.paste.addEventListener('click', () => this.paste());
     this.controls.edit.addEventListener('click', () => this.edit());

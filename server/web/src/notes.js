@@ -83,6 +83,23 @@ export class NotesView {
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
     document.addEventListener('timekeeper:notes-changed',()=>{this.info=null;this.folder=null;if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
+    window.visualViewport?.addEventListener('resize',()=>this.fit());
+    this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
+    this.navigation.addEventListener('dragstart',event=>{
+      const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
+      if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading){event.preventDefault();return;}
+      this.dragged={id:entry.id,session:this.session,generation:this.generation};event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('application/x-timekeeper-note',entry.id);
+    });
+    this.navigation.addEventListener('dragover',event=>{
+      const target=this.dropTarget(event);this.clearDropTarget();if(!target)return;
+      event.preventDefault();event.dataTransfer.dropEffect='move';target.element.classList.add('notes-drop-target');
+    });
+    this.navigation.addEventListener('drop',event=>{
+      const target=this.dropTarget(event),source=this.dragged;this.clearDrag();if(!target)return;
+      event.preventDefault();void this.moveDocument(source,target.folder);
+    });
+    this.navigation.addEventListener('dragleave',event=>{if(!this.navigation.contains(event.relatedTarget))this.clearDropTarget();});
+    this.navigation.addEventListener('dragend',()=>this.clearDrag());
     // CSS can hide a focused control before matchMedia's change event, leaving
     // activeElement at body. Remember actual focus so the toggle can receive it.
     document.addEventListener('focusin',event=>{this.navigationFocused=this.navigation.contains(event.target)||event.target===this.resize;});
@@ -96,10 +113,33 @@ export class NotesView {
     if(this.session&&this.session!==session)this.reset();this.session=session;this.writable=connected&&writable;this.controls();
     if(this.visible&&!this.busy&&!this.loading)void this.reload();
   }
-  show(){this.visible=true;this.fit();if(this.session)void this.reload();}
-  hide(){this.visible=false;}
+  show(){this.visible=true;window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
+  hide(){this.visible=false;this.clearDrag();}
+  clearDropTarget(){this.navigation.classList.remove('notes-drop-target');for(const node of this.navigation.querySelectorAll('.notes-drop-target'))node.classList.remove('notes-drop-target');}
+  clearDrag(){this.dragged=null;this.clearDropTarget();}
+  dropTarget(event){
+    const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.loading||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
+    const source=this.entries.get(drag.id),row=event.target.closest?.('[role=treeitem]');
+    const folder=row?this.entries.get(row.dataset.id):{id:this.info.rootId,path:'',kind:'FOLDER'};
+    if(!source||!folder||folder.kind!=='FOLDER'||source.parentId===folder.id)return null;
+    return {folder,element:row?.querySelector('.notes-tree-pick')||this.navigation};
+  }
+  async moveDocument(drag,folder){
+    if(!await this.canLeave()||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale)return;
+    const entry=this.note?.id===drag.id?this.note:this.entries.get(drag.id);if(!entry||entry.deleted||entry.kind==='FOLDER')return;
+    const path=(folder.path?folder.path+'/':'')+entry.path.split('/').at(-1);this.busy=true;this.controls();
+    try{
+      const reply=await drag.session.request('/notes/entries/'+entry.id+'/path',{method:'PUT',etag:entry.entryEtag,body:{path}});
+      if(drag.session!==this.session||drag.generation!==this.generation)return;
+      if(this.note?.id===entry.id){this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}
+      this.expanded.add(folder.id);this.busy=false;await this.reload();
+      if(drag.session!==this.session||drag.generation!==this.generation)return;
+      this.moveStatus.textContent=t('notes.moved',{path:reply.data.path});this.callbacks.onChanged?.();
+    }catch(error){if(drag.session===this.session&&drag.generation===this.generation)this.fail(error);}
+    finally{if(drag.session===this.session&&drag.generation===this.generation){this.busy=false;this.controls();}}
+  }
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.autosave.reset();this.saving=false;this.uncertain=null;this.saveFailed=false;this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  reset(){this.autosave.reset();this.saving=false;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
   navigationState(){
     const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
     this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);
@@ -108,9 +148,10 @@ export class NotesView {
     if(!visible){this.closeSortMenu(false);if(this.visible&&focused)this.toggle.focus();}
     this.fit();
   }
-  fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top+scrollY,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0;this.root.style.setProperty('--notes-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');}
+  fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0,bottom=window.visualViewport?visualViewport.offsetTop+visualViewport.height:innerHeight;this.root.style.setProperty('--notes-editor-height',Math.max(0,bottom-top-navHeight)+'px');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
+    for(const pick of this.tree.querySelectorAll('.notes-tree-pick')){const entry=this.entries.get(pick.parentElement.dataset.id);pick.draggable=!!(entry&&this.writable&&!this.stale&&!this.busy&&!this.loading&&!this.showTrash&&!entry.deleted&&entry.kind!=='FOLDER');}
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.retrySave.hidden=!this.saveFailed||!this.note||this.note.deleted;this.retrySave.textContent=t(this.uncertain?'journal.check_result':'journal.retry_save');this.retrySave.disabled=!!this.busy||!!this.saving||!this.writable||this.stale&&!this.uncertain;
     this.rename.disabled=this.remove.disabled=!write||this.saving||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;

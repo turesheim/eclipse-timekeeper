@@ -1400,5 +1400,7 @@
   "calendar.sharing.tasks.setup": "If your task app provides an iCalendar task feed, add its subscription link separately and enable To-do items. Without such a feed, create a task in Dagsverk or add a calendar event for the planned work.",
   "journal.retry_save": "Retry saving",
   "calendar.video_meeting": "Video meeting",
-  "today.resize_sidebar": "Resize Today sidebar"
+  "today.resize_sidebar": "Resize Today sidebar",
+  "ui.date_navigation": "Date navigation",
+  "notes.moved": "Moved to {{path}}."
 }
