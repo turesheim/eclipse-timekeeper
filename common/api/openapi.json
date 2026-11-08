@@ -17918,7 +17918,7 @@
     "/notes/recent": {
       "get": {
         "operationId": "listRecentNotes",
-        "summary": "List recently edited notes excluding journal notes",
+        "summary": "List recently edited ordinary, event and journal notes",
         "x-required-permission": "read",
         "parameters": [
           {
@@ -17996,7 +17996,7 @@
             "$ref": "#/components/responses/507"
           }
         },
-        "description": "Metadata only, ordered by modification instant descending and then portable path and identity. The configured recentNotesDays window includes the entire current civil day in the account time zone. Excludes folders, assets, deleted entries and the configured journal subtree. Includes event notes. Pagination requires the first page snapshot in If-Match after offset zero; changes to the collection, day, time zone or preference invalidate it."
+        "description": "Metadata only, ordered by modification instant descending and then portable path and identity. The configured recentNotesDays window includes the entire current civil day in the account time zone. Includes ordinary, event and daily/weekly journal notes. Excludes folders, assets and deleted entries. Eligibility uses the edit instant rather than the journal date. Pagination requires the first page snapshot in If-Match after offset zero; changes to the collection, day, time zone, preference or selection policy invalidate it."
       }
     },
     "/admin/notes/limits": {
@@ -32241,7 +32241,7 @@
             "minimum": 1,
             "maximum": 3650,
             "default": 7,
-            "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+            "description": "Recent notes window in account-local calendar days including today; includes ordinary, event and daily/weekly journal notes."
           },
           "editorCursor": {
             "type": "string",
@@ -32310,7 +32310,7 @@
             "minimum": 1,
             "maximum": 3650,
             "default": 7,
-            "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+            "description": "Recent notes window in account-local calendar days including today; includes ordinary, event and daily/weekly journal notes."
           },
           "editorCursor": {
             "type": "string",
@@ -32677,7 +32677,7 @@
                 "minimum": 1,
                 "maximum": 3650,
                 "default": 7,
-                "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+                "description": "Recent notes window in account-local calendar days including today; includes ordinary, event and daily/weekly journal notes."
               },
               "editorCursor": {
                 "type": "string",
@@ -33064,7 +33064,7 @@
             "minimum": 1,
             "maximum": 3650,
             "default": 7,
-            "description": "Recent notes window in account-local calendar days including today; excludes the journal folder."
+            "description": "Recent notes window in account-local calendar days including today; includes ordinary, event and daily/weekly journal notes."
           },
           "zoneId": {
             "type": "string"

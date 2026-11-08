@@ -527,3 +527,6 @@ code, pre { font-size: var(--font-code); }
 .today-recent-list { display: grid; gap: .35rem; }
 .today-recent-note { display: grid; width: 100%; min-width: 0; text-align: start; }
 .today-recent-note > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-recent-note-title { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+.today-recent-note-title > .icon { flex: none; }
+.today-recent-note-title > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

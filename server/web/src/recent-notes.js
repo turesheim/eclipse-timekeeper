@@ -2,6 +2,7 @@ import {t} from './i18n.js';
 import {dateInZone,instantText} from './model.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {noteTitle} from './note-title.js';
+import {icon} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 
@@ -50,8 +51,11 @@ export class RecentNotes {
       const list=node('ul',undefined,'today-list today-recent-list'),scope=this.scope,generation=this.generation;
       for(const entry of this.items){
         const item=node('li'),action=node('button',undefined,'btn btn-outline-secondary today-recent-note');action.type='button';action.dataset.recentNote=entry.id;
-        action.append(node('strong',noteTitle(entry)),node('span',entry.path,'hint'));
-        action.title=(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
+        const [glyph,key]=entry.kind==='EVENT'?['calendar-event','notes.type_event']:['DAY','WEEK'].includes(entry.kind)?['journal-text','notes.type_journal']:['file-earmark-text','notes.type_ordinary'];
+        const title=node('span',undefined,'today-recent-note-title');
+        title.append(icon(glyph),node('span',t(key)+': ','visually-hidden'),node('strong',noteTitle(entry)));
+        action.append(title,node('span',entry.path,'hint'));
+        action.title=t(key)+'\n'+(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
         action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
         item.append(action);list.append(item);
       }

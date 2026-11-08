@@ -8,8 +8,9 @@ Save folder settings before importing a vault whose layout uses those folders.
 
 The **Recent notes: number of days** preference controls the list below Planned
 tasks in Today. The default is seven calendar days including today, using your
-account time zone. Journal notes are excluded; other Markdown and event notes
-open in Notes when selected. Selecting a historical date in Today does not change
+account time zone. Ordinary, event and daily/weekly journal notes have distinct
+icons before their titles, with their type also announced to screen readers.
+All open in Notes when selected. Selecting a historical date in Today does not change
 this recent-edit window. Unsaved drafts still require confirmation before leaving.
 
 Under **Import notes**, choose the local vault root with **Choose vault folder**.
