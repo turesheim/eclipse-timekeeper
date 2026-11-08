@@ -485,3 +485,20 @@ test('a stale bookmark write reloads metadata and preserves the note draft',asyn
   const markPath='/notes/bookmark?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey}),before=await api('GET',markPath);await api('PUT',markPath,{bookmarked:true},{'If-Match':before.headers().etag});
   const source=await notesSource(page);await source.fill('Draft remains private');const rejected=page.waitForResponse(reply=>reply.request().method()==='PUT'&&reply.url().includes('/notes/bookmark?'));await button.click();expect((await rejected).status()).toBe(412);await expect(button).toHaveAttribute('aria-pressed','true');await expect(source).toHaveValue('Draft remains private');expect((await(await api('GET',markPath)).json()).bookmarked).toBe(true);
 });
+
+test('touch users can add a bookmark on a narrow Today editor without hover',async({page,request,browser})=>{
+  await setup(page,request);const phone=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,storageState:await page.context().storageState(),viewport:{width:390,height:844},hasTouch:true,isMobile:true});
+  try{
+    const mobile=await phone.newPage();await mobile.goto('/web/');await expect(mobile.locator('#status')).toHaveText('Up to date');await mobile.locator('[data-tab=today]').click();await mobile.locator('#today-date').fill('2026-11-10');const button=mobile.locator('#today-note-editor .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('opacity','1');await button.tap();await expect(button).toHaveAttribute('aria-pressed','true');await captureScreenshot(mobile,{path:test.info().outputPath('bookmark-touch-phone.png')});
+  }finally{await phone.close();}
+});
+
+test('a delayed bookmark response cannot paint the next selected note',async({page,request})=>{
+  const api=await setup(page,request);const first=await(await api('PUT','/notes/files?path=Notes%2FFirst.md',Buffer.from('First note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();await api('PUT','/notes/files?path=Notes%2FSecond.md',Buffer.from('Second note'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  const markPath='/notes/bookmark?'+new URLSearchParams({sourceType:first.sourceType,sourceKey:first.sourceKey}),before=await api('GET',markPath);await api('PUT',markPath,{bookmarked:true},{'If-Match':before.headers().etag});
+  let release,arrive,deliver;const gate=new Promise(resolve=>release=resolve),arrived=new Promise(resolve=>arrive=resolve),delivered=new Promise(resolve=>deliver=resolve);let delayed=false;
+  await page.route('**/api/v1/notes/bookmark?**',async route=>{
+    if(new URL(route.request().url()).searchParams.get('sourceKey')!==first.sourceKey||delayed)return route.continue();delayed=true;const response=await route.fetch();arrive();await gate;try{await route.fulfill({response});}finally{deliver();}
+  });
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/First.md').click();await arrived;await noteEntry(page.locator('#notes-navigation'),'Notes/Second.md').click();const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveAttribute('aria-pressed','false');release();await delivered;await expect(button).toHaveAttribute('aria-pressed','false');await expect(page.locator('#notes-document-title')).toHaveText('Second.md');
+});
