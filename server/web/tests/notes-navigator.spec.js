@@ -90,16 +90,18 @@ test('Notes keeps navigation and both editor modes anchored while their contents
   // be hidden when Notes measures its available viewport.
   await page.locator('[data-tab=activities]').click();await page.evaluate(()=>scrollTo(0,300));await page.locator('[data-tab=notes]').click();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Long.md').click();
-  for(const width of [1440,390]){
-    await page.setViewportSize({width,height:900});
-    if(width===390)await page.locator('.notes-drawer-toggle').click();
+  for(const {width,height} of [{width:1440,height:900},{width:390,height:900},{width:844,height:600},{width:320,height:568}]){
+    await page.setViewportSize({width,height});
+    expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
+    if(width<=760)await page.locator('.notes-drawer-toggle').click();
     await navigation.hover();await page.mouse.wheel(0,3000);await expect.poll(()=>navigation.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     const top=await navigation.evaluate(node=>node.getBoundingClientRect().top);await page.mouse.wheel(0,3000);expect(await page.evaluate(()=>scrollY)).toBe(0);expect(await navigation.evaluate(node=>node.getBoundingClientRect().top)).toBe(top);
-    if(width===390)await page.locator('.notes-drawer-toggle').click();
+    if(width<=760)await page.locator('.notes-drawer-toggle').click();
     for(const mode of ['Markdown source','Formatted']){
       await page.locator('#notes-panel').getByRole('button',{name:mode,exact:true}).click();const content=page.locator(mode==='Formatted'?'.notes-markdown .ProseMirror':'#notes-body');
       await content.hover();await page.mouse.wheel(0,5000);await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.mouse.wheel(0,5000);
       expect(await page.evaluate(()=>scrollY)).toBe(0);await expect(page.locator('.notes-footer')).toBeInViewport();
+      expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
       const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
       await captureScreenshot(page,{path:`test-results/notes-anchored-${width}-${mode==='Formatted'?'formatted':'source'}.png`});
     }

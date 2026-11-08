@@ -50,6 +50,26 @@ test('Notes account imports a vault with review, guarded conflicts and exact fil
   }finally{await rm(root,{recursive:true,force:true});}
 });
 
+test('Notes shows saved creation and change times in the account zone, retaining them through drafts and rejected saves',async({page,request})=>{
+  const api=await setup(page,request),createdAt='2026-07-01T12:34:56Z',modifiedAt='2026-07-02T20:30:00Z';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Dates.md',createdAt,modifiedAt}),Buffer.from('# Saved dates\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const me=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo',locale:'en-GB'},{'If-Match':me.headers().etag});
+  await page.reload();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Dates.md').click();
+  const times=page.locator('.notes-timestamps time'),status=page.locator('.notes-footer > [role=status]');
+  await expect(times.nth(0)).toHaveAttribute('datetime',createdAt);await expect(times.nth(0)).toContainText('14:34:56');await expect(times.nth(1)).toHaveAttribute('datetime',modifiedAt);await expect(times.nth(1)).toContainText('22:30:00');
+  await expect(page.locator('.notes-timestamps')).toContainText('Created:');await expect(page.locator('.notes-timestamps')).toContainText('Last changed:');
+  await page.route('**/api/v1/notes/entries/'+entry.id+'/content',route=>route.request().method()==='PUT'?route.fulfill({status:412,contentType:'application/json',body:JSON.stringify({error:{code:'STALE_VERSION',message:'Concurrent edit'}})}):route.continue());
+  const source=await notesSource(page);await source.fill('# Pending dates\n');await expect(status).toHaveText('Unsaved changes');await expect(times.nth(1)).toHaveAttribute('datetime',modifiedAt);
+  await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect(status).toContainText('changed');await expect(times.nth(1)).toHaveAttribute('datetime',modifiedAt);
+  await page.unrouteAll({behavior:'wait'});await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(status).toHaveText('Saved');
+  await source.fill('# Saved again\n');await saveMarkdown(page.locator('#notes-panel'));await expect(times.nth(1)).not.toHaveAttribute('datetime',modifiedAt);await expect(times.nth(0)).toHaveAttribute('datetime',createdAt);
+  const saved=await(await api('GET','/notes/entries/'+entry.id)).json();await expect(times.nth(1)).toHaveAttribute('datetime',saved.modifiedAt);
+  const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await page.locator('[data-tab=notes]').click();
+  await expect(page.locator('.notes-timestamps')).toBeHidden();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Dates.md').click();
+  await expect(page.locator('.notes-timestamps')).toContainText('Opprettet:');await expect(page.locator('.notes-timestamps')).toContainText('Sist endret:');await expect(times.nth(0)).toContainText('12:34:56');
+  for(const width of [1440,320]){await page.setViewportSize({width,height:900});await expect(times.nth(0)).toBeInViewport();await expect(times.nth(1)).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-saved-dates-${width}.png`});}
+});
+
 test('Notes source and formatted editors stay above the menu at desktop and phone sizes',async({page,request})=>{
   const api=await setup(page,request),body='# Document\n\n'+Array.from({length:150},(_,index)=>'Paragraph '+index+' with enough text for scrolling.\n\n').join('');
   await api('PUT','/notes/files?path=Notes%2FViewport.md',Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});

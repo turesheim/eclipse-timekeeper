@@ -1405,5 +1405,7 @@
   "calendar.video_meeting": "Videomøte",
   "today.resize_sidebar": "Endre bredden på sidepanelet i I dag",
   "ui.date_navigation": "Datonavigasjon",
-  "notes.moved": "Flyttet til {{path}}."
+  "notes.moved": "Flyttet til {{path}}.",
+  "notes.created": "Opprettet:",
+  "notes.modified": "Sist endret:"
 }

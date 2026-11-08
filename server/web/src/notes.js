@@ -8,6 +8,7 @@ import {relativeNotePath,rasterType,notesEntryVisible} from './notes-links.js';
 import {vaultEditorResources} from './vault-editor-resources.js';
 import {imagePreview} from './image-preview.js';
 import {noteTitle} from './note-title.js';
+import {dateTimeFormat} from './formatters.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const action=(label,run,name)=>{const value=node('button',name?'':label,'btn btn-outline-secondary');value.type='button';if(name)iconButton(value,name,label);value.addEventListener('click',run);return value;};
@@ -72,7 +73,9 @@ export class NotesView {
     this.markdown.addActionsGroup(this.documentTools);this.editor.append(this.markdown.actionsMenu);this.editor.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.preview=node('div',undefined,'notes-image-preview');this.preview.hidden=true;
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
-    const footer=node('div',undefined,'notes-footer');footer.append(this.status);this.retrySave=action(t('journal.retry_save'),()=>void this.retryCommit());this.retrySave.hidden=true;footer.append(this.retrySave);
+    this.timestamps=node('p',undefined,'hint notes-timestamps');this.timestamps.hidden=true;this.savedDates={};
+    for(const [field,key]of [['createdAt','notes.created'],['modifiedAt','notes.modified']]){const label=node('span'),time=node('time');label.append(document.createTextNode(t(key)+' '),time);this.savedDates[field]=time;this.timestamps.append(label);}
+    const footer=node('div',undefined,'notes-footer');footer.append(this.status,this.timestamps);this.retrySave=action(t('journal.retry_save'),()=>void this.retryCommit());this.retrySave.hidden=true;footer.append(this.retrySave);
     this.editor.append(fileTools,this.empty,host,this.preview,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
     this.dialog=node('dialog',undefined,'app-dialog');this.dialogTitle=node('h2');this.dialogTitle.id='notes-path-title';this.dialog.setAttribute('aria-labelledby',this.dialogTitle.id);
     this.form=node('form');const pathLabel=node('label',t('notes.path'),'form-label');this.pathInput=node('input',undefined,'form-control');this.pathInput.id='notes-path';this.pathInput.required=true;this.pathInput.maxLength=1024;pathLabel.htmlFor=this.pathInput.id;
@@ -112,7 +115,7 @@ export class NotesView {
   async reloadDocument(){if(this.saving)await this.autosave.flush();if(!this.note||this.busy||this.dirty()&&!confirm(t('journal.reload_confirm')))return;await this.select(this.note.id,true);}
   async retryCommit(){if(this.uncertain){await this.checkCommitted();return;}this.stale=false;this.error.hidden=true;await this.autosave.flush();}
   update(snapshot,connected,session,writable){
-    if(this.session&&this.session!==session)this.reset();this.session=session;this.writable=connected&&writable;this.controls();
+    if(this.session&&this.session!==session)this.reset();this.session=session;this.zone=snapshot?.profile?.data?.zoneId||'UTC';this.writable=connected&&writable;this.controls();
     if(this.visible&&!this.busy&&!this.loading)void this.reload();
   }
   show(){this.visible=true;window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
@@ -171,7 +174,12 @@ export class NotesView {
     this.empty.hidden=!!this.selectedImage||!!this.note&&!this.binary&&!this.note.deleted;this.preview.hidden=!this.selectedImage;this.markdown.root.hidden=!this.note||this.binary||this.note.deleted;
     const host=this.markdown.root.hidden?this.fileTools:this.markdown.toolbar;if(this.markdown.actionsTrigger.parentElement!==host)host.append(this.markdown.actionsTrigger);
     this.markdown.resourceTools.hidden=this.markdown.root.hidden;this.documentTools.hidden=!this.note;this.fileTools.hidden=!this.note||host!==this.fileTools;this.markdown.syncActions();
-    if(this.note&&!this.busy)this.status.textContent=this.saving?t('journal.saving'):this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
+    if(!this.note)this.status.textContent='';else if(!this.busy)this.status.textContent=this.saving?t('journal.saving'):this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
+    this.timestamps.hidden=!this.note;
+    for(const [field,time]of Object.entries(this.savedDates)){
+      const value=this.note?.[field],date=new Date(value||NaN),valid=Number.isFinite(date.getTime());time.parentElement.hidden=!valid;
+      time.dateTime=valid?value:'';time.textContent=valid?dateTimeFormat(getLocale(),{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short',timeZone:this.zone||'UTC'}).format(date):'';
+    }
   }
   fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}
   sortState(){
