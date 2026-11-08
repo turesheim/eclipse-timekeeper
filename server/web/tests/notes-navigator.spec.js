@@ -123,7 +123,7 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
   });
   const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   const rows=navigation.locator(`[role=treeitem][data-id="${folder.id}"] > [role=group] > [role=treeitem] > button`);
-  await expect(rows).toHaveText(['Nested','Alpha.md','Beta.md','Zulu.md']);expect(new Set(offsets)).toEqual(new Set([0,1,2,3]));
+  await expect(rows).toHaveText(['Nested','Alpha','Beta','Zulu']);expect(new Set(offsets)).toEqual(new Set([0,1,2,3]));
   await navigation.getByRole('button',{name:'Notes/Alpha.md',exact:true}).click();await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('Unsaved navigator draft.');
   const toolbar=navigation.getByRole('toolbar',{name:'Note navigation actions'});await expect(toolbar.getByRole('group')).toHaveCount(3);
   const refresh=toolbar.getByRole('button',{name:'Refresh',exact:true}),trash=toolbar.getByRole('button',{name:'Recently deleted',exact:true});
@@ -134,13 +134,13 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
     ['Modified (oldest first)',['Beta','Zulu','Alpha']],['Modified (newest first)',['Alpha','Zulu','Beta']]
   ]){
     await toolbar.getByRole('button',{name:'Sort notes',exact:true}).click();await page.getByRole('menuitemradio',{name:label,exact:true}).click();
-    await expect(rows).toHaveText(['Nested',...names.map(name=>name+'.md')]);await expect(page.locator('#notes-body')).toHaveValue('Unsaved navigator draft.');
+    await expect(rows).toHaveText(['Nested',...names]);await expect(page.locator('#notes-body')).toHaveValue('Unsaved navigator draft.');
     await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   }
   const sort=toolbar.getByRole('button',{name:'Sort notes',exact:true});await sort.focus();await sort.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Modified (newest first)',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(sort).toBeFocused();
   await sort.press('ArrowRight');await expect(toolbar.getByRole('button',{name:'Collapse all folders',exact:true})).toBeFocused();await page.keyboard.press('ArrowLeft');await expect(sort).toBeFocused();
   await page.locator('#notes-search').fill('.md');await expect(toolbar.getByRole('button',{name:'Expand all folders',exact:true})).toBeDisabled();
-  await expect(navigation.locator('[role=treeitem] > button')).toHaveText(['Notes/Alpha.md','Notes/Zulu.md','Notes/Beta.md']);
+  await expect(navigation.locator('[role=treeitem] > button')).toHaveText(['Alpha','Zulu','Beta']);
 });
 
 test('expand and collapse cover nested folders, exclude a hidden journal and cancel stale expansion',async({page,request})=>{
