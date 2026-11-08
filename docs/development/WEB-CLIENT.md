@@ -126,6 +126,12 @@ linked from About. See the [editor development contract](MARKDOWN-EDITOR.md).
 
 ## Today and Calendar views
 
+The shared date-navigation component reuses each view's date input and period
+handlers. Today, Calendar, Week, Workweek and Activities use the same grouped
+picker and previous/current/next controls; the monthly picker retains its month
+and year popover. Date labels remain available to assistive technology, while
+redundant visible month, work-session and date/time-zone captions are omitted.
+
 **Today** is the default workspace tab. It opens a selected day with its Markdown
 journal in the main column. The date field and adjacent buttons move between
 days. The mini calendar selects any visible date, marks dates containing day
@@ -1095,12 +1101,6 @@ emulation to check a 34px inset with desktop and touch input at narrow/wide
 widths; other engines check their naturally reported inset.
 
 ## Notes collections
-
-The shared date-navigation component reuses each view's date input and period
-handlers. Today, Calendar, Week, Workweek and Activities use the same grouped
-picker and previous/current/next controls; the monthly picker retains its month
-and year popover. Date labels remain available to assistive technology, while
-redundant visible month, total and date/time-zone captions are omitted.
 
 Notes navigation, editor headings and Today’s Recent notes use the API’s display
 title: event titles for event notes and the first document heading for ordinary

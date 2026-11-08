@@ -49,6 +49,13 @@ test('a conflicting document drop cannot replace either file',async({page,reques
   for(const [entry,text] of [[source,'Source stays intact.'],[target,'Destination stays intact.']])expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(text);
 });
 
+test('native journal documents retain their folder associations when organizing notes',async({page,request})=>{
+  const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');
+  for(const name of ['2026-11-02.md','2026-W45.md'])await put(api,'journal/'+name,'Canonical journal body.');
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(navigation,'journal').click();
+  for(const name of ['2026-11-02.md','2026-W45.md'])await expect(noteEntry(navigation,'journal/'+name)).toHaveAttribute('draggable','false');
+});
+
 test('a read-only Notes session cannot drag or drop a document into another folder',async({page,request,browser})=>{
   const {api}=await setup(page,request);await api('POST','/notes/folders',{path:'Notes/Archive'});const entry=await(await put(api,'Notes/Read only.md','Read-only source.')).json();
   const token=await(await api('POST','/auth/tokens',{name:'Read-only document drag','permissions':['read'],'expiresAt':null})).json();
@@ -82,6 +89,7 @@ test('Notes keeps navigation and both editor modes anchored while their contents
       await content.hover();await page.mouse.wheel(0,5000);await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.mouse.wheel(0,5000);
       expect(await page.evaluate(()=>scrollY)).toBe(0);await expect(page.locator('.notes-footer')).toBeInViewport();
       const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
+      await captureScreenshot(page,{path:`test-results/notes-anchored-${width}-${mode==='Formatted'?'formatted':'source'}.png`});
     }
   }
 });
