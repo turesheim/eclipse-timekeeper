@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Portable logical records plus checksummed bytes; no database indexes or authority. */
 final class VaultArchive {
-    private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt");
+    private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt","createdAtSource");
     private static final Set<String> SETTINGS_FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder","recentNotesDays","editorCursor");
     @FunctionalInterface interface File {void accept(String path,byte[] bytes)throws IOException;}
     static boolean owns(String name){return name!=null&&name.matches("vault/(content|recycle)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin");}
@@ -52,6 +52,7 @@ final class VaultArchive {
                 if(!value.path(date).isTextual())throw ApiFailure.validation();
                 VaultImportDates.parse(value.path(date).asText(),null);
             }
+            if(value.has("createdAtSource"))VaultImportDates.parse(value.has("createdAt")?value.path("createdAt").asText():null,null,value.path("createdAtSource").asText());
             UUID id=identifier(value.path("id").asText());identifier(value.path("parentId").asText());
             var path=new VaultPath(value.path("path").asText());if(!path.value().equals(value.path("path").asText())||entries.put(id,((ObjectNode)value).deepCopy())!=null)throw ApiFailure.validation();
             final VaultIndex.Kind kind;try{kind=VaultIndex.Kind.valueOf(value.path("kind").asText());}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}

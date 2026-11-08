@@ -377,7 +377,7 @@ def prepare_import_metadata(folder,maximum=160_000_000,include_config=False,max_
         result={'modifiedAt':instant(value.st_mtime_ns)}
         birth=getattr(value,'st_birthtime_ns',None)
         if birth is None and hasattr(value,'st_birthtime'):birth=round(value.st_birthtime*1_000_000_000)
-        if birth is not None:result['createdAt']=instant(birth)
+        if birth is not None:result.update(createdAt=instant(birth),createdAtSource='ORIGINAL')
         # POSIX ctime is a metadata-change time, never a substitute for birthtime.
         return result
     def visit(fd,prefix=''):

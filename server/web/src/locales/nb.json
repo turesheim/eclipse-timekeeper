@@ -1316,7 +1316,7 @@
   "notes.import_metadata_changed": "Innholdet ble endret etter tidsstempeløyeblikksbildet. Filens nåværende endringstid brukes.",
   "notes.export_title": "Eksporter notater",
   "notes.export_help": "Opprett en ZIP-fil med alle aktive notater, dagbok- og hendelsesmapper og vedlegg. Markdown og relative stier beholdes nøyaktig. Tidsstempelmetadata bevarer opprettelses- og endringsdatoer ved import av den utpakkede mappen. Nylig slettede elementer og kontodata tas ikke med.",
-  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Eksportmetadata fra Dagsverk bevarer disse datoene. For et eksisterende lokalt hvelv kan den manuelle klienten opprette tidsstempelmetadata før du velger mappen.",
+  "notes.import_dates_help": "Filenes endringsdatoer bevares. Nettlesere gir ikke tilgang til filsystemets opprettelsesdatoer. Uten tidsstempelmetadata registreres det når en ny fil ble lagt til i Dagsverk. En erstatning beholder den eksisterende opprettelsesdatoen. Eksport fra Dagsverk inkluderer tidsstempelmetadata. For et lokalt hvelv kan den manuelle klienten klargjøre opprinnelige tidsstempler før du velger mappen.",
   "notes.import_reviewed_other": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
   "notes.import_done_other": "Importerte {{count}} filer. Filer i konflikt er uendret.",
   "notes.import_reviewed_one": "{{count}} ny fil er klar til import. Se gjennom listen før du fortsetter.",
@@ -1440,5 +1440,13 @@
   "tasks.more": "Vis flere oppgaver",
   "tasks.loading": "Laster kalenderoppgaver …",
   "notes.created": "Opprettet:",
-  "notes.modified": "Sist endret:"
+  "notes.modified": "Sist endret:",
+  "notes.added": "Lagt til:",
+  "notes.created_or_added": "Opprettet / lagt til:",
+  "notes.creation_date_help": "En opprinnelig opprettelsesdato vises når den er oppgitt. Ellers registrerer Dagsverk når elementet ble lagt til. Eldre elementer angir ikke alltid hvilken dato som er registrert.",
+  "notes.import_overwrite": "Overskriv eksisterende filer",
+  "notes.import_overwrite_help": "Eksisterende filer beholdes som standard. Slå på dette for å gjennomgå erstatninger. Filer som endres eller flyttes etter gjennomgangen, beholdes og rapporteres som konflikter.",
+  "notes.import_replace": "Vil erstatte eksisterende fil",
+  "notes.import_reviewed_overwrite": "{{count}} filer er valgt, inkludert {{replacements}} erstatninger. Gjennomgå før import.",
+  "notes.import_apply_selected": "Importer valgte filer"
 }

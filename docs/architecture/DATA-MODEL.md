@@ -681,7 +681,10 @@ used by all canonical note writers. Metadata queries never fetch attachment data
 
 New entries also record a `createdAt` timestamp, using an original source creation
 time supplied during create-only import, or otherwise their creation in the
-collection. It survives content edits, moves, deletion/recovery and logical
+collection. `createdAtSource` distinguishes `ORIGINAL` source creation from
+`ADDED` collection addition; absent provenance or `UNKNOWN` stays unknown.
+Clients must not infer it from the ordering of creation and modification times.
+It survives content edits, moves, deletion/recovery and logical
 account archives. Entries predating this metadata may omit it; reads and moves do
 not invent a creation date. File `modifiedAt` remains the canonical content's
 modification time. A create-only import can supply this original modification

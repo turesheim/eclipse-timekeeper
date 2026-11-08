@@ -22,7 +22,7 @@ final class VaultExport {
                 String path=new VaultPath(entry.path("path").asText()).value();boolean directory=VaultCollection.folder(entry);
                 names.add(new VaultPath(path).key());
                 var metadata=object().put("path",path).put("kind",directory?"FOLDER":"FILE");
-                if(entry.has("createdAt"))metadata.set("createdAt",entry.get("createdAt"));
+                if(entry.has("createdAt")){metadata.set("createdAt",entry.get("createdAt"));metadata.put("createdAtSource",entry.path("createdAtSource").asText("UNKNOWN"));}
                 final byte[] bytes;
                 if(directory){bytes=new byte[0];if(entry.has("modifiedAt"))metadata.set("modifiedAt",entry.get("modifiedAt"));}
                 else{

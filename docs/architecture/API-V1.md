@@ -1199,29 +1199,41 @@ carry entryEtag in the HTTP ETag header; content responses carry the content
 validator. Use entryEtag for PUT `/path`, DELETE entry and POST `/restore`.
 New entries include `createdAt`, the original creation time supplied by import,
 or otherwise the time they were added to the collection. Existing entries with
-no recorded creation date omit it. It is
-preserved by editing, moving, recovery and account archives. `modifiedAt` describes
+no recorded creation date omit it. `createdAtSource` is `ORIGINAL`, `ADDED` or
+`UNKNOWN`; older entries without it have unknown provenance. It is preserved by editing, moving, recovery and account archives. `modifiedAt` describes
 the canonical file content. Clients sort after following every metadata page;
 unknown dates can be placed after known dates without fetching file bytes.
-Conflicting destinations are never overwritten. Stale/missing preconditions
+Create-only imports never overwrite conflicting destinations. Stale/missing preconditions
 return 412/428; account quota growth returns 507. Day labels are independent.
 
-The create-only file endpoint accepts optional `createdAt` and `modifiedAt` query
-parameters; the folder endpoint accepts the same optional fields in
+The create-only file endpoint accepts optional `createdAt`, `modifiedAt` and
+`createdAtSource` query parameters; the folder endpoint accepts the same optional fields in
 `VaultFolderInput`. They are validated RFC 3339 instants, normalized to UTC within
 years 0001–9999, and applied atomically to
 the new namespace entry and its canonical content, with the resulting content
 validator refreshed before replying. They cannot retime an existing file, bypass
 If-None-Match, change a day label, or add an artificial content revision. Normal
 content edits advance modification time and preserve creation time. Account
-archives retain both dates when present; older archives remain accepted.
+archives retain both dates and their creation-date provenance when present;
+older archives remain accepted. Supplying `createdAtSource` requires `createdAt`;
+when a source creation date is supplied without provenance it defaults to `ORIGINAL`.
+
+For an explicitly reviewed replacement, `PUT /notes/entries/{id}/import` accepts
+raw file bytes and the same optional date query parameters. Require the reviewed
+`entryEtag` in `If-Match`; this guards edits, moves, deletion and replacement of the
+reviewed entry. Replacements preserve entry ID and path, enforce the usual quotas
+and native note validation, and update bytes and source dates in one transaction.
+Without a supplied creation date, the existing creation date and provenance remain
+unchanged. Folders/deleted entries cannot be overwritten. Native journal imports
+leave independent day labels untouched. This endpoint requires write permission;
+normal content edits retain their existing timestamp semantics.
 
 `GET /notes/export` requires read permission and prepares a private ZIP using the
 same authorization recheck, restore fence, repeatable-read snapshot, temporary-file
 cleanup and download mechanism as `/data/account/export`. It contains active
 portable paths and exact bytes, including configured journal/event folders and
 assets, but no trash or account authority. Its `timekeeper-notes-v1` auxiliary
-metadata records `path`, `kind` (`FILE`/`FOLDER`), optional `createdAt`/`modifiedAt`,
+metadata records `path`, `kind` (`FILE`/`FOLDER`), optional `createdAt`/`modifiedAt`/`createdAtSource`,
 and file `bytes`/`sha256`. It normally uses `timekeeper-notes-metadata.json`, with a UUID
 suffix on collision. ZIP timestamp fields are also populated; the metadata
 preserves nanosecond precision and empty folder dates across extraction/import.

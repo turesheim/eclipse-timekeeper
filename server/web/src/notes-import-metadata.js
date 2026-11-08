@@ -16,8 +16,9 @@ export function parseNotesMetadata(value){
   if(!value||value.format!==NOTES_METADATA_FORMAT||!Array.isArray(value.entries)||value.entries.length>250000||Object.keys(value).some(name=>!['format','entries'].includes(name)))invalid();
   const entries=new Map();
   for(const item of value.entries){
-    if(!item||!validPath(item.path)||!['FILE','FOLDER'].includes(item.kind)||entries.has(key(item.path))||Object.keys(item).some(name=>!['path','kind','createdAt','modifiedAt','bytes','sha256'].includes(name)))invalid();
+    if(!item||!validPath(item.path)||!['FILE','FOLDER'].includes(item.kind)||entries.has(key(item.path))||Object.keys(item).some(name=>!['path','kind','createdAt','modifiedAt','createdAtSource','bytes','sha256'].includes(name)))invalid();
     for(const name of ['createdAt','modifiedAt'])if(name in item&&!validDate(item[name]))invalid();
+    if('createdAtSource' in item&&(!item.createdAt||!['ORIGINAL','ADDED','UNKNOWN'].includes(item.createdAtSource)))invalid();
     if(item.kind==='FILE'&&(!Number.isSafeInteger(item.bytes)||item.bytes<0||!/^[a-f0-9]{64}$/.test(item.sha256)))invalid();
     if(item.kind==='FOLDER'&&('bytes' in item||'sha256' in item))invalid();
     entries.set(key(item.path),{...item});
@@ -44,7 +45,7 @@ export function metadataEntry(metadata,path){return metadata?.entries.get(key(pa
 export async function importedFileDates(file,metadata,options={}){
   const dates={};if(Number.isFinite(file.lastModified))dates.modifiedAt=new Date(file.lastModified).toISOString();
   if(!metadata)return {dates,changed:false};
-  if(metadata.createdAt)dates.createdAt=metadata.createdAt;
+  if(metadata.createdAt){dates.createdAt=metadata.createdAt;dates.createdAtSource=metadata.createdAtSource||'UNKNOWN';}
   const unchanged=file.size===metadata.bytes&&await fileSha256(file,options)===metadata.sha256;
   if(unchanged&&metadata.modifiedAt)dates.modifiedAt=metadata.modifiedAt;
   return {dates,changed:!unchanged};

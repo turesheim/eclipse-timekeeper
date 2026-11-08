@@ -16952,6 +16952,21 @@
               "maxLength": 40,
               "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
             }
+          },
+          {
+            "name": "createdAtSource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ORIGINAL",
+                "ADDED",
+                "UNKNOWN"
+              ],
+              "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
+            },
+            "description": "Requires createdAt. Defaults to ORIGINAL when a creation date is supplied. Metadata from older exports can explicitly use UNKNOWN."
           }
         ],
         "responses": {
@@ -18303,6 +18318,133 @@
           }
         },
         "description": "Read-only owned catalog of task definitions and detached instances, including undated and completed tasks. No upstream fetch or native task writes. Pagination is signed and owner/revision/source-snapshot bound; subsequent cursor requests require If-Match with the returned snapshot/ETag. A changed feed, configuration or account zone returns 412; an account revision change returns 409 CURSOR_EXPIRED. Per-subscription errors preserve unrelated sources."
+      }
+    },
+    "/notes/entries/{id}/import": {
+      "put": {
+        "operationId": "importNoteBytes",
+        "summary": "Replace a reviewed existing file with imported bytes and available source dates",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "name": "createdAt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 40,
+              "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+            }
+          },
+          {
+            "name": "modifiedAt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 40,
+              "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+            }
+          },
+          {
+            "name": "createdAtSource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ORIGINAL",
+                "ADDED",
+                "UNKNOWN"
+              ],
+              "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
+            },
+            "description": "Requires createdAt. Defaults to ORIGINAL when a creation date is supplied. Metadata from older exports can explicitly use UNKNOWN."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "description": "Uses the entryEtag in If-Match, guarding both structure and content changes since review. Preserves entry identity and applies provided original dates atomically. Without createdAt, the existing creation date and its provenance are kept. Folders and deleted entries are refused; normal quotas, authorization and native journal validation apply. No existing file is overwritten by the create-only endpoint."
       }
     }
   },
@@ -32524,7 +32666,21 @@
             "maxLength": 4096,
             "readOnly": true,
             "description": "Display title: the associated event title for EVENT notes, or the first nonempty document-level Markdown heading for MARKDOWN notes, as plain text. Omitted when unavailable; clients fall back to the filename/path. This does not change paths, canonical bytes or write validators."
+          },
+          "createdAtSource": {
+            "type": "string",
+            "enum": [
+              "ORIGINAL",
+              "ADDED",
+              "UNKNOWN"
+            ],
+            "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
           }
+        },
+        "dependentRequired": {
+          "createdAtSource": [
+            "createdAt"
+          ]
         }
       },
       "VaultLimits": {
@@ -32684,7 +32840,21 @@
             "type": "string",
             "format": "date-time",
             "description": "Original last content modification time, retained on restore when present."
+          },
+          "createdAtSource": {
+            "type": "string",
+            "enum": [
+              "ORIGINAL",
+              "ADDED",
+              "UNKNOWN"
+            ],
+            "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
           }
+        },
+        "dependentRequired": {
+          "createdAtSource": [
+            "createdAt"
+          ]
         }
       },
       "AccountArchiveVaultFile": {
@@ -33116,7 +33286,21 @@
             "format": "date-time",
             "maxLength": 40,
             "description": "Optional original source timestamp, accepted only when creating a new entry. Existing entries are never retimed by an import."
+          },
+          "createdAtSource": {
+            "type": "string",
+            "enum": [
+              "ORIGINAL",
+              "ADDED",
+              "UNKNOWN"
+            ],
+            "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
           }
+        },
+        "dependentRequired": {
+          "createdAtSource": [
+            "createdAt"
+          ]
         }
       },
       "RecentNotesPage": {
