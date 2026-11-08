@@ -73,8 +73,8 @@ export function buildExperience(field){
   const suggestions=el('div');suggestions.className='markdown-suggestions';suggestions.hidden=true;suggestions.setAttribute('role','listbox');suggestions.setAttribute('aria-label',t('markdown.suggestions'));f.root.append(suggestions);f.suggestions=suggestions;
   let completion=0,lastQuery;
   const source=sourceBrackets(f);
-  f.dismissSuggestions=()=>{++completion;lastQuery=null;suggestions.hidden=true;suggestions.replaceChildren();};
-  f.resetCompletions=()=>{source.reset();f.dismissSuggestions();};
+  f.dismissSuggestions=(reset=false)=>{++completion;lastQuery=reset?null:context()?.key??null;suggestions.hidden=true;suggestions.replaceChildren();};
+  f.resetCompletions=()=>{source.reset();f.dismissSuggestions(true);};
   const context=()=>{
     if(f.readOnly||f.loading||f.editor?.composing())return null;
     const active=document.activeElement,inside=suggestions.contains(active);
