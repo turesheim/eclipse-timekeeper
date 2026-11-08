@@ -696,6 +696,8 @@ published to-do definition and detached recurrence instance, independently of
 the calendar window. This includes undated, completed, cancelled and distant
 dates. It does not generate an infinite occurrence list or create native tasks.
 Native and Eclipse/Mylyn tasks retain their existing `/tasks` records.
+Absolute calendar times retain UTC precision, including repeated local hours;
+floating times retain their account-zone wall value without an invented instant.
 The new catalog requires read permission, binds rows/cursors to the owner, and
 never returns the subscription feed URL or fetches an upstream feed during a
 read. Subsequent pages require `If-Match` with the response snapshot/ETag;

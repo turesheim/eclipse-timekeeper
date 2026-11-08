@@ -20,6 +20,7 @@ test('the task catalog combines local, linked and all dated/undated calendar tas
 test('smart categories use the account day and reject invented instants at DST gaps/overlaps or unknown zones',()=>{
   assert.deepEqual(taskMomentDate({kind:'DATE',date:'2026-06-01'},'America/Los_Angeles'),{date:'2026-06-01',unresolved:false});
   assert.equal(taskMomentDate({kind:'DATE_TIME',date:'2026-06-01',time:'00:30',timeZone:'Europe/Oslo'},'America/Los_Angeles').date,'2026-05-31');
+  assert.equal(taskMomentDate({kind:'DATE_TIME',date:'2026-06-01',time:'00:30',timeZone:'UTC'},'America/Los_Angeles').date,'2026-05-31');
   for(const [date,time,zone]of [['2026-03-29','02:30','Europe/Oslo'],['2026-10-25','02:30','Europe/Oslo'],['2026-06-01','12:00','Provider/Unknown']])assert.deepEqual(taskMomentDate({kind:'DATE_TIME',date,time,timeZone:zone},'UTC'),{date:null,unresolved:true});
   const urgent=taskRows({...data,tasks:[{id:'urgent',summary:'Urgent',urgent:true}]})[0];assert.equal(taskMatches(urgent,{kind:'smart',value:'critical'},'2026-06-01'),true);
   assert.equal(taskRows({...data,focusClientIds:[],tasks:[],projects:[]},[{id:'outside',clientId:'c'}]).length,0);

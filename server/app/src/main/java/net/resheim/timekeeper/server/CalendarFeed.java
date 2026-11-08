@@ -100,8 +100,10 @@ final class CalendarFeed {
     private static com.fasterxml.jackson.databind.JsonNode taskMoment(Temporal value,ZoneId zone){
         if(value==null)return com.fasterxml.jackson.databind.node.NullNode.instance;
         if(value instanceof LocalDate day)return object().put("kind","DATE").put("date",day.toString());
-        var local=value instanceof LocalDateTime time?time:instant(value,zone).atZone(zone).toLocalDateTime();
-        return object().put("kind","DATE_TIME").put("date",local.toLocalDate().toString()).put("time",local.toLocalTime().toString()).put("timeZone",zone.getId());
+        // An absolute deadline must stay distinguishable across a repeated local
+        // hour. Floating values retain their wall clock without inventing an instant.
+        var local=value instanceof LocalDateTime time?time:instant(value,zone).atOffset(ZoneOffset.UTC).toLocalDateTime();
+        return object().put("kind","DATE_TIME").put("date",local.toLocalDate().toString()).put("time",local.toLocalTime().toString()).put("timeZone",value instanceof LocalDateTime?zone.getId():"UTC");
     }
     private static boolean completed(CalendarComponent event){return "COMPLETED".equals(text(event,"STATUS","",30))||event.getProperty("COMPLETED").isPresent();}
     private static void validateRule(String rule) {

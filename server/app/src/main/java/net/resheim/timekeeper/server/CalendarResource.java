@@ -44,7 +44,7 @@ public class CalendarResource {
         ContractInputs.queries(uri.getQueryParameters(),"fromDate","toDate");return tx(()->new ApiReplies(200,calendars().events(from,to),null,null));
     }
     @GET @Path("/calendar-tasks") public Response tasks(@QueryParam("limit")String limit,@QueryParam("cursor")String cursor,@HeaderParam("If-Match")String match){
-        ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");int size=ContractInputs.number(limit,200,1,500);
+        ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");int size=ContractInputs.number(limit,100,1,500);
         return tx(()->{
             var catalog=calendars().tasks();String snapshot=catalog.path("snapshot").asText();
             if(cursor!=null&&match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");

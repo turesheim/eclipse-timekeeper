@@ -33459,7 +33459,7 @@
           "color"
         ],
         "additionalProperties": false,
-        "description": "One current published VTODO definition or detached recurrence instance from a visible subscription with to-dos enabled. No native task is created. Includes completed, cancelled, undated and out-of-window items without expanding an infinite recurrence. Date-only values retain their civil day; timed values are projected into the account time zone. id binds subscription, UID and recurrence identity."
+        "description": "One current published VTODO definition or detached recurrence instance from a visible subscription with to-dos enabled. No native task is created. Includes completed, cancelled, undated and out-of-window items without expanding an infinite recurrence. Date-only values retain their civil day. Absolute times retain UTC precision; floating times retain their wall value and account zone without an invented instant. id binds subscription, UID and recurrence identity."
       },
       "CalendarTasks": {
         "type": "object",

@@ -1,5 +1,5 @@
 import {t,getLocale} from './i18n.js';
-import {dateInZone} from './model.js';
+import {dateInZone,localDateTime,localDateTimeToInstant} from './model.js';
 import {iconButton} from './icons.js';
 import {calendarDescription,linkedText} from './tooltip-description.js';
 import {taskRows,taskMatches} from './tasks-model.js';
@@ -87,7 +87,11 @@ export class TasksView {
     const fields=node('dl',undefined,'task-metadata'),add=(label,text)=>{if(text){fields.append(node('dt',t(label)),node('dd',text));}};
     add('tasks.source',row.source==='calendar'?row.record.calendarName:(row.record.externalReferences||[]).map(value=>value.providerId).join(', ')||t('tasks.native'));
     add('ui.client',this.data.clients.find(client=>client.id===row.clientId)?.name||t('ui.unassigned'));add('ui.project',row.projectName);add('tasks.status_label',t('tasks.status.'+row.status));add('tasks.project_categories',row.categories.join(', '));
-    const moment=value=>value?value.date+(value.kind==='DATE_TIME'?' '+value.time+' · '+value.timeZone:''):'';
+    const moment=value=>{
+      if(!value)return '';if(value.kind==='DATE')return value.date;
+      if(row.source==='calendar'&&value.timeZone==='UTC')return localDateTime(localDateTimeToInstant(value.date+'T'+value.time,'UTC'),this.data.profile.data.zoneId)+' · '+this.data.profile.data.zoneId;
+      return value.date+' '+value.time+' · '+value.timeZone;
+    };
     add('tasks.scheduled',row.scheduledDate);add('tasks.start',moment(row.record.start));add('tasks.due_label',moment(row.record.due));this.detailBody.append(fields);
     if(row.source==='calendar')this.detailBody.append(node('p',t('calendar.todo_read_only'),'hint'));
     if(row.unresolvedTiming)this.detailBody.append(node('p',t('tasks.unresolved_help'),'hint'));

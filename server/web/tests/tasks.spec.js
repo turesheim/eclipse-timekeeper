@@ -22,7 +22,7 @@ async function setup(page,request,{locale='en-GB',remoteCount=6}={}){
   const special=['UID:undated\nSUMMARY:Calendar undated\nCATEGORIES:Team','UID:past\nSUMMARY:Calendar old\nDUE;VALUE=DATE:19990101','UID:future\nSUMMARY:Calendar future\nDUE;VALUE=DATE:20990101','UID:today\nSUMMARY:Calendar today\nDUE;VALUE=DATE:'+today.replaceAll('-',''),'UID:done\nSUMMARY:Calendar completed\nSTATUS:COMPLETED','UID:cancelled\nSUMMARY:Calendar cancelled\nSTATUS:CANCELLED'];
   const values=Array.from({length:remoteCount},(_,index)=>special[index]||`UID:remote-${index}\nSUMMARY:Remote task ${index}\nCATEGORIES:Team`),body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dagsverk//Tasks browser//EN\r\n'+values.map(value=>'BEGIN:VTODO\r\nDTSTAMP:20260101T000000Z\r\n'+value.replaceAll('\n','\r\n')+'\r\nEND:VTODO\r\n').join('')+'END:VCALENDAR\r\n';
   const feed=await(await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}})).json();const subscription=await(await api('POST','/calendar-subscriptions',{name:'Task calendar',clientId:clientB.id,visible:true,includeEvents:false,includeTodos:true,url:feed.url})).json();
-  await expect.poll(async()=>((await(await api('GET','/calendar-tasks')).json()).items.length)).toBe(Math.min(remoteCount,200));
+  await expect.poll(async()=>((await(await api('GET','/calendar-tasks?limit=500')).json()).items.length)).toBe(remoteCount);
   await page.reload();await expect(page.locator('html')).toHaveAttribute('lang',locale);await expect(page.locator('#workspace')).toBeVisible();api=await apiFor(page);await page.locator('[data-tab=tasks]').click();await expect(page.locator('#tasks-list')).toHaveAttribute('aria-busy','false');
   return {api,user,native,clientA,clientB,project,subscription,feed,today};
 }
@@ -39,6 +39,13 @@ test('Tasks browses all sources by client/category, today and urgency and create
   await page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true}).click();await page.locator('#field-summary').fill('Created in Tasks');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();await expect(row(page,'Created in Tasks')).toBeVisible();
   await row(page,'Local task').click();await page.locator('#task-details').getByRole('button',{name:'Edit task',exact:true}).click();await page.locator('#field-summary').fill('Edited in Tasks');await page.locator('#save').click();await expect(row(page,'Edited in Tasks')).toBeVisible();expect((await(await api('GET','/tasks/'+native.local.id)).json()).summary).toBe('Edited in Tasks');
   expect((await(await api('GET','/tasks?limit=500')).json()).items).toHaveLength(5);
+});
+
+test('calendar deadline details distinguish the two occurrences of a repeated account-zone hour',async({page,request})=>{
+  const {api,clientB}=await setup(page,request),body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dagsverk//Deadline precision//EN\r\n'+[['early','20261025T003000Z'],['late','20261025T013000Z']].map(([name,due])=>`BEGIN:VTODO\r\nUID:${name}\r\nDTSTAMP:20260101T000000Z\r\nSUMMARY:Repeated ${name}\r\nDUE:${due}\r\nEND:VTODO\r\n`).join('')+'END:VCALENDAR\r\n';
+  const feed=await(await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}})).json();await api('POST','/calendar-subscriptions',{name:'Repeated deadlines',clientId:clientB.id,visible:true,includeEvents:false,includeTodos:true,url:feed.url});
+  await expect.poll(async()=>((await(await api('GET','/calendar-tasks')).json()).items.length)).toBe(8);await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();
+  for(const [name,offset]of [['early','+02:00'],['late','+01:00']]){await row(page,'Repeated '+name).click();await expect(page.locator('#task-details')).toContainText('2026-10-25T02:30:00'+offset+' · Europe/Oslo');await page.keyboard.press('Escape');}
 });
 
 test('all calendar pages remain available and the task list renders additional rows on demand',async({page,request})=>{

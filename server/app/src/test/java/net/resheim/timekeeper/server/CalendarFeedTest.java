@@ -73,7 +73,7 @@ class CalendarFeedTest {
         var byName=new HashMap<String,com.fasterxml.jackson.databind.JsonNode>();tasks.forEach(value->byName.put(value.path("summary").asText(),value));
         assertEquals("1999-01-01",byName.get("Old deadline").path("due").path("date").asText());assertTrue(byName.get("Old deadline").path("start").isNull());
         assertEquals(Set.of("Arbeid","Review, release"),java.util.stream.StreamSupport.stream(byName.get("Old deadline").path("categories").spliterator(),false).map(value->value.asText()).collect(java.util.stream.Collectors.toSet()));
-        assertEquals("2098-12-31",byName.get("Future deadline").path("due").path("date").asText());assertEquals("16:30",byName.get("Future deadline").path("due").path("time").asText());
+        assertEquals("2099-01-01",byName.get("Future deadline").path("due").path("date").asText());assertEquals("00:30",byName.get("Future deadline").path("due").path("time").asText());assertEquals("UTC",byName.get("Future deadline").path("due").path("timeZone").asText());
         assertTrue(byName.get("No deadline").path("due").isNull());assertEquals("COMPLETED",byName.get("Completed without STATUS").path("status").asText());assertEquals("CANCELLED",byName.get("Cancelled").path("status").asText());assertTrue(byName.get("Repeating task").path("recurring").asBoolean());
     }
     @Test void taskCatalogKeepsStableDefinitionAndDetachedInstanceIdentitiesAndLatestRevisions(){
@@ -85,6 +85,14 @@ class CalendarFeedTest {
         assertEquals("2026-01-10",moved.path("due").path("date").asText());assertEquals("Team",moved.path("categories").get(0).asText());
         var renamed=feed(original,changed.replace("Moved instance","Renamed instance")).tasks(ZoneOffset.UTC);
         assertEquals(tasks.stream().map(value->value.path("id").asText()).toList(),renamed.stream().map(value->value.path("id").asText()).toList());
+    }
+    @Test void taskDeadlinesRetainAbsolutePrecisionAcrossRepeatedHoursAndKeepFloatingClocksUnresolved(){
+        var tasks=feed(todo("UID:early\nDUE:20261025T003000Z\nSUMMARY:Early hour"),todo("UID:late\nDUE:20261025T013000Z\nSUMMARY:Late hour"),
+                todo("UID:floating\nDUE:20261025T023000\nSUMMARY:Floating clock")).tasks(ZoneId.of("Europe/Oslo"));
+        var moments=new HashMap<String,com.fasterxml.jackson.databind.JsonNode>();tasks.forEach(value->moments.put(value.path("summary").asText(),value.path("due")));
+        assertEquals("00:30",moments.get("Early hour").path("time").asText());assertEquals("01:30",moments.get("Late hour").path("time").asText());
+        assertEquals("UTC",moments.get("Early hour").path("timeZone").asText());assertEquals("UTC",moments.get("Late hour").path("timeZone").asText());
+        assertEquals("02:30",moments.get("Floating clock").path("time").asText());assertEquals("Europe/Oslo",moments.get("Floating clock").path("timeZone").asText());
     }
     @Test void calendarTodosIncludeDueOnlyScheduledAndCompletedItemsWithoutEventIdentityCollisions(){
         var source=feed(event("UID:shared\nDTSTART;VALUE=DATE:20260504\nSUMMARY:Event"),

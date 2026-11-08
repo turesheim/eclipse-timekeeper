@@ -5,7 +5,10 @@ export function taskMomentDate(moment,zone){
   if(!moment)return {date:null,unresolved:false};
   // Comparing civil days in the same zone requires no invented UTC instant.
   if(moment.kind==='DATE'||moment.timeZone===zone)return {date:moment.date,unresolved:false};
-  try{return {date:dateInZone(localDateTimeToInstant(moment.date+'T'+moment.time,moment.timeZone),zone),unresolved:false};}
+  try{
+    if(moment.timeZone==='UTC')return {date:dateInZone(moment.date+'T'+moment.time+'Z',zone),unresolved:false};
+    return {date:dateInZone(localDateTimeToInstant(moment.date+'T'+moment.time,moment.timeZone),zone),unresolved:false};
+  }
   catch{return {date:null,unresolved:true};}
 }
 export function taskRows(data,calendars=[]){
