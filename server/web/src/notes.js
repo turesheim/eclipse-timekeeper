@@ -315,7 +315,8 @@ export class NotesView {
   async resolveLink(reference,session=this.session){
     const path=this.linkPath(reference),relative=this.note?relativeNotePath(this.note.path,reference,{legacyAssets:false}):null;if(!path||!relative)throw new Error(t('notes.invalid_link'));
     const find=async path=>{try{return (await session.request('/notes/resolve?'+new URLSearchParams({path}))).data;}catch(error){if(error.status===404)return null;throw error;}};
-    const ordinary=await find(relative);if(path===relative){
+    if(path===relative){
+      const ordinary=await find(relative);
       if(ordinary)return ordinary;
       // Keep old root-assets references renderable after nesting the default
       // folder, without rewriting authored Markdown or shadowing a real path.
@@ -323,7 +324,7 @@ export class NotesView {
       const relocated=relative.startsWith('assets/')&&folder&&folder!=='assets'?await find(folder+'/'+relative.slice(7)):null;
       if(!relocated)throw new Error(t('notes.invalid_link'));return relocated;
     }
-    const candidate=await find(path),legacy=candidate?.kind==='ASSET'?candidate:null;
+    const [ordinary,candidate]=await Promise.all([find(relative),find(path)]),legacy=candidate?.kind==='ASSET'?candidate:null;
     if(ordinary&&legacy&&ordinary.id!==legacy.id)throw new Error(t('notes.ambiguous_link'));
     if(!ordinary&&!legacy)throw new Error(t('notes.invalid_link'));return ordinary||legacy;
   }

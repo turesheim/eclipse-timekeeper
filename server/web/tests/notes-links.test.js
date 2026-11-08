@@ -5,6 +5,56 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {relativeNotePath,rasterType,notesEntryVisible} from '../src/notes-links.js';
 import {needsSource} from '../src/markdown-document.js';
+import {vaultEditorResources} from '../src/vault-editor-resources.js';
+
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
+const collection=(journalFolder='journal',assetsFolder='journal/assets')=>({settings:{journalFolder,assetsFolder,eventsFolder:'events'},limits:{pageSize:200},snapshot:'snapshot'});
+test('concurrent native image lookups share settings while later lookups see changed folders',async()=>{
+  const first=deferred(),requests=[];let settings=collection(),infos=0;
+  const session={request:async path=>{requests.push(path);if(path==='/notes')return {data:++infos===1?await first.promise:settings};
+    const target=new URLSearchParams(path.split('?')[1]).get('path');if(!target.startsWith(settings.settings.assetsFolder+'/'))throw Object.assign(new Error('missing'),{status:404});return {data:{id:target,path:target,kind:'ASSET'}};}};
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-08'}));
+  const pending=Promise.all(['one','two','three'].map(name=>resources.canonicalAsset('assets/'+name+'.png')));
+  assert.equal(infos,1);first.resolve(settings);assert.deepEqual(await pending,['journal/assets/one.png','journal/assets/two.png','journal/assets/three.png']);
+  assert.equal(requests.length,4);
+  settings=collection('journal','Pictures');assert.equal(await resources.canonicalAsset('assets/four.png'),'Pictures/four.png');assert.equal(infos,2);
+});
+test('ordinary relative assets use their known origin without a collection read',async()=>{
+  const requests=[],session={request:async path=>{requests.push(path);const target=new URLSearchParams(path.split('?')[1]).get('path');return {data:{id:'image',path:target}};}};
+  const resources=vaultEditorResources(()=>session,()=> 'Notes/page.md');
+  assert.equal(await resources.canonicalAsset('../Images/a.png'),'Images/a.png');assert.equal(requests.length,1);assert.ok(requests[0].startsWith('/notes/resolve?'));
+  assert.equal(await resources.assetReference({path:'Images/a.png'}),'../Images/a.png');assert.equal(requests.length,1);
+});
+test('wiki image resolution filters the filename and still reads every ambiguity candidate',async()=>{
+  const requests=[],entries=[{id:'local',path:'Notes/shot.png',kind:'ASSET'},{id:'other',path:'Other/shot.png',kind:'ASSET'}];
+  const session={request:async(path,options)=>{requests.push(path);if(path==='/notes')return {data:collection()};const query=new URLSearchParams(path.split('?')[1]);
+    assert.equal(query.get('query'),'shot.png');assert.equal(options.etag,'snapshot');const offset=Number(query.get('offset'));return {data:{items:[entries[offset]],...(offset===0?{nextOffset:1}:{})}};}};
+  let origin='Notes/page.md';const resources=vaultEditorResources(()=>session,()=>origin);
+  assert.equal((await resources.resolveWiki('shot.png')).id,'local');assert.equal(requests.length,3);
+  origin='page.md';await assert.rejects(resources.resolveWiki('shot.png'));assert.equal(requests.length,3);
+  await assert.rejects(resources.resolveWiki('https://foreign.invalid/image.png'));assert.equal(requests.length,3);
+});
+test('superseded image settings cannot issue lookups or replace another account request',async()=>{
+  const delayed=deferred(),oldRequests=[],newRequests=[];
+  const old={request:async path=>{oldRequests.push(path);return {data:await delayed.promise};}};
+  const current={request:async path=>{newRequests.push(path);if(path==='/notes')return {data:collection('Private','Private/assets')};return {data:{id:'current-image',path:new URLSearchParams(path.split('?')[1]).get('path')}};}};
+  let session=old;const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-08'}));
+  const pending=resources.canonicalAsset('assets/private.png'),rejected=assert.rejects(pending);
+  session=current;assert.equal(await resources.canonicalAsset('assets/own.png'),'Private/assets/own.png');delayed.resolve(collection('Other','Other/assets'));await rejected;
+  assert.deepEqual(oldRequests,['/notes']);assert.equal(newRequests.filter(path=>path==='/notes').length,1);
+});
+test('invalidated settings and failed old catalog reads cannot evict fresh lookups',async()=>{
+  const delayedInfo=deferred(),delayedPage=deferred();let infos=0,pages=0;
+  const session={request:async path=>{if(path==='/notes')return {data:++infos===1?await delayedInfo.promise:collection()};
+    if(path.startsWith('/notes/entries?'))return {data:++pages===1?await delayedPage.promise:{items:[{id:'new',path:'Notes/new.md',kind:'MARKDOWN'}]}};
+    return {data:{id:'asset',path:new URLSearchParams(path.split('?')[1]).get('path')}};}};
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-08'}));
+  const old=resources.canonicalAsset('assets/old.png'),rejected=assert.rejects(old);resources.invalidate();
+  assert.equal(await resources.canonicalAsset('assets/current.png'),'journal/assets/current.png');delayedInfo.resolve(collection());await rejected;
+  const pending=resources.complete(''),failed=assert.rejects(pending);await new Promise(resolve=>setImmediate(resolve));resources.invalidate();
+  assert.deepEqual((await resources.complete('new')).map(entry=>entry.id),['new']);delayedPage.reject(new Error('old page failed'));await failed;
+  assert.deepEqual((await resources.complete('new')).map(entry=>entry.id),['new']);assert.equal(pages,2);
+});
 
 test('collection-relative links decode once and cannot escape or load external images',()=>{
   assert.equal(relativeNotePath('Notes/First.md','../Images/a%20b.png'),'Images/a b.png');
