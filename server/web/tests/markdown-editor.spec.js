@@ -23,6 +23,31 @@ test('Markdown editor lazily loads local formatting and preserves exact mode rou
   await captureScreenshot(page,{path:'test-results/markdown-desktop.png',fullPage:true});
   expect(outside).toEqual([]);expect(requests.filter(request=>!['GET','HEAD'].includes(request.method()))).toEqual([]);
 });
+test('Markdown tables stay compact, themed and readable on desktop and mobile',async({page})=>{
+  test.setTimeout(120000);
+  await open(page);
+  const source='| Pool | Nodes | vCPU |\n| :--- | ---: | ---: |\n| Test | 7 | 56 |\n| Production | 18 | 120 |\n\n| Environment | Platform nodes | Worker nodes | Application nodes | Total vCPU | Subscription units |\n| --- | --- | --- | --- | --- | --- |\n| Production | 5 | 7 | 6 | 120 | 30 |\n';
+  await importNote(page,source);await page.locator('#markdown-rich').click();
+  const table=page.locator('#markdown-formatted table').first();await expect(table).toBeVisible();
+  const backgrounds=new Set();
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    backgrounds.add(await table.locator('th').first().evaluate(cell=>getComputedStyle(cell).backgroundColor));
+    for(const width of [1200,390]){
+      await page.setViewportSize({width,height:900});
+      expect((await table.locator('tr').nth(1).boundingBox()).height).toBeLessThan(36);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      if(width===390)expect(await page.locator('#markdown-formatted table').last().evaluate(table=>{
+        for(let parent=table.parentElement;parent&&!parent.classList.contains('journal-formatted');parent=parent.parentElement)
+          if(['auto','scroll'].includes(getComputedStyle(parent).overflowX)&&parent.scrollWidth>parent.clientWidth)return true;
+        return false;
+      })).toBe(true);
+      expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+      if(['timekeeper','nord'].includes(theme))await captureScreenshot(page,{path:`test-results/markdown-table-${theme}-${width}.png`,fullPage:true});
+    }
+  }
+  expect(backgrounds.size).toBe(6);expect(await downloaded(page)).toBe(source);
+});
 test('Markdown rich edits, tasks, undo and source edits keep semantic content and metadata',async({page})=>{
   await open(page);const original=await fixture('standard');await importNote(page,original);await page.locator('#markdown-rich').click();
   await page.getByRole('checkbox',{name:'Task: Follow up'}).check();await page.locator('#markdown-source').click();

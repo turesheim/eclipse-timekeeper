@@ -81,8 +81,27 @@ export class NotesView {
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
     this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>!!this.session&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(this.editor,this.autosave);
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
-    document.addEventListener('timekeeper:notes-changed',()=>{this.info=null;this.folder=null;if(this.session)this.callbacks.onChanged?.();});
+    document.addEventListener('timekeeper:notes-changed',()=>{if(this.treePointerPending||this.dragged)this.reloadAfterDrag=true;else{this.info=null;this.folder=null;}if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
+    window.visualViewport?.addEventListener('resize',()=>this.fit());
+    this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
+    this.navigation.addEventListener('pointerdown',event=>{if(event.button===0&&event.target.closest?.('.notes-tree-pick'))this.treePointerPending=true;});
+    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.treePointerPending&&!this.dragged)this.clearDrag();});
+    this.navigation.addEventListener('dragstart',event=>{
+      const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
+      if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading&&!this.treePointerPending){event.preventDefault();return;}
+      this.dragged={id:entry.id,session:this.session,generation:this.generation};event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('application/x-timekeeper-note',entry.id);
+    });
+    this.navigation.addEventListener('dragover',event=>{
+      const target=this.dropTarget(event);this.clearDropTarget();if(!target)return;
+      event.preventDefault();event.dataTransfer.dropEffect='move';target.element.classList.add('notes-drop-target');
+    });
+    this.navigation.addEventListener('drop',event=>{
+      const target=this.dropTarget(event),source=this.dragged;this.clearDrag();if(!target)return;
+      event.preventDefault();void this.moveDocument(source,target.folder);
+    });
+    this.navigation.addEventListener('dragleave',event=>{if(!this.navigation.contains(event.relatedTarget))this.clearDropTarget();});
+    this.navigation.addEventListener('dragend',()=>this.clearDrag());
     // CSS can hide a focused control before matchMedia's change event, leaving
     // activeElement at body. Remember actual focus so the toggle can receive it.
     document.addEventListener('focusin',event=>{this.navigationFocused=this.navigation.contains(event.target)||event.target===this.resize;});
@@ -96,10 +115,38 @@ export class NotesView {
     if(this.session&&this.session!==session)this.reset();this.session=session;this.writable=connected&&writable;this.controls();
     if(this.visible&&!this.busy&&!this.loading)void this.reload();
   }
-  show(){this.visible=true;this.fit();if(this.session)void this.reload();}
-  hide(){this.visible=false;}
+  show(){this.visible=true;window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
+  hide(){this.visible=false;this.clearDrag();}
+  clearDropTarget(){this.navigation.classList.remove('notes-drop-target');for(const node of this.navigation.querySelectorAll('.notes-drop-target'))node.classList.remove('notes-drop-target');}
+  clearDrag(){
+    const refresh=this.reloadAfterDrag,session=this.session;this.dragged=null;this.treePointerPending=false;this.reloadAfterDrag=false;this.clearDropTarget();
+    // Let the associated click/drop finish before replacing any tree nodes.
+    if(refresh)setTimeout(()=>{if(this.visible&&this.session===session&&!this.busy)void this.reload();},0);
+  }
+  dropTarget(event){
+    const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
+    const source=this.entries.get(drag.id),row=event.target.closest?.('[role=treeitem]');
+    const folder=row?this.entries.get(row.dataset.id):{id:this.info.rootId,path:'',kind:'FOLDER'};
+    if(!source||source.sourceType!=='VAULT_CONTENT'||!folder||folder.kind!=='FOLDER'||source.parentId===folder.id)return null;
+    return {folder,element:row?.querySelector('.notes-tree-pick')||this.navigation};
+  }
+  async moveDocument(drag,folder){
+    if(!await this.canLeave()||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale)return;
+    const entry=this.note?.id===drag.id?this.note:this.entries.get(drag.id);if(!entry||entry.deleted||entry.sourceType!=='VAULT_CONTENT')return;
+    const path=(folder.path?folder.path+'/':'')+entry.path.split('/').at(-1);this.moveFailed=false;this.busy=true;this.controls();
+    try{
+      const reply=await drag.session.request('/notes/entries/'+entry.id+'/path',{method:'PUT',etag:entry.entryEtag,body:{path}});
+      if(drag.session!==this.session||drag.generation!==this.generation)return;
+      this.markdown.resources?.invalidate?.();
+      if(this.note?.id===entry.id){this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}
+      this.expanded.add(folder.id);this.busy=false;await this.reload();
+      if(drag.session!==this.session||drag.generation!==this.generation)return;
+      this.moveStatus.textContent=t('notes.moved',{path:reply.data.path});this.callbacks.onChanged?.();
+    }catch(error){if(drag.session===this.session&&drag.generation===this.generation){this.moveFailed=true;this.fail(error);}}
+    finally{if(drag.session===this.session&&drag.generation===this.generation){this.busy=false;this.controls();}}
+  }
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.autosave.reset();this.saving=false;this.uncertain=null;this.saveFailed=false;this.clearPreview();++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
+  reset(){this.moveFailed=false;this.autosave.reset();this.saving=false;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.documentTitle.textContent=t('notes.select');this.controls();}
   navigationState(){
     const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
     this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);
@@ -108,9 +155,11 @@ export class NotesView {
     if(!visible){this.closeSortMenu(false);if(this.visible&&focused)this.toggle.focus();}
     this.fit();
   }
-  fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top+scrollY,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0;this.root.style.setProperty('--notes-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');}
+  fit(){if(!this.visible||!this.root.offsetParent)return;const viewport=window.visualViewport,bottom=viewport?viewport.offsetTop+viewport.height:innerHeight;document.documentElement.style.setProperty('--notes-viewport-height',bottom+'px');}
+  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&(!this.loading||this.treePointerPending||this.dragged)&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
+    for(const pick of this.tree.querySelectorAll('.notes-tree-pick'))pick.draggable=this.canDrag(this.entries.get(pick.parentElement.dataset.id));
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.retrySave.hidden=!this.saveFailed||!this.note||this.note.deleted;this.retrySave.textContent=t(this.uncertain?'journal.check_result':'journal.retry_save');this.retrySave.disabled=!!this.busy||!!this.saving||!this.writable||this.stale&&!this.uncertain;
     this.rename.disabled=this.remove.disabled=!write||this.saving||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;
@@ -144,24 +193,27 @@ export class NotesView {
     return rows;
   }
   async reload(retry=0){
+    if(this.treePointerPending||this.dragged){this.reloadAfterDrag=true;return;}
     if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1,expandAll=this.expandAllRequested,expanded=new Set(this.expanded);this.loadGeneration=current;this.loading=true;this.controls();
     try{
       const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
       const search=this.search.value.trim();const children=new Map(),entries=new Map();
       if(search||this.showTrash){const listed=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
       else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),listed=await this.list({parentId:parent},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&(expandAll||expanded.has(row.id))){expanded.add(row.id);pending.push(row.id);}}}}
-      if(session!==this.session||current!==this.loadGeneration)return;this.expanded=expanded;this.children=children;this.entries=entries;this.paint();if(!this.stale)this.error.hidden=true;
+      if(session!==this.session||current!==this.loadGeneration)return;this.expanded=expanded;this.children=children;this.entries=entries;this.paint();if(!this.stale&&!this.moveFailed)this.error.hidden=true;
       if(this.note&&!this.saving){const inspected=this.note;const reply=await session.request('/notes/entries/'+inspected.id);if(session!==this.session||current!==this.loadGeneration)return;if(this.note!==inspected||this.saving)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}}
     }catch(error){if(session===this.session&&current===this.loadGeneration){if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.expandAllRequested=false;this.controls();}}
   }
   paint(){
     if(!this.info)return;
+    if(this.treePointerPending||this.dragged){this.reloadAfterDrag=true;return;}
     const focused=this.tree.querySelector(':focus')?.dataset.id;this.tree.replaceChildren();
     const append=(parent,host)=>{for(const entry of sortedNotes(this.children.get(parent)||[],this.sortOrder,getLocale())){
       const folder=entry.kind==='FOLDER',row=node('div',undefined,'notes-tree-row');row.setAttribute('role','treeitem');row.setAttribute('aria-selected',String(this.note?.id===entry.id));row.dataset.id=entry.id;row.tabIndex=-1;
       const title=noteTitle(entry,parent==='search'?entry.path:entry.path.split('/').at(-1));
       const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.kind==='EVENT'?title:entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.title?title+' · '+entry.path:entry.path);pick.append(icon(folder?'folder':'file-earmark-text'),node('span',title));row.append(pick);
+      pick.draggable=this.canDrag(entry);
       row.addEventListener('focus',()=>{for(const item of this.tree.querySelectorAll('[role=treeitem]'))item.tabIndex=item===row?0:-1;});
       if(folder&&!this.showTrash){row.setAttribute('aria-expanded',String(this.expanded.has(entry.id)));if(this.expanded.has(entry.id)){const group=node('div');group.setAttribute('role','group');append(entry.id,group);row.append(group);}}host.append(row);
     }};append(this.children.has('search')?'search':this.info.rootId,this.tree);
@@ -178,7 +230,7 @@ export class NotesView {
   async select(id,force=false){
     if(!id||this.busy||!force&&this.note?.id===id||!force&&!await this.canLeave())return;
     if(this.note&&!this.binary)this.positions.set(this.note.id,this.markdown.position());
-    this.autosave.reset();this.saveFailed=false;this.uncertain=null;const session=this.session,current=++this.generation;this.clearPreview();this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
+    this.moveFailed=false;this.autosave.reset();this.saveFailed=false;this.uncertain=null;const session=this.session,current=++this.generation;this.clearPreview();this.note=null;this.original='';this.binary=false;this.stale=false;this.markdown.clear();this.controls();
     try{
       const reply=await session.request('/notes/entries/'+id);if(session!==this.session||current!==this.generation)return;
       const metadata={...reply.data};let text='',imageBlob=null;

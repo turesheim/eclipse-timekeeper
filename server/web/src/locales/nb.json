@@ -1404,6 +1404,8 @@
   "journal.retry_save": "Prøv å lagre på nytt",
   "calendar.video_meeting": "Videomøte",
   "today.resize_sidebar": "Endre bredden på sidepanelet i I dag",
+  "ui.date_navigation": "Datonavigasjon",
+  "notes.moved": "Flyttet til {{path}}.",
   "tasks.browse": "Bla gjennom oppgaver",
   "tasks.new": "Ny oppgave",
   "tasks.refresh": "Oppdater oppgaver",

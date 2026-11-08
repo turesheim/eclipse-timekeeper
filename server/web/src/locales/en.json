@@ -1404,6 +1404,8 @@
   "journal.retry_save": "Retry saving",
   "calendar.video_meeting": "Video meeting",
   "today.resize_sidebar": "Resize Today sidebar",
+  "ui.date_navigation": "Date navigation",
+  "notes.moved": "Moved to {{path}}.",
   "tasks.browse": "Browse tasks",
   "tasks.new": "New task",
   "tasks.refresh": "Refresh tasks",

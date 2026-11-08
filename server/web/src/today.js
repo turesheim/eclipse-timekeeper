@@ -1,4 +1,5 @@
 import {RecentNotes} from './recent-notes.js';
+import {dateNavigation} from './date-navigation.js';
 import {calendarDescription,calendarLocation} from './tooltip-description.js';
 import {richTooltip} from './tooltips.js';
 import {workSessionsTooltip,calendarEventTooltip} from './tooltip-content.js';
@@ -48,11 +49,7 @@ export class TodayView {
     this.picker.append(pickerTitle,this.pickerContext,this.choices,pickerActions);root.append(this.picker);
     this.picker.addEventListener('close',()=>{const origin=this.pickerOrigin;this.pickerOrigin=null;this.picking=null;this.choices.replaceChildren();if(origin&&this.visible&&!document.querySelector('#editor[open]'))root.querySelector(`[data-today-client="${origin}"]`)?.focus();});
     this.dateInput.addEventListener('change',()=>this.select(this.dateInput.value));
-    iconButton(byId('today-date-choose'),'calendar',t('today.choose_date')).addEventListener('click',()=>{
-      try {if(typeof this.dateInput.showPicker==='function')this.dateInput.showPicker();else this.dateInput.focus();}
-      catch {this.dateInput.focus();}
-    });
-    for(const [id,glyph,label] of [['today-previous','left','today.previous_day'],['today-current','clock','ui.today'],['today-next','right','today.next_day']])iconButton(byId(id),glyph,t(label));
+    dateNavigation(root.querySelector('.today-date-navigation'),{input:this.dateInput,choose:byId('today-date-choose'),previous:byId('today-previous'),current:byId('today-current'),next:byId('today-next'),previousLabel:t('today.previous_day'),currentLabel:t('ui.today'),nextLabel:t('today.next_day')});
     for(const [id,days] of [['today-previous',-1],['today-next',1]])byId(id).addEventListener('click',()=>this.select(addDays(this.date,days)));
     byId('today-current').addEventListener('click',()=>this.select(dateInZone(Date.now(),this.data.profile.data.zoneId)));
     for(const [id,months] of [['today-month-previous',-1],['today-month-next',1]]){

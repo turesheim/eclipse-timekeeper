@@ -152,6 +152,12 @@ linked from About. See the [editor development contract](MARKDOWN-EDITOR.md).
 
 ## Today and Calendar views
 
+The shared date-navigation component reuses each view's date input and period
+handlers. Today, Calendar, Week, Workweek and Activities use the same grouped
+picker and previous/current/next controls; the monthly picker retains its month
+and year popover. Date labels remain available to assistive technology, while
+redundant visible month, work-session and date/time-zone captions are omitted.
+
 **Today** is the default workspace tab. It opens a selected day with its Markdown
 journal in the main column. The date field and adjacent buttons move between
 days. The mini calendar selects any visible date, marks dates containing day
@@ -1137,6 +1143,17 @@ The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
 tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
+
+Notes navigation and editor content scroll independently within the available
+viewport. Its flex layout fills the space above navigation after the old view's
+toolbar is hidden and adapts to visual viewport changes; nested scrolling does
+not chain to the page at its boundaries.
+Ordinary writable document rows can be dragged to folders or the navigation background
+(the collection root). Moves flush the current draft and use the existing
+conditional path endpoint, preserving identities and bytes. Read-only, stale,
+deleted and foreign-session drags cannot write. Daily/weekly journal and event
+notes retain their configured folder associations. The Move dialog remains the
+keyboard alternative. A conflicting destination is never overwritten.
 
 The navigation toggle stays to the left of the Notes title at every screen
 size, including when navigation is collapsed or the phone drawer is open.

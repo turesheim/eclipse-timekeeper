@@ -59,7 +59,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor')).toBeVisible();
     await expect(page.locator('#today-title')).toContainText('Saturday');await expect(page.locator('#today-title')).toContainText('2025');
     await expect(page.locator('#today-zone')).toHaveCount(0);
-    expect((await page.locator('.today-date-field').boundingBox()).width).toBeLessThan(180);
+    expect((await page.locator('.today-date-navigation .date-navigation-field').boundingBox()).width).toBeLessThan(180);
     expect(await page.locator('.today-toolbar').evaluate(toolbar=>{const heading=toolbar.querySelector('.track-heading').getBoundingClientRect(),controls=toolbar.querySelector('.track-controls').getBoundingClientRect();return Math.abs(heading.y+heading.height/2-controls.y-controls.height/2);})).toBeLessThan(2);
     await expect(page.locator('#today-note-title')).toHaveClass(/visually-hidden/);
     const gridSizes=await page.locator('#today-month-grid').evaluate(grid=>[...new Set([...grid.children].map(child=>getComputedStyle(child).fontSize))]);
@@ -236,7 +236,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
     await expect(page.locator('#today-note-editor')).toBeVisible();await expect(page.locator('html')).toHaveAttribute('lang',locale);
     await page.locator('#today-date').fill('2026-10-26');
     await expect(page.locator('#today-date')).toHaveAccessibleName(locale==='nb-NO'?'Dato':'Date');await expect(page.locator('label[for="today-date"]')).toHaveClass(/visually-hidden/);
-    const navigator=page.getByRole('toolbar',{name:locale==='nb-NO'?'Datonavigering':'Day navigation',exact:true});
+    const navigator=page.getByRole('toolbar',{name:locale==='nb-NO'?'Datonavigasjon':'Date navigation',exact:true});
     await expect(navigator.getByRole('group')).toHaveCount(1);await expect(navigator.getByRole('button')).toHaveCount(3);await expect(navigator.locator('.btn-group')).toHaveCount(1);
     const originalBrand=await page.evaluate(()=>document.documentElement.style.getPropertyValue('--font-brand'));
     const check=async(width,font,heading=null,brand=originalBrand)=>{

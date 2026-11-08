@@ -44,7 +44,7 @@ export class TasksView {
   hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detail.close();this.navigationState(false);this.controls();}
   reset(){this.hide();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.rows=[];this.selection={kind:'smart',value:'all'};this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
   async load(){
-    if(!this.visible||!this.session)return;if(this.loading){this.reloadRequested=true;return;}const session=this.session,current=++this.generation,zone=this.data.profile.data.zoneId;this.controller=new AbortController();const signal=this.controller.signal;this.loading=true;this.controls();
+    if(!this.visible||!this.session||!this.root.offsetParent)return;if(this.loading){this.reloadRequested=true;return;}const session=this.session,current=++this.generation,zone=this.data.profile.data.zoneId;this.controller=new AbortController();const signal=this.controller.signal;this.loading=true;this.controls();
     try{
       const reply=await calendarTasks(session,signal);if(session!==this.session||current!==this.generation||zone!==this.data.profile.data.zoneId)return;
       this.sourceTasks=reply.items;this.warning.hidden=!Object.keys(reply.errors).length;this.error.hidden=true;

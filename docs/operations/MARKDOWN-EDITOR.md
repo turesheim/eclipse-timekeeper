@@ -18,6 +18,10 @@ exact spelling of edited markup matters.
 The formatted dialect is CommonMark/GFM: paragraphs, H1–H6, emphasis, strong,
 strikethrough, links, quotations, horizontal rules, nested/task lists, tables and
 fenced code. Enter creates a paragraph; Shift+Enter creates a hard line break.
+Tables use compact cells and theme-colored headers; wide tables scroll within
+the editor instead of breaking words. Short rows display their
+omitted trailing cells as empty without changing the saved source. As in GFM,
+separate text following a table with a blank line to start a new paragraph.
 An ordinary newline in Markdown is a soft break. Newly formatted rules use `---`.
 Unknown extensions, HTML other than safe anchors, reference-style links and code
 fences with extra metadata remain inert, editable source fragments. Their HTML is never executed.
