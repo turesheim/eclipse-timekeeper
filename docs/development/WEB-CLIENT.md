@@ -1108,6 +1108,11 @@ notes, with filename/path fallbacks. Name sorting follows the displayed title.
 Collection paths remain available for identification and keep their existing
 synchronization and link semantics.
 
+Today’s Recent notes includes ordinary, event and daily/weekly journal notes.
+Each title starts with a locally bundled file, calendar-event or journal icon;
+localized type text is available to screen readers and in the tooltip. Selection
+still uses the shared draft guard and opens the canonical document in Notes.
+
 The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
 tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The

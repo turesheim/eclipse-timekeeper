@@ -744,17 +744,20 @@ archives without the field use 7. The preference is included in full account
 archives, but not notes-only ZIP exports.
 
 `GET /api/v1/notes/recent` returns owner-private index metadata rather than
-document or attachment bodies. It includes active Markdown and event notes edited
-from the first local midnight through the end of today, excluding the configured
-journal subtree, day/week notes, assets, folders and trash. Results sort by edit
+document or attachment bodies. It includes active ordinary, event and daily/weekly
+journal notes edited from the first local midnight through the end of today,
+excluding assets, folders and trash. Journal dates do not determine eligibility;
+the edit instant does. Results sort by edit
 instant descending, then normalized path and identity. The pagination snapshot
 binds the collection generation, day range, time zone and preference; subsequent
-pages require it in `If-Match`. Midnight and time-zone changes invalidate pages
+pages require it in `If-Match`. The selection policy is versioned in the opaque
+snapshot, so an upgrade from the old journal-excluding policy invalidates pages.
+Midnight and time-zone changes invalidate pages
 even when no note has changed.
 
 An empty Recent notes read does not initialize the collection or create business
 records. This preserves the strict empty-target restore check after a user opens
-Today on a fresh installation. Existing canonical event notes are indexed on the
+Today on a fresh installation. Existing canonical event and journal notes are indexed on the
 first recent-list read when the collection has not yet been initialized.
 
 `VAULT_SETTINGS.editorCursor` is an optional account preference: `default`, `line`,
