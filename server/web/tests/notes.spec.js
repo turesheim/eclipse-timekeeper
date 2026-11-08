@@ -26,14 +26,14 @@ async function setup(page,request){
 
 test('clicking a hashtag searches exact private tags and retains the current Notes draft',async({page,request})=>{
   const api=await setup(page,request),put=async(path,value)=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(value),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
-  await put('Notes/A-current.md','# Current\n\nA #OpenShift deployment.\n');await put('Notes/B-tagged.md','# Another\n\nAlso #openshift.\n');await put('Notes/C-plain.md','OpenShift #OpenShiftTools `#OpenShift`');
+  const current=await(await put('Notes/A-current.md','# Current\n\nA #OpenShift deployment.\n')).json();await put('Notes/B-tagged.md','# Another\n\nAlso #openshift.\n');await put('Notes/C-plain.md','OpenShift #OpenShiftTools `#OpenShift`');
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'tag:#openshift'}));return reply.status();},{timeout:30000}).toBe(200);
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/A-current.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
   await appendEditorText(page.locator('#notes-formatted p'),' Keep this private draft.');await page.locator('#notes-formatted [data-hashtag="#openshift"]').click();
   await expect(page.locator('#notes-search-mode')).toHaveValue('content');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');
   const rows=page.locator('#notes-navigation .notes-tree > [role=treeitem]');await expect(rows).toHaveCount(2);await expect(rows.first()).toContainText('A-current.md');await expect(rows.last()).toContainText('B-tagged.md');await expect(page.locator('#notes-formatted')).toContainText('Keep this private draft.');
-  const read=await api('GET','/notes/files?path=Notes%2FA-current.md');expect(await read.text()).not.toContain('Keep this private draft.');
+  const read=await api('GET','/notes/entries/'+current.id+'/content');expect(await read.text()).not.toContain('Keep this private draft.');
   await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true})).toHaveAttribute('aria-expanded','false');
   await page.locator('#notes-formatted [data-hashtag="#openshift"]').focus();await page.locator('#notes-formatted [data-hashtag="#openshift"]').press('Enter');await expect(page.locator('#notes-search')).toBeVisible();await expect(rows).toHaveCount(2);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

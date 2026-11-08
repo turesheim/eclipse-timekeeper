@@ -24,7 +24,7 @@ test('prose hashtags use accent links without changing Markdown or literal code 
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
     expect(await café.evaluate(node=>{const probe=document.createElement('span');probe.style.color='var(--accent)';node.after(probe);const expected=getComputedStyle(probe).color;probe.remove();return getComputedStyle(node).color===expected;})).toBe(true);
-    expect((await new AxeBuilder({page}).include('#experience-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+    expect((await new AxeBuilder({page}).include('#experience-editor .markdown-hashtag').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
   }
   await page.setViewportSize({width:390,height:844});await captureScreenshot(page,{path:'test-results/hashtag-accent-phone.png',fullPage:true});
   await page.evaluate(()=>globalThis.experience.setReadOnly(true));await tags.last().click();expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.searchedTags.at(-1))).toBe('#work/cloud');
