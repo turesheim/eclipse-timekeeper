@@ -53,6 +53,10 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
     toMarkdown:{match:node=>node.type.name==='callout',runner:(state,node)=>state.openNode('callout',undefined,{marker:node.attrs.marker,title:node.attrs.title}).next(node.content).closeNode()}
   }));
   const convert=(node,block=false)=>{
+    // GFM gives omitted trailing cells the same meaning as explicit empty cells.
+    // Project complete rows for editing and comparison; retain authored source.
+    if(node.type==='table')node={...node,children:node.children.map(row=>({...row,children:[...row.children,
+      ...Array.from({length:Math.max(0,node.align.length-row.children.length)},()=>({type:'tableCell',children:[]}))]}))};
     if(block&&node.type==='html'&&/<\/a\s*>\s*$/i.test(node.value)){const link=anchor(node.value,true);if(link)return {type:'paragraph',children:[link],position:node.position};}
     if(node.children)node={...node,children:inlineLinks(node.children.map(child=>node.type==='paragraph'&&child.type==='html'&&/^<br\s*\/?>$/i.test(child.value.trim())
       ?{type:'inlineBreak',position:child.position}:convert(child)))};

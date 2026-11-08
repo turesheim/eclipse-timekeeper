@@ -25,8 +25,10 @@
 .markdown-mermaid-preview img { display: block; max-width: 100%; height: auto; margin-inline: auto; }
 .markdown-editor .ProseMirror code { color: inherit; }
 .markdown-editor .ProseMirror img { display: block; max-width: 100%; height: auto; margin-block: .75rem; }
-.markdown-editor .ProseMirror table { width: 100%; }
-.markdown-editor .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
+.markdown-editor .ProseMirror table { width: 100%; table-layout: auto; margin-block: .75rem; }
+.markdown-editor .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .25rem .5rem; overflow-wrap: normal; }
+.markdown-editor .ProseMirror :is(th,td) > p { margin: 0; }
+.markdown-editor .ProseMirror th { background: color-mix(in srgb, var(--bs-primary) 14%, var(--bs-body-bg)); color: var(--bs-body-color); }
 .markdown-editor .ProseMirror li[data-task="true"] { display: flex; align-items: flex-start; gap: .75rem; list-style: none; }
 .markdown-editor .ProseMirror li > div { min-width: 0; }
 .markdown-editor .ProseMirror li[data-task="true"] > div { flex: 1; }
