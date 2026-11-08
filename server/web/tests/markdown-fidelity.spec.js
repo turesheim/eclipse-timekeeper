@@ -10,6 +10,24 @@ async function open(page,source){
 }
 async function download(page){const pending=page.waitForEvent('download');await page.locator('#markdown-download').click();return readFile(await(await pending).path(),'utf8');}
 
+test('short table rows render without changing authored Markdown or unrelated blocks',async({page})=>{
+  const source='Opening paragraph.\r\n\r\n| Pool | Nodes | vCPU |\r\n| :--- | ---: | ---: |\r\n| Test | 7 | 56 |\r\n| Production | 18 |\r\nCalculation: 244 / 4 = 61.\r\n\r\nTail paragraph.\r\n';
+  await open(page,source);
+  const table=page.locator('#markdown-formatted table');await expect(table).toHaveCount(1);
+  await expect(table.locator('tr')).toHaveCount(4);await expect(table.locator('tr').last().locator('td')).toHaveCount(3);
+  await expect(table.locator('tr').last().locator('td').first()).toHaveText('Calculation: 244 / 4 = 61.');
+  await expect(table.locator('tr').last().locator('td').nth(1)).toHaveText('');
+  expect(await download(page)).toBe(source);
+  const tail=page.locator('#markdown-formatted p').filter({hasText:'Tail paragraph.'});await tail.click();await page.keyboard.press('End');await page.keyboard.type(' Edited.');
+  const changed=source.replace('Tail paragraph.','Tail paragraph. Edited.');expect(await download(page)).toBe(changed);
+  await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(changed.replaceAll('\r\n','\n'));
+  await page.locator('#markdown-rich').click();await expect(table).toBeVisible();expect(await download(page)).toBe(changed);
+  await table.locator('tr').nth(2).locator('td').first().click();await page.keyboard.press('End');await page.keyboard.type(' edited');
+  const edited=await download(page);expect(edited).toContain('Production edited');expect(edited).toContain('244 / 4 = 61.');expect(edited).toContain('Tail paragraph. Edited.');
+  await page.locator('#markdown-source').click();await page.locator('#markdown-rich').click();await expect(table).toBeVisible();
+  await expect(table.locator('tr').last().locator('td').first()).toHaveText('Calculation: 244 / 4 = 61.');
+});
+
 test('editing one paragraph retains untouched Markdown spelling, blank lines, mixed line endings and frontmatter',async({page})=>{
   const fixture=await readFile(new URL('./fixtures/markdown/fidelity/blocks.md',import.meta.url),'utf8');
   const source='\uFEFF'+fixture.replaceAll('\n','\r\n').replace('42 |\r\n\r\nTail','42 |\n\nTail');
