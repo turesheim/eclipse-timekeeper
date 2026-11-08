@@ -236,7 +236,7 @@ test('internal link assistance pairs brackets and completes a narrowed document 
     await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');
     await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[]]');
     const list=page.locator('#experience-field .markdown-suggestions'),options=list.getByRole('option');await expect(options).toHaveCount(3);
-    await page.keyboard.type('Des');await expect(options).toHaveCount(1);await expect(options.first()).toContainText('Notes/Design.md');
+    await page.keyboard.type('Desx');await expect(options).toHaveCount(0);await page.keyboard.press('Backspace');await expect(options).toHaveCount(1);await expect(options.first()).toContainText('Notes/Design.md');
     await page.keyboard.press('ArrowDown');await expect(options.first()).toBeFocused();await page.keyboard.press('Enter');await expect(list).toBeHidden();
     const completed=await page.evaluate(()=>globalThis.field.value());expect(completed.trim()).toBe('[[Notes/Design]]');
     if(formatted)await expect(edit.locator('[data-wiki-reference="Notes/Design"]')).toHaveCount(1);
@@ -307,4 +307,11 @@ test('bracket pairing wraps a selection without losing its text and composition 
     await field(page,'',formatted,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);const composing=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await composing.click();await composing.dispatchEvent('compositionstart',{data:''});await page.keyboard.type('[[');
     await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();expect(await composing.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[');await composing.dispatchEvent('compositionend',{data:'[['});
   }
+});
+
+
+test('source bracket tracking cannot skip unrelated text after a formatted edit',async({page})=>{
+  await field(page,'',false);const source=page.locator('#experience-body');await source.click();await page.keyboard.type('[');await expect(source).toHaveValue('[]');
+  const host=page.locator('#experience-field');await host.getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#experience-formatted .ProseMirror');await rich.focus();await page.keyboard.press('ControlOrMeta+a');await page.keyboard.type('AB');
+  await host.getByRole('button',{name:'Markdown source',exact:true}).click();await source.evaluate(node=>node.setSelectionRange(1,1));await page.keyboard.type(']');expect(await page.evaluate(()=>globalThis.field.value())).toContain('A]B');
 });

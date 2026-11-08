@@ -173,6 +173,7 @@ export class MarkdownField {
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
+    this.resetCompletions?.();
     if(!formatted)this.closeBlockMenu();
     this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.plain.hidden=formatted;
     this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
