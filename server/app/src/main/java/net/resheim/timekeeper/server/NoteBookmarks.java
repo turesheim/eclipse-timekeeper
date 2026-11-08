@@ -69,14 +69,12 @@ final class NoteBookmarks {
     }
     static void validate(JsonNode bookmarks,JsonNode vault){
         if(bookmarks.isMissingNode())return;if(!bookmarks.isArray()||bookmarks.size()>250000)throw ApiFailure.validation();var seen=new HashSet<String>();
+        var files=new HashSet<String>();for(var entry:vault.path("entries"))if(entry.path("kind").asText().equals("MARKDOWN")&&entry.path("sourceType").asText().equals(VaultContent.TYPE))files.add(entry.path("sourceId").asText());
         for(var value:bookmarks){
             var fields=new HashSet<String>();value.fieldNames().forEachRemaining(fields::add);
             if(!value.isObject()||!fields.equals(Set.of("sourceType","sourceKey"))||!value.path("sourceType").isTextual()||!value.path("sourceKey").isTextual())throw ApiFailure.validation();
             var ref=key(value.path("sourceType").asText(),value.path("sourceKey").asText());if(!seen.add(ref.type()+":"+ref.key()))throw ApiFailure.validation();
-            if(ref.type().equals(VaultContent.TYPE)){
-                boolean found=false;for(var entry:vault.path("entries"))if(entry.path("kind").asText().equals("MARKDOWN")&&entry.path("sourceType").asText().equals(ref.type())&&entry.path("sourceId").asText().equals(ref.id().toString()))found=true;
-                if(!found)throw ApiFailure.validation();
-            }
+            if(ref.type().equals(VaultContent.TYPE)&&!files.contains(ref.id().toString()))throw ApiFailure.validation();
         }
     }
     void restore(JsonNode bookmarks){if(bookmarks.isMissingNode())return;for(var value:bookmarks){var ref=key(value.path("sourceType").asText(),value.path("sourceKey").asText());save(ref,tag(ref),true);}}

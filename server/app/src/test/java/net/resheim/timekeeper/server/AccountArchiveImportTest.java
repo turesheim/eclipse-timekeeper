@@ -156,6 +156,7 @@ class AccountArchiveImportTest {
         store.transaction("b",()->importer().apply(upload,false,review.etag()));
         store.transaction("b",()->{var marks=new NoteBookmarks(store);assertTrue(marks.get(source).path("bookmarked").asBoolean());assertTrue(marks.day(DayNotes.date("2026-11-08")));assertTrue(store.find(DayNotes.TYPE,DayNotes.id(DayNotes.date("2026-11-08"))).isEmpty());return null;});
         var invalid=archive.deepCopy();invalid.withArray("bookmarks").add(invalid.path("bookmarks").get(0).deepCopy());assertEquals(422,assertThrows(ApiFailure.class,()->NoteBookmarks.validate(invalid.path("bookmarks"),invalid.path("vault"))).status);
+        var missing=archive.deepCopy();missing.withArray("bookmarks").add(object().put("sourceType",VaultContent.TYPE).put("sourceKey",UUID.randomUUID().toString()));assertEquals(422,assertThrows(ApiFailure.class,()->NoteBookmarks.validate(missing.path("bookmarks"),missing.path("vault"))).status);
     }
     @Test void dayNotesRoundTripWithoutWorkAndNeverOverwriteAnExistingDate() throws Exception {
         source();
