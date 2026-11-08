@@ -126,6 +126,22 @@ final class CalendarSubscriptions {
         }
         return result;
     }
+    ObjectNode tasks(){
+        var result=object();var items=result.putArray("items");var errors=result.putObject("errors");var state=object().put("owner",store.owner()).put("zone",store.profile().path("zoneId").asText());var sources=state.putArray("sources");
+        var zone=ZoneId.of(store.profile().path("zoneId").asText());
+        for(var subscription:store.list(SUB).stream().sorted(Comparator.comparing(value->value.path("id").asText())).toList())if(subscription.path("visible").asBoolean()&&subscription.path("includeTodos").asBoolean(false)) {
+            String id=subscription.path("id").asText();var feed=store.find(FEED,uuid(subscription.get("id")));var source=object().put("id",id).put("version",subscription.path("version").asLong()).put("feedVersion",feed.map(value->value.path("version").asLong()).orElse(-1L));sources.add(source);
+            if(subscription.hasNonNull("lastError"))errors.put(id,subscription.path("lastError").asText());
+            if(feed.isEmpty()||!feed.get().hasNonNull("body")){errors.put(id,subscription.path("lastError").asText("CALENDAR_UNAVAILABLE"));continue;}
+            var client=store.find("CLIENT",uuid(subscription.get("clientId"))).orElseThrow(ApiFailure::notFound);
+            try{for(var task:new CalendarFeed(feed.get().path("body").asText(),false,true).tasks(zone)) {
+                task.put("subscriptionId",id).put("calendarName",subscription.path("name").asText()).put("clientId",client.path("id").asText()).put("clientName",client.path("name").asText()).put("color",client.path("color").asText());
+                // UIDs are only unique inside their source subscription.
+                task.put("id",hash(array().add(id).add(task.path("id").asText()).toString()));items.add(task);
+            }}catch(CalendarFailure failure){errors.put(id,failure.code);}
+        }
+        result.put("snapshot",etag(state)).put("zoneId",zone.getId());return result;
+    }
     ObjectNode convert(UUID id,String key,JsonNode input){
         var subscription=required(id);if(!key.matches("[0-9a-f]{64}"))throw ApiFailure.badRequest();
         UUID linkId=ImportLedger.identifier("calendar-activity",id.toString(),key);

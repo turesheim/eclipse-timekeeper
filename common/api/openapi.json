@@ -18219,6 +18219,91 @@
         },
         "description": "Read-only logical usage, including retained Trash and journal/event content. Category bars share the account allowance; there are no separate per-category quotas. Counts exclude the virtual root and include files and folders in Trash. Reading never initializes an unused namespace or changes versions."
       }
+    },
+    "/calendar-tasks": {
+      "get": {
+        "operationId": "listCalendarTasks",
+        "summary": "Browse all published subscribed to-dos, independently of the visible calendar window",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatchOptional"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque source snapshot. Required as If-Match with a continuation cursor."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarTasks"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "description": "Read-only owned catalog of task definitions and detached instances, including undated and completed tasks. No upstream fetch or native task writes. Pagination is signed and owner/revision/source-snapshot bound; subsequent cursor requests require If-Match with the returned snapshot/ETag. A changed feed, configuration or account zone returns 412; an account revision change returns 409 CURSOR_EXPIRED. Per-subscription errors preserve unrelated sources."
+      }
     }
   },
   "components": {
@@ -33266,6 +33351,157 @@
             "maximum": 9007199254740991
           }
         }
+      },
+      "CalendarTask": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "uid": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "recurrenceId": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEEDS-ACTION",
+              "IN-PROCESS",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "recurring": {
+            "type": "boolean"
+          },
+          "start": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "maxItems": 1000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 4000
+            }
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "calendarName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "clientName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          }
+        },
+        "required": [
+          "id",
+          "uid",
+          "recurrenceId",
+          "summary",
+          "description",
+          "location",
+          "url",
+          "status",
+          "recurring",
+          "start",
+          "due",
+          "categories",
+          "subscriptionId",
+          "calendarName",
+          "clientId",
+          "clientName",
+          "color"
+        ],
+        "additionalProperties": false,
+        "description": "One current published VTODO definition or detached recurrence instance from a visible subscription with to-dos enabled. No native task is created. Includes completed, cancelled, undated and out-of-window items without expanding an infinite recurrence. Date-only values retain their civil day; timed values are projected into the account time zone. id binds subscription, UID and recurrence identity."
+      },
+      "CalendarTasks": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/CalendarTask"
+            }
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snapshot": {
+            "type": "string"
+          },
+          "zoneId": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "revision",
+          "nextCursor",
+          "snapshot",
+          "zoneId",
+          "errors"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

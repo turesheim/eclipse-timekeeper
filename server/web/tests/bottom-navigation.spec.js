@@ -16,13 +16,13 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     return [...document.fonts].some(font=>font.family.includes('bootstrap-icons') && font.status==='loaded');
   })).toBe(true);
   await expect(page.locator('#refresh')).toHaveClass(/\bbtn\b/);
-  const views=[['today','Today'],['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['clients','Clients'],['projects','Projects'],['notes','Notes']];
+  const views=[['today','Today'],['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['tasks','Tasks'],['clients','Clients'],['projects','Projects'],['notes','Notes']];
   await expect(page.locator('[data-tab=labels]')).toHaveCount(0);
-  await expect(page.locator('[data-tab=tasks],#tasks-panel,#activity-tasks,#tasks,#add-task')).toHaveCount(0);
+  await expect(page.locator('#activity-tasks,#tasks,#add-task')).toHaveCount(0);
   expect(await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:844});
-    await expect(bar.locator('button')).toHaveCount(8);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(8);
+    await expect(bar.locator('button')).toHaveCount(9);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(9);
     const brand=await page.locator('.brand').boundingBox(),status=await page.locator('#sync-status').boundingBox();expect(status.x).toBeGreaterThanOrEqual(brand.x+brand.width);expect(Math.abs(status.y+status.height/2-brand.y-brand.height/2)).toBeLessThan(1);
     const bounds=await bar.boundingBox();expect(bounds.y+bounds.height).toBeCloseTo(844,0);
     for(const [id,label] of views) {
@@ -42,7 +42,7 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     expect(screenshot.readUInt32BE(16)).toBe(width);expect(screenshot.readUInt32BE(20)).toBe(844);
   }
   const activities=bar.getByRole('button',{name:'Activities',exact:true});await activities.focus();await page.keyboard.press('Enter');await expect(activities).toHaveAttribute('aria-current','page');
-  await page.keyboard.press(browserName==='webkit' && process.platform==='darwin' ? 'Alt+Tab':'Tab');await expect(bar.getByRole('button',{name:'Clients',exact:true})).toBeFocused();
+  await page.keyboard.press(browserName==='webkit' && process.platform==='darwin' ? 'Alt+Tab':'Tab');await expect(bar.getByRole('button',{name:'Tasks',exact:true})).toBeFocused();
   await page.setViewportSize({width:390,height:844});await openAbout(page);
   const aboutAudit=await new AxeBuilder({page}).include('#server-info').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(aboutAudit.violations).toEqual([]);
   await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Account menu',exact:true})).toBeFocused();
@@ -73,7 +73,7 @@ test('bottom navigation uses compact desktop spacing while preserving touch safe
       const above=target.y-bounds.y,below=bounds.y+bounds.height-target.y-target.height;
       const borders=await bar.evaluate(value=>{const style=getComputedStyle(value);return parseFloat(style.borderTopWidth)-parseFloat(style.borderBottomWidth);});
       expect(below-above).toBeCloseTo((touch?inset:0)-borders,0);expect(target.height).toBeGreaterThanOrEqual(44);
-      for(const name of ['Today','Calendar','Week','Workweek','Activities','Clients','Projects'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
+      for(const name of ['Today','Calendar','Week','Workweek','Activities','Tasks','Clients','Projects','Notes'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
       if(width>=1024){
         await bar.getByRole('button',{name:'Today',exact:true}).click();
         await expect.poll(async()=>{const note=await page.locator('#today-note-editor').boundingBox(),nav=await bar.boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-note.y-note.height-gap);}).toBeLessThan(2);

@@ -15,6 +15,7 @@ public class CalendarResource {
     @Inject ContractInputs inputs;
     @Inject CommandReceipts receipts;
     @Inject CalendarRefresh refresh;
+    @Inject Pages pages;
     @Context UriInfo uri;
     private Response tx(Supplier<ApiReplies> operation){return store.authenticated(identity,()->operation.get().response());}
     private CalendarSubscriptions calendars(){return new CalendarSubscriptions(store);}
@@ -41,6 +42,17 @@ public class CalendarResource {
     }
     @GET @Path("/calendar-events") public Response events(@QueryParam("fromDate")String from,@QueryParam("toDate")String to){
         ContractInputs.queries(uri.getQueryParameters(),"fromDate","toDate");return tx(()->new ApiReplies(200,calendars().events(from,to),null,null));
+    }
+    @GET @Path("/calendar-tasks") public Response tasks(@QueryParam("limit")String limit,@QueryParam("cursor")String cursor,@HeaderParam("If-Match")String match){
+        ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");int size=ContractInputs.number(limit,200,1,500);
+        return tx(()->{
+            var catalog=calendars().tasks();String snapshot=catalog.path("snapshot").asText();
+            if(cursor!=null&&match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");
+            if(match!=null&&!match.equals(snapshot))throw new ApiFailure(412,"STALE_VERSION");
+            var values=new java.util.ArrayList<JsonNode>();catalog.path("items").forEach(values::add);values.sort(java.util.Comparator.comparing(value->value.path("id").asText()));
+            var page=pages.page("CALENDAR_TASKS",values,JsonValues.object().put("snapshot",snapshot),size,cursor);page.set("errors",catalog.path("errors"));page.put("snapshot",snapshot).set("zoneId",catalog.path("zoneId"));
+            return new ApiReplies(200,page,snapshot,null);
+        });
     }
     @POST @Path("/calendar-subscriptions/{id}/events/{key}/activity") public Response convert(@PathParam("id")String id,@PathParam("key")String event,@HeaderParam("Idempotency-Key")String key,JsonNode body){
         UUID subscription=ContractInputs.pathId(id);var input=inputs.validate("CalendarEventConversion",body);noQueries();

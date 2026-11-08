@@ -11,6 +11,7 @@ import { sameSession } from './calendar-model.js';
 import { MonthTrack } from './track.js';
 import { TodayView } from './today.js';
 import { NotesView } from './notes.js';
+import { TasksView } from './tasks.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
 import { UndoNotice } from './undo.js';
@@ -58,6 +59,7 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
+const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(vaultNoteNavigation,async event=>{
   event.preventDefault();const session=api;if(!session||!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return;
@@ -151,6 +153,7 @@ function readOnlyWhileDisconnected() {
   track.setWritable(connected && canWrite);
   today.journal.setWritable(connected && canWrite);
   notes.writable=connected && canWrite;notes.controls();
+  tasks.writable=connected && canWrite;tasks.controls();
   weekSessions.setWritable(connected && canWrite);
   $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
   $('editor-delete-confirm').querySelector('[value=delete]').disabled = $('editor-delete').disabled;
@@ -158,9 +161,10 @@ function readOnlyWhileDisconnected() {
 }
 async function tab(name) {
   const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return false;
-  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks']) $(`${item}-panel`).hidden = item !== name;
   if(name==='notes')notes.show();else notes.hide();
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
+  if(name==='tasks')tasks.show();else tasks.hide();
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if (name !== 'track') track.hide();
   if (name === 'today') today.show();else today.hide();
@@ -206,7 +210,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();collapsed.clear();expandedClients.clear();canWrite = false;
+    calendar.reset();track.reset();today.reset();notes.reset();tasks.reset();collapsed.clear();expandedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -394,6 +398,7 @@ function render() {
   track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
   today.update(s, connected, api);
   notes.update(s,connected,api,canWrite);
+  tasks.update(s,connected,api,canWrite);
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({ length: 7 }, (_, index) => addDays(s.dates.first, index));

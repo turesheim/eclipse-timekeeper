@@ -22,6 +22,15 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_calendar_task_catalog_is_read_only_paged_and_includes_real_optional_deadlines(self):
+        operation=CONTRACT['paths']['/calendar-tasks']
+        self.assertEqual({'get'},set(operation));self.assertEqual('read',operation['get']['x-required-permission'])
+        task={'id':'a'*64,'uid':'provider-id','recurrenceId':'','summary':'Undated task','description':'Body','location':'','url':'','status':'NEEDS-ACTION','recurring':False,'start':None,'due':None,'categories':['Review'],'subscriptionId':ID,'calendarName':'Private tasks','clientId':ID,'clientName':'Client','color':'#176653'}
+        page={'items':[task],'revision':1,'nextCursor':None,'snapshot':'"source-snapshot"','zoneId':'Europe/Oslo','errors':{}}
+        self.assertTrue(validator('CalendarTasks').is_valid(page))
+        for invalid in ({**task,'due':{'kind':'DATE','date':'not a date'}},{**task,'status':'UNKNOWN'},{**task,'feedUrl':'https://secret.invalid/private'},{**task,'ownerId':'another-account'}):
+            self.assertFalse(validator('CalendarTask').is_valid(invalid))
+
     def test_storage_usage_is_read_only_and_quota_edits_are_conditional_administrator_writes(self):
         usage=CONTRACT['paths']['/notes/storage']['get']
         self.assertEqual('read',usage['x-required-permission'])
@@ -681,7 +690,7 @@ class ContractTest(unittest.TestCase):
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
             'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
-            'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
+            'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

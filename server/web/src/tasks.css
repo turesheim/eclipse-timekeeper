@@ -1,0 +1,32 @@
+.tasks-heading { display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem; }
+.tasks-heading h2 { margin:0;flex:1;min-width:0; }
+.tasks-heading .btn-group { flex-shrink:0; }
+.tasks-layout { display:grid;grid-template-columns:minmax(12rem,16rem) minmax(0,1fr);gap:1rem;align-items:start;position:relative; }
+.tasks-navigation,.tasks-results { padding:1rem;min-width:0; }
+.tasks-navigation h3 { font-size:1rem;margin:1rem 0 .5rem; }
+.tasks-navigation h3:first-child { margin-top:0; }
+.tasks-filter-group { display:flex;flex-direction:column;gap:.2rem; }
+.tasks-filter { display:flex;align-items:center;justify-content:space-between;gap:.5rem;width:100%;min-height:2.75rem;border:0;border-radius:var(--bs-border-radius);background:transparent;color:var(--bs-body-color);padding:.5rem;text-align:start; }
+.tasks-filter > span:first-child { overflow-wrap:anywhere;min-width:0; }
+.tasks-filter .badge { flex-shrink:0; }
+.tasks-filter.active { background:var(--bs-primary-bg-subtle);color:var(--bs-primary-text-emphasis);font-weight:650; }
+.tasks-filter:hover,.tasks-open:hover { background:var(--bs-tertiary-bg); }
+.tasks-results > h3 { font-size:1.2rem;margin:0;overflow-wrap:anywhere; }
+.tasks-list { list-style:none;margin:0;padding:0; }
+.tasks-list > li + li { border-top:var(--bs-border-width) solid var(--bs-border-color); }
+.tasks-open { display:flex;flex-direction:column;gap:.25rem;width:100%;border:0;background:transparent;color:var(--bs-body-color);text-align:start;padding:1rem .5rem;overflow-wrap:anywhere; }
+.tasks-context,.tasks-timing,.tasks-status { font-size:.9em;color:var(--bs-secondary-color); }
+.tasks-status { font-weight:600; }
+.task-details h2 { overflow-wrap:anywhere; }
+.task-details-close { float:right;margin-inline-start:.75rem; }
+.task-metadata { display:grid;grid-template-columns:auto minmax(0,1fr);gap:.25rem 1rem; }
+.task-metadata dd { margin:0;overflow-wrap:anywhere; }
+.task-plain-body { white-space:pre-wrap;overflow-wrap:anywhere; }
+@media(min-width:761px) { .tasks-heading > button:first-child { display:none; } }
+@media(max-width:760px) {
+  .tasks-layout { grid-template-columns:minmax(0,1fr); }
+  .tasks-navigation { display:none;position:absolute;z-index:3;inset:0 auto auto 0;width:min(90%,22rem);max-height:65dvh;overflow:auto;background:var(--bs-body-bg);box-shadow:0 .25rem 1rem #0003; }
+  .tasks-navigation-open .tasks-navigation { display:block; }
+  .task-metadata { grid-template-columns:minmax(0,1fr);gap:0; }
+  .task-metadata dd { margin-bottom:.5rem; }
+}
