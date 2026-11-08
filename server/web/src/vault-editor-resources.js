@@ -15,15 +15,23 @@ const relativeReference=(origin,target)=>{
 const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',reference,{legacyAssets:false});
 /** All lookups use the current API session. No credentials enter resource URLs. */
 export function vaultEditorResources(session,origin=()=>'',open){
-  let cachedSession,cache,info;
-  const catalog=async()=>{
-    const current=session();if(!current)throw new Error(t('notes.invalid_link'));
-    if(current!==cachedSession){cachedSession=current;cache=null;info=null;}
-    if(!cache||Date.now()-cache.at>5000){const promise=(async()=>{
-      const collection=(await current.request('/notes')).data,rows=[];let offset=0;
-      do{const page=(await current.request('/notes/entries?'+new URLSearchParams({query:'',offset,limit:collection.limits.pageSize}),{etag:collection.snapshot})).data;rows.push(...page.items);offset=page.nextOffset;}while(offset!==undefined);
-      if(current!==session())throw new Error(t('notes.invalid_link'));info=collection;return rows;
-    })();cache={at:Date.now(),promise};promise.catch(()=>{cache=null;});}
+  let cachedSession,cache,info,infoRequest,generation=0;
+  const invalidate=()=>{cache=null;info=null;infoRequest=null;generation++;};
+  const currentSession=()=>{const current=session();if(!current)throw new Error(t('notes.invalid_link'));if(current!==cachedSession){cachedSession=current;invalidate();}return current;};
+  // Share only in-flight settings reads: each later operation still sees current roots.
+  const collectionInfo=()=>{
+    const current=currentSession(),cycle=generation;
+    if(!infoRequest){const pending=current.request('/notes').then(reply=>{if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return reply.data;});
+      infoRequest=pending;void pending.finally(()=>{if(infoRequest===pending)infoRequest=null;}).catch(()=>{});}
+    return infoRequest;
+  };
+  const catalog=async(query='')=>{
+    const current=currentSession(),cycle=generation;
+    if(!cache||cache.query!==query||Date.now()-cache.at>5000){const pending={at:Date.now(),query};pending.promise=(async()=>{
+      const collection=await collectionInfo(),rows=[];let offset=0;
+      do{const page=(await current.request('/notes/entries?'+new URLSearchParams({query,offset,limit:collection.limits.pageSize}),{etag:collection.snapshot})).data;rows.push(...page.items);offset=page.nextOffset;}while(offset!==undefined);
+      if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));info=collection;return rows;
+    })();cache=pending;pending.promise.catch(()=>{if(cache===pending)cache=null;});}
     return cache.promise;
   };
   const originPath=(entries,value,settings=info?.settings)=>{
@@ -36,12 +44,16 @@ export function vaultEditorResources(session,origin=()=>'',open){
     return '';
   };
   const resolveWiki=async reference=>{
-    const value=origin(),entries=await catalog(),matches=wikiCandidates(entries,reference,originPath(entries,value));
+    const ref=wikiReference(reference);if(!ref)throw new Error(t('notes.invalid_link'));
+    const value=origin(),filename=(ref.path||(typeof value==='string'?value:'')).split('/').at(-1).replace(/\.md$/i,'');
+    // Every possible match contains this filename. Filter before asking the
+    // server to derive titles; retain all pages for exact/relative ambiguity checks.
+    const entries=await catalog(filename),matches=wikiCandidates(entries,reference,originPath(entries,value));
     if(matches.length!==1)throw new Error(t(matches.length?'notes.ambiguous_link':'notes.invalid_link'));return matches[0];
   };
   const resolveRelative=async reference=>{
-    const value=origin(),current=session(),collection=(await current.request('/notes')).data;
-    let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);
+    const value=origin(),current=currentSession(),collection=typeof value==='string'?null:await collectionInfo();
+    let path=originPath([],value,collection?.settings);if(!path)path=originPath(await catalog(),value,collection?.settings);
     const ordinary=relativeNotePath(path,reference,{legacyAssets:false});if(!path||!ordinary)throw new Error(t('notes.invalid_link'));
     const native=typeof value==='object'&&['DAY_NOTE','WEEK_NOTE','EVENT_NOTE'].includes(value?.sourceType);
     const legacy=native&&reference.startsWith('assets/')?relativeNotePath(collection.settings.assetsFolder+'/note.md',reference.slice(7),{legacyAssets:false}):null;
@@ -52,12 +64,12 @@ export function vaultEditorResources(session,origin=()=>'',open){
   const navigate=async(entry,heading,source)=>{
     if(open)return open(entry,heading);(source||document).dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,heading,guards:[],leave:[]}}));
   };
-  const previewImage=(load,alt)=>{const current=session();return imagePreview({alt,active:()=>current===session(),load:async()=>{const entry=await load();if(current!==session())throw new Error(t('notes.invalid_link'));return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
+  const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
   return {
-    invalidate:()=>{cache=null;info=null;},resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
+    invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
     image:(reference,alt)=>previewImage(()=>resolveRelative(reference),alt),
     canonicalAsset:async reference=>(await resolveRelative(reference)).path,
-    assetReference:async entry=>{const value=origin(),collection=(await session().request('/notes')).data;let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);return relativeReference(path,entry.path);},
+    assetReference:async entry=>{const value=origin(),collection=typeof value==='string'?null:await collectionInfo();let path=originPath([],value,collection?.settings);if(!path)path=originPath(await catalog(),value,collection?.settings);return relativeReference(path,entry.path);},
     previewWiki:async reference=>{const current=session(),entry=await resolveWiki(reference);if(!['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind))return entry.path;const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});if(current!==session())throw new Error(t('notes.invalid_link'));return noteTitle(entry,entry.path)+(entry.title&&entry.kind!=='EVENT'?'\n'+entry.path:'')+'\n'+(await reply.data.slice(0,1500).text()).slice(0,600);},
     complete:async(query,options={})=>(await catalog()).filter(entry=>!entry.deleted&&entry.kind!=='FOLDER'&&(options.assetsOnly?['ASSET','BINARY'].includes(entry.kind):!!wikiReference(entry.path))&&[entry.path,noteTitle(entry)].some(value=>value.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).slice(0,30),
     openWiki:async(reference,source)=>{const current=session(),entry=await resolveWiki(reference);if(current!==session()||source&&!source.isConnected)return;return navigate(entry,wikiReference(reference)?.heading||'',source);},

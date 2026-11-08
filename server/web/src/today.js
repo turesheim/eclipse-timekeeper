@@ -63,7 +63,7 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){this.recentNotes.reset();clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){this.recentNotes.reset();clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>{void this.loadEvents(true);void this.recentNotes.refresh();},30000);}
   show(){this.visible=true;this.recentNotes.show();this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.recentNotes.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
@@ -96,22 +96,25 @@ export class TodayView {
   }
   paintMonth(){
     if(!this.data||!this.month)return;
-    const calendar=monthCalendar(this.month,this.data.profile.data.zoneId),today=dateInZone(Date.now(),this.data.profile.data.zoneId);
-    this.monthTitle.textContent=dateTimeFormat(getLocale(),{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(this.month+'-15T12:00:00Z'));
-    const focus=this.grid.contains(document.activeElement)?document.activeElement.dataset.date:null;
-    this.grid.replaceChildren();
-    this.grid.append(node('span',t('today.week_short'),'today-weekday'));
-    for(let day=0;day<7;day++)this.grid.append(node('span',dateTimeFormat(getLocale(),{weekday:'narrow',timeZone:'UTC'}).format(new Date(calendar.days[day].date+'T12:00:00Z')),'today-weekday'));
-    for(let index=0;index<calendar.days.length;index++){
-      const day=calendar.days[index];
-      if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',Number(week.slice(-2))+' · '+t('today.week_note',{week}));pick.title=t('today.week_note',{week});if(this.noteWeeks.has(week))pick.append(node('span',undefined,'today-month-dot'));pick.addEventListener('click',()=>void this.weekEditor.open(week,this.scope,this.connected&&this.callbacks.canWrite()));this.grid.append(pick);}
-      const pick=node('button',String(Number(day.date.slice(-2))),'btn today-month-day');pick.type='button';pick.dataset.date=day.date;
-      pick.classList.toggle('outside',!day.inMonth);pick.classList.toggle('selected',day.date===this.date);pick.classList.toggle('current',day.date===today);
-      pick.setAttribute('aria-label',dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z')));
-      pick.setAttribute('aria-pressed',String(day.date===this.date));if(this.noteDates.has(day.date))pick.append(node('span',undefined,'today-month-dot'));
-      pick.addEventListener('click',()=>this.select(day.date));this.grid.append(pick);
+    const zone=this.data.profile.data.zoneId,key=JSON.stringify([this.month,zone,getLocale()]),rebuild=key!==this.monthGridKey;
+    const focus=this.grid.contains(document.activeElement)?{date:document.activeElement.dataset.date,week:document.activeElement.dataset.week}:null;
+    if(rebuild){
+      this.monthGridKey=key;const calendar=monthCalendar(this.month,zone);
+      this.monthTitle.textContent=dateTimeFormat(getLocale(),{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(this.month+'-15T12:00:00Z'));
+      this.grid.replaceChildren();this.grid.append(node('span',t('today.week_short'),'today-weekday'));
+      for(let day=0;day<7;day++)this.grid.append(node('span',dateTimeFormat(getLocale(),{weekday:'narrow',timeZone:'UTC'}).format(new Date(calendar.days[day].date+'T12:00:00Z')),'today-weekday'));
+      for(let index=0;index<calendar.days.length;index++){
+        const day=calendar.days[index];
+        if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',Number(week.slice(-2))+' · '+t('today.week_note',{week}));pick.title=t('today.week_note',{week});pick.addEventListener('click',()=>void this.weekEditor.open(week,this.scope,this.connected&&this.callbacks.canWrite()));this.grid.append(pick);}
+        const pick=node('button',String(Number(day.date.slice(-2))),'btn today-month-day');pick.type='button';pick.dataset.date=day.date;pick.classList.toggle('outside',!day.inMonth);
+        pick.setAttribute('aria-label',dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z')));pick.addEventListener('click',()=>this.select(day.date));this.grid.append(pick);
+      }
     }
-    if(focus)this.grid.querySelector(`[data-date="${focus}"]`)?.focus({preventScroll:true});
+    // Note refreshes update decorations without disconnecting a pressed or focused button.
+    const today=dateInZone(Date.now(),zone),dot=(pick,present)=>{const previous=pick.querySelector('.today-month-dot');if(present&&!previous)pick.append(node('span',undefined,'today-month-dot'));else if(!present&&previous)previous.remove();};
+    for(const pick of this.grid.querySelectorAll('[data-date]')){const date=pick.dataset.date;pick.classList.toggle('selected',date===this.date);pick.classList.toggle('current',date===today);pick.setAttribute('aria-pressed',String(date===this.date));dot(pick,this.noteDates.has(date));}
+    for(const pick of this.grid.querySelectorAll('[data-week]'))dot(pick,this.noteWeeks.has(pick.dataset.week));
+    if(rebuild&&focus){const selector=focus.date?`[data-date="${focus.date}"]`:focus.week?`[data-week="${focus.week}"]`:null;if(selector)this.grid.querySelector(selector)?.focus({preventScroll:true});}
   }
   async loadMonthNotes(){
     if(!this.visible||!this.scope||!this.data||!this.month)return;
