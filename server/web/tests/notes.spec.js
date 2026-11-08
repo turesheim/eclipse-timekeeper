@@ -61,7 +61,7 @@ test('Notes shows saved creation and change times in the account zone, retaining
   await page.route('**/api/v1/notes/entries/'+entry.id+'/content',route=>route.request().method()==='PUT'?route.fulfill({status:412,contentType:'application/json',body:JSON.stringify({error:{code:'STALE_VERSION',message:'Concurrent edit'}})}):route.continue());
   const source=await notesSource(page);await source.fill('# Pending dates\n');await expect(status).toHaveText('Unsaved changes');await expect(times.nth(1)).toHaveAttribute('datetime',modifiedAt);
   await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect(status).toContainText('changed');await expect(times.nth(1)).toHaveAttribute('datetime',modifiedAt);
-  await page.unrouteAll({behavior:'wait'});await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(status).toHaveText('Saved');
+  await page.unrouteAll({behavior:'wait'});page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(status).toHaveText('Saved');
   await source.fill('# Saved again\n');await saveMarkdown(page.locator('#notes-panel'));await expect(times.nth(1)).not.toHaveAttribute('datetime',modifiedAt);await expect(times.nth(0)).toHaveAttribute('datetime',createdAt);
   const saved=await(await api('GET','/notes/entries/'+entry.id)).json();await expect(times.nth(1)).toHaveAttribute('datetime',saved.modifiedAt);
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await page.locator('[data-tab=notes]').click();
