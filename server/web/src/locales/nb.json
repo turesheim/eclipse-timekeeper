@@ -1438,5 +1438,7 @@
   "tasks.status.DEFERRED": "Utsatt",
   "tasks.status.CANCELLED": "Avbrutt",
   "tasks.more": "Vis flere oppgaver",
-  "tasks.loading": "Laster kalenderoppgaver …"
+  "tasks.loading": "Laster kalenderoppgaver …",
+  "notes.created": "Opprettet:",
+  "notes.modified": "Sist endret:"
 }

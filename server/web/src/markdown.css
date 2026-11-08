@@ -9,6 +9,7 @@
 .journal-formatted:not([hidden]), .journal-formatted > div, .journal-formatted .milkdown { display: flex; flex-direction: column; }
 .journal-formatted :is(.ProseMirror,.milkdown), .journal-formatted > div { flex: 1; min-width: 0; }
 .markdown-editor .ProseMirror:focus-visible { outline: none; box-shadow: none; }
+.markdown-editor .ProseMirror :is(a[href],[data-wiki-reference]) { cursor: pointer; }
 .markdown-editor .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
 .markdown-editor .ProseMirror h1 { font-size: var(--font-markdown-h1); }
 .markdown-editor .ProseMirror h2 { font-size: var(--font-markdown-h2); }

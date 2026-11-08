@@ -1438,5 +1438,7 @@
   "tasks.status.DEFERRED": "Deferred",
   "tasks.status.CANCELLED": "Cancelled",
   "tasks.more": "Show more tasks",
-  "tasks.loading": "Loading calendar tasks…"
+  "tasks.loading": "Loading calendar tasks…",
+  "notes.created": "Created:",
+  "notes.modified": "Last changed:"
 }
