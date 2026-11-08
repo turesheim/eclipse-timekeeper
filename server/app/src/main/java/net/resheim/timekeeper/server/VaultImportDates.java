@@ -30,8 +30,8 @@ record VaultImportDates(Instant createdAt,Instant modifiedAt,String createdAtSou
             var ref=VaultSources.fromEntry(entry);
             var value=((ObjectNode)store.find(ref.type(),ref.id()).orElseThrow(ApiFailure::notFound)).deepCopy();
             value.put("modifiedAt",modifiedAt.toString());
-            // The new content version has not left this owner transaction yet.
-            // Date import must not create a spurious edit or change a day label.
+            // Import dates and validators atomically without adding a content
+            // revision for a metadata-only correction or changing a day label.
             if(store.update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",value.toString(),store.owner(),ref.type(),ref.id(),value.path("version").asLong())!=1)
                 throw new ApiFailure(412,"STALE_VERSION");
             entry=new VaultIndex(store).content(VaultCollection.id(entry),new VaultSources(store,store.vaultLimits(),ref).snapshot(),entry.path("retainedBytes").asLong());

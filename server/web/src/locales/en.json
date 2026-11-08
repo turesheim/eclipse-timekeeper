@@ -1260,7 +1260,7 @@
   "notes.import_folder": "Import folder",
   "notes.choose_folder": "Choose vault folder",
   "notes.import_apply": "Import new files",
-  "notes.import_help": "Select the local vault root, then choose the files and folders to import. Folder paths and journal/event associations are retained. Existing files are never overwritten. Completed imports are retained if interrupted.",
+  "notes.import_help": "Select the local vault root, then choose the files and folders to import. Folder paths and journal/event associations are retained. Existing files are kept unless you enable overwrite and select them. Completed imports are retained if interrupted.",
   "notes.import_reviewing": "Reviewing files…",
   "notes.import_reviewed": "{{count}} new files ready to import. Review the list before continuing.",
   "notes.import_ready": "New file",
@@ -1447,6 +1447,7 @@
   "notes.import_overwrite": "Overwrite existing files",
   "notes.import_overwrite_help": "Existing files are kept by default. Enable this to review replacements. Files changed or moved after review are kept and reported as conflicts.",
   "notes.import_replace": "Will replace existing file",
-  "notes.import_reviewed_overwrite": "{{count}} files selected, including {{replacements}} replacements. Review before importing.",
-  "notes.import_apply_selected": "Import selected files"
+  "notes.import_reviewed_overwrite": "{{count}} files selected. Replacements: {{replacements}}. Review before importing.",
+  "notes.import_apply_selected": "Import selected files",
+  "notes.import_reviewed_overwrite_one": "{{count}} file selected. Replacements: {{replacements}}. Review before importing."
 }

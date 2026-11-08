@@ -1260,7 +1260,7 @@
   "notes.import_folder": "Importer mappe",
   "notes.choose_folder": "Velg rotmappe for hvelvet",
   "notes.import_apply": "Importer nye filer",
-  "notes.import_help": "Velg roten til det lokale hvelvet, og velg deretter filer og mapper som skal importeres. Mappestier og koblinger til dagbok og hendelser beholdes. Eksisterende filer overskrives aldri. Fullførte importer beholdes ved avbrudd.",
+  "notes.import_help": "Velg roten til det lokale hvelvet, og velg deretter filene og mappene som skal importeres. Mappestier og tilknytninger til journal og hendelser beholdes. Eksisterende filer beholdes med mindre du slår på overskriving og velger dem. Fullførte importer beholdes ved avbrudd.",
   "notes.import_reviewing": "Kontrollerer filer …",
   "notes.import_reviewed": "{{count}} nye filer er klare for import. Se gjennom listen før du fortsetter.",
   "notes.import_ready": "Ny fil",
@@ -1447,6 +1447,7 @@
   "notes.import_overwrite": "Overskriv eksisterende filer",
   "notes.import_overwrite_help": "Eksisterende filer beholdes som standard. Slå på dette for å gjennomgå erstatninger. Filer som endres eller flyttes etter gjennomgangen, beholdes og rapporteres som konflikter.",
   "notes.import_replace": "Vil erstatte eksisterende fil",
-  "notes.import_reviewed_overwrite": "{{count}} filer er valgt, inkludert {{replacements}} erstatninger. Gjennomgå før import.",
-  "notes.import_apply_selected": "Importer valgte filer"
+  "notes.import_reviewed_overwrite": "{{count}} filer er valgt. Erstatninger: {{replacements}}. Gjennomgå før import.",
+  "notes.import_apply_selected": "Importer valgte filer",
+  "notes.import_reviewed_overwrite_one": "{{count}} fil er valgt. Erstatninger: {{replacements}}. Gjennomgå før import."
 }
