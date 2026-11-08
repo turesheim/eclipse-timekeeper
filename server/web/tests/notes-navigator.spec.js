@@ -21,10 +21,10 @@ const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams
 test('a folder click survives metadata refresh between pointer down and pointer up',async({page,request})=>{
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Click.md','Folder click body.');
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
-  const folder=noteEntry(navigation,'Notes'),original=await folder.elementHandle(),box=await folder.boundingBox();let release;
+  const folder=noteEntry(navigation,'Notes');let release;
   const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/me',async route=>{await pending;await route.continue();});
   try{
-    await page.mouse.move(box.x+20,box.y+box.height/2);await page.mouse.down();await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
+    await folder.hover();await page.mouse.down();const original=await folder.elementHandle();await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
     await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','true');release();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
     expect(await original.evaluate(node=>node.isConnected)).toBe(true);await page.mouse.up();await expect(noteEntry(navigation,'Notes/Click.md')).toBeVisible();
   }finally{release();await page.mouse.up();await page.unrouteAll({behavior:'wait'});}
