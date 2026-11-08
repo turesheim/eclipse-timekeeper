@@ -25,6 +25,7 @@ final class NotesSearchChanges {
     NotesSearchChanges(ServerStore store,int retained){if(retained<1||retained>RETAINED)throw new IllegalArgumentException("Invalid search history bound");this.store=store;this.retained=retained;}
 
     Snapshot snapshot(){return snapshot(ensure());}
+    Optional<Snapshot> existing(){return store.find(STATE,ID).map(NotesSearchChanges::snapshot);}
     private static Snapshot snapshot(JsonNode value){return new Snapshot(uuid(value.path("epoch")),value.path("generation").asLong(),value.path("historyFloor").asLong());}
     private ObjectNode ensure(){
         var found=store.find(STATE,ID);if(found.isPresent())return ((ObjectNode)found.get()).deepCopy();
