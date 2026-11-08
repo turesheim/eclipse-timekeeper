@@ -422,3 +422,12 @@ test('Notes identifies unknown creation-date provenance without guessing from an
   for(const width of [320,1440]){await page.setViewportSize({width,height:900});await expect(page.locator('.notes-timestamps time').first()).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   await noteEntry(page.locator('#notes-navigation'),'Notes/Original.md').click();await expect(page.locator('.notes-timestamps')).toContainText('Created:');await expect(page.locator('.notes-timestamps time').first()).toHaveAttribute('datetime',createdAt);
 });
+
+
+test('Notes completes and follows an internal document link with actual private collection data',async({page,request})=>{
+  const api=await setup(page,request);for(const [path,body]of [['Notes/Target.md','# Target\n\nPrivate target body.'],['Notes/Links.md','']])await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  const navigation=page.locator('#notes-navigation');await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Links.md').click();
+  const rich=page.locator('#notes-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.click();await page.keyboard.type('[[Tar');const options=page.locator('#notes-panel .markdown-suggestions').getByRole('option');await expect(options).toHaveCount(1);await expect(options.first()).toContainText('Notes/Target.md');await options.first().click();
+  await saveMarkdown(page.locator('#notes-panel'));await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');const link=await(await api('GET','/notes/resolve?path=Notes%2FLinks.md')).json();expect((await(await api('GET','/notes/entries/'+link.id+'/content')).text()).trim()).toBe('[[Notes/Target]]');
+  await rich.locator('[data-wiki-reference="Notes/Target"]').click();await expect(page.locator('#notes-document-title')).toHaveText('Target');await expect(page.locator('#notes-formatted')).toContainText('Private target body.');
+});

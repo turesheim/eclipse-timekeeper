@@ -48,6 +48,16 @@ can also be followed with Enter.
 Unsafe schemes and paths leaving the vault are rejected. Obsidian plugins,
 transclusions of entire Markdown notes and executable HTML are not supported.
 
+## Internal-link assistance
+
+In Formatted mode and Markdown source, typing `[` inserts its matching `]` with
+the caret between them. Typing a second `[` creates `[[…]]` and offers matching
+documents. Continue typing to narrow by title or path, then click a choice or use
+Arrow Down and Enter. Escape dismisses the choices. Generated closing brackets
+are consumed when completing a link or skipped when typed; Backspace removes an
+empty generated pair. Code, escaped links and read-only documents stay literal.
+Selections and edits remain in the current draft until the host saves it.
+
 ## Writing and source tools
 
 The heading menu selects plain text or H1–H6. Toolbar tooltips name each action

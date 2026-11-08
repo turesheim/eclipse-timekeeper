@@ -38,3 +38,12 @@ test('setext headings remain eligible for rich editing without admitting unsuppo
   assert.equal(needsSource('Heading\n=======\n\nText.\n'),false);
   assert.equal(needsSource('==highlight==\n'),true);
 });
+
+test('completion ranges consume generated closers while source code and escapes remain literal',async()=>{
+  const {wikiCompletion,literalBracketContext}=await import('../src/markdown-brackets.js');
+  assert.deepEqual(wikiCompletion('[[Des]]',5),{query:'Des',embed:false,from:0,to:7});
+  assert.deepEqual(wikiCompletion('![[asset]]',8),{query:'asset',embed:true,from:0,to:10});
+  assert.equal(wikiCompletion('\\[[Des]]',6),null);
+  for(const value of ['```text\ncode','~~~text\ncode','    code','`code','`one\ntwo','[label](https://example.invalid/','\\','\\['])assert.equal(literalBracketContext(value,value.length),true,value);
+  for(const value of ['ordinary text','```text\ncode\n```\nprose','`code` then prose','`one\ntwo` prose','`open\n\nprose','* List item','    * Nested item'])assert.equal(literalBracketContext(value,value.length),false,value);
+});

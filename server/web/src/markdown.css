@@ -86,7 +86,7 @@
 .markdown-wikilink { display: inline; border: 0; padding: 0; background: transparent; color: var(--bs-link-color); text-decoration: underline; font: inherit; }
 .markdown-wikilink[data-resolved=false] { text-decoration-style: wavy; color: var(--bs-danger); }
 .markdown-suggestions { position: fixed; z-index: 1080; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); padding: .25rem; border-radius: .4rem; box-shadow: 0 .25rem .75rem #0002; max-width: calc(100vw - 1rem); }
-.markdown-suggestions { display: flex; flex-direction: column; max-height: 12rem; overflow: auto; width: 17rem; }
+.markdown-suggestions { display: flex; flex-direction: column; max-height: min(12rem,calc(100vh - 1rem)); overflow: auto; width: 17rem; }
 .markdown-suggestions button { flex-shrink: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markdown-editor button[aria-pressed=true] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
 @media(max-width:600px) {
