@@ -38,16 +38,16 @@ export class TasksView {
   navigationState(open){this.root.classList.toggle('tasks-navigation-open',open);this.toggle.setAttribute('aria-expanded',String(!this.narrow.matches||open));}
   update(data,connected,session,writable){
     if(this.session&&session!==this.session)this.reset();const changed=this.data?.revision!==data.revision||this.data?.profile.data.zoneId!==data.profile.data.zoneId;
-    this.data=data;this.session=session;this.connected=connected;this.writable=connected&&writable;this.controls();if(this.visible){this.paint();if(changed)void this.load();}
+    this.data=data;this.session=session;this.connected=connected;this.writable=connected&&writable;this.controls();if(this.visible){this.paint();if(changed||this.catalogZone!==data.profile.data.zoneId)void this.load();}
   }
   show(){this.visible=true;this.paint();void this.load();this.timer??=setInterval(()=>{this.paint();void this.load();},30000);}
   hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detail.close();this.navigationState(false);this.controls();}
-  reset(){this.hide();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.rows=[];this.selection={kind:'smart',value:'all'};this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
+  reset(){this.hide();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.catalogZone=null;this.rows=[];this.selection={kind:'smart',value:'all'};this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
   async load(){
     if(!this.visible||!this.session||!this.root.offsetParent)return;if(this.loading){this.reloadRequested=true;return;}const session=this.session,current=++this.generation,zone=this.data.profile.data.zoneId;this.controller=new AbortController();const signal=this.controller.signal;this.loading=true;this.controls();
     try{
       const reply=await calendarTasks(session,signal);if(session!==this.session||current!==this.generation||zone!==this.data.profile.data.zoneId)return;
-      this.sourceTasks=reply.items;this.warning.hidden=!Object.keys(reply.errors).length;this.error.hidden=true;
+      this.sourceTasks=reply.items;this.catalogZone=reply.zoneId;this.warning.hidden=!Object.keys(reply.errors).length;this.error.hidden=true;
     }catch(error){if(!signal.aborted&&session===this.session&&current===this.generation){this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
     finally{if(session===this.session&&current===this.generation){this.loading=false;this.controller=null;this.paint();this.controls();if(this.reloadRequested){this.reloadRequested=false;void this.load();}}}
   }
@@ -62,7 +62,7 @@ export class TasksView {
     for(const child of [...group.children])if(!specs.some(spec=>this.filterButtons.get(selectionKey(spec))===child))child.remove();
   }
   paint(){
-    if(!this.data)return;const today=dateInZone(Date.now(),this.data.profile.data.zoneId),collator=new Intl.Collator(getLocale(),{numeric:true,sensitivity:'base'});this.rows=taskRows(this.data,this.sourceTasks);
+    if(!this.data)return;const today=dateInZone(Date.now(),this.data.profile.data.zoneId),collator=new Intl.Collator(getLocale(),{numeric:true,sensitivity:'base'});this.rows=taskRows(this.data,this.catalogZone===this.data.profile.data.zoneId?this.sourceTasks:[]);
     const smart=[['today','tasks.today'],['all','tasks.all'],['critical','tasks.critical']].map(([value,label])=>({kind:'smart',value,label:t(label)})),clients=this.data.clients.map(value=>({kind:'client',value:value.id,label:value.name}));
     if(this.rows.some(row=>!row.clientId))clients.push({kind:'client',value:null,label:t('ui.unassigned')});
     const categories=[...new Set(this.rows.flatMap(row=>row.categories))].sort(collator.compare).map(value=>({kind:'category',value,label:value})),all=[...smart,...clients,...categories];

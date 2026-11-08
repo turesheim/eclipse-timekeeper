@@ -48,6 +48,17 @@ test('calendar deadline details distinguish the two occurrences of a repeated ac
   for(const [name,offset]of [['early','+02:00'],['late','+01:00']]){await row(page,'Repeated '+name).click();await expect(page.locator('#task-details')).toContainText('2026-10-25T02:30:00'+offset+' · Europe/Oslo');await page.keyboard.press('Escape');}
 });
 
+test('changing account zone cannot reinterpret cached floating calendar deadlines while their replacement loads',async({page,request})=>{
+  const {api,clientB}=await setup(page,request),body='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dagsverk//Floating task//EN\r\nBEGIN:VTODO\r\nUID:floating\r\nDTSTAMP:20260101T000000Z\r\nDUE:20260601T003000\r\nSUMMARY:Floating deadline\r\nEND:VTODO\r\nEND:VCALENDAR\r\n';
+  const feed=await(await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}})).json();await api('POST','/calendar-subscriptions',{name:'Floating deadlines',clientId:clientB.id,visible:true,includeEvents:false,includeTodos:true,url:feed.url});
+  await expect.poll(async()=>((await(await api('GET','/calendar-tasks')).json()).items.length)).toBe(7);await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();await expect(row(page,'Floating deadline')).toContainText('Due 2026-06-01');
+  let release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/calendar-tasks?**',async route=>{await pending;await route.continue();});
+  try{
+    const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'America/Los_Angeles'},{'If-Match':profile.headers().etag});await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await expect(row(page,'Floating deadline')).toHaveCount(0);release();await page.unrouteAll({behavior:'wait'});await expect(row(page,'Floating deadline')).toContainText('Due 2026-06-01');
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('all calendar pages remain available and the task list renders additional rows on demand',async({page,request})=>{
   const {api}=await setup(page,request,{remoteCount:221});await expect(page.locator('.tasks-results > [role=status]')).toHaveText('225 tasks');await expect(page.locator('#tasks-list > li')).toHaveCount(50);
   for(let count=100;count<=200;count+=50){await page.locator('#tasks-panel').getByRole('button',{name:'Show more tasks',exact:true}).click();await expect(page.locator('#tasks-list > li')).toHaveCount(count);}
