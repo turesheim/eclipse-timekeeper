@@ -1449,8 +1449,8 @@
   "notes.search_rebuild": "Rebuild search",
   "notes.search_results": "Results ordered by relevance.",
   "notes.search_none": "No matching notes.",
-  "notes.search_changed": "Notes changed. Search again for current results.",
-  "notes.search_invalid": "Use words or complete phrases in double quotes (up to 512 characters).",
+  "notes.search_changed": "Search results changed or expired. Search again for current results.",
+  "notes.search_invalid": "Use up to 32 words or complete phrases in double quotes (up to 512 characters).",
   "notes.search_unavailable": "Content search is being prepared or is unavailable. Try again shortly; browsing files still works.",
   "notes.search_preparing": "Preparing content search…"
 }

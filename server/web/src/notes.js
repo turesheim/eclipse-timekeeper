@@ -222,8 +222,8 @@ export class NotesView {
   }
   async moreSearch(){
     if(!this.session||!this.searchCursor||this.loading)return;const session=this.session,current=++this.loadGeneration,cursor=this.searchCursor,focusMore=document.activeElement===this.searchMore,previousCount=this.children.get('search')?.length||0;this.loading=true;this.controls();
-    try{const rows=await this.searchPage(session,current,cursor);if(!rows)return;for(const row of rows)this.entries.set(row.id,row);this.children.get('search').push(...rows);this.paint();if(focusMore)this.tree.querySelectorAll('[role=treeitem]')[previousCount]?.focus();}
-    catch(error){if(session===this.session&&current===this.loadGeneration)this.searchFailed(error);}
+    try{const rows=await this.searchPage(session,current,cursor);if(!rows)return;for(const row of rows)this.entries.set(row.id,row);this.children.get('search').push(...rows);const focusStillPaging=focusMore&&(document.activeElement===this.searchMore||document.activeElement===document.body);this.paint();if(focusStillPaging)this.tree.querySelectorAll('[role=treeitem]')[previousCount]?.focus();}
+    catch(error){if(session===this.session&&current===this.loadGeneration){const focusStillPaging=focusMore&&(document.activeElement===this.searchMore||document.activeElement===document.body);this.searchFailed(error);if(focusStillPaging)this.searchRetry.focus();}}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.controls();}}
   }
   async rebuildSearch(){

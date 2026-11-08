@@ -344,6 +344,7 @@ test('Notes content search finds body text, keeps relevance order and pages on d
   await rows.first().locator('button').click();const source=await notesSource(page);await expect(source).toHaveValue(/Sparrow priority/);
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
   await source.fill('# Sparrow priority\n\nUnsaved private draft.');await page.locator('#notes-search').fill('absentword');await expect(navigation).toContainText('No matching notes.');await expect(source).toHaveValue('# Sparrow priority\n\nUnsaved private draft.');
+  await page.locator('#notes-search').fill(word);await expect(rows).toHaveCount(50);await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:900});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
@@ -364,7 +365,22 @@ test('Notes content search rejects delayed old queries and explains unavailable 
   });
   const navigation=page.locator('#notes-navigation');await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('old');await started;
   await page.locator('#notes-search').fill('fresh');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');releaseOld();await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');
-  await navigation.getByRole('button',{name:'More results',exact:true}).click();await expect(navigation).toContainText('Notes changed. Search again');await expect(navigation.locator('.notes-search-excerpt')).toHaveCount(0);
+  await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeFocused();await expect(navigation).toContainText('Search results changed or expired. Search again');await expect(navigation.locator('.notes-search-excerpt')).toHaveCount(0);
   await page.locator('#notes-search').fill('unavailable');await expect(navigation).toContainText('Content search is being prepared or is unavailable');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeVisible();
   await page.locator('#notes-search-mode').selectOption('filename');await page.locator('#notes-search').fill('Search.md');await expect(noteEntry(navigation,'Notes/Search.md')).toBeVisible();
+});
+
+
+test('Notes content paging leaves focus in the editor when the user moves there while waiting',async({page,request})=>{
+  const api=await setup(page,request);const entry=await(await api('PUT','/notes/files?path=Notes%2FFocus.md',Buffer.from('# Focus\n\nBody result.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  let releaseMore,moreStarted;const held=new Promise(resolve=>releaseMore=resolve),started=new Promise(resolve=>moreStarted=resolve);
+  const hit={entry,excerpt:{text:'Body result.',highlights:[{start:0,end:4}]}};
+  await page.route('**/api/v1/notes/search?**',async route=>{
+    if(new URL(route.request().url()).searchParams.has('cursor')){moreStarted();await held;return route.fulfill({json:{snapshot:'fixture',items:[]}});}
+    return route.fulfill({json:{snapshot:'fixture',items:[hit],nextCursor:'fixture-cursor'}});
+  });
+  const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes/Focus.md').locator('button.notes-tree-pick').click();const source=await notesSource(page);
+  await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('body');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Body result.');
+  const more=navigation.getByRole('button',{name:'More results',exact:true});await more.focus();await more.press('Enter');await started;await source.focus();releaseMore();
+  await expect(more).toBeHidden();await expect(source).toBeFocused();
 });

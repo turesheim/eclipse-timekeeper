@@ -1449,8 +1449,8 @@
   "notes.search_rebuild": "Bygg opp søket på nytt",
   "notes.search_results": "Treff sortert etter relevans.",
   "notes.search_none": "Ingen samsvarende notater.",
-  "notes.search_changed": "Notatene er endret. Søk på nytt for oppdaterte treff.",
-  "notes.search_invalid": "Bruk ord eller fullstendige fraser i doble anførselstegn (opptil 512 tegn).",
+  "notes.search_changed": "Søketreffene er endret eller utløpt. Søk på nytt for oppdaterte treff.",
+  "notes.search_invalid": "Bruk opptil 32 ord eller fullstendige fraser i doble anførselstegn (opptil 512 tegn).",
   "notes.search_unavailable": "Innholdssøket klargjøres eller er utilgjengelig. Prøv igjen om litt. Du kan fortsatt bla i filene.",
   "notes.search_preparing": "Klargjør innholdssøk …"
 }
