@@ -1114,12 +1114,14 @@ navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
 
 Notes navigation and editor content scroll independently within the available
-viewport. Entering Notes measures the layout after the old view's toolbar is
-hidden; nested scrolling does not chain to the page at its boundaries.
-Writable document rows can be dragged to folders or the navigation background
+viewport. Its flex layout fills the space above navigation after the old view's
+toolbar is hidden and adapts to visual viewport changes; nested scrolling does
+not chain to the page at its boundaries.
+Ordinary writable document rows can be dragged to folders or the navigation background
 (the collection root). Moves flush the current draft and use the existing
 conditional path endpoint, preserving identities and bytes. Read-only, stale,
-deleted and foreign-session drags cannot write; the Move dialog remains the
+deleted and foreign-session drags cannot write. Daily/weekly journal and event
+notes retain their configured folder associations. The Move dialog remains the
 keyboard alternative. A conflicting destination is never overwritten.
 
 The navigation toggle stays to the left of the Notes title at every screen

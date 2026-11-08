@@ -1,4 +1,14 @@
 .notes-heading,.notes-layout { display:grid; grid-template-columns:minmax(180px,var(--notes-nav-width,260px)) 8px minmax(0,1fr); }
+body:has(#workspace[data-view=notes]:not([hidden])) {
+  display:flex;flex-direction:column;height:var(--notes-viewport-height,100dvh);
+  & > .app-header { flex-shrink:0; }
+  & > main { display:flex;flex-direction:column;flex:1;min-height:0;width:100%;margin-block:0;padding-bottom:calc(var(--workspace-nav-height) + var(--workspace-content-gap)); }
+  & #workspace { display:flex;flex-direction:column;flex:1;min-height:0;padding-bottom:0; }
+  & #work-session { flex-shrink:0; }
+  & #notes-panel { display:flex;flex-direction:column;flex:1;min-height:0; }
+  & #notes-panel > :not(.notes-layout) { flex-shrink:0; }
+  & .notes-layout { flex:1;height:0;min-height:0; }
+}
 .notes-heading { align-items:center; margin-bottom:.75rem; min-width:0; }
 .notes-heading h2 { margin:0; font-size:var(--font-notes-heading); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .notes-navigation-heading { display:flex; align-items:center; min-width:0; padding-inline-start:.75rem; gap:.5rem; }

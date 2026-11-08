@@ -121,16 +121,17 @@ export class NotesView {
     const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.loading||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
     const source=this.entries.get(drag.id),row=event.target.closest?.('[role=treeitem]');
     const folder=row?this.entries.get(row.dataset.id):{id:this.info.rootId,path:'',kind:'FOLDER'};
-    if(!source||!folder||folder.kind!=='FOLDER'||source.parentId===folder.id)return null;
+    if(!source||source.sourceType!=='VAULT_CONTENT'||!folder||folder.kind!=='FOLDER'||source.parentId===folder.id)return null;
     return {folder,element:row?.querySelector('.notes-tree-pick')||this.navigation};
   }
   async moveDocument(drag,folder){
     if(!await this.canLeave()||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale)return;
-    const entry=this.note?.id===drag.id?this.note:this.entries.get(drag.id);if(!entry||entry.deleted||entry.kind==='FOLDER')return;
+    const entry=this.note?.id===drag.id?this.note:this.entries.get(drag.id);if(!entry||entry.deleted||entry.sourceType!=='VAULT_CONTENT')return;
     const path=(folder.path?folder.path+'/':'')+entry.path.split('/').at(-1);this.busy=true;this.controls();
     try{
       const reply=await drag.session.request('/notes/entries/'+entry.id+'/path',{method:'PUT',etag:entry.entryEtag,body:{path}});
       if(drag.session!==this.session||drag.generation!==this.generation)return;
+      this.markdown.resources?.invalidate?.();
       if(this.note?.id===entry.id){this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}
       this.expanded.add(folder.id);this.busy=false;await this.reload();
       if(drag.session!==this.session||drag.generation!==this.generation)return;
@@ -148,10 +149,10 @@ export class NotesView {
     if(!visible){this.closeSortMenu(false);if(this.visible&&focused)this.toggle.focus();}
     this.fit();
   }
-  fit(){if(!this.visible||!this.root.offsetParent)return;const top=this.layout.getBoundingClientRect().top,navHeight=document.getElementById('workspace-navigation')?.getBoundingClientRect().height||0,bottom=window.visualViewport?visualViewport.offsetTop+visualViewport.height:innerHeight;this.root.style.setProperty('--notes-editor-height',Math.max(0,bottom-top-navHeight)+'px');}
+  fit(){if(!this.visible||!this.root.offsetParent)return;const viewport=window.visualViewport,bottom=viewport?viewport.offsetTop+viewport.height:innerHeight;document.documentElement.style.setProperty('--notes-viewport-height',bottom+'px');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
-    for(const pick of this.tree.querySelectorAll('.notes-tree-pick')){const entry=this.entries.get(pick.parentElement.dataset.id);pick.draggable=!!(entry&&this.writable&&!this.stale&&!this.busy&&!this.loading&&!this.showTrash&&!entry.deleted&&entry.kind!=='FOLDER');}
+    for(const pick of this.tree.querySelectorAll('.notes-tree-pick')){const entry=this.entries.get(pick.parentElement.dataset.id);pick.draggable=!!(entry&&this.writable&&!this.stale&&!this.busy&&!this.loading&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
     const write=!!this.session&&this.writable&&!this.busy&&!this.stale;this.markdown.setReadOnly(!write||!this.note||this.binary||this.note.deleted);
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.retrySave.hidden=!this.saveFailed||!this.note||this.note.deleted;this.retrySave.textContent=t(this.uncertain?'journal.check_result':'journal.retry_save');this.retrySave.disabled=!!this.busy||!!this.saving||!this.writable||this.stale&&!this.uncertain;
     this.rename.disabled=this.remove.disabled=!write||this.saving||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;
