@@ -324,7 +324,8 @@ public class ServerStore {
     }
     List<JsonNode> resourcePage(String type,UUID after,int limit){
         if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource page");
-        String sql="SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=?"+(after==null?"":" AND id>?")+" ORDER BY id FETCH FIRST "+limit+" ROWS ONLY";
+        // H2 needs the constant key prefix in ORDER BY to stop at the page limit.
+        String sql="SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=?"+(after==null?"":" AND id>?")+" ORDER BY owner_id,entity_type,id FETCH FIRST "+limit+" ROWS ONLY";
         var result=new ArrayList<JsonNode>();
         try(var query=after==null?statement(sql,owner(),type):statement(sql,owner(),type,after);var rows=query.executeQuery()){
             while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
@@ -356,7 +357,7 @@ public class ServerStore {
     List<JsonNode> list(String type,UUID first,UUID last,int limit) {
         if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource batch");
         var result=new ArrayList<JsonNode>();
-        try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id FETCH FIRST "+limit+" ROWS ONLY",owner(),type,first,last);var rows=statement.executeQuery()){
+        try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY owner_id,entity_type,id FETCH FIRST "+limit+" ROWS ONLY",owner(),type,first,last);var rows=statement.executeQuery()){
             while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }

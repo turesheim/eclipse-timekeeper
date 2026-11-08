@@ -44,7 +44,7 @@ final class NotesSearchSources {
         if(!ref.type().equals(VaultContent.TYPE)&&!VaultSources.fromStored(ref.type(),source).key().equals(ref.key()))throw unavailable();
         byte[] bytes=switch(ref.type()){
             case VaultContent.TYPE->VaultContent.bytes((ObjectNode)source);
-            case DayNotes.TYPE->{var notes=new DayNotes(store);var date=DayNotes.date(ref.key());if(notes.getContent(date).path("deleted").asBoolean())throw unavailable();yield DayNotes.document(date,(ObjectNode)source);}
+            case DayNotes.TYPE->{if(dayDeleted(ref.id(),source.path("version").asLong()))throw unavailable();yield DayNotes.document(DayNotes.date(ref.key()),(ObjectNode)source);}
             case WeekNotes.TYPE->source.path("body").asText().getBytes(StandardCharsets.UTF_8);
             case EventNotes.TYPE->EventNotes.document(source);
             default->throw unavailable();
@@ -58,8 +58,11 @@ final class NotesSearchSources {
         if(!entry.path("path").asText().equals(hit.path())||!entry.path("kind").asText().equals(hit.kind())||!ref.type().equals(hit.sourceType())||!ref.id().equals(hit.sourceId())
                 ||entry.path("contentVersion").asLong()!=hit.sourceVersion()||!entry.path("contentTag").asText().equals(hit.sourceTag())||!entry.path("sha256").asText().equals(hit.sourceHash())
                 ||store.resourceVersion(ref.type(),ref.id())!=hit.sourceVersion())throw unavailable();
-        if(ref.type().equals(DayNotes.TYPE)&&new DayNotes(store).getContent(DayNotes.date(ref.key())).path("deleted").asBoolean())throw unavailable();
+        if(ref.type().equals(DayNotes.TYPE)&&dayDeleted(ref.id(),hit.sourceVersion()))throw unavailable();
         var result=((ObjectNode)entry).deepCopy().put("etag",hit.sourceTag()).put("entryEtag",etag(entry));if(!hit.title().isBlank())result.put("title",hit.title());return result;
+    }
+    private boolean dayDeleted(UUID id,long version){
+        return store.find(JournalState.Kind.JOURNAL_DELETE.name(),id).map(marker->marker.path("noteVersion").asLong()==version).orElse(false);
     }
     private static boolean eligible(JsonNode entry){return NotesSearchChanges.searchable(entry)&&!entry.path("deleted").asBoolean();}
     private static VaultSources.Ref reference(JsonNode entry){

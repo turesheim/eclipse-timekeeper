@@ -17,6 +17,13 @@ class NotesSearchSourcesTest {
     }
     @Inject ServerStore store;
     @Inject VaultLimits limits;
+    @jakarta.enterprise.inject.Vetoed
+    private static final class MetadataStore extends ServerStore {
+        private final ServerStore delegate;int canonicalPayloads;
+        MetadataStore(ServerStore delegate){this.delegate=delegate;}
+        @Override public Optional<JsonNode> find(String type,UUID id){if(Set.of(VaultContent.TYPE,DayNotes.TYPE,WeekNotes.TYPE,EventNotes.TYPE).contains(type))canonicalPayloads++;return delegate.find(type,id);}
+        @Override long resourceVersion(String type,UUID id){return delegate.resourceVersion(type,id);}
+    }
     private static byte[] bytes(String value){return value.getBytes(StandardCharsets.UTF_8);}
     private VaultCollection vault(){var vault=new VaultCollection(store,limits);vault.initialize();new NotesSearchChanges(store).snapshot();return vault;}
     private static NotesLuceneIndex.Hit hit(NotesLuceneIndex.Source source){return new NotesLuceneIndex.Hit(source.id(),source.path(),source.kind(),source.title(),source.sourceType(),source.sourceId(),source.sourceVersion(),source.sourceTag(),source.sourceHash(),new NotesLuceneIndex.Excerpt("",List.of()),new NotesLuceneIndex.Position(1,VaultPath.searchKey(source.path()),source.id()));}
@@ -36,7 +43,7 @@ class NotesSearchSourcesTest {
         var sources=new NotesSearchSources(store);var titles=new ArrayList<String>();
         for(UUID id:ids){
             var source=sources.load(owner,id);titles.add(source.title());assertFalse(source.text().body().contains("excludedmetadata"));assertFalse(source.text().body().contains("canonical-search"));
-            store.transaction(owner,()->{var current=sources.current(hit(source));assertEquals(id.toString(),current.path("id").asText());assertFalse(current.has("body"));assertFalse(current.has("data"));return null;});
+            store.transaction(owner,()->{var counted=new MetadataStore(store);var current=new NotesSearchSources(counted).current(hit(source));assertEquals(0,counted.canonicalPayloads);assertEquals(id.toString(),current.path("id").asText());assertFalse(current.has("body"));assertFalse(current.has("data"));return null;});
         }
         assertEquals(List.of("Ordinary title","","","Event title"),titles);
         assertFalse(sources.state(owner).toString().contains(owner));assertNull(store.currentConnection());

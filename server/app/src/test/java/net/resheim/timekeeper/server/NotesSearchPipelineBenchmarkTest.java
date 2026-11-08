@@ -61,8 +61,16 @@ class NotesSearchPipelineBenchmarkTest {
         assertEquals("false",build.getProperty("dirty"),"Benchmark requires a clean committed source");metrics.put("sourceCommit",build.getProperty("commit"));
         var heap=ManagementFactory.getMemoryMXBean();var peak=new AtomicLong();var sampler=Executors.newSingleThreadScheduledExecutor(task->{var thread=new Thread(task,"benchmark heap sampler");thread.setDaemon(true);return thread;});sampler.scheduleWithFixedDelay(()->peak.accumulateAndGet(heap.getHeapMemoryUsage().getUsed(),Math::max),0,50,TimeUnit.MILLISECONDS);
         try{
-            long begun=System.nanoTime();store.transaction("a",()->{var vault=new VaultCollection(store,limits);vault.initialize();vault.mkdir(new VaultPath("Corpus"));return null;});
+            long begun=System.nanoTime();boolean resume=Boolean.getBoolean("timekeeper.notes.search.benchmark.resume");
             long[] bytes={0};int[] sequence={0};UUID[] last={null};String[] lastPath={null};byte[][] lastBody={null};
+            if(resume)store.transaction("a",()->{
+                assertEquals(target,new VaultState(store,limits).get().path("totalBytes").asLong());
+                try(var query=store.statement("SELECT COUNT(*) FROM tk_resource WHERE owner_id=? AND entity_type=?","a",VaultContent.TYPE);var rows=query.executeQuery()){
+                    assertTrue(rows.next());sequence[0]=Math.toIntExact(rows.getLong(1));
+                }catch(java.sql.SQLException failure){throw new IllegalStateException(failure);}
+                lastPath[0]="Corpus/Record-"+String.format(Locale.ROOT,"%06d",sequence[0]-1)+".md";var vault=new VaultCollection(store,limits);var entry=vault.get(new VaultPath(lastPath[0]));last[0]=VaultCollection.id(entry);lastBody[0]=vault.read(entry);String original=new String(lastBody[0],StandardCharsets.UTF_8).replace(UPDATED,"pipelinefreshnessa");if(!Arrays.equals(lastBody[0],original.getBytes(StandardCharsets.UTF_8))){lastBody[0]=original.getBytes(StandardCharsets.UTF_8);vault.put(new VaultPath(lastPath[0]),vault.tag(entry),false,lastBody[0]);}bytes[0]=target;return null;
+            });else store.transaction("a",()->{var vault=new VaultCollection(store,limits);vault.initialize();vault.mkdir(new VaultPath("Corpus"));return null;});
+            metrics.put("resumedCanonicalFixture",resume);
             while(bytes[0]<target){store.transaction("a",()->{var vault=new VaultCollection(store,limits);
                 for(int batch=0;batch<64&&bytes[0]<target;batch++){
                     long remaining=target-bytes[0];int maximum=(int)Math.min(70_000,remaining);if(remaining<1_000)throw new IllegalStateException("Unexpected small corpus remainder");
@@ -82,7 +90,7 @@ class NotesSearchPipelineBenchmarkTest {
             long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);boolean found=false;
             do{var reply=search(UPDATED);if(reply.statusCode()==200){assertEquals(last[0].toString(),reply.jsonPath().getString("items[0].entry.id"));found=true;break;}assertEquals(503,reply.statusCode());Thread.sleep(20);}while(System.nanoTime()<deadline);assertTrue(found,"Committed save did not become searchable");metrics.put("saveToSearchMillis",millis(System.nanoTime()-begun));
             assertEquals(202,given().header("Authorization","Bearer test-a").post("/api/v1/notes/search/rebuild").statusCode());begun=System.nanoTime();ready(TimeUnit.MINUTES.toMillis(20),true);metrics.put("rebuildMillis",millis(System.nanoTime()-begun));
-            assertEquals(last[0].toString(),search(UPDATED).jsonPath().getString("items[0].entry.id"));metrics.put("sampledPeakHeapBytes",peak.get()).put("databaseBytes",size(root)-size(root.resolve("index")));
+            assertEquals(last[0].toString(),search(UPDATED).jsonPath().getString("items[0].entry.id"));metrics.put("sampledPeakHeapBytes",peak.get()).put("databaseBytes",Files.size(root.resolve("canonical.mv.db")));
             Files.writeString(root.resolve("measurements.json"),MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(metrics));System.out.println("Canonical search pipeline measurements: "+metrics);
         }finally{sampler.shutdownNow();}
     }
