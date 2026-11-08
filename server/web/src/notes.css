@@ -43,9 +43,12 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-markdown > .journal-formatted :is(.milkdown),.notes-markdown > .journal-formatted > div { flex:1; min-height:0; }
 .notes-markdown textarea { flex:1; height:auto; min-height:0; resize:none; overscroll-behavior:contain; }
 .notes-markdown > .journal-formatted .ProseMirror,.notes-markdown .markdown-code-editor { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
-.notes-footer { justify-content:flex-end; flex-wrap:wrap; }
+.notes-footer { justify-content:flex-start; flex-wrap:wrap; }
 .notes-footer > [role=status] { margin:0; }
 .notes-footer .notes-timestamps { display:flex; flex-wrap:wrap; gap:.25rem 1rem; margin:0 auto 0 0; }
+@media(max-width:600px) and (max-height:650px) {
+  .notes-markdown .markdown-tools { flex-wrap:nowrap; min-width:0; overflow-x:auto; }
+}
 .notes-drawer-toggle { display:inline-flex; flex-shrink:0; width:2.75rem; padding:.5rem; }
 @media(max-width:760px) {
   .notes-heading { grid-template-columns:auto minmax(0,1fr); }

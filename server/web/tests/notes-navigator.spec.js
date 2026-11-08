@@ -99,12 +99,14 @@ test('Notes keeps navigation and both editor modes anchored while their contents
     if(width<=760)await page.locator('.notes-drawer-toggle').click();
     for(const mode of ['Markdown source','Formatted']){
       await page.locator('#notes-panel').getByRole('button',{name:mode,exact:true}).click();const content=page.locator(mode==='Formatted'?'.notes-markdown .ProseMirror':'#notes-body');
+      expect((await content.boundingBox()).height).toBeGreaterThan(24);
       await content.hover();await page.mouse.wheel(0,5000);await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.mouse.wheel(0,5000);
       expect(await page.evaluate(()=>scrollY)).toBe(0);await expect(page.locator('.notes-footer')).toBeInViewport();
       expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
       const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
       await captureScreenshot(page,{path:`test-results/notes-anchored-${width}-${mode==='Formatted'?'formatted':'source'}.png`});
     }
+    if(width===320){const last=page.locator('.notes-markdown [data-command=hr]');await last.focus();await expect(last).toBeInViewport();}
   }
 });
 

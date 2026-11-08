@@ -67,7 +67,11 @@ test('Notes shows saved creation and change times in the account zone, retaining
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await page.locator('[data-tab=notes]').click();
   await expect(page.locator('.notes-timestamps')).toBeHidden();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Dates.md').click();
   await expect(page.locator('.notes-timestamps')).toContainText('Opprettet:');await expect(page.locator('.notes-timestamps')).toContainText('Sist endret:');await expect(times.nth(0)).toContainText('12:34:56');
-  for(const width of [1440,320]){await page.setViewportSize({width,height:900});await expect(times.nth(0)).toBeInViewport();await expect(times.nth(1)).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-saved-dates-${width}.png`});}
+  for(const width of [1440,320]){
+    await page.setViewportSize({width,height:900});await expect(times.nth(0)).toBeInViewport();await expect(times.nth(1)).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);}
+    await captureScreenshot(page,{path:`test-results/notes-saved-dates-${width}.png`});
+  }
 });
 
 test('Notes source and formatted editors stay above the menu at desktop and phone sizes',async({page,request})=>{
