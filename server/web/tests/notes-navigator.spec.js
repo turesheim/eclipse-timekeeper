@@ -54,6 +54,7 @@ test('a conflicting document drop cannot replace either file',async({page,reques
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await api('POST','/notes/folders',{path:'Notes/Archive'});
   const source=await(await put(api,'Notes/Review.md','Source stays intact.')).json(),target=await(await put(api,'Notes/Archive/Review.md','Destination stays intact.')).json();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
+  await expect(page.locator('#notes-document-title')).toHaveText('Notes');await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
   await expect(noteEntry(navigation,source.path)).toHaveAttribute('draggable','true');await noteEntry(navigation,source.path).dragTo(noteEntry(navigation,'Notes/Archive'));
   await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
