@@ -227,3 +227,28 @@ test('completion choices keep readable rows and scroll to keyboard selection on 
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/completion-readable-${width}.png`,fullPage:true});
   }
 });
+
+
+test('internal link assistance pairs brackets and completes a narrowed document in both modes',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',title:'Design decisions',kind:'MARKDOWN'},{path:'Notes/Diary.md',kind:'MARKDOWN'},{path:'Notes/Other.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[]]');
+    const list=page.locator('#experience-field .markdown-suggestions'),options=list.getByRole('option');await expect(options).toHaveCount(3);
+    await page.keyboard.type('Des');await expect(options).toHaveCount(1);await expect(options.first()).toContainText('Notes/Design.md');
+    await page.keyboard.press('ArrowDown');await expect(options.first()).toBeFocused();await page.keyboard.press('Enter');await expect(list).toBeHidden();
+    const completed=await page.evaluate(()=>globalThis.field.value());expect(completed.trim()).toBe('[[Notes/Design]]');
+    if(formatted)await expect(edit.locator('[data-wiki-reference="Notes/Design"]')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+z');expect((await page.evaluate(()=>globalThis.field.value())).trim()).not.toBe('[[Notes/Design]]');await page.keyboard.press('ControlOrMeta+Shift+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(completed);
+    await captureScreenshot(page,{path:`test-results/internal-completion-${formatted?'formatted':'source'}.png`,fullPage:true});
+  }
+});
+
+test('generated bracket closers skip typed closers and empty pairs delete together',async({page})=>{
+  for(const formatted of [true,false]){
+    await field(page,'',formatted);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
+    await page.keyboard.press('Backspace');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');await page.keyboard.press('Backspace');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('');
+    await page.keyboard.type('[[Notes/Design]]');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]]');await page.keyboard.type(' tail');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]] tail');
+  }
+});

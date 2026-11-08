@@ -4,6 +4,8 @@ import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
 import {closeHistory} from '@milkdown/kit/prose/history';
 import {codeTools} from './code-tools.js';
+import {bracketPairs} from './bracket-pairs.js';
+import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
@@ -34,9 +36,13 @@ const dailyWikilink=$node('daily_wikilink',()=>({
   parseMarkdown:{match:node=>node.type==='dailyWikilink',runner:(state,node,type)=>state.addNode(type,{date:node.value})},
   toMarkdown:{match:node=>node.type.name==='daily_wikilink',runner:(state,node)=>state.addNode('dailyWikilink',undefined,node.attrs.date)}
 }));
+const wikiNode=(state,match,start)=>{
+  if(Number.isInteger(start)){const position=state.doc.resolve(start),before=position.parent.textBetween(0,position.parentOffset,'','\ufffc');if(escapedBracket(before,before.length))return null;}
+  if(!wikiReference(match[2],!!match[1])||state.selection.$from.parent.type.spec.code||state.selection.$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;
+  const date=!match[1]&&dailyNoteDate(match[2]);return (date?state.schema.nodes.daily_wikilink.create({date}):state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]})).mark(state.storedMarks||state.selection.$from.marks());
+};
 const vaultWikilinkInput=$inputRule(()=>new InputRule(/(!?)\[\[([^\[\]\n]{1,1024})\]\]$/,(state,match,start,end)=>{
-  if(!wikiReference(match[2],!!match[1])||state.selection.$from.parent.type.spec.code||state.selection.$from.marks().some(mark=>mark.type.name==='inlineCode'))return null;
-  const date=!match[1]&&dailyNoteDate(match[2]),node=date?state.schema.nodes.daily_wikilink.create({date}):state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]});return state.tr.replaceWith(start,end,node.mark(state.storedMarks||state.selection.$from.marks()));
+  const node=wikiNode(state,match,start);return node?state.tr.replaceWith(start,end,node):null;
 }));
 const dailyWikilinkRemark=$remark('timekeeperDailyWikilinks',()=>remarkDailyWikilinks);
 const sourceNodes=new Set(['html','imageReference','linkReference','definition']);
@@ -122,6 +128,10 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const cleanGenerated=value=>value.replaceAll(emptyMarker,'');
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
   const code=codeTools(()=>readOnly);
+  const brackets=bracketPairs(()=>readOnly,(view,transaction,at)=>{
+    const position=transaction.doc.resolve(at),before=position.parent.textBetween(0,position.parentOffset,'','\ufffc'),match=/(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(before);if(!match)return;
+    const from=at-match[0].length,node=wikiNode(view.state,match,from);if(!node)return;transaction.replaceWith(from,at,node).setSelection(TextSelection.near(transaction.doc.resolve(from+node.nodeSize)));
+  });
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
   const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
@@ -138,10 +148,12 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     ctx.set(editorViewOptionsCtx,{
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
+      handleTextInput:(view,from,to,text)=>brackets.input(view,from,to,text),
       handleKeyDown:(_view,event)=>{
         // DOM reconciliation also calls this with an undispatched key event.
         // Its DOM already contains the edit; keep the model's pre-edit selection.
         if(event.target&&!event.isComposing)syncDOMSelection(_view,root);
+        if(brackets.keyDown(_view,event))return true;
         if(event.key.toLowerCase()==='v'&&(event.metaKey||event.ctrlKey))plainPaste=event.shiftKey;
 
         const foot=event.target?.closest?.('[data-footnote-reference]');if(foot&&['Enter',' '].includes(event.key)){event.preventDefault();foot.click();return true;}
@@ -212,7 +224,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(brackets.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -327,7 +339,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       scrollTo:(position)=>{view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(position+1,view.state.doc.content.size)))).scrollIntoView());view.focus();},
       slash:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph')return null;const match=/^\/([\w-]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.start(),to:$from.pos}:null;},
       replaceSlash:(name,payload)=>{const {$from}=view.state.selection;view.dispatch(view.state.tr.delete($from.start(),$from.pos));return command(name,payload);},
-      wikiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code)return null;const match=/(!?)\[\[([^\]\n]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[2],embed:!!match[1],from:$from.pos-match[0].length,to:$from.pos}:null;},
+      wikiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code||$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;
+        const range=wikiCompletion($from.parent.textBetween(0,$from.parent.content.size,'','\ufffc'),$from.parentOffset);return range?{...range,from:$from.start()+range.from,to:$from.start()+range.to}:null;},
       emojiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code||$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;const match=/(?:^|\s):([a-z0-9_+-]{1,40})$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.pos-match[1].length-1,to:$from.pos}:null;},
       insertEmoji:(range,name)=>{if(readOnly||!emojiFor(name))return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.emoji_shortcode.create({name})));view.focus();return true;},
       insertWiki:(range,path)=>{if(readOnly)return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.vault_wikilink.create({value:path,embed:!!range.embed})));view.focus();return true;},

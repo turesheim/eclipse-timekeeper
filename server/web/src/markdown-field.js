@@ -179,6 +179,7 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.resetCompletions?.();
     this.closeActions?.();
     this.caret?.clear();
     this.sourcePosition=null;

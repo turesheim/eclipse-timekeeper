@@ -5,6 +5,7 @@ import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
 import {iconButton} from './icons.js';
 import {headingAnchor} from './wiki-links.js';
+import {sourceBrackets} from './source-brackets.js';
 import {buildActionsMenu} from './markdown-actions.js';
 const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
 const action=(key,run,glyph)=>{const button=el('button',glyph?'':t(key));button.type='button';button.className='btn btn-outline-secondary';if(glyph)iconButton(button,glyph,t(key));button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',run);return button;};
@@ -71,7 +72,23 @@ export function buildExperience(field){
   f.scrollToHeading=heading=>{if(!heading)return;const target=f.editor?.outline().find(item=>headingAnchor(item.text)===headingAnchor(heading));if(target){f.editor.scrollTo(target.pos);return true;}f.status.textContent=t('markdown.heading_missing',{heading});return false;};
   const suggestions=el('div');suggestions.className='markdown-suggestions';suggestions.hidden=true;suggestions.setAttribute('role','listbox');suggestions.setAttribute('aria-label',t('markdown.suggestions'));f.root.append(suggestions);f.suggestions=suggestions;
   let completion=0,lastQuery;
-  const place=(node,rect)=>{node.style.left=Math.max(8,Math.min(rect.left,innerWidth-280))+'px';node.style.top=Math.max(8,Math.min(rect.bottom+8,innerHeight-220))+'px';};
+  const source=sourceBrackets(f);
+  f.dismissSuggestions=()=>{++completion;lastQuery=null;suggestions.hidden=true;suggestions.replaceChildren();};
+  f.resetCompletions=()=>{source.reset();f.dismissSuggestions();};
+  const context=()=>{
+    if(f.readOnly||f.loading||f.editor?.composing())return null;
+    const active=document.activeElement,inside=suggestions.contains(active);
+    const rich=f.editor&&(inside||f.rich.contains(active)),plain=!f.editor&&!f.plain.hidden&&(inside||active===f.text);
+    const wiki=rich?f.editor.wikiQuery():plain?source.query():null,slash=rich&&!wiki?f.editor.slash():null,emoji=rich&&!wiki&&!slash?f.editor.emojiQuery():null;
+    const range=wiki||slash||emoji;if(!range)return null;
+    return {wiki,slash,emoji,rich,key:[f.generation,rich?'rich':'source',wiki?'wiki':slash?'slash':'emoji',range.from,range.to,range.query,!!wiki?.embed].join('|')};
+  };
+  const place=()=>{
+    const rich=f.editor?.selectionRect(),native=!f.editor?f.caret?.sourceRect(f.text):null,rect=rich||(native?{left:native.left,top:native.top,bottom:native.top+native.height}:null);if(!rect)return;
+    const width=suggestions.offsetWidth,height=suggestions.offsetHeight;
+    suggestions.style.left=Math.max(8,Math.min(rect.left,innerWidth-width-8))+'px';
+    suggestions.style.top=Math.max(8,Math.min(rect.bottom+8+height<=innerHeight-8?rect.bottom+8:rect.top-height-8,innerHeight-height-8))+'px';
+  };
   f.updateExperience=()=>{
     for(const button of historyList.children)button.disabled=historyBusy;
     f.applyRevision.disabled=f.readOnly||!chosen||historyBusy;
@@ -87,18 +104,34 @@ export function buildExperience(field){
       if(tableKeys){f.tableButton.setAttribute('aria-description',t('markdown.table_keys'));f.tableButton.setAttribute('aria-keyshortcuts','ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Backspace Delete Shift+Delete L C R');}
       else{f.tableButton.removeAttribute('aria-description');f.tableButton.removeAttribute('aria-keyshortcuts');}
     }
-    if(!f.editor||f.readOnly||f.editor.composing()){suggestions.hidden=true;return;}
-    const wiki=f.editor.wikiQuery(),slash=f.editor.slash(),emoji=f.editor.emojiQuery(),query=wiki?'wiki:'+wiki.query:slash?'slash:'+slash.query:emoji?'emoji:'+emoji.query:null;
-    if(query===lastQuery)return;lastQuery=query;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
-    const add=(label,run)=>{const button=el('button',label);button.type='button';button.className='btn btn-light';button.setAttribute('role','option');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{if(f.readOnly)return;suggestions.hidden=true;run();});suggestions.append(button);};
+    const state=context();if(!state){if(lastQuery!==null)f.dismissSuggestions();return;}
+    if(state.key===lastQuery){if(!suggestions.hidden)place();return;}lastQuery=state.key;const current=++completion;suggestions.replaceChildren();suggestions.hidden=true;
+    const valid=()=>current===completion&&context()?.key===state.key;
+    const add=(label,run)=>{
+      const button=el('button',label);button.type='button';button.className='btn btn-light';button.setAttribute('role','option');button.setAttribute('aria-selected','false');button.addEventListener('mousedown',event=>event.preventDefault());
+      button.addEventListener('focus',()=>{for(const choice of suggestions.children)choice.setAttribute('aria-selected',String(choice===button));});
+      button.addEventListener('click',()=>{if(!valid())return;f.dismissSuggestions();run();});suggestions.append(button);
+    };
+    const {wiki,slash,emoji}=state;
     if(emoji)for(const {name,emoji:character}of emojiSuggestions(emoji.query))add(character+' :'+name+':',()=>f.editor.insertEmoji(emoji,name));
-    if(slash){for(const name of ['heading','list','ordered','tasks','quote','code_block','table','hr'])if(t('markdown.'+name).toLocaleLowerCase().includes(slash.query.toLocaleLowerCase()))add(t('markdown.'+name),()=>f.editor.replaceSlash(name));}
-    if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query,{assetsOnly:wiki.embed}).then(entries=>{if(current!==completion||f.readOnly)return;for(const entry of entries)add(entry.title?noteTitle(entry)+' · '+entry.path:entry.path,()=>f.editor.insertWiki(wiki,entry.path.replace(/\.md$/i,'')));suggestions.hidden=!suggestions.children.length;place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});}).catch(()=>{});
-    suggestions.hidden=!suggestions.children.length;if(!suggestions.hidden)place(suggestions,f.editor.selectionRect()||{left:8,bottom:8});
+    if(slash)for(const name of ['heading','list','ordered','tasks','quote','code_block','table','hr'])if(t('markdown.'+name).toLocaleLowerCase().includes(slash.query.toLocaleLowerCase()))add(t('markdown.'+name),()=>f.editor.replaceSlash(name));
+    if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query,{assetsOnly:wiki.embed}).then(entries=>{
+      if(!valid())return;for(const entry of entries)add(entry.title?noteTitle(entry)+' · '+entry.path:entry.path,()=>{const path=entry.path.replace(/\.md$/i,'');if(state.rich)f.editor.insertWiki(wiki,path);else source.insert(wiki,path);});
+      suggestions.hidden=!suggestions.children.length;if(!suggestions.hidden)place();
+    }).catch(()=>{});
+    suggestions.hidden=!suggestions.children.length;if(!suggestions.hidden)place();
   };
   f.rich.addEventListener('compositionend',()=>queueMicrotask(()=>f.updateExperience()));
-  f.rich.addEventListener('keydown',event=>{
-    if(event.isComposing||suggestions.hidden)return;const buttons=[...suggestions.querySelectorAll('button')];if(event.key==='ArrowDown'){event.preventDefault();buttons[0]?.focus();}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();suggestions.hidden=true;}
+  const editorKeys=event=>{
+    if(event.isComposing||suggestions.hidden)return;
+    if(event.key==='ArrowDown'){event.preventDefault();event.stopPropagation();suggestions.querySelector('button')?.focus();}
+    else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.dismissSuggestions();f.focus();}
+  };
+  f.rich.addEventListener('keydown',editorKeys,true);f.text.addEventListener('keydown',editorKeys,true);
+  suggestions.addEventListener('focusout',()=>queueMicrotask(()=>f.updateExperience()));
+  suggestions.addEventListener('keydown',event=>{
+    const buttons=[...suggestions.querySelectorAll('button')],index=buttons.indexOf(document.activeElement);
+    if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();event.stopPropagation();buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}
+    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.dismissSuggestions();f.focus();}
   });
-  suggestions.addEventListener('keydown',event=>{const buttons=[...suggestions.querySelectorAll('button')],index=buttons.indexOf(document.activeElement);if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}if(event.key==='Escape'){event.preventDefault();suggestions.hidden=true;f.editor?.focus();}});
 }
