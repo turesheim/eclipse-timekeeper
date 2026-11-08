@@ -332,7 +332,7 @@ test('opening a weekly note survives a metadata refresh between pointer down and
 });
 
 test('Notes content search finds body text, keeps relevance order and pages on demand without replacing a draft',async({page,request})=>{
-  const api=await setup(page,request),word='sparrow';
+  test.setTimeout(150000);const api=await setup(page,request),word='sparrow';
   for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await api('PUT','/notes/files?path=Notes%2Fbinary.txt',Buffer.from(word),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:word}));return reply.status();},{timeout:30000}).toBe(200);
@@ -341,15 +341,19 @@ test('Notes content search finds body text, keeps relevance order and pages on d
   await page.locator('#notes-search-mode').selectOption('content');await expect(rows).toHaveCount(50);await expect(rows.first()).toContainText('Sparrow priority');
   await expect(navigation.getByRole('button',{name:'Sort notes',exact:true})).toBeDisabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
   await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await expect(rows).toHaveCount(50);
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:900});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
+      await captureScreenshot(page,{path:`test-results/notes-content-search-${theme}-${width}.png`});
+    }
+  }
+  await page.setViewportSize({width:1440,height:900});
   await rows.first().locator('button').click();const source=await notesSource(page);await expect(source).toHaveValue(/Sparrow priority/);
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
   await source.fill('# Sparrow priority\n\nUnsaved private draft.');await page.locator('#notes-search').fill('absentword');await expect(navigation).toContainText('No matching notes.');await expect(source).toHaveValue('# Sparrow priority\n\nUnsaved private draft.');
   await page.locator('#notes-search').fill(word);await expect(rows).toHaveCount(50);await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
-  for(const width of [1440,390]){
-    await page.setViewportSize({width,height:900});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
-    await captureScreenshot(page,{path:`test-results/notes-content-search-${width}.png`});
-  }
 });
 
 test('Notes content search rejects delayed old queries and explains unavailable or stale pages',async({page,request})=>{

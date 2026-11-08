@@ -135,21 +135,33 @@ def search_ready(api, query):
         time.sleep(.1)
 
 
-def verify_search_restore(source, api, archive, expected, note):
+def retain_search_cache(source, destination, api, note):
     for sequence in range(8):
         note=api.call('PUT','/notes/entries/'+note['id']+'/content',('# Restore fixture\n\nfuturecacheword '+str(sequence)).encode(),headers={'If-Match':note['etag']})
     if len(search_ready(api,'futurecacheword')['items'])!=1:raise RuntimeError('Pre-restore cache did not contain the later source')
     cached_target=api.call('GET','/notes/search/status')['target'];cached_version=note['contentVersion']
-    restore_api(source,archive,password=ADMIN_PASSWORD,initialize=False)
-    restored=verify_data(source,expected)
-    if not source.compose('exec','-T','api-1','find','/instance/notes-search-api-1','-name','segments_*','-print'):
+    # Copy a stopped, committed replica cache into the otherwise empty target.
+    # Public restore intentionally requires an empty destination database.
+    source.stop();cache=destination.folder/'old-search-cache'
+    source.run('docker','cp',source.compose('ps','-a','-q','api-1')+':/instance/notes-search-api-1',str(cache))
+    with tempfile.TemporaryFile() as transfer:
+        with tarfile.open(fileobj=transfer,mode='w') as archive:archive.add(cache,arcname='notes-search-api-1')
+        transfer.seek(0)
+        installed=subprocess.run(['docker','exec','-i','--user','10001:10001',destination.compose('ps','-q','api-1'),'tar','-xf','-','--no-same-owner','-C','/instance'],stdin=transfer,capture_output=True,timeout=90)
+        if installed.returncode:raise RuntimeError('Could not install the private committed search-cache fixture')
+    source.start()
+    return cached_target,cached_version
+
+
+def verify_search_restore(destination, restored, note, cached):
+    if not destination.compose('exec','-T','api-1','find','/instance/notes-search-api-1','-name','segments_*','-print'):
         raise RuntimeError('Restore fixture did not retain an old local search cache')
     note=restored.call('GET','/notes/entries/'+note['id'])
     for sequence in range(8):
         note=restored.call('PUT','/notes/entries/'+note['id']+'/content',('# Restore fixture\n\nfreshrestoredword '+str(sequence)).encode(),headers={'If-Match':note['etag']})
     owner=note['ownerId'].replace("'","''")
-    target=int(source.sql("SELECT payload::jsonb->>'generation' FROM tk_resource WHERE owner_id='"+owner+"' AND entity_type='NOTES_SEARCH'"))
-    if target!=cached_target or note['contentVersion']!=cached_version:raise RuntimeError('Restore fixture did not exercise reused versions/generations')
+    target=int(destination.sql("SELECT payload::jsonb->>'generation' FROM tk_resource WHERE owner_id='"+owner+"' AND entity_type='NOTES_SEARCH'"))
+    if target!=cached[0] or note['contentVersion']!=cached[1]:raise RuntimeError('Restore fixture did not exercise reused versions/generations')
     matches=search_ready(restored,'freshrestoredword')['items']
     if len(matches)!=1 or matches[0]['entry']['id']!=note['id'] or search_ready(restored,'futurecacheword')['items']:
         raise RuntimeError('Old search cache survived full-instance restore without canonical rebuild')
@@ -177,11 +189,12 @@ def main():
             if args.notes_search:
                 original.call('GET','/notes');search_note=original.call('PUT','/notes/files?path=Restore-search.md',b'# Restore fixture\n\noldrestoretext',headers={'If-None-Match':'*'});search_ready(original,'oldrestoretext')
             archive = export(original)
-            if args.notes_search:verify_search_restore(source,original,archive,expected,search_note)
             print('Administrator exported healthy Compose source', flush=True)
-            destination = Installation(folder / 'destination', args.server_image, 'dagsverk'); destination.start()
+            destination = Installation(folder / 'destination', args.server_image, 'dagsverk', notes_search=args.notes_search); destination.start()
+            cached=retain_search_cache(source,destination,original,search_note) if args.notes_search else None
             restore_api(destination, archive)
             restored = verify_data(destination, expected)
+            if args.notes_search:verify_search_restore(destination,restored,search_note,cached)
             print('Public Compose restore preserved account access, data and attachments', flush=True)
             backup = Path(destination.backup())
             if not (backup / 'instance-material.tar').is_file():
