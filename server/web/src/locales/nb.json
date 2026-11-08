@@ -1440,5 +1440,17 @@
   "tasks.more": "Vis flere oppgaver",
   "tasks.loading": "Laster kalenderoppgaver …",
   "notes.created": "Opprettet:",
-  "notes.modified": "Sist endret:"
+  "notes.modified": "Sist endret:",
+  "notes.search_mode": "Søk i",
+  "notes.search_names": "Navn og stier",
+  "notes.search_content": "Notatinnhold",
+  "notes.search_retry": "Søk på nytt",
+  "notes.search_more": "Flere treff",
+  "notes.search_rebuild": "Bygg opp søket på nytt",
+  "notes.search_results": "Treff sortert etter relevans.",
+  "notes.search_none": "Ingen samsvarende notater.",
+  "notes.search_changed": "Notatene er endret. Søk på nytt for oppdaterte treff.",
+  "notes.search_invalid": "Bruk ord eller fullstendige fraser i doble anførselstegn (opptil 512 tegn).",
+  "notes.search_unavailable": "Innholdssøket klargjøres eller er utilgjengelig. Prøv igjen om litt. Du kan fortsatt bla i filene.",
+  "notes.search_preparing": "Klargjør innholdssøk …"
 }

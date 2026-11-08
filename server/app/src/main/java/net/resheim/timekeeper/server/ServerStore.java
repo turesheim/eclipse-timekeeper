@@ -42,6 +42,12 @@ public class ServerStore {
     @Inject VaultLimits vaultLimits;
     VaultLimits vaultLimits(){return vaultLimits;}
     String restoreGeneration(){return restoreFence.generation();}
+    Set<String> notesSearchOwners(){
+        var owners=new HashSet<String>();
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection);var query=connection.createStatement();var rows=query.executeQuery("SELECT id FROM tk_owner")){
+            while(rows.next())owners.add(rows.getString(1));return Set.copyOf(owners);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     private Connection h2SchemaSession;

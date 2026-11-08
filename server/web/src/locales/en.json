@@ -1440,5 +1440,17 @@
   "tasks.more": "Show more tasks",
   "tasks.loading": "Loading calendar tasks…",
   "notes.created": "Created:",
-  "notes.modified": "Last changed:"
+  "notes.modified": "Last changed:",
+  "notes.search_mode": "Search in",
+  "notes.search_names": "Names and paths",
+  "notes.search_content": "Note contents",
+  "notes.search_retry": "Search again",
+  "notes.search_more": "More results",
+  "notes.search_rebuild": "Rebuild search",
+  "notes.search_results": "Results ordered by relevance.",
+  "notes.search_none": "No matching notes.",
+  "notes.search_changed": "Notes changed. Search again for current results.",
+  "notes.search_invalid": "Use words or complete phrases in double quotes (up to 512 characters).",
+  "notes.search_unavailable": "Content search is being prepared or is unavailable. Try again shortly; browsing files still works.",
+  "notes.search_preparing": "Preparing content search…"
 }

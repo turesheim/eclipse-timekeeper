@@ -53,7 +53,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     private final IndexWriter writer;
     private final SearcherManager readers;
     private final ReentrantReadWriteLock lock=new ReentrantReadWriteLock();
-    private Watermark watermark;
+    private volatile Watermark watermark;
     private boolean closed;
 
     NotesLuceneIndex(Path path,Identity identity)throws IOException{this(path,identity,new Watermark(0,false,null));}
@@ -71,7 +71,7 @@ final class NotesLuceneIndex implements AutoCloseable {
                 }
                 catch(RuntimeException invalid){throw new RebuildRequired();}
             }
-            writing=new IndexWriter(opened,new IndexWriterConfig(analysis).setCommitOnClose(false));
+            writing=new IndexWriter(opened,new IndexWriterConfig(analysis).setCommitOnClose(false).setRAMBufferSizeMB(16).setMergeScheduler(new SerialMergeScheduler()));
             writing.setLiveCommitData(metadata(saved).entrySet());writing.commit();managed=new SearcherManager(opened,null);
             for(String name:opened.listAll())privateFile(path.resolve(name));
             directory=opened;analyzer=analysis;writer=writing;readers=managed;watermark=saved;
@@ -81,7 +81,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     }
     private Map<String,String> identityData(){return Map.of("format",FORMAT,"lucene",org.apache.lucene.util.Version.LATEST.toString(),"owner",identity.owner(),"collection",identity.collection().toString(),"epoch",identity.epoch().toString(),"restore",identity.restoreGeneration());}
     private Map<String,String> metadata(Watermark state){var values=new HashMap<>(identityData());values.put("generation",Long.toString(state.generation()));values.put("ready",Boolean.toString(state.ready()));values.put("after",state.afterEntry()==null?"":state.afterEntry().toString());return values;}
-    Watermark watermark(){lock.readLock().lock();try{return watermark;}finally{lock.readLock().unlock();}}
+    Watermark watermark(){return watermark;}
     Identity identity(){return identity;}
     void put(Source source)throws IOException{
         if(!Set.of("MARKDOWN","DAY","WEEK","EVENT").contains(source.kind()))throw new IllegalArgumentException("Unsupported search source");
@@ -168,7 +168,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     }
     private static String chunk(int index){return "body_"+index;}
     private void open()throws IOException{if(closed)throw new Unavailable();}
-    private static void privateDirectory(Path path)throws IOException{
+    static void privateDirectory(Path path)throws IOException{
         if(Files.isSymbolicLink(path))throw new IOException("Invalid private search cache");
         try{Files.createDirectories(path,PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rwx------"));}
         catch(UnsupportedOperationException unsupported){
@@ -177,7 +177,7 @@ final class NotesLuceneIndex implements AutoCloseable {
         }
         if(Files.isSymbolicLink(path)||!Files.isDirectory(path,LinkOption.NOFOLLOW_LINKS))throw new IOException("Invalid private search cache");
     }
-    private static void privateFile(Path path)throws IOException{try{Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException unsupported){/* Inherit the owner-only directory ACL. */}}
+    static void privateFile(Path path)throws IOException{try{Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException unsupported){/* Inherit the owner-only directory ACL. */}}
     @Override public void close()throws IOException{
         lock.writeLock().lock();try{
             if(closed)return;closed=true;
