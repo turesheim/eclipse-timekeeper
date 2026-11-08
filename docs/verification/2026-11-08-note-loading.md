@@ -33,6 +33,13 @@ page before resolving relative paths and ambiguity. Older account responses,
 invalidated requests and failed old catalog reads cannot populate or evict the
 current request cache. All 154 web unit tests passed at this stage.
 
+WebKit acceptance also exposed a weekly-note click lost when note metadata
+arrived between pointer down and pointer up. A controlled-response scenario
+reproduced the closed dialog on the unchanged package. The Today month grid now
+retains its day/week buttons while updating note dots and selection; it rebuilds
+for month, zone or locale changes and clears on an account reset. The regression
+uses an actual metadata response while the week button is pressed.
+
 Reproduce the server investigation from the repository root:
 
 ```sh
