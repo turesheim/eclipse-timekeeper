@@ -5,7 +5,7 @@ import {calendarItemStatus} from './calendar-item.js';
 import {eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
-import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
+import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText, weekRange } from './model.js';
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
 import { iconButton } from './icons.js';
 import {dateNavigation} from './date-navigation.js';
@@ -33,9 +33,11 @@ export class WeekCalendar {
     this.controls = Object.fromEntries(['previous', 'next', 'today', 'copy', 'paste', 'edit', 'new', 'range'].map((key) => [key, root.querySelector(`#calendar-${key}`)]));
     for (const [key, glyph, label] of [['previous', 'left', i18nText("ui.previous_week")], ['next', 'right', i18nText("ui.next_week")], ['copy', 'copy', i18nText("ui.copy_work_session")], ['paste', 'paste', i18nText("ui.paste_work_session")], ['edit', 'edit', i18nText("ui.edit_selected_work_session")], ['new', 'add', i18nText("ui.record_work_session_at_selected_time")], ['range', 'clock', i18nText("ui.select_time_range")]])
     iconButton(this.controls[key], glyph, label);
-    this.controls.previous.addEventListener('click', () => callbacks.onDate(addDays(this.calendar.first, -7)));
-    this.controls.next.addEventListener('click', () => callbacks.onDate(addDays(this.calendar.first, 7)));
-    this.controls.today.addEventListener('click', () => callbacks.onDate(dateInZone(this.data.report.generatedAt, this.data.profile.data.zoneId)));
+    const dateInput=root.querySelector('#calendar-date');
+    for(const [key,days]of [['previous',-7],['next',7]])this.controls[key].addEventListener('click',()=>{
+      dateInput.value=addDays(weekRange(dateInput.value||this.calendar.first,this.data.profile.data.zoneId).first,days);callbacks.onDate(dateInput.value);
+    });
+    this.controls.today.addEventListener('click', () => {dateInput.value=dateInZone(this.data.report.generatedAt,this.data.profile.data.zoneId);callbacks.onDate(dateInput.value);});
     dateNavigation(root.querySelector('.calendar-controls'),{input:root.querySelector('#calendar-date'),previous:this.controls.previous,current:this.controls.today,next:this.controls.next,previousLabel:i18nText('ui.previous_week'),currentLabel:i18nText('ui.today'),nextLabel:i18nText('ui.next_week')});
     this.controls.copy.addEventListener('click', () => this.copy());
     this.controls.paste.addEventListener('click', () => this.paste());

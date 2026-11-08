@@ -21,8 +21,14 @@ for(const locale of ['en-GB','nb-NO'])test(`date controls share selection, navig
     await page.locator(`[data-tab=${tab}]`).click();const root=page.locator(selector),controls=root.locator('.date-navigation'),input=page.locator('#'+inputId);
     await expect(controls).toBeVisible();await expect(controls.locator('.input-group > button')).toHaveCount(1);await expect(controls.getByRole('group').getByRole('button')).toHaveCount(3);
     await expect(controls.locator('label')).toHaveClass('visually-hidden');
-    await input.fill(date);await page.locator('#'+previous).click();await expect(input).toHaveValue(before);
-    await input.fill(date);await page.locator('#'+next).click();await expect(input).toHaveValue(after);
+    // Native date fields may commit on blur. Navigation must use that newly
+    // entered date even while the older report request is still pending.
+    let release;const report='**/api/v1/reports/activities?**';
+    if(tab==='calendar'){const pending=new Promise(resolve=>{release=resolve;});await page.route(report,async route=>{await pending;await route.continue();});}
+    try{
+      await input.fill(date);await page.locator('#'+previous).click();await expect(input).toHaveValue(before);
+      await input.fill(date);await page.locator('#'+next).click();await expect(input).toHaveValue(after);
+    }finally{if(release){release();await page.unroute(report);}}
     if(tab!=='track'){
       await input.evaluate(node=>{node.showPicker=()=>{node.dataset.opened='true';};});await controls.locator('.input-group > button').click();await expect(input).toHaveAttribute('data-opened','true');
       await input.evaluate(node=>{node.showPicker=()=>{throw new Error('Native picker unavailable');};});await controls.locator('.input-group > button').click();await expect(input).toBeFocused();
