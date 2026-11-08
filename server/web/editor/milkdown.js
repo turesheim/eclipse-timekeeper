@@ -152,7 +152,6 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       editable:()=>!readOnly,
       handleTextInput:(view,from,to,text)=>brackets.input(view,from,to,text),
       handleKeyDown:(_view,event)=>{
-        if(hashtags.keyDown(event))return true;
         // DOM reconciliation also calls this with an undispatched key event.
         // Its DOM already contains the edit; keep the model's pre-edit selection.
         if(event.target&&!event.isComposing)syncDOMSelection(_view,root);

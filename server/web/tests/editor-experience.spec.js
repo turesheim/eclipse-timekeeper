@@ -27,7 +27,7 @@ test('prose hashtags use accent links without changing Markdown or literal code 
     expect((await new AxeBuilder({page}).include('#experience-editor .markdown-hashtag').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
   }
   await page.setViewportSize({width:390,height:844});await captureScreenshot(page,{path:'test-results/hashtag-accent-phone.png',fullPage:true});
-  await page.evaluate(()=>globalThis.experience.setReadOnly(true));await tags.last().click();expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.searchedTags.at(-1))).toBe('#work/cloud');
+  await page.evaluate(()=>globalThis.experience.setReadOnly(true));await tags.last().focus();await tags.last().press('Enter');expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.searchedTags.at(-1))).toBe('#work/cloud');
 });
 
 test('hashtag presentation follows typing and undo while source remains portable text',async({page})=>{

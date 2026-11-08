@@ -16,7 +16,12 @@ export function hashtagPresentation(resources){
       return false;
     });return DecorationSet.create(doc,decorations);
   };
-  const plugin=$prose(()=>new Plugin({key,state:{init:(_config,state)=>build(state.doc),apply:(transaction,previous)=>transaction.docChanged?build(transaction.doc):previous},props:{decorations:state=>key.getState(state)}}));
   const activate=event=>{const target=event.target?.closest?.('[data-hashtag]');if(!target||!resources?.searchTag)return false;event.preventDefault();resources.searchTag(target.dataset.hashtag,target);return true;};
-  return {plugin,click:event=>event.button===0&&!event.ctrlKey&&!event.metaKey&&activate(event),keyDown:event=>!event.isComposing&&['Enter',' '].includes(event.key)&&activate(event)};
+  const keys=event=>{if(!event.isComposing&&['Enter',' '].includes(event.key)&&activate(event))event.stopPropagation();};
+  const plugin=$prose(()=>new Plugin({key,state:{init:(_config,state)=>build(state.doc),apply:(transaction,previous)=>transaction.docChanged?build(transaction.doc):previous},props:{decorations:state=>key.getState(state)},view:view=>{
+    // ProseMirror's editing key handler is disabled in a read-only view.
+    // Links remain keyboard-operable there, including after a rejected save.
+    view.dom.addEventListener('keydown',keys,true);return {destroy:()=>view.dom.removeEventListener('keydown',keys,true)};
+  }}));
+  return {plugin,click:event=>event.button===0&&!event.ctrlKey&&!event.metaKey&&activate(event)};
 }
