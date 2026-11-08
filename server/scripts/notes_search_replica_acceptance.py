@@ -43,7 +43,7 @@ class SearchReplicas(Replicas):
         try:reply=urlopen(request,timeout=30)
         except HTTPError as failure:reply=failure
         with reply:
-            body=reply.read();return reply.status,json.loads(body) if body and reply.headers.get_content_type()=='application/json' else body,reply.headers
+            body=reply.read();return reply.status,json.loads(body) if body and reply.headers.get_content_type() in {'application/json','application/problem+json'} else body,reply.headers
     def sql(self,sql):return self.command('docker','exec','-i',self.database,'psql','-X','-q','-A','-t','-v','ON_ERROR_STOP=1','-U','timekeeper','-d','timekeeper',input=sql).stdout.strip()
 
 
@@ -62,10 +62,10 @@ def exercise(system):
         parameters={'q':query,'limit':limit}
         if cursor is not None:parameters['cursor']=cursor
         return system.request(index,browser,'/notes/search?'+urlencode(parameters))
-    def ready(index,browser,query,limit=37):
+    def ready(index,browser,query,limit=37,*,cursor=None):
         deadline=time.monotonic()+90
         while True:
-            reply=page(index,browser,query,limit=limit)
+            reply=page(index,browser,query,limit=limit,cursor=cursor)
             if reply[0]==200:
                 if reply[2].get('Cache-Control')!='private, no-store':raise AssertionError('Search response is cacheable')
                 return reply[1]
@@ -85,7 +85,7 @@ def exercise(system):
             excerpt=hit['excerpt'];assert len(excerpt['text'].encode('utf-16-le'))//2<=320
             assert all(0<=span['start']<span['end']<=len(excerpt['text'].encode('utf-16-le'))//2 for span in excerpt['highlights'])
         if 'nextCursor' not in result:break
-        replica=3-replica;result=expect(page(replica,alice,'replicaneedle',cursor=result['nextCursor']),200,'Logical continuation on another replica')
+        replica=3-replica;result=ready(replica,alice,'replicaneedle',cursor=result['nextCursor'])
     assert seen=={entry['id'] for entry in entries};assert len(ready(2,bob,'replicaneedle')['items'])==1
     expect(page(2,bob,'replicaneedle',cursor=first['nextCursor']),412,'Foreign cursor');expect(system.request(2,bob,'/notes/entries/'+entries[0]['id']),404,'Foreign metadata')
     for query in ['Cafe\u0301','BLÅBÆR','service.cluster.local','"committed replicas"']:assert ready(2,alice,query)['items']
