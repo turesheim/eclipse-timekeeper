@@ -24,6 +24,14 @@ async function setup(page,request){
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return api;
 }
 
+test('saved private PlantUML notes retain frontmatter and untouched fence bytes after a rich prose edit',async({page,request})=>{
+  const api=await setup(page,request),source='\uFEFF---\r\nprivate: retained\r\n---\r\n\r\n~~~puml\r\n@startuml\r\nAlice -> Bob: Private plan\r\n@enduml\r\n~~~\r\n\r\nAfter the diagram.\r\n',entry=await(await api('PUT','/notes/files?path=Notes%2FDiagram.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Diagram.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  const image=page.locator('#notes-formatted .markdown-plantuml-block img');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(node=>node.complete?node.naturalWidth:0)).toBeGreaterThan(0);
+  await appendEditorText(page.locator('#notes-formatted .ProseMirror > p').last(),' Saved.');await saveMarkdown(page.locator('#notes-panel'));expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source.replace('After the diagram.','After the diagram. Saved.'));
+  await page.reload();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Diagram.md').click();await expect(page.locator('#notes-formatted .markdown-plantuml-block img')).toBeVisible();
+});
+
 test('Notes account imports a vault with review, guarded conflicts and exact file bytes',async({page,request})=>{
   const {mkdtemp,mkdir,writeFile,rm}=await import('node:fs/promises'),{join}=await import('node:path'),{tmpdir}=await import('node:os');
   const api=await setup(page,request),root=await mkdtemp(join(tmpdir(),'timekeeper-notes-import-')),day='2026-11-02';

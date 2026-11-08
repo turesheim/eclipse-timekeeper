@@ -45,6 +45,14 @@ test('ordinary prose after PlantUML stays editable and undo preserves the diagra
   const value=fence(examples.class)+'\nAfter the diagram.\n',root=await open(page,value);await rendered(root);const paragraph=root.locator('.ProseMirror > p').last();await appendEditorText(paragraph,' Changed.');expect(await source(page)).toContain(fence(examples.class).trimEnd());await page.keyboard.press('ControlOrMeta+z');expect(await source(page)).toBe(value);
 });
 
+test('mode switches retain the prose caret after an atomic diagram preview',async({page})=>{
+  for(const [language,body]of [['plantuml',examples.sequence],['mermaid','graph LR\n  Start --> Finish']]){
+    const value='Before the diagram.\n\n'+fence(body,language)+'\nAfter the diagram.\n',root=await open(page,value),image=root.locator('.markdown-plantuml-block img,.markdown-mermaid-block img');await expect(image).toBeVisible();await appendEditorText(root.locator('.ProseMirror > p').last(),'');
+    await root.getByRole('button',{name:'Markdown source',exact:true}).click();const textarea=page.locator('#plantuml-body');expect(await textarea.evaluate(node=>node.selectionStart)).toBe(value.indexOf('After the diagram.')+'After the diagram.'.length);
+    await root.getByRole('button',{name:'Formatted',exact:true}).click();await page.keyboard.insertText(' Here.');await expect(root.locator('.ProseMirror > p').last()).toHaveText('After the diagram. Here.');expect(await source(page)).toContain(fence(body,language).trimEnd());
+  }
+});
+
 test('changing a code-block language to PlantUML renders a preview and undo restores editable code',async({page})=>{
   const value=fence(examples.sequence,'text'),root=await open(page,value),code=root.locator('.markdown-code-block');await code.getByRole('button',{name:/Code language:/}).click();const language=page.getByRole('dialog',{name:'Code language',exact:true}).getByRole('combobox',{name:'Code language',exact:true});await language.fill('plantuml');await language.press('Enter');await rendered(root);expect(await source(page)).toContain('```plantuml');await page.keyboard.press('ControlOrMeta+z');await expect(root.locator('.markdown-code-block code')).toHaveText(examples.sequence);expect(await source(page)).toBe(value);
 });
