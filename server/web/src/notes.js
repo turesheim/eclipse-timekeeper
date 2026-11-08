@@ -81,15 +81,15 @@ export class NotesView {
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
     this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>!!this.session&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(this.editor,this.autosave);
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
-    document.addEventListener('timekeeper:notes-changed',()=>{if(this.dragPending||this.dragged)this.reloadAfterDrag=true;else{this.info=null;this.folder=null;}if(this.session)this.callbacks.onChanged?.();});
+    document.addEventListener('timekeeper:notes-changed',()=>{if(this.treePointerPending||this.dragged)this.reloadAfterDrag=true;else{this.info=null;this.folder=null;}if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
     window.visualViewport?.addEventListener('resize',()=>this.fit());
     this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
-    this.navigation.addEventListener('pointerdown',event=>{if(event.button===0&&event.target.closest?.('.notes-tree-pick')?.draggable)this.dragPending=true;});
-    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.dragPending&&!this.dragged)this.clearDrag();});
+    this.navigation.addEventListener('pointerdown',event=>{if(event.button===0&&event.target.closest?.('.notes-tree-pick'))this.treePointerPending=true;});
+    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.treePointerPending&&!this.dragged)this.clearDrag();});
     this.navigation.addEventListener('dragstart',event=>{
       const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
-      if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading&&!this.dragPending){event.preventDefault();return;}
+      if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading&&!this.treePointerPending){event.preventDefault();return;}
       this.dragged={id:entry.id,session:this.session,generation:this.generation};event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('application/x-timekeeper-note',entry.id);
     });
     this.navigation.addEventListener('dragover',event=>{
@@ -119,7 +119,7 @@ export class NotesView {
   hide(){this.visible=false;this.clearDrag();}
   clearDropTarget(){this.navigation.classList.remove('notes-drop-target');for(const node of this.navigation.querySelectorAll('.notes-drop-target'))node.classList.remove('notes-drop-target');}
   clearDrag(){
-    const refresh=this.reloadAfterDrag,session=this.session;this.dragged=null;this.dragPending=false;this.reloadAfterDrag=false;this.clearDropTarget();
+    const refresh=this.reloadAfterDrag,session=this.session;this.dragged=null;this.treePointerPending=false;this.reloadAfterDrag=false;this.clearDropTarget();
     // Let the associated click/drop finish before replacing any tree nodes.
     if(refresh)setTimeout(()=>{if(this.visible&&this.session===session&&!this.busy)void this.reload();},0);
   }
@@ -156,7 +156,7 @@ export class NotesView {
     this.fit();
   }
   fit(){if(!this.visible||!this.root.offsetParent)return;const viewport=window.visualViewport,bottom=viewport?viewport.offsetTop+viewport.height:innerHeight;document.documentElement.style.setProperty('--notes-viewport-height',bottom+'px');}
-  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&(!this.loading||this.dragPending||this.dragged)&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
+  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&(!this.loading||this.treePointerPending||this.dragged)&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
     for(const pick of this.tree.querySelectorAll('.notes-tree-pick'))pick.draggable=this.canDrag(this.entries.get(pick.parentElement.dataset.id));
@@ -193,7 +193,7 @@ export class NotesView {
     return rows;
   }
   async reload(retry=0){
-    if(this.dragPending||this.dragged){this.reloadAfterDrag=true;return;}
+    if(this.treePointerPending||this.dragged){this.reloadAfterDrag=true;return;}
     if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1,expandAll=this.expandAllRequested,expanded=new Set(this.expanded);this.loadGeneration=current;this.loading=true;this.controls();
     try{
       const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
@@ -207,7 +207,7 @@ export class NotesView {
   }
   paint(){
     if(!this.info)return;
-    if(this.dragPending||this.dragged){this.reloadAfterDrag=true;return;}
+    if(this.treePointerPending||this.dragged){this.reloadAfterDrag=true;return;}
     const focused=this.tree.querySelector(':focus')?.dataset.id;this.tree.replaceChildren();
     const append=(parent,host)=>{for(const entry of sortedNotes(this.children.get(parent)||[],this.sortOrder,getLocale())){
       const folder=entry.kind==='FOLDER',row=node('div',undefined,'notes-tree-row');row.setAttribute('role','treeitem');row.setAttribute('aria-selected',String(this.note?.id===entry.id));row.dataset.id=entry.id;row.tabIndex=-1;
