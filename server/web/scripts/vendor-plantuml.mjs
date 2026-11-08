@@ -4,7 +4,8 @@ import {gzipSync} from 'node:zlib';
 const root=new URL('../',import.meta.url),check=process.argv.includes('--check');
 const manifest=JSON.parse(await readFile(new URL('package.json',root))),upstream=JSON.parse(await readFile(new URL('node_modules/@plantuml/core/package.json',root)));
 if(upstream.version!=='1.2026.9'||manifest.devDependencies['@plantuml/core']!==upstream.version||upstream.license!=='MIT')throw new Error('Review the pinned official MIT PlantUML distribution before updating it');
-const engine=await readFile(new URL('node_modules/@plantuml/core/plantuml.js',root)),license=await readFile(new URL('node_modules/@plantuml/core/LICENSE',root));
+// Normalize line endings only; preserve upstream code and complete license text.
+const engine=Buffer.from((await readFile(new URL('node_modules/@plantuml/core/plantuml.js',root),'utf8')).replace(/\r\n/g,'\n')),license=Buffer.from((await readFile(new URL('node_modules/@plantuml/core/LICENSE',root),'utf8')).replace(/\r\n/g,'\n'));
 const bundled=await build({absWorkingDir:root.pathname,entryPoints:['editor/plantuml-worker.js'],bundle:true,format:'esm',target:['es2022'],external:['./plantuml-engine.js'],write:false,minify:true,legalComments:'eof',outfile:'worker.js'});
 const worker=bundled.outputFiles[0].contents,inventory=[{name:upstream.name,version:upstream.version,license:upstream.license}];
 const sizes=[{file:'plantuml-engine.js',bytes:engine.length},{file:'worker.js',bytes:worker.length}];

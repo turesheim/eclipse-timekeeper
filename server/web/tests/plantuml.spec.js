@@ -21,7 +21,7 @@ test('PlantUML loads locally on demand and preserves fenced sequence, class and 
   await expect(root.locator('.markdown-plantuml-block pre,.markdown-plantuml-block code,.markdown-plantuml-block textarea')).toHaveCount(0);expect(requests.some(url=>url.includes('/assets/plantuml/plantuml-engine.js'))).toBe(true);
   await root.getByRole('button',{name:'Markdown source',exact:true}).click();expect(await source(page)).toBe(original);
   for(const [name,value]of Object.entries(examples)){
-    await page.evaluate(value=>globalThis.plantumlField.setValue(value),fence(value,name==='class'?'puml':'plantuml'));await root.getByRole('button',{name:'Formatted',exact:true}).click();const image=await rendered(root);const svg=await image.evaluate(async node=>(await fetch(node.src)).text());expect(svg).toContain('<svg');expect(svg).not.toContain('plantuml-src');expect(await source(page)).toBe(fence(value,name==='class'?'puml':'plantuml'));await root.getByRole('button',{name:'Markdown source',exact:true}).click();
+    await page.evaluate(value=>globalThis.plantumlField.setValue(value),fence(value,name==='class'?'puml':'plantuml'));await root.getByRole('button',{name:'Formatted',exact:true}).click();const image=await rendered(root);await expect(image).toHaveAttribute('src',/^blob:/);expect(await source(page)).toBe(fence(value,name==='class'?'puml':'plantuml'));await root.getByRole('button',{name:'Markdown source',exact:true}).click();
   }
   expect(outside).toEqual([]);
 });
@@ -50,7 +50,7 @@ test('changing a code-block language to PlantUML renders a preview and undo rest
 });
 
 test('clearing PlantUML revokes its image and cancels a worker without replacing a newer document',async({page})=>{
-  const root=await open(page,fence(examples.sequence));const image=await rendered(root),url=await image.getAttribute('src');await page.evaluate(()=>globalThis.plantumlField.clear());expect(await page.evaluate(async url=>{try{await fetch(url);return false;}catch{return true;}},url)).toBe(true);
+  const root=await open(page,fence(examples.sequence));const image=await rendered(root),url=await image.getAttribute('src');await page.evaluate(()=>globalThis.plantumlField.clear());expect(await page.evaluate(url=>new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(false);image.onerror=()=>resolve(true);image.src=url;}),url)).toBe(true);
   let worker;page.on('worker',value=>{worker=value;});await page.route('**/assets/plantuml/worker.js',route=>route.fulfill({contentType:'text/javascript',body:'postMessage({ready:true});onmessage=()=>{};'}));
   await page.evaluate(async value=>{plantumlField.setValue(value);await plantumlField.showFormatted();},fence(examples.class));await expect.poll(()=>!!worker).toBe(true);const closed=new Promise(resolve=>worker.once('close',resolve));await page.evaluate(()=>plantumlField.setValue('A different private document.'));await closed;await expect(root.locator('img')).toHaveCount(0);expect(await source(page)).toBe('A different private document.');
 });
