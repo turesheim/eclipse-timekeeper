@@ -50,8 +50,13 @@ class RecentNotesTest {
             assertEquals("Meeting",first.path("items").get(1).path("title").asText());
             assertFalse(first.toString().contains("private body"));assertFalse(first.toString().contains("meeting note"));
             assertEquals(7,first.path("days").asInt());assertEquals("2026-10-30",first.path("fromDate").asText());assertEquals("2026-11-05",first.path("toDate").asText());
-            String snapshot=first.path("snapshot").asText();var second=recent.page(2,2,snapshot);assertEquals("Notes/A.md",second.path("items").get(0).path("path").asText());assertEquals("Notes/B.md",second.path("items").get(1).path("path").asText());
-            var last=recent.page(4,2,snapshot);assertEquals(1,last.path("items").size());assertEquals("Notes/Boundary.md",last.path("items").get(0).path("path").asText());assertFalse(last.has("nextOffset"));
+            String snapshot=first.path("snapshot").asText();var second=recent.page(2,2,snapshot);
+            var oldContext=first.deepCopy();oldContext.remove(List.of("items","snapshot","nextOffset"));oldContext.put("generation",vault.generation());
+            assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(2,2,etag(oldContext))).status);
+            assertEquals("DAY",second.path("items").get(0).path("kind").asText());assertEquals("WEEK",second.path("items").get(1).path("kind").asText());
+            assertEquals("Private/Journal/2026-11-05.md",second.path("items").get(0).path("path").asText());
+            var third=recent.page(4,2,snapshot);assertEquals("Private/Journal/Private.md",third.path("items").get(0).path("path").asText());assertEquals("Notes/A.md",third.path("items").get(1).path("path").asText());
+            var last=recent.page(6,2,snapshot);assertEquals(2,last.path("items").size());assertEquals("Notes/B.md",last.path("items").get(0).path("path").asText());assertEquals("Notes/Boundary.md",last.path("items").get(1).path("path").asText());assertFalse(last.has("nextOffset"));
             assertEquals(428,assertThrows(ApiFailure.class,()->recent.page(2,2,null)).status);
             vault.put(new VaultPath("Notes/New.md"),null,true,bytes("new"));assertEquals(412,assertThrows(ApiFailure.class,()->recent.page(2,2,snapshot)).status);return null;
         });
@@ -85,7 +90,7 @@ class RecentNotesTest {
         var saved=given().header("Authorization","Bearer test-b").header("If-Match",initialSettings.header("ETag")).contentType("application/json").body("{\"editorCursor\":\"solid\"}").put("/api/v1/notes/settings");assertEquals(200,saved.statusCode());assertEquals("solid",saved.jsonPath().getString("editorCursor"));
         assertEquals(412,given().header("Authorization","Bearer test-b").header("If-Match",initialSettings.header("ETag")).contentType("application/json").body("{\"editorCursor\":\"line\"}").put("/api/v1/notes/settings").statusCode());
     }
-    @Test void preCollectionEventNotesAreBackfilledWhileJournalOnlyAccountsStayUnmaterialized(){
+    @Test void preCollectionEventAndJournalNotesAreBackfilledForRecentNotes(){
         clock.set(Instant.parse("2026-11-05T10:00:00Z"));
         store.transaction("recent-legacy-events",()->{
             var key=new EventNotes.Key(UUID.randomUUID(),"cd".repeat(32));var events=new EventNotes(store);
@@ -95,13 +100,25 @@ class RecentNotesTest {
         });
         store.transaction("recent-legacy-journal",()->{
             var notes=new DayNotes(store);var day=DayNotes.date("2026-11-05");notes.saveDocument(day,etag(notes.getContent(day)),bytes("Journal body"));
-            assertTrue(new RecentNotes(store,limits).page(0,2,null).path("items").isEmpty());assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());return null;
+            assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());
+            var recent=new RecentNotes(store,limits).page(0,2,null);inputs.validate("RecentNotesPage",recent);
+            assertEquals(1,recent.path("items").size());assertEquals("DAY",recent.path("items").get(0).path("kind").asText());
+            assertEquals("journal/2026-11-05.md",recent.path("items").get(0).path("path").asText());assertFalse(recent.toString().contains("Journal body"));return null;
+        });
+        store.transaction("recent-legacy-week",()->{
+            var notes=new WeekNotes(store);var week=WeekNotes.week("2020-W01");notes.saveDocument(week,etag(notes.get(week)),bytes("Weekly body"));
+            assertTrue(store.find(VaultState.TYPE,VaultState.ID).isEmpty());
+            var recent=new RecentNotes(store,limits).page(0,2,null);inputs.validate("RecentNotesPage",recent);
+            assertEquals(1,recent.path("items").size());assertEquals("WEEK",recent.path("items").get(0).path("kind").asText());
+            assertEquals("journal/2020-W01.md",recent.path("items").get(0).path("path").asText());assertFalse(recent.toString().contains("Weekly body"));return null;
         });
     }
     @Test void httpReadsAreOwnerPrivateAndAllowReadOnlyTokens(){
         var path="Recent-"+UUID.randomUUID()+".md";
         assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).body(bytes("# Owner only title\n\nsecret body")).put("/api/v1/notes/files").statusCode());
         var reader=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=1");assertEquals(200,reader.statusCode());assertTrue(reader.header("Cache-Control").contains("no-store"));assertEquals(path,reader.jsonPath().getString("items[0].path"));assertEquals("Owner only title",reader.jsonPath().getString("items[0].title"));assertFalse(reader.asString().contains("secret body"));inputs.validate("RecentNotesPage",parse(reader.asString()));
+        assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path","journal/2020-01-02.md").body(bytes("secret journal body")).put("/api/v1/notes/files").statusCode());
+        var journals=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=2");assertEquals(200,journals.statusCode());assertTrue(journals.jsonPath().getList("items.kind").contains("DAY"));assertFalse(journals.asString().contains("secret journal body"));inputs.validate("RecentNotesPage",parse(journals.asString()));
         assertEquals(0,given().header("Authorization","Bearer test-b").get("/api/v1/notes/recent").jsonPath().getList("items").size());
         assertEquals(401,given().get("/api/v1/notes/recent").statusCode());assertEquals(428,given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?offset=1").statusCode());
         assertEquals(422,given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=0").statusCode());

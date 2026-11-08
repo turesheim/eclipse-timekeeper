@@ -1131,6 +1131,13 @@ Titles are bounded to 4,096 characters. Clients fall back to the filename/path
 when no title is available. Title reads do not modify canonical Markdown bytes,
 filenames, note versions or write validators.
 
+`GET /notes/recent` includes ordinary, event and daily/weekly journal note metadata
+within the configured account-local recent-edit window. It excludes folders,
+attachments and trash. Results use stable edit-time ordering and guarded snapshot
+pagination; upgrading the selection policy also invalidates an older snapshot.
+An unused account stays uninitialized; existing canonical event/journal notes
+are indexed on the first recent-list read when needed.
+
 `GET /notes/storage` requires read permission and returns owner-private logical
 usage without initializing an unused collection. It includes effective `limits`,
 `usage` (`bytes`, `entries`, `files`, `folders`), six `categories` (`NOTES`, `DAY`,
