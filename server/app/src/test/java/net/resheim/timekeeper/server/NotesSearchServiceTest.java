@@ -23,7 +23,7 @@ class NotesSearchServiceTest {
     private UUID create(String owner,String text){return store.transaction(owner,()->{var vault=new VaultCollection(store,limits);vault.initialize();new NotesSearchChanges(store).snapshot();return VaultCollection.id(vault.put(new VaultPath("note.md"),null,true,bytes(text)));});}
     private NotesLuceneIndex.Page waitFor(NotesSearchService service,NotesSearchSources.State state,String text)throws Exception{
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);IOException last=null;
-        do{try{return service.search(state,NotesSearchQuery.parse(text),50,null,500);}catch(NotesLuceneIndex.Unavailable unavailable){last=unavailable;Thread.sleep(10);}}while(System.nanoTime()<deadline);
+        do{try{return service.search(state,NotesSearchQuery.parse(text),50,null,500);}catch(IOException unavailable){last=unavailable;Thread.sleep(10);}}while(System.nanoTime()<deadline);
         throw new AssertionError("Search cache did not become ready",last);
     }
     @Test void independentReplicasCatchUpAfterSavesAndKeepOwnerResultsPrivate()throws Exception{
@@ -71,6 +71,27 @@ class NotesSearchServiceTest {
             store.transaction(owner,()->{var vault=new VaultCollection(store,limits);var entry=vault.get(id);vault.put(VaultCollection.path(entry),vault.tag(entry),false,bytes("saved despite full cache"));return null;});
             service.minimumFreeBytes=0;var changed=sources().state(owner);service.rebuild(changed);
             assertEquals(1,waitFor(service,changed,"saved").items().size());
+        }
+    }
+    @Test void aLockedIndexIsNotDeletedAndSearchRecoversAfterItsWriterCloses()throws Exception{
+        String owner="search-runtime-writer-lock";create(owner,"needle protected");var state=sources().state(owner);Path cache=temporary.resolve("writer-lock");
+        try(var initial=new NotesSearchService(store,cache)){assertEquals(1,waitFor(initial,state,"needle").items().size());}
+        Path index;try(var files=Files.walk(cache)){index=files.filter(path->path.getFileName().toString().startsWith("index-")).findFirst().orElseThrow();}
+        try(var writer=new NotesLuceneIndex(index,state.identity());var service=new NotesSearchService(store,cache)){
+            service.status(state);long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+            while(service.status(state).error()==null&&System.nanoTime()<deadline)Thread.sleep(10);
+            assertEquals("CACHE_UNAVAILABLE",service.status(state).error());assertTrue(Files.isDirectory(index));
+            try(var files=Files.list(index)){assertTrue(files.anyMatch(path->path.getFileName().toString().startsWith("segments_")));}
+            writer.close();service.rebuild(state);assertEquals(1,waitFor(service,state,"needle").items().size());
+        }
+    }
+    @Test void repeatedOwnerEvictionKeepsEachAccountsCacheReadable()throws Exception{
+        var states=new ArrayList<NotesSearchSources.State>();var ids=new ArrayList<UUID>();
+        for(int i=0;i<4;i++){String owner="search-runtime-eviction-"+i;ids.add(create(owner,"needle "+i));states.add(sources().state(owner));}
+        try(var service=new NotesSearchService(store,temporary.resolve("eviction"))){
+            service.maximumOwners=1;
+            for(int round=0;round<12;round++)for(var state:states)service.status(state);
+            for(int i=0;i<states.size();i++)assertEquals(ids.get(i),waitFor(service,states.get(i),"needle").items().getFirst().id());
         }
     }
     @Test void deletedOwnersArePurgedAndCachePermissionsArePrivate()throws Exception{

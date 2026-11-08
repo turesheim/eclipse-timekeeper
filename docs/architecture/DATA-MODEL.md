@@ -691,6 +691,18 @@ Logical account archives and portable Notes ZIP metadata preserve available
 creation and modification dates. Clients can sort complete metadata listings
 without reading document bodies.
 
+`NOTES_SEARCH` stores an owner-scoped search epoch, committed generation and
+retained-history floor. `NOTES_SEARCH_LOG` stores at most 8,192 content-free
+changed-entry/deletion/scope records, written in the same SQL transaction as
+canonical mutations. Each replica independently replays those records into its
+private Lucene cache. Cache commits retain identity and the applied watermark;
+backfill copies canonical data in short repeatable-read snapshots and parses it
+after releasing SQL connections. Final API publication rechecks current SQL
+identity, generation, authorization and canonical source versions. Logical account
+restore resets the search epoch, while instance restore also fences caches by
+its restore generation. Search rows are derived synchronization data, excluded
+from portable account exports; SQL backups include the state needed for recovery.
+
 `VAULT_CONTENT` holds exact general-file bytes, checksum, size and content version.
 DAY_NOTE, WEEK_NOTE, EVENT_NOTE and JOURNAL_ASSET remain the sole live sources for
 typed entries. `VAULT_RECYCLE` retains deleted legacy bytes, associated with the

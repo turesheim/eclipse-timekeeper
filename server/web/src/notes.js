@@ -175,7 +175,7 @@ export class NotesView {
     this.newNote.disabled=this.newFolder.disabled=!write||!!this.showTrash;this.retrySave.hidden=!this.saveFailed||!this.note||this.note.deleted;this.retrySave.textContent=t(this.uncertain?'journal.check_result':'journal.retry_save');this.retrySave.disabled=!!this.busy||!!this.saving||!this.writable||this.stale&&!this.uncertain;
     this.rename.disabled=this.remove.disabled=!write||this.saving||!this.note||this.note.deleted;this.recover.hidden=!this.note?.deleted;this.recover.disabled=!write;
     this.reloadNote.disabled=!this.note||this.busy||this.saving;this.apply.disabled=this.cancel.disabled=!!this.busy;
-    this.searchLabel.textContent=t(this.searchMode.value==='content'&&!this.showTrash?'notes.search_content':'notes.search');this.searchMode.disabled=!this.session||this.busy||this.showTrash;this.searchMore.disabled=this.searchRetry.disabled=this.searchRebuild.disabled=!!this.loading||this.busy;this.sortButton.disabled=!this.session||this.busy||this.contentResults;
+    this.searchLabel.textContent=t(this.searchMode.value==='content'&&!this.showTrash?'notes.search_content':'notes.search');this.searchMode.disabled=!this.session||this.busy||this.showTrash;this.searchMore.disabled=this.searchRetry.disabled=this.searchRebuild.disabled=!!this.loading||this.busy;this.sortButton.disabled=!this.session||this.busy||this.contentSearch();
     this.collapseAll.disabled=!this.session||!this.info||this.busy||this.showTrash||!!this.search.value.trim();
     this.expandAll.disabled=this.collapseAll.disabled||this.expandAllRequested;
     this.download.hidden=!this.note||this.note.kind!=='BINARY'&&this.note.kind!=='ASSET'||this.note.deleted;this.download.disabled=!!this.busy;
@@ -263,7 +263,7 @@ export class NotesView {
       const excerpt=this.searchExcerpts.get(entry.id);
       if(this.contentResults&&excerpt){
         pick.append(node('span',entry.path,'notes-search-path'));
-        const text=node('span',undefined,'notes-search-excerpt');let offset=0;
+        const text=node('span',undefined,'notes-search-excerpt');text.id='notes-search-excerpt-'+entry.id;row.setAttribute('aria-describedby',text.id);pick.setAttribute('aria-describedby',text.id);let offset=0;
         for(const range of excerpt.highlights){text.append(document.createTextNode(excerpt.text.slice(offset,range.start)),node('mark',excerpt.text.slice(range.start,range.end)));offset=range.end;}
         text.append(document.createTextNode(excerpt.text.slice(offset)));pick.classList.add('notes-search-pick');pick.append(text);
       }

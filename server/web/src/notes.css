@@ -74,6 +74,6 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 
 #notes-search-mode { margin-bottom:.5rem; }
 .notes-search-pick { display:grid; grid-template-columns:auto minmax(0,1fr); }
-.notes-search-pick > .notes-search-excerpt { grid-column:1 / -1; white-space:normal; overflow-wrap:anywhere; font-size:.9em; font-weight:400; }
+.notes-search-pick > span.notes-search-excerpt { grid-column:1 / -1; white-space:normal; overflow-wrap:anywhere; font-size:.9em; font-weight:400; }
 .notes-search-excerpt mark { color:var(--bs-emphasis-color); background:var(--bs-warning-bg-subtle); padding:0; }
 .notes-search-path { grid-column:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.9em; font-weight:400; color:var(--bs-secondary-color); }

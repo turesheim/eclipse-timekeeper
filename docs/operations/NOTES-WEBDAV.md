@@ -122,6 +122,76 @@ Journal image references also resolve companions imported through vault synchron
 including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
 
+## Searching note contents
+
+The Notes navigator has explicit **Names and paths** and **Note contents** modes.
+Names and paths keeps substring matching for files and folders, including
+attachments. An empty query returns ordinary folder navigation. Content search
+covers active ordinary Markdown, daily, weekly and event notes; it excludes
+attachments, deleted notes, old revisions and independent day labels. Hidden
+journal paths and disabled `.obsidian` configuration remain excluded.
+
+Use words (all required) or double quotes for a phrase. Search is case-insensitive,
+Unicode-aware and does not stem or fold accents. English and Norwegian text,
+link labels and code are indexed; YAML frontmatter and markup are excluded.
+Queries allow at most 512 UTF-16 code units and 32 analyzed terms. Punctuation
+acts as text separators; arbitrary Lucene query syntax is not available.
+
+Matches are ordered by relevance, with title and path matches boosted. Each
+result shows its title, path and a plain-text highlighted excerpt. **More results**
+loads the next page without reordering earlier matches. Changing a query keeps
+an open draft; opening another result uses the usual save/navigation guard.
+Changes during pagination require a fresh search rather than mixing snapshots.
+
+Content search is derived from the canonical SQL records using embedded Lucene.
+Each server replica independently replays the committed, content-free change
+log into its own private index. A search first captures the committed generation;
+if that replica cannot catch up within a short wait, it reports that search is
+being prepared or unavailable. File browsing and canonical saves remain usable.
+The next successful search validates that its indexed source versions are current.
+Do not treat an indexing response as a complete empty result.
+
+### Search cache and recovery
+
+`TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY` defaults to `AUTO`: a private
+`timekeeper-notes-search-*` directory in the JVM temporary directory. A clean
+shutdown removes an automatic cache; a restart rebuilds it from SQL. Abruptly
+terminated processes can leave temporary directories for the operator or OS
+temporary-file cleanup to remove. Only remove directories from stopped instances.
+For persistent reuse, choose a dedicated local directory owned by the server
+account. Each replica requires a different writable directory; a shared directory
+is refused. Keep these derived files outside backup/export storage and include
+only the canonical database in the backup plan. Restore works without any index.
+
+The defaults are eight open account caches, two concurrent searches, a 16 GB soft
+aggregate disk limit within the configured cache root and 1 GiB free-space
+headroom. Configure them with `TIMEKEEPER_NOTES_SEARCH_OPEN_OWNERS` (1–32),
+`TIMEKEEPER_NOTES_SEARCH_MAX_CACHE_BYTES` and
+`TIMEKEEPER_NOTES_SEARCH_MIN_FREE_BYTES`. Disk usage is measured every two seconds;
+bounded in-flight work and Lucene merges can exceed the soft limit. Inactive
+account caches are reclaimed when the limit is reached. Idle handles close after
+ten minutes. The worker processes at most 32 records or about 8 MB per replay
+batch, stopping between records after its 100 ms work budget. A single supported
+Markdown file and a commit/merge can extend a batch beyond those soft budgets.
+Canonical transactions never wait for parsing or index commits.
+
+`GET /api/v1/notes/search/status` reports this replica's ready/indexing/unavailable
+state, applied and target generations and any safe failure category.
+`POST /api/v1/notes/search/rebuild` requires write permission and schedules a
+private rebuild for this account on this replica. The content-search UI offers
+**Search again** and **Rebuild search** when unavailable. Missing, incompatible,
+corrupt or expired caches rebuild automatically; collection and instance-restore
+identities fence old contents. Removed SQL owners are purged during maintenance.
+Cache failure, disk pressure or a busy writer produces an unavailable response
+without changing canonical notes. The cache uses private directory/file permissions.
+
+Search pages contain at most 50 results by default, capped at 200. Excerpts contain
+at most 320 UTF-16 code units and 64 highlight ranges. Signed snapshot/cursor tokens
+last ten minutes and bind the account, query, visibility, collection, restore
+identity and content generation. A changed snapshot returns 412; retryable indexing
+or cache failure returns 503. Continuation uses logical relevance/path/entry-ID
+positions, allowing another caught-up replica to continue without local document IDs.
+
 ## Connection and folder choices
 
 Create a dedicated read/write API token under **My Account**. Use any nonempty

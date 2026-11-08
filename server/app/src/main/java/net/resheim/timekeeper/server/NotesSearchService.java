@@ -24,6 +24,7 @@ class NotesSearchService implements AutoCloseable {
     private static final org.jboss.logging.Logger LOG=org.jboss.logging.Logger.getLogger(NotesSearchService.class);
     private final LinkedHashMap<String,Handle> handles=new LinkedHashMap<>(16,.75f,true);
     private final ArrayDeque<Handle> closing=new ArrayDeque<>();
+    private final Set<String> closingOwners=new HashSet<>();
     private final Semaphore queries=new Semaphore(2);
     private Path root;
     private boolean temporary,closed;
@@ -50,7 +51,12 @@ class NotesSearchService implements AutoCloseable {
         if(maximumOwners<1||maximumOwners>32||maximumBytes<1||minimumFreeBytes<0)throw new IOException("Invalid search cache owner limit");
         try{
         temporary=configuredDirectory.equals("AUTO");root=temporary?Files.createTempDirectory("timekeeper-notes-search-"):Path.of(configuredDirectory).toAbsolutePath().normalize();
-        NotesLuceneIndex.privateDirectory(root);Path marker=root.resolve(".format");
+        Path marker=root.resolve(".format");
+        if(Files.exists(root,LinkOption.NOFOLLOW_LINKS)){
+            if(!Files.isDirectory(root,LinkOption.NOFOLLOW_LINKS))throw new IOException("Invalid Notes search cache root");
+            if(!Files.exists(marker,LinkOption.NOFOLLOW_LINKS))try(var files=Files.list(root)){if(files.findAny().isPresent())throw new IOException("Notes search requires a dedicated cache directory");}
+        }
+        NotesLuceneIndex.privateDirectory(root);
         if(Files.exists(marker,LinkOption.NOFOLLOW_LINKS)){
             if(Files.isSymbolicLink(marker)||Files.size(marker)>256||!Files.readString(marker).equals(MARKER))throw new IOException("Invalid Notes search cache root");
         }else{
@@ -70,9 +76,9 @@ class NotesSearchService implements AutoCloseable {
         }
     }
     private synchronized Handle prepare(NotesSearchSources.State state)throws IOException{
-        initialize();String owner=state.identity().owner();var existing=handles.get(owner);if(existing!=null){existing.touched=System.nanoTime();return existing;}
+        initialize();String owner=state.identity().owner();if(closingOwners.contains(owner))throw new IOException("Notes search cache is busy");var existing=handles.get(owner);if(existing!=null){existing.touched=System.nanoTime();var current=existing.current;if(current==null||!current.caughtUp(state))existing.nextPoll=0;return existing;}
         if(handles.size()>=maximumOwners){
-            if(closing.size()>=4)throw new IOException("Notes search cache is busy");var iterator=handles.values().iterator();var evicted=iterator.next();iterator.remove();evicted.removed=true;closing.add(evicted);
+            if(closing.size()>=4)throw new IOException("Notes search cache is busy");var iterator=handles.values().iterator();var evicted=iterator.next();iterator.remove();evicted.removed=true;closingOwners.add(evicted.owner);closing.add(evicted);
         }
         var handle=new Handle(owner,root.resolve(ownerKey(owner)));handles.put(owner,handle);return handle;
     }
@@ -81,7 +87,7 @@ class NotesSearchService implements AutoCloseable {
             return new Status(!handle.broken&&current!=null&&current.caughtUp(state)?"READY":handle.error==null?"INDEXING":"UNAVAILABLE",saved==null?0:saved.generation(),state.changes().generation(),handle.rebuild||handle.building!=null,handle.error);
         }catch(IOException|RuntimeException unavailable){return new Status("UNAVAILABLE",0,state.changes().generation(),false,"CACHE_UNAVAILABLE");}
     }
-    void rebuild(NotesSearchSources.State state)throws IOException{var handle=prepare(state);handle.rebuild=true;handle.retryAfter=0;}
+    void rebuild(NotesSearchSources.State state)throws IOException{var handle=prepare(state);handle.rebuild=true;handle.retryAfter=0;handle.nextPoll=0;}
     NotesLuceneIndex.Page search(NotesSearchSources.State state,NotesSearchQuery.Parsed query,int limit,NotesLuceneIndex.Position after,long waitMillis)throws IOException{
         if(waitMillis<0||waitMillis>1000)throw new IllegalArgumentException("Invalid search wait budget");var handle=prepare(state);long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(waitMillis);
         do{
@@ -102,7 +108,7 @@ class NotesSearchService implements AutoCloseable {
         try{
             Handle selected,retired;List<Handle> snapshot;
             synchronized(this){if(closed)return;retired=closing.poll();snapshot=List.copyOf(handles.values());selected=snapshot.isEmpty()?null:snapshot.get(Math.floorMod(rotation++,snapshot.size()));}
-            if(retired!=null)closeHandle(retired,false);
+            if(retired!=null)try{closeHandle(retired,false);}finally{synchronized(this){closingOwners.remove(retired.owner);}}
             if(System.nanoTime()>=sweepAt){sweepAt=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);sweep();}
             if(selected!=null&&!selected.removed){
                 long now=System.nanoTime();
@@ -164,7 +170,7 @@ class NotesSearchService implements AutoCloseable {
         List<Path> folders;try(var entries=Files.list(handle.folder)){folders=entries.filter(path->path.getFileName().toString().matches("index-[0-9a-f-]{36}")).sorted().toList();}
         for(var path:folders){
             NotesSearchReplay replay;
-            try{replay=NotesSearchReplay.open(path,sources,state);}catch(IOException|RuntimeException corrupt){remove(path);continue;}
+            try{replay=NotesSearchReplay.open(path,sources,state);}catch(org.apache.lucene.store.LockObtainFailedException busy){throw busy;}catch(IOException|RuntimeException corrupt){remove(path);continue;}
             var saved=replay.index().watermark();boolean ready=saved.ready()&&saved.generation()<=state.changes().generation();
             var previous=ready?handle.current:handle.building;
             if(previous==null||saved.generation()>=previous.index().watermark().generation()){
@@ -181,7 +187,7 @@ class NotesSearchService implements AutoCloseable {
         Set<Path> active;synchronized(this){active=new HashSet<>();handles.values().forEach(handle->active.add(handle.folder));}
         try(var folders=Files.list(root)){for(var folder:folders.toList())if(folder.getFileName().toString().matches("[0-9a-f]{64}")&&!allowed.contains(folder.getFileName().toString())&&!active.contains(folder))remove(folder);}
     }
-    private void retire(Handle handle,boolean purge){synchronized(this){if(handles.get(handle.owner)==handle)handles.remove(handle.owner);handle.removed=true;}try{closeHandle(handle,purge);}catch(IOException failure){LOG.warn("Notes search cache cleanup unavailable");}}
+    private void retire(Handle handle,boolean purge){synchronized(this){if(handles.get(handle.owner)==handle)handles.remove(handle.owner);handle.removed=true;closingOwners.add(handle.owner);}try{closeHandle(handle,purge);}catch(IOException failure){LOG.warn("Notes search cache cleanup unavailable");}finally{synchronized(this){closingOwners.remove(handle.owner);}}}
     private static void closeHandle(Handle handle,boolean purge)throws IOException{
         IOException failure=null;
         try{if(handle.current!=null)handle.current.close();}catch(IOException problem){failure=problem;}
