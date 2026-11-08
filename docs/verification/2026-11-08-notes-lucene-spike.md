@@ -72,7 +72,7 @@ needs space for the canonical SQL fixture and the derived index. Metrics are
 written to `server/app/target/lucene-spike-metrics.json`. PostgreSQL scenarios
 require the named test fixture variables and are skipped when unconfigured.
 
-Production work still includes durable application mutation tracking, bounded
-catch-up/backfill and excerpts, local-cache lifecycle/restore fencing, the
-restricted query grammar, current-source permission revalidation, API/UI
-pagination, and failure/recovery acceptance.
+This engine-only spike did not establish production mutation tracking, bounded
+replay, authorization or restore correctness. Subsequent end-to-end capacity
+measurements are recorded in [the pipeline report](2026-11-08-notes-search-pipeline.md);
+normal quality and runtime acceptance cover the application behavior separately.
