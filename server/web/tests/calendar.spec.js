@@ -236,7 +236,7 @@ test('calendar shows seven days and editable work sessions while keeping activit
     expect(await page.locator('.calendar-scroll').evaluate(value=>value.scrollWidth>value.clientWidth)).toBeTruthy();
     await captureScreenshot(page,{path:'test-results/calendar-mobile.png',fullPage:true});
     await page.locator('[data-tab=activities]').click();await expect(page.locator('#activities').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true}).first()).toHaveAttribute('href',f.url);for(const activity of f.activities)await expect(page.locator(`#activities [data-activity-id="${activity.id}"]`)).toContainText(activity.summary);
-    await expect(page.locator('[data-tab=tasks],#tasks-panel')).toHaveCount(0);
+    await expect(page.locator('[data-tab=tasks]')).toBeVisible();await expect(page.locator('#tasks-panel')).toBeHidden();
     await page.locator('[data-tab=calendar]').click();
     await page.locator('#calendar-next').click();await expect(page.locator('#calendar-zone')).toContainText('2025-10-27');
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(1);
