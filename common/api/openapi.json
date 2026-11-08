@@ -18320,6 +18320,217 @@
         "description": "Read-only owned catalog of task definitions and detached instances, including undated and completed tasks. No upstream fetch or native task writes. Pagination is signed and owner/revision/source-snapshot bound; subsequent cursor requests require If-Match with the returned snapshot/ETag. A changed feed, configuration or account zone returns 412; an account revision change returns 409 CURSOR_EXPIRED. Per-subscription errors preserve unrelated sources."
       }
     },
+    "/notes/search": {
+      "get": {
+        "operationId": "searchNotes",
+        "summary": "Search note titles, paths and Markdown content",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          },
+          "200": {
+            "description": "Owner-private search operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesSearchPage"
+                }
+              }
+            }
+          }
+        },
+        "description": "Words are required across title, path and body; double quotes form phrases. No wildcard or Lucene query syntax is interpreted. Results exclude deleted entries and hidden/configuration paths before paging. Excerpts are plain text; highlight start/end offsets use UTF-16 code units. Relevance order is server-defined with stable portable-path and entry-ID ties. Signed snapshot and continuation tokens expire after ten minutes and bind the account, query, visibility, collection, restore epoch and committed search generation. A stale token returns 412. An unavailable or catching-up replica returns 503 instead of stale results. Responses are private, no-store."
+      }
+    },
+    "/notes/search/status": {
+      "get": {
+        "operationId": "getNotesSearchStatus",
+        "summary": "Read this replica’s search readiness",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          },
+          "200": {
+            "description": "Owner-private search operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesSearchStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/search/rebuild": {
+      "post": {
+        "operationId": "rebuildNotesSearch",
+        "summary": "Rebuild this account’s private search cache on this replica",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          },
+          "202": {
+            "description": "Owner-private search operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesSearchStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/notes/entries/{id}/import": {
       "put": {
         "operationId": "importNoteBytes",
@@ -33686,6 +33897,129 @@
           "errors"
         ],
         "additionalProperties": false
+      },
+      "NotesSearchExcerpt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "highlights"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 320
+          },
+          "highlights": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 320
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 320
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotesSearchHit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entry",
+          "excerpt"
+        ],
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/VaultEntry"
+          },
+          "excerpt": {
+            "$ref": "#/components/schemas/NotesSearchExcerpt"
+          }
+        }
+      },
+      "NotesSearchPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "snapshot",
+          "items"
+        ],
+        "properties": {
+          "snapshot": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/NotesSearchHit"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      },
+      "NotesSearchStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "generation",
+          "target",
+          "rebuilding",
+          "error"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "INDEXING",
+              "UNAVAILABLE"
+            ]
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "target": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rebuilding": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "CACHE_UNAVAILABLE",
+              "SOURCE_UNAVAILABLE",
+              "CACHE_CAPACITY",
+              null
+            ]
+          }
+        }
       }
     },
     "parameters": {

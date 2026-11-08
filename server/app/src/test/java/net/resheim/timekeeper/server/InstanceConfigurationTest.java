@@ -71,6 +71,20 @@ class InstanceConfigurationTest {
         assertEquals(1,snapshot.files().size());assertArrayEquals(Files.readAllBytes(external),snapshot.files().values().iterator().next());
         assertEquals("private configuration encryption key",snapshot.document().path("properties").path("smallrye.config.secret-handler.aes-gcm-nopadding.encryption-key").asText());
     }
+    @Test void derivedNotesSearchCacheIsMetadataRatherThanRecoverableInput() throws Exception {
+        Path cache=Files.createDirectory(directory.resolve("private-search-cache"));Files.writeString(cache.resolve("stored-text"),"sensitive derived note text");
+        var properties=base();properties.put("timekeeper.notes.search.cache-directory","${TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY:AUTO}");
+        var environment=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY",cache.toString()),300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment).build();
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertTrue(snapshot.files().isEmpty());assertTrue(snapshot.document().path("files").isEmpty());
+            assertEquals(cache.toString(),snapshot.document().path("properties").path("timekeeper.notes.search.cache-directory").asText());
+            assertFalse(snapshot.document().path("properties").has("timekeeper.notes.search.cache.directory"));
+        }
+        // A missing derived cache must not prevent a database-only recovery.
+        properties.put("timekeeper.notes.search.cache-directory",directory.resolve("missing-cache").toString());
+        try(var snapshot=InstanceConfiguration.capture(properties,Map.of())){assertTrue(snapshot.files().isEmpty());}
+    }
     @Test void newlyDeclaredApplicationInputsMustHaveBackupCoverage() throws Exception {
         var declaration=java.util.regex.Pattern.compile("@(?:org\\.eclipse\\.microprofile\\.config\\.inject\\.)?ConfigProperty\\([^;]*?name\\s*=\\s*\"([^\"]+)\"");int found=0;
         try(var files=Files.walk(Path.of("src/main/java/net/resheim/timekeeper/server"))) {

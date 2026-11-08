@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Installation:
-    def __init__(self, folder, image, identity):
+    def __init__(self, folder, image, identity, notes_search=False):
         self.folder = folder; self.folder.mkdir()
         self.project = 'timekeeper-instance-' + secrets.token_hex(5)
         self.origin = 'https://localhost:' + ('18443' if identity == 'timekeeper' else '19443')
@@ -42,6 +42,8 @@ class Installation:
         package(archive, subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip())
         with tarfile.open(archive) as source:
             source.extractall(folder, filter='data')
+        if notes_search:
+            (folder / 'compose.override.yaml').write_text('services:\n  api-1:\n    environment:\n      TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY: /instance/notes-search-api-1\n  api-2:\n    environment:\n      TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY: /instance/notes-search-api-2\n')
         (folder / '.env').write_text('TIMEKEEPER_STATE_DIR=' + str(self.state) + '\nTIMEKEEPER_SERVER_IMAGE=' + image
             + '\nTIMEKEEPER_PACKAGE_ID=' + identity + '\nTIMEKEEPER_PUBLIC_ORIGIN=' + self.origin
             + '\nTIMEKEEPER_HTTP_PORT=' + str(port) + '\n')
@@ -91,25 +93,28 @@ class Installation:
         shutil.rmtree(self.folder)
 
 
-def restore_api(destination, archive):
+def restore_api(destination, archive, *, password=DESTINATION_PASSWORD, initialize=True):
     api = destination.api()
     api.call('GET', '/auth/status')
-    api.call('POST', '/auth/setup', {'code': destination.code, 'username': 'destination-admin', 'password': DESTINATION_PASSWORD,
-                                  'displayName': 'Disposable destination administrator', 'email': 'destination@example.org'})
-    operation = api.call('POST', '/admin/instance/uploads', {'currentPassword': DESTINATION_PASSWORD,
+    if initialize:
+        api.call('POST', '/auth/setup', {'code': destination.code, 'username': 'destination-admin', 'password': password,
+                                      'displayName': 'Disposable destination administrator', 'email': 'destination@example.org'})
+    else:
+        api.login('original-admin', password)
+    operation = api.call('POST', '/admin/instance/uploads', {'currentPassword': password,
         'bytes': len(archive), 'sha256': hashlib.sha256(archive).hexdigest()})['operation']['id']
     path = '/admin/instance/uploads/' + operation
     for offset in range(0, len(archive), 1048576):
         api.call('PUT', path + '/content?offset=' + str(offset), archive[offset:offset + 1048576])
-    api.call('POST', path + '/validate', {'currentPassword': DESTINATION_PASSWORD, 'passphrase': PASSPHRASE})
+    api.call('POST', path + '/validate', {'currentPassword': password, 'passphrase': PASSPHRASE})
     api.until(path, lambda value: value['operation']['state'] == 'REVIEW')
     stage = api.call('GET', path + '/staging')
-    api.call('POST', path + '/staging', {'currentPassword': DESTINATION_PASSWORD, 'passphrase': PASSPHRASE,
+    api.call('POST', path + '/staging', {'currentPassword': password, 'passphrase': PASSPHRASE,
         'operationVersion': stage['operationVersion'], 'publicOrigin': destination.origin, 'passkeyRpId': 'AUTO', 'passkeysEnabled': True})
     stage = api.until(path + '/staging', lambda value: value['phase'] == 'READY')
     if stage['target']['packageId'] != destination.identity:
         raise RuntimeError('Compose restore did not review its actual package identity')
-    api.call('POST', path + '/confirm', {'currentPassword': DESTINATION_PASSWORD, 'operationVersion': stage['operationVersion'],
+    api.call('POST', path + '/confirm', {'currentPassword': password, 'operationVersion': stage['operationVersion'],
         'generation': stage['generation'], 'confirmation': 'RESTORE ' + destination.identity})
     api.call('GET', '/clients', expected=(503,))
     destination.backup(expected=1)  # Pending consent cannot enter maintenance archives.
@@ -117,10 +122,57 @@ def restore_api(destination, archive):
     api.call('GET', '/clients', expected=(401,))
 
 
+def search_ready(api, query):
+    from urllib.parse import urlencode
+    deadline=time.monotonic()+90
+    while True:
+        value,headers=api.request('GET','/notes/search?'+urlencode({'q':query}),expected=(200,503))
+        if isinstance(value,bytes):value=json.loads(value)
+        if 'items' in value:
+            if headers.get('Cache-Control')!='private, no-store':raise RuntimeError('Restored search response is cacheable')
+            return value
+        if time.monotonic()>deadline:raise RuntimeError('Restored Notes search did not become ready')
+        time.sleep(.1)
+
+
+def retain_search_cache(source, destination, api, note):
+    for sequence in range(8):
+        note=api.call('PUT','/notes/entries/'+note['id']+'/content',('# Restore fixture\n\nfuturecacheword '+str(sequence)).encode(),headers={'If-Match':note['etag']})
+    if len(search_ready(api,'futurecacheword')['items'])!=1:raise RuntimeError('Pre-restore cache did not contain the later source')
+    cached_target=api.call('GET','/notes/search/status')['target'];cached_version=note['contentVersion']
+    # Copy a stopped, committed replica cache into the otherwise empty target.
+    # Public restore intentionally requires an empty destination database.
+    source.stop();cache=destination.folder/'old-search-cache'
+    source.run('docker','cp',source.compose('ps','-a','-q','api-1')+':/instance/notes-search-api-1',str(cache))
+    with tempfile.TemporaryFile() as transfer:
+        with tarfile.open(fileobj=transfer,mode='w') as archive:archive.add(cache,arcname='notes-search-api-1')
+        transfer.seek(0)
+        installed=subprocess.run(['docker','exec','-i','--user','10001:10001',destination.compose('ps','-q','api-1'),'tar','-xf','-','--no-same-owner','-C','/instance'],stdin=transfer,capture_output=True,timeout=90)
+        if installed.returncode:raise RuntimeError('Could not install the private committed search-cache fixture')
+    source.start()
+    return cached_target,cached_version
+
+
+def verify_search_restore(destination, restored, note, cached):
+    if not destination.compose('exec','-T','api-1','find','/instance/notes-search-api-1','-name','segments_*','-print'):
+        raise RuntimeError('Restore fixture did not retain an old local search cache')
+    note=restored.call('GET','/notes/entries/'+note['id'])
+    for sequence in range(8):
+        note=restored.call('PUT','/notes/entries/'+note['id']+'/content',('# Restore fixture\n\nfreshrestoredword '+str(sequence)).encode(),headers={'If-Match':note['etag']})
+    owner=note['ownerId'].replace("'","''")
+    target=int(destination.sql("SELECT payload::jsonb->>'generation' FROM tk_resource WHERE owner_id='"+owner+"' AND entity_type='NOTES_SEARCH'"))
+    if target!=cached[0] or note['contentVersion']!=cached[1]:raise RuntimeError('Restore fixture did not exercise reused versions/generations')
+    matches=search_ready(restored,'freshrestoredword')['items']
+    if len(matches)!=1 or matches[0]['entry']['id']!=note['id'] or search_ready(restored,'futurecacheword')['items']:
+        raise RuntimeError('Old search cache survived full-instance restore without canonical rebuild')
+    print('Full-instance restore fenced an old local cache with reused content/search generations',flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image', default='timekeeper-server:test')
     parser.add_argument('--expected-commit')
+    parser.add_argument('--notes-search',action='store_true',help='Verify retained Notes cache after a full-instance restore')
     parser.add_argument('--output', type=Path, default=ROOT / 'server/target/acceptance/instance-compose.json')
     args = parser.parse_args()
     args.output.unlink(missing_ok=True)
@@ -128,16 +180,21 @@ def main():
         source = destination = None
         try:
             folder = Path(temporary)
-            source = Installation(folder / 'source', args.server_image, 'timekeeper'); source.start()
+            source = Installation(folder / 'source', args.server_image, 'timekeeper', notes_search=args.notes_search); source.start()
             original, expected = seed(source)
             information = original.call('GET', '/server')
             if args.expected_commit and information['commit'] != args.expected_commit:
                 raise RuntimeError('Compose acceptance image does not match requested source commit')
+            search_note=None
+            if args.notes_search:
+                original.call('GET','/notes');search_note=original.call('PUT','/notes/files?path=Restore-search.md',b'# Restore fixture\n\noldrestoretext',headers={'If-None-Match':'*'});search_ready(original,'oldrestoretext')
             archive = export(original)
             print('Administrator exported healthy Compose source', flush=True)
-            destination = Installation(folder / 'destination', args.server_image, 'dagsverk'); destination.start()
+            destination = Installation(folder / 'destination', args.server_image, 'dagsverk', notes_search=args.notes_search); destination.start()
+            cached=retain_search_cache(source,destination,original,search_note) if args.notes_search else None
             restore_api(destination, archive)
             restored = verify_data(destination, expected)
+            if args.notes_search:verify_search_restore(destination,restored,search_note,cached)
             print('Public Compose restore preserved account access, data and attachments', flush=True)
             backup = Path(destination.backup())
             if not (backup / 'instance-material.tar').is_file():
@@ -195,7 +252,7 @@ def main():
             receipt = {'sourceCommit': information['commit'], 'publicAdministratorRestore': True, 'twoAccountsAndOwnerIsolation': True,
                 'dataIdsVersionsAndRelationships': True, 'journalsAndAttachmentBytes': True, 'pendingRestoreBackupRefused': True,
                 'materialLossBackupRefused': True, 'maintenanceMaterialRecovery': True, 'concurrentMaintenanceRefused': True, 'pendingMaintenanceBackupRefused': True, 'interruptedMaintenanceRestartRefused': True, 'strippedMaterialSqlRolledBack': True,
-                'completeBackupRetry': True, 'sourceApplicationUnchanged': True}
+                'completeBackupRetry': True, 'sourceApplicationUnchanged': not args.notes_search, 'sourceExpectedDataPreserved': True, 'notesSearchRestoreFence': args.notes_search}
             args.output.write_text(json.dumps(receipt, indent=2) + '\n')
             print(json.dumps(receipt, indent=2))
         finally:

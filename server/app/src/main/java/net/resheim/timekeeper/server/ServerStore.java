@@ -41,6 +41,13 @@ public class ServerStore {
     @Inject ServerInfo serverInfo;
     @Inject VaultLimits vaultLimits;
     VaultLimits vaultLimits(){return vaultLimits;}
+    String restoreGeneration(){return restoreFence.generation();}
+    Set<String> notesSearchOwners(){
+        var owners=new HashSet<String>();
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection);var query=connection.createStatement();var rows=query.executeQuery("SELECT id FROM tk_owner")){
+            while(rows.next())owners.add(rows.getString(1));return Set.copyOf(owners);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     private Connection h2SchemaSession;
@@ -51,7 +58,7 @@ public class ServerStore {
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
-    record Context(String owner, Connection connection, Instant now) { }
+    record Context(String owner, Connection connection, Instant now, boolean readOnly) { }
     Connection currentConnection(){var current=context.get();return current==null?null:current.connection();}
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
@@ -144,6 +151,7 @@ public class ServerStore {
         Context existing = context.get();
         if (existing != null) {
             if (!existing.owner().equals(owner)) throw new IllegalStateException("Cross-owner nested transaction");
+            if(existing.readOnly())throw new IllegalStateException("Cannot write inside a read snapshot");
             return work.get();
         }
         long started=System.nanoTime(),acquired=0,locked=0,worked=0;String phase="pool",outcome="failed";
@@ -163,7 +171,7 @@ public class ServerStore {
                     lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
                 }
                 locked=System.nanoTime();phase="work";
-                context.set(new Context(owner,connection,clock.now()));
+                context.set(new Context(owner,connection,clock.now(),false));
                 AccountStore.ensureAccount(connection,owner);
                 try(var initialized=statement("SELECT initialized FROM tk_account WHERE owner_id=?",owner);var rows=initialized.executeQuery()) {
                     if(!rows.next()) throw new SQLException("Missing account identity");
@@ -188,6 +196,18 @@ public class ServerStore {
                         locked==0?0:(workEnd-locked)/1_000_000,worked==0?0:(ended-worked)/1_000_000);
             }
         }
+    }
+    /** Committed canonical reads without provisioning, rollover or the owner write lock. */
+    <T> T readSnapshot(String owner,Supplier<T> work){
+        if(context.get()!=null)throw new IllegalStateException("Read snapshots must not nest inside owner transactions");
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)){
+            connection.setReadOnly(true);connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setAutoCommit(false);
+            context.set(new Context(owner,connection,clock.now(),true));
+            try{
+                try(var query=statement("SELECT id FROM tk_owner WHERE id=?",owner);var rows=query.executeQuery()){if(!rows.next())throw ApiFailure.notFound();}
+                return work.get();
+            }finally{context.remove();connection.rollback();}
+        }catch(SQLException failure){throw databaseFailure(failure);}
     }
     public <T> T authenticated(RequestIdentity identity,Supplier<T> work) {
         return transaction(identity.owner(),()->{
@@ -233,10 +253,12 @@ public class ServerStore {
     public Instant now() { return current().now(); }
     PreparedStatement statement(String sql, Object... parameters) throws SQLException {
         var statement = current().connection().prepareStatement(sql);
+        if(current().readOnly())statement.setQueryTimeout(5);
         for (int i=0;i<parameters.length;i++) statement.setObject(i+1,parameters[i]);
         return statement;
     }
     int update(String sql, Object... parameters) {
+        if(current().readOnly())throw new IllegalStateException("Cannot write inside a read snapshot");
         try (var statement = statement(sql,parameters)) { return statement.executeUpdate(); }
         catch (SQLException e) { throw databaseFailure(e); }
     }
@@ -294,6 +316,21 @@ public class ServerStore {
             if (!rows.next()) return Optional.empty(); return Optional.of(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
         } catch (SQLException e) { throw databaseFailure(e); }
     }
+    /** Revalidate a canonical source without copying its document-sized payload. */
+    long resourceVersion(String type,UUID id){
+        try(var query=statement("SELECT version FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",owner(),type,id);var rows=query.executeQuery()){
+            return rows.next()?rows.getLong(1):0;
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    List<JsonNode> resourcePage(String type,UUID after,int limit){
+        if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource page");
+        // H2 needs the constant key prefix in ORDER BY to stop at the page limit.
+        String sql="SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=?"+(after==null?"":" AND id>?")+" ORDER BY owner_id,entity_type,id FETCH FIRST "+limit+" ROWS ONLY";
+        var result=new ArrayList<JsonNode>();
+        try(var query=after==null?statement(sql,owner(),type):statement(sql,owner(),type,after);var rows=query.executeQuery()){
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     public List<JsonNode> list(String type) {
         List<JsonNode> list = new ArrayList<>();
         try (var statement = statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner(),type); var rows = statement.executeQuery()) {
@@ -313,6 +350,14 @@ public class ServerStore {
     List<JsonNode> list(String type,UUID first,UUID last) {
         var result=new ArrayList<JsonNode>();
         try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id",owner(),type,first,last);var rows=statement.executeQuery()) {
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    /** Bounded range reads use the existing owner/type/id resource primary key. */
+    List<JsonNode> list(String type,UUID first,UUID last,int limit) {
+        if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource batch");
+        var result=new ArrayList<JsonNode>();
+        try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY owner_id,entity_type,id FETCH FIRST "+limit+" ROWS ONLY",owner(),type,first,last);var rows=statement.executeQuery()){
             while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
@@ -516,6 +561,7 @@ public class ServerStore {
         if ("TASK".equals(type)) update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
         if ("ACTIVITY".equals(type)) update("DELETE FROM tk_active WHERE owner_id=? AND activity_id=?",owner(),id);
         if (update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=? AND version=?",owner(),type,id,existing.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
+        if(type.equals(VaultIndex.ENTRY))new NotesSearchChanges(this).changed(existing,null);
     }
     boolean related(String kind,String type,UUID id) {
         try (var statement = statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND kind=? AND to_type=? AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),kind,type,id); var rows = statement.executeQuery()) { return rows.next(); }
