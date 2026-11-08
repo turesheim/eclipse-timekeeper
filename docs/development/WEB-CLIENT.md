@@ -94,8 +94,8 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
-Clients and Projects. Labels are configured under **My Account → Labels**.
+`nav-link` controls. The nine views appear in this order: Today, Calendar, Week, Workweek, Activities,
+Tasks, Clients and Projects, followed by Notes. Labels are configured under **My Account → Labels**.
 
 Configure **My Account → Focus areas** with a name and a set of clients, then
 select an area in the account menu. **No focus** shows all clients and unassigned
@@ -114,6 +114,32 @@ bar and page content clear of each other. Standard action buttons use Bootstrap
 `btn` variants, including the manual status refresh and calendar actions. The
 clickable sync indicator sits immediately beside the Timekeeper title in the
 header, remains available in My Account and is hidden when signed out.
+
+## Tasks
+
+Tasks combines native Dagsverk and Eclipse/Mylyn task records with read-only
+to-dos actually published by visible calendar subscriptions with **To-do items**
+enabled. All includes completed, cancelled, undated and distant calendar tasks;
+recurrence definitions and detached instances retain their published identities.
+It does not manufacture an unbounded list of virtual occurrences.
+
+The single-column sidebar provides Today, All and Time critical, followed by
+clients and categories. Categories include task metadata, calendar categories
+and project names, preserving the Eclipse/Mylyn project/category mapping.
+Focus areas apply to native and calendar tasks. Today selects unfinished tasks
+scheduled, starting or due on the current account day. Time critical selects
+unfinished tasks overdue, due today or explicitly urgent. Civil dates retain
+their day; timed dates use the account zone. Unknown zones or ambiguous times
+that cannot be projected across zones retain their original values in details
+and show a date-review hint. No UTC instant is invented.
+
+Native tasks can be created or edited through the existing conditional editor.
+Calendar tasks remain in their source collection and cannot be edited or
+converted to worked time from Tasks. Read-only sessions retain browsing and
+details. Catalog paging restarts if a source snapshot changes, and the list
+renders 50 rows at a time with **Show more tasks**. Source refreshes every 30
+seconds while visible; session changes clear records, filters, details and
+in-flight reads. The sidebar becomes a keyboard-accessible drawer on phones.
 
 ## Shared Markdown component
 

@@ -691,6 +691,21 @@ ICS feed can be displayed. In particular, the separate task-provider APIs and
 connectors described in [the task protocol](TASK-SYNC-PROTOCOL.md) remain separate.
 
 Today, like Week, reloads subscription results every 30 seconds while visible.
+The Tasks page reads `/calendar-tasks?limit=…&cursor=…` to browse every current
+published to-do definition and detached recurrence instance, independently of
+the calendar window. This includes undated, completed, cancelled and distant
+dates. It does not generate an infinite occurrence list or create native tasks.
+Native and Eclipse/Mylyn tasks retain their existing `/tasks` records.
+Absolute calendar times retain UTC precision, including repeated local hours;
+floating times retain their account-zone wall value without an invented instant.
+The new catalog requires read permission, binds rows/cursors to the owner, and
+never returns the subscription feed URL or fetches an upstream feed during a
+read. Subsequent pages require `If-Match` with the response snapshot/ETag;
+changed source/configuration/zone snapshots return 412 and require a restart.
+Native account revision changes retain the normal `409 CURSOR_EXPIRED` behavior.
+Per-subscription errors preserve unrelated results. Calendar completion remains
+read-only; change it in the source provider.
+
 The server refreshes upstream feeds at its existing 15-minute interval. Today
 shows visible-subscription download/parse failures rather than silently treating
 a partial result as an empty calendar. Source providers can cache published ICS
