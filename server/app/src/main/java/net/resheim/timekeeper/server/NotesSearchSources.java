@@ -59,7 +59,7 @@ final class NotesSearchSources {
                 ||entry.path("contentVersion").asLong()!=hit.sourceVersion()||!entry.path("contentTag").asText().equals(hit.sourceTag())||!entry.path("sha256").asText().equals(hit.sourceHash())
                 ||store.resourceVersion(ref.type(),ref.id())!=hit.sourceVersion())throw unavailable();
         if(ref.type().equals(DayNotes.TYPE)&&dayDeleted(ref.id(),hit.sourceVersion()))throw unavailable();
-        var result=((ObjectNode)entry).deepCopy().put("etag",hit.sourceTag()).put("entryEtag",etag(entry));if(!hit.title().isBlank())result.put("title",hit.title());return result;
+        var result=new NoteBookmarks(store).annotate((ObjectNode)entry);String metadata=etag(result);result.put("etag",hit.sourceTag()).put("entryEtag",metadata);if(!hit.title().isBlank())result.put("title",hit.title());return result;
     }
     private boolean dayDeleted(UUID id,long version){
         return store.find(JournalState.Kind.JOURNAL_DELETE.name(),id).map(marker->marker.path("noteVersion").asLong()==version).orElse(false);

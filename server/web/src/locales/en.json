@@ -1462,5 +1462,8 @@
   "notes.import_reviewed_overwrite": "{{count}} files selected. Replacements: {{replacements}}. Review before importing.",
   "notes.import_apply_selected": "Import selected files",
   "notes.import_reviewed_overwrite_one": "{{count}} file selected. Replacements: {{replacements}}. Review before importing.",
-  "notes.search_tag": "Search notes for {{tag}}"
+  "notes.search_tag": "Search notes for {{tag}}",
+  "notes.bookmark_add": "Add bookmark",
+  "notes.bookmark_remove": "Remove bookmark",
+  "notes.bookmarks": "Bookmarks"
 }

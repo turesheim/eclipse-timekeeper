@@ -1223,3 +1223,19 @@ Formatted mode shows the diagram only; Markdown source edits its text. There is
 no hidden editable code region. Normal links and inertly parsed safe HTML anchors
 follow the owner-aware link adapter; wiki links retain their existing resolution,
 draft checks and private attachment handling.
+
+Notes and Today expose a page bookmark in the editor’s upper-right corner. On
+pointer devices the add icon appears on hover or keyboard focus; a saved
+bookmark remains visible and shows the remove icon on hover/focus. Touch devices
+always expose the control. Read-only clients display saved bookmarks disabled.
+Calendar uses `journal-bookmark` for bookmarked dates and Notes navigation uses
+`bookmark`. Empty dates can be bookmarked without creating a Markdown document.
+
+Bookmarks use the owner-private `/notes/bookmark?sourceType=…&sourceKey=…`
+GET/PUT resource and an independent ETag. They follow canonical note identity
+through edits, moves and trash recovery. A toggle never changes document bytes,
+creation/modification times, body validators or edit history. Failed/stale bookmark
+writes reload metadata and require a new explicit decision; body drafts stay in
+memory. Optional `bookmarks` metadata is included in account ZIP archives and in
+the normal full database backup. A plain folder import/export carries document
+files and dates; it does not carry these application bookmarks.

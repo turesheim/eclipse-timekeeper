@@ -23,10 +23,10 @@ final class VaultCollection {
     String generation(){return etag(state.get());}
     String tag(JsonNode entry){return tag(entry,folder(entry)?generation():null);}
     String tag(JsonNode entry,String snapshot){return folder(entry)?etag(object().put("entry",etag(entry)).put("generation",snapshot)):entry.path("contentTag").asText();}
-    String metadataTag(JsonNode entry){return folder(entry)?tag(entry):etag(entry);}
+    String metadataTag(JsonNode entry){return folder(entry)?tag(entry):etag(new NoteBookmarks(store).annotate((ObjectNode)entry));}
     ObjectNode metadata(ObjectNode entry){return metadata(entry,folder(entry)?generation():null);}
     private ObjectNode metadata(ObjectNode entry,String snapshot){
-        String tag=tag(entry,snapshot);var result=entry.deepCopy().put("etag",tag).put("entryEtag",folder(entry)?tag:etag(entry));
+        String tag=tag(entry,snapshot);var result=new NoteBookmarks(store).annotate(entry);String metadata=folder(entry)?tag:etag(result);result.put("etag",tag).put("entryEtag",metadata);
         String title=new NoteTitles(store).get(entry);if(!title.isBlank())result.put("title",title);return result;
     }
     ObjectNode page(UUID parent,String query,boolean trash,int offset,int count,String snapshot){

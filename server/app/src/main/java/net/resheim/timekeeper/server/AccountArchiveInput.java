@@ -79,6 +79,7 @@ final class AccountArchiveInput {
         if(labels&&!value.path("dayLabels").isArray()||!labels&&value.has("dayLabels"))throw ApiFailure.validation();
         if(value.path("format").asText().equals(AccountArchive.FORMAT)){if(!value.path("vault").isObject())throw ApiFailure.validation();}
         else if(value.has("vault"))throw ApiFailure.validation();
+        NoteBookmarks.validate(value.path("bookmarks"),value.path("vault"));
         try {ContractInputs.pathId(value.path("archiveId").asText());Instant.parse(value.path("generatedAt").asText());}
         catch(RuntimeException invalid) {throw ApiFailure.validation();}
         if(!value.path("account").isObject() || !value.path("preferences").isObject() || !value.path("work").isObject() || !value.path("importHistory").isArray()) throw ApiFailure.validation();
@@ -89,7 +90,7 @@ final class AccountArchiveInput {
         // before preview or commit; this layer only establishes safe framing.
         return (ObjectNode)value;
     }
-    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.removeAll(Set.of("dayNotes","weekNotes","journalAssets","journalFiles","dayLabels","vault"));return fields;}
+    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.removeAll(Set.of("dayNotes","weekNotes","journalAssets","journalFiles","dayLabels","vault","bookmarks"));return fields;}
     static ObjectNode counts(JsonNode archive) {
         var result=object();for(String name:AccountArchive.WORK.keySet()) {
             var values=archive.path("work").path(name);
@@ -99,6 +100,7 @@ final class AccountArchiveInput {
         result.put("importAuditRecords",archive.path("importHistory").size());
         if(archive.has("dayLabels"))result.put("dayLabels",archive.path("dayLabels").size());
         if(archive.has("vault")){result.put("notesEntries",archive.path("vault").path("entries").size());result.put("notesFiles",archive.path("vault").path("files").size());}
+        if(archive.has("bookmarks"))result.put("bookmarks",archive.path("bookmarks").size());
         if(archive.has("dayNotes"))result.put("dayNotes",archive.path("dayNotes").size());
         if(archive.has("weekNotes"))result.put("weekNotes",archive.path("weekNotes").size());
         if(archive.has("journalAssets"))result.put("journalAssets",archive.path("journalAssets").size());

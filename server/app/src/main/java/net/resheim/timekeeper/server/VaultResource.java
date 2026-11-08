@@ -46,6 +46,13 @@ public class VaultResource {
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source);
         return tx(false,()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
     }
+    @GET @Path("/bookmark") public Response bookmark(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key){
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return tx(false,()->{var bookmarks=new NoteBookmarks(store);var ref=bookmarks.reference(type,key);return Response.ok(bookmarks.get(ref)).header("ETag",bookmarks.tag(ref)).build();});
+    }
+    @PUT @Path("/bookmark") @Consumes("application/json") public Response bookmark(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key,@HeaderParam("If-Match")String match,JsonNode input){
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");var value=inputs.validate("NoteBookmarkInput",input);
+        return tx(false,()->{var bookmarks=new NoteBookmarks(store);var ref=bookmarks.reference(type,key);return Response.ok(bookmarks.save(ref,match,value.path("bookmarked").asBoolean())).header("ETag",bookmarks.tag(ref)).build();});
+    }
     @GET @Path("/revisions/{revisionId}") public Response revision(@PathParam("revisionId")String revision,@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
         return tx(false,()->{var history=new NoteRevisions(store);var snapshot=history.snapshot(history.reference(type,id),version);return Response.ok(snapshot.body()).header("ETag",snapshot.etag()).build();});

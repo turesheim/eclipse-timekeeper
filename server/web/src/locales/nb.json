@@ -1462,5 +1462,8 @@
   "notes.import_reviewed_overwrite": "{{count}} filer er valgt. Erstatninger: {{replacements}}. Gjennomgå før import.",
   "notes.import_apply_selected": "Importer valgte filer",
   "notes.import_reviewed_overwrite_one": "{{count}} fil er valgt. Erstatninger: {{replacements}}. Gjennomgå før import.",
-  "notes.search_tag": "Søk i notater etter {{tag}}"
+  "notes.search_tag": "Søk i notater etter {{tag}}",
+  "notes.bookmark_add": "Legg til bokmerke",
+  "notes.bookmark_remove": "Fjern bokmerke",
+  "notes.bookmarks": "Bokmerker"
 }
