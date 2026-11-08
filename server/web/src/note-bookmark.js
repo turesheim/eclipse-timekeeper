@@ -25,8 +25,8 @@ export class NoteBookmark {
     this.button.hidden=!context||!context.writable&&!marked;
     this.button.disabled=!context?.writable||this.busy||!this.etag&&!this.failed;
     this.button.classList.toggle('is-bookmarked',marked);this.button.setAttribute('aria-pressed',String(marked));this.button.setAttribute('aria-label',label);this.button.title=label;
-    this.button.replaceChildren(icon(marked?'bookmark':'bookmark-plus'));
-    if(marked)this.button.append(icon('bookmark-x'));
+    // Keep pointer-down/up targets stable while editor controls refresh.
+    if(this.iconState!==marked){this.iconState=marked;this.button.replaceChildren(icon(marked?'bookmark':'bookmark-plus'));if(marked)this.button.append(icon('bookmark-x'));}
   }
   async load(){
     const context=this.context;if(!context?.session)return;const generation=this.generation;
