@@ -28,7 +28,7 @@ for(const locale of ['en-GB','nb-NO'])test(`date controls share selection, navig
     try{
       await input.fill(date);await page.locator('#'+previous).click();await expect(input).toHaveValue(before);
       await input.fill(date);await page.locator('#'+next).click();await expect(input).toHaveValue(after);
-    }finally{if(release){release();await page.unroute(report);}}
+    }finally{if(release){release();await page.unrouteAll({behavior:'wait'});}}
     if(tab!=='track'){
       await input.evaluate(node=>{node.showPicker=()=>{node.dataset.opened='true';};});await controls.locator('.input-group > button').click();await expect(input).toHaveAttribute('data-opened','true');
       await input.evaluate(node=>{node.showPicker=()=>{throw new Error('Native picker unavailable');};});await controls.locator('.input-group > button').click();await expect(input).toBeFocused();
