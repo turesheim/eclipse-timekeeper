@@ -1,7 +1,7 @@
 import {saveMarkdown} from './editor-interactions.js';
 import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -295,4 +295,38 @@ test('an unavailable save retains the draft and leaves the server version intact
   const api=await setup(page,request),entry=await(await api('PUT','/notes/files?path=Notes%2FOffline.md',Buffer.from('Server original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Offline.md').click();await(await notesSource(page)).fill('Draft retained through a failed save');
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect(page.locator('#notes-panel > .alert')).toBeVisible();await expect(page.locator('#notes-body')).toHaveValue('Draft retained through a failed save');await page.unroute('**/api/v1/notes/entries/*/content');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Server original');
+});
+
+test('note images avoid unrelated catalog reads and concurrent journal images share settings',async({page,request})=>{
+  const api=await setup(page,request),png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=';
+  for(const name of ['shot.png','a.png','b.png','c.png'])await api('PUT','/journal-assets/'+name,{data:png},{'If-None-Match':'*'});
+  for(let i=0;i<24;i++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Unrelated-'+i+'.md'}),Buffer.from('# Unrelated title '+i+'\n\n'+'Unrelated prose. '.repeat(100)),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  const source='# Loading target\n\n![[shot.png]]\n\n![Relative screenshot](../journal/assets/shot.png)\n';
+  const entry=await(await api('PUT','/notes/files?path=Notes%2FImages.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();
+  const queries=[];page.on('request',request=>{const url=new URL(request.url());if(url.pathname==='/api/v1/notes/entries'&&url.searchParams.has('query'))queries.push(url.searchParams.get('query'));});
+  const started=Date.now();await noteEntry(page.locator('#notes-navigation'),entry.path).click();const images=page.locator('#notes-formatted .ProseMirror').getByRole('img');await expect(images).toHaveCount(2);
+  await expect.poll(()=>images.evaluateAll(nodes=>nodes.every(node=>node.complete&&node.naturalWidth===1))).toBe(true);
+  expect(queries.length).toBeGreaterThan(0);expect(queries.every(query=>query==='shot.png')).toBe(true);const noteMillis=Date.now()-started;
+  expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
+  const body='![A](assets/a.png)\n\n![B](assets/b.png)\n\n![C](assets/c.png)\n';
+  await api('PUT','/notes/files?path=journal%2F2026-11-03.md',Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  let settingsReads=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/v1/notes')settingsReads++;});
+  const journalStarted=Date.now();await page.goto('/web/?day=2026-11-03');await expect(page.locator('#status')).toHaveText('Up to date');
+  const journal=page.locator('#today-journal-formatted .ProseMirror').getByRole('img');await expect(journal).toHaveCount(3);await expect.poll(()=>journal.evaluateAll(nodes=>nodes.every(node=>node.complete&&node.naturalWidth===1))).toBe(true);
+  expect(settingsReads).toBe(1);
+  const metrics=test.info().outputPath('note-image-loading.json');await writeFile(metrics,JSON.stringify({noteMillis,journalMillis:Date.now()-journalStarted,wikiQueries:queries,journalSettingsReads:settingsReads})+'\n');
+  await test.info().attach('note-image-loading.json',{path:metrics,contentType:'application/json'});
+});
+
+test('opening a weekly note survives a metadata refresh between pointer down and pointer up',async({page,request})=>{
+  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-04');
+  const weekButton=page.locator('#today-month-grid [data-week]').first(),week=await weekButton.getAttribute('data-week');
+  const previous=await api('GET','/week-notes/'+week);let release,fetched;
+  const gate=new Promise(resolve=>{release=resolve;}),arrived=new Promise(resolve=>{fetched=resolve;});
+  await page.route('**/api/v1/week-notes?**',async route=>{const response=await route.fetch();fetched();await gate;await route.fulfill({response});});
+  await api('PUT','/week-notes/'+week,{body:'Saved weekly note'},{'If-Match':previous.headers().etag});
+  await page.evaluate(()=>document.getElementById('refresh').click());await arrived;
+  await weekButton.hover();await page.mouse.down();release();await expect(weekButton.locator('.today-month-dot')).toHaveCount(1);await page.mouse.up();
+  await expect(page.locator('#today-week-note-editor')).toBeVisible();await expect(page.locator('#today-week-note-editor .ProseMirror')).toHaveAttribute('contenteditable','true');
 });
