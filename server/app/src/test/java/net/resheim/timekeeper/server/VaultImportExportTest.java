@@ -25,7 +25,7 @@ class VaultImportExportTest {
             var vault=new VaultCollection(store,limits);vault.initialize();var dates=VaultImportDates.parse(CREATED,MODIFIED);
             var folder=dates.apply(store,vault.mkdir(new VaultPath("Notes")));assertEquals(MODIFIED,folder.path("modifiedAt").asText());
             var file=dates.apply(store,vault.put(new VaultPath("Notes/Exact.md"),null,true,bytes("Original\r\n")));
-            assertEquals(CREATED,file.path("createdAt").asText());assertEquals(MODIFIED,file.path("modifiedAt").asText());assertEquals(1,file.path("contentVersion").asLong());
+            assertEquals(CREATED,file.path("createdAt").asText());assertEquals("ORIGINAL",file.path("createdAtSource").asText());assertEquals(MODIFIED,file.path("modifiedAt").asText());assertEquals(1,file.path("contentVersion").asLong());
             assertEquals(412,assertThrows(ApiFailure.class,()->dates.apply(store,vault.put(new VaultPath("Notes/Exact.md"),null,true,bytes("Wrong")))).status);
             assertEquals(MODIFIED,vault.get(VaultCollection.id(file)).path("modifiedAt").asText());
             file=vault.put(new VaultPath("Notes/Exact.md"),vault.tag(file),false,bytes("Edited"));assertEquals(CREATED,file.path("createdAt").asText());assertTrue(Instant.parse(file.path("modifiedAt").asText()).isAfter(Instant.parse(MODIFIED)));
@@ -58,7 +58,7 @@ class VaultImportExportTest {
             assertNull(zip.getEntry("Export/Removed.md"));assertNull(zip.getEntry("Other-owner.md"));assertNull(zip.getEntry("archive.json"));
             var manifest=parse(new String(zip.getInputStream(zip.getEntry(VaultExport.MANIFEST)).readAllBytes(),StandardCharsets.UTF_8));assertEquals(VaultExport.FORMAT,manifest.path("format").asText());
             var metadata=java.util.stream.StreamSupport.stream(manifest.path("entries").spliterator(),false).filter(row->row.path("path").asText().equals("Export/Ærlig.md")).findFirst().orElseThrow();
-            assertEquals(CREATED,metadata.path("createdAt").asText());assertEquals(MODIFIED,metadata.path("modifiedAt").asText());assertEquals(ArchiveJournalFiles.digest(document),metadata.path("sha256").asText());
+            assertEquals(CREATED,metadata.path("createdAt").asText());assertEquals("ORIGINAL",metadata.path("createdAtSource").asText());assertEquals(MODIFIED,metadata.path("modifiedAt").asText());assertEquals(ArchiveJournalFiles.digest(document),metadata.path("sha256").asText());
             assertEquals(Instant.parse(MODIFIED).getEpochSecond(),zip.getEntry("Export/Ærlig.md").getLastModifiedTime().toInstant().getEpochSecond());assertFalse(manifest.toString().contains("ownerId"));
         }
         assertFalse(java.nio.file.Files.exists(temporary));

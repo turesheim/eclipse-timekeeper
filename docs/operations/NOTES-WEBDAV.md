@@ -52,12 +52,19 @@ for folder import. Timekeeper recognizes the auxiliary metadata, excludes it fro
 uploads, and preserves dates and empty folders. A source file with the same name
 is kept as a normal file. Invalid or ambiguous metadata blocks review. Original
 creation dates follow relative paths; a checksum detects content edited after the
-snapshot and uses that file's current modification time instead. Existing server
-files and existing folder dates remain unchanged.
+snapshot and uses that file's current modification time instead. Existing files are kept by default. Select **Overwrite existing files** to
+include them as reviewed replacements. The review identifies each replacement;
+a subsequent edit, move or deletion causes a conflict and preserves the current
+server file. Replacements preserve file identity and path. Existing folder dates
+remain unchanged. Without supplied original creation metadata, a replacement
+keeps its existing creation date. Source modification dates are preserved.
 
 Browsers expose `lastModified` but not filesystem creation dates. A folder import
 without metadata therefore preserves the available modification time and records
-when each new entry joined Timekeeper. To keep creation dates for an existing
+when each new entry joined Dagsverk. The footer calls that date **Added**;
+**Created** identifies a supplied original creation date. Older entries have no
+recorded date provenance and show **Created / added**. Modification time may be
+older than either value; it must not be substituted for an unknown creation date. To keep creation dates for an existing
 local vault, download the manual sync client from the same account page and run:
 
 ```sh
@@ -71,7 +78,9 @@ where the OS provides them (including macOS); POSIX `ctime` is never used as a
 creation date. It refuses symlinks, checks for concurrent source changes, and
 refuses to overwrite an unrelated file occupying the metadata filename. `--include-obsidian` includes configuration when
 also enabled in the target account. Timekeeper exports already include metadata
-and do not need this preparation step. The helper defaults to at most 100,000 entries (adjust with `--max-entries`);
+and do not need this preparation step. To correct dates on files already
+imported without metadata, prepare the metadata in the original local folder,
+choose that folder again, enable overwrite and review the replacements. The helper defaults to at most 100,000 entries (adjust with `--max-entries`);
 `--max-file-bytes` sets its bounded per-file limit. The browser review still
 applies the target server's own limits.
 
