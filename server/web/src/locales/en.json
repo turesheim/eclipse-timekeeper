@@ -1405,5 +1405,7 @@
   "calendar.video_meeting": "Video meeting",
   "today.resize_sidebar": "Resize Today sidebar",
   "ui.date_navigation": "Date navigation",
-  "notes.moved": "Moved to {{path}}."
+  "notes.moved": "Moved to {{path}}.",
+  "notes.created": "Created:",
+  "notes.modified": "Last changed:"
 }

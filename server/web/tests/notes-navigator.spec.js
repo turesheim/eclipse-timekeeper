@@ -21,10 +21,10 @@ const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams
 test('a folder click survives metadata refresh between pointer down and pointer up',async({page,request})=>{
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Click.md','Folder click body.');
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
-  const folder=noteEntry(navigation,'Notes'),original=await folder.elementHandle(),box=await folder.boundingBox();let release;
+  const folder=noteEntry(navigation,'Notes');let release;
   const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/me',async route=>{await pending;await route.continue();});
   try{
-    await page.mouse.move(box.x+20,box.y+box.height/2);await page.mouse.down();await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
+    await folder.hover();await page.mouse.down();const original=await folder.elementHandle();await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));
     await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','true');release();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
     expect(await original.evaluate(node=>node.isConnected)).toBe(true);await page.mouse.up();await expect(noteEntry(navigation,'Notes/Click.md')).toBeVisible();
   }finally{release();await page.mouse.up();await page.unrouteAll({behavior:'wait'});}
@@ -54,6 +54,7 @@ test('a conflicting document drop cannot replace either file',async({page,reques
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await api('POST','/notes/folders',{path:'Notes/Archive'});
   const source=await(await put(api,'Notes/Review.md','Source stays intact.')).json(),target=await(await put(api,'Notes/Archive/Review.md','Destination stays intact.')).json();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
+  await expect(page.locator('#notes-document-title')).toHaveText('Notes');await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
   await expect(noteEntry(navigation,source.path)).toHaveAttribute('draggable','true');await noteEntry(navigation,source.path).dragTo(noteEntry(navigation,'Notes/Archive'));
   await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
@@ -90,19 +91,23 @@ test('Notes keeps navigation and both editor modes anchored while their contents
   // be hidden when Notes measures its available viewport.
   await page.locator('[data-tab=activities]').click();await page.evaluate(()=>scrollTo(0,300));await page.locator('[data-tab=notes]').click();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Long.md').click();
-  for(const width of [1440,390]){
-    await page.setViewportSize({width,height:900});
-    if(width===390)await page.locator('.notes-drawer-toggle').click();
+  for(const {width,height} of [{width:1440,height:900},{width:390,height:900},{width:844,height:600},{width:320,height:568}]){
+    await page.setViewportSize({width,height});
+    expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
+    if(width<=760)await page.locator('.notes-drawer-toggle').click();
     await navigation.hover();await page.mouse.wheel(0,3000);await expect.poll(()=>navigation.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     const top=await navigation.evaluate(node=>node.getBoundingClientRect().top);await page.mouse.wheel(0,3000);expect(await page.evaluate(()=>scrollY)).toBe(0);expect(await navigation.evaluate(node=>node.getBoundingClientRect().top)).toBe(top);
-    if(width===390)await page.locator('.notes-drawer-toggle').click();
+    if(width<=760)await page.locator('.notes-drawer-toggle').click();
     for(const mode of ['Markdown source','Formatted']){
       await page.locator('#notes-panel').getByRole('button',{name:mode,exact:true}).click();const content=page.locator(mode==='Formatted'?'.notes-markdown .ProseMirror':'#notes-body');
+      expect((await content.boundingBox()).height).toBeGreaterThan(24);
       await content.hover();await page.mouse.wheel(0,5000);await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.mouse.wheel(0,5000);
       expect(await page.evaluate(()=>scrollY)).toBe(0);await expect(page.locator('.notes-footer')).toBeInViewport();
+      expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
       const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
       await captureScreenshot(page,{path:`test-results/notes-anchored-${width}-${mode==='Formatted'?'formatted':'source'}.png`});
     }
+    if(width===320){const last=page.locator('.notes-markdown [data-command=hr]');await last.focus();await expect(last).toBeInViewport();}
   }
 });
 

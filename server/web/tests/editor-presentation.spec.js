@@ -47,8 +47,12 @@ test('code uses highlight.js in a compact badge, preserving source, copy and lan
 });
 
 test('formatted Markdown, HTML and wiki links follow ordinary clicks without modifying the draft',async({page})=>{
-  const original='[Web link](https://example.test/page) and [Local](Notes/Target.md).\n\n<a href="https://example.test/?one=1&amp;two=2" onclick="window.badLink=true">HTML link</a>\n\n[[Notes/Target|Wiki link]]\n';
+  const original='[Web link](https://example.test/page) and [Local](Notes/Target.md).\n\n<a href="https://example.test/?one=1&amp;two=2" onclick="window.badLink=true">HTML link</a>\n\n[[Notes/Target|Wiki link]] and [[2026-11-02]]\n';
   const root=await open(page,original);
+  for(const readOnly of [false,true]){
+    await page.evaluate(value=>globalThis.presentation.setReadOnly(value),readOnly);
+    for(const link of await root.locator('a[href],[data-wiki-reference]').all())await expect(link).toHaveCSS('cursor','pointer');
+  }
   await root.getByRole('link',{name:'Web link',exact:true}).click();await root.getByRole('link',{name:'HTML link',exact:true}).click();
   expect(await page.evaluate(()=>globalThis.openedLinks)).toEqual([['https://example.test/page','_blank','noopener,noreferrer'],['https://example.test/?one=1&two=2','_blank','noopener,noreferrer']]);
   await root.getByRole('link',{name:'Local',exact:true}).click();await root.getByRole('button',{name:'Wiki link',exact:true}).click();expect(await page.evaluate(()=>globalThis.followedLinks)).toEqual(['Notes/Target.md','Notes/Target|Wiki link']);

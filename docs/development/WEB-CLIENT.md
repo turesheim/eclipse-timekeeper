@@ -1138,6 +1138,14 @@ the folder drawer; selecting a document closes the drawer. The toggle reports
 its current state to assistive technology and retains focus when a viewport
 change hides the focused navigation control.
 
+The footer shows the selected item's saved creation and last-change timestamps
+beside its save state, using the account's time zone and locale. Unsaved edits
+and rejected saves retain the saved timestamps; a successful save updates the
+last-change time. Dates wrap on narrow screens. Formatted web, local, daily and
+wiki links show the hand pointer in both writable and read-only notes.
+In short phone windows the formatting actions scroll horizontally, retaining
+space for the document and keyboard access to every action.
+
 ![Notes workspace with a compact, resizable folder tree](../assets/screenshots/notes-workspace-expanded.png)
 
 ![Notes editor using the full workspace width](../assets/screenshots/notes-workspace-collapsed.png)
