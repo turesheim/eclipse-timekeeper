@@ -18,7 +18,7 @@ const source=page=>page.evaluate(()=>globalThis.experience.markdown());
 
 test('prose hashtags use accent links without changing Markdown or literal code and link content',async({page})=>{
   const value='# Tag examples\n\nA #Open**Shift** deployment, #Cafe\u0301 and #work/cloud.\n\n`#literal` [#linked](https://example.org/#destination) [[#heading]]\n\n~~~text\n#code\n~~~\n';
-  await engine(page,value,{tags:true});const tags=page.locator('#experience-editor [data-hashtag]');await expect(tags).toHaveCount(3);expect(await source(page)).toBe(value);
+  await engine(page,value,{tags:true});const tags=page.locator('#experience-editor [data-hashtag]');await expect(tags).toHaveCount(4);expect(await tags.evaluateAll(nodes=>[...new Set(nodes.map(node=>node.dataset.hashtag))])).toEqual(['#openshift','#café','#work/cloud']);expect(await source(page)).toBe(value);
   await tags.first().click();expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift']);
   const café=page.locator('[data-hashtag="#café"]');await café.focus();await café.press('Enter');expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift','#café']);expect(await source(page)).toBe(value);
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
