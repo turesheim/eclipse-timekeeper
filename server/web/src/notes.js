@@ -221,8 +221,8 @@ export class NotesView {
     this.searchMessage.textContent=t(error.status===412?'notes.search_changed':error.status===422?'notes.search_invalid':'notes.search_unavailable');this.searchMessage.hidden=false;this.searchRetry.hidden=false;this.searchRebuild.hidden=!this.writable||error.status!==503;
   }
   async moreSearch(){
-    if(!this.session||!this.searchCursor||this.loading)return;const session=this.session,current=++this.loadGeneration,cursor=this.searchCursor;this.loading=true;this.controls();
-    try{const rows=await this.searchPage(session,current,cursor);if(!rows)return;for(const row of rows)this.entries.set(row.id,row);this.children.get('search').push(...rows);this.paint();}
+    if(!this.session||!this.searchCursor||this.loading)return;const session=this.session,current=++this.loadGeneration,cursor=this.searchCursor,focusMore=document.activeElement===this.searchMore,previousCount=this.children.get('search')?.length||0;this.loading=true;this.controls();
+    try{const rows=await this.searchPage(session,current,cursor);if(!rows)return;for(const row of rows)this.entries.set(row.id,row);this.children.get('search').push(...rows);this.paint();if(focusMore)this.tree.querySelectorAll('[role=treeitem]')[previousCount]?.focus();}
     catch(error){if(session===this.session&&current===this.loadGeneration)this.searchFailed(error);}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.controls();}}
   }

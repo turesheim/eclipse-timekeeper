@@ -173,7 +173,10 @@ account caches are reclaimed when the limit is reached. Idle handles close after
 ten minutes. The worker processes at most 32 records or about 8 MB per replay
 batch, stopping between records after its 100 ms work budget. A single supported
 Markdown file and a commit/merge can extend a batch beyond those soft budgets.
-Canonical transactions never wait for parsing or index commits.
+Backfills checkpoint approximately once per second and publish readers only when
+ready. A crash can repeat uncommitted backfill work; canonical data stays in SQL.
+Incremental updates commit before being considered caught up. Canonical
+transactions never wait for parsing or index commits.
 
 `GET /api/v1/notes/search/status` reports this replica's ready/indexing/unavailable
 state, applied and target generations and any safe failure category.

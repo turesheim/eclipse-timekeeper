@@ -111,7 +111,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     void remove(UUID id)throws IOException{lock.writeLock().lock();try{open();writer.deleteDocuments(new Term("id",id.toString()));}finally{lock.writeLock().unlock();}}
     void commit(Watermark state)throws IOException{
         lock.writeLock().lock();try{
-            open();writer.setLiveCommitData(metadata(state).entrySet());writer.commit();readers.maybeRefreshBlocking();watermark=state;
+            open();writer.setLiveCommitData(metadata(state).entrySet());writer.commit();if(state.ready())readers.maybeRefreshBlocking();watermark=state;
             for(String name:directory.listAll())privateFile(((FSDirectory)directory).getDirectory().resolve(name));
         }finally{lock.writeLock().unlock();}
     }

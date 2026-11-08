@@ -340,7 +340,7 @@ test('Notes content search finds body text, keeps relevance order and pages on d
   await page.locator('#notes-search').fill(word);await expect(navigation).toContainText('No matching files or folders.');
   await page.locator('#notes-search-mode').selectOption('content');await expect(rows).toHaveCount(50);await expect(rows.first()).toContainText('Sparrow priority');
   await expect(navigation.getByRole('button',{name:'Sort notes',exact:true})).toBeDisabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
-  await navigation.getByRole('button',{name:'More results',exact:true}).click();await expect(rows).toHaveCount(55);await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
+  await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
   await rows.first().locator('button').click();const source=await notesSource(page);await expect(source).toHaveValue(/Sparrow priority/);
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
   await source.fill('# Sparrow priority\n\nUnsaved private draft.');await page.locator('#notes-search').fill('absentword');await expect(navigation).toContainText('No matching notes.');await expect(source).toHaveValue('# Sparrow priority\n\nUnsaved private draft.');

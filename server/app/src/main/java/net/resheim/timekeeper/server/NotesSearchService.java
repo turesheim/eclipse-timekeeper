@@ -132,6 +132,8 @@ class NotesSearchService implements AutoCloseable {
             if(handle.building!=null){
                 final NotesSearchReplay.Step step;
                 try{step=handle.building.advance(BATCH);}catch(NotesLuceneIndex.RebuildRequired expired){handle.building.close();remove(handle.buildingPath);handle.building=null;createBuild(handle,sources,state);return;}
+                catch(ApiFailure sourceFailure){throw sourceFailure;}
+                catch(IOException|RuntimeException broken){var previous=handle.building;var path=handle.buildingPath;handle.building=null;handle.buildingPath=null;handle.rebuild=true;try{previous.close();}finally{remove(path);}throw broken;}
                 if(step.ready()){
                     var previous=handle.current;var previousPath=handle.currentPath;handle.current=handle.building;handle.currentPath=handle.buildingPath;handle.building=null;handle.buildingPath=null;handle.broken=false;
                     if(previous!=null){previous.close();remove(previousPath);}

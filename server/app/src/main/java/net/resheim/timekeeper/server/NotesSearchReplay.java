@@ -15,16 +15,18 @@ final class NotesSearchReplay implements AutoCloseable {
     private final NotesLuceneIndex index;
     private final NotesSearchSources sources;
     private final NotesLuceneIndex.Identity identity;
-    private NotesSearchReplay(NotesLuceneIndex index,NotesSearchSources sources){this.index=index;this.sources=sources;identity=index.identity();}
+    private NotesLuceneIndex.Watermark progress;
+    private long checkpointAt=System.nanoTime()-TimeUnit.SECONDS.toNanos(1);
+    private NotesSearchReplay(NotesLuceneIndex index,NotesSearchSources sources){this.index=index;this.sources=sources;identity=index.identity();progress=index.watermark();}
     static NotesSearchReplay open(Path path,NotesSearchSources sources,NotesSearchSources.State initial)throws IOException{
         return new NotesSearchReplay(new NotesLuceneIndex(path,initial.identity(),new NotesLuceneIndex.Watermark(initial.changes().generation(),false,null)),sources);
     }
     NotesLuceneIndex index(){return index;}
     boolean caughtUp(NotesSearchSources.State state){var saved=index.watermark();return identity.equals(state.identity())&&saved.ready()&&saved.generation()==state.changes().generation();}
     synchronized Step advance(Budget budget)throws IOException{
-        long started=System.nanoTime(),spent=0;int records=0;var state=sources.state(identity.owner());var saved=index.watermark();long target=state.changes().generation();
+        long started=System.nanoTime(),spent=0;int records=0;var state=sources.state(identity.owner());var saved=progress;long target=state.changes().generation();
         if(!identity.equals(state.identity())||saved.generation()>target||saved.generation()<state.changes().historyFloor())throw new NotesLuceneIndex.RebuildRequired();
-        if(saved.ready()&&saved.generation()==target)return new Step(true,target,target,0);
+        if(saved.ready()&&saved.generation()==target){checkpoint(saved,true);return new Step(true,target,target,0);}
         if(!saved.ready()){
             var entries=sources.entries(identity.owner(),saved.afterEntry(),budget.records());UUID after=saved.afterEntry();
             for(var entry:entries){
@@ -35,7 +37,7 @@ final class NotesSearchReplay implements AutoCloseable {
                 if(records>=budget.records()||spent>=budget.bytes()||expired(started,budget))break;
             }
             if(!entries.isEmpty()){
-                index.commit(new NotesLuceneIndex.Watermark(saved.generation(),false,after));return new Step(false,saved.generation(),target,records);
+                checkpoint(new NotesLuceneIndex.Watermark(saved.generation(),false,after),false);return new Step(false,saved.generation(),target,records);
             }
         }
         long applied=saved.generation();
@@ -56,7 +58,11 @@ final class NotesSearchReplay implements AutoCloseable {
             if(changes.isEmpty()&&applied!=target)throw new NotesLuceneIndex.RebuildRequired();
         }catch(NotesSearchChanges.HistoryExpired expired){throw new NotesLuceneIndex.RebuildRequired();}
         boolean ready=saved.ready()||applied==target;
-        index.commit(new NotesLuceneIndex.Watermark(applied,ready,saved.afterEntry()));return new Step(ready&&applied==target,applied,target,records);
+        checkpoint(new NotesLuceneIndex.Watermark(applied,ready,saved.afterEntry()),ready);return new Step(ready&&applied==target,applied,target,records);
+    }
+    private void checkpoint(NotesLuceneIndex.Watermark next,boolean force)throws IOException{
+        progress=next;
+        if(!next.equals(index.watermark())&&(force||System.nanoTime()-checkpointAt>=TimeUnit.SECONDS.toNanos(1))){index.commit(next);checkpointAt=System.nanoTime();}
     }
     private static boolean expired(long started,Budget budget){return System.nanoTime()-started>=TimeUnit.MILLISECONDS.toNanos(budget.milliseconds());}
     @Override public void close()throws IOException{index.close();}
