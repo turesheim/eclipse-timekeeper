@@ -39,7 +39,7 @@ async function review(page,name) {
   await captureScreenshot(page,{path:`test-results/newspaper-${name}.png`,fullPage:true});
 }
 
-test('Newspaper prints records, journals and controls in two inks with serif type on desktop and mobile',async({page,request,context})=>{
+test('Newspaper prints records, journals and controls in two inks with serif type on desktop and mobile',async({page,request,context,browserName})=>{
   test.setTimeout(150000);
   const records=[],date='2025-10-20',headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
   async function api(method,path,data,extra={}) {
@@ -65,19 +65,24 @@ test('Newspaper prints records, journals and controls in two inks with serif typ
     await expect(page.locator('#today-journal-formatted')).toContainText('The day’s work, in print');
     await expect(page.locator('body')).toHaveCSS('font-family',/Georgia/);
     await expect(page.locator('#today-journal-formatted .ProseMirror')).toHaveCSS('font-family',/Georgia/);
+    await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
+    await expect(page.locator('#today-journal-body')).toHaveCSS('font-family',/monospace/);await expect(page.locator('#today-journal-body')).toHaveValue(body);
+    await page.locator('#today-note-editor').getByRole('button',{name:'Formatted',exact:true}).click();
     await review(page,'today-desktop');
-    await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','newspaper');
+    await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','newspaper');await expect(page.locator('#status')).toHaveText('Up to date');
     await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');
     await expect(page.locator('.track-client-day').first()).toHaveCSS('border-left-color','rgb(0, 0, 0)');
     await review(page,'calendar-desktop');
-    await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(date);await review(page,'week-desktop');
+    await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(date);await expect(page.locator('.calendar-session')).toHaveCount(1);await review(page,'week-desktop');
     await expect(page.locator('.calendar-day.weekend').first()).toHaveCSS('background-image',/conic-gradient/);
     await page.locator('[data-tab=clients]').click();await page.getByRole('button',{name:'New client',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill('The Sunday Review');await review(page,'editor');
-    const name=page.getByLabel('Name',{exact:true});await name.focus();await page.keyboard.press('Tab');
+    const name=page.getByLabel('Name',{exact:true});await name.focus();await page.keyboard.press(browserName==='webkit' && process.platform==='darwin'?'Alt+Tab':'Tab');
     await expect(page.getByLabel('Color',{exact:true})).toBeFocused();
     await page.locator('#cancel').click();
     await openThemeSettings(page);await review(page,'account');
+    await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
+    for(const view of ['tasks','notes']) {await page.locator(`[data-tab=${view}]`).click();await expect(page.locator(`[data-tab=${view}]`)).toHaveAttribute('aria-current','page');await review(page,view);}
     // Switching back restores the real client color; the theme never rewrites it.
     await setTheme(page,'timekeeper');await page.locator('[data-tab=track]').click();
     await expect(page.locator('.track-client-day').first()).toHaveCSS('border-left-color','rgb(219, 34, 68)');
@@ -85,6 +90,7 @@ test('Newspaper prints records, journals and controls in two inks with serif typ
     await setTheme(page,'newspaper');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);
     await page.setViewportSize({width:390,height:844});await review(page,'today-mobile');
     await page.setViewportSize({width:320,height:844});await review(page,'today-320');
+    await page.locator('[data-tab=clients]').click();await page.getByRole('button',{name:'New client',exact:true}).click();await review(page,'editor-mobile');await page.locator('#cancel').click();
     const other=await context.newPage();await other.setViewportSize({width:1440,height:1000});await other.goto('/admin/');await expect(other.locator('#status')).not.toContainText('Loading');await expect(other.locator('#account-content')).not.toBeEmpty();await review(other,'administration');await other.close();
     const signedOut=await context.browser().newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
     const login=await signedOut.newPage();await login.addInitScript(()=>localStorage.setItem('timekeeper.theme','newspaper'));await login.goto('/web/');await expect(login.locator('#login-form')).toBeVisible();await review(login,'sign-in');await signedOut.close();
