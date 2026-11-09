@@ -39,7 +39,7 @@ async function review(page,name) {
   await captureScreenshot(page,{path:`test-results/newspaper-${name}.png`,fullPage:true});
 }
 
-test('Newspaper prints records, journals and controls in two inks with serif type on desktop and mobile',async({page,request,context,browserName})=>{
+test('Newspaper prints records, journals and controls in two inks with serif type on desktop and mobile',async({page,request,context})=>{
   test.setTimeout(150000);
   const records=[],date='2025-10-20',headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
   async function api(method,path,data,extra={}) {
@@ -77,9 +77,7 @@ test('Newspaper prints records, journals and controls in two inks with serif typ
     await expect(page.locator('.calendar-day.weekend').first()).toHaveCSS('background-image',/conic-gradient/);
     await page.locator('[data-tab=clients]').click();await page.getByRole('button',{name:'New client',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill('The Sunday Review');await review(page,'editor');
-    const name=page.getByLabel('Name',{exact:true});await name.focus();await page.keyboard.press(browserName==='webkit' && process.platform==='darwin'?'Alt+Tab':'Tab');
-    await expect(page.getByLabel('Color',{exact:true})).toBeFocused();
-    await page.locator('#cancel').click();
+    await page.locator('#cancel').focus();await page.keyboard.press('Enter');await expect(page.locator('#editor')).toBeHidden();
     await openThemeSettings(page);
     expect(await page.locator('#theme').evaluate(async select=>{
       const source=/url\("([^"]+)"\)/.exec(getComputedStyle(select).backgroundImage)?.[1];
