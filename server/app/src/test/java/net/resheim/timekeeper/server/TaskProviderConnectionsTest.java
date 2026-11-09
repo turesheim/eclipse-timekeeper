@@ -77,6 +77,44 @@ class TaskProviderConnectionsTest {
         var again=connect(owner,grant(owner));assertEquals(initial.get("id"),again.get("id"));assertEquals("Custom name",again.path("name").asText());assertEquals(selected.get("selectedLists"),again.get("selectedLists"));
         assertEquals(1,tx(owner,()->store.list("TASK_CONNECTION").size()));assertEquals(1,tx(owner,()->store.list(TaskProviderConnections.AUTH).size()));
     }
+    private TaskProviderConnections.Grant writableGrant(String owner){
+        var attempt=tx(owner,()->connections().begin(TaskCloudProvider.Provider.GOOGLE,settings(),"browser-a",true));
+        var address=URI.create(attempt.path("authorizationUrl").asText());
+        var values=new HashMap<String,String>();for(String pair:address.getRawQuery().split("&")){var parts=pair.split("=",2);values.put(parts[0],URLDecoder.decode(parts[1],StandardCharsets.UTF_8));}
+        assertTrue(Arrays.asList(values.get("scope").split(" ")).contains("https://www.googleapis.com/auth/tasks"));
+        return tx(owner,()->connections().consume(values.get("state"),"browser-a"));
+    }
+    @Test void twoWayRequiresTheBoundConsentAndActualWriteScopeAndReauthorizationCanDowngradeIt(){
+        String owner=owner();var grant=writableGrant(owner);assertTrue(grant.writable());
+        assertEquals("TASK_PROVIDER_PERMISSION_REQUIRED",assertThrows(ApiFailure.class,()->connect(owner,grant)).code);
+        assertTrue(tx(owner,()->store.list("TASK_CONNECTION").isEmpty()));
+        var broad=new TaskProviderOAuth.Tokens("private-write-access","private-refresh",Instant.now().plusSeconds(3600),Set.of("openid","https://www.googleapis.com/auth/tasks"));
+        var result=tx(owner,()->connections().connect(grant,settings(),new TaskCloudProvider.Account("stable-account","Name"),broad,catalog()));UUID id=uuid(result.get("id"));
+        assertEquals("TWO_WAY",result.path("direction").asText());
+        tx(owner,()->connections().select(id,List.of("remote-list"),etag(result)));
+        var claim=tx(owner,()->connections().claim(id,false));assertTrue(claim.writable());
+        tx(owner,()->{var row=store.find("TASK_CONNECTION",id).orElseThrow();assertTrue(row.path("writable").asBoolean());
+            var fields=row.path("capabilities").path("fields");assertTrue(fields.path("summary").path("writable").asBoolean());assertFalse(fields.path("parentTaskId").path("writable").asBoolean());
+            assertTrue(store.list("TASK_LIST").getFirst().path("writable").asBoolean());return null;});
+        // A Google grant may include scopes from earlier consent. An import-only flow still stays import-only.
+        var readGrant=grant(owner);var readonly=tx(owner,()->connections().connect(readGrant,settings(),new TaskCloudProvider.Account("stable-account","Name"),broad,catalog()));
+        assertEquals(id.toString(),readonly.path("id").asText());assertEquals("IMPORT",readonly.path("direction").asText());
+        tx(owner,()->{assertNull(connections().active(claim));assertFalse(store.find("TASK_CONNECTION",id).orElseThrow().path("writable").asBoolean());assertFalse(store.list("TASK_LIST").getFirst().path("writable").asBoolean());return null;});
+        assertFalse(tx(owner,()->connections().claim(id,false)).writable());
+    }
+    @Test void configurationGenerationSurvivesTokenRotationAndStatusUpdatesButNotChangedSelection(){
+        String owner=owner();var connected=connect(owner,grant(owner));UUID id=uuid(connected.get("id"));
+        var selected=tx(owner,()->connections().select(id,List.of("remote-list"),etag(connected)));var claim=tx(owner,()->connections().claim(id,false));
+        tx(owner,()->{assertTrue(connections().credentials(claim,tokens()));assertNotNull(connections().active(claim));assertEquals(claim.generation(),connections().required(id).path("generation").asText());return null;});
+        var latest=tx(owner,()->connections().visible(connections().required(id)));
+        tx(owner,()->connections().select(id,List.of(),etag(latest)));
+        tx(owner,()->{assertNull(connections().active(claim));assertNotEquals(claim.generation(),connections().required(id).path("generation").asText());return null;});
+        assertThrows(ApiFailure.class,()->tx(owner(),()->connections().required(id)));
+    }
+    @Test void unsupportedProviderCannotAcquireATwoWayFlow(){
+        String owner=owner();assertThrows(ApiFailure.class,()->tx(owner,()->connections().begin(TaskCloudProvider.Provider.MICROSOFT,settings(),"browser-a",true)));
+        assertTrue(tx(owner,()->store.list(TaskProviderConnections.FLOW).isEmpty()));
+    }
     @Test void listSelectionChecksEtagAndCatalogAndRollsBackUnknownSelections(){
         String owner=owner();var result=connect(owner,grant(owner));UUID id=uuid(result.get("id"));
         assertThrows(ApiFailure.class,()->tx(owner,()->connections().select(id,List.of("remote-list"),"\"stale\"")));

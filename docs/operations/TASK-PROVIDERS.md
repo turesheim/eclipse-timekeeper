@@ -3,8 +3,15 @@
 Ordinary calendar subscriptions import calendar events and any `VTODO` records
 actually included in the feed. They do not grant access to a separate task
 service. Connect Google Tasks or Microsoft To Do under **Account → Task
-connections**, then select the lists to import. The connection belongs to the
-signed-in Dagsverk account.
+connections**, then select the lists to import. Choose an optional Dagsverk
+project for each selected list. **Review import** shows counts and sample titles;
+**Import this list** accepts the complete first import. Selecting a list alone
+does not create tasks. The connection belongs to the signed-in Dagsverk account.
+
+Project mappings apply to new root tasks. Existing tasks keep their project,
+and new children inherit their parent's project even if the list mapping has
+changed. Status polling and pause/resume retain unsaved list/project choices;
+a competing configuration change requires reviewing the draft before saving.
 
 The current cloud connectors import tasks and subsequent provider changes.
 Local edits stay in Dagsverk; completing a task here does not complete it at the
@@ -15,6 +22,18 @@ errors and the number of tasks needing review.
 
 Selected lists refresh in the background, normally every 15 minutes. **Refresh
 from provider** requests an earlier scan and discovers newly created lists.
+**Pause synchronization** stops provider I/O and keeps acknowledged pages;
+**Resume synchronization** continues with the same selection. Staged pages are
+private and survive a server restart. Repeated pages or incomplete scans do not
+advance the public synchronization checkpoint. A first-import preview expires
+after 15 minutes; refresh from the provider before approving an expired preview.
+Sources above 10,000 tasks or 32 MiB per list report a limit error and keep
+existing tasks and the previous completed checkpoint.
+
+Google polls an overlapping five-minute `updatedMin` window after a successful
+import and performs a full reconciliation at least every 24 hours. Partial
+observations keep unchanged siblings' provider positions. Google's `due` value
+is a scheduled civil day in Dagsverk, without a fabricated deadline or reminder.
 Reconnecting the same provider account retains its connection and list selection.
 A revoked grant, changed app registration or expired client secret requires
 reconnecting. Transient failures leave existing tasks intact.

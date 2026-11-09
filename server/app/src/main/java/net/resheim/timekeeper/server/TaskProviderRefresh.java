@@ -59,7 +59,7 @@ class TaskProviderRefresh {
             if(!TaskProviderConnections.settingsHash(settings).equals(claim.settingsHash()))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
             var tokens=claim.tokens();
             if(!tokens.expires().isAfter(clock.now().plusSeconds(60))){
-                tokens=clients.oauth(claim.provider()).refresh(settings,tokens,clock.now());var renewed=tokens;
+                tokens=clients.oauth(claim.provider()).refresh(settings,tokens,clock.now(),claim.writable());var renewed=tokens;
                 if(!store.transaction(claim.owner(),()->connections().credentials(claim,renewed)))return;
             }
             var provider=clients.cloud(claim.provider());
@@ -70,8 +70,17 @@ class TaskProviderRefresh {
             if(claim.catalogOnly())outcome=object();
             else{
                 if(claim.list()==null)throw new ApiFailure(409,"TASK_PROVIDER_LIST_MISSING");
-                var scan=TaskCloudPull.fetch(provider,tokens.access(),claim.account(),claim.remoteList(),clock.now());
-                outcome=store.transaction(claim.owner(),()->connections().active(claim)==null?null:new TaskCloudPull(store,receipts,inputs).apply(claim.id(),claim.list(),scan));
+                if(!provider.account(tokens.access()).id().equals(claim.account()))throw new ApiFailure(409,"TASK_PROVIDER_ACCOUNT_CHANGED");
+                var scans=new TaskProviderScans(store,receipts,inputs);
+                var scan=store.transaction(claim.owner(),()->scans.begin(claim));long deadline=System.nanoTime()+java.time.Duration.ofMinutes(2).toNanos();
+                while(scan!=null&&scan.path("state").asText().equals("FETCHING")){
+                    if(Thread.currentThread().isInterrupted()||System.nanoTime()>deadline)throw new ApiFailure(503,"TASK_PROVIDER_SCAN_INCOMPLETE");
+                    if(!store.transaction(claim.owner(),()->connections().active(claim)!=null))return;
+                    var page=provider.tasks(tokens.access(),claim.remoteList(),optionalText(scan.get("next")).orElse(null),optionalText(scan.get("updatedMin")).map(Instant::parse).orElse(null));
+                    var expected=scan;scan=store.transaction(claim.owner(),()->scans.acknowledge(claim,expected,page));
+                }
+                if(scan==null)return;
+                outcome=store.transaction(claim.owner(),()->scans.reconcile(claim));
             }
         }catch(TaskProviderHttp.Failure failure){error=failure.getMessage();retry=failure.retryAfterSeconds;}
         catch(ApiFailure failure){error=failure.code;}
@@ -89,7 +98,7 @@ class TaskProviderRefresh {
                     var query=connection.prepareStatement("SELECT r.owner_id,r.id,r.payload,c.payload FROM tk_resource r JOIN tk_resource c ON c.owner_id=r.owner_id AND c.id=r.id AND c.entity_type='TASK_CONNECTION' JOIN tk_account a ON a.owner_id=r.owner_id WHERE r.entity_type='TASK_AUTH' AND a.state<>'DISABLED'");var rows=query.executeQuery()){
                 while(rows.next()){
                     var value=parse(rows.getString(3));var metadata=parse(rows.getString(4));
-                    if(!metadata.path("enabled").asBoolean()||!metadata.path("readable").asBoolean()||value.path("blocked").asBoolean()||value.path("selected").isEmpty()&&!value.path("requested").asBoolean()
+                    if(!metadata.path("enabled").asBoolean()||!metadata.path("readable").asBoolean()||value.path("paused").asBoolean()||value.path("blocked").asBoolean()||value.path("selected").isEmpty()&&!value.path("requested").asBoolean()
                             ||!automatic&&!value.path("requested").asBoolean()||!value.hasNonNull("nextRefresh"))continue;
                     var provider=TaskProviderConfiguration.provider(metadata.path("providerId").asText());if(!configuration.available(provider))continue;
                     Instant next=Instant.parse(value.path("nextRefresh").asText());if(!next.isAfter(now))due.add(new Due(rows.getString(1),rows.getObject(2,UUID.class),next));

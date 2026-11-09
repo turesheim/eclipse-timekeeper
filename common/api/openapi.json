@@ -19791,6 +19791,280 @@
         },
         "description": "One selected list is fetched per cross-replica lease, with at most four workers per server. Source identity and the connection generation are checked before applying observations. Manual attempts within 30 seconds return 429; an already-running refresh returns 202. Missing or failed source reads do not delete tasks."
       }
+    },
+    "/task-providers/{id}/imports/{list}": {
+      "get": {
+        "operationId": "previewTaskProviderImport",
+        "summary": "Review a complete staged provider list before its first import",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "in": "path",
+            "name": "list",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderImportPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        }
+      },
+      "post": {
+        "operationId": "approveTaskProviderImport",
+        "summary": "Approve a staged first import without changing existing task projects",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "in": "path",
+            "name": "list",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderConnection"
+                }
+              }
+            }
+          }
+        },
+        "description": "One selected list is fetched per cross-replica lease, with at most four workers per server. Source identity and the connection generation are checked before applying observations. Manual attempts within 30 seconds return 429; an already-running refresh returns 202. Missing or failed source reads do not delete tasks."
+      }
+    },
+    "/task-providers/{id}/state": {
+      "put": {
+        "operationId": "pauseTaskProvider",
+        "summary": "Pause or resume an owned task connection",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderConnection"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskProviderStateInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31836,6 +32110,17 @@
           },
           "item": {
             "$ref": "#/components/schemas/TaskSyncObservedItem"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owned project for a newly imported task. Existing task projects are preserved; children must match their parent."
           }
         },
         "required": [
@@ -35416,7 +35701,17 @@
       },
       "TaskProviderAuthorizeInput": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "IMPORT",
+              "TWO_WAY"
+            ],
+            "default": "IMPORT",
+            "description": "Import-only by default. TWO_WAY explicitly requests write consent; currently supported for Google Tasks only."
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
@@ -35487,6 +35782,21 @@
             },
             "maxItems": 20,
             "uniqueItems": true
+          },
+          "projectMappings": {
+            "type": "object",
+            "maxProperties": 20,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Map selected remote list IDs to owned projects for new imports only. Existing task projects never change."
           }
         },
         "required": [
@@ -35569,7 +35879,8 @@
           "direction": {
             "type": "string",
             "enum": [
-              "IMPORT"
+              "IMPORT",
+              "TWO_WAY"
             ]
           },
           "syncing": {
@@ -35634,6 +35945,37 @@
               "$ref": "#/components/schemas/TaskProviderList"
             },
             "maxItems": 1000
+          },
+          "projectMappings": {
+            "type": "object",
+            "maxProperties": 20,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Map selected remote list IDs to owned projects for new imports only. Existing task projects never change."
+          },
+          "imports": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/TaskProviderImportStatus"
+            }
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused connections retain credentials and staged pages but perform no provider I/O."
+          },
+          "configurationVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Changes only when consent or list/project selection changes. Polling, credential refresh and pause state do not replace a settings draft."
           }
         },
         "required": [
@@ -35656,7 +35998,7 @@
           "availableLists"
         ],
         "additionalProperties": false,
-        "description": "Owned inbound Google Tasks or Microsoft To Do connection. Provider tokens and private observations are never included. Native task edits remain local; conflicting remote observations require review."
+        "description": "Owned Google Tasks or Microsoft To Do connection. Provider tokens and private observations are never included. Google write-back requires explicit TWO_WAY consent and an actual write grant; import-only remains the default."
       },
       "TaskProviderConnections": {
         "type": "object",
@@ -35694,6 +36036,135 @@
           "items",
           "providers",
           "refreshMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderImportStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteListId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "FETCHING",
+              "READY"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "remoteListId",
+          "state",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderImportPreview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteListId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "existingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deletedCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "samples": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "deleted": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "title",
+                "deleted"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "remoteListId",
+          "observedAt",
+          "projectId",
+          "count",
+          "createCount",
+          "existingCount",
+          "deletedCount",
+          "revision",
+          "samples",
+          "version"
+        ]
+      },
+      "TaskProviderStateInput": {
+        "type": "object",
+        "properties": {
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paused"
         ],
         "additionalProperties": false
       }

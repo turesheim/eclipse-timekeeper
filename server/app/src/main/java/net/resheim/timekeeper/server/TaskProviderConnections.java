@@ -12,23 +12,25 @@ import net.resheim.eclipse.timekeeper.domain.*;
 /** Private, owner-scoped provider grants. Neither resource kind is part of portable account data. */
 final class TaskProviderConnections {
     static final String AUTH="TASK_AUTH",FLOW="TASK_OAUTH";
-    record Grant(String owner,TaskCloudProvider.Provider provider,String verifier,String settingsHash) {
+    record Grant(String owner,TaskCloudProvider.Provider provider,String verifier,String settingsHash,boolean writable) {
         @Override public String toString(){return "Consumed task-provider authorization grant";}
     }
     record Claim(String owner,UUID id,String lease,TaskCloudProvider.Provider provider,String account,String remoteList,UUID list,boolean discover,boolean catalogOnly,
-            String settingsHash,TaskProviderOAuth.Tokens tokens) {
+            String settingsHash,TaskProviderOAuth.Tokens tokens,boolean writable,String generation) {
         @Override public String toString(){return "Claimed task-provider refresh";}
     }
     private final ServerStore store;
     TaskProviderConnections(ServerStore store){this.store=store;}
 
-    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser){
+    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser){return begin(provider,settings,browser,false);}
+    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,boolean writable){
+        if(writable&&provider!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
         String binding=binding(browser);Instant now=store.now();
         for(var flow:store.list(FLOW))if(!Instant.parse(flow.path("expires").asText()).isAfter(now))remove(FLOW,flow);
         if(store.list(FLOW).size()>=5)throw new ApiFailure(429,"TASK_PROVIDER_AUTHORIZATION_LIMIT");
-        var attempt=new TaskProviderOAuth(provider).begin(settings);
+        var attempt=new TaskProviderOAuth(provider).begin(settings,writable);
         var value=object().put("provider",provider.name()).put("stateHash",hash(attempt.state())).put("browserHash",binding)
-                .put("verifier",attempt.verifier()).put("settingsHash",settingsHash(settings)).put("expires",now.plusSeconds(600).toString());
+                .put("verifier",attempt.verifier()).put("settingsHash",settingsHash(settings)).put("writable",writable).put("expires",now.plusSeconds(600).toString());
         insert(FLOW,flowId(attempt.state()),value);
         return object().put("authorizationUrl",attempt.address()).put("expiresAt",value.path("expires").asText());
     }
@@ -38,11 +40,12 @@ final class TaskProviderConnections {
         if(!equal(value.path("stateHash").asText(),hash(state))||!equal(value.path("browserHash").asText(),binding(browser)))throw new ApiFailure(403,"TASK_PROVIDER_BROWSER_CHANGED");
         if(!Instant.parse(value.path("expires").asText()).isAfter(store.now()))throw new ApiFailure(409,"TASK_PROVIDER_AUTHORIZATION_EXPIRED");
         remove(FLOW,value);
-        return new Grant(store.owner(),TaskCloudProvider.Provider.valueOf(value.path("provider").asText()),value.path("verifier").asText(),value.path("settingsHash").asText());
+        return new Grant(store.owner(),TaskCloudProvider.Provider.valueOf(value.path("provider").asText()),value.path("verifier").asText(),value.path("settingsHash").asText(),value.path("writable").asBoolean());
     }
     ObjectNode connect(Grant grant,TaskProviderOAuth.Settings settings,TaskCloudProvider.Account account,TaskProviderOAuth.Tokens tokens,List<TaskCloudProvider.RemoteList> catalog){
         if(!grant.owner().equals(store.owner()))throw ApiFailure.notFound();
         if(!equal(grant.settingsHash(),settingsHash(settings)))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
+        if(grant.writable()&&(grant.provider()!=TaskCloudProvider.Provider.GOOGLE||!new TaskProviderOAuth(grant.provider()).canWrite(tokens.scopes())))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");
         var provider=new TaskCloudProvider(grant.provider());var seen=new HashSet<String>();var lists=array();
         if(catalog.size()>1000)throw new ApiFailure(422,"TASK_PROVIDER_LIST_LIMIT");
         for(var list:catalog){
@@ -53,10 +56,16 @@ final class TaskProviderConnections {
         TaskConnection old=null;
         for(var connection:store.list("TASK_CONNECTION"))if(connection.path("providerId").asText().equals(provider.id())&&connection.path("remoteAccountId").asText().equals(account.id())){old=(TaskConnection)decode("TASK_CONNECTION",connection);break;}
         UUID id=old==null?UUID.randomUUID():old.id();
-        var connection=new TaskConnection(id,provider.id(),account.id(),old==null?account.name():old.name(),true,false,true,capabilities(provider.capabilities()),old==null?0:old.version()+1);
+        var connection=new TaskConnection(id,provider.id(),account.id(),old==null?account.name():old.name(),true,grant.writable(),true,capabilities(provider.capabilities(grant.writable())),old==null?0:old.version()+1);
         store.save("TASK_CONNECTION",connection);store.change("TASK_CONNECTION",old==null?"CREATED":"UPDATED",id.toString());
+        for(var list:ownedLists(id).values())if(list.writable()!=grant.writable()){
+            var updated=new TaskList(list.id(),list.connectionId(),list.remoteListId(),list.name(),list.kind(),list.readable(),grant.writable(),list.shared(),list.owner(),list.present(),list.position(),list.sharing(),list.providerData(),list.version()+1);
+            store.save("TASK_LIST",updated);store.change("TASK_LIST","UPDATED",list.id().toString());
+        }
         var previous=store.find(AUTH,id);var value=previous.map(node->((ObjectNode)node).deepCopy()).orElseGet(JsonValues::object);
         value.put("accessToken",tokens.access()).put("refreshToken",tokens.refresh()).put("tokenExpires",tokens.expires().toString()).put("settingsHash",settingsHash(settings));
+        value.put("direction",grant.writable()?"TWO_WAY":"IMPORT").put("generation",UUID.randomUUID().toString());
+        value.put("configurationVersion",value.path("configurationVersion").asLong()+1);
         var scopes=value.putArray("scopes");tokens.scopes().stream().sorted().forEach(scopes::add);value.set("catalog",lists);
         if(!value.has("selected"))value.putArray("selected");
         value.putNull("lastError").putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().toString());
@@ -69,18 +78,24 @@ final class TaskProviderConnections {
     ObjectNode visible(JsonNode value){
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
-        result.set("version",value.path("version"));result.put("direction","IMPORT");
-        result.put("syncing",value.hasNonNull("lease")||value.path("roundActive").asBoolean()||value.path("requested").asBoolean()).put("pendingCount",value.path("pendingCount").asInt());
+        result.set("version",value.path("version"));result.put("configurationVersion",value.path("configurationVersion").asLong()).put("direction",value.path("direction").asText("IMPORT")).put("paused",value.path("paused").asBoolean());
+        result.put("syncing",!value.path("paused").asBoolean()&&(value.hasNonNull("lease")||value.path("roundActive").asBoolean()||value.path("requested").asBoolean())).put("pendingCount",value.path("pendingCount").asInt());
         result.set("listErrors",value.has("listErrors")?value.get("listErrors").deepCopy():object());
         for(String field:List.of("lastAttempt","lastSuccess","lastError","nextRefresh"))result.set(field,value.has(field)?value.get(field):com.fasterxml.jackson.databind.node.NullNode.instance);
         result.set("selectedLists",value.path("selected").deepCopy());var catalog=result.putArray("availableLists");
+        result.set("projectMappings",value.path("projects").isObject()?value.path("projects").deepCopy():object());result.set("imports",TaskProviderScans.previews(store,value));
         for(var list:value.path("catalog")){var item=object();for(String field:List.of("id","name","kind","shared","owner"))item.set(field,list.path(field));catalog.add(item);}
         return result;
     }
-    ObjectNode select(UUID id,List<String> selected,String match){
+    ObjectNode select(UUID id,List<String> selected,String match){return select(id,selected,null,match);}
+    ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match){
         var value=required(id);ApiReplies.match(visible(value),match);
         if(selected.size()>20||new HashSet<>(selected).size()!=selected.size())throw ApiFailure.validation();
         var chosen=new HashSet<>(selected);var known=new HashSet<String>();
+        var mappings=projects==null?(value.path("projects").isObject()?((ObjectNode)value.get("projects")).deepCopy():object()):((ObjectNode)projects).deepCopy();
+        if(projects!=null)for(var names=projects.fieldNames();names.hasNext();)if(!chosen.contains(names.next()))throw ApiFailure.validation();
+        mappings.retain(selected);for(var project:mappings)if(!project.isNull())store.find("PROJECT",uuid(project)).orElseThrow(ApiFailure::notFound);
+        value.set("projects",mappings);var approved=array();for(var remote:value.path("approved"))if(chosen.contains(remote.asText()))approved.add(remote);value.set("approved",approved);
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
         String provider=connection.path("providerId").asText();int position=0;var existingLists=ownedLists(id);
@@ -94,12 +109,12 @@ final class TaskProviderConnections {
                 var previous=(ObjectNode)parse(envelope.json());previous.set("observation",remote.path("observation").deepCopy());payload=previous;
             }
             var envelope=object().put("namespace",provider+".tasks").put("version",1);envelope.set("payload",payload);
-            var list=new TaskList(old==null?UUID.randomUUID():old.id(),id,key,remote.path("name").asText(),TaskListKind.valueOf(remote.path("kind").asText()),true,false,
+            var list=new TaskList(old==null?UUID.randomUUID():old.id(),id,key,remote.path("name").asText(),TaskListKind.valueOf(remote.path("kind").asText()),true,writable(value,connection),
                     remote.path("shared").asBoolean(),remote.path("owner").asBoolean(),true,position++,old==null?TaskListSharing.empty():old.sharing(),Optional.of(providerData(envelope)),old==null?0:old.version()+1);
             store.save("TASK_LIST",list);store.change("TASK_LIST",old==null?"CREATED":"UPDATED",list.id().toString());
         }
         if(!known.containsAll(chosen))throw ApiFailure.validation();
-        var ids=value.putArray("selected");selected.forEach(ids::add);value.put("nextRefresh",store.now().toString()).putNull("lease").putNull("leaseUntil");
+        var ids=value.putArray("selected");selected.forEach(ids::add);value.put("configurationVersion",value.path("configurationVersion").asLong()+1).put("generation",UUID.randomUUID().toString()).put("nextRefresh",store.now().toString()).putNull("lease").putNull("leaseUntil");
         value.put("roundActive",false).put("roundIndex",0).put("requested",!selected.isEmpty()&&!value.path("blocked").asBoolean()).put("pendingCount",0).putNull("lastSuccess");
         if(!value.path("blocked").asBoolean())value.putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         return visible(save(AUTH,value));
@@ -107,6 +122,7 @@ final class TaskProviderConnections {
     /** One list per lease bounds work and lets other accounts make progress between large lists. */
     Claim claim(UUID id,boolean force){
         var value=required(id);if(!enabled())return null;
+        if(value.path("paused").asBoolean()){if(force)throw new ApiFailure(409,"TASK_PROVIDER_PAUSED");return null;}
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
         boolean catalogOnly=value.path("selected").isEmpty();if(catalogOnly&&!force&&!value.path("requested").asBoolean())return null;
@@ -118,7 +134,7 @@ final class TaskProviderConnections {
             value.put("roundActive",false).put("requested",true);
         }else if(value.hasNonNull("nextRefresh")&&Instant.parse(value.path("nextRefresh").asText()).isAfter(now))return null;
         if(!value.path("roundActive").asBoolean()){
-            value.put("roundActive",true).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
+            value.put("roundActive",true).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         }
         int index=value.path("roundIndex").asInt();if(index<0||!catalogOnly&&index>=value.path("selected").size())throw ApiFailure.conflict();
         String remote=catalogOnly?null:value.path("selected").get(index).asText();UUID listId=null;
@@ -126,16 +142,17 @@ final class TaskProviderConnections {
         String lease=UUID.randomUUID().toString();value.put("lease",lease).put("leaseUntil",now.plusSeconds(600).toString()).put("lastAttempt",now.toString()).put("nextRefresh",now.plusSeconds(600).toString());
         save(AUTH,value);var scopes=new HashSet<String>();value.path("scopes").forEach(scope->scopes.add(scope.asText()));
         return new Claim(store.owner(),id,lease,TaskProviderConfiguration.provider(connection.path("providerId").asText()),connection.path("remoteAccountId").asText(),remote,listId,index==0||catalogOnly,catalogOnly,
-                value.path("settingsHash").asText(),new TaskProviderOAuth.Tokens(value.path("accessToken").asText(),value.path("refreshToken").asText(),Instant.parse(value.path("tokenExpires").asText()),scopes));
+                value.path("settingsHash").asText(),new TaskProviderOAuth.Tokens(value.path("accessToken").asText(),value.path("refreshToken").asText(),Instant.parse(value.path("tokenExpires").asText()),scopes),writable(value,connection),value.path("generation").asText());
     }
     ObjectNode active(Claim claim){
         if(!store.owner().equals(claim.owner())||!enabled())return null;
         var value=store.find(AUTH,claim.id());var connection=store.find("TASK_CONNECTION",claim.id());
-        return value.isPresent()&&connection.isPresent()&&connection.get().path("enabled").asBoolean()&&connection.get().path("readable").asBoolean()
-                &&value.get().path("lease").asText().equals(claim.lease())?((ObjectNode)value.get()).deepCopy():null;
+        return value.isPresent()&&connection.isPresent()&&!value.get().path("paused").asBoolean()&&connection.get().path("enabled").asBoolean()&&connection.get().path("readable").asBoolean()
+                &&value.get().path("lease").asText().equals(claim.lease())&&value.get().path("generation").asText().equals(claim.generation())?((ObjectNode)value.get()).deepCopy():null;
     }
     boolean credentials(Claim claim,TaskProviderOAuth.Tokens tokens){
         var value=active(claim);if(value==null)return false;
+        if(claim.writable()&&!new TaskProviderOAuth(claim.provider()).canWrite(tokens.scopes()))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");
         value.put("accessToken",tokens.access()).put("refreshToken",tokens.refresh()).put("tokenExpires",tokens.expires().toString());
         var scopes=value.putArray("scopes");tokens.scopes().stream().sorted().forEach(scopes::add);save(AUTH,value);return true;
     }
@@ -170,7 +187,8 @@ final class TaskProviderConnections {
         int next=value.path("roundIndex").asInt()+1;boolean more=!blocked&&next<value.path("selected").size();
         value.put("roundIndex",more?next:0).put("roundActive",more).put("blocked",blocked).putNull("lease").putNull("leaseUntil");
         if(!more)value.put("requested",false);
-        if(!more&&errors.isEmpty())value.put("lastSuccess",store.now().toString());
+        if(outcome!=null&&outcome.path("awaitingImport").asBoolean())value.put("roundPreview",true);
+        if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean())value.put("lastSuccess",store.now().toString());
         String first=errors.isEmpty()?null:errors.elements().next().asText();if(first==null)value.putNull("lastError");else value.put("lastError",first);
         if(blocked)value.putNull("nextRefresh");
         else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,Math.min(900,retryAfter)),more?0:errors.isEmpty()?900:60)).toString());
@@ -180,16 +198,26 @@ final class TaskProviderConnections {
         try(var query=store.statement("SELECT state FROM tk_account WHERE owner_id=?",store.owner());var rows=query.executeQuery()) {return rows.next()&&!rows.getString(1).equals("DISABLED");}
         catch(java.sql.SQLException failure){throw new ApiFailure(503,"UNAVAILABLE");}
     }
+    ObjectNode pause(UUID id,boolean paused,String match){
+        var value=required(id);ApiReplies.match(visible(value),match);
+        value.put("paused",paused).putNull("lease").putNull("leaseUntil").put("roundActive",false).put("roundIndex",0).put("requested",!paused&&!value.path("selected").isEmpty());
+        if(paused)value.putNull("nextRefresh");else value.put("nextRefresh",store.now().toString());
+        return visible(save(AUTH,value));
+    }
     void disconnect(UUID id,String match){
         var value=required(id);ApiReplies.match(visible(value),match);
         var before=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);var connection=(TaskConnection)decode("TASK_CONNECTION",before);
         store.save("TASK_CONNECTION",connection.update(connection.name(),false,false,false));store.change("TASK_CONNECTION","UPDATED",id.toString());remove(AUTH,value);
     }
     static String settingsHash(TaskProviderOAuth.Settings settings){return hash(settings.clientId()+"\n"+settings.redirect()+"\n"+hash(settings.clientSecret()));}
+    static boolean writable(JsonNode credentials,JsonNode connection){
+        return credentials.path("direction").asText().equals("TWO_WAY")&&connection.path("providerId").asText().equals("google")&&connection.path("writable").asBoolean()
+                &&java.util.stream.StreamSupport.stream(credentials.path("scopes").spliterator(),false).anyMatch(scope->scope.asText().equals("https://www.googleapis.com/auth/tasks"));
+    }
     private static UUID flowId(String state){return UUID.nameUUIDFromBytes(("dagsverk-task-flow:"+state).getBytes(StandardCharsets.UTF_8));}
     private static boolean equal(String left,String right){return MessageDigest.isEqual(left.getBytes(StandardCharsets.UTF_8),right.getBytes(StandardCharsets.UTF_8));}
     private static String binding(String browser){if(browser==null||browser.isBlank()||browser.length()>1024)throw new ApiFailure(403,"TASK_PROVIDER_BROWSER_REQUIRED");return hash(browser);}
-    private ObjectNode insert(String kind,UUID id,ObjectNode value){value=value.deepCopy();value.put("id",id.toString()).put("ownerId",store.owner()).put("version",0);store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),kind,id,0,value.toString());return value;}
+    ObjectNode insert(String kind,UUID id,ObjectNode value){value=value.deepCopy();value.put("id",id.toString()).put("ownerId",store.owner()).put("version",0);store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),kind,id,0,value.toString());return value;}
     ObjectNode save(String kind,ObjectNode value){long version=value.path("version").asLong();value=value.deepCopy().put("version",version+1);if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),kind,uuid(value.get("id")),version)!=1)throw new ApiFailure(412,"STALE_VERSION");return value;}
     private void remove(String kind,JsonNode value){if(store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=? AND version=?",store.owner(),kind,uuid(value.get("id")),value.path("version").asLong())!=1)throw new ApiFailure(412,"STALE_VERSION");}
 }

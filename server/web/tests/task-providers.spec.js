@@ -19,11 +19,12 @@ async function signIn(page,request,{language='en-GB',readOnly=false}={}){
   return (await(await browserRequest(page).get('/api/v1/auth/session')).json()).ownerId;
 }
 function connection(owner,overrides={}){
-  return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,direction:'IMPORT',syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
+  return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null}={}){
-  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0};
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[]}={}){
+  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3};
+  if(projects.length)await page.route('**/api/v1/projects?*',route=>route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({items:projects,revision:1,nextCursor:null})}));
   await page.route('**/api/v1/task-providers**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname.slice('/api/v1/task-providers'.length),method=request.method(),input=JSON.parse(request.postData()||'{}');
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')};
@@ -34,8 +35,16 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     if(path==='/complete'){model.completed++;expect(input).toEqual({state,code});expect(new URL(page.url()).search).toBe('');expect(request.headers().referer).not.toContain(code);expect(request.headers().referer).not.toContain(state);return reply(model.rows[0]);}
     if(path==='/cancel'){model.cancelled++;expect(input).toEqual({state});return reply(null,204);}
     const row=model.rows.find(value=>path.startsWith('/'+value.id));if(!row)return reply({type:'about:blank',title:'Not found',status:404,code:'NOT_FOUND'},404);
+    if(path.includes('/imports/')){
+      if(method==='GET')return reply({id:path.split('/').at(-1),version:model.previewVersion,remoteListId:'work',projectId:row.projectMappings.work||null,observedAt:'2026-11-09T12:00:00Z',count:3,createCount:2,existingCount:1,deletedCount:0,revision:'a'.repeat(64),samples:[{title:'Source <img src=x onerror=alert(1)>',deleted:false},{title:'Undated task',deleted:false}]});
+      if(method==='POST'){
+        if(request.headers()['if-match']!==`"provider-${model.previewVersion}"`)return reply({type:'about:blank',title:'Stale version',status:412,code:'STALE_VERSION'},412);
+        row.imports=[];row.version++;return reply(row);
+      }
+    }
     if(method==='GET')return reply(row);
-    if(method==='PUT'&&path.endsWith('/lists')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedLists=input.selectedLists;row.version++;row.syncing=true;return reply(row);}
+    if(method==='PUT'&&path.endsWith('/lists')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedLists=input.selectedLists;row.projectMappings=input.projectMappings;row.version++;row.configurationVersion++;row.syncing=true;return reply(row);}
+    if(method==='PUT'&&path.endsWith('/state')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.paused=input.paused;row.version++;return reply(row);}
     if(method==='DELETE'){model.rows=model.rows.filter(value=>value!==row);return reply(null,204);}
     if(method==='POST'&&path.endsWith('/refresh')){row.version++;row.lastSuccess='2026-11-09T12:01:00Z';return reply(row,202);}
     throw new Error('Unexpected task provider fixture request');
@@ -48,14 +57,14 @@ test.afterEach(async({request})=>{await locale(request,'en-GB');});
 test('provider setup availability and read-only sessions do not acquire write controls',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],providers:{google:true,microsoft:false}});await open(page);
   await expect(page.getByRole('heading',{name:'Task connections',exact:true})).toBeVisible();
-  for(const name of ['Connect Google Tasks','Connect Microsoft To Do','Save','Refresh from provider','Reconnect','Disconnect'])await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();
+  for(const name of ['Connect Google Tasks','Connect Microsoft To Do','Save','Refresh from provider','Pause synchronization','Reconnect','Disconnect'])await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();
   await expect(card(page,row.id).getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Refresh status',exact:true})).toBeEnabled();
   await expect(page.getByText('Unavailable task providers must be enabled by the server administrator.',{exact:true})).toBeVisible();expect(model.writes).toEqual([]);
 });
 
 test('list drafts survive status updates and stale saves keep the captured selection',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row]});await open(page);
-  const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();row.version++;row.syncing=true;
+  const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();row.version++;row.configurationVersion++;row.syncing=true;
   await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(home).toBeChecked();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(home).toBeChecked();expect(model.writes.filter(value=>value.method==='PUT')).toEqual([]);
 });
@@ -63,7 +72,7 @@ test('list drafts survive status updates and stale saves keep the captured selec
 test('saved selections refresh in the background without replacing focused controls',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row]});await open(page);
   const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();await panel.getByRole('button',{name:'Save',exact:true}).click();
-  await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();expect(model.writes.find(value=>value.method==='PUT').input).toEqual({selectedLists:['work','home']});
+  await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();expect(model.writes.find(value=>value.method==='PUT').input).toEqual({selectedLists:['work','home'],projectMappings:{work:null,home:null}});
   row.version++;row.syncing=false;row.lastSuccess='2026-11-09T12:01:00Z';await home.focus();await page.getByRole('button',{name:'Refresh status',exact:true}).evaluate(button=>button.click());
   await expect(home).toBeFocused();await expect(home).toBeChecked();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toHaveCount(0);
   await panel.getByRole('button',{name:'Disconnect',exact:true}).click();await expect(panel).toHaveCount(0);await expect(page.getByText('Disconnected. Imported tasks remain in Dagsverk.',{exact:true})).toBeVisible();expect(model.writes.filter(value=>value.method==='DELETE')).toHaveLength(1);
@@ -77,6 +86,39 @@ test('provider status errors are actionable and remain text in all themes and na
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   }
   await captureScreenshot(page,{path:'test-results/task-providers-320.png',fullPage:true});
+});
+
+test('initial import is reviewed before approval and stale previews retain the displayed comparison',async({page,request})=>{
+  const owner=await signIn(page,request),list=randomUUID(),row=connection(owner,{imports:[{id:list,remoteListId:'work',state:'READY',count:3}]});
+  const model=await providerFixture(page,owner,{rows:[row]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review import for Work',exact:true}).click();
+  await expect(panel.getByRole('heading',{name:'Import preview · Work',exact:true})).toBeFocused();
+  await expect(panel.getByText('2 new tasks, 1 existing matches, 0 deleted records.',{exact:true})).toBeVisible();await expect(panel.getByText('Source <img src=x onerror=alert(1)>',{exact:true})).toBeVisible();await expect(panel.locator('img')).toHaveCount(0);
+  expect(model.writes).toEqual([]);model.previewVersion++;
+  await panel.getByRole('button',{name:'Import this list',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(panel.getByText('Source <img src=x onerror=alert(1)>',{exact:true})).toBeVisible();expect(row.imports).toHaveLength(1);
+  await panel.getByRole('button',{name:'Review import for Work',exact:true}).click();await panel.getByRole('button',{name:'Import this list',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Review import for Work',exact:true})).toHaveCount(0);await expect(panel.getByRole('heading',{name:'Google Tasks · Fixture account',exact:true})).toBeFocused();
+  expect(model.writes.filter(value=>value.method==='POST')).toHaveLength(2);expect(row.imports).toEqual([]);
+});
+
+test('project mappings and list drafts survive pause, resume and status polling',async({page,request})=>{
+  const owner=await signIn(page,request),project=randomUUID(),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],projects:[{id:project,name:'Imported work'}]});await open(page);const panel=card(page,row.id);
+  const mapping=panel.getByRole('combobox',{name:'Project for Work',exact:true});await mapping.selectOption(project);await panel.getByRole('checkbox',{name:'Home',exact:true}).check();
+  await panel.getByRole('button',{name:'Pause synchronization',exact:true}).click();await expect(panel.getByRole('button',{name:'Resume synchronization',exact:true})).toBeVisible();await expect(panel.getByRole('button',{name:'Refresh from provider',exact:true})).toBeDisabled();await expect(mapping).toHaveValue(project);await expect(panel.getByRole('checkbox',{name:'Home',exact:true})).toBeChecked();
+  await panel.getByRole('button',{name:'Resume synchronization',exact:true}).click();await expect(mapping).toHaveValue(project);expect(model.writes.map(value=>value.input)).toEqual([{paused:true},{paused:false}]);
+  await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();await expect(mapping).toHaveValue(project);
+  expect(model.writes.find(value=>value.path.endsWith('/lists')).input).toEqual({selectedLists:['work','home'],projectMappings:{work:project,home:null}});
+});
+
+test('project choice is sent with selected lists',async({page,request})=>{
+  const owner=await signIn(page,request),project=randomUUID(),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],projects:[{id:project,name:'Imported work'}]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('combobox',{name:'Project for Work',exact:true}).selectOption(project);await panel.getByRole('button',{name:'Save',exact:true}).click();
+  expect(model.writes.find(value=>value.path.endsWith('/lists')).input).toEqual({selectedLists:['work'],projectMappings:{work:project}});
+});
+
+test('read-only sessions can inspect but cannot approve imports',async({page,request})=>{
+  const readOwner=await signIn(page,request,{readOnly:true}),readRow=connection(readOwner,{imports:[{id:randomUUID(),remoteListId:'work',state:'READY',count:3}]});const readModel=await providerFixture(page,readOwner,{rows:[readRow]});await open(page);const readonly=card(page,readRow.id);
+  await readonly.getByRole('button',{name:'Review import for Work',exact:true}).click();await expect(readonly.getByRole('button',{name:'Import this list',exact:true})).toBeDisabled();expect(readModel.writes).toEqual([]);
 });
 
 test('task connections and failure states are localized in Norwegian',async({page,request})=>{

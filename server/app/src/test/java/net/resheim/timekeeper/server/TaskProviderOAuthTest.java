@@ -2,6 +2,7 @@ package net.resheim.timekeeper.server;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.net.URLDecoder;
+import java.net.URI;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class TaskProviderOAuthTest {
     private static final Instant NOW=Instant.parse("2026-11-09T12:00:00Z");
     private static final String READ="https://www.googleapis.com/auth/tasks.readonly";
+    private static final String WRITE="https://www.googleapis.com/auth/tasks";
     private static final String VERIFIER="dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     private TaskProviderOAuth.Settings settings(){return new TaskProviderOAuth.Settings("client-id","private-client-secret","https://dagsverk.example.invalid/web/task-provider-callback.html");}
     private TaskProviderHttp.Reply reply(int status,String json){return new TaskProviderHttp.Reply(status,Map.of(),json.getBytes(StandardCharsets.UTF_8));}
@@ -32,6 +34,23 @@ class TaskProviderOAuthTest {
             public void onError(Throwable error){done.completeExceptionally(error);}
             public void onComplete(){done.complete(null);}
         });done.join();return bytes.toString(StandardCharsets.UTF_8);
+    }
+    @Test void writeAuthorizationRequiresAnExplicitRequestAndAnActualWriteGrant(){
+        assertEquals("openid "+READ,form(URI.create(oauth().begin(settings()).address()).getRawQuery()).get("scope"));
+        var requested=form(URI.create(oauth().begin(settings(),true).address()).getRawQuery());assertEquals("openid "+WRITE,requested.get("scope"));assertEquals("S256",requested.get("code_challenge_method"));
+        var readOnly=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"access\",\"refresh_token\":\"refresh\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\"openid "+READ+"\"}"));
+        assertEquals("TASK_PROVIDER_PERMISSION_REQUIRED",assertThrows(TaskProviderHttp.Failure.class,()->readOnly.exchange(settings(),"code",VERIFIER,NOW,true)).getMessage());assertEquals("access",readOnly.exchange(settings(),"code",VERIFIER,NOW).access());
+        var granted=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"access\",\"refresh_token\":\"refresh\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\"openid "+WRITE+"\"}"));
+        assertTrue(granted.exchange(settings(),"code",VERIFIER,NOW,true).scopes().contains(WRITE));
+    }
+    @Test void refreshingCannotUpgradeAReadOnlyGrantAndMissingWritePermissionIsNotAccepted(){
+        var readOnly=new TaskProviderOAuth.Tokens("access","refresh",NOW,Set.of("openid",READ));
+        assertEquals("TASK_PROVIDER_PERMISSION_REQUIRED",assertThrows(TaskProviderHttp.Failure.class,()->oauth().refresh(settings(),readOnly,NOW,true)).getMessage());
+        var writable=new TaskProviderOAuth.Tokens("access","refresh",NOW,Set.of("openid",WRITE));
+        var downgraded=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"renewed\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\"openid "+READ+"\"}"));
+        assertEquals("TASK_PROVIDER_PERMISSION_REQUIRED",assertThrows(TaskProviderHttp.Failure.class,()->downgraded.refresh(settings(),writable,NOW,true)).getMessage());
+        var retained=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"renewed\",\"token_type\":\"Bearer\",\"expires_in\":3600}"));
+        var renewed=retained.refresh(settings(),writable,NOW,true);assertTrue(renewed.scopes().contains(WRITE));assertEquals("refresh",renewed.refresh());
     }
     @Test void pkceMatchesTheRfc7636S256Vector(){assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",TaskProviderOAuth.challenge(VERIFIER));}
     @Test void googleRequestsReadOnlyOfflineAccessWithUniqueStateAndNoClientSecret(){

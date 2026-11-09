@@ -57,22 +57,27 @@ final class TaskCloudProvider {
             next=page.next();if(next!=null&&(!pages.add(next)||pages.size()>100))throw new TaskProviderHttp.Failure("TASK_PROVIDER_SCAN_INCOMPLETE",0,0,false);
         }while(next!=null);return List.copyOf(result);
     }
-    Page<RemoteTask> tasks(String token,String listId,String next){
+    Page<RemoteTask> tasks(String token,String listId,String next){return tasks(token,listId,next,null);}
+    Page<RemoteTask> tasks(String token,String listId,String next,Instant updatedMin){
         if(listId==null||listId.isBlank()||listId.length()>1024)throw invalid();
         String collection=provider==Provider.GOOGLE?GOOGLE+"lists/"+segment(listId)+"/tasks":GRAPH+"todo/lists/"+segment(listId)+"/tasks";
         var value=get(address(collection,next,provider==Provider.GOOGLE
-                ?"maxResults=100&showCompleted=true&showHidden=true&showDeleted=true&showAssigned=true":"$top=100"),token);
+                ?"maxResults=100&showCompleted=true&showHidden=true&showDeleted=true&showAssigned=true"+(updatedMin==null?"":"&updatedMin="+segment(updatedMin.toString())):"$top=100"),token);
         var result=new ArrayList<RemoteTask>();
         for(var task:items(value))result.add(normalize(task));
         return new Page<>(result,next(value,collection),delta(value,collection));
     }
-    ObjectNode capabilities(){
-        var result=object().put("version",1).put("providerApiVersion",provider==Provider.GOOGLE?"tasks-v1/dagsverk-read-1":"graph-v1.0/dagsverk-read-1");
+    ObjectNode capabilities(){return capabilities(false);}
+    ObjectNode capabilities(boolean writable){
+        var result=object().put("version",1).put("providerApiVersion",provider==Provider.GOOGLE?"tasks-v1/dagsverk-1":"graph-v1.0/dagsverk-read-1");
         var fields=result.putObject("fields");
         var names=new ArrayList<>(List.of("summary","body","status","completedAt"));
         if(provider==Provider.GOOGLE)names.addAll(List.of("scheduledDate","parentTaskId","siblingOrder"));
         else names.addAll(List.of("start","due","priority","metadata.categories"));
         for(String name:names)fields.putObject(name).put("readable",true).put("writable",false).put("deletable",false).putNull("note");
+        if(writable&&provider==Provider.GOOGLE)for(String name:List.of("summary","body","status","completedAt","scheduledDate")){
+            ((ObjectNode)fields.get(name)).put("writable",true).put("deletable",!name.equals("summary")&&!name.equals("status"));
+        }
         return result;
     }
     RemoteTask normalize(JsonNode value){

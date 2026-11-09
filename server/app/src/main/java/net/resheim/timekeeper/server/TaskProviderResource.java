@@ -19,6 +19,7 @@ public class TaskProviderResource {
     @Inject TaskProviderConfiguration configuration;
     @Inject TaskProviderClients clients;
     @Inject TaskProviderRefresh refresh;
+    @Inject CommandReceipts receipts;
     @Context UriInfo uri;
     @Context HttpHeaders headers;
     private TaskProviderConnections connections(){return new TaskProviderConnections(store);}
@@ -36,8 +37,9 @@ public class TaskProviderResource {
         UUID key=ContractInputs.pathId(id);queries();return tx(()->ApiReplies.resource(200,connections().visible(connections().required(key)),null));
     }
     @POST @Path("/{provider}/authorize") public Response authorize(@PathParam("provider")String provider,JsonNode body){
-        inputs.validate("TaskProviderAuthorizeInput",body);queries();var kind=TaskProviderConfiguration.provider(provider);var settings=configuration.settings(kind);String browser=browser();
-        return tx(()->new ApiReplies(200,connections().begin(kind,settings,browser),null,null));
+        var input=inputs.validate("TaskProviderAuthorizeInput",body);queries();var kind=TaskProviderConfiguration.provider(provider);var settings=configuration.settings(kind);String browser=browser();
+        boolean writable=input.path("direction").asText("IMPORT").equals("TWO_WAY");
+        return tx(()->new ApiReplies(200,connections().begin(kind,settings,browser,writable),null,null));
     }
     @POST @Path("/cancel") public Response cancel(JsonNode body){
         var input=inputs.validate("TaskProviderCancelInput",body);queries();String browser=browser();
@@ -49,7 +51,7 @@ public class TaskProviderResource {
         var settings=configuration.settings(grant.provider());
         if(!TaskProviderConnections.settingsHash(settings).equals(grant.settingsHash()))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
         try{
-            var tokens=clients.oauth(grant.provider()).exchange(settings,input.path("code").asText(),grant.verifier(),clock.now());
+            var tokens=clients.oauth(grant.provider()).exchange(settings,input.path("code").asText(),grant.verifier(),clock.now(),grant.writable());
             var provider=clients.cloud(grant.provider());var account=provider.account(tokens.access());
             var catalog=provider.catalog(tokens.access());
             var response=tx(()->ApiReplies.resource(200,connections().connect(grant,settings,account,tokens,catalog),null));refresh.wake();return response;
@@ -58,10 +60,21 @@ public class TaskProviderResource {
     @PUT @Path("/{id}/lists") public Response select(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
         UUID key=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderSelectionInput",body);queries();
         var selected=new ArrayList<String>();input.path("selectedLists").forEach(value->selected.add(value.asText()));
-        var response=tx(()->ApiReplies.resource(200,connections().select(key,selected,match),null));refresh.wake();return response;
+        var response=tx(()->ApiReplies.resource(200,connections().select(key,selected,input.get("projectMappings"),match),null));refresh.wake();return response;
+    }
+    @GET @Path("/{id}/imports/{list}") public Response importPreview(@PathParam("id")String id,@PathParam("list")String list){
+        UUID key=ContractInputs.pathId(id),listKey=ContractInputs.pathId(list);queries();return tx(()->ApiReplies.resource(200,new TaskProviderScans(store,receipts,inputs).review(key,listKey),null));
+    }
+    @POST @Path("/{id}/imports/{list}") @Consumes("*/*") public Response importApprove(@PathParam("id")String id,@PathParam("list")String list,@HeaderParam("If-Match")String match){
+        UUID key=ContractInputs.pathId(id),listKey=ContractInputs.pathId(list);queries();
+        var response=tx(()->{new TaskProviderScans(store,receipts,inputs).approve(key,listKey,match);return ApiReplies.resource(200,connections().visible(connections().required(key)),null);});refresh.wake();return response;
     }
     @DELETE @Path("/{id}") public Response disconnect(@PathParam("id")String id,@HeaderParam("If-Match")String match){
         UUID key=ContractInputs.pathId(id);queries();return tx(()->{connections().disconnect(key,match);return new ApiReplies(204,null,null,null);});
+    }
+    @PUT @Path("/{id}/state") public Response state(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
+        UUID key=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderStateInput",body);queries();
+        var response=tx(()->ApiReplies.resource(200,connections().pause(key,input.path("paused").asBoolean(),match),null));refresh.wake();return response;
     }
     @POST @Path("/{id}/refresh") @Consumes("*/*") public Response refresh(@PathParam("id")String id){
         UUID key=ContractInputs.pathId(id);queries();return refresh.refresh(identity,key).response();

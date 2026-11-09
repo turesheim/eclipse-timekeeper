@@ -81,6 +81,12 @@ final class TaskSync {
             var parentId=optionalText(accepted.get("parentTaskId")).map(TaskSync::uuidText);
             var parent=parentId.map(value -> providerParent(value,key.providerId(),list.path("id").asText()));
             var projectId=parent.flatMap(value -> optionalText(value.get("projectId"))).map(TaskSync::uuidText).map(ProjectId::new);
+            var selectedProject=optionalText(input.get("projectId")).map(TaskSync::uuidText).map(ProjectId::new);
+            if(selectedProject.isPresent()){
+                store.find("PROJECT",selectedProject.get().value()).orElseThrow(ApiFailure::notFound);
+                if(parent.isPresent()&&!projectId.equals(selectedProject))throw ApiFailure.conflict();
+                projectId=selectedProject;
+            }
             var baseline=new ExternalTaskBaseline(1,store.now(),accepted.toString());
             var assignment=Optional.ofNullable(accepted.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
             var ref=new ExternalTaskReference(key.providerId(),key.repositoryId(),key.externalId(),Optional.empty(),
@@ -283,7 +289,9 @@ final class TaskSync {
         var row=object();row.put("field",field);row.put("reason",reason);warnings.add(row);
     }
 
-    ApiReplies preview(JsonNode input) {
+    ApiReplies preview(JsonNode input) {return preview(input,false);}
+    /** Only an in-process adapter with acknowledged pages can supply fresh complete-scan evidence. */
+    ApiReplies preview(JsonNode input,boolean acknowledgedScan) {
         UUID connectionId=uuid(input.get("connectionId")),listId=uuid(input.get("listId"));
         var connection=store.find("TASK_CONNECTION",connectionId).orElseThrow(ApiFailure::notFound);
         var list=store.find("TASK_LIST",listId).orElseThrow(ApiFailure::notFound);
@@ -291,7 +299,7 @@ final class TaskSync {
         boolean healthy=input.path("sourceState").asText().equals("HEALTHY")
                 && connection.path("enabled").asBoolean() && connection.path("readable").asBoolean()
                 && list.path("present").asBoolean() && list.path("readable").asBoolean();
-        boolean complete=healthy && input.path("scanComplete").asBoolean() && completedScan(connectionId,listId);
+        boolean complete=healthy && input.path("scanComplete").asBoolean() && (acknowledgedScan||completedScan(connectionId,listId));
         var result=object();result.put("revision",store.revision());
         optionalText(input.get("pageToken")).ifPresentOrElse(value -> result.put("pageToken",value),
                 () -> result.putNull("pageToken"));

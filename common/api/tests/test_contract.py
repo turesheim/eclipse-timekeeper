@@ -42,6 +42,11 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(validator('TaskProviderSelectionInput').is_valid({'selectedLists':['remote-list']}))
         self.assertFalse(validator('TaskProviderSelectionInput').is_valid({'selectedLists':['remote-list','remote-list']}))
         self.assertFalse(validator('TaskProviderSelectionInput').is_valid({'selectedLists':[],'ownerId':'foreign'}))
+        for value in [{},{'direction':'IMPORT'},{'direction':'TWO_WAY'}]:
+            self.assertTrue(validator('TaskProviderAuthorizeInput').is_valid(value))
+        for value in [{'direction':'EXPORT'},{'direction':'TWO_WAY','ownerId':'foreign'},{'writable':True}]:
+            self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid(value))
+        validator('TaskProviderConnection').validate({**connection,'direction':'TWO_WAY'})
         for name in ['TaskProviderCompleteInput','TaskProviderCancelInput']:
             self.assertTrue(CONTRACT['components']['schemas'][name]['properties']['state']['writeOnly'])
         self.assertTrue(CONTRACT['components']['schemas']['TaskProviderCompleteInput']['properties']['code']['writeOnly'])
@@ -749,7 +754,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',
