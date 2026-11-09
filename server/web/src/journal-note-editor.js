@@ -70,6 +70,7 @@ export class JournalNoteEditor {
   controls(){
     if(!this.markdown)return;
     const ready=!!this.note&&!this.busy,write=ready&&this.writable&&!this.stale;
+    this.markdown.root.inert=!ready;
     if(this.markdown.readOnly===write)this.markdown.setReadOnly(!write);
     if(this.delete){this.delete.hidden=this.vault;this.delete.disabled=!write||this.saving||!this.note?.version||this.note?.deleted;this.markdown.syncActions();}
     if(this.retrySave){this.retrySave.hidden=!this.saveFailed;this.retrySave.disabled=!!this.saving||!!this.busy||!this.writable||this.stale&&!this.uncertain;this.retrySave.textContent=t(this.uncertain?'journal.check_result':'journal.retry_save');}

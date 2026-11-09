@@ -60,6 +60,11 @@ second with a five-second typing deadline; failures keep the draft and block
 navigation. Unknown replies are reconciled by reads before further writes. Body edits
 and day labels use independent records and validators.
 
+Note dialogs keep their content inert until the note read completes. Close stays
+available while loading; mode and editing actions become available against the
+loaded document. This prevents an early mode selection from being overwritten
+by the initial formatted projection.
+
 ## Assets and licenses
 
 Install the pinned dependencies, then regenerate editor assets and attribution:
