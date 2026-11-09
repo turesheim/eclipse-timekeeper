@@ -36,7 +36,7 @@ export class NotesView {
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.layout=node('div',undefined,'notes-layout');this.navigation=node('aside',undefined,'notes-navigation card');this.navigation.id='notes-navigation';this.navigation.setAttribute('aria-label',t('notes.navigation'));
     const tools=node('div',undefined,'btn-toolbar notes-navigation-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label',t('notes.navigation_actions'));
-    this.newNote=action(t('notes.new_note'),()=>this.pathDialog('note'),'file-earmark-plus');this.newFolder=action(t('notes.new_folder'),()=>this.pathDialog('folder'),'folder-plus');this.refresh=action(t('notes.refresh'),()=>void this.reload(),'refresh');
+    this.newNote=action(t('notes.new_note'),()=>this.pathDialog('note'),'file-earmark-plus');this.newFolder=action(t('notes.new_folder'),()=>this.pathDialog('folder'),'folder-plus');this.refresh=action(t('notes.refresh'),()=>{void this.reload();void this.recentNotes.refresh(true);},'refresh');
     this.trash=action(t('notes.trash'),()=>{this.showTrash=!this.showTrash;this.trash.setAttribute('aria-pressed',String(this.showTrash));this.trash.classList.toggle('active',this.showTrash);void this.reload();},'trash');this.trash.setAttribute('aria-pressed','false');
     this.sortButton=action(t('notes.sort'),event=>this.showSortMenu(event.detail===0),'sort-alpha-down');
     this.sortButton.setAttribute('aria-haspopup','menu');this.sortButton.setAttribute('aria-expanded','false');this.sortButton.setAttribute('aria-controls','notes-sort-menu');
