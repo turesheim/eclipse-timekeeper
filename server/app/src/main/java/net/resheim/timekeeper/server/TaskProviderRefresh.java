@@ -89,7 +89,7 @@ class TaskProviderRefresh {
                     var query=connection.prepareStatement("SELECT r.owner_id,r.id,r.payload,c.payload FROM tk_resource r JOIN tk_resource c ON c.owner_id=r.owner_id AND c.id=r.id AND c.entity_type='TASK_CONNECTION' JOIN tk_account a ON a.owner_id=r.owner_id WHERE r.entity_type='TASK_AUTH' AND a.state<>'DISABLED'");var rows=query.executeQuery()){
                 while(rows.next()){
                     var value=parse(rows.getString(3));var metadata=parse(rows.getString(4));
-                    if(!metadata.path("enabled").asBoolean()||!metadata.path("readable").asBoolean()||value.path("blocked").asBoolean()||value.path("selected").isEmpty()
+                    if(!metadata.path("enabled").asBoolean()||!metadata.path("readable").asBoolean()||value.path("blocked").asBoolean()||value.path("selected").isEmpty()&&!value.path("requested").asBoolean()
                             ||!automatic&&!value.path("requested").asBoolean()||!value.hasNonNull("nextRefresh"))continue;
                     var provider=TaskProviderConfiguration.provider(metadata.path("providerId").asText());if(!configuration.available(provider))continue;
                     Instant next=Instant.parse(value.path("nextRefresh").asText());if(!next.isAfter(now))due.add(new Due(rows.getString(1),rows.getObject(2,UUID.class),next));

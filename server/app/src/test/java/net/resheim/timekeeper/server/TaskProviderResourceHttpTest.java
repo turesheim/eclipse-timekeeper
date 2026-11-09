@@ -114,4 +114,10 @@ class TaskProviderResourceHttpTest {
         var current=call("GET","/"+id,null,null);assertEquals(204,call("DELETE","/"+id,null,current.header("ETag")).statusCode());
         refresh.execute(claim);assertEquals(before,state.requests.get());
     }
+    @Test void interruptedCatalogOnlyRefreshIsRescheduledWithoutAutomaticTaskPolling()throws Exception{
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();
+        store.transaction(owner,()->{var c=new TaskProviderConnections(store);c.claim(UUID.fromString(id),true);var value=c.required(UUID.fromString(id));value.put("leaseUntil",store.now().minusSeconds(1).toString()).put("nextRefresh",store.now().toString());c.save(TaskProviderConnections.AUTH,value);return null;});
+        TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).listName="Recovered catalog";
+        refresh.sweep();var result=idle(id);assertEquals("Recovered catalog",result.path("availableLists").get(0).path("name").asText());assertTrue(result.path("lastError").isNull());
+    }
 }

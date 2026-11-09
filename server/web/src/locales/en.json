@@ -1502,7 +1502,7 @@
   "task_providers.pending": "Tasks needing review: {{count}}.",
   "task_providers.list_missing": "A selected list is no longer available. Tasks already imported from it are kept.",
   "task_providers.no_lists": "No task lists were found. Create a list at the provider, then refresh from the provider.",
-  "task_providers.selection_saved": "List selection saved. Imports run in the background.",
+  "task_providers.selection_saved": "List selection saved.",
   "task_providers.return": "Back to task connections",
   "task_providers.connecting": "Completing the connection…",
   "task_providers.cancelled": "Connection cancelled.",

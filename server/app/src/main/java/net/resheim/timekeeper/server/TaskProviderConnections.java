@@ -100,7 +100,7 @@ final class TaskProviderConnections {
         }
         if(!known.containsAll(chosen))throw ApiFailure.validation();
         var ids=value.putArray("selected");selected.forEach(ids::add);value.put("nextRefresh",store.now().toString()).putNull("lease").putNull("leaseUntil");
-        value.put("roundActive",false).put("roundIndex",0).put("requested",!selected.isEmpty()).put("pendingCount",0).putNull("lastSuccess");
+        value.put("roundActive",false).put("roundIndex",0).put("requested",!selected.isEmpty()&&!value.path("blocked").asBoolean()).put("pendingCount",0).putNull("lastSuccess");
         if(!value.path("blocked").asBoolean())value.putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         return visible(save(AUTH,value));
     }
@@ -109,7 +109,7 @@ final class TaskProviderConnections {
         var value=required(id);if(!enabled())return null;
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
-        boolean catalogOnly=value.path("selected").isEmpty();if(catalogOnly&&!force)return null;
+        boolean catalogOnly=value.path("selected").isEmpty();if(catalogOnly&&!force&&!value.path("requested").asBoolean())return null;
         Instant now=store.now();
         if(value.hasNonNull("leaseUntil")&&Instant.parse(value.path("leaseUntil").asText()).isAfter(now))return null;
         if(value.path("blocked").asBoolean()){if(force)throw new ApiFailure(409,value.path("lastError").asText("TASK_PROVIDER_RECONNECT_REQUIRED"));return null;}

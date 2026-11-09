@@ -1502,7 +1502,7 @@
   "task_providers.pending": "Oppgaver som må gjennomgås: {{count}}.",
   "task_providers.list_missing": "En valgt liste er ikke lenger tilgjengelig. Oppgaver som allerede er importert fra den beholdes.",
   "task_providers.no_lists": "Fant ingen oppgavelister. Opprett en liste hos tjenesten og oppdater fra tjenesten.",
-  "task_providers.selection_saved": "Listevalget er lagret. Importen kjører i bakgrunnen.",
+  "task_providers.selection_saved": "Listevalget er lagret.",
   "task_providers.return": "Tilbake til oppgavekoblinger",
   "task_providers.connecting": "Fullfører tilkoblingen …",
   "task_providers.cancelled": "Tilkoblingen ble avbrutt.",

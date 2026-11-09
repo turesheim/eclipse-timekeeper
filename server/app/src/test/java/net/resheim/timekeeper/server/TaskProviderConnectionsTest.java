@@ -141,4 +141,20 @@ class TaskProviderConnectionsTest {
         assertNull(tx(owner,()->connections().claim(id,false)));assertThrows(ApiFailure.class,()->tx(owner,()->connections().claim(id,true)));
         var visible=tx(owner,()->connections().visible(connections().required(id)));assertFalse(visible.path("syncing").asBoolean());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",visible.path("lastError").asText());
     }
+    @Test void expiredCatalogLeaseIsRetryableWithoutSelectedLists(){
+        String owner=owner();var connection=connect(owner,grant(owner));UUID id=uuid(connection.get("id"));
+        var first=tx(owner,()->connections().claim(id,true));assertTrue(first.catalogOnly());
+        tx(owner,()->{var value=connections().required(id);value.put("leaseUntil",store.now().minusSeconds(1).toString()).put("nextRefresh",store.now().toString());connections().save(TaskProviderConnections.AUTH,value);return null;});
+        var retried=tx(owner,()->connections().claim(id,false));assertNotNull(retried);assertTrue(retried.catalogOnly());assertNotEquals(first.lease(),retried.lease());
+        assertFalse(tx(owner,()->connections().finish(retried,object(),null,0)));
+        assertFalse(tx(owner,()->connections().visible(connections().required(id))).path("syncing").asBoolean());
+    }
+    @Test void blockedConnectionsKeepSelectionsWithoutRemainingQueued(){
+        String owner=owner();var connection=connect(owner,grant(owner));UUID id=uuid(connection.get("id"));
+        tx(owner,()->connections().select(id,List.of("remote-list"),etag(connection)));var claim=tx(owner,()->connections().claim(id,false));
+        tx(owner,()->connections().finish(claim,null,"TASK_PROVIDER_RECONNECT_REQUIRED",0));
+        var blocked=tx(owner,()->connections().visible(connections().required(id)));
+        var selected=tx(owner,()->connections().select(id,List.of("remote-list"),etag(blocked)));
+        assertFalse(selected.path("syncing").asBoolean());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",selected.path("lastError").asText());assertEquals(blocked.get("selectedLists"),selected.get("selectedLists"));
+    }
 }

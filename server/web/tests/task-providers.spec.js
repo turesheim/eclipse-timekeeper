@@ -63,7 +63,7 @@ test('list drafts survive status updates and stale saves keep the captured selec
 test('saved selections refresh in the background without replacing focused controls',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row]});await open(page);
   const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();await panel.getByRole('button',{name:'Save',exact:true}).click();
-  await expect(panel.getByText('List selection saved. Imports run in the background.',{exact:true})).toBeVisible();expect(model.writes.find(value=>value.method==='PUT').input).toEqual({selectedLists:['work','home']});
+  await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();expect(model.writes.find(value=>value.method==='PUT').input).toEqual({selectedLists:['work','home']});
   row.version++;row.syncing=false;row.lastSuccess='2026-11-09T12:01:00Z';await home.focus();await page.getByRole('button',{name:'Refresh status',exact:true}).evaluate(button=>button.click());
   await expect(home).toBeFocused();await expect(home).toBeChecked();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toHaveCount(0);
   await panel.getByRole('button',{name:'Disconnect',exact:true}).click();await expect(panel).toHaveCount(0);await expect(page.getByText('Disconnected. Imported tasks remain in Dagsverk.',{exact:true})).toBeVisible();expect(model.writes.filter(value=>value.method==='DELETE')).toHaveLength(1);
