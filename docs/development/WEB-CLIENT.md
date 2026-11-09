@@ -31,7 +31,8 @@ Change polling shares any refresh already in flight. It reloads again if that
 completed read is older than the batch; running work keeps its periodic refresh.
 Popup saves use the shared notes-changed event to request a single refresh.
 Inactive client, project, label, activity, month and week views retain their data
-and paint when selected. Notes retains its catalog for unchanged account
+and paint when selected. Unchanged client, project and label lists keep their
+existing rows and focused actions during unrelated synchronization. Notes retains its catalog for unchanged account
 revisions; note changes, local invalidation and the Notes Refresh action reload it.
 Notifications arriving during a catalog read or another busy operation remain
 pending for one follow-up reload when the view is ready.

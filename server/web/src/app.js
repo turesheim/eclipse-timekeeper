@@ -38,7 +38,7 @@ let watchSession = null;
 let accountName = '',canWrite = false;
 let serverInfoRequest = 0;
 let snapshotAt = 0,activeAsOf = 0n;
-const collapsed = new Set(),expandedClients = new Set();
+const collapsed = new Set(),expandedClients = new Set(),legacyRenderKeys = new Map();
 let decimalHours = false,activitiesCollapsed = false;
 const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosText(value);
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
@@ -233,7 +233,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();canWrite = false;
+    calendar.reset();track.reset();today.reset();notes.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -413,11 +413,16 @@ function render() {
   notes.update(s,connected,api,canWrite);
   tasks.update(s,connected,api,canWrite);
 }
+function renderChangedList(id,records,paint){
+  const key=JSON.stringify([getLocale(),records]);
+  if(legacyRenderKeys.get(id)===key)return;
+  paint();legacyRenderKeys.set(id,key);
+}
 function renderLegacyViews(s,zone){
-  if(!$('clients-panel').hidden)table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
-  if(!$('projects-panel').hidden)renderProjects(s);
+  if(!$('clients-panel').hidden)renderChangedList('clients',s.clients,()=>table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))]))));
+  if(!$('projects-panel').hidden)renderChangedList('projects',[s.clients,s.projects],()=>renderProjects(s));
   if(!$('labels-panel').hidden){
-    table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))])));
+    renderChangedList('labels',s.labels,()=>table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))]))));
     for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
   }
   if($('activities-panel').hidden)return;
