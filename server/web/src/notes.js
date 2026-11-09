@@ -107,7 +107,10 @@ export class NotesView {
     window.visualViewport?.addEventListener('resize',()=>this.fit());
     this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
     this.navigation.addEventListener('pointerdown',event=>{if(event.button===0&&event.target.closest?.('.notes-tree-pick'))this.treePointerPending=true;});
-    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.treePointerPending&&!this.dragged)this.clearDrag();});
+    // A pending catalog reply must not replace the pressed button between
+    // pointer-up and the browser's subsequent click event.
+    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,event=>{if(this.treePointerPending&&!this.dragged&&(type==='pointercancel'||!event.target.closest?.('.notes-tree-pick')))this.clearDrag();});
+    window.addEventListener('click',()=>{if(this.treePointerPending&&!this.dragged)this.clearDrag();});
     this.navigation.addEventListener('dragstart',event=>{
       const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
       if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading&&!this.treePointerPending){event.preventDefault();return;}
@@ -156,11 +159,21 @@ export class NotesView {
   }
   async retryCommit(){if(this.uncertain){await this.checkCommitted();return;}this.stale=false;this.error.hidden=true;await this.autosave.flush();}
   update(snapshot,connected,session,writable){
-    if(this.session&&this.session!==session)this.reset();this.session=session;this.zone=snapshot?.profile?.data?.zoneId||'UTC';this.writable=connected&&writable;this.controls();
+    const revision=snapshot?.revision,zone=snapshot?.profile?.data?.zoneId||'UTC',changed=!Number.isSafeInteger(revision)||this.session!==session||this.zone!==zone||this.revision!==revision;
+    if(this.session&&this.session!==session)this.reset();this.session=session;this.zone=zone;this.revision=revision;this.writable=connected&&writable;this.controls();
     this.recentNotes.update(session,this.zone,snapshot?.revision);if(this.visible){this.recentNotes.show();this.pollRecent();}
     // Keep a content search's pages and focused controls until an explicit
     // search/refresh; its cursor already detects changes at the next page.
-    if(this.visible&&!this.busy&&!this.loading&&!this.contentSearch())void this.reload();
+    if(this.visible&&!this.contentSearch()&&(changed||!this.info)){this.reloadRequested=true;this.scheduleReload();}
+  }
+  scheduleReload(){
+    if(!this.reloadRequested||this.reloadScheduled||!this.visible||!this.session||this.busy||this.loading||this.contentSearch())return;
+    const scheduled=this.reloadScheduled={session:this.session};
+    queueMicrotask(()=>{
+      if(this.reloadScheduled!==scheduled)return;this.reloadScheduled=null;
+      if(!this.reloadRequested||this.session!==scheduled.session||!this.visible||this.busy||this.loading||this.contentSearch())return;
+      this.reloadRequested=false;void this.reload();
+    });
   }
   pollRecent(){if(!this.recentTimer)this.recentTimer=setInterval(()=>void this.recentNotes.refresh(),30000);}
   show(){this.visible=true;this.recentNotes.show();this.pollRecent();window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
@@ -195,7 +208,7 @@ export class NotesView {
     finally{if(drag.session===this.session&&drag.generation===this.generation){this.busy=false;this.controls();}}
   }
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.recentNotes.reset();clearInterval(this.recentTimer);this.recentTimer=null;this.invalidateSearch();this.searchMode.value='filename';this.searchLabel.textContent=t('notes.search');this.moveFailed=false;this.autosave.reset();this.saving=false;this.titleSaving=null;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.updateTitle(true);this.controls();}
+  reset(){this.recentNotes.reset();clearInterval(this.recentTimer);this.recentTimer=null;this.reloadRequested=false;this.reloadScheduled=null;this.revision=null;this.invalidateSearch();this.searchMode.value='filename';this.searchLabel.textContent=t('notes.search');this.moveFailed=false;this.autosave.reset();this.saving=false;this.titleSaving=null;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.updateTitle(true);this.controls();}
   navigationState(){
     const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
     this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);
@@ -230,6 +243,7 @@ export class NotesView {
       const value=this.note?.[field],date=new Date(value||NaN),valid=Number.isFinite(date.getTime());time.parentElement.hidden=!valid;
       time.dateTime=valid?value:'';time.textContent=valid?dateTimeFormat(getLocale(),{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short',timeZone:this.zone||'UTC'}).format(date):'';
     }
+    this.scheduleReload();
   }
   async bookmarkChanged(value,etag){
     const session=this.session,note=this.note;if(!note)return;
@@ -298,7 +312,7 @@ export class NotesView {
   }
   async reload(retry=0){
     if(this.treePointerPending||this.dragged){this.reloadAfterDrag=true;return;}
-    if(!this.session)return;const session=this.session,current=(this.loadGeneration||0)+1,expandAll=this.expandAllRequested,expanded=new Set(this.expanded);this.loadGeneration=current;this.loading=true;this.controls();
+    if(!this.session)return;this.reloadRequested=false;const session=this.session,current=(this.loadGeneration||0)+1,expandAll=this.expandAllRequested,expanded=new Set(this.expanded);this.loadGeneration=current;this.loading=true;this.controls();
     try{
       const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
       const search=this.search.value.trim();const children=new Map(),entries=new Map();

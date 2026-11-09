@@ -52,6 +52,19 @@ test('Notes Recent notes scrolls independently and fits the drawer in every them
   await recent.locator('[data-recent-note]').last().focus();await page.keyboard.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(navigation).toBeHidden();await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();
 });
 
+test('a loading note popup keeps keyboard actions outside its unloaded editor',async({page,request})=>{
+  const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
+  const entry=await(await api('PUT','/notes/files?path=Notes%2FLoading.md',Buffer.from('# Loading note\n\nOriginal body.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.reload();let held=false,release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{if(route.request().method()==='GET'){held=true;await pending;}await route.continue();});
+  try{
+    await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();const popup=page.locator('#note-popup-editor'),close=popup.getByRole('button',{name:'Close',exact:true});await expect(popup).toBeVisible();await expect.poll(()=>held).toBe(true);
+    await close.focus();await expect(close).toBeFocused();await page.keyboard.press('Tab');expect(await popup.locator('.journal-document-content').evaluate(node=>node.contains(document.activeElement))).toBe(false);
+    release();await expect(popup.locator('#note-popup-formatted .ProseMirror')).toBeVisible();await popup.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#note-popup-body').fill('# Chosen source\n\nLoaded edit.\n');await saveMarkdown(popup,{close:true});
+    expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('# Chosen source\n\nLoaded edit.\n');
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('Recent notes uses account days, includes journals and protects drafts when opening notes',async({page,request})=>{
   const api=await setup(page,request);
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'en-GB'},{'If-Match':profile.headers().etag});

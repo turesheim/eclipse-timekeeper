@@ -18,6 +18,16 @@ async function setup(page,request){
 }
 const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
 
+test('a folder remains clickable when a catalog reply arrives between pointer up and click',async({page,request})=>{
+  const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Pointer.md','Pointer gap body.');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
+  let held=false,release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/notes/entries?*',async route=>{if(held)return route.continue();const reply=await route.fetch();held=true;await pending;await route.fulfill({response:reply});});
+  try{
+    await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>held).toBe(true);const folder=noteEntry(navigation,'Notes'),original=await folder.elementHandle();
+    await folder.dispatchEvent('pointerdown',{button:0,pointerId:1});await folder.dispatchEvent('pointerup',{button:0,pointerId:1});release();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');expect(await original.evaluate(node=>node.isConnected)).toBe(true);
+    await original.evaluate(node=>node.click());await expect(noteEntry(navigation,'Notes/Pointer.md')).toBeVisible();
+  }finally{release();await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel')));await page.unrouteAll({behavior:'wait'});}
+});
+
 test('a folder click survives metadata refresh between pointer down and pointer up',async({page,request})=>{
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Click.md','Folder click body.');
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');

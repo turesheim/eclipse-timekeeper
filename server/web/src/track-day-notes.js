@@ -172,7 +172,7 @@ export class TrackDayNotes {
     });
   }
   paint(focused){
-    if(!this.cells)return;
+    if(!this.cells||this.root.hidden)return;
     focused=focused|| (this.grid.contains(document.activeElement)?document.activeElement?.getAttribute(this.noteAttr):null);
     for(const [date,cell] of this.cells){
       const heading=cell.querySelector(this.headingSelector),previous=heading.querySelector('.track-day-note'),text=this.notes.get(date),hasBody=this.bodyDates.has(date),bookmarked=this.bookmarkedDates.has(date);
