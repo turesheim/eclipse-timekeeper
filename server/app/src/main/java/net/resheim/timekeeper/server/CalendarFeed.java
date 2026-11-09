@@ -66,6 +66,35 @@ final class CalendarFeed {
         return hash(canonical(content).toString());
     }
     private static boolean todo(CalendarComponent event){return event instanceof VToDo;}
+    /** Published event definitions, not an unbounded expansion of recurring occurrences. */
+    List<ObjectNode> eventDefinitions(ZoneId zone) {
+        var result=new ArrayList<ObjectNode>();var budget=new Budget();
+        try {
+            for(var revisions:series.values()) {
+                var master=revisions.get("");if(master!=null&&(todo(master)||cancelled(master)))continue;
+                boolean recurring=revisions.size()>1||master!=null&&(!master.getProperties("RRULE").isEmpty()||!master.getProperties("RDATE").isEmpty());
+                for(var item:revisions.entrySet()) {
+                    budget.use();var source=item.getValue();if(todo(source)||cancelled(source))continue;
+                    String uid=text(source,"UID",null,1024),rid=item.getKey();
+                    Temporal start=date(source,"DTSTART");
+                    var timing=source.getProperty("DTEND").isPresent()||source.getProperty("DURATION").isPresent()||master==null?source:master;
+                    Temporal end=start.plus(duration(timing));boolean allDay=start instanceof LocalDate,definition=rid.isEmpty()&&recurring;
+                    var value=object().put("id",hash(array().add("VEVENT").add(uid).add(rid).toString())).put("uid",uid).put("recurrenceId",rid)
+                            .put("title",text(source,"SUMMARY",master==null?"":text(master,"SUMMARY","",4000),4000))
+                            .put("description",text(source,"DESCRIPTION",master==null?"":text(master,"DESCRIPTION","",16000),16000))
+                            .put("location",text(source,"LOCATION",master==null?"":text(master,"LOCATION","",4000),4000))
+                            .put("start",instant(start,zone).toString()).put("end",instant(end,zone).toString())
+                            .put("allDay",allDay).put("firstDate",allDay?start.toString():null).put("endDate",allDay?end.toString():null)
+                            .put("recurring",recurring||!rid.isEmpty()).put("seriesDefinition",definition);
+                    // A series is not one occurrence. Do not invent a note key
+                    // for its DTSTART, which may be excluded or overridden.
+                    if(definition)value.putNull("eventKey");else value.put("eventKey",hash(array().add(uid).add(rid.isEmpty()?"single":rid).toString()));
+                    result.add(value);
+                }
+            }
+        }catch(CalendarFailure failure){throw failure;}catch(Exception failure){throw CalendarFailure.invalid();}
+        return result.stream().sorted(Comparator.comparing(value->value.path("id").asText())).toList();
+    }
     /** Published task definitions and detached instances, independent of a calendar window. */
     List<ObjectNode> tasks(ZoneId zone) {
         var result=new ArrayList<ObjectNode>();var budget=new Budget();
