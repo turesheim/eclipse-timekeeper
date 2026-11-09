@@ -1,0 +1,139 @@
+package net.resheim.timekeeper.server;
+
+import static net.resheim.timekeeper.server.JsonValues.*;
+import static org.junit.jupiter.api.Assertions.*;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.quarkus.test.junit.*;
+import jakarta.inject.Inject;
+import net.resheim.eclipse.timekeeper.domain.*;
+import org.junit.jupiter.api.Test;
+
+@QuarkusTest @TestProfile(TaskCloudPullTest.Profile.class)
+class TaskCloudPullTest {
+    public static class Profile implements QuarkusTestProfile {
+        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:task_cloud_pull");}
+    }
+    @Inject ServerStore store;
+    @Inject CommandReceipts receipts;
+    @Inject ContractInputs inputs;
+    private static final Instant TIME=Instant.parse("2026-11-09T12:00:00Z");
+    record Fixture(String owner,UUID connection,UUID list) {}
+    private TaskCloudProvider google(){return new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE);}
+    private Fixture fixture(){return fixture(TaskCloudProvider.Provider.GOOGLE);}
+    private Fixture fixture(TaskCloudProvider.Provider provider){
+        String owner="cloud-test-"+UUID.randomUUID();UUID connection=UUID.randomUUID(),list=UUID.randomUUID();
+        var adapter=new TaskCloudProvider(provider);
+        store.transaction(owner,()->{
+            store.save("TASK_CONNECTION",new TaskConnection(connection,adapter.id(),"remote-account","Task account",true,false,true,capabilities(adapter.capabilities()),0));
+            store.save("TASK_LIST",new TaskList(list,connection,"remote-list","Selected list",TaskListKind.STANDARD,true,false,false,true,true,0,null,0));return null;
+        });return new Fixture(owner,connection,list);
+    }
+    private <T>T tx(Fixture f,Supplier<T> work){return store.transaction(f.owner(),work);}
+    private TaskCloudPull pull(){return new TaskCloudPull(store,receipts,inputs);}
+    private TaskCloudProvider.RemoteTask task(String id,String title,String parent,String position){
+        var value=object().put("id",id).put("title",title).put("status","needsAction").put("position",position).put("etag","provider-v1").put("updated","2026-11-08T11:00:00Z");
+        if(parent!=null)value.put("parent",parent);return google().normalize(value);
+    }
+    private TaskCloudPull.Scan scan(TaskCloudProvider.RemoteTask...tasks){return new TaskCloudPull.Scan("google","remote-account","remote-list",List.of(tasks),TIME);}
+    private ObjectNode apply(Fixture f,TaskCloudPull.Scan scan){return tx(f,()->pull().apply(f.connection(),f.list(),scan));}
+    private JsonNode stored(Fixture f,String id){return tx(f,()->store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("remote-account","remote-list"),id)).orElseThrow());}
+    private TaskProviderHttp.Reply reply(int code,String json){return new TaskProviderHttp.Reply(code,Map.of(),json.getBytes(StandardCharsets.UTF_8));}
+
+    @Test void childBeforeParentImportsTheOwnedHierarchyAndRepeatedScansDoNotDuplicateOrAdvanceTaskVersions(){
+        var f=fixture();var child=task("child"," Child ","parent","0001");var parent=task("parent","Parent",null,"0002");
+        var result=apply(f,scan(child,parent));assertTrue(result.path("complete").asBoolean());assertEquals(2,result.path("created").asInt());
+        var before=stored(f,"child");var root=stored(f,"parent");
+        assertEquals(root.path("id"),before.path("parentTaskId"));
+        assertEquals("Child",before.path("summary").asText());
+        assertEquals("2026-11-08T11:00:00Z",before.path("externalReferences").get(0).path("source").path("modifiedAt").asText());
+        assertEquals(child.original(),before.path("externalReferences").get(0).path("providerData").path("payload").path("observation"));
+        var again=apply(f,scan(child,parent));assertEquals(0,again.path("created").asInt());assertEquals(2,again.path("unchanged").asInt());
+        assertEquals(before,stored(f,"child"));assertEquals(root,stored(f,"parent"));
+        assertEquals(2,tx(f,()->store.list("TASK").size()));
+        assertEquals(1,tx(f,()->store.list("TASK_SYNC_CURSOR").size()));
+    }
+    @Test void remoteOnlyChangesApplyWhileIndependentLocalChangesRemain(){
+        var f=fixture();var first=task("one","Before",null,"001");apply(f,scan(first));
+        tx(f,()->{var value=(ObjectNode)stored(f,"one");value.put("priority","HIGH").put("version",value.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",value));return null;});
+        var next=task("one","After",null,"001");var result=apply(f,scan(next));
+        assertEquals(1,result.path("updated").asInt());assertTrue(result.path("complete").asBoolean());
+        assertEquals("After",stored(f,"one").path("summary").asText());assertEquals("HIGH",stored(f,"one").path("priority").asText());
+    }
+    @Test void opposingEditsReturnConflictAndRetainBothTheTaskAndPreviousCheckpoint(){
+        var f=fixture();apply(f,scan(task("one","Before",null,"001")));
+        tx(f,()->{var value=(ObjectNode)stored(f,"one");value.put("summary","Local edit").put("version",value.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",value));return null;});
+        var before=stored(f,"one");var cursor=tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst().deepCopy());
+        var result=apply(f,scan(task("one","Remote edit",null,"001")));
+        assertFalse(result.path("complete").asBoolean());assertEquals("CONFLICT",result.path("pending").get(0).path("status").asText());
+        assertEquals("Remote edit",result.path("pending").get(0).path("observation").path("fields").path("summary").asText());
+        assertEquals(before,stored(f,"one"));assertEquals(cursor,tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst()));
+    }
+    @Test void explicitRemoteDeletionRequiresReviewAndAbsenceNeverDeletes(){
+        var f=fixture();apply(f,scan(task("one","Keep me",null,"001")));
+        var before=stored(f,"one");var deleted=google().normalize(parse("{\"id\":\"one\",\"deleted\":true}"));
+        var result=apply(f,scan(deleted));assertFalse(result.path("complete").asBoolean());
+        assertTrue(result.path("pending").get(0).path("status").asText().startsWith("DELETE_"));assertEquals(before,stored(f,"one"));
+        assertTrue(apply(f,scan()).path("complete").asBoolean());assertEquals(before,stored(f,"one"));
+    }
+    @Test void unresolvedHierarchyDoesNotFlattenOrInventParents(){
+        var f=fixture();var result=apply(f,scan(task("child","Child","missing-parent","001")));
+        assertFalse(result.path("complete").asBoolean());assertEquals("PARENT_UNRESOLVED",result.path("pending").get(0).path("reason").asText());
+        assertTrue(tx(f,()->store.list("TASK").isEmpty()));assertTrue(tx(f,()->store.list("TASK_SYNC_CURSOR").isEmpty()));
+    }
+    @Test void unreadableProviderPositionCannotInventAnOrderingBaseline(){
+        var f=fixture();var remote=google().normalize(parse("{\"id\":\"id\",\"title\":\"Task\",\"status\":\"needsAction\"}"));
+        var result=apply(f,scan(remote));assertFalse(result.path("complete").asBoolean());
+        assertEquals("POSITION_UNOBSERVED",result.path("pending").get(0).path("reason").asText());assertTrue(tx(f,()->store.list("TASK").isEmpty()));
+    }
+    @Test void wrongOwnerAccountOrListCannotApplyTheScan(){
+        var f=fixture();var other=fixture();var scan=scan(task("one","Task",null,"001"));
+        assertThrows(ApiFailure.class,()->tx(other,()->pull().apply(f.connection(),f.list(),scan)));
+        assertThrows(ApiFailure.class,()->apply(f,new TaskCloudPull.Scan("google","another-account","remote-list",scan.tasks(),TIME)));
+        assertThrows(ApiFailure.class,()->apply(f,new TaskCloudPull.Scan("google","remote-account","another-list",scan.tasks(),TIME)));
+        assertTrue(tx(f,()->store.list("TASK").isEmpty()));assertTrue(tx(other,()->store.list("TASK").isEmpty()));
+    }
+    @Test void pageFailureOrRepeatedTokenCannotBecomeACompleteOrEmptyScan(){
+        var calls=new AtomicInteger();
+        var provider=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE,new TaskProviderHttp(Set.of("tasks.googleapis.com","openidconnect.googleapis.com"),request->{
+            if(request.uri().getHost().equals("openidconnect.googleapis.com"))return reply(200,"{\"sub\":\"remote-account\"}");
+            return calls.incrementAndGet()==1?reply(200,"{\"items\":[{\"id\":\"one\",\"title\":\"Title\",\"status\":\"needsAction\"}],\"nextPageToken\":\"next\"}"):reply(503,"{\"private\":\"details\"}");
+        }));
+        var failure=assertThrows(TaskProviderHttp.Failure.class,()->TaskCloudPull.fetch(provider,"token","remote-account","remote-list",TIME));
+        assertEquals("TASK_PROVIDER_UNAVAILABLE",failure.getMessage());assertEquals(2,calls.get());
+        var repeat=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE,new TaskProviderHttp(Set.of("tasks.googleapis.com","openidconnect.googleapis.com"),request->
+                request.uri().getHost().equals("openidconnect.googleapis.com")?reply(200,"{\"sub\":\"remote-account\"}"):reply(200,"{\"nextPageToken\":\"repeated\"}")));
+        assertEquals("TASK_PROVIDER_SCAN_INCOMPLETE",assertThrows(TaskProviderHttp.Failure.class,()->TaskCloudPull.fetch(repeat,"token","remote-account","remote-list",TIME)).getMessage());
+    }
+    @Test void aTokenForAnotherProviderAccountStopsBeforeAnyTaskPage(){
+        var calls=new AtomicInteger();var provider=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE,new TaskProviderHttp(Set.of("openidconnect.googleapis.com"),request->{calls.incrementAndGet();return reply(200,"{\"sub\":\"other-account\"}");}));
+        assertEquals("TASK_PROVIDER_ACCOUNT_CHANGED",assertThrows(TaskProviderHttp.Failure.class,()->TaskCloudPull.fetch(provider,"token","remote-account","remote-list",TIME)).getMessage());assertEquals(1,calls.get());
+    }
+    @Test void microsoftImportsRetainHtmlDatesAndProviderDataWithoutClearingLocalAppleTags(){
+        var f=fixture(TaskCloudProvider.Provider.MICROSOFT);var adapter=new TaskCloudProvider(TaskCloudProvider.Provider.MICROSOFT);
+        var raw=parse("""
+            {"id":"graph-task","title":"Plan","status":"notStarted","categories":["Work"],"body":{"contentType":"html","content":"<p>Original</p>"},
+             "dueDateTime":{"dateTime":"2026-11-10T17:00:00.0000000","timeZone":"W. Europe Standard Time"},"importance":"normal",
+             "createdDateTime":"2026-10-01T12:00:00Z","recurrence":{"pattern":{"type":"weekly"}}}
+            """);
+        var observation=adapter.normalize(raw);var scan=new TaskCloudPull.Scan("microsoft","remote-account","remote-list",List.of(observation),TIME);
+        assertTrue(apply(f,scan).path("complete").asBoolean());
+        var key=new ExternalTaskReferenceKey("microsoft",TaskCloudPull.repository("remote-account","remote-list"),"graph-task");
+        tx(f,()->{
+            var task=((ObjectNode)store.byReference(key).orElseThrow()).deepCopy();
+            assertEquals("HTML",task.path("body").path("format").asText());assertEquals("W. Europe Standard Time",task.path("due").path("timeZone").asText());
+            assertEquals("2026-10-01T12:00:00Z",task.path("externalReferences").get(0).path("source").path("createdAt").asText());
+            assertEquals(raw,task.path("externalReferences").get(0).path("providerData").path("payload").path("observation"));
+            ((ObjectNode)task.path("metadata")).putArray("tags").add("Apple tag");task.put("flagged",true).put("version",task.path("version").asLong()+1);
+            store.save("TASK",(Task)decode("TASK",task));return null;
+        });
+        var next=((ObjectNode)raw).deepCopy();next.putArray("categories");
+        assertTrue(apply(f,new TaskCloudPull.Scan("microsoft","remote-account","remote-list",List.of(adapter.normalize(next)),TIME)).path("complete").asBoolean());
+        tx(f,()->{var task=store.byReference(key).orElseThrow();assertTrue(task.path("metadata").path("categories").isEmpty());assertEquals("Apple tag",task.path("metadata").path("tags").get(0).asText());assertTrue(task.path("flagged").asBoolean());return null;});
+    }
+}
