@@ -154,7 +154,9 @@ export class NotesView {
   async retryCommit(){if(this.uncertain){await this.checkCommitted();return;}this.stale=false;this.error.hidden=true;await this.autosave.flush();}
   update(snapshot,connected,session,writable){
     if(this.session&&this.session!==session)this.reset();this.session=session;this.zone=snapshot?.profile?.data?.zoneId||'UTC';this.writable=connected&&writable;this.controls();
-    if(this.visible&&!this.busy&&!this.loading)void this.reload();
+    // Keep a content search's pages and focused controls until an explicit
+    // search/refresh; its cursor already detects changes at the next page.
+    if(this.visible&&!this.busy&&!this.loading&&!this.contentSearch())void this.reload();
   }
   show(){this.visible=true;window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
   hide(){this.visible=false;this.clearDrag();}
