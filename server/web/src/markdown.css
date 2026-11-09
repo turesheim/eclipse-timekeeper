@@ -154,3 +154,12 @@
 .markdown-caret-mirror { position: fixed; inset: 0 auto auto 0; height: auto; box-sizing: border-box; border: 0; visibility: hidden; pointer-events: none; user-select: none; }
 @keyframes markdown-caret-blink { 50% { opacity: 0; } }
 @media(prefers-reduced-motion: reduce) { .markdown-caret { animation: none; } }
+
+.has-note-bookmark { position: relative; }
+.has-note-bookmark > .markdown-toolbar { padding-inline-end: calc(44px + .75rem); }
+.note-bookmark { position: absolute; inset-block-start: .2rem; inset-inline-end: .2rem; min-width: 44px; min-height: 44px; opacity: 0; z-index: 1; }
+.note-bookmark:is(:hover,:focus-visible,.is-bookmarked) { opacity: 1; }
+.note-bookmark.is-bookmarked > .bi-bookmark-x { display: none; }
+.note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark { display: none; }
+.note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark-x { display: inline-block; }
+@media (hover: none) { .note-bookmark { opacity: 1; } }

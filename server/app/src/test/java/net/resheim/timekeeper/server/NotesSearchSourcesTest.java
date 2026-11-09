@@ -23,6 +23,7 @@ class NotesSearchSourcesTest {
         MetadataStore(ServerStore delegate){this.delegate=delegate;}
         @Override public Optional<JsonNode> find(String type,UUID id){if(Set.of(VaultContent.TYPE,DayNotes.TYPE,WeekNotes.TYPE,EventNotes.TYPE).contains(type))canonicalPayloads++;return delegate.find(type,id);}
         @Override long resourceVersion(String type,UUID id){return delegate.resourceVersion(type,id);}
+        @Override String restoreGeneration(){return delegate.restoreGeneration();}
     }
     private static byte[] bytes(String value){return value.getBytes(StandardCharsets.UTF_8);}
     private VaultCollection vault(){var vault=new VaultCollection(store,limits);vault.initialize();new NotesSearchChanges(store).snapshot();return vault;}

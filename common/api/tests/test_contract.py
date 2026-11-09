@@ -22,6 +22,22 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_note_bookmarks_have_separate_conditional_private_metadata(self):
+        operations=CONTRACT['paths']['/notes/bookmark']
+        self.assertEqual({'get','put'},set(operations))
+        self.assertEqual('read',operations['get']['x-required-permission'])
+        self.assertEqual('write',operations['put']['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operations['put']['parameters'])
+        self.assertIn('412',operations['put']['responses']);self.assertIn('428',operations['put']['responses'])
+        self.assertTrue(validator('NoteBookmarkInput').is_valid({'bookmarked':True}))
+        for value in ({'bookmarked':'true'},{'bookmarked':True,'body':'changed'},{'bookmarked':True,'ownerId':'foreign'},{}):
+            self.assertFalse(validator('NoteBookmarkInput').is_valid(value))
+        state={'sourceType':'DAY_NOTE','sourceKey':'2026-11-08','bookmarked':False,'version':0}
+        self.assertTrue(validator('NoteBookmarkState').is_valid(state))
+        self.assertFalse(validator('NoteBookmarkState').is_valid({**state,'sourceType':'TASK'}))
+        self.assertTrue(validator('ArchivedNoteBookmark').is_valid({'sourceType':'VAULT_CONTENT','sourceKey':ID}))
+        self.assertFalse(validator('ArchivedNoteBookmark').is_valid({'sourceType':'VAULT_CONTENT','sourceKey':ID,'ownerId':'foreign'}))
+
     def test_calendar_task_catalog_is_read_only_paged_and_includes_real_optional_deadlines(self):
         operation=CONTRACT['paths']['/calendar-tasks']
         self.assertEqual({'get'},set(operation));self.assertEqual('read',operation['get']['x-required-permission'])
@@ -703,7 +719,7 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
-            'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
+            'getNoteBookmark', 'updateNoteBookmark', 'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
             'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'importNoteBytes', 'moveNoteEntry', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',

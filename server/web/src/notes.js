@@ -76,7 +76,7 @@ export class NotesView {
     this.resize.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();width(event.key==='Home'?180:event.key==='End'?480:(this.navWidth||260)+(event.key==='ArrowLeft'?-20:20));}});
     this.editor=node('section',undefined,'notes-editor card');this.editor.setAttribute('aria-labelledby','notes-document-title');
     const fileTools=this.fileTools=node('div',undefined,'notes-file-tools');this.rename=action(t('notes.move'),()=>this.pathDialog('move'),'edit');this.remove=action(t('notes.delete'),()=>void this.delete(),'delete');this.recover=action(t('notes.restore'),()=>void this.restore(),'arrow-counterclockwise');this.reloadNote=action(t('notes.reload'),()=>void this.reloadDocument(),'refresh');this.download=action(t('notes.download_attachment'),()=>void this.downloadAttachment(),'download');this.documentTools=node('div',undefined,'btn-group markdown-document-tools');this.documentTools.setAttribute('role','group');this.documentTools.setAttribute('aria-label',t('notes.document_actions'));this.documentTools.append(this.remove,this.rename,this.reloadNote,this.recover,this.download);
-    const resources={...noteRevisionResources(()=>this.session,()=>({sourceType:this.note?.sourceType,sourceId:this.note?.sourceId}),{latest:async()=>{const session=this.session,id=this.note?.id;const reply=await session.request('/notes/entries/'+id+'/content',{binary:'application/octet-stream'});return {text:await reply.data.text(),etag:reply.etag};}}),...vaultEditorResources(()=>this.session,()=>this.note?.path||'',async(entry,heading)=>{await this.select(entry.id);if(heading)await this.markdown.showFormatted(false);this.markdown.scrollToHeading?.(heading);}),canonicalAsset:async reference=>(await this.resolveLink(reference)).path,allowsAsset:reference=>!!this.linkPath(reference),allowsLink:reference=>!!this.linkPath(reference),image:(reference,alt)=>this.image(reference,alt),openLink:reference=>void this.openLink(reference)};
+    const resources={bookmark:{current:()=>this.note&&!this.note.deleted&&['MARKDOWN','DAY','WEEK','EVENT'].includes(this.note.kind)?{session:this.session,sourceType:this.note.sourceType,sourceKey:this.note.sourceKey,writable:this.writable&&!this.busy}:null,error:error=>this.fail(error),changed:(value,etag)=>void this.bookmarkChanged(value,etag)},...noteRevisionResources(()=>this.session,()=>({sourceType:this.note?.sourceType,sourceId:this.note?.sourceId}),{latest:async()=>{const session=this.session,id=this.note?.id;const reply=await session.request('/notes/entries/'+id+'/content',{binary:'application/octet-stream'});return {text:await reply.data.text(),etag:reply.etag};}}),...vaultEditorResources(()=>this.session,()=>this.note?.path||'',async(entry,heading)=>{await this.select(entry.id);if(heading)await this.markdown.showFormatted(false);this.markdown.scrollToHeading?.(heading);}),canonicalAsset:async reference=>(await this.resolveLink(reference)).path,allowsAsset:reference=>!!this.linkPath(reference),allowsLink:reference=>!!this.linkPath(reference),image:(reference,alt)=>this.image(reference,alt),openLink:reference=>void this.openLink(reference)};
     const host=node('div',undefined,'notes-markdown');this.markdown=new MarkdownField(host,()=>{this.controls();this.autosave?.changed();},()=>{if(this.dirty()&&!this.saveFailed&&!this.stale)this.autosave?.changed();},'notes',(file,image)=>this.upload(file,image),resources);
     this.markdown.addActionsGroup(this.documentTools);this.editor.append(this.markdown.actionsMenu);this.editor.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.preview=node('div',undefined,'notes-image-preview');this.preview.hidden=true;
@@ -92,7 +92,7 @@ export class NotesView {
     this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});this.form.addEventListener('submit',event=>{event.preventDefault();void this.applyPath();});
     this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>!!this.session&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(this.editor,this.autosave);
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
-    document.addEventListener('timekeeper:notes-changed',()=>{if(this.treePointerPending||this.dragged)this.reloadAfterDrag=true;else{this.info=null;this.folder=null;}if(this.session)this.callbacks.onChanged?.();});
+    document.addEventListener('timekeeper:notes-changed',()=>{if(this.treePointerPending||this.dragged)this.reloadAfterDrag=true;else{this.info=null;this.folder=null;}this.markdown.bookmark?.refresh();if(this.session)this.callbacks.onChanged?.();});
     this.observer=new ResizeObserver(()=>this.fit());for(const target of [document.documentElement,heading,this.error])this.observer.observe(target);window.addEventListener('resize',()=>this.fit());
     window.visualViewport?.addEventListener('resize',()=>this.fit());
     this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
@@ -190,6 +190,17 @@ export class NotesView {
       time.dateTime=valid?value:'';time.textContent=valid?dateTimeFormat(getLocale(),{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short',timeZone:this.zone||'UTC'}).format(date):'';
     }
   }
+  async bookmarkChanged(value,etag){
+    const session=this.session,note=this.note;if(!note)return;
+    note.bookmarked=value.bookmarked;note.bookmarkEtag=etag;
+    const entry=this.entries.get(note.id);if(entry)entry.bookmarked=value.bookmarked;this.paint();
+    try{
+      const reply=await session.request('/notes/entries/'+note.id);
+      if(session!==this.session||note!==this.note)return;
+      if(reply.data.etag===note.etag)note.entryEtag=reply.data.entryEtag;
+    }catch(error){if(session===this.session&&note===this.note)this.fail(error);}
+    if(session===this.session)document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));
+  }
   fail(error){this.error.hidden=false;this.error.textContent=error.uncertain?t('notes.uncertain'):error.message;if(error.status===401)this.callbacks.onUnauthorized?.(error);}
   sortState(){
     const order=noteSortOrders.find(value=>value.value===this.sortOrder);this.sortButton.replaceChildren(icon(order.icon));this.sortButton.title=t('notes.sort')+' · '+t(order.label);this.sortButton.setAttribute('aria-description',t(order.label));
@@ -255,7 +266,7 @@ export class NotesView {
       else if(search||this.showTrash){const listed=await this.list({query:search,...(this.showTrash?{trash:true}:{})},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set('search',rows);for(const row of rows)entries.set(row.id,row);}
       else{const pending=[this.info.rootId];while(pending.length){const parent=pending.shift(),listed=await this.list({parentId:parent},session,snapshot,current);if(!listed)return;const rows=listed.filter(entry=>notesEntryVisible(entry,this.info.settings));children.set(parent,rows);for(const row of rows){entries.set(row.id,row);if(row.kind==='FOLDER'&&(expandAll||expanded.has(row.id))){expanded.add(row.id);pending.push(row.id);}}}}
       if(session!==this.session||current!==this.loadGeneration)return;this.expanded=expanded;this.children=children;this.entries=entries;this.paint();if(!this.stale&&!this.moveFailed)this.error.hidden=true;
-      if(this.note&&!this.saving){const inspected=this.note;const reply=await session.request('/notes/entries/'+inspected.id);if(session!==this.session||current!==this.loadGeneration)return;if(this.note!==inspected||this.saving)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}}
+      if(this.note&&!this.saving){const inspected=this.note;const reply=await session.request('/notes/entries/'+inspected.id);if(session!==this.session||current!==this.loadGeneration)return;if(this.note!==inspected||this.saving)return;if(reply.data.etag!==this.note.etag){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;}else{this.note={...reply.data};this.documentTitle.textContent=noteTitle(this.note,this.note.path);}this.markdown.bookmark?.refresh();}
     }catch(error){if(session===this.session&&current===this.loadGeneration){if(this.contentSearch()){this.searchFailed(error);return;}if(error.status===412&&retry===0){await this.reload(1);return;}this.fail(error);}}
     finally{if(session===this.session&&current===this.loadGeneration){this.loading=false;this.expandAllRequested=false;this.controls();}}
   }
@@ -266,7 +277,7 @@ export class NotesView {
     const append=(parent,host)=>{for(const entry of this.contentResults?(this.children.get(parent)||[]):sortedNotes(this.children.get(parent)||[],this.sortOrder,getLocale())){
       const folder=entry.kind==='FOLDER',row=node('div',undefined,'notes-tree-row');row.setAttribute('role','treeitem');row.setAttribute('aria-selected',String(this.note?.id===entry.id));row.dataset.id=entry.id;row.tabIndex=-1;
       const title=noteTitle(entry,parent==='search'?entry.path:entry.path.split('/').at(-1));
-      const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.kind==='EVENT'?title:entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.title?title+' · '+entry.path:entry.path);pick.append(icon(folder?'folder':'file-earmark-text'),node('span',title));row.append(pick);
+      const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.kind==='EVENT'?title:entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.title?title+' · '+entry.path:entry.path);pick.append(icon(folder?'folder':entry.bookmarked?'bookmark':'file-earmark-text'),node('span',title));row.append(pick);
       const excerpt=this.searchExcerpts.get(entry.id);
       if(this.contentResults&&excerpt){
         pick.append(node('span',entry.path,'notes-search-path'));

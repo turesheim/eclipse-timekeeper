@@ -1467,5 +1467,8 @@
   "markdown.plantuml_too_large": "The diagram exceeds the 10 KB preview limit. Its Markdown source is preserved.",
   "markdown.plantuml_external": "Diagram previews cannot load files, images, themes or external resources. Its Markdown source is preserved.",
   "markdown.plantuml_invalid": "The diagram could not be rendered. Edit its Markdown source to correct or simplify it.",
-  "notes.search_tag": "Search notes for {{tag}}"
+  "notes.search_tag": "Search notes for {{tag}}",
+  "notes.bookmark_add": "Add bookmark",
+  "notes.bookmark_remove": "Remove bookmark",
+  "notes.bookmarks": "Bookmarks"
 }

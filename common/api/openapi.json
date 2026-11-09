@@ -18657,6 +18657,201 @@
         },
         "description": "Uses the entryEtag in If-Match, guarding both structure and content changes since review. Preserves entry identity and applies provided original dates atomically. Without createdAt, the existing creation date and its provenance are kept. Folders and deleted entries are refused; normal quotas, authorization and native journal validation apply. No existing file is overwritten by the create-only endpoint."
       }
+    },
+    "/notes/bookmark": {
+      "get": {
+        "operationId": "getNoteBookmark",
+        "summary": "Read private page bookmark",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_NOTE",
+                "WEEK_NOTE",
+                "EVENT_NOTE",
+                "VAULT_CONTENT"
+              ]
+            }
+          },
+          {
+            "name": "sourceKey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteBookmarkState"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "description": "Bookmarks belong to the authenticated account. Daily and weekly keys can name an empty page. Content bytes, dates, history and content validators remain unchanged. Responses are private, no-store."
+      },
+      "put": {
+        "operationId": "updateNoteBookmark",
+        "summary": "Set private page bookmark without changing note content",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_NOTE",
+                "WEEK_NOTE",
+                "EVENT_NOTE",
+                "VAULT_CONTENT"
+              ]
+            }
+          },
+          {
+            "name": "sourceKey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteBookmarkState"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteBookmarkInput"
+              }
+            }
+          }
+        },
+        "description": "Bookmarks belong to the authenticated account. Daily and weekly keys can name an empty page. Content bytes, dates, history and content validators remain unchanged. Responses are private, no-store."
+      }
     }
   },
   "components": {
@@ -23822,6 +24017,10 @@
           "notesFiles": {
             "type": "integer",
             "minimum": 0
+          },
+          "bookmarks": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -27234,6 +27433,10 @@
             "$ref": "#/components/schemas/Version",
             "readOnly": true,
             "description": "Independent day-label version in this deprecated combined projection. It participates in the combined ETag."
+          },
+          "bookmarked": {
+            "type": "boolean",
+            "description": "A bookmarked civil-date page can be present without note text."
           }
         },
         "description": "Private calendar metadata only. Fetch /day-notes/{date} with its ETag to read or change the complete note."
@@ -31041,6 +31244,13 @@
               "$ref": "#/components/schemas/ArchiveWeekNote"
             },
             "description": "Private weekly Markdown files. Deleted files are excluded."
+          },
+          "bookmarks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteBookmark"
+            }
           }
         },
         "required": [
@@ -31097,6 +31307,13 @@
               "$ref": "#/components/schemas/ArchivedDayLabel"
             },
             "description": "Independent day labels, including explicitly cleared values. Markdown frontmatter is opaque and does not own these labels."
+          },
+          "bookmarks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteBookmark"
+            }
           }
         },
         "required": [
@@ -31165,6 +31382,13 @@
               "$ref": "#/components/schemas/ArchiveJournalFile"
             },
             "description": "Checksummed separate Markdown and binary ZIP entries. Nonempty indexes require the complete ZIP for restore."
+          },
+          "bookmarks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteBookmark"
+            }
           }
         },
         "required": [
@@ -32886,6 +33110,14 @@
               "UNKNOWN"
             ],
             "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
+          },
+          "bookmarked": {
+            "type": "boolean",
+            "description": "Private page bookmark, independent of canonical content."
+          },
+          "bookmarkEtag": {
+            "type": "string",
+            "description": "Validator for the separate bookmark state."
           }
         },
         "dependentRequired": {
@@ -33221,6 +33453,13 @@
           },
           "vault": {
             "$ref": "#/components/schemas/AccountArchiveVault"
+          },
+          "bookmarks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteBookmark"
+            }
           }
         },
         "required": [
@@ -34018,6 +34257,76 @@
               "CACHE_CAPACITY",
               null
             ]
+          }
+        }
+      },
+      "NoteBookmarkInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bookmarked"
+        ],
+        "properties": {
+          "bookmarked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoteBookmarkState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey",
+          "bookmarked",
+          "version"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "bookmarked": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "ArchivedNoteBookmark": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
           }
         }
       }

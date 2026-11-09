@@ -36,6 +36,7 @@ final class AccountArchiveImport {
         new DayNotes(store).restore(archive.path("dayNotes"));new WeekNotes(store).restore(archive.path("weekNotes"));new JournalAssets(store).restore(archive.path("journalAssets"));
         if(archive.path("journalFiles").size()>0)ArchiveJournalFiles.restore(document.file().file(),archive.path("journalFiles"),store,archive.has("dayLabels"));
         VaultArchive.restore(document.file().file(),archive.path("vault"),store);
+        new NoteBookmarks(store).restore(archive.path("bookmarks"));
         return null;});
     }
     private void importWork(Document document){
