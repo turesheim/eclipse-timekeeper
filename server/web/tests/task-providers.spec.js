@@ -105,7 +105,7 @@ test('project mappings and list drafts survive pause, resume and status polling'
   const owner=await signIn(page,request),project=randomUUID(),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],projects:[{id:project,name:'Imported work'}]});await open(page);const panel=card(page,row.id);
   const mapping=panel.getByRole('combobox',{name:'Project for Work',exact:true});await mapping.selectOption(project);await panel.getByRole('checkbox',{name:'Home',exact:true}).check();
   await panel.getByRole('button',{name:'Pause synchronization',exact:true}).click();await expect(panel.getByRole('button',{name:'Resume synchronization',exact:true})).toBeVisible();await expect(panel.getByRole('button',{name:'Refresh from provider',exact:true})).toBeDisabled();await expect(mapping).toHaveValue(project);await expect(panel.getByRole('checkbox',{name:'Home',exact:true})).toBeChecked();
-  await panel.getByRole('button',{name:'Resume synchronization',exact:true}).click();await expect(mapping).toHaveValue(project);expect(model.writes.map(value=>value.input)).toEqual([{paused:true},{paused:false}]);
+  await panel.getByRole('button',{name:'Resume synchronization',exact:true}).click();await expect(panel.getByRole('button',{name:'Pause synchronization',exact:true})).toBeVisible();await expect(mapping).toHaveValue(project);expect(model.writes.map(value=>value.input)).toEqual([{paused:true},{paused:false}]);
   await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();await expect(mapping).toHaveValue(project);
   expect(model.writes.find(value=>value.path.endsWith('/lists')).input).toEqual({selectedLists:['work','home'],projectMappings:{work:project,home:null}});
 });
@@ -113,6 +113,7 @@ test('project mappings and list drafts survive pause, resume and status polling'
 test('project choice is sent with selected lists',async({page,request})=>{
   const owner=await signIn(page,request),project=randomUUID(),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],projects:[{id:project,name:'Imported work'}]});await open(page);const panel=card(page,row.id);
   await panel.getByRole('combobox',{name:'Project for Work',exact:true}).selectOption(project);await panel.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();
   expect(model.writes.find(value=>value.path.endsWith('/lists')).input).toEqual({selectedLists:['work'],projectMappings:{work:project}});
 });
 

@@ -89,6 +89,13 @@ class TaskProviderScansTest {
         tx(f,()->connections().pause(f.connection(),false,etag(paused)));var resumed=claim(f);assertNotNull(resumed);
         assertEquals(etag(saved),etag(tx(f,()->scans().begin(resumed))));
     }
+    @Test void deselectingAListDiscardsPrivatePagesButKeepsImportedTasksAndTheirCursor(){
+        var f=fixture();imported(f,task("one",null,"001","One"));var before=stored(f,"one");var cursor=tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst());
+        var claim=reclaim(f);var start=tx(f,()->scans().begin(claim));tx(f,()->scans().acknowledge(claim,start,page("next",task("one",null,"001","Changed provider title"))));
+        assertFalse(tx(f,()->store.list(TaskProviderScans.PAGE).isEmpty()));
+        tx(f,()->{var current=connections().visible(connections().required(f.connection()));connections().select(f.connection(),List.of(),etag(current));return null;});
+        assertTrue(tx(f,()->store.list(TaskProviderScans.PAGE).isEmpty()));assertTrue(tx(f,()->store.list(TaskProviderScans.SCAN).isEmpty()));assertEquals(before,stored(f,"one"));assertEquals(cursor,tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst()));
+    }
     private void imported(Fixture f,TaskCloudProvider.RemoteTask...items){
         var claim=claim(f);var start=tx(f,()->scans().begin(claim));tx(f,()->scans().acknowledge(claim,start,page(null,items)));
         var preview=tx(f,()->scans().review(f.connection(),f.list()));tx(f,()->scans().approve(f.connection(),f.list(),etag(preview)));

@@ -194,5 +194,7 @@ class TaskProviderConnectionsTest {
         var blocked=tx(owner,()->connections().visible(connections().required(id)));
         var selected=tx(owner,()->connections().select(id,List.of("remote-list"),etag(blocked)));
         assertFalse(selected.path("syncing").asBoolean());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",selected.path("lastError").asText());assertEquals(blocked.get("selectedLists"),selected.get("selectedLists"));
+        var paused=tx(owner,()->connections().pause(id,true,etag(selected)));var resumed=tx(owner,()->connections().pause(id,false,etag(paused)));
+        assertFalse(resumed.path("syncing").asBoolean());assertTrue(resumed.path("nextRefresh").isNull());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",resumed.path("lastError").asText());
     }
 }

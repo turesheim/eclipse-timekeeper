@@ -107,6 +107,18 @@ class TaskProviderResourceHttpTest {
         assertEquals("Updated work list",result.path("availableLists").get(0).path("name").asText());assertTrue(result.path("selectedLists").isEmpty());
         assertEquals(0,TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).reads.get());
     }
+    @Test void manualRefreshReplacesAReadyPreviewWithFreshProviderObservations()throws Exception{
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();
+        var input=object();input.putArray("selectedLists").add("list-1").add("list-2");json(call("PUT","/"+id+"/lists",input,etag(connection)),200);var ready=idle(id);
+        assertTrue(ready.path("lastSuccess").isNull());var paths=new LinkedHashMap<String,String>();var etags=new HashMap<String,String>();
+        for(var preview:ready.path("imports")){String path="/"+id+"/imports/"+preview.path("id").asText();var before=call("GET",path,null,null);assertEquals(200,before.statusCode());paths.put(preview.path("remoteListId").asText(),path);etags.put(path,before.header("ETag"));}assertEquals(2,paths.size());
+        TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).title="Fresh provider title";
+        store.transaction(owner,()->{var c=new TaskProviderConnections(store);var value=c.required(UUID.fromString(id));value.put("lastAttempt",store.now().minusSeconds(31).toString());c.save(TaskProviderConnections.AUTH,value);return null;});
+        assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());idle(id);
+        for(var entry:paths.entrySet()){var after=call("GET",entry.getValue(),null,null);assertEquals(200,after.statusCode());assertEquals("Fresh provider title "+entry.getKey(),after.jsonPath().getString("samples[0].title"));
+            assertEquals(412,call("POST",entry.getValue(),null,etags.get(entry.getValue())).statusCode());}
+        assertTrue(store.transaction(owner,()->store.list("TASK").stream().noneMatch(task->task.path("externalReferences").toString().contains(connection.path("remoteAccountId").asText()))));
+    }
     @Test void expiredTokensRefreshAndListRenamesDoNotRewriteUnchangedTasks()throws Exception{
         var connection=connect("microsoft");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");idle(id);
         var key=new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("microsoft",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1");

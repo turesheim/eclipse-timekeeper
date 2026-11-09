@@ -22,7 +22,7 @@ final class TaskProviderScans {
         if(before.isPresent()){
             var old=before.get();boolean same=old.path("generation").asText().equals(claim.generation());
             if(same&&old.path("state").asText().equals("FETCHING")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(86400).isAfter(now))return ((ObjectNode)old).deepCopy();
-            if(same&&old.path("state").asText().equals("READY")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(900).isAfter(now))return ((ObjectNode)old).deepCopy();
+            if(same&&!claim.forced()&&old.path("state").asText().equals("READY")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(900).isAfter(now))return ((ObjectNode)old).deepCopy();
         }
         boolean full=claim.provider()!=TaskCloudProvider.Provider.GOOGLE||!approved(auth,claim.remoteList())||before.isEmpty()
                 ||!before.get().hasNonNull("lastFullAt")||!Instant.parse(before.get().path("lastFullAt").asText()).plusSeconds(86400).isAfter(now);
@@ -125,6 +125,12 @@ final class TaskProviderScans {
     }
     private ObjectNode required(UUID list){return store.find(SCAN,list).map(node->((ObjectNode)node).deepCopy()).orElseThrow(ApiFailure::notFound);}
     private static UUID pageId(JsonNode value,int index){return UUID.nameUUIDFromBytes(("dagsverk-task-page:"+value.path("scanId").asText()+":"+index).getBytes(StandardCharsets.UTF_8));}
-    private void clearPages(JsonNode value){for(int index=0;index<value.path("pageCount").asInt();index++)store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),PAGE,pageId(value,index));}
+    private void clearPages(JsonNode value){clearPages(store,value);}
+    private static void clearPages(ServerStore store,JsonNode value){for(int index=0;index<value.path("pageCount").asInt();index++)store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),PAGE,pageId(value,index));}
+    static void retain(ServerStore store,UUID connection,Set<String> selected){
+        for(var value:store.list(SCAN))if(value.path("connectionId").asText().equals(connection.toString())&&!selected.contains(value.path("remoteListId").asText())){
+            clearPages(store,value);store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),SCAN,uuid(value.get("id")));
+        }
+    }
     private static TaskProviderHttp.Failure failure(String code){return new TaskProviderHttp.Failure(code,0,0,false);}
 }

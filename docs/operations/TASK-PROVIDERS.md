@@ -27,6 +27,10 @@ from provider** requests an earlier scan and discovers newly created lists.
 private and survive a server restart. Repeated pages or incomplete scans do not
 advance the public synchronization checkpoint. A first-import preview expires
 after 15 minutes; refresh from the provider before approving an expired preview.
+Manual refresh replaces ready previews for every selected list. Deselecting a
+list or disconnecting discards its temporary pages while keeping imported tasks
+and their completed checkpoints. A connection requiring reauthorization stays
+stopped when resumed until the user reconnects.
 Sources above 10,000 tasks or 32 MiB per list report a limit error and keep
 existing tasks and the previous completed checkpoint.
 

@@ -16,7 +16,7 @@ final class TaskProviderConnections {
         @Override public String toString(){return "Consumed task-provider authorization grant";}
     }
     record Claim(String owner,UUID id,String lease,TaskCloudProvider.Provider provider,String account,String remoteList,UUID list,boolean discover,boolean catalogOnly,
-            String settingsHash,TaskProviderOAuth.Tokens tokens,boolean writable,String generation) {
+            String settingsHash,TaskProviderOAuth.Tokens tokens,boolean writable,String generation,boolean forced) {
         @Override public String toString(){return "Claimed task-provider refresh";}
     }
     private final ServerStore store;
@@ -114,6 +114,7 @@ final class TaskProviderConnections {
             store.save("TASK_LIST",list);store.change("TASK_LIST",old==null?"CREATED":"UPDATED",list.id().toString());
         }
         if(!known.containsAll(chosen))throw ApiFailure.validation();
+        TaskProviderScans.retain(store,id,chosen);
         var ids=value.putArray("selected");selected.forEach(ids::add);value.put("configurationVersion",value.path("configurationVersion").asLong()+1).put("generation",UUID.randomUUID().toString()).put("nextRefresh",store.now().toString()).putNull("lease").putNull("leaseUntil");
         value.put("roundActive",false).put("roundIndex",0).put("requested",!selected.isEmpty()&&!value.path("blocked").asBoolean()).put("pendingCount",0).putNull("lastSuccess");
         if(!value.path("blocked").asBoolean())value.putNull("lastError");value.putArray("pending");value.putObject("listErrors");
@@ -134,7 +135,7 @@ final class TaskProviderConnections {
             value.put("roundActive",false).put("requested",true);
         }else if(value.hasNonNull("nextRefresh")&&Instant.parse(value.path("nextRefresh").asText()).isAfter(now))return null;
         if(!value.path("roundActive").asBoolean()){
-            value.put("roundActive",true).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
+            value.put("roundActive",true).put("forceRound",force).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         }
         int index=value.path("roundIndex").asInt();if(index<0||!catalogOnly&&index>=value.path("selected").size())throw ApiFailure.conflict();
         String remote=catalogOnly?null:value.path("selected").get(index).asText();UUID listId=null;
@@ -142,7 +143,7 @@ final class TaskProviderConnections {
         String lease=UUID.randomUUID().toString();value.put("lease",lease).put("leaseUntil",now.plusSeconds(600).toString()).put("lastAttempt",now.toString()).put("nextRefresh",now.plusSeconds(600).toString());
         save(AUTH,value);var scopes=new HashSet<String>();value.path("scopes").forEach(scope->scopes.add(scope.asText()));
         return new Claim(store.owner(),id,lease,TaskProviderConfiguration.provider(connection.path("providerId").asText()),connection.path("remoteAccountId").asText(),remote,listId,index==0||catalogOnly,catalogOnly,
-                value.path("settingsHash").asText(),new TaskProviderOAuth.Tokens(value.path("accessToken").asText(),value.path("refreshToken").asText(),Instant.parse(value.path("tokenExpires").asText()),scopes),writable(value,connection),value.path("generation").asText());
+                value.path("settingsHash").asText(),new TaskProviderOAuth.Tokens(value.path("accessToken").asText(),value.path("refreshToken").asText(),Instant.parse(value.path("tokenExpires").asText()),scopes),writable(value,connection),value.path("generation").asText(),value.path("forceRound").asBoolean());
     }
     ObjectNode active(Claim claim){
         if(!store.owner().equals(claim.owner())||!enabled())return null;
@@ -200,14 +201,14 @@ final class TaskProviderConnections {
     }
     ObjectNode pause(UUID id,boolean paused,String match){
         var value=required(id);ApiReplies.match(visible(value),match);
-        value.put("paused",paused).putNull("lease").putNull("leaseUntil").put("roundActive",false).put("roundIndex",0).put("requested",!paused&&!value.path("selected").isEmpty());
-        if(paused)value.putNull("nextRefresh");else value.put("nextRefresh",store.now().toString());
+        value.put("paused",paused).putNull("lease").putNull("leaseUntil").put("roundActive",false).put("roundIndex",0).put("requested",!paused&&!value.path("blocked").asBoolean()&&!value.path("selected").isEmpty());
+        if(paused||value.path("blocked").asBoolean())value.putNull("nextRefresh");else value.put("nextRefresh",store.now().toString());
         return visible(save(AUTH,value));
     }
     void disconnect(UUID id,String match){
         var value=required(id);ApiReplies.match(visible(value),match);
         var before=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);var connection=(TaskConnection)decode("TASK_CONNECTION",before);
-        store.save("TASK_CONNECTION",connection.update(connection.name(),false,false,false));store.change("TASK_CONNECTION","UPDATED",id.toString());remove(AUTH,value);
+        store.save("TASK_CONNECTION",connection.update(connection.name(),false,false,false));store.change("TASK_CONNECTION","UPDATED",id.toString());TaskProviderScans.retain(store,id,Set.of());remove(AUTH,value);
     }
     static String settingsHash(TaskProviderOAuth.Settings settings){return hash(settings.clientId()+"\n"+settings.redirect()+"\n"+hash(settings.clientSecret()));}
     static boolean writable(JsonNode credentials,JsonNode connection){
