@@ -27,6 +27,12 @@ in parallel. Profile and revision checks still reject mixed snapshots and retry
 up to three times. A 30-second overall deadline covers all pages and attempts;
 failed or superseded attempts abort their outstanding reads. Browser console
 warnings report refreshes lasting at least five seconds without exposing records.
+Change polling shares any refresh already in flight. It reloads again if that
+completed read is older than the batch; running work keeps its periodic refresh.
+Popup saves use the shared notes-changed event to request a single refresh.
+Inactive client, project, label, activity, month and week views retain their data
+and paint when selected. Notes retains its catalog for unchanged account
+revisions; note changes, local invalidation and the Notes Refresh action reload it.
 See [Synology synchronization diagnostics](../operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
 for request and database timings in the container logs.
 

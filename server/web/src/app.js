@@ -62,7 +62,7 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
-const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>{document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));void refresh().catch(()=>{});}});
+const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))});
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
@@ -187,13 +187,14 @@ async function tab(name) {
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if(name==='notes')notes.show();else notes.hide();
   if(name==='tasks')tasks.show();else tasks.hide();
-  if (name !== 'track') track.hide();
+  if (name === 'track') track.show();else track.hide();
   if (name === 'today') today.show();else today.hide();
-  if (name !== 'week') weekSessions.hide();
+  if (name === 'week') weekSessions.show();else weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page');else item.removeAttribute('aria-current');
   }
+  if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
 }
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
@@ -204,6 +205,7 @@ const auth = authentication({
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
     const panel=$('labels-panel');view.root.append(panel);panel.hidden=false;
+    if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
     view.cleanup.add(()=>{panel.hidden=true;$('account-labels-home').append(panel);});
   },
   async connect(session, account) {
@@ -287,9 +289,12 @@ async function watch(session) {
       if (!connected || !snapshot) await refresh();
       const changes = await session.changes(snapshot.revision);
       if (session !== api) return;
+      // A local save can already be loading a snapshot containing this batch.
+      // Await that read before deciding whether another consistent read is needed.
+      const reading=refreshing;if(reading)await reading;if(session!==api)return;
       // Full consistent reads include changes made during pagination/report loading.
-      if (changes.items.length || changes.hasMore || snapshot.active.data || snapshot.activeWorkSession.data) await refresh();else
-      void refreshServerInfo(session);
+      if (changes.nextSequence>snapshot.revision || !reading&&(snapshot.active.data || snapshot.activeWorkSession.data)) await refresh();else
+      if(!reading)void refreshServerInfo(session);
       delay = 1000;
     } catch (error) {
       if (session !== api) return;
@@ -399,11 +404,23 @@ function render() {
   $('active-title').replaceChildren(active && !focusIncludesActivity(s,active) ? document.createTextNode(i18nText('focus.running_outside')) : active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
   $('active-details').textContent = active && !focusIncludesActivity(s,active) ? '' : active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
   $('stop').hidden = !active;readOnlyWhileDisconnected();
-  table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
-  renderProjects(s);
-  table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))])));
-  for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
+  renderLegacyViews(s,zone);
   refreshLabelFields();refreshClientChoices();renderSession();
+  weekSessions.update(s, activeAsOf, displayNanos, api, connected && canWrite, null);
+  calendar.update(s, connected, api);
+  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
+  today.update(s, connected, api);
+  notes.update(s,connected,api,canWrite);
+  tasks.update(s,connected,api,canWrite);
+}
+function renderLegacyViews(s,zone){
+  if(!$('clients-panel').hidden)table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
+  if(!$('projects-panel').hidden)renderProjects(s);
+  if(!$('labels-panel').hidden){
+    table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))])));
+    for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
+  }
+  if($('activities-panel').hidden)return;
   $('week-total').textContent = displayDuration(s.report.total);$('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
     const date = addDays(s.dates.first, index),day = s.report.days.find((v) => v.date === date);
@@ -415,11 +432,6 @@ function render() {
   }
   $('activities-heading').textContent = selectedDay ? i18nText("ui.activities_a05abe", { value0: selectedDay }) : i18nText("ui.activities");
   renderWorkweek(s, zone);
-  calendar.update(s, connected, api);
-  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
-  today.update(s, connected, api);
-  notes.update(s,connected,api,canWrite);
-  tasks.update(s,connected,api,canWrite);
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({ length: 7 }, (_, index) => addDays(s.dates.first, index));
@@ -430,7 +442,6 @@ function renderWorkweek(s, zone) {
     const daily = dates.map((date) => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
     return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
   };
-  weekSessions.update(s, activeAsOf, displayNanos, api, connected && canWrite, null);
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title');node.style.setProperty('--level', level);
     if (key) {

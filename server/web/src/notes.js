@@ -156,11 +156,12 @@ export class NotesView {
   }
   async retryCommit(){if(this.uncertain){await this.checkCommitted();return;}this.stale=false;this.error.hidden=true;await this.autosave.flush();}
   update(snapshot,connected,session,writable){
+    const revision=snapshot?.revision,zone=snapshot?.profile?.data?.zoneId||'UTC',changed=!Number.isSafeInteger(revision)||this.session!==session||this.zone!==zone||this.revision!==revision;this.revision=revision;
     if(this.session&&this.session!==session)this.reset();this.session=session;this.zone=snapshot?.profile?.data?.zoneId||'UTC';this.writable=connected&&writable;this.controls();
     this.recentNotes.update(session,this.zone,snapshot?.revision);if(this.visible){this.recentNotes.show();this.pollRecent();}
     // Keep a content search's pages and focused controls until an explicit
     // search/refresh; its cursor already detects changes at the next page.
-    if(this.visible&&!this.busy&&!this.loading&&!this.contentSearch())void this.reload();
+    if(this.visible&&!this.busy&&!this.loading&&!this.contentSearch()&&(changed||!this.info))void this.reload();
   }
   pollRecent(){if(!this.recentTimer)this.recentTimer=setInterval(()=>void this.recentNotes.refresh(),30000);}
   show(){this.visible=true;this.recentNotes.show();this.pollRecent();window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}

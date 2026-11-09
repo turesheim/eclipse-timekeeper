@@ -55,13 +55,14 @@ export class MonthTrack {
   select(month) {this.notes.hide();this.closePicker();this.holidays.hide();this.monthPicker.close();this.month = month;this.input.setCustomValidity('');this.paint(true);}
   update(snapshot, asOf, format, writable, session) {
     this.session=session;
-    this.snapshot = snapshot;this.sessionsById = new Map(snapshot.workSessions.map((session) => [session.id, session]));this.asOf = asOf;this.format = format;this.setWritable(writable);this.paint(true);
+    this.snapshot = snapshot;this.sessionsById = new Map(snapshot.workSessions.map((session) => [session.id, session]));this.asOf = asOf;this.format = format;this.setWritable(writable);if(!this.root.hidden)this.paint(true);
   }
   setWritable(writable) {
     this.writable = writable;this.notes.setWritable(writable);
     for (const button of this.grid.querySelectorAll('button[data-track-daily-client]')) button.disabled = !writable;
     if (!writable) this.closePicker();
   }
+  show() {this.paint(true);}
   hide() {this.notes.hide();this.closePicker();this.holidays.hide();this.monthPicker.close();}
   closePicker() {this.picking = null;if (this.picker.open) this.picker.close();this.choices.replaceChildren();}
   sessions(date, clientId) {
