@@ -339,6 +339,23 @@ test('a conflicting or stale title rename retains the draft and never overwrites
   page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');
 });
 
+test('a stale title warning survives an already running catalog refresh',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Title snapshot.md',body='# Title snapshot\n\nExact body.\n';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const navigation=page.locator('#notes-navigation'),refresh=navigation.getByRole('button',{name:'Refresh',exact:true});
+  await refresh.click();await noteEntry(navigation,'Notes').click();await noteEntry(navigation,path).click();
+  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true}),warning=page.locator('#notes-panel > [role=alert]');
+  await title.fill('My pending title');const current=await api('GET','/notes/entries/'+entry.id);await api('PUT','/notes/entries/'+entry.id+'/title',{title:'Peer title'},{'If-Match':current.headers().etag});
+  await refresh.evaluate(button=>button.click());await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');await expect(title).toHaveValue('My pending title');
+  let held=false,release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/notes/entries?*',async route=>{const response=await route.fetch();held=true;await pending;await route.fulfill({response});});
+  try{
+    await refresh.evaluate(button=>button.click());await expect.poll(()=>held).toBe(true);await title.press('Enter');await expect(warning).toBeVisible();
+    release();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(warning).toBeVisible();await expect(title).toHaveValue('My pending title');await expect(title).not.toBeEditable();
+    expect((await(await api('GET','/notes/entries/'+entry.id)).json()).title).toBe('Peer title');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);
+    page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(title).toBeEditable();await expect(warning).toBeHidden();
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('an uncertain title rename keeps the draft and is checked by reload without another write',async({page,request})=>{
   const api=await setup(page,request),path='Notes/Uncertain title.md';
   const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# Uncertain title\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();

@@ -145,7 +145,7 @@ export class NotesView {
     const session=this.session,current=this.generation,id=this.note.id,title=this.titleInput.value;
     const operation=(async()=>{
       if(!await this.autosave.flush()||session!==this.session||current!==this.generation)return false;
-      if(this.titleBase&&(this.titleBase.id!==this.note.id||this.titleBase.path!==this.note.path||this.titleBase.title!==noteTitle(this.note,this.note.path))){this.error.textContent=t('notes.stale');this.error.hidden=false;return false;}
+      if(this.titleBase&&(this.titleBase.id!==this.note.id||this.titleBase.path!==this.note.path||this.titleBase.title!==noteTitle(this.note,this.note.path))){this.stale=true;this.error.textContent=t('notes.stale');this.error.hidden=false;return false;}
       this.busy=true;this.controls();
       try{
         const reply=await session.request('/notes/entries/'+id+'/title',{method:'PUT',etag:this.note.entryEtag,body:{title}});
