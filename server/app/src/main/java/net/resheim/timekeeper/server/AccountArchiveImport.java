@@ -28,7 +28,7 @@ final class AccountArchiveImport {
             upload.put("verifiedArchiveId",value.path("archiveId").asText()).put("verifiedArchiveDigest",parsed.sha256());return new Document(file,value);
         }catch(RuntimeException|Error failure){file.close();throw failure;}
     }
-    private void restoreJournals(Document document){
+    private void restoreJournals(Document document,JsonNode mappings){
         store.withJournalSource(DayNoteHistory.Source.ARCHIVE_RESTORE,()->{
         var archive=document.data();
         VaultArchive.prepare(archive.path("vault"),store);
@@ -37,15 +37,17 @@ final class AccountArchiveImport {
         if(archive.path("journalFiles").size()>0)ArchiveJournalFiles.restore(document.file().file(),archive.path("journalFiles"),store,archive.has("dayLabels"));
         VaultArchive.restore(document.file().file(),archive.path("vault"),store);
         new NoteBookmarks(store).restore(archive.path("bookmarks"));
+        new NoteClients(store).restore(archive.path("noteClients"),mappings);
         return null;});
     }
-    private void importWork(Document document){
+    private JsonNode importWork(Document document){
         var archive=document.data();
         JsonNode mappings;
         if(!archive.path("format").asText().equals(AccountArchive.LEGACY_FORMAT)&&archive.path("work").path("taskAttachments").size()>0){
             try(var reader=new ArchiveJournalFiles.TaskReader(document.file().file(),archive.path("journalFiles"))){mappings=new DomainTransfer(store).importRecords(archive.path("work"),reader::data).body().path("ids");}
         }else mappings=new DomainTransfer(store).importRecords(archive.path("work")).body().path("ids");
         new FocusAreas(store).restore(archive.path("preferences").path("focusAreas"),mappings,inputs);
+        return mappings;
     }
     private static ObjectNode intent(ObjectNode upload) {return object().put("archiveId",upload.path("verifiedArchiveId").asText()).put("documentSha256",upload.path("verifiedArchiveDigest").asText());}
     private static String key(ObjectNode upload) {if(!upload.hasNonNull("verifiedArchiveId") || !upload.hasNonNull("verifiedArchiveDigest")) throw ApiFailure.conflict();return ImportLedger.identifier("account-archive-import",upload.path("verifiedArchiveId").asText()).toString();}
@@ -82,8 +84,8 @@ final class AccountArchiveImport {
             if(conflicts.isEmpty()) {
                 try {
                     var c=store.current().connection();var savepoint=c.setSavepoint();
-                    try {restoreZone(archive,restoreZone);importWork(document);
-                        restoreJournals(document);}
+                    try {restoreZone(archive,restoreZone);var mappings=importWork(document);
+                        restoreJournals(document,mappings);}
                     catch(ApiFailure invalid) {if(invalid.status!=409) throw invalid;conflicts.add("Existing work records, journal notes or attachments conflict with this archive. Resolve the conflict before importing.");}
                     finally {c.rollback(savepoint);c.releaseSavepoint(savepoint);}
                 }catch(SQLException unavailable) {throw new ApiFailure(503,"UNAVAILABLE");}
@@ -103,8 +105,8 @@ final class AccountArchiveImport {
                     || review.path("restoreTimeZone").asBoolean()!=restoreZone) throw ApiFailure.conflict();
             if(review.path("revision").asLong(-1)!=store.revision() || review.path("profileVersion").asLong(-1)!=store.profile().path("version").asLong()) throw new ApiFailure(412,"STALE_VERSION");
             try(var document=document(id,upload)){
-                var archive=document.data();restoreZone(archive,restoreZone);importWork(document);
-                restoreJournals(document);
+                var archive=document.data();restoreZone(archive,restoreZone);var mappings=importWork(document);
+                restoreJournals(document,mappings);
                 // Keep old import ledgers as inert audit copies. Their replay keys,
                 // mappings and Undo versions are never effective in this account.
                 for(var audit:archive.path("importHistory")) {

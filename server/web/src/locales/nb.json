@@ -1476,5 +1476,7 @@
   "notes.bookmark_remove": "Fjern bokmerke",
   "notes.bookmarks": "Bokmerker",
   "notes.maximize": "Åpne i arbeidsområdet",
-  "notes.create_linked_confirm": "Notatet «{{path}}» finnes ikke. Vil du opprette det og åpne redigeringsvinduet?"
+  "notes.create_linked_confirm": "Notatet «{{path}}» finnes ikke. Vil du opprette det og åpne redigeringsvinduet?",
+  "notes.client": "Knytt til kunde",
+  "notes.no_client": "Ingen kunde"
 }

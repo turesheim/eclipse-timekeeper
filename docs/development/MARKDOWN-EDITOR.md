@@ -112,3 +112,12 @@ It has no button border: a filled bookmark marks saved metadata, an outlined plu
 adds it, and an outlined dash appears when removing it with pointer or keyboard.
 A visible keyboard focus outline and a touch target of at least 44 pixels remain.
 Popup bookmarks align with their note-content edge below the window controls.
+
+The Note tools menu includes **Associate with client** for an owned note or empty
+daily/weekly page. The dialog lists every owned client, including those outside
+the workspace focus filter, and **No client** removes the association. A small
+name and color marker appear at the top right of the note. Read-only sessions
+can see the label. Selecting a client does not save a body draft or change its
+bytes, dates or content ETag. Stale or uncertain association writes are resolved
+by reading metadata; another write requires an explicit choice. Saved event
+notes, native journal editors and ordinary note popups share this behavior.

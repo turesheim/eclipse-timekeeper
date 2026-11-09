@@ -158,6 +158,26 @@ class AccountArchiveImportTest {
         var invalid=archive.deepCopy();invalid.withArray("bookmarks").add(invalid.path("bookmarks").get(0).deepCopy());assertEquals(422,assertThrows(ApiFailure.class,()->NoteBookmarks.validate(invalid.path("bookmarks"),invalid.path("vault"))).status);
         var missing=archive.deepCopy();missing.withArray("bookmarks").add(object().put("sourceType",VaultContent.TYPE).put("sourceKey",UUID.randomUUID().toString()));assertEquals(422,assertThrows(ApiFailure.class,()->NoteBookmarks.validate(missing.path("bookmarks"),missing.path("vault"))).status);
     }
+    @Test void noteClientsRoundTripWithRemappedBusinessClientsAndPreviewIsPrivate() throws Exception {
+        source();
+        var source=store.transaction("a",()->{
+            var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();var entry=vault.put(new VaultPath("Client note.md"),null,true,"Exact client note\r\n".getBytes(StandardCharsets.UTF_8));
+            var clients=new NoteClients(store);UUID client=uuid(store.list("CLIENT").get(0).path("id"));var file=clients.reference(VaultContent.TYPE,entry.path("sourceKey").asText());clients.save(file,clients.tag(file),client);
+            var day=clients.reference(DayNotes.TYPE,"2026-11-19");clients.save(day,clients.tag(day),client);return file;
+        });
+        ObjectNode archive;byte[] zip;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");zip=java.nio.file.Files.readAllBytes(file.file());}
+        inputs.validate("AccountArchiveSnapshot",archive);assertEquals(2,archive.path("noteClients").size());assertEquals(2,AccountArchiveInput.counts(archive).path("noteClients").asInt());String originalClient=archive.path("noteClients").get(0).path("clientId").asText();
+        UUID upload=stage(zip,"application/zip");var review=store.transaction("b",()->importer().preview(upload,false));assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->{assertTrue(new NoteClients(store).get(source).path("clientId").isNull());assertTrue(store.list(NoteClients.TYPES.get(DayNotes.TYPE)).isEmpty());return null;});
+        store.transaction("b",()->importer().apply(upload,false,review.etag()));
+        store.transaction("b",()->{
+            var clients=new NoteClients(store);String mapped=clients.get(source).path("clientId").asText();assertNotEquals(originalClient,mapped);assertEquals(store.list("PROJECT").get(0).path("clientId").asText(),mapped);
+            assertEquals(mapped,clients.get(clients.reference(DayNotes.TYPE,"2026-11-19")).path("clientId").asText());assertTrue(store.find(DayNotes.TYPE,DayNotes.id(DayNotes.date("2026-11-19"))).isEmpty());
+            assertArrayEquals("Exact client note\r\n".getBytes(StandardCharsets.UTF_8),new VaultSources(store,store.vaultLimits(),source).read());return null;
+        });
+        var duplicate=archive.deepCopy();duplicate.withArray("noteClients").add(duplicate.path("noteClients").get(0).deepCopy());assertEquals(422,assertThrows(ApiFailure.class,()->NoteClients.validate(duplicate)).status);
+        var foreign=archive.deepCopy();((ObjectNode)foreign.path("noteClients").get(0)).put("clientId",UUID.randomUUID().toString());assertEquals(422,assertThrows(ApiFailure.class,()->NoteClients.validate(foreign)).status);
+    }
     @Test void dayNotesRoundTripWithoutWorkAndNeverOverwriteAnExistingDate() throws Exception {
         source();
         store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date("2026-05-17");notes.save(date,etag(notes.get(date)),"Ferie");return null;});
