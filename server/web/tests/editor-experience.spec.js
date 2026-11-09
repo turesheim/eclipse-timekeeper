@@ -85,6 +85,45 @@ async function field(page,value,formatted=true,catalog=[]){
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
   },{value,formatted,catalog});
 }
+async function pasteText(page,text,{html='',plain=false}={}){
+  await page.evaluate(({text,html,plain})=>{
+    const root=document.querySelector('#experience-editor .ProseMirror'),data=new DataTransfer();data.setData('text/plain',text);if(html)data.setData('text/html',html);
+    if(plain)root.dispatchEvent(new KeyboardEvent('keydown',{key:'v',ctrlKey:true,shiftKey:true,bubbles:true,cancelable:true}));
+    root.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));
+  },{text,html,plain});
+}
+test('pasted URLs retain their spelling and remain links through rich edits and source replacement',async({page})=>{
+  const url='https://example.org/a_b/one_(two)?name[0]=value&next=a_b#part_one';
+  await engine(page,'Before.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');await page.keyboard.insertText(' ');
+  await pasteText(page,url,{html:'<a href="'+url+'">'+url+'</a>'});
+  let markdown=await source(page);expect(markdown).toContain(url);
+  await expect(page.locator('#experience-editor a')).toHaveAttribute('href',url);await expect(page.locator('#experience-editor a')).toHaveText(url);
+  expect(markdown).toContain('<'+url+'>');expect(markdown).not.toContain('\\_');
+  await page.keyboard.insertText(' More.');markdown=await source(page);expect(markdown).toContain('<'+url+'>');await expect(page.locator('#experience-editor a')).toHaveText(url);
+  expect(await page.evaluate(value=>globalThis.experience.replaceMarkdown(value),markdown)).toBe(true);await appendEditorText(page.locator('#experience-editor p'),' Again.');expect(await source(page)).toContain('<'+url+'>');
+});
+test('authored autolinks survive edits beside explicit Markdown links',async({page})=>{
+  const url='https://example.org/a_b?key=one&next=two',resource='[Named link]('+url+')';
+  await engine(page,'Before <'+url+'> and '+resource+'.\n');await appendEditorText(page.locator('#experience-editor p'),' More.');
+  const markdown=await source(page);expect(markdown).toContain('<'+url+'>');expect(markdown).toContain(resource);
+  await expect(page.locator('#experience-editor a')).toHaveCount(2);expect(await page.evaluate(value=>globalThis.experience.replaceMarkdown(value),markdown)).toBe(true);
+  await appendEditorText(page.locator('#experience-editor p'),' Again.');expect(await source(page)).toContain(resource);
+});
+test('plain clipboard URLs become links in table cells without changing table structure',async({page})=>{
+  const url='https://example.org/a_b?name[0]=one&next=two';await engine(page,'| A | B |\n| --- | --- |\n| One | Two |\n');
+  const cell=page.locator('#experience-editor td p').first();await appendEditorText(cell,' ');await pasteText(page,url);
+  await expect(cell.locator('a')).toHaveText(url);const markdown=await source(page);expect(markdown).toContain('<'+url+'>');
+  expect(await page.evaluate(value=>globalThis.experience.replaceMarkdown(value),markdown)).toBe(true);await expect(page.locator('#experience-editor tr')).toHaveCount(2);await expect(page.locator('#experience-editor td')).toHaveCount(2);
+});
+test('code, plain paste, unsafe schemes and read-only notes do not create URL links',async({page})=>{
+  const url='https://example.org/a_b?key=one&next=two';await engine(page,'~~~text\nliteral\n~~~\n');
+  await page.locator('#experience-editor pre code').click();await page.keyboard.press('End');await pasteText(page,url);await expect(page.locator('#experience-editor pre')).toContainText(url);await expect(page.locator('#experience-editor a')).toHaveCount(0);
+  expect(await page.evaluate(()=>globalThis.experience.replaceMarkdown('`literal`\n'))).toBe(true);await page.locator('#experience-editor code').click();await page.keyboard.press('End');await pasteText(page,url);await expect(page.locator('#experience-editor code')).toContainText(url);await expect(page.locator('#experience-editor a')).toHaveCount(0);
+  expect(await page.evaluate(()=>globalThis.experience.replaceMarkdown('Before.\n'))).toBe(true);await appendEditorText(page.locator('#experience-editor p'),' ');await pasteText(page,url,{plain:true});await expect(page.locator('#experience-editor a')).toHaveCount(0);await expect(page.locator('#experience-editor p')).toContainText(url);
+  await pasteText(page,'javascript:alert(1)');await expect(page.locator('#experience-editor a')).toHaveCount(0);
+  const before=await source(page);await page.evaluate(()=>globalThis.experience.setReadOnly(true));await pasteText(page,url);expect(await source(page)).toBe(before);
+});
+
 test('rich paste retains safe structure and URL-over-selection preserves the selected text',async({page})=>{
   await engine(page,'Text to link.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');
   await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','Heading\nBold');data.setData('text/html','<h2 onclick="bad()">Heading</h2><p><strong>Bold</strong><img src="https://evil.invalid/track"><script>window.bad=true</script></p>');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});

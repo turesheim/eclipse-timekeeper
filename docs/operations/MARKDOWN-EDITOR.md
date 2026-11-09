@@ -147,8 +147,9 @@ explicit. In lists, Tab/Shift+Tab indent/outdent and Enter continues the list.
 
 Formatted paste retains safe headings, lists, links and tables. Scripts, embedded
 media and remote clipboard images are discarded. Command/Ctrl+Shift+V pastes
-literal text. Pasting an HTTP(S) URL over selected text creates a link without
-replacing its label. Code fields accept literal text.
+literal text. Pasting an HTTP(S) URL creates a link with the original URL spelling
+in Markdown. Pasting it over selected text creates a link without replacing its
+label. Code fields accept literal text.
 
 Paste screenshots or drop files to upload them at a tracked insertion point.
 The current upload shows its filename/count; **Retry** retains failed files and
