@@ -56,7 +56,8 @@ export class RecentNotes {
         title.append(icon(glyph),node('span',t(key)+': ','visually-hidden'),node('span',noteTitle(entry),'today-recent-note-label'));
         action.append(title);
         action.title=t(key)+'\n'+(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
-        action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,popup:true,originSelector:`[data-recent-note="${entry.id}"]`,originElement:action,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
+        const originSelector=(this.root.id?'#'+CSS.escape(this.root.id)+' ':'')+`[data-recent-note="${entry.id}"]`;
+        action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,popup:true,originSelector,originElement:action,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
         item.append(action);list.append(item);
       }
       this.root.append(list);
