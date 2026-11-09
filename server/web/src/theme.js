@@ -3,7 +3,7 @@
   const key='timekeeper.theme';
   const themes=[['timekeeper','Dagsverk','light'],['timekeeper-dark','Dagsverk Dark','dark'],
     ['solarized-light','Solarized Light','light'],['solarized-dark','Solarized Dark','dark'],
-    ['nord','Nord','dark'],['dracula','Dracula','dark']];
+    ['nord','Nord','dark'],['dracula','Dracula','dark'],['newspaper','Newspaper','light']];
   const normalize=value=>themes.some(([id])=>id===value) ? value:'timekeeper';
   let selected='timekeeper',picker;
   const apply=value=>{
