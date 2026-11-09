@@ -12,6 +12,7 @@ import { sameSession } from './calendar-model.js';
 import { MonthTrack } from './track.js';
 import { TodayView } from './today.js';
 import { NotesView } from './notes.js';
+import {NotesSearch} from './notes-search.js';
 import {NotePopup} from './note-popup.js';
 import { TasksView } from './tasks.js';
 import { WorkweekSessions } from './workweek-sessions.js';
@@ -61,6 +62,7 @@ const today = new TodayView($('today-panel'), {
   onNotesChanged:()=>void refresh().catch(()=>{}),
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
+const noteSearch=new NotesSearch($('titlebar-notes-search'),{onUnauthorized:error=>auth.clear(errorText(error))});
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
 const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))});
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
@@ -68,20 +70,19 @@ async function navigationGuards(guards,session=api){for(const guard of guards)if
 document.addEventListener(tagNavigation,async event=>{
   event.preventDefault();const session=api,tag=hashtagKey(event.detail.tag);
   if(!tag||!session||!await navigationGuards(event.detail.guards,session))return;
-  if($('workspace').dataset.view!=='notes'&&await tab('notes')===false||session!==api)return;
-  event.detail.leave.forEach(leave=>leave());await notes.findTag(tag);
+  event.detail.leave.forEach(leave=>leave());noteSearch.show('tag:'+tag);
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
   event.preventDefault();const session=api,detail=event.detail;
   if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return;
   detail.leave.forEach(leave=>leave());
   if(detail.popup){await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
-  if(detail.maximize){today.closeEvent();calendar.subscriptions.details.close();}
+  if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}
   if(detail.maximize&&detail.entry.kind==='DAY'){
     const date=dailyNoteDate(detail.entry.sourceKey);if(!date)return;
     if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}return;
   }
-  if(await tab('notes')===false||session!==api)return;await notes.select(detail.entry.id,!!detail.maximize);
+  if(await tab('notes')===false||session!==api)return;if(detail.searchFolder){await notes.revealFolder(detail.entry);return;}await notes.select(detail.entry.id,!!detail.maximize);
   if(detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(detail.heading);
   if(detail.maximize&&notes.note?.id===detail.entry.id)notes.markdown.focus();
 });
@@ -233,7 +234,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
+    calendar.reset();track.reset();today.reset();notes.reset();noteSearch.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -410,7 +411,7 @@ function render() {
   calendar.update(s, connected, api);
   track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
   today.update(s, connected, api);
-  notes.update(s,connected,api,canWrite);
+  notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite);
   tasks.update(s,connected,api,canWrite);
 }
 function renderChangedList(id,records,paint){

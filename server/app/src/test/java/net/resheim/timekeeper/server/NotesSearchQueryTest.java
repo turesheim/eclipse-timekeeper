@@ -59,6 +59,31 @@ class NotesSearchQueryTest {
             assertEquals(Set.of("own"),matches(writer,"needle","alice",false,"journal").keySet());
         }
     }
+    @Test void typeQualifiersRestrictWordsAndPhrasesWithoutChangingUnqualifiedSearch()throws Exception{
+        try(var directory=new ByteBuffersDirectory();var analyzer=NotesSearchQuery.analyzer();var writer=new IndexWriter(directory,new IndexWriterConfig(analyzer))){
+            for(String kind:List.of("MARKDOWN","DAY","WEEK","EVENT"))writer.addDocument(document(kind,"alice","Planning","Notes/"+kind+".md",kind,false,"Cache misses during planning."));
+            writer.addDocument(document("foreign","bob","Planning","Notes/Foreign.md","EVENT",false,"Cache misses during planning."));
+            writer.addDocument(document("trash","alice","Planning","Notes/Trash.md","EVENT",true,"Cache misses during planning."));
+            assertEquals(Set.of("MARKDOWN","DAY","WEEK","EVENT"),matches(writer,"planning","alice",false,null).keySet());
+            assertEquals(Set.of("EVENT"),matches(writer,"event:planning","alice",false,null).keySet());
+            assertEquals(Set.of("DAY","WEEK"),matches(writer,"journal:\"cache misses\" planning","alice",false,null).keySet());
+            assertEquals(Set.of("MARKDOWN"),matches(writer,"note: planning","alice",false,null).keySet());
+            assertEquals(Set.of("EVENT"),matches(writer,"EVENT:","alice",false,null).keySet());
+            assertTrue(matches(writer,"event: journal:","alice",false,null).isEmpty());
+        }
+    }
+    @Test void fileQualifierMatchesLiteralPathSubstringsAndCombinesWithOtherFilters()throws Exception{
+        try(var directory=new ByteBuffersDirectory();var analyzer=NotesSearchQuery.analyzer();var writer=new IndexWriter(directory,new IndexWriterConfig(analyzer))){
+            writer.addDocument(document("path","alice","Other title","Reports/Release planning.md","MARKDOWN",false,"needle"));
+            writer.addDocument(document("body","alice","Release planning","Notes/Other.md","MARKDOWN",false,"Reports release planning needle"));
+            assertEquals(Set.of("path"),matches(writer,"file:\"release PLAN\" needle note:","alice",false,null).keySet());
+            assertEquals(Set.of("path"),matches(writer,"file:Reports","alice",false,null).keySet());
+            assertTrue(matches(writer,"file:* needle","alice",false,null).isEmpty());
+            assertTrue(matches(writer,"event: file:Reports","alice",false,null).isEmpty());
+            assertThrows(ApiFailure.class,()->NotesSearchQuery.parse("file:"));
+            assertThrows(ApiFailure.class,()->NotesSearchQuery.parse("journal:\"unfinished"));
+        }
+    }
     @Test void titlePathBodyWeightsStayIdenticalAfterDifferentIndexHistories()throws Exception{
         try(var a=new ByteBuffersDirectory();var b=new ByteBuffersDirectory();var aa=NotesSearchQuery.analyzer();var ab=NotesSearchQuery.analyzer();var wa=new IndexWriter(a,new IndexWriterConfig(aa));var wb=new IndexWriter(b,new IndexWriterConfig(ab))){
             var title=document("title","alice","Needle","Notes/A.md","MARKDOWN",false,"other");

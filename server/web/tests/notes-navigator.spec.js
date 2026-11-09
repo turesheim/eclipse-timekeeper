@@ -1,3 +1,4 @@
+import {searchNotes} from './notes-search.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -149,8 +150,8 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
   }
   const sort=toolbar.getByRole('button',{name:'Sort notes',exact:true});await sort.focus();await sort.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Modified (newest first)',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(sort).toBeFocused();
   await sort.press('ArrowRight');await expect(toolbar.getByRole('button',{name:'Collapse all folders',exact:true})).toBeFocused();await page.keyboard.press('ArrowLeft');await expect(sort).toBeFocused();
-  await page.locator('#notes-search').fill('.md');await expect(toolbar.getByRole('button',{name:'Expand all folders',exact:true})).toBeDisabled();
-  await expect(navigation.locator('[role=treeitem] > button')).toHaveText(['Alpha','Zulu','Beta']);
+  const results=await searchNotes(page,'file:.md');await expect(results.locator('[data-search-note]')).toHaveCount(3);await expect(toolbar.getByRole('button',{name:'Expand all folders',exact:true})).toBeEnabled();
+  await expect(rows).toHaveText(['Nested','Alpha','Zulu','Beta']);
 });
 
 test('expand and collapse cover nested folders, exclude a hidden journal and cancel stale expansion',async({page,request})=>{
@@ -199,12 +200,12 @@ test('navigation toggle stays left of Notes while collapse preserves the draft a
   expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-expandedWidth)).toBeLessThan(2);await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
   // A viewport change must not leave focus in navigation that is now hidden.
-  await page.locator('#notes-search').focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
   expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await toggle.press('Enter');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toBeHidden();
   expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
-  await toggle.click();await page.setViewportSize({width:390,height:844});await toggle.click();await expect(navigation).toBeVisible();await page.locator('#notes-search').focus();
+  await toggle.click();await page.setViewportSize({width:390,height:844});await toggle.click();await expect(navigation).toBeVisible();await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
 });
 

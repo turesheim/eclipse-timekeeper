@@ -1280,3 +1280,14 @@ writes reload metadata and require a new explicit decision; body drafts stay in
 memory. Optional `bookmarks` metadata is included in account ZIP archives and in
 the normal full database backup. A plain folder import/export carries document
 files and dates; it does not carry these application bookmarks.
+
+## Note search panel
+
+The title-bar search and right-side results panel use the owner-bound Notes
+search API. Unqualified queries search all note types; `event:`, `journal:` and
+`note:` filters narrow them. Pure `file:` queries use the existing filename
+catalog to retain folder and attachment results. Search generations reject late
+queries and account changes, while signed cursors detect stale paging. The panel
+is modeless so users can keep editing or open guarded note popups without losing
+results. Maximizing a popup closes the panel; ordinary Close returns focus to the
+result that opened it.

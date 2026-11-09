@@ -1248,7 +1248,13 @@ each tag is at most 128 UTF-16 code units including `#`. Unicode letters,
 numbers, underscores, hyphens and slash-separated segments are supported.
 Code, link destinations/labels, image labels, YAML frontmatter and wikilink
 targets do not define tags. Query length is 512 UTF-16 code units and at most
-32 analyzed terms or tag filters.
+32 analyzed terms or filters. `file:value` restricts results to a literal,
+case-insensitive path substring (quote values containing spaces). `event:`,
+`journal:` and `note:` constrain results to events, daily/weekly journals and
+ordinary Markdown respectively. Each can precede a word or quoted phrase; an
+empty type qualifier matches the whole type. Filters combine with ordinary words
+and tags. The browser uses the existing filename catalog endpoint for a pure
+`file:` query so folders and attachments also appear.
 Default/capped page sizes are 50/200, and excerpts are at most 320 code units.
 Owner, deletion, configuration and hidden-journal filters precede pagination.
 

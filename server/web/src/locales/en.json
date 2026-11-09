@@ -1454,7 +1454,7 @@
   "notes.search_results": "Results ordered by relevance.",
   "notes.search_none": "No matching notes.",
   "notes.search_changed": "Search results changed or expired. Search again for current results.",
-  "notes.search_invalid": "Use up to 32 words, quoted phrases or tag:#name filters (up to 512 characters).",
+  "notes.search_invalid": "Use up to 32 words, quoted phrases or tag:, file:, event:, journal: and note: filters (up to 512 characters).",
   "notes.search_unavailable": "Content search is being prepared or is unavailable. Try again shortly; browsing files still works.",
   "notes.search_preparing": "Preparing content search…",
   "notes.added": "Added:",
@@ -1476,5 +1476,7 @@
   "notes.bookmark_remove": "Remove bookmark",
   "notes.bookmarks": "Bookmarks",
   "notes.maximize": "Open in workspace",
-  "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?"
+  "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?",
+  "notes.search_title": "Search notes",
+  "notes.search_help": "Search all note contents. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes."
 }
