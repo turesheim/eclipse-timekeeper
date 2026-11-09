@@ -54,6 +54,7 @@ class TaskProviderRefresh {
     void execute(TaskProviderConnections.Claim claim){
         ObjectNode outcome=null;String error=null;int retry=0;
         try{
+            if(!store.transaction(claim.owner(),()->connections().active(claim)!=null))return;
             var settings=configuration.settings(claim.provider());
             if(!TaskProviderConnections.settingsHash(settings).equals(claim.settingsHash()))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
             var tokens=claim.tokens();

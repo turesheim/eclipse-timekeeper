@@ -43,7 +43,7 @@ export async function renderTaskProviders(view){
     const card={data},panel=section(view,t('task_providers.account',{provider:providerName(data.providerId),name:data.name}));card.panel=panel;panel.dataset.taskProviderId=data.id;panel.firstElementChild.classList.add('text-break');
     card.status=node('p','','hint');card.status.setAttribute('role','status');card.error=node('p','','alert alert-warning');card.error.hidden=true;
     card.form=node('form');card.form.addEventListener('change',()=>view.dirty.add(card.form));
-    const fields=node('fieldset');fields.append(node('legend',t('task_providers.lists'),'h3'));card.choices=node('div');fields.append(card.choices);card.form.append(fields);
+    const fields=node('fieldset');fields.append(node('legend',t('task_providers.lists'),'h6 mb-2'));card.choices=node('div');fields.append(card.choices);card.form.append(fields);
     card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('ui.save'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
     card.form.append(card.feedback,card.save);card.form.addEventListener('submit',event=>{
       event.preventDefault();run(async()=>{
@@ -60,7 +60,7 @@ export async function renderTaskProviders(view){
       const latest=await view.session.request('/task-providers/'+data.id);if(!view.valid())return;
       await view.session.request('/task-providers/'+data.id,{method:'DELETE',etag:latest.etag});if(!view.valid())return;
       view.clean(card.form);await load();feedback.textContent=t('task_providers.disconnected');
-    },card.disconnect,card.feedback),'btn btn-outline-danger');
+    },card.disconnect,card.feedback));
     const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.refresh,card.reconnect,card.disconnect);
     panel.append(card.status,card.error,card.form,actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));cards.set(data.id,card);return card;
   }

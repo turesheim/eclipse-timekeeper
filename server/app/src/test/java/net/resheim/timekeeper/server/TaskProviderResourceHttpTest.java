@@ -23,6 +23,7 @@ class TaskProviderResourceHttpTest {
     }
     @Inject ContractInputs inputs;
     @Inject ServerStore store;
+    @Inject TaskProviderRefresh refresh;
     private final List<String> created=new ArrayList<>();
     private static final String BROWSER="a".repeat(43);
     private Response call(String owner,String browser,String method,String path,ObjectNode value,String match){
@@ -105,5 +106,12 @@ class TaskProviderResourceHttpTest {
         assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());var result=idle(id);assertTrue(result.path("lastError").isNull());assertEquals(1,state.refreshes.get());
         assertEquals("Renamed list",result.path("availableLists").get(0).path("name").asText());
         store.transaction(owner,()->{assertEquals(before,store.byReference(key).orElseThrow());var list=store.list("TASK_LIST").stream().filter(row->row.path("connectionId").asText().equals(id)).findFirst().orElseThrow();assertEquals("Renamed list",list.path("name").asText());return null;});
+    }
+    @Test void queuedRefreshCannotContactTheProviderAfterDisconnect(){
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();
+        var claim=store.transaction(owner,()->new TaskProviderConnections(store).claim(UUID.fromString(id),true));
+        var state=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());int before=state.requests.get();
+        var current=call("GET","/"+id,null,null);assertEquals(204,call("DELETE","/"+id,null,current.header("ETag")).statusCode());
+        refresh.execute(claim);assertEquals(before,state.requests.get());
     }
 }

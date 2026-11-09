@@ -14,7 +14,7 @@ import jakarta.enterprise.inject.Alternative;
 /** Test-only transport replacement; production keeps its fixed HTTPS provider hosts. */
 @Alternative @ApplicationScoped
 public class TaskProviderHttpTestFixture extends TaskProviderClients {
-    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();}
+    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();}
     static final Map<String,State> STATES=new ConcurrentHashMap<>();
     @Override TaskProviderOAuth oauth(TaskCloudProvider.Provider provider){
         return new TaskProviderOAuth(provider,new TaskProviderHttp(Set.of("oauth2.googleapis.com","login.microsoftonline.com"),request->{
@@ -31,7 +31,7 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
         return new TaskCloudProvider(provider,new TaskProviderHttp(Set.of("tasks.googleapis.com","openidconnect.googleapis.com","graph.microsoft.com"),request->{
             if(!request.method().equals("GET"))throw new AssertionError("Inbound sync cannot write to the provider");
             String token=request.headers().firstValue("Authorization").orElseThrow().substring("Bearer fixture-access-".length());
-            var state=STATES.get(token);String path=request.uri().getPath();
+            var state=STATES.get(token);state.requests.incrementAndGet();String path=request.uri().getPath();
             if(path.equals("/v1/userinfo"))return reply(200,JsonValues.object().put("sub",token).put("name","Google fixture").toString());
             if(path.equals("/v1.0/me"))return reply(200,JsonValues.object().put("id",token).put("displayName","Microsoft fixture").toString());
             boolean google=provider==TaskCloudProvider.Provider.GOOGLE;
