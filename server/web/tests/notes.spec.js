@@ -522,6 +522,9 @@ test('Notes content search finds body text, keeps relevance order and pages on d
     for(const width of [1440,390,320]){
       await page.setViewportSize({width,height:900});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-search-panel').analyze()).violations).toEqual([]);
+      if(theme==='newspaper'){
+        const query=page.locator('#notes-search-query'),box=await query.boundingBox();await query.click({position:{x:box.width-20,y:box.height/2}});await expect(query).toHaveValue('');await expect(rows).toHaveCount(0);await searchNotes(page,word);await expect(rows).toHaveCount(50);
+      }
       await captureScreenshot(page,{path:`test-results/notes-content-search-${theme}-${width}.png`});
     }
   }
