@@ -84,7 +84,7 @@ test('a read-only Notes session cannot drag or drop a document into another fold
 });
 
 test('Notes keeps navigation and both editor modes anchored while their contents scroll',async({page,request})=>{
-  const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');
+  const {api}=await setup(page,request),navigation=page.locator('#notes-navigation'),folders=navigation.locator('.notes-navigation-browser');
   const body='# Anchored document\n\n'+('A long paragraph that scrolls inside the editor.\n\n'.repeat(140));await put(api,'Notes/Long.md',body);
   for(let index=0;index<28;index++)await put(api,`Notes/File ${index}.md`);
   // Enter from a scrolled, week-based page: the previous toolbar must already
@@ -95,7 +95,7 @@ test('Notes keeps navigation and both editor modes anchored while their contents
     await page.setViewportSize({width,height});
     expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
     if(width<=760)await page.locator('.notes-drawer-toggle').click();
-    await navigation.hover();await page.mouse.wheel(0,3000);await expect.poll(()=>navigation.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+    await folders.hover();await page.mouse.wheel(0,3000);await expect.poll(()=>folders.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     const top=await navigation.evaluate(node=>node.getBoundingClientRect().top);await page.mouse.wheel(0,3000);expect(await page.evaluate(()=>scrollY)).toBe(0);expect(await navigation.evaluate(node=>node.getBoundingClientRect().top)).toBe(top);
     if(width<=760)await page.locator('.notes-drawer-toggle').click();
     for(const mode of ['Markdown source','Formatted']){
