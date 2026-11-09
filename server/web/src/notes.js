@@ -107,7 +107,10 @@ export class NotesView {
     window.visualViewport?.addEventListener('resize',()=>this.fit());
     this.moveStatus=node('p','','visually-hidden');this.moveStatus.setAttribute('role','status');root.append(this.moveStatus);
     this.navigation.addEventListener('pointerdown',event=>{if(event.button===0&&event.target.closest?.('.notes-tree-pick'))this.treePointerPending=true;});
-    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,()=>{if(this.treePointerPending&&!this.dragged)this.clearDrag();});
+    // A pending catalog reply must not replace the pressed button between
+    // pointer-up and the browser's subsequent click event.
+    for(const type of ['pointerup','pointercancel'])window.addEventListener(type,event=>{if(this.treePointerPending&&!this.dragged&&(type==='pointercancel'||!event.target.closest?.('.notes-tree-pick')))this.clearDrag();});
+    window.addEventListener('click',()=>{if(this.treePointerPending&&!this.dragged)this.clearDrag();});
     this.navigation.addEventListener('dragstart',event=>{
       const pick=event.target.closest?.('.notes-tree-pick'),entry=pick&&this.entries.get(pick.parentElement.dataset.id);
       if(!entry||!pick.draggable||!this.writable||this.stale||this.busy||this.loading&&!this.treePointerPending){event.preventDefault();return;}
