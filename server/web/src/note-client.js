@@ -15,7 +15,7 @@ const same=(a,b)=>!!a&&!!b&&a.session===b.session&&a.sourceType===b.sourceType&&
 export class NoteClient {
   constructor(field,options){
     Object.assign(this,{field,options,generation:0});fields.add(this);
-    this.label=node('span',undefined,'note-client-label');this.label.hidden=true;this.swatch=node('span',undefined,'note-client-swatch');this.swatch.setAttribute('aria-hidden','true');this.name=node('span');this.label.append(this.swatch,this.name);field.toolbar.append(this.label);
+    this.line=node('div',undefined,'note-client-line');this.line.hidden=true;this.label=node('span',undefined,'note-client-label');this.label.hidden=true;this.swatch=node('span',undefined,'note-client-swatch');this.swatch.setAttribute('aria-hidden','true');this.name=node('span');this.label.append(this.swatch,this.name);this.line.append(this.label);field.toolbar.before(this.line);
     this.action=button('',()=>void this.open());this.action.setAttribute('aria-label',t('notes.client'));this.action.append(icon('briefcase'));this.group=node('div');this.group.append(this.action);field.addActionsGroup(this.group);
     this.dialog=node('dialog',undefined,'app-dialog note-client-dialog');const id='note-client-'+crypto.randomUUID(),heading=node('h2',t('notes.client'));heading.id=id+'-heading';this.dialog.setAttribute('aria-labelledby',heading.id);
     const label=node('label',t('notes.client'),'form-label');this.select=node('select',undefined,'form-select');this.select.id=id;label.htmlFor=id;
@@ -31,7 +31,8 @@ export class NoteClient {
   sync(){
     const context=this.current();
     if(!same(context,this.context)){
-      this.abort?.abort();++this.generation;this.context=context;this.data=this.etag=null;this.busy=false;this.saving=false;this.revision=null;this.refreshPending=false;this.dialog.close();
+      this.abort?.abort();++this.generation;this.context=context;this.data=this.etag=this.openContext=null;this.busy=false;this.saving=false;this.revision=null;this.refreshPending=false;
+      this.name.textContent='';this.label.title='';this.color=null;this.swatch.style.backgroundColor='';this.select.replaceChildren();this.error.textContent='';this.error.hidden=true;this.dialog.close();
     }
     if(context&&this.visible()&&this.revision!==directory.revision){
       if(this.dialog.open||this.busy)this.refreshPending=true;else{this.revision=directory.revision;void this.load();}
@@ -41,6 +42,7 @@ export class NoteClient {
   paint(){
     const context=this.current(),client=context&&directory.clients.find(value=>value.id===this.data?.clientId),hidden=!client;
     if(this.label.hidden!==hidden)this.label.hidden=hidden;
+    if(this.line.hidden!==hidden)this.line.hidden=hidden;
     if(client){if(this.name.textContent!==client.name)this.name.textContent=client.name;if(this.label.title!==client.name)this.label.title=client.name;const color=/^#[a-f0-9]{6}$/i.test(client.color||'')?client.color:'';if(this.color!==color){this.color=color;this.swatch.style.backgroundColor=color||'var(--bs-secondary)';}}
     if(this.group.hidden!==!context)this.group.hidden=!context;
     const disabled=!context?.writable||this.busy;if(this.action.disabled!==disabled)this.action.disabled=disabled;

@@ -69,6 +69,7 @@ test('client labels and the keyboard selector fit all themes at desktop and phon
     await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
       await expect(scope.locator('.note-client-label')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      const label=await scope.locator('.note-client-label').boundingBox(),card=await scope.locator('.notes-editor').boundingBox(),toolbar=await scope.locator('.markdown-toolbar').boundingBox();expect(label.y+label.height).toBeLessThanOrEqual(toolbar.y+1);expect(label.x+label.width).toBeGreaterThan(card.x+card.width/2);expect(label.y-card.y).toBeLessThan(40);
       await clickNoteAction(page,scope,'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeFocused();expect((await new AxeBuilder({page}).include('.note-client-dialog[open]').analyze()).violations).toEqual([]);await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(scope.getByRole('button',{name:'Note tools',exact:true})).toBeFocused();
     }
     await captureScreenshot(page,{path:`test-results/note-client-label-${width}.png`});
@@ -104,4 +105,10 @@ test('a failed metadata read can be retried and the loading selector remains can
     await openNote(page);await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client');await expect.poll(()=>held).toBe(true);
     const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeDisabled();await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeEnabled();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();release();await page.unrouteAll({behavior:'wait'});expect(writes).toBe(0);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
   }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('signing out clears client labels and the private chooser contents',async({page,request})=>{
+  const {alpha}=await setup(page,request);await openNote(page);await choose(page,page.locator('#notes-panel'),alpha.id);await expect(page.locator('#notes-panel .note-client-label')).toHaveText(alpha.name);
+  await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login-form')).toBeVisible();
+  expect(await page.locator('.note-client-label').allTextContents()).not.toContain(alpha.name);await expect(page.locator('.note-client-dialog option')).toHaveCount(0);
 });
