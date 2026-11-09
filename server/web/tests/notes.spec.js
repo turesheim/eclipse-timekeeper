@@ -498,6 +498,22 @@ test('title-bar search filters note types, finds folders and keeps results behin
   for(const width of [320,390]){await page.setViewportSize({width,height:568});await expect(page.locator('#titlebar-notes-query')).toBeHidden();const toggle=page.locator('#titlebar-notes-search button');await toggle.focus();await toggle.press('Enter');await expect(page.locator('#notes-search-query')).toBeFocused();await searchNotes(page,'file:Plain.md');await expect(rows).toHaveCount(1);await page.locator('#notes-search-query').press('Escape');await expect(panel).toBeHidden();await expect(toggle).toBeFocused();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });
 
+test('event search finds calendar details without creating a note and keeps the result through maximize',async({page,request})=>{
+  test.setTimeout(60000);const api=await setup(page,request);
+  const description='Spectrograph calibration session.',location='North observatory',title='Sky planning';
+  const body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Dagsverk//Event search fixture//EN','BEGIN:VEVENT','UID:search-unsaved-event','DTSTAMP:20260101T000000Z','DTSTART:20260504T100000Z','DTEND:20260504T110000Z','SUMMARY:'+title,'DESCRIPTION:'+description,'LOCATION:'+location,'END:VEVENT','END:VCALENDAR',''].join('\r\n');
+  const feed=await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}});expect(feed.status()).toBe(201);
+  const client=await(await api('POST','/clients',{name:'Event search client',color:'#305070'})).json();
+  const subscription=await(await api('POST','/calendar-subscriptions',{name:'Event search calendar',clientId:client.id,url:(await feed.json()).url,visible:true,includeEvents:true,includeTodos:false},{'Idempotency-Key':randomUUID()})).json();
+  let event;await expect.poll(async()=>{const catalog=await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json();event=catalog.items.find(item=>item.subscriptionId===subscription.id);return event?.title;},{timeout:30000}).toBe(title);
+  const notePath='/event-notes/'+subscription.id+'/'+event.key;expect((await(await api('GET',notePath)).json()).version).toBe(0);
+  const panel=await searchNotes(page,'event:observatory'),result=panel.getByRole('button',{name:new RegExp(title)});await expect(result).toBeVisible();
+  for(const query of ['event:spectrograph','event:"calibration session"','event:observatory calibration','observatory']){await searchNotes(page,query);await expect(result).toBeVisible();}
+  await result.click();const popup=page.getByRole('dialog').filter({hasText:title});await expect(popup).toBeVisible();await expect(popup).toContainText(description);await expect(popup).toContainText(location);await expect(panel).toBeVisible();
+  await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(panel).toBeHidden();await expect(popup).toBeHidden();await expect(page.locator('#workspace')).toContainText(description);await expect(page.locator('#workspace')).toContainText(location);
+  expect((await(await api('GET',notePath)).json()).version).toBe(0);
+});
+
 test('a delayed search cannot display the signed-out account in a new session',async({page,request})=>{
   const api=await setup(page,request),entry=await(await api('PUT','/notes/files?path=Notes%2FPrivate.md',Buffer.from('Private owner result.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   let release,arrive;const held=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{arrive=resolve;});
