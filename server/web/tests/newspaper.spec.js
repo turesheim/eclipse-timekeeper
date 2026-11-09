@@ -85,7 +85,7 @@ test('Newspaper prints records, journals and controls in two inks with serif typ
     await page.setViewportSize({width:390,height:844});await review(page,'today-mobile');
     await page.setViewportSize({width:320,height:844});await review(page,'today-320');
     const other=await context.newPage();await other.setViewportSize({width:1440,height:1000});await other.goto('/admin/');await review(other,'administration');await other.close();
-    const signedOut=await context.browser().newContext({baseURL:process.env.TIMEKEEPER_WEB_URL});
+    const signedOut=await context.browser().newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
     const login=await signedOut.newPage();await login.addInitScript(()=>localStorage.setItem('timekeeper.theme','newspaper'));await login.goto('/web/');await review(login,'sign-in');await signedOut.close();
   } finally {
     const current=await api('GET',`/day-notes/${date}/content`);await api('PUT',`/day-notes/${date}/content`,{body:original},{'If-Match':current.headers().etag});

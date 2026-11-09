@@ -171,6 +171,12 @@
   & input[type=color] { filter: grayscale(1) contrast(1000); }
   & :is(.btn,.form-check-input):disabled { opacity: 1; border-style: dotted; }
   & .btn:disabled { text-decoration: line-through; }
+  & .btn-light {
+    --bs-btn-color: #000; --bs-btn-bg: var(--newspaper-paper); --bs-btn-border-color: #000;
+    --bs-btn-hover-color: var(--newspaper-paper); --bs-btn-hover-bg: #000; --bs-btn-hover-border-color: #000;
+    --bs-btn-active-color: var(--newspaper-paper); --bs-btn-active-bg: #000; --bs-btn-active-border-color: #000;
+    --bs-btn-disabled-color: #000; --bs-btn-disabled-bg: var(--newspaper-paper); --bs-btn-disabled-border-color: #000;
+  }
   & :is(.btn-outline-danger,.btn-danger) {
     --bs-btn-color: #000; --bs-btn-bg: var(--newspaper-paper); --bs-btn-border-color: #000;
     --bs-btn-hover-color: var(--newspaper-paper); --bs-btn-hover-bg: #000; --bs-btn-hover-border-color: #000;
@@ -191,6 +197,9 @@
   & .dropdown-item:hover { text-decoration: underline; }
   & :is(.markdown-code-block,.css-editor-highlight) :is(.hljs-keyword,.hljs-operator,.hljs-selector-tag) { font-weight: 700; }
   & :is(.markdown-code-block,.css-editor-highlight) :is(.hljs-comment,.hljs-meta,.hljs-quote) { font-style: italic; }
+  & .ProseMirror-selectednode, & .ProseMirror li.ProseMirror-selectednode::after { outline-color: #000; border-color: #000; }
+  & .ProseMirror .column-resize-handle { background: #000; }
+  & .ProseMirror .selectedCell::after { background: var(--newspaper-dots) 0 0 / 2px 2px; }
 
   /* Stored client colors are presentation-only here; names still identify them. */
   & :is(.calendar-summary-card,.calendar-session,.calendar-planned,.calendar-all-day-event),
