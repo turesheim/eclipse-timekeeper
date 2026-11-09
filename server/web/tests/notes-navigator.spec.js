@@ -18,6 +18,25 @@ async function setup(page,request){
 }
 const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
 
+test('a late heading-link completion preserves a pressed navigator action',async({page,request})=>{
+  const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');
+  await api('POST','/notes/folders',{path:'Other'});await put(api,'Other/Target.md','# Heading\n\nTarget body.\n');await put(api,'Notes/Source.md','[[Other/Target#Heading]]\n');
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Source.md').click();
+  const link=page.locator('#notes-formatted [data-wiki-reference="Other/Target#Heading"]');await expect(link).toBeVisible();
+  // Hold completion after rendering, while the link still has its heading follow-up.
+  await page.evaluate(async()=>{
+    const {MarkdownField}=await import('/web/markdown-field.js'),show=MarkdownField.prototype.showFormatted;
+    const pending=new Promise(resolve=>{window.releaseHeadingRender=resolve;});window.restoreHeadingRender=()=>{MarkdownField.prototype.showFormatted=show;window.releaseHeadingRender();};
+    MarkdownField.prototype.showFormatted=async function(...args){const result=await show.apply(this,args);if(this.root.closest('#notes-panel')&&document.querySelector('#notes-document-title').textContent==='Heading'){window.headingRenderPending=true;await pending;}return result;};
+  });
+  try{
+    await link.click();await expect.poll(()=>page.evaluate(()=>!!window.headingRenderPending)).toBe(true);await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
+    const source=noteEntry(navigation,'Notes/Source.md');await source.hover();await page.mouse.down();await expect(source).toBeFocused();
+    await page.evaluate(()=>{window.releaseHeadingRender();return new Promise(resolve=>requestAnimationFrame(resolve));});await expect(source).toBeFocused();
+    await page.mouse.up();await expect(page.locator('#notes-document-title')).toHaveText('Source');await expect(link).toBeVisible();
+  }finally{await page.evaluate(()=>window.restoreHeadingRender());await page.mouse.up();}
+});
+
 test('folder expansion survives an older catalog completing before the deferred refresh',async({page,request})=>{
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Expansion.md');
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
