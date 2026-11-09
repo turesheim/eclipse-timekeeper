@@ -97,6 +97,6 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-search-result-title { display:flex; align-items:baseline; gap:.5rem; font-weight:600; }
 .notes-search-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
 @media (max-width:767px) {
-  .app-header { flex-wrap:wrap; }
-  .titlebar-notes-search { order:4; flex-basis:100%; }
+  .titlebar-notes-search { flex:0 0 auto; min-width:0; }
+  .titlebar-notes-search input { display:none; }
 }

@@ -262,10 +262,11 @@ export class NotesView {
   async revealFolder(entry){
     const session=this.session,current=++this.generation;if(!session)return;
     try{
-      const parts=entry.path.split('/');
+      const parts=entry.path.split('/'),parents=[];
       for(let count=1;count<=parts.length;count++){
-        const reply=await session.request('/notes/resolve?'+new URLSearchParams({path:parts.slice(0,count).join('/')}));if(session!==this.session||current!==this.generation)return;this.expanded.add(reply.data.id);
+        const reply=await session.request('/notes/resolve?'+new URLSearchParams({path:parts.slice(0,count).join('/')}));if(session!==this.session||current!==this.generation)return;parents.push(reply.data.id);
       }
+      for(const parent of parents)this.expanded.add(parent);
       this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.folder=entry;this.navCollapsed=false;this.root.classList.add('notes-drawer-open');this.navigationState();await this.reload();
       if(session===this.session&&current===this.generation)this.tree.querySelector(`[data-id="${entry.id}"]`)?.focus();
     }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}

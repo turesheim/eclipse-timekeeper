@@ -286,8 +286,7 @@ test('Notes can hide the configured journal without losing drafts or journal acc
   await expect(page.locator('#notes-body')).toHaveValue('Private unsaved draft');
   expect((await(await api('GET','/day-notes/'+day+'/content')).json()).body).toBe('Private unsaved draft');
   const results=await searchNotes(page,'file:2026');await expect(results.locator('[data-search-note]')).toHaveCount(0);await expect(results).toContainText('No matching notes.');
-  await searchNotes(page,'file:Keep');await expect(results.locator('[data-search-note]')).toContainText('Notes/Keep.md');await results.getByRole('button',{name:'Close',exact:true}).click();
-  await noteEntry(page.locator('#notes-navigation'),'Notes/Keep.md').click();
+  await searchNotes(page,'file:Keep');await expect(results.locator('[data-search-note]')).toContainText('Notes/Keep.md');await results.locator('[data-search-note]').click();const popup=page.locator('#note-popup-editor');await expect(popup.locator('.ProseMirror')).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(results).toBeHidden();
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();
   await page.evaluate(()=>location.hash='#account/notes');await expect(page.locator('#account-navigation a[href=\"#account/notes\"]')).toHaveAttribute('aria-current','page');await expect(page.getByLabel('Hide journal folder',{exact:true})).toBeChecked();
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
@@ -472,9 +471,14 @@ test('title-bar search filters note types, finds folders and keeps results behin
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'Sundial'}));return reply.status();},{timeout:30000}).toBe(200);
   const panel=await searchNotes(page,'Sundial'),rows=panel.locator('[data-search-note]');await expect(rows).toHaveCount(4);
   for(const [query,count]of [['note:Sundial',1],['journal:Sundial',2],['event:Sundial',1],['event:',1],['tag:#work',4],['file:Notes note:Sundial',1]]){await searchNotes(page,query);await expect(rows).toHaveCount(count);}
-  await searchNotes(page,'file:Sundial');await expect(rows).toHaveCount(1);await expect(rows).toContainText('Notes/Sundial folder');await rows.click();await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-navigation [data-id="'+folder.id+'"]')).toHaveAttribute('aria-expanded','true');
+  let heldRoot=false,captured,releaseRoot;const rootStarted=new Promise(resolve=>{captured=resolve;}),rootGate=new Promise(resolve=>{releaseRoot=resolve;});
+  await page.route('**/api/v1/notes/entries?*',async route=>{if(!new URL(route.request().url()).searchParams.has('parentId')||heldRoot)return route.continue();const reply=await route.fetch();heldRoot=true;captured();await rootGate;await route.fulfill({response:reply});});
+  await page.route('**/api/v1/notes/resolve?*',async route=>{if(new URL(route.request().url()).searchParams.get('path')!==folder.path)return route.continue();await rootStarted;releaseRoot();await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');await route.continue();});
+  try{await searchNotes(page,'file:Sundial');await expect(rows).toHaveCount(1);await expect(rows).toContainText('Notes/Sundial folder');await rows.click();await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-navigation [data-id="'+folder.id+'"]')).toHaveAttribute('aria-expanded','true');}
+  finally{releaseRoot();await page.unrouteAll({behavior:'wait'});}
   await searchNotes(page,'note:Sundial');const pick=panel.locator('[data-search-note="'+ordinary.id+'"]');await pick.click();const popup=page.locator('#note-popup-editor');await expect(popup.locator('.ProseMirror')).toContainText('Sundial');await expect(panel).toBeVisible();await popup.getByRole('button',{name:'Close',exact:true}).click();await expect(pick).toBeFocused();
   await pick.press('Enter');await expect(popup.locator('.ProseMirror')).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(panel).toBeHidden();await expect(page.locator('#notes-formatted')).toContainText('Sundial');await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();
+  for(const width of [320,390]){await page.setViewportSize({width,height:568});await expect(page.locator('#titlebar-notes-query')).toBeHidden();const toggle=page.locator('#titlebar-notes-search button');await toggle.focus();await toggle.press('Enter');await expect(page.locator('#notes-search-query')).toBeFocused();await searchNotes(page,'file:Plain.md');await expect(rows).toHaveCount(1);await page.locator('#notes-search-query').press('Escape');await expect(panel).toBeHidden();await expect(toggle).toBeFocused();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });
 
 test('a delayed search cannot display the signed-out account in a new session',async({page,request})=>{

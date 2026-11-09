@@ -36,7 +36,7 @@ export class NotesSearch {
   show(query){
     if(!this.session)return;this.origin=document.activeElement;this.input.value=this.titleInput.value=query;this.root.hidden=false;this.input.focus({preventScroll:true});void this.search();
   }
-  hide(restore=true){const open=!this.root.hidden;this.root.hidden=true;if(open&&restore)(this.origin?.isConnected&&this.origin.getClientRects().length?this.origin:this.titleInput).focus({preventScroll:true});}
+  hide(restore=true){const open=!this.root.hidden;this.root.hidden=true;if(open&&restore)(this.origin?.isConnected&&this.origin.getClientRects().length?this.origin:this.titleInput.getClientRects().length?this.titleInput:this.form.querySelector('button')).focus({preventScroll:true});}
   controls(){this.results.setAttribute('aria-busy',String(!!this.busy));this.more.hidden=!this.cursor&&this.offset===undefined;this.retry.hidden=!this.failed;this.rebuild.hidden=!this.failed||this.failed.status!==503||!this.writable;for(const action of [this.more,this.retry,this.rebuild])action.disabled=this.busy;}
   async search(more=false){
     clearTimeout(this.timer);if(!this.session||more&&this.busy)return;
