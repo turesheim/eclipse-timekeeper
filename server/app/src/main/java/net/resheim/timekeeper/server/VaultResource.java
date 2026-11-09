@@ -113,6 +113,10 @@ public class VaultResource {
             if(!saved.equals(written)){new VaultState(store,limits).changed(0,0,false);store.change("PROFILE","UPDATED",store.owner());}
             return Response.ok(collection.metadata(saved)).header("ETag",collection.metadataTag(saved)).build();});
     }
+    @PUT @Path("/entries/{id}/title") @Consumes("application/json") public Response title(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode input){
+        ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("VaultTitleInput",input);UUID entry=uuid(id);
+        return tx(()->{var collection=vault();var result=collection.renameTitle(collection.get(entry),value.path("title").asText(),match);return Response.ok(collection.metadata(result)).header("ETag",collection.metadataTag(result)).build();});
+    }
     @PUT @Path("/entries/{id}/path") @Consumes("application/json") public Response move(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());fields(input,"path");UUID entry=uuid(id);var target=new VaultPath(input.path("path").asText());
         return tx(()->{var collection=vault();var current=collection.get(entry);VaultCollection.match(collection.metadataTag(current),match);var value=collection.move(current,target,collection.tag(current));return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});

@@ -1142,6 +1142,8 @@
   "event_notes.delete_confirm": "Slette dette hendelsesnotatet?",
   "event_notes.count": "Hendelsesnotater",
   "notes.title": "Notater",
+  "notes.document_title": "Dokumenttittel",
+  "notes.title_help": "Endre tittelen for å gi filen nytt navn. Trykk Enter for å lagre eller Escape for å avbryte.",
   "notes.navigation": "Mapper og notater",
   "notes.resize": "Endre bredden på notatnavigasjonen",
   "notes.new_note": "Nytt notat",

@@ -1142,6 +1142,8 @@
   "event_notes.delete_confirm": "Delete this event note?",
   "event_notes.count": "Event notes",
   "notes.title": "Notes",
+  "notes.document_title": "Document title",
+  "notes.title_help": "Change the title to rename this file. Press Enter to save or Escape to cancel.",
   "notes.navigation": "Folders and notes",
   "notes.resize": "Resize notes navigation",
   "notes.new_note": "New note",

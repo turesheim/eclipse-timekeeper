@@ -112,6 +112,18 @@ final class VaultCollection {
         for(var descendant:descendants){var next=path(descendant).rebase(path(entry),target);allowed(next);if(!folder(descendant)&&association(next)!=null)throw new ApiFailure(409,"VAULT_ASSOCIATION_MOVE");}
         var moved=index.move(id(entry),target);if(!path(moved).equals(path(entry))){state.changed(0,0,false);changed();}return moved;
     }
+    ObjectNode renameTitle(ObjectNode entry,String title,String expected){
+        match(metadataTag(entry),expected);
+        if(entry.path("deleted").asBoolean())throw ApiFailure.notFound();
+        if(!entry.path("kind").asText().equals("MARKDOWN")||!entry.path("sourceType").asText().equals(VaultContent.TYPE))throw new ApiFailure(409,"VAULT_ASSOCIATION_MOVE");
+        if(title==null||title.isBlank())throw ApiFailure.validation();
+        title=java.text.Normalizer.normalize(title.strip(),java.text.Normalizer.Form.NFC);
+        var previous=path(entry);String name=previous.name();var target=previous.parent().resolve(title+name.substring(NoteTitles.filenameTitle(name).length()));
+        var moved=move(entry,target,tag(entry));boolean changedTitle=!title.equals(moved.path("title").asText());
+        var result=index.title(id(entry),title);
+        if(changedTitle&&path(moved).value().equals(previous.value())){state.changed(0,0,false);changed();}
+        return result;
+    }
     void delete(ObjectNode entry,String expected){
         match(tag(entry),expected);protectedRoot(entry);if(entry.path("deleted").asBoolean())throw ApiFailure.notFound();
         var entries=new ArrayList<>(index.subtree(id(entry)));Collections.reverse(entries);UUID batch=UUID.randomUUID();

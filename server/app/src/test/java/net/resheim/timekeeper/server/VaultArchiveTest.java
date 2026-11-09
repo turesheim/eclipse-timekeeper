@@ -24,6 +24,7 @@ class VaultArchiveTest {
         store.transaction("a",()->{
             var vault=new VaultCollection(store,limits);vault.initialize();vault.mkdir(new VaultPath("Notes"));
             var entry=VaultImportDates.parse("2020-01-01T00:00:00Z","2021-02-03T04:05:06.123456789Z").apply(store,vault.put(new VaultPath("Notes/Exact.md"),null,true,document));identities.put("note",VaultCollection.id(entry));creation.put("note",entry.path("createdAt").asText());
+            vault.renameTitle(entry,"Chosen title",vault.metadataTag(entry));
             entry=vault.put(new VaultPath("Notes/image.bin"),null,true,binary);identities.put("binary",VaultCollection.id(entry));
             entry=vault.put(new VaultPath("Notes/Deleted.md"),null,true,document);identities.put("trash",VaultCollection.id(entry));vault.delete(entry,vault.tag(entry));
             entry=vault.put(new VaultPath("journal/2026-10-30.md"),null,true,document);identities.put("day",VaultCollection.id(entry));
@@ -43,6 +44,7 @@ class VaultArchiveTest {
                 new VaultCollection(store,limits).initialize();
                 VaultArchive.prepare(snapshot.path("vault"),store);new DayLabels(store).restore(snapshot.path("dayLabels"));ArchiveJournalFiles.restore(download.file(),snapshot.path("journalFiles"),store,true);VaultArchive.restore(download.file(),snapshot.path("vault"),store);
                 var vault=new VaultCollection(store,limits);assertArrayEquals(document,vault.read(vault.get(identities.get("note"))));assertArrayEquals(binary,vault.read(vault.get(identities.get("binary"))));
+                assertEquals("Chosen title",vault.metadata(vault.get(identities.get("note"))).path("title").asText());assertEquals("Notes/Chosen title.md",vault.get(identities.get("note")).path("path").asText());
                 assertEquals(creation.get("note"),vault.get(identities.get("note")).path("createdAt").asText());assertEquals("ORIGINAL",vault.get(identities.get("note")).path("createdAtSource").asText());
                 assertEquals("2021-02-03T04:05:06.123456789Z",vault.get(identities.get("note")).path("modifiedAt").asText());
                 assertArrayEquals(binary,JournalAssets.bytes(new JournalAssets(store).get("legacy.bin")));assertEquals("Private/Journal",new VaultSettings(store).get().path("journalFolder").asText());

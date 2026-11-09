@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Portable logical records plus checksummed bytes; no database indexes or authority. */
 final class VaultArchive {
-    private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt","createdAtSource");
+    private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt","createdAtSource","title");
     private static final Set<String> SETTINGS_FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder","recentNotesDays","editorCursor");
     @FunctionalInterface interface File {void accept(String path,byte[] bytes)throws IOException;}
     static boolean owns(String name){return name!=null&&name.matches("vault/(content|recycle)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin");}
@@ -56,6 +56,7 @@ final class VaultArchive {
             UUID id=identifier(value.path("id").asText());identifier(value.path("parentId").asText());
             var path=new VaultPath(value.path("path").asText());if(!path.value().equals(value.path("path").asText())||entries.put(id,((ObjectNode)value).deepCopy())!=null)throw ApiFailure.validation();
             final VaultIndex.Kind kind;try{kind=VaultIndex.Kind.valueOf(value.path("kind").asText());}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}
+            if(value.has("title")&&(kind!=VaultIndex.Kind.MARKDOWN||!value.path("title").isTextual()||!NoteTitles.filenameTitle(path.name()).equals(value.path("title").asText())))throw ApiFailure.validation();
             if(!value.path("deleted").asBoolean()&&!activePaths.add(path.key()))throw ApiFailure.validation();
             if(kind==VaultIndex.Kind.FOLDER){if(value.has("sourceType")||value.has("sourceId")||value.has("sourceKey"))throw ApiFailure.validation();}
             else{
