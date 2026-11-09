@@ -18,6 +18,23 @@ async function setup(page,request){
 }
 const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
 
+test('folder expansion survives an older catalog completing before the deferred refresh',async({page,request})=>{
+  const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Expansion.md');
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
+  let held=false,release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/notes/entries?*',async route=>{if(held)return route.continue();const response=await route.fetch();held=true;await pending;await route.fulfill({response});});
+  try{
+    await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>held).toBe(true);
+    const folder=noteEntry(navigation,'Notes');await folder.dispatchEvent('pointerdown',{button:0,pointerId:1});
+    // Split click propagation so the older response finishes before the queued refresh.
+    await folder.dispatchEvent('click',{bubbles:false});await expect(page.locator('#notes-document-title')).toHaveText('Notes');
+    const response=page.waitForResponse(reply=>new URL(reply.url()).pathname==='/api/v1/notes/entries');release();await(await response).finished();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
+    await page.evaluate(()=>window.dispatchEvent(new MouseEvent('click')));
+    await expect(noteEntry(navigation,'Notes/Expansion.md')).toBeVisible();
+  }finally{release();await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel')));await page.unrouteAll({behavior:'wait'});}
+});
+
 test('a folder remains clickable when a catalog reply arrives between pointer up and click',async({page,request})=>{
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Pointer.md','Pointer gap body.');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
   let held=false,release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/notes/entries?*',async route=>{if(held)return route.continue();const reply=await route.fetch();held=true;await pending;await route.fulfill({response:reply});});

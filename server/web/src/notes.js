@@ -311,7 +311,11 @@ export class NotesView {
     return rows;
   }
   async reload(retry=0){
-    if(this.treePointerPending||this.dragged){this.reloadAfterDrag=true;return;}
+    if(this.treePointerPending||this.dragged){
+      // A queued read must supersede the older snapshot before it can replace
+      // expansion choices made by the click that is still being dispatched.
+      this.loadGeneration=(this.loadGeneration||0)+1;this.reloadAfterDrag=true;return;
+    }
     if(!this.session)return;this.reloadRequested=false;const session=this.session,current=(this.loadGeneration||0)+1,expandAll=this.expandAllRequested,expanded=new Set(this.expanded);this.loadGeneration=current;this.loading=true;this.controls();
     try{
       const reply=await session.request('/notes');if(session!==this.session||current!==this.loadGeneration)return;this.info=reply.data;if(this.folder&&!notesEntryVisible(this.folder,this.info.settings))this.folder=null;const snapshot=reply.data.snapshot;
