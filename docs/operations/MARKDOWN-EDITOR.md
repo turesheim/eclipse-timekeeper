@@ -26,6 +26,28 @@ An ordinary newline in Markdown is a soft break. Newly formatted rules use `---`
 Unknown extensions, HTML other than safe anchors, reference-style links and code
 fences with extra metadata remain inert, editable source fragments. Their HTML is never executed.
 
+Saved checklist items such as `- [ ] Follow up` are also ordinary, unassigned
+Dagsverk tasks. Checking or unchecking an item updates the task's completion;
+completing or reopening the task updates the linked checkbox. Fenced/indented
+code examples, escaped markers and empty items do not create tasks. Existing
+notes are enrolled when their content is next changed, rather than on opening.
+Each document supports up to 1,000 nonempty checklist items. Task titles longer
+than 1,024 characters are shortened with an ellipsis; the note keeps the full text.
+
+Links use private metadata and add no IDs or comments to Markdown. Moving or
+renaming the file retains its links. Distinct titles can be reordered; repeated
+identical titles remain separate in their relative order. A title edited in the
+note updates its task; editing a task title separately leaves the note's wording
+intact. Removing an item or deleting its note retains the ordinary task. Deleting
+a task does not recreate it during unrelated note edits; editing that item's
+title or checkbox can create a new task. Restoring a trashed note retains its
+links and uses the tasks' current completion states.
+
+Account archives retain checklist links and remap task IDs on restore. A notes-only
+export contains Markdown, so importing those files elsewhere creates new tasks.
+Task completion is a normal note change with a new content validator and history;
+a concurrent unsaved note draft is retained for explicit review.
+
 Vault extensions include:
 
 | Syntax | Behavior |

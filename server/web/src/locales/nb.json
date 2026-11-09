@@ -1479,5 +1479,6 @@
   "notes.create_linked_confirm": "Notatet «{{path}}» finnes ikke. Vil du opprette det og åpne redigeringsvinduet?",
   "notes.client": "Knytt til kunde",
   "notes.no_client": "Ingen kunde",
-  "notes.client_associations": "Notater knyttet til kunder"
+  "notes.client_associations": "Notater knyttet til kunder",
+  "notes.task_count": "Sjekklistepunkter i notater"
 }

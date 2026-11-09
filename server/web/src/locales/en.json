@@ -1479,5 +1479,6 @@
   "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?",
   "notes.client": "Associate with client",
   "notes.no_client": "No client",
-  "notes.client_associations": "Notes linked to clients"
+  "notes.client_associations": "Notes linked to clients",
+  "notes.task_count": "Note checklist items"
 }

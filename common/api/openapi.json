@@ -24309,6 +24309,10 @@
           "noteClients": {
             "type": "integer",
             "minimum": 0
+          },
+          "noteTasks": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -31547,6 +31551,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -31618,6 +31630,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -31701,6 +31721,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -33786,6 +33814,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -34756,6 +34792,75 @@
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
+          }
+        }
+      },
+      "ArchivedNoteTasks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey",
+          "items"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTaskItem"
+            }
+          }
+        }
+      },
+      "ArchivedNoteTaskItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "marker",
+          "summary",
+          "checked",
+          "depth"
+        ],
+        "properties": {
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "marker": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
           }
         }
       }

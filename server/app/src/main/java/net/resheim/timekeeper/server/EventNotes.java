@@ -82,6 +82,7 @@ final class EventNotes {
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,key.id(),value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),TYPE,key.id(),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
         VaultCatalog.complete(vault);
+        if(!deleted)new NoteTasks(store).source(new VaultSources.Ref(TYPE,key.id(),key.filename()),document(value));
         store.change("PROFILE","UPDATED",store.owner());return get(key);
     }
     void restore(String filename,byte[] bytes){var parsed=parse(filename,bytes);var current=get(parsed.key());if(present(current)){

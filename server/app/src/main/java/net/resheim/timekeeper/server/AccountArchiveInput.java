@@ -81,6 +81,7 @@ final class AccountArchiveInput {
         else if(value.has("vault"))throw ApiFailure.validation();
         NoteBookmarks.validate(value.path("bookmarks"),value.path("vault"));
         NoteClients.validate(value);
+        NoteTaskArchive.validate(value.path("noteTasks"),value.path("work"));
         try {ContractInputs.pathId(value.path("archiveId").asText());Instant.parse(value.path("generatedAt").asText());}
         catch(RuntimeException invalid) {throw ApiFailure.validation();}
         if(!value.path("account").isObject() || !value.path("preferences").isObject() || !value.path("work").isObject() || !value.path("importHistory").isArray()) throw ApiFailure.validation();
@@ -91,7 +92,7 @@ final class AccountArchiveInput {
         // before preview or commit; this layer only establishes safe framing.
         return (ObjectNode)value;
     }
-    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.removeAll(Set.of("dayNotes","weekNotes","journalAssets","journalFiles","dayLabels","vault","bookmarks","noteClients"));return fields;}
+    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.removeAll(Set.of("dayNotes","weekNotes","journalAssets","journalFiles","dayLabels","vault","bookmarks","noteClients","noteTasks"));return fields;}
     static ObjectNode counts(JsonNode archive) {
         var result=object();for(String name:AccountArchive.WORK.keySet()) {
             var values=archive.path("work").path(name);
@@ -103,6 +104,7 @@ final class AccountArchiveInput {
         if(archive.has("vault")){result.put("notesEntries",archive.path("vault").path("entries").size());result.put("notesFiles",archive.path("vault").path("files").size());}
         if(archive.has("bookmarks"))result.put("bookmarks",archive.path("bookmarks").size());
         if(archive.has("noteClients"))result.put("noteClients",archive.path("noteClients").size());
+        if(archive.has("noteTasks")){int count=0;for(var note:archive.path("noteTasks"))count+=note.path("items").size();result.put("noteTasks",count);}
         if(archive.has("dayNotes"))result.put("dayNotes",archive.path("dayNotes").size());
         if(archive.has("weekNotes"))result.put("weekNotes",archive.path("weekNotes").size());
         if(archive.has("journalAssets"))result.put("journalAssets",archive.path("journalAssets").size());

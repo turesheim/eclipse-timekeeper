@@ -1335,3 +1335,23 @@ account are retained; oldest snapshots are evicted atomically. General binary
 assets are excluded. Revision snapshots are server-local recovery data; portable
 Markdown/WebDAV exports contain current files, not a revision database. Full
 instance backups retain the underlying owner-private records.
+
+### Note checklist tasks
+
+Canonical Markdown writes for daily, weekly, saved event and ordinary Notes
+resources reconcile nonempty Markdown checklist items into shared-domain tasks.
+Read-only reads do not enroll existing notes. Tasks remain unassigned unless the
+user explicitly assigns them. Source creation and task creation/updates commit
+under the same account transaction; normal task completion patches only the
+checkbox marker in the current source and changes its content ETag. Stale note
+writers receive the existing 412 response and must retain/review their draft.
+Code examples, escapes, YAML frontmatter and binary files are not task sources.
+A document is limited to 1,000 checklist items. Removal detaches a link without
+deleting a task; a deliberately deleted task is not recreated by prose-only edits.
+
+Account snapshots may include `noteTasks`, an array of source references and
+ordered checklist identities. Every non-null task ID must reference the owned
+work graph exactly once and is remapped by account restoration. Null IDs retain
+a deliberate task deletion. Preview rolls back both graph and link writes;
+restoration suppresses automatic enrollment while restoring original bytes and
+then validates/installs the remapped links. Older archives omit this optional field.
