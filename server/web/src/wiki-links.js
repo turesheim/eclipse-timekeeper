@@ -16,3 +16,11 @@ export function wikiCandidates(entries,reference,origin=''){
   return exact.length?exact:files.filter(entry=>stem(entry.path.split('/').at(-1))===target);
 }
 export const headingAnchor=text=>text.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu,'').replace(/\s+/g,'-');
+
+/** Bare new links belong beside their source; qualified paths are vault-relative. */
+export function wikiCreationPath(reference,origin=''){
+  const ref=wikiReference(reference);if(!ref?.path)return null;
+  const parts=ref.path.split('/');if(parts.some(part=>!part||part==='.'||part==='..'))return null;
+  const target=ref.path+(ref.path.toLowerCase().endsWith('.md')?'':'.md');
+  return (parts.length===1&&origin.includes('/')?origin.slice(0,origin.lastIndexOf('/')+1):'')+target;
+}

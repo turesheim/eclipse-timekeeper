@@ -32,5 +32,5 @@ export function bracketPairs(readOnly,complete){
     const at=view.state.selection.from,pair=(key.getState(view.state)||[]).find(pair=>pair.open===at-1&&pair.close===at);if(!pair)return false;
     view.dispatch(view.state.tr.delete(pair.open,pair.close+1).scrollIntoView());return true;
   };
-  return {plugin,input,keyDown};
+  return {plugin,input,keyDown,pending:(state,from,to)=>(key.getState(state)||[]).some(pair=>pair.close>=from&&pair.close<to)};
 }

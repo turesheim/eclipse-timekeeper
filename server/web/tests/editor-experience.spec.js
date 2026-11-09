@@ -335,3 +335,32 @@ test('source bracket tracking cannot skip unrelated text after a formatted edit'
   const host=page.locator('#experience-field');await host.getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#experience-formatted .ProseMirror');await rich.focus();await page.keyboard.press('ControlOrMeta+a');await page.keyboard.type('AB');
   await host.getByRole('button',{name:'Markdown source',exact:true}).click();await source.evaluate(node=>node.setSelectionRange(1,1));await page.keyboard.type(']');expect(await page.evaluate(()=>globalThis.field.value())).toContain('A]B');
 });
+
+test('native formatted input preserves active wikilinks without Markdown escapes',async({page})=>{
+  await engine(page,'Before.\n');
+  await page.locator('#experience-editor p').evaluate(node=>{
+    node.textContent='Before. [[Notes/New note|New note]] after native input.';
+    const range=document.createRange();range.selectNodeContents(node);range.collapse(false);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);
+    node.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'[[Notes/New note|New note]]'}));
+  });
+  await expect.poll(()=>source(page)).toContain('[[Notes/New note|New note]]');
+  await expect(page.locator('[data-wiki-reference="Notes/New note|New note"]')).toHaveText('New note');
+  await page.locator('#experience-editor .ProseMirror').focus();await page.keyboard.press('ControlOrMeta+z');expect(await source(page)).toBe('Before.\n');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(page.locator('[data-wiki-reference="Notes/New note|New note"]')).toHaveCount(1);
+});
+
+test('native wikilink conversion preserves authored escapes across edits and source replacement',async({page})=>{
+  const value='Authored \\[[Keep literal]] text.\n\nChange here.\n';await engine(page,value);
+  await appendEditorText(page.locator('#experience-editor p').last(),' More.');await expect(page.locator('[data-wiki-reference]')).toHaveCount(0);expect(await source(page)).toContain('\\[[Keep literal]]');
+  await page.evaluate(()=>globalThis.experience.replaceMarkdown('Replaced \\[[Still literal]].\n\nEditable paragraph.\n'));await expect(page.locator('[data-wiki-reference]')).toHaveCount(0);
+  await appendEditorText(page.locator('#experience-editor p').last(),' More.');expect(await source(page)).toContain('\\[[Still literal]]');
+});
+
+test('native composition creates an active wikilink after composition ends',async({page})=>{
+  await engine(page,'');await page.locator('#experience-editor .ProseMirror').evaluate(node=>{
+    node.focus();node.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));const paragraph=node.querySelector('p');paragraph.textContent='[[Øving]]';
+    const range=document.createRange();range.selectNodeContents(paragraph);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);
+    paragraph.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'[[Øving]]',isComposing:true}));node.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'[[Øving]]'}));
+  });
+  await expect(page.locator('[data-wiki-reference="Øving"]')).toHaveText('Øving');expect(await source(page)).toContain('[[Øving]]');
+  await page.locator('#experience-editor .ProseMirror').focus();await page.keyboard.press('ControlOrMeta+z');expect(await source(page)).toBe('');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(page.locator('[data-wiki-reference="Øving"]')).toHaveCount(1);
+});

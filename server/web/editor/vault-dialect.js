@@ -98,7 +98,7 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
       let disposed=false,timer;
       const preview=()=>{if(!resources?.previewWiki)return;clearTimeout(timer);timer=setTimeout(()=>{void resources.previewWiki(node.attrs.value).then(text=>{if(!disposed)dom.title=text;}).catch(()=>{});},300);};dom.addEventListener('mouseenter',preview);dom.addEventListener('focus',preview);dom.addEventListener('mouseleave',()=>clearTimeout(timer));dom.addEventListener('blur',()=>clearTimeout(timer));
       if(resources?.resolveWiki)void resources.resolveWiki(node.attrs.value).then(entry=>{if(!disposed){dom.dataset.resolved='true';dom.title=entry.path;}}).catch(error=>{if(!disposed){dom.dataset.resolved='false';dom.title=error.message;dom.setAttribute('aria-label',label+' · '+error.message);}});
-      dom.addEventListener('click',event=>{event.preventDefault();void resources?.openWiki?.(node.attrs.value,dom).catch(error=>{dom.title=error.message;dom.dataset.resolved='false';});});
+      dom.addEventListener('click',event=>{event.preventDefault();void resources?.openWiki?.(node.attrs.value,dom).catch(error=>{if(!disposed){dom.title=error.message;dom.dataset.resolved='false';dom.dispatchEvent(new CustomEvent('timekeeper:markdown-link-error',{bubbles:true,detail:error.message}));}});});
       return {dom,stopEvent:()=>true,ignoreMutation:()=>true,destroy(){disposed=true;clearTimeout(timer);}};
     }
   };

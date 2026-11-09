@@ -1470,5 +1470,7 @@
   "notes.search_tag": "Søk i notater etter {{tag}}",
   "notes.bookmark_add": "Legg til bokmerke",
   "notes.bookmark_remove": "Fjern bokmerke",
-  "notes.bookmarks": "Bokmerker"
+  "notes.bookmarks": "Bokmerker",
+  "notes.maximize": "Åpne i arbeidsområdet",
+  "notes.create_linked_confirm": "Notatet «{{path}}» finnes ikke. Vil du opprette det og åpne redigeringsvinduet?"
 }

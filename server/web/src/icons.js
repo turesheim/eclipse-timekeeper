@@ -13,7 +13,7 @@ export function searchProjectIcons(query = '', {category='all',style='all'} = {}
     && (style!=='filled'||entry.filled) && (style!=='unfilled'||!entry.filled)
     && terms.every(term => entry.search.includes(term)));
 }
-const actions = {close:'x-lg',add:'plus-lg',link:'link-45deg',unlink:'link',left:'chevron-left',right:'chevron-right',down:'chevron-down',clock:'clock',calendar:'calendar3',more:'three-dots',start:'play-fill',stop:'stop-fill',edit:'pencil-square',delete:'trash',refresh:'arrow-repeat',check:'check-circle-fill',warning:'exclamation-triangle-fill',error:'exclamation-circle-fill',collapse:'chevron-double-up',expand:'chevron-double-down',copy:'copy',paste:'clipboard'};
+const actions = {maximize:'arrows-fullscreen',close:'x-lg',add:'plus-lg',link:'link-45deg',unlink:'link',left:'chevron-left',right:'chevron-right',down:'chevron-down',clock:'clock',calendar:'calendar3',more:'three-dots',start:'play-fill',stop:'stop-fill',edit:'pencil-square',delete:'trash',refresh:'arrow-repeat',check:'check-circle-fill',warning:'exclamation-triangle-fill',error:'exclamation-circle-fill',collapse:'chevron-double-up',expand:'chevron-double-down',copy:'copy',paste:'clipboard'};
 function bootstrapIcon(name) {
   const node = document.createElement('span'); node.className = `icon bi bi-${name}`;
   node.setAttribute('aria-hidden', 'true'); return node;

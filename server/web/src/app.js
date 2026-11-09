@@ -12,6 +12,7 @@ import { sameSession } from './calendar-model.js';
 import { MonthTrack } from './track.js';
 import { TodayView } from './today.js';
 import { NotesView } from './notes.js';
+import {NotePopup} from './note-popup.js';
 import { TasksView } from './tasks.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
@@ -61,6 +62,7 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
+const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>{document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));void refresh().catch(()=>{});}});
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
@@ -70,15 +72,24 @@ document.addEventListener(tagNavigation,async event=>{
   event.detail.leave.forEach(leave=>leave());await notes.findTag(tag);
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
-  event.preventDefault();const session=api;if(!session||!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return;
-  event.detail.leave.forEach(leave=>leave());await tab('notes');await notes.select(event.detail.entry.id);
-  if(event.detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(event.detail.heading);
+  event.preventDefault();const session=api,detail=event.detail;
+  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return;
+  detail.leave.forEach(leave=>leave());
+  if(detail.popup){await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
+  if(detail.maximize){today.closeEvent();calendar.subscriptions.details.close();}
+  if(detail.maximize&&detail.entry.kind==='DAY'){
+    const date=dailyNoteDate(detail.entry.sourceKey);if(!date)return;
+    if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}return;
+  }
+  if(await tab('notes')===false||session!==api)return;await notes.select(detail.entry.id,!!detail.maximize);
+  if(detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(detail.heading);
+  if(detail.maximize&&notes.note?.id===detail.entry.id)notes.markdown.focus();
 });
 document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
   if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
-  if(await today.select(date,{confirmed:true})){await tab('today');history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
+  if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),
@@ -161,6 +172,7 @@ function readOnlyWhileDisconnected() {
   track.setWritable(connected && canWrite);
   today.journal.setWritable(connected && canWrite);
   notes.writable=connected && canWrite;notes.controls();
+  notePopup.writable=connected&&canWrite;notePopup.controls();
   tasks.writable=connected && canWrite;tasks.controls();
   weekSessions.setWritable(connected && canWrite);
   $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
@@ -168,7 +180,8 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 async function tab(name) {
-  const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return false;
+  const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return false;
+  notePopup.close(true);
   for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
@@ -185,8 +198,8 @@ async function tab(name) {
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
-  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline(),
-  beforeNavigate:async()=>await notes.canLeave()&&await today.journal.canLeaveInline(),
+  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave(),
+  beforeNavigate:async()=>{if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave())return false;notePopup.close(true);return true;},
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
@@ -218,7 +231,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();tasks.reset();collapsed.clear();expandedClients.clear();canWrite = false;
+    calendar.reset();track.reset();today.reset();notes.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();

@@ -53,10 +53,10 @@ export class RecentNotes {
         const item=node('li'),action=node('button',undefined,'btn btn-outline-secondary today-recent-note');action.type='button';action.dataset.recentNote=entry.id;
         const [glyph,key]=entry.kind==='EVENT'?['calendar-event','notes.type_event']:['DAY','WEEK'].includes(entry.kind)?['journal-text','notes.type_journal']:['file-earmark-text','notes.type_ordinary'];
         const title=node('span',undefined,'today-recent-note-title');
-        title.append(icon(glyph),node('span',t(key)+': ','visually-hidden'),node('strong',noteTitle(entry)));
+        title.append(icon(glyph),node('span',t(key)+': ','visually-hidden'),node('span',noteTitle(entry),'today-recent-note-label'));
         action.append(title);
         action.title=t(key)+'\n'+(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
-        action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
+        action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,popup:true,originSelector:`[data-recent-note="${entry.id}"]`,originElement:action,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
         item.append(action);list.append(item);
       }
       this.root.append(list);

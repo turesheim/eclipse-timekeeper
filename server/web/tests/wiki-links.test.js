@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {wikiReference,wikiCandidates,headingAnchor} from '../src/wiki-links.js';
+import {wikiReference,wikiCandidates,wikiCreationPath,headingAnchor} from '../src/wiki-links.js';
 test('wiki targets remain vault-local and preserve aliases and image dimensions',()=>{
   for(const value of ['https://example.org/x','../secret','/root','a\\b','a\nb'])assert.equal(wikiReference(value),null);
   assert.deepEqual(wikiReference('Notes/Øving#Choices|caption'),{path:'Notes/Øving',heading:'Choices',label:'caption',width:null,height:null});
@@ -8,4 +8,11 @@ test('wiki targets remain vault-local and preserve aliases and image dimensions'
 test('wiki resolution reports ambiguities and uses portable case folding',()=>{
   const entries=[{path:'Notes/Øving.md',kind:'MARKDOWN'},{path:'Other/Øving.md',kind:'MARKDOWN'},{path:'Deleted.md',kind:'MARKDOWN',deleted:true}];
   assert.equal(wikiCandidates(entries,'Øving','Root.md').length,2);assert.equal(wikiCandidates(entries,'notes/øVING','Root.md')[0].path,'Notes/Øving.md');assert.equal(wikiCandidates(entries,'#Local','Notes/Øving.md')[0].path,'Notes/Øving.md');assert.equal(wikiCandidates(entries,'Deleted').length,0);
+});
+
+test('new wikilink targets use a predictable safe Markdown path',()=>{
+  assert.equal(wikiCreationPath('New note#Decisions|caption','Notes/Source.md'),'Notes/New note.md');
+  assert.equal(wikiCreationPath('Research/Øving.MD','Notes/Source.md'),'Research/Øving.MD');
+  assert.equal(wikiCreationPath('Root','Source.md'),'Root.md');
+  for(const value of ['#Heading','../secret','/root','https://example.org','a//b','./note','a/../b'])assert.equal(wikiCreationPath(value,'Notes/Source.md'),null);
 });
