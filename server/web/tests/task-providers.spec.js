@@ -92,8 +92,8 @@ test('authorization responses cannot navigate to an unrelated host',async({page,
 test('callback removes provider codes from history and referrers before completing the owned connection',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner);
   const callback=new URL('/web/task-provider-callback.html?'+new URLSearchParams({state,code}),process.env.TIMEKEEPER_WEB_URL).href;
-  await page.route('https://accounts.google.com/o/oauth2/v2/auth*',route=>route.fulfill({status:302,headers:{Location:callback}}));
-  await page.goto('https://accounts.google.com/o/oauth2/v2/auth?fixture=1');await expect(page).toHaveURL(/\/web\/#account\/task-providers$/);await expect(page.getByRole('heading',{name:'Task connections',exact:true})).toBeVisible();expect(model.completed).toBe(1);
+  await page.route('https://accounts.google.com/o/oauth2/v2/auth*',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><html lang="en"><head><title>Provider fixture</title></head><body><a href="'+callback.replaceAll('&','&amp;').replaceAll('"','&quot;')+'">Continue</a></body></html>'}));
+  await page.goto('https://accounts.google.com/o/oauth2/v2/auth?fixture=1');await page.getByRole('link',{name:'Continue',exact:true}).click();await expect(page).toHaveURL(/\/web\/#account\/task-providers$/);await expect(page.getByRole('heading',{name:'Task connections',exact:true})).toBeVisible();expect(model.completed).toBe(1);
   expect(await page.evaluate(({state,code})=>[...Object.values(localStorage),...Object.values(sessionStorage)].some(value=>value.includes(state)||value.includes(code)),{state,code})).toBe(false);
 });
 
