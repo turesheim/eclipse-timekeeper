@@ -34,6 +34,7 @@ async function review(page,name) {
   const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
   expect(result.violations.map(({id,nodes})=>({id,targets:nodes.map(node=>node.target)}))).toEqual([]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();});
   await page.mouse.move(0,0);
   await captureScreenshot(page,{path:`test-results/newspaper-${name}.png`,fullPage:true});
 }

@@ -167,12 +167,19 @@
   & :is(.form-control,.form-select) { color: #000; background-color: var(--newspaper-paper); border-color: #000; }
   & :is(.form-control::placeholder,.form-control:disabled) { color: #000; opacity: 1; }
   & .form-select { --bs-form-select-bg-img: url('./assets/newspaper-select.svg'); }
+  & input::-webkit-datetime-edit-day-field:focus { color: var(--newspaper-paper); background: #000; }
+  & input::-webkit-datetime-edit-month-field:focus { color: var(--newspaper-paper); background: #000; }
+  & input::-webkit-datetime-edit-year-field:focus { color: var(--newspaper-paper); background: #000; }
+  & input::-webkit-datetime-edit-hour-field:focus { color: var(--newspaper-paper); background: #000; }
+  & input::-webkit-datetime-edit-minute-field:focus { color: var(--newspaper-paper); background: #000; }
+  & input::-webkit-datetime-edit-ampm-field:focus { color: var(--newspaper-paper); background: #000; }
   & .form-check-input { border-color: #000; background-color: var(--newspaper-paper); box-shadow: none; }
   & .form-check-input:checked { background-color: #000; }
   & input[type=color]::-webkit-color-swatch { background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px !important; }
   & input[type=color]::-moz-color-swatch { background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px !important; }
   & :is(.btn,.form-check-input):disabled { opacity: 1; border-style: dotted; }
   & .btn:disabled { text-decoration: line-through; }
+  & .btn-link { --bs-btn-color: #000; --bs-btn-hover-color: #000; --bs-btn-active-color: #000; --bs-btn-disabled-color: #000; }
   & .form-check-input:disabled ~ .form-check-label { opacity: 1; }
   & button.calendar-summary-card:disabled { opacity: 1; border-style: dotted; }
   & .btn-light {
