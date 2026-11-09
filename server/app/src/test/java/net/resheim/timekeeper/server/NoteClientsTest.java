@@ -61,10 +61,12 @@ class NoteClientsTest {
         assertEquals(404,save("test-a",type,day,tag,object().put("clientId",foreign.toString()).toString()).statusCode());
         assertEquals(412,save("test-b",type,day,tag,object().put("clientId",foreign.toString()).toString()).statusCode());
         var saved=save("test-a",type,day,tag,body.toString());assertEquals(200,saved.statusCode());assertEquals(own.toString(),saved.jsonPath().getString("clientId"));inputs.validate("NoteClientState",parse(saved.asString()));
+        var client=given().header("Authorization","Bearer test-a").get("/api/v1/clients/"+own);assertEquals(200,client.statusCode());assertEquals(409,given().header("Authorization","Bearer test-a").header("If-Match",client.header("ETag")).delete("/api/v1/clients/"+own).statusCode());
         assertEquals(saved.header("ETag"),save("test-a",type,day,saved.header("ETag"),body.toString()).header("ETag"));
         assertTrue(parse(read("test-b",type,day).asString()).path("clientId").isNull());assertEquals(own.toString(),read("test-read",type,day).jsonPath().getString("clientId"));
         assertEquals(412,save("test-a",type,day,tag,"{\"clientId\":null}").statusCode());
         var cleared=save("test-a",type,day,saved.header("ETag"),"{\"clientId\":null}");assertEquals(200,cleared.statusCode());assertTrue(parse(cleared.asString()).path("clientId").isNull());
+        assertEquals(204,given().header("Authorization","Bearer test-a").header("If-Match",client.header("ETag")).delete("/api/v1/clients/"+own).statusCode());
         var entry=given().header("Authorization","Bearer test-a").queryParam("path","Client private.md").header("If-None-Match","*").contentType("application/octet-stream").body("Private".getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files");assertEquals(201,entry.statusCode());String key=entry.jsonPath().getString("sourceKey");
         assertEquals(200,read("test-a",VaultContent.TYPE,key).statusCode());assertEquals(404,read("test-b",VaultContent.TYPE,key).statusCode());
         assertEquals(400,given().header("Authorization","Bearer test-a").queryParam("sourceType",type).queryParam("sourceKey",day).queryParam("extra","x").get("/api/v1/notes/client").statusCode());

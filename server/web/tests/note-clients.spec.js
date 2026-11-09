@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
-import {clickNoteAction,notesSource} from './editor-interactions.js';
+import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {captureScreenshot} from './screenshots.js';
 
@@ -72,4 +72,23 @@ test('client labels and the keyboard selector fit all themes at desktop and phon
     }
     await captureScreenshot(page,{path:`test-results/note-client-label-${width}.png`});
   }
+});
+
+test('a delayed client read cannot label the next document with the previous client',async({page,request})=>{
+  const {api,alpha,beta,entry}=await setup(page,request),other=await(await api('PUT','/notes/files?path=Notes%2FOther.md',Buffer.from('# Other\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  for(const [note,client]of [[entry,beta],[other,alpha]]){const current=await api('GET',association(note));await api('PUT',association(note),{clientId:client.id},{'If-Match':current.headers().etag});}
+  let held=false,release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/notes/client?*',async route=>{if(new URL(route.request().url()).searchParams.get('sourceKey')!==entry.sourceKey)return route.continue();const response=await route.fetch();held=true;await pending;await route.fulfill({response}).catch(()=>{});});
+  try{
+    await openNote(page);await expect.poll(()=>held).toBe(true);await noteEntry(page.locator('#notes-navigation'),'Notes/Other.md').click();await expect(page.locator('#notes-panel .note-client-label')).toHaveText(alpha.name);release();await page.unrouteAll({behavior:'wait'});await expect(page.locator('#notes-panel .note-client-label')).toHaveText(alpha.name);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('a read-only session sees the client label and cannot change the association',async({page,request,browser})=>{
+  const {api,alpha,entry}=await setup(page,request);const current=await api('GET',association(entry));await api('PUT',association(entry),{clientId:alpha.id},{'If-Match':current.headers().etag});
+  const token=await(await api('POST','/auth/tokens',{name:'Read-only note client','permissions':['read'],'expiresAt':null})).json(),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
+  try{
+    const reader=await context.newPage();let writes=0;reader.on('request',request=>{if(request.method()==='PUT'&&new URL(request.url()).pathname==='/api/v1/notes/client')writes++;});
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await openNote(reader);
+    const scope=reader.locator('#notes-panel');await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);await expect((await noteActions(reader,scope)).getByRole('menuitem',{name:'Associate with client',exact:true})).toBeDisabled();expect(writes).toBe(0);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
+  }finally{await context.close();}
 });
