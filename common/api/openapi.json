@@ -18852,6 +18852,95 @@
         },
         "description": "Bookmarks belong to the authenticated account. Daily and weekly keys can name an empty page. Content bytes, dates, history and content validators remain unchanged. Responses are private, no-store."
       }
+    },
+    "/notes/entries/{id}/title": {
+      "put": {
+        "operationId": "renameNoteTitle",
+        "summary": "Rename an ordinary Markdown document using its editable title",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultTitleInput"
+              }
+            }
+          }
+        },
+        "description": "Atomically retain the chosen display title and rename its file in the same folder, preserving the Markdown extension, canonical bytes and source dates. Requires the current metadata ETag. Existing files are never overwritten; journal/event/attachment titles cannot be renamed here."
+      }
     }
   },
   "components": {
@@ -33100,7 +33189,7 @@
             "minLength": 1,
             "maxLength": 4096,
             "readOnly": true,
-            "description": "Display title: the associated event title for EVENT notes, or the first nonempty document-level Markdown heading for MARKDOWN notes, as plain text. Omitted when unavailable; clients fall back to the filename/path. This does not change paths, canonical bytes or write validators."
+            "description": "Display title: an explicitly chosen filename title for MARKDOWN notes, otherwise the first nonempty document-level heading; the associated event title for EVENT notes. Omitted when unavailable. Editing a Markdown document title through /title renames its file without rewriting canonical bytes."
           },
           "createdAtSource": {
             "type": "string",
@@ -33292,6 +33381,12 @@
               "UNKNOWN"
             ],
             "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "Explicit ordinary Markdown title matching the filename stem."
           }
         },
         "dependentRequired": {
@@ -34327,6 +34422,21 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024
+          }
+        }
+      },
+      "VaultTitleInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 252,
+            "description": "Plain document title used as the Markdown filename stem; must form a valid portable collection filename."
           }
         }
       }

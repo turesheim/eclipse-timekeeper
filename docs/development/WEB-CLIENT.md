@@ -1176,8 +1176,21 @@ the folder drawer; selecting a document closes the drawer. The toggle reports
 its current state to assistive technology and retains focus when a viewport
 change hides the focused navigation control.
 
+An ordinary Markdown document has an editable title above its content. Press
+Enter or leave the field to save; Escape cancels a draft. Saving the title
+renames the file in its existing folder, retaining the extension and canonical
+Markdown bytes. The chosen title survives reloads and account archives. A name
+collision or stale save retains the draft; read-only clients cannot change it.
+Journal and event titles retain their existing date/event association.
+
 The footer shows the selected item's saved creation/addition and last-change timestamps
-beside its save state, using the account's time zone and locale. Unsaved edits
+beside its save state, using the account's time zone and locale. The document's
+full collection-relative path follows the last-change timestamp, updates after
+renaming or moving, and wraps on narrow screens. Wikilinks first match paths and
+filenames. A bare link such as `[[CVE-2026-111943]]` also matches a unique display
+title when no filename matches. Duplicate titles require an explicit path, such
+as `[[Notes/Imported investigation]]`; headings still do not rename files.
+Unsaved edits
 and rejected saves retain the saved timestamps; a successful save updates the
 last-change time. The creation label distinguishes original creation, addition to Dagsverk and unknown legacy provenance. Dates wrap on narrow screens. Formatted web, local, daily and
 wiki links show the hand pointer in both writable and read-only notes.

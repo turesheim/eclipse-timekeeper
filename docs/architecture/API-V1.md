@@ -1138,13 +1138,22 @@ corresponding private staging capacity.
 
 ## Notes collection API (schema 10)
 
-Notes entry metadata includes an optional read-only `title`: the associated event
-title for event notes, or the first nonempty document-level Markdown heading
+Notes entry metadata includes an optional read-only `title`: an explicitly named
+ordinary document, the associated event title for event notes, or the first nonempty document-level Markdown heading
 (ATX or Setext) for ordinary notes. Heading formatting is reduced to plain text;
 frontmatter, code examples and quoted headings do not supply a document title.
 Titles are bounded to 4,096 characters. The browser falls back to the filename
 without its `.md` suffix when no title is available. Title reads do not modify canonical Markdown bytes,
 filenames, note versions or write validators.
+
+`PUT /notes/entries/{id}/title` accepts a plain `title` for an ordinary Markdown
+document and requires the current metadata `If-Match`. In one owner transaction
+it retains that display title and renames the file in its current folder,
+preserving its extension, ID, canonical bytes, content version and source dates.
+Collisions, stale metadata and invalid portable filenames fail without changing
+either document. Journal, event and attachment associations cannot be renamed
+through this operation. Explicit titles survive account archives and subsequent
+content edits; a later path rename updates the chosen title to its filename stem.
 
 `GET /notes/recent` includes ordinary, event and daily/weekly journal note metadata
 within the configured account-local recent-edit window. It excludes today's

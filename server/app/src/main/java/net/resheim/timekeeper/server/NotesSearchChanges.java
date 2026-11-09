@@ -16,7 +16,7 @@ final class NotesSearchChanges {
     private static final long SEQUENCE_PREFIX=0x7365617263680000L,MAXIMUM=9007199254740991L;
     private static final Set<String> KINDS=Set.of("MARKDOWN","DAY","WEEK","EVENT");
     private static final List<String> IDENTITY=List.of("id","path","kind","sourceType","sourceId","sourceKey",
-            "deleted","contentTag","contentVersion","sha256","byteLength","createdAt","modifiedAt");
+            "deleted","contentTag","contentVersion","sha256","byteLength","createdAt","modifiedAt","title");
     private final ServerStore store;
     private final int retained;
     record Snapshot(UUID epoch,long generation,long historyFloor) { }

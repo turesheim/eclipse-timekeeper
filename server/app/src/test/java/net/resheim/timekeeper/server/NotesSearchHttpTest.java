@@ -28,6 +28,12 @@ class NotesSearchHttpTest {
             assertEquals(503,reply.statusCode(),reply.asString());Thread.sleep(20);
         }while(System.nanoTime()<deadline);throw new AssertionError("Notes search did not become ready");
     }
+    @Test void anExplicitTitleWithAnUnchangedPathRefreshesSearchMetadata()throws Exception{
+        String title="chosenfilename";create("a","search-http/"+title+".md","# Different imported heading\n");
+        assertEquals("Different imported heading",page(title,200,null).path("items").get(0).path("entry").path("title").asText());
+        store.transaction("a",()->{var vault=new VaultCollection(store,limits);var entry=vault.get(new VaultPath("search-http/"+title+".md"));vault.renameTitle(entry,title,vault.metadataTag(entry));return null;});
+        assertEquals(title,page(title,200,null).path("items").get(0).path("entry").path("title").asText());
+    }
     @Test void httpSearchPagesArePrivateRankedPlainTextAndExpireAfterCommittedChanges()throws Exception{
         String word="httpneedle";for(int i=0;i<5;i++)create("a","search-http/"+i+".md","# Title "+i+"\n\n😀 "+word+" owner text");
         create("b","search-http/foreign.md",word+" private foreign text");

@@ -99,11 +99,14 @@ final class VaultIndex {
         if(!original.path("parentId").asText().equals(parent.path("id").asText()))unlinkChild(original);
         ObjectNode moved=null;
         for(var entry:entries){
+            String previousName=path(entry).name(),nextName=targets.get(id(entry)).name();
+            if(entry.has("title")&&!previousName.equals(nextName))entry.put("title",NoteTitles.filenameTitle(nextName));
             entry.put("path",targets.get(id(entry)).value());if(id(entry).equals(source))entry.put("parentId",id(parent).toString());
             var saved=write(ENTRY,id(entry),entry);link(saved);if(id(entry).equals(source))moved=saved;
         }
         return moved;
     }
+    ObjectNode title(UUID entryId,String title){var entry=get(entryId);return title.equals(entry.path("title").asText())?entry:write(ENTRY,entryId,entry.put("title",title));}
     ObjectNode tombstone(UUID entryId,UUID batch){
         var entry=get(entryId);if(entryId.equals(ROOT))throw ApiFailure.conflict();
         if(entry.path("deleted").asBoolean())return entry;

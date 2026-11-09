@@ -24,6 +24,14 @@ class NotesSearchChangesTest {
     private NotesSearchChanges changes(){return new NotesSearchChanges(store);}
     private List<JsonNode> since(NotesSearchChanges.Snapshot before){var now=changes().snapshot();return changes().page(now,before.generation(),NotesSearchChanges.MAX_BATCH);}
     private void upserted(List<JsonNode> events,UUID id){assertTrue(events.stream().anyMatch(event->event.path("entryId").asText().equals(id.toString())&&event.path("operation").asText().equals("UPSERT")));}
+    @Test void choosingATitleWithoutMovingTheFileRefreshesSearchAndAnIdenticalRenameDoesNot(){
+        store.transaction("search-explicit-title",()->{
+            var vault=vault();byte[] body=bytes("# Imported heading\n");var entry=vault.put(new VaultPath("Chosen title.md"),null,true,body);var before=changes().snapshot();String tag=vault.tag(entry);
+            var renamed=vault.renameTitle(entry,"Chosen title",vault.metadataTag(entry));upserted(since(before),VaultCollection.id(entry));
+            assertEquals(VaultCollection.path(entry),VaultCollection.path(renamed));assertEquals(tag,vault.tag(renamed));assertArrayEquals(body,vault.read(renamed));
+            before=changes().snapshot();vault.renameTitle(renamed,"Chosen title",vault.metadataTag(renamed));assertEquals(before,changes().snapshot());return null;
+        });
+    }
 
     @Test void ordinaryEqualSizeEditsMovesDeletionAndRecoveryAreDurableAndContentFree(){
         String owner="search-ordinary";

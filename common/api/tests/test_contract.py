@@ -22,6 +22,14 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_document_title_rename_is_private_conditional_and_strict(self):
+        operation=CONTRACT['paths']['/notes/entries/{id}/title']['put']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+        self.assertIn('409',operation['responses']);self.assertIn('412',operation['responses'])
+        self.assertTrue(validator('VaultTitleInput').is_valid({'title':'CVE-2026-111943'}))
+        for value in [{},{'title':''},{'title':'x','ownerId':'foreign'},{'title':3}]:
+            self.assertFalse(validator('VaultTitleInput').is_valid(value))
     def test_note_bookmarks_have_separate_conditional_private_metadata(self):
         operations=CONTRACT['paths']['/notes/bookmark']
         self.assertEqual({'get','put'},set(operations))
@@ -720,7 +728,7 @@ class ContractTest(unittest.TestCase):
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
             'getNoteBookmark', 'updateNoteBookmark', 'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
-            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'importNoteBytes', 'moveNoteEntry', 'restoreNoteEntry', 'exportNotes',
+            'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'importNoteBytes', 'moveNoteEntry', 'renameNoteTitle', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'undoWorkSessionChange', 'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',

@@ -17,8 +17,10 @@ final class NoteTitles {
             .extensions(List.of(YamlFrontMatterExtension.create(),StrikethroughExtension.create())).build();
     private final ServerStore store;
     NoteTitles(ServerStore store){this.store=store;}
+    static String filenameTitle(String filename){int dot=filename.lastIndexOf('.');return dot>0?filename.substring(0,dot):filename;}
     String get(JsonNode entry){
         String source=entry.path("sourceType").asText(),kind=entry.path("kind").asText();
+        if(kind.equals("MARKDOWN")&&source.equals(VaultContent.TYPE)&&entry.hasNonNull("title"))return entry.path("title").asText();
         if(kind.equals("EVENT")&&source.equals(EventNotes.TYPE))
             return store.find(source,uuid(entry.path("sourceId"))).map(value->value.path("event").path("title").asText().strip()).orElse("");
         if(kind.equals("MARKDOWN")&&source.equals(VaultContent.TYPE))

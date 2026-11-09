@@ -6,7 +6,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {captureScreenshot} from './screenshots.js';
-import {setTheme} from './navigation.js';
+import {setTheme,openAccountMenu} from './navigation.js';
 import {browserRequest} from './browser-request.js';
 import {appendEditorText} from './editor-interactions.js';
 
@@ -212,7 +212,7 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
   const token=await(await api('POST','/auth/tokens',{name:'Read-only Notes browser','permissions':['read'],'expiresAt':null})).json();
   const session=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
   try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#notes-search')).toBeVisible();
-    await reader.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(reader.locator('#notes-navigation'),'Notes/Theme.md').click();await expect(reader.locator('#notes-body')).toHaveValue('# Theme note\n');await expect(reader.locator('#notes-body')).not.toBeEditable();await expect(reader.locator('.notes-footer button')).toBeDisabled();await expect(reader.locator('#notes-panel .note-bookmark')).toHaveAttribute('aria-pressed','true');await expect(reader.locator('#notes-panel .note-bookmark')).toBeDisabled();
+    await reader.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(reader.locator('#notes-navigation'),'Notes/Theme.md').click();await expect(reader.locator('#notes-body')).toHaveValue('# Theme note\n');await expect(reader.locator('#notes-body')).not.toBeEditable();await expect(reader.locator('.notes-title-input')).not.toBeEditable();await expect(reader.locator('.notes-footer button')).toBeDisabled();await expect(reader.locator('#notes-panel .note-bookmark')).toHaveAttribute('aria-pressed','true');await expect(reader.locator('#notes-panel .note-bookmark')).toBeDisabled();
     await reader.evaluate(()=>location.hash='#account/notes');await expect(reader.locator('#notes-import-folder')).toBeDisabled();await expect(reader.locator('#account-content button[type=submit]')).toBeDisabled();for(const input of await reader.locator('#account-content input[type=text]').all())await expect(input).toBeDisabled();
   }finally{await session.close();}
 });
@@ -301,6 +301,90 @@ test('revision comparison restores an unsaved draft and leaves stale-write guard
   await dialog.getByRole('button',{name:'Use as unsaved draft',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue('First version.\n');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Second version.\n');
   await saveMarkdown(page.locator('#notes-panel'));await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('First version.\r\n');
 });
+test('editing the title above a document renames its file and preserves the body and dates',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Imported title.md',body='# Original heading\r\n\r\nExact body.\r\n';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
+  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await expect(title).toHaveValue('Original heading');await title.fill('CVE-2026-111943');await title.press('Enter');
+  await expect(page.locator('.notes-document-path')).toHaveText('Notes/CVE-2026-111943.md');await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');
+  const saved=await(await api('GET','/notes/entries/'+entry.id)).json();for(const field of ['id','sourceId','etag','createdAt','modifiedAt','contentVersion'])expect(saved[field]).toEqual(entry[field]);
+  expect(saved.title).toBe('CVE-2026-111943');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);
+  await page.reload();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/CVE-2026-111943.md').click();await expect(title).toHaveValue('CVE-2026-111943');
+  await title.fill('Cancelled title');await title.press('Escape');await expect(title).toHaveValue('CVE-2026-111943');await expect(page.locator('.notes-document-path')).toHaveText('Notes/CVE-2026-111943.md');
+});
+
+test('a conflicting or stale title rename retains the draft and never overwrites another file',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Title guard.md';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# Title guard\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await api('PUT','/notes/files?path=Notes%2FExisting.md',Buffer.from('Existing exact bytes'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
+  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await title.fill('Existing');await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('Existing');await expect(page.locator('.notes-document-path')).toHaveText(path);
+  const existing=await(await api('GET','/notes/resolve?path=Notes%2FExisting.md')).json();expect(await(await api('GET','/notes/entries/'+existing.id+'/content')).text()).toBe('Existing exact bytes');
+  await title.press('Escape');await title.fill('My pending title');const current=await api('GET','/notes/entries/'+entry.id);await api('PUT','/notes/entries/'+entry.id+'/title',{title:'Peer title'},{'If-Match':current.headers().etag});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');await expect(title).toHaveValue('My pending title');
+  await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('My pending title');expect((await(await api('GET','/notes/entries/'+entry.id)).json()).title).toBe('Peer title');
+  page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');
+});
+
+test('an uncertain title rename keeps the draft and is checked by reload without another write',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Uncertain title.md';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# Uncertain title\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
+  let writes=0;await page.route('**/api/v1/notes/entries/'+entry.id+'/title',async route=>{writes++;await route.fetch();return route.abort('internetdisconnected');});
+  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await title.fill('Applied uncertain title');await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('Applied uncertain title');await title.press('Enter');expect(writes).toBe(1);
+  expect((await(await api('GET','/notes/entries/'+entry.id)).json()).path).toBe('Notes/Applied uncertain title.md');await page.unrouteAll({behavior:'wait'});
+  page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Applied uncertain title');await expect(page.locator('.notes-document-path')).toHaveText('Notes/Applied uncertain title.md');expect(writes).toBe(1);
+});
+
+test('a late title rename response cannot restore private metadata after page suspension',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Private title.md';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# Private title\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
+  let release,arrive,deliver;const gate=new Promise(resolve=>release=resolve),arrived=new Promise(resolve=>arrive=resolve),delivered=new Promise(resolve=>deliver=resolve);
+  await page.route('**/api/v1/notes/entries/'+entry.id+'/title',async route=>{const response=await route.fetch();arrive();await gate;try{await route.fulfill({response});}catch{}finally{deliver();}});
+  try{
+    const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await title.fill('Private renamed title');await title.press('Enter');await arrived;
+    await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true})));await expect(page.locator('#workspace')).not.toBeVisible();release();await delivered;
+    await expect(page.locator('.notes-title-input')).toHaveValue('');await expect(page.locator('.notes-document-path')).toBeEmpty();await expect(page.locator('#notes-document-title')).not.toContainText('Private');
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('journal wikilinks resolve CVE filenames and show the target document path',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/CVE-2026-111943.md',day='2026-11-09';
+  await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# CVE-2026-111943\n\nPrivate investigation.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?'+new URLSearchParams({path:'journal/'+day+'.md'}),Buffer.from('Follow up [[CVE-2026-111943]].\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');
+  const link=page.locator('#today-journal-formatted [data-wiki-reference="CVE-2026-111943"]');
+  await expect(link).toHaveAttribute('data-resolved','true');await link.click();
+  await expect(page.locator('#notes-document-title')).toHaveText('CVE-2026-111943');await expect(page.locator('#notes-formatted')).toContainText('Private investigation.');
+  const storedPath=page.locator('.notes-footer .notes-document-path');await expect(storedPath).toHaveText(path);
+  expect(await storedPath.evaluate(node=>!!node.previousElementSibling?.querySelector('time'))).toBe(true);
+  await clickNoteAction(page,page.locator('#notes-panel'),'Rename or move');const rename=page.getByRole('dialog',{name:'Rename or move',exact:true});
+  const movedPath='Notes/Renamed investigation '+('CVE-2026-111943-'.repeat(10))+'.md';
+  await rename.getByLabel('Path from collection root',{exact:true}).fill(movedPath);await rename.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(storedPath).toHaveText(movedPath);
+  for(const width of [1440,320]){
+    await page.setViewportSize({width,height:900});await expect(storedPath).toBeInViewport();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await captureScreenshot(page,{path:`test-results/notes-document-path-${width}.png`});
+  }
+  await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('.notes-footer .notes-document-path')).toBeEmpty();
+});
+
+test('journal wikilinks open unique document titles and keep duplicate titles ambiguous',async({page,request})=>{
+  const api=await setup(page,request),day='2026-11-09',path='Notes/Imported investigation.md';
+  await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# CVE-2026-111943\n\n## Analysis\n\nMatched by title.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?'+new URLSearchParams({path:'journal/'+day+'.md'}),Buffer.from('[[CVE-2026-111943#Analysis|Investigation]]\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');
+  const link=page.locator('#today-journal-formatted [data-wiki-reference="CVE-2026-111943#Analysis|Investigation"]');
+  await expect(link).toHaveAttribute('data-resolved','true');await link.click();
+  await expect(page.locator('#notes-document-title')).toHaveText('CVE-2026-111943');await expect(page.locator('.notes-document-path')).toHaveText(path);await expect(page.locator('#notes-formatted h2')).toHaveText('Analysis');
+  await api('PUT','/notes/files?path=Notes%2FDuplicate.md',Buffer.from('# CVE-2026-111943\n\nDifferent investigation.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');await expect(link).toHaveAttribute('data-resolved','false');
+  const dialogs=[];page.on('dialog',dialog=>{dialogs.push(dialog.message());void dialog.dismiss();});await link.click();
+  await expect(link).toHaveAttribute('title','Several documents match this link. Use the full path from the collection root.');expect(dialogs).toEqual([]);await expect(page.locator('#today-panel')).toBeVisible();
+});
+
 test('vault wikilinks report ambiguity, navigate to headings and preview authenticated image embeds',async({page,request})=>{
   const api=await setup(page,request);await api('POST','/notes/folders',{path:'A'});await api('POST','/notes/folders',{path:'B'});
   for(const [path,text] of [['Notes/Design.md','# Design\n\n## Decisions\n\nKeep it portable.\n'],['A/Plan.md','First'],['B/Plan.md','Second'],['Notes/Links.md','[[Notes/Design#Decisions|Decision]] and [[Plan]].\n\n![[Notes/pixel.png|32]]\n']])await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
@@ -376,6 +460,7 @@ test('Notes content search finds body text, keeps relevance order and pages on d
   await page.locator('#notes-search-mode').selectOption('content');await expect(rows).toHaveCount(50);await expect(rows.first()).toContainText('Sparrow priority');
   await expect(navigation.getByRole('button',{name:'Sort notes',exact:true})).toBeDisabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
   await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
+  await page.locator('#refresh').evaluate(button=>button.click());await expect(page.locator('#status')).toHaveText('Up to date');await expect(navigation.locator('.notes-tree')).toHaveAttribute('aria-busy','false');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
     await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await expect(rows).toHaveCount(50);
     for(const width of [1440,390]){
