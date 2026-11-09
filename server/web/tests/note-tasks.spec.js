@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
 import {noteEntry} from './note-entry.js';
-import {notesSource,saveMarkdown} from './editor-interactions.js';
+import {notesSource,saveMarkdown,clickNoteAction} from './editor-interactions.js';
 
 test.beforeAll(async({request})=>{
   const headers={Origin:new URL(process.env.TIMEKEEPER_WEB_URL).origin},status=await request.get('/api/v1/auth/status',{headers});
@@ -32,10 +32,10 @@ test('saving and checking note items creates ordinary tasks with separate stable
   await page.locator('[data-tab=tasks]').click();const row=page.locator('#tasks-list').getByRole('button',{name:'Open task Follow up',exact:true});await expect(row).toBeVisible();await expect(row).toContainText('Completed');await row.click();await expect(page.locator('#task-details')).toContainText('Dagsverk');
 });
 
-test('normal task planning updates an open checkbox and preserves every other source byte',async({page,request})=>{
+test('normal task planning preserves exact source bytes and reload shows its linked checkbox',async({page,request})=>{
   const api=await setup(page,request),original='\uFEFF---\r\ncustom: exact\r\n---\r\n- [ ] Keep **formatting** 😀\r\n';const entry=await create(api,'Exact.md',original);await open(page,'Exact.md');const task=(await tasks(api))[0];
-  await complete(api,task.id,true);await expect(checkbox(page,'Keep formatting 😀')).toBeChecked();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original.replace('[ ]','[x]'));
-  await complete(api,task.id,false);await expect(checkbox(page,'Keep formatting 😀')).not.toBeChecked();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original);expect((await tasks(api)).map(value=>value.id)).toEqual([task.id]);
+  await complete(api,task.id,true);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original.replace('[ ]','[x]'));await expect(page.locator('#notes-panel > .alert')).toBeVisible();await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(checkbox(page,'Keep formatting 😀')).toBeChecked();
+  await complete(api,task.id,false);await expect(page.locator('#notes-panel > .alert')).toBeVisible();await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(checkbox(page,'Keep formatting 😀')).not.toBeChecked();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original);expect((await tasks(api)).map(value=>value.id)).toEqual([task.id]);
 });
 
 test('a task completed in another client retains an unsaved note draft for explicit review',async({page,request})=>{
@@ -46,15 +46,15 @@ test('a task completed in another client retains an unsaved note draft for expli
 });
 
 test('an uncertain note save is reconciled without creating duplicate ordinary tasks',async({page,request})=>{
-  const api=await setup(page,request);const entry=await create(api,'Uncertain.md','Before\n');await open(page,'Uncertain.md');const endpoint='**/api/v1/notes/entries/'+entry.id+'/content';let dropped=false;
-  await page.route(endpoint,async route=>{if(route.request().method()==='PUT'&&!dropped){dropped=true;await route.fetch();return route.abort('internetdisconnected');}return route.continue();});
-  await(await notesSource(page)).fill('- [ ] Created once\n');await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect.poll(async()=>await tasks(api)).toHaveLength(1);const task=(await tasks(api))[0];await page.unroute(endpoint);await saveMarkdown(page.locator('#notes-panel'));expect((await tasks(api)).map(value=>value.id)).toEqual([task.id]);
+  const api=await setup(page,request);const entry=await create(api,'Uncertain.md','Before\n');await open(page,'Uncertain.md');const endpoint='**/api/v1/notes/entries/'+entry.id+'/content';let dropped=false,writes=0;
+  await page.route(endpoint,async route=>{if(route.request().method()==='PUT')writes++;if(route.request().method()==='PUT'&&!dropped){dropped=true;await route.fetch();return route.abort('internetdisconnected');}return route.continue();});
+  await(await notesSource(page)).fill('- [ ] Created once\n');await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect.poll(async()=>await tasks(api)).toHaveLength(1);const task=(await tasks(api))[0];await page.unroute(endpoint);await page.locator('.notes-footer').getByRole('button',{name:'Check saved result',exact:true}).click();await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');expect(writes).toBe(1);expect((await tasks(api)).map(value=>value.id)).toEqual([task.id]);
   await page.reload();await open(page,'Uncertain.md');await expect(checkbox(page,'Created once')).not.toBeChecked();expect((await tasks(api)).map(value=>value.id)).toEqual([task.id]);
 });
 
 test('Today and weekly Markdown writers create the same ordinary tasks and reopen their checkboxes',async({page,request})=>{
   const api=await setup(page,request),day='2026-11-09',daily=await api('GET','/day-notes/'+day+'/content'),week='2026-W46',weekly=await api('GET','/week-notes/'+week);
   await api('PUT','/day-notes/'+day+'/content',{body:'- [ ] Daily follow up\n'},{'If-Match':daily.headers().etag});await api('PUT','/week-notes/'+week,{body:'- [x] Weekly follow up\n'},{'If-Match':weekly.headers().etag});expect(await tasks(api)).toHaveLength(2);
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const dailyCheckbox=page.locator('#today-journal-formatted').getByRole('checkbox',{name:'Task: Daily follow up',exact:true});await expect(dailyCheckbox).not.toBeChecked();await dailyCheckbox.check();await saveMarkdown(page.locator('#today-note-editor'));await expect.poll(async()=>(await tasks(api)).find(value=>value.summary==='Daily follow up').status).toBe('COMPLETED');
-  const task=(await tasks(api)).find(value=>value.summary==='Daily follow up');await complete(api,task.id,false);await expect(dailyCheckbox).not.toBeChecked();
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const dailyCheckbox=page.locator('#today-journal-formatted').getByRole('checkbox',{name:'Task: Daily follow up',exact:true});await expect(dailyCheckbox).not.toBeChecked();await dailyCheckbox.check();await saveMarkdown(page.locator('#today-note-editor'));await expect.poll(async()=>(await tasks(api)).find(value=>value.summary==='Daily follow up').status).toBe('COMPLETED');
+  const task=(await tasks(api)).find(value=>value.summary==='Daily follow up');await complete(api,task.id,false);await page.locator('#today-date').fill('2026-11-10');await page.locator('#today-date').fill(day);await expect(dailyCheckbox).not.toBeChecked();
 });

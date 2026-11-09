@@ -46,7 +46,9 @@ links and uses the tasks' current completion states.
 Account archives retain checklist links and remap task IDs on restore. A notes-only
 export contains Markdown, so importing those files elsewhere creates new tasks.
 Task completion is a normal note change with a new content validator and history;
-a concurrent unsaved note draft is retained for explicit review.
+a concurrent unsaved note draft is retained for explicit review. An open Notes
+editor reports a server change; use **Reload from server** to review the updated
+checkbox state.
 
 Vault extensions include:
 
