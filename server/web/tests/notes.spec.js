@@ -6,7 +6,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {captureScreenshot} from './screenshots.js';
-import {setTheme} from './navigation.js';
+import {setTheme,openAccountMenu} from './navigation.js';
 import {browserRequest} from './browser-request.js';
 import {appendEditorText} from './editor-interactions.js';
 
@@ -320,7 +320,21 @@ test('journal wikilinks resolve CVE filenames and show the target document path'
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await captureScreenshot(page,{path:`test-results/notes-document-path-${width}.png`});
   }
-  await page.locator('#logout').click();await expect(page.locator('.notes-footer')).not.toContainText('Renamed investigation.md');
+  await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('.notes-footer .notes-document-path')).toBeEmpty();
+});
+
+test('journal wikilinks open unique document titles and keep duplicate titles ambiguous',async({page,request})=>{
+  const api=await setup(page,request),day='2026-11-09',path='Notes/Imported investigation.md';
+  await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# CVE-2026-111943\n\n## Analysis\n\nMatched by title.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?'+new URLSearchParams({path:'journal/'+day+'.md'}),Buffer.from('[[CVE-2026-111943#Analysis|Investigation]]\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');
+  const link=page.locator('#today-journal-formatted [data-wiki-reference="CVE-2026-111943#Analysis|Investigation"]');
+  await expect(link).toHaveAttribute('data-resolved','true');await link.click();
+  await expect(page.locator('#notes-document-title')).toHaveText('CVE-2026-111943');await expect(page.locator('.notes-document-path')).toHaveText(path);await expect(page.locator('#notes-formatted h2')).toHaveText('Analysis');
+  await api('PUT','/notes/files?path=Notes%2FDuplicate.md',Buffer.from('# CVE-2026-111943\n\nDifferent investigation.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');await expect(link).toHaveAttribute('data-resolved','false');
+  const dialogs=[];page.on('dialog',dialog=>{dialogs.push(dialog.message());void dialog.dismiss();});await link.click();
+  await expect(link).toHaveAttribute('title','Several documents match this link. Use the full path from the collection root.');expect(dialogs).toEqual([]);await expect(page.locator('#today-panel')).toBeVisible();
 });
 
 test('vault wikilinks report ambiguity, navigate to headings and preview authenticated image embeds',async({page,request})=>{

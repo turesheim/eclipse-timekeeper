@@ -34,6 +34,16 @@ test('wiki image resolution filters the filename and still reads every ambiguity
   origin='page.md';await assert.rejects(resources.resolveWiki('shot.png'));assert.equal(requests.length,3);
   await assert.rejects(resources.resolveWiki('https://foreign.invalid/image.png'));assert.equal(requests.length,3);
 });
+test('journal title lookup shares a complete paged catalog and does not guess a qualified path',async()=>{
+  const entries=[{id:'first',path:'Notes/Imported.md',kind:'MARKDOWN',title:'CVE-2026-111943'},{id:'second',path:'Notes/Another.md',kind:'MARKDOWN',title:'Other title'}],queries=[];
+  const session={request:async path=>{if(path==='/notes')return {data:collection()};const query=new URLSearchParams(path.split('?')[1]);queries.push(query.get('query'));
+    if(query.get('query'))return {data:{items:[]}};const offset=Number(query.get('offset'));return {data:{items:[entries[offset]],...(offset===0?{nextOffset:1}:{})}};}};
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-09'}));
+  assert.equal((await resources.resolveWiki('CVE-2026-111943')).id,'first');
+  assert.equal((await resources.resolveWiki('Other title')).id,'second');assert.equal(queries.filter(query=>query==='').length,2);
+  await assert.rejects(resources.resolveWiki('Notes/CVE-2026-111943'),error=>error.code==='NOTE_LINK_MISSING');
+  assert.equal(queries.filter(query=>query==='').length,2);
+});
 test('superseded image settings cannot issue lookups or replace another account request',async()=>{
   const delayed=deferred(),oldRequests=[],newRequests=[];
   const old={request:async path=>{oldRequests.push(path);return {data:await delayed.promise};}};
