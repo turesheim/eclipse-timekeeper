@@ -170,3 +170,11 @@ test('journal popups retain custom asset paths and maximize saved daily and week
   await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2020-01');await page.locator(`[data-track-note-date="${day}"]`).click();const nativeDay=page.locator('#track-note-editor');await nativeDay.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill(body+'Changed from daily popup.\n');await nativeDay.getByRole('button',{name:'Open in workspace',exact:true}).click();
   await expect(nativeDay).not.toBeVisible();await expect(page.locator('#today-date')).toHaveValue(day);await expect(page.locator('#today-journal-formatted')).toContainText('Changed from daily popup.');
 });
+
+test('note popup clears the previous account title and body when authentication ends',async({page,request})=>{
+  const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
+  const title='Private account headline 607',marker='Private account body marker 607';
+  const entry=await(await api('PUT','/notes/files?path=Notes%2FPrivate.md',Buffer.from('# '+title+'\n\n'+marker+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.reload();await page.locator(`[data-recent-note="${entry.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText(title);await expect(page.locator('#note-popup-formatted')).toContainText(marker);
+  await api('POST','/auth/logout');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#note-popup-editor')).not.toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('');await expect(page.locator('#note-popup-body')).toHaveValue('');expect(await page.locator('#note-popup-editor').textContent()).not.toContain(title);expect(await page.locator('#note-popup-editor').textContent()).not.toContain(marker);
+});
