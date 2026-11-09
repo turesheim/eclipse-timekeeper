@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
 import {noteEntry} from './note-entry.js';
+import {expandProjectClient} from './navigation.js';
 import {appendEditorText} from './editor-interactions.js';
 
 test.beforeAll(async({request})=>{
@@ -35,6 +36,20 @@ test('background synchronization preserves typing and defers inactive work views
   const changes=await page.evaluate(()=>{globalThis.syncObservers.forEach(observer=>observer.disconnect());return globalThis.syncMutations;});expect(changes).toEqual(Object.fromEntries(Object.keys(changes).map(key=>[key,0])));
   await page.locator('[data-tab=clients]').click();for(let index=0;index<3;index++)await expect(page.locator('#clients')).toContainText('Synchronized client '+index);
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-formatted .ProseMirror p')).toHaveText('Before. '+text);
+});
+
+test('unchanged visible lists retain their focused actions across unrelated synchronization',async({page,request})=>{
+  const {api}=await setup(page,request),client=await(await api('POST','/clients',{name:'Stable client',color:'#305070'})).json();
+  await api('POST','/projects',{name:'Stable project',clientId:client.id});await api('POST','/labels',{name:'Stable label',color:'#507030'});
+  for(const [tab,list,title] of [['clients','clients','Stable client'],['projects','projects','Stable project'],['labels','labels','Stable label']]){
+    if(tab==='labels')await page.goto('/web/#account/labels');else await page.locator('[data-tab='+tab+']').click();
+    const row=page.locator('#'+list+' tr').filter({hasText:title}),action=row.getByRole('button',{name:'Edit',exact:true});
+    if(tab==='projects')await expandProjectClient(page,client.id);
+    await expect(action).toBeVisible();await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await action.focus();await expect(action).toBeFocused();
+    const revision=(await(await api('GET','/projects?limit=500')).json()).revision,published=page.waitForResponse(async reply=>reply.request().method()==='GET'&&new URL(reply.url()).pathname==='/api/v1/projects'&&(await reply.json()).revision>revision);
+    await api('POST',tab==='labels'?'/projects':'/labels',tab==='labels'?{name:'Unrelated '+tab,clientId:client.id}:{name:'Unrelated '+tab,color:'#507030'});await published;await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+    await expect(action).toBeFocused();await page.keyboard.press('Enter');await expect(page.locator('#editor')).toBeVisible();await expect(page.getByLabel('Name',{exact:true})).toHaveValue(title);await page.locator('#cancel').click();
+  }
 });
 
 test('unchanged account refreshes retain the Notes catalog while note changes and explicit refresh still reload it',async({page,request})=>{
