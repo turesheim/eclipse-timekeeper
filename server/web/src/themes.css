@@ -198,7 +198,7 @@
   & :is(.btn-outline-secondary:hover,.btn-outline-secondary:active,.workspace-nav .nav-link:not(.active):hover,
     .project-icon-option:has(:checked),.day,.calendar-heading.today:not(.public-holiday),.calendar-day.weekend,
     .calendar-heading.public-holiday,.calendar-day.public-holiday,.track-public-holiday,.today-public-holiday,
-    .alert,.markdown-source-fragment,.markdown-revision-diff,.markdown-editor .ProseMirror pre,
+    .alert,.markdown-source-fragment,.markdown-revision-diff,.notes-search-excerpt mark,.markdown-editor .ProseMirror pre,
     .markdown-editor .ProseMirror th,.calendar-task,.calendar-create-preview) {
     background-color: var(--newspaper-paper); background-image: var(--newspaper-dots); background-size: 4px 4px;
   }
