@@ -5,7 +5,7 @@ import {t} from './i18n.js';
 export class NoteBookmark {
   constructor(root,options){
     Object.assign(this,{root,options,generation:0});
-    this.button=document.createElement('button');this.button.type='button';this.button.className='btn btn-outline-secondary icon-button note-bookmark';
+    this.button=document.createElement('button');this.button.type='button';this.button.className='btn icon-button note-bookmark';
     this.button.addEventListener('click',()=>void this.toggle());root.classList.add('has-note-bookmark');root.append(this.button);this.paint();
   }
   current(){return this.options.current?.();}
@@ -26,7 +26,7 @@ export class NoteBookmark {
     this.button.disabled=!context?.writable||this.busy||!this.etag&&!this.failed;
     this.button.classList.toggle('is-bookmarked',marked);this.button.setAttribute('aria-pressed',String(marked));this.button.setAttribute('aria-label',label);this.button.title=label;
     // Keep pointer-down/up targets stable while editor controls refresh.
-    if(this.iconState!==marked){this.iconState=marked;this.button.replaceChildren(icon(marked?'bookmark':'bookmark-plus'));if(marked)this.button.append(icon('bookmark-x'));}
+    if(this.iconState!==marked){this.iconState=marked;this.button.replaceChildren(icon(marked?'bookmark-fill':'bookmark-plus'));if(marked)this.button.append(icon('bookmark-dash'));}
   }
   async load(){
     const context=this.context;if(!context?.session)return;const generation=this.generation;

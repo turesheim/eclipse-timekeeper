@@ -106,3 +106,9 @@ historical measurements from current implementation and platform coverage.
 
 The [#548 presentation verification](../verification/MARKDOWN-EDITOR-548.md)
 records the subsequent code badge, link, diagram and note-action coverage.
+
+The bookmark action attaches to the top edge of Notes and inline journal cards.
+It has no button border: a filled bookmark marks saved metadata, an outlined plus
+adds it, and an outlined dash appears when removing it with pointer or keyboard.
+A visible keyboard focus outline and a touch target of at least 44 pixels remain.
+Popup bookmarks align with their note-content edge below the window controls.

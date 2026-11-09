@@ -217,7 +217,7 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
   const bookmarkPath='/notes/bookmark?'+new URLSearchParams({sourceType:themeEntry.sourceType,sourceKey:themeEntry.sourceKey});const bookmark=await api('GET',bookmarkPath);await api('PUT',bookmarkPath,{bookmarked:true},{'If-Match':bookmark.headers().etag});
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
     await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();
-    if(!await noteEntry(page.locator('#notes-navigation'),'Notes/Theme.md').isVisible())await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Theme.md').click();const bookmarkButton=page.locator('#notes-panel .note-bookmark');await expect(bookmarkButton).toHaveAttribute('aria-pressed','true');
+    if(!await noteEntry(page.locator('#notes-navigation'),'Notes/Theme.md').isVisible())await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Theme.md').click();const bookmarkButton=page.locator('#notes-panel .note-bookmark');await expect(bookmarkButton).toHaveAttribute('aria-pressed','true');await expect(bookmarkButton).toHaveCSS('border-top-width','0px');await expect(bookmarkButton).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
     expect(await bookmarkButton.evaluate(button=>{const box=button.getBoundingClientRect();return box.right<=innerWidth&&box.width>=44&&box.height>=44;})).toBe(true);await captureScreenshot(page,{path:test.info().outputPath('bookmark-'+theme+'.png')});
     const result=await new AxeBuilder({page}).include('#notes-panel').analyze();expect(result.violations).toEqual([]);
   }
@@ -337,6 +337,23 @@ test('a conflicting or stale title rename retains the draft and never overwrites
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');await expect(title).toHaveValue('My pending title');
   await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('My pending title');expect((await(await api('GET','/notes/entries/'+entry.id)).json()).title).toBe('Peer title');
   page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');
+});
+
+test('a stale title warning survives an already running catalog refresh',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Title snapshot.md',body='# Title snapshot\n\nExact body.\n';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const navigation=page.locator('#notes-navigation'),refresh=navigation.getByRole('button',{name:'Refresh',exact:true});
+  await refresh.click();await noteEntry(navigation,'Notes').click();await noteEntry(navigation,path).click();
+  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true}),warning=page.locator('#notes-panel > [role=alert]');
+  await title.fill('My pending title');const current=await api('GET','/notes/entries/'+entry.id);await api('PUT','/notes/entries/'+entry.id+'/title',{title:'Peer title'},{'If-Match':current.headers().etag});
+  await refresh.evaluate(button=>button.click());await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');await expect(title).toHaveValue('My pending title');
+  let held=false,release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/notes/entries?*',async route=>{const response=await route.fetch();held=true;await pending;await route.fulfill({response});});
+  try{
+    await refresh.evaluate(button=>button.click());await expect.poll(()=>held).toBe(true);await title.press('Enter');await expect(warning).toBeVisible();
+    release();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(warning).toBeVisible();await expect(title).toHaveValue('My pending title');await expect(title).not.toBeEditable();
+    expect((await(await api('GET','/notes/entries/'+entry.id)).json()).title).toBe('Peer title');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);
+    page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(title).toBeEditable();await expect(warning).toBeHidden();
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
 
 test('an uncertain title rename keeps the draft and is checked by reload without another write',async({page,request})=>{
@@ -594,19 +611,20 @@ test('bookmarks persist in Notes without changing a rejected body draft, bytes o
   const api=await setup(page,request),path='Notes/Bookmark.md',body='# Bookmark\r\n\r\nExact spaces  \r\n';
   const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
-  const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await page.mouse.move(0,0);await expect(button).toHaveCSS('opacity','0');await button.hover();await expect(button.locator('.bi-bookmark-plus')).toBeVisible();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await page.mouse.move(0,0);await expect(button.locator('.bi-bookmark')).toBeVisible();await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-bookmark')).toBeVisible();
+  const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('border-top-width','0px');expect(Math.abs((await button.boundingBox()).y-(await page.locator('.notes-editor').boundingBox()).y)).toBeLessThanOrEqual(1.5);await page.mouse.move(0,0);await expect(button).toHaveCSS('opacity','0');await button.hover();await expect(button.locator('.bi-bookmark-plus')).toBeVisible();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await page.mouse.move(0,0);await expect(button.locator('.bi-bookmark-fill')).toBeVisible();await expect(button).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-bookmark')).toBeVisible();
   await page.reload();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();await expect(button).toHaveAttribute('aria-pressed','true');
   await page.route('**/api/v1/notes/entries/'+entry.id+'/content',route=>route.request().method()==='PUT'?route.fulfill({status:412,contentType:'application/json',body:JSON.stringify({error:{code:'STALE_VERSION',message:'Concurrent edit'}})}):route.continue());
   const source=await notesSource(page);await source.fill('# Unsaved bookmark draft\n');await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect(page.locator('.notes-footer > [role=status]')).toContainText('changed');
-  await expect(button).toBeEnabled();await button.hover();await expect(button.locator('.bi-bookmark-x')).toBeVisible();await button.press('Enter');await expect(button).toHaveAttribute('aria-pressed','false');await expect(source).toHaveValue('# Unsaved bookmark draft\n');
+  await expect(button).toBeEnabled();await button.hover();await expect(button.locator('.bi-bookmark-dash')).toBeVisible();await button.press('Enter');await expect(button).toHaveAttribute('aria-pressed','false');await expect(source).toHaveValue('# Unsaved bookmark draft\n');
   const metadata=await(await api('GET','/notes/entries/'+entry.id)).json();expect(metadata.createdAt).toBe(entry.createdAt);expect(metadata.modifiedAt).toBe(entry.modifiedAt);expect(metadata.etag).toBe(entry.etag);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);expect(metadata.bookmarked).toBe(false);
 });
 
 test('Today bookmarks an empty day and Calendar shows its bookmark without creating a note',async({page,request})=>{
   const api=await setup(page,request),day='2026-11-08';await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);
-  const button=page.locator('#today-note-editor .note-bookmark');await expect(button).toBeEnabled();await button.focus();await button.press('Enter');await expect(button).toHaveAttribute('aria-pressed','true');
+  const button=page.locator('#today-note-editor .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('border-top-width','0px');expect(Math.abs((await button.boundingBox()).y-(await page.locator('#today-note-editor').boundingBox()).y)).toBeLessThanOrEqual(1.5);await button.focus();await button.press('Enter');await expect(button).toHaveAttribute('aria-pressed','true');
   const original=await(await api('GET','/day-notes/'+day+'/content')).json();expect(original.body).toBe('');expect(original.version).toBe(0);const summary=await(await api('GET','/day-notes?'+new URLSearchParams({fromDate:day,toDate:day}))).json();expect(summary.items.find(item=>item.date===day).bookmarked).toBe(true);
   await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(day);const calendarButton=page.locator('[data-week-note-date="'+day+'"]');await expect(calendarButton.locator('.bi-journal-bookmark')).toBeVisible();
+  await calendarButton.click();const popup=page.locator('dialog.journal-dialog[open]'),popupBookmark=popup.locator('.note-bookmark');await expect(popupBookmark).toBeEnabled();await expect(popupBookmark).toHaveAttribute('aria-pressed','true');await expect(popupBookmark).toHaveCSS('border-top-width','0px');await expect(popupBookmark).toHaveCSS('background-color','rgba(0, 0, 0, 0)');expect(Math.abs((await popupBookmark.boundingBox()).y-(await popup.locator('.has-note-bookmark').boundingBox()).y)).toBeLessThanOrEqual(1.5);await page.keyboard.press('Escape');await expect(popup).toBeHidden();
   await page.locator('[data-tab=today]').click();await expect(button).toHaveAttribute('aria-pressed','true');await page.setViewportSize({width:390,height:844});await button.focus();await expect(button).toBeInViewport();await captureScreenshot(page,{path:test.info().outputPath('bookmark-today-phone.png')});await button.press('Space');await expect(button).toHaveAttribute('aria-pressed','false');expect((await(await api('GET','/day-notes/'+day+'/content')).json()).version).toBe(0);
 });
 
