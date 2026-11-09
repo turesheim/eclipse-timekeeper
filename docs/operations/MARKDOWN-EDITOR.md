@@ -36,9 +36,10 @@ than 1,024 characters are shortened with an ellipsis; the note keeps the full te
 
 Links use private metadata and add no IDs or comments to Markdown. Moving or
 renaming the file retains its links. Distinct titles can be reordered; repeated
-identical titles remain separate in their relative order. A title edited in the
-note updates its task; editing a task title separately leaves the note's wording
-intact. Removing an item or deleting its note retains the ordinary task. Deleting
+identical titles remain separate in their relative order. Unambiguous title edits
+in the note update their tasks; editing a task title separately leaves the note's
+wording intact. Replacing several unrelated items can create new tasks while
+retaining the previous tasks. Removing an item or deleting its note retains the ordinary task. Deleting
 a task does not recreate it during unrelated note edits; editing that item's
 title or checkbox can create a new task. Restoring a trashed note retains its
 links and uses the tasks' current completion states.

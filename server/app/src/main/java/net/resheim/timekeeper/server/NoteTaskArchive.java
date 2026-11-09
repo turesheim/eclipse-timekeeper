@@ -49,10 +49,15 @@ final class NoteTaskArchive {
         if(values.isMissingNode())return;var tasks=new HashMap<UUID,UUID>();for(var mapping:mappings)if(mapping.path("entityType").asText().equals("TASK"))tasks.put(uuid(mapping.path("sourceId")),uuid(mapping.path("id")));
         for(var value:values){
             var ref=NoteBookmarks.key(value.path("sourceType").asText(),value.path("sourceKey").asText());byte[] bytes=source(store,ref);var actual=NoteTaskMarkup.items(new String(bytes,StandardCharsets.UTF_8));
-            if(actual.size()!=value.path("items").size())throw ApiFailure.validation();var items=array();int index=0;
+            if(actual.size()!=value.path("items").size())throw ApiFailure.validation();boolean active=!new VaultSources(store,store.vaultLimits(),ref).snapshot().deleted();var items=array();int index=0;
             for(var item:value.path("items")){
                 var parsed=actual.get(index++);if(parsed.marker()!=item.path("marker").asInt()||parsed.checked()!=item.path("checked").asBoolean()||parsed.depth()!=item.path("depth").asInt()||!parsed.summary().equals(item.path("summary").asText()))throw ApiFailure.validation();
-                UUID taskId=item.path("taskId").isNull()?UUID.randomUUID():tasks.get(uuid(item.path("taskId")));if(taskId==null||!item.path("taskId").isNull()&&store.find("TASK",taskId).isEmpty())throw ApiFailure.validation();var next=((ObjectNode)item).deepCopy().put("taskId",taskId.toString());items.add(next);
+                UUID taskId=item.path("taskId").isNull()?UUID.randomUUID():tasks.get(uuid(item.path("taskId")));if(taskId==null)throw ApiFailure.validation();
+                if(!item.path("taskId").isNull()){
+                    var task=store.find("TASK",taskId).orElseThrow(ApiFailure::validation);
+                    if(active&&task.path("status").asText().equals("COMPLETED")!=parsed.checked())throw ApiFailure.validation();
+                }
+                var next=((ObjectNode)item).deepCopy().put("taskId",taskId.toString());items.add(next);
             }
             new NoteTasks(store).install(ref,items);
         }

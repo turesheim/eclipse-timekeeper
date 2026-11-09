@@ -25,6 +25,15 @@ class NoteTaskArchiveTest {
     private AccountArchiveImport importer(){return new AccountArchiveImport(store,inputs,receipts);}
     private UUID stage(byte[] bytes){return store.transaction("b",()->{var uploads=new AccountUploads(store);var upload=uploads.create("account.zip","application/zip",bytes.length,ArchiveJournalFiles.digest(bytes));UUID id=uuid(upload.path("id"));for(int offset=0,index=0;offset<bytes.length;offset+=AccountUploads.CHUNK_BYTES,index++)uploads.chunk(id,index,Base64.getEncoder().encodeToString(Arrays.copyOfRange(bytes,offset,Math.min(bytes.length,offset+AccountUploads.CHUNK_BYTES))));return id;});}
     private static byte[] bytes(String value){return value.getBytes(StandardCharsets.UTF_8);}
+    @Test void inconsistentActiveCheckboxAndTaskStateCannotBeRestored(){
+        store.transaction("bad-checklist-archive",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();var entry=store.withNoteTaskSync(()->vault.put(new VaultPath("Inconsistent.md"),null,true,bytes("- [ ] Inconsistent\n")));
+            var task=store.service().createTask(new CreateTask(Optional.empty(),"Inconsistent",Optional.empty()));task=store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),new TaskPlanning(TaskStatus.COMPLETED,Optional.empty(),Optional.of(store.now()))));
+            UUID source=UUID.randomUUID();var metadata=object().put("sourceType",VaultContent.TYPE).put("sourceKey",entry.path("sourceKey").asText());metadata.putArray("items").add(object().put("taskId",source.toString()).put("marker",2).put("summary","Inconsistent").put("checked",false).put("depth",0));
+            var mappings=array().add(object().put("entityType","TASK").put("sourceId",source.toString()).put("id",task.id().value().toString()));
+            assertEquals(422,assertThrows(ApiFailure.class,()->NoteTaskArchive.restore(array().add(metadata),mappings,store)).status);assertTrue(store.list(NoteTasks.DOCUMENT).isEmpty());assertTrue(store.list(NoteTasks.LINK).isEmpty());return null;
+        });
+    }
     @Test void reviewedAccountRestoreRemapsTasksWithoutCreatingDuplicatesAndKeepsDeletedTaskDecisions()throws Exception{
         var principal=tokens.authenticate("Bearer test-a");tokens.authenticate("Bearer test-b");var sourceIds=new HashSet<TaskId>();UUID[] trash={null};
         store.transaction("a",()->{
