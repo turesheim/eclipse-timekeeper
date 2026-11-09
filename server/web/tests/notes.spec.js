@@ -24,6 +24,19 @@ async function setup(page,request){
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return api;
 }
 
+test('pasted URLs survive saving and reopening a private Notes document without escapes',async({page,request})=>{
+  const api=await setup(page,request),url='https://example.org/a_b/one_(two)?name[0]=value&next=a_b#part_one',path='Notes/Pasted URL.md';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('Before.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const open=async()=>{await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();};
+  await open();await appendEditorText(page.locator('#notes-formatted p'),' ');
+  await page.evaluate(text=>{const data=new DataTransfer();data.setData('text/plain',text);document.querySelector('#notes-formatted .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));},url);
+  await expect(page.locator('#notes-formatted a')).toHaveAttribute('href',url);await saveMarkdown(page.locator('#notes-panel'));
+  const stored=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(stored).toContain('<'+url+'>');expect(stored).not.toContain('\\_');
+  await notesSource(page);await expect(page.locator('#notes-body')).toHaveValue(stored);await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#notes-formatted a')).toHaveText(url);
+  await page.reload();await page.locator('[data-tab=notes]').click();await open();await expect(page.locator('#notes-formatted a')).toHaveAttribute('href',url);
+  await appendEditorText(page.locator('#notes-formatted p'),' Later.');await expect(page.locator('#notes-formatted a')).toHaveText(url);await saveMarkdown(page.locator('#notes-panel'));expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toContain('<'+url+'>');
+});
+
 test('saved private PlantUML notes retain frontmatter and untouched fence bytes after a rich prose edit',async({page,request})=>{
   const api=await setup(page,request),source='\uFEFF---\r\nprivate: retained\r\n---\r\n\r\n~~~puml\r\n@startuml\r\nAlice -> Bob: Private plan\r\n@enduml\r\n~~~\r\n\r\nAfter the diagram.\r\n',entry=await(await api('PUT','/notes/files?path=Notes%2FDiagram.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Diagram.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();

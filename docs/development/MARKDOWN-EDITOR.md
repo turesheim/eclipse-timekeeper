@@ -42,6 +42,11 @@ the separate About prototype and its scratchpad controls have been retired.
   authored alias through source switches, undo and serialization. The pinned
   local gemoji data is regenerated with `npm run vendor:emoji`; code, escapes
   and URL destinations remain literal.
+- Pasted HTTP(S) URLs become links with autolink source spelling. The link schema
+  retains this spelling through DOM edits and source replacement; explicitly
+  authored resource links keep their normal Markdown syntax. Plain paste and
+  code remain literal, and URL-over-selection retains the selected label.
+  Link marks end at their boundary, so following prose does not extend the label.
 - Mermaid fences use an atomic presentation node and lazy-load the local
   renderer. Formatted mode shows only an inert SVG image; Markdown source edits
   its complete fenced text. Script and external-resource requests are rejected.

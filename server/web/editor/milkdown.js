@@ -26,6 +26,7 @@ import {wikiReference,headingAnchor} from '../src/wiki-links.js';
 import {clipboardSlice,spreadsheetSlice} from './clipboard.js';
 import {vaultDialect} from './vault-dialect.js';
 import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
+import {remarkAutolinks,autolinkSchema} from './autolinks.js';
 import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import {t} from '../src/i18n.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
@@ -48,6 +49,7 @@ const vaultWikilinkInput=$inputRule(()=>new InputRule(/(!?)\[\[([^\[\]\n]{1,1024
   const node=wikiNode(state,match,start);return node?state.tr.replaceWith(start,end,node):null;
 }));
 const dailyWikilinkRemark=$remark('timekeeperDailyWikilinks',()=>remarkDailyWikilinks);
+const autolinkRemark=$remark('timekeeperAutolinks',()=>remarkAutolinks);
 const sourceNodes=new Set(['html','imageReference','linkReference','definition']);
 const safeAsset=url=>typeof url==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(url);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
@@ -148,7 +150,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
     ctx.update(paragraphSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toMarkdown:{...schema.toMarkdown,runner:(state,node)=>{if(node.content.size)schema.toMarkdown.runner(state,node);else state.openNode('paragraph').addNode('html',undefined,emptyMarker).closeNode();}}};});
-    ctx.update(linkSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toDOM:mark=>{const [tag,attributes,...content]=schema.toDOM(mark);return [tag,{...attributes,tabindex:'0'},...content];}};});
+    ctx.update(linkSchema.key,previous=>schemaContext=>autolinkSchema(previous(schemaContext)));
     ctx.update(codeBlockSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,parseMarkdown:{...schema.parseMarkdown,match:node=>node.type==='code'&&String(node.lang).toLowerCase()!=='mermaid'&&!isPlantUml(node.lang)}};});
     ctx.update(remarkStringifyOptionsCtx,options=>({...options,resourceLink:true,rule:'-',ruleRepetition:3,ruleSpaces:false}));
     ctx.set(editorViewOptionsCtx,{
@@ -206,9 +208,12 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const files=[...(event.clipboardData?.files||[])];
         if(files.length&&uploadFiles){event.preventDefault();uploadFiles(files,bookmark());return true;}
         const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();
-        const selection=view.state.selection,code=selection.$from.parent.type.spec.code||selection.$from.marks().some(mark=>mark.type.name==='inlineCode');
-        if(!forcePlain&&!code&&!selection.empty&&/^https?:\/\/[^\s]+$/i.test(text)&&linkAllowed(text)){
-          view.dispatch(view.state.tr.addMark(selection.from,selection.to,view.state.schema.marks.link.create({href:text})));return true;
+        const selection=view.state.selection,code=selection.$from.parent.type.spec.code||(view.state.storedMarks||selection.$from.marks()).some(mark=>mark.type.name==='inlineCode');
+        if(!forcePlain&&!code&&/^https?:\/\/[^\s<>\u0000-\u0020\u007f]+$/i.test(text)&&linkAllowed(text)){
+          const type=view.state.schema.marks.link,transaction=view.state.tr;
+          if(selection.empty)transaction.insertText(text).addMark(selection.from,selection.from+text.length,type.create({href:text,sourceAutolink:true})).removeStoredMark(type);
+          else transaction.addMark(selection.from,selection.to,type.create({href:text}));
+          view.dispatch(transaction.scrollIntoView());return true;
         }
         const html=event.clipboardData?.getData('text/html');
         if(!forcePlain&&!code){
@@ -231,7 +236,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput).use(hashtags.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
