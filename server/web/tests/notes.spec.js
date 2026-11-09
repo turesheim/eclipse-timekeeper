@@ -336,6 +336,7 @@ test('a conflicting or stale title rename retains the draft and never overwrites
   await title.press('Escape');await title.fill('My pending title');const current=await api('GET','/notes/entries/'+entry.id);await api('PUT','/notes/entries/'+entry.id+'/title',{title:'Peer title'},{'If-Match':current.headers().etag});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');await expect(title).toHaveValue('My pending title');
   await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('My pending title');expect((await(await api('GET','/notes/entries/'+entry.id)).json()).title).toBe('Peer title');
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('My pending title');
   page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');
 });
 
