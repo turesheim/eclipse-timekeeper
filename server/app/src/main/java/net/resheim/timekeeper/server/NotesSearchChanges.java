@@ -39,6 +39,7 @@ final class NotesSearchChanges {
         boolean wasActive=searchable(before)&&!before.path("deleted").asBoolean(),active=searchable(after)&&!after.path("deleted").asBoolean();
         if(!wasActive&&!active)return;
         if(before!=null&&after!=null&&IDENTITY.stream().allMatch(field->Objects.equals(before.get(field),after.get(field))))return;
+        if(before!=null&&before.path("kind").asText().equals("EVENT")||after!=null&&after.path("kind").asText().equals("EVENT"))new CalendarSearchState(store).changed();
         append(active?"UPSERT":"DELETE",uuid((after==null?before:after).path("id")));
     }
     void scopeChanged(){append("SCOPE",null);}
