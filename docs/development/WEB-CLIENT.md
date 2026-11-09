@@ -367,15 +367,21 @@ data license; loading failures and Retry remain available in the monthly view.
 
 ## Themes
 
-Choose **Theme** under **My Account → Profile** to switch between Timekeeper (the default),
-Timekeeper Dark, Solarized Light, Solarized Dark, Nord and Dracula. The selection
-is saved on this browser and shared with other open Timekeeper tabs, including
+Choose **Theme** under **My Account → Profile** to switch between Dagsverk (the default),
+Dagsverk Dark, Solarized Light, Solarized Dark, Nord, Dracula and Newspaper. The selection
+is saved on this browser and shared with other open Dagsverk tabs, including
 Administration. A saved theme also applies to sign-in and loads before the
 stylesheets to avoid flashing a light page. If browser storage is unavailable,
 theme selection still works for the current page.
 
 Theme tokens cover forms, tables, calendar surfaces, dialogs and account pages.
-Client colors remain the colors chosen for those clients. The palettes use
+Client colors remain the colors chosen for those clients, except in Newspaper.
+Newspaper uses black ink and almost-white paper, serif typography, square edges
+and double rules. Hard-edged pixel dithering replaces tinted surfaces, including
+weekends, holidays and selected table rows. Client/label swatches and calendar
+edges display in monochrome without changing saved colors. Code and Markdown
+source retain monospace fonts. The theme uses local assets and system fonts.
+The other palettes use
 [Solarized](https://ethanschoonover.com/solarized/),
 [Nord](https://www.nordtheme.com/docs/colors-and-palettes/) and
 [Dracula](https://draculatheme.com/spec), with text/accent contrast adjusted for
