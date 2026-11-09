@@ -27,7 +27,7 @@ export function remarkAutolinks(){
 }
 
 export function autolinkSchema(schema){
-  return {...schema,
+  return {...schema,inclusive:false,
     attrs:{...schema.attrs,sourceAutolink:{default:false,validate:'boolean'}},
     parseDOM:schema.parseDOM.map(rule=>({...rule,getAttrs:dom=>{
       const attrs=rule.getAttrs?.(dom);return attrs===false?false:{...attrs,sourceAutolink:dom.hasAttribute('data-source-autolink')};

@@ -34,7 +34,7 @@ test('pasted URLs survive saving and reopening a private Notes document without 
   const stored=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(stored).toContain('<'+url+'>');expect(stored).not.toContain('\\_');
   await notesSource(page);await expect(page.locator('#notes-body')).toHaveValue(stored);await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#notes-formatted a')).toHaveText(url);
   await page.reload();await page.locator('[data-tab=notes]').click();await open();await expect(page.locator('#notes-formatted a')).toHaveAttribute('href',url);
-  await appendEditorText(page.locator('#notes-formatted p'),' Later.');await saveMarkdown(page.locator('#notes-panel'));expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toContain('<'+url+'>');
+  await appendEditorText(page.locator('#notes-formatted p'),' Later.');await expect(page.locator('#notes-formatted a')).toHaveText(url);await saveMarkdown(page.locator('#notes-panel'));expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toContain('<'+url+'>');
 });
 
 test('saved private PlantUML notes retain frontmatter and untouched fence bytes after a rich prose edit',async({page,request})=>{
