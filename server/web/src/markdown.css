@@ -156,12 +156,19 @@
 @media(prefers-reduced-motion: reduce) { .markdown-caret { animation: none; } }
 
 .has-note-bookmark { position: relative; }
-.has-note-bookmark > .markdown-toolbar { padding-inline-end: calc(44px + .75rem); }
-.note-bookmark { position: absolute; inset-block-start: .2rem; inset-inline-end: .2rem; min-width: 44px; min-height: 44px; opacity: 0; z-index: 1; }
-.note-bookmark:is(:hover,:focus-visible,.is-bookmarked) { opacity: 1; }
-.note-bookmark.is-bookmarked > .bi-bookmark-x { display: none; }
-.note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark { display: none; }
-.note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark-x { display: inline-block; }
+.has-note-bookmark > .markdown-toolbar { padding-inline-end: calc(48px + .75rem); }
+.notes-editor,.journal-inline { position: relative; }
+.notes-editor > .has-note-bookmark,.journal-inline .has-note-bookmark { position: static; }
+.journal-inline .journal-note-label { max-width: min(36rem,calc(100% - 3.5rem)); }
+.note-bookmark { position:absolute; inset-block-start:0; inset-inline-end:1rem; width:48px; height:56px; min-width:44px; min-height:44px; padding:0; border:0; border-radius:0; background:transparent; color:var(--bs-danger); opacity:0; z-index:1; display:inline-flex; align-items:flex-start; justify-content:center; }
+.note-bookmark > .icon { width:1em; font-size:3rem; line-height:1; }
+.note-bookmark > .icon::before { vertical-align:top; }
+.note-bookmark:is(:hover,:focus-visible,.is-bookmarked) { opacity:1; }
+.note-bookmark:is(:hover,:active,:focus-visible) { background:transparent; color:var(--bs-danger); }
+.note-bookmark:focus-visible { outline:2px solid var(--bs-primary); outline-offset:2px; box-shadow:none; }
+.note-bookmark.is-bookmarked > .bi-bookmark-dash { display:none; }
+.note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark-fill { display:none; }
+.note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark-dash { display:inline-block; }
 @media (hover: none) { .note-bookmark { opacity: 1; } }
 
 .journal-document-dialog[open] { display: flex; flex-direction: column; gap: .5rem; height: min(54rem,94dvh); }
