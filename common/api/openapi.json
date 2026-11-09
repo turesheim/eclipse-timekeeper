@@ -18941,6 +18941,201 @@
         },
         "description": "Atomically retain the chosen display title and rename its file in the same folder, preserving the Markdown extension, canonical bytes and source dates. Requires the current metadata ETag. Existing files are never overwritten; journal/event/attachment titles cannot be renamed here."
       }
+    },
+    "/notes/client": {
+      "get": {
+        "operationId": "getNoteClient",
+        "summary": "Read private note client",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_NOTE",
+                "WEEK_NOTE",
+                "EVENT_NOTE",
+                "VAULT_CONTENT"
+              ]
+            }
+          },
+          {
+            "name": "sourceKey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteClientState"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "description": "The client must belong to the authenticated account. Daily and weekly keys may name an empty page. A null clientId removes the association. Writes require the current independent association ETag. Content bytes, dates, history and content validators remain unchanged. Responses are private, no-store."
+      },
+      "put": {
+        "operationId": "updateNoteClient",
+        "summary": "Set private note client without changing note content",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_NOTE",
+                "WEEK_NOTE",
+                "EVENT_NOTE",
+                "VAULT_CONTENT"
+              ]
+            }
+          },
+          {
+            "name": "sourceKey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteClientState"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteClientInput"
+              }
+            }
+          }
+        },
+        "description": "The client must belong to the authenticated account. Daily and weekly keys may name an empty page. A null clientId removes the association. Writes require the current independent association ETag. Content bytes, dates, history and content validators remain unchanged. Responses are private, no-store."
+      }
     }
   },
   "components": {
@@ -24108,6 +24303,10 @@
             "minimum": 0
           },
           "bookmarks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "noteClients": {
             "type": "integer",
             "minimum": 0
           }
@@ -31340,6 +31539,14 @@
             "items": {
               "$ref": "#/components/schemas/ArchivedNoteBookmark"
             }
+          },
+          "noteClients": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteClient"
+            },
+            "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
           }
         },
         "required": [
@@ -31403,6 +31610,14 @@
             "items": {
               "$ref": "#/components/schemas/ArchivedNoteBookmark"
             }
+          },
+          "noteClients": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteClient"
+            },
+            "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
           }
         },
         "required": [
@@ -31478,6 +31693,14 @@
             "items": {
               "$ref": "#/components/schemas/ArchivedNoteBookmark"
             }
+          },
+          "noteClients": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteClient"
+            },
+            "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
           }
         },
         "required": [
@@ -33555,6 +33778,14 @@
             "items": {
               "$ref": "#/components/schemas/ArchivedNoteBookmark"
             }
+          },
+          "noteClients": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteClient"
+            },
+            "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
           }
         },
         "required": [
@@ -34437,6 +34668,94 @@
             "minLength": 1,
             "maxLength": 252,
             "description": "Plain document title used as the Markdown filename stem; must form a valid portable collection filename."
+          }
+        }
+      },
+      "NoteClientState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey",
+          "clientId",
+          "version"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "clientId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "NoteClientInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clientId"
+        ],
+        "properties": {
+          "clientId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ArchivedNoteClient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey",
+          "clientId"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
           }
         }
       }

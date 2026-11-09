@@ -1155,6 +1155,21 @@ either document. Journal, event and attachment associations cannot be renamed
 through this operation. Explicit titles survive account archives and subsequent
 content edits; a later path rename updates the chosen title to its filename stem.
 
+`GET /notes/client?sourceType=...&sourceKey=...` reads an account-private
+note-to-client association with its own strong ETag. `PUT` accepts exactly
+`{clientId: <owned client UUID or null>}` and requires that association's current
+`If-Match` (428 when absent, 412 when stale). Clearing an unchanged association
+is a no-op. Valid sources are ordinary Markdown, saved event notes, and daily or
+weekly pages, including empty daily/weekly pages. Foreign notes/clients return
+404; read-only tokens cannot write. Responses are private, no-store.
+
+Association writes retain canonical note bytes, dates, content validators and
+edit history. A client relation protects the associated client from deletion
+until its notes are detached. Account archives include optional `noteClients`
+metadata and remap client IDs with the imported work graph. Review rolls back
+these associations; an existing different association is an import conflict.
+Note-only ZIPs do not contain business-client records or these associations.
+
 `GET /notes/recent` includes ordinary, event and daily/weekly journal note metadata
 within the configured account-local recent-edit window. It excludes today's
 daily journal note, identified by its canonical date in the account time zone,

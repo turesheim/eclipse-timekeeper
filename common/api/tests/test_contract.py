@@ -46,6 +46,18 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(validator('ArchivedNoteBookmark').is_valid({'sourceType':'VAULT_CONTENT','sourceKey':ID}))
         self.assertFalse(validator('ArchivedNoteBookmark').is_valid({'sourceType':'VAULT_CONTENT','sourceKey':ID,'ownerId':'foreign'}))
 
+    def test_note_client_choices_cannot_write_content_or_choose_another_owner(self):
+        operation = CONTRACT['paths']['/notes/client']['put']
+        self.assertEqual('write', operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'}, operation['parameters'])
+        for status in ('403', '404', '412', '428'):
+            self.assertIn(status, operation['responses'])
+        for value in ({'clientId': ID}, {'clientId': None}):
+            self.assertTrue(validator('NoteClientInput').is_valid(value))
+        for value in ({}, {'clientId': True}, {'clientId': 'invalid'},
+                      {'clientId': ID, 'body': 'changed'}, {'clientId': ID, 'ownerId': 'foreign'}):
+            self.assertFalse(validator('NoteClientInput').is_valid(value))
+
     def test_calendar_task_catalog_is_read_only_paged_and_includes_real_optional_deadlines(self):
         operation=CONTRACT['paths']['/calendar-tasks']
         self.assertEqual({'get'},set(operation));self.assertEqual('read',operation['get']['x-required-permission'])
@@ -727,7 +739,7 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
-            'getNoteBookmark', 'updateNoteBookmark', 'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
+            'getNoteClient', 'updateNoteClient', 'getNoteBookmark', 'updateNoteBookmark', 'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
             'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'importNoteBytes', 'moveNoteEntry', 'renameNoteTitle', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',

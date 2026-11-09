@@ -733,6 +733,15 @@ journal/event associations. Encrypted instance backups retain raw records and
 history across accounts. See [Notes design](NOTES-VAULT.md) and the
 [manual synchronization guide](../operations/NOTES-WEBDAV.md).
 
+`DAY_CLIENT`, `WEEK_CLIENT`, `EVENT_CLIENT` and `VAULT_CLIENT` store optional
+owned business-client associations by stable canonical note source ID. Their
+versions and ETags are independent of content and bookmark metadata. An assigned
+record has an owner-scoped `client` relation to `CLIENT`; clearing removes that
+relation. These records survive note moves, title edits and recoverable deletion,
+and empty day/week associations do not create Markdown files. Logical account
+archives remap their client IDs with imported work records. Encrypted instance
+backups retain the raw records and relations.
+
 ### Prospective note revisions
 
 `NOTE_REVISION` owner-scoped `tk_resource` records retain prior canonical UTF-8

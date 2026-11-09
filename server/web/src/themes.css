@@ -217,6 +217,7 @@
   & :is(button.calendar-summary-card,.calendar-session,.calendar-planned,.calendar-all-day-event):hover { border-inline-start-color: #000; }
   & .work-session { border-block-start-color: #000; }
   & .client-color::before { border-radius: 0; background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px; }
+  & .note-client-swatch { border-radius: 0; background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px !important; }
   & .calendar-task { border-color: #000; }
   & .calendar-slot { border-color: #000; border-block-start-style: dotted; }
   & .calendar-slot.hour { border-block-start-style: solid; }
