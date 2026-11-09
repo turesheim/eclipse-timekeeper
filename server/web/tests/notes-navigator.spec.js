@@ -58,10 +58,14 @@ test('a folder remains clickable when a catalog reply arrives between pointer up
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');await put(api,'Notes/Pointer.md','Pointer gap body.');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
   let held=false,release;const pending=new Promise(resolve=>{release=resolve;});await page.route('**/api/v1/notes/entries?*',async route=>{if(held)return route.continue();const reply=await route.fetch();held=true;await pending;await route.fulfill({response:reply});});
   try{
-    await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>held).toBe(true);const folder=noteEntry(navigation,'Notes');
-    // Capture the pressed target atomically; a preceding catalog paint may replace it.
-    const original=await folder.evaluateHandle(node=>{node.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:1,bubbles:true}));return node;});
-    await original.evaluate(node=>node.dispatchEvent(new PointerEvent('pointerup',{button:0,pointerId:1,bubbles:true})));release();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');expect(await original.evaluate(node=>node.isConnected)).toBe(true);
+    await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>held).toBe(true);
+    // The navigation host stays attached. Resolve its current button and begin
+    // the gesture in one browser task, without a locator/handle round trip.
+    const original=await navigation.evaluateHandle(host=>{
+      const target=host.querySelector('.notes-tree-pick[aria-label="Notes"]');if(!target?.isConnected)throw new Error('The folder must be attached before pointer down');
+      for(const type of ['pointerdown','pointerup'])target.dispatchEvent(new PointerEvent(type,{button:0,pointerId:1,bubbles:true,pointerType:'mouse',isPrimary:true}));return target;
+    });
+    release();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');expect(await original.evaluate(node=>node.isConnected)).toBe(true);
     await original.evaluate(node=>node.click());await expect(noteEntry(navigation,'Notes/Pointer.md')).toBeVisible();
   }finally{release();await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel')));await page.unrouteAll({behavior:'wait'});}
 });
