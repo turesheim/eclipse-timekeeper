@@ -84,9 +84,9 @@ test('Newspaper prints records, journals and controls in two inks with serif typ
     await setTheme(page,'newspaper');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);
     await page.setViewportSize({width:390,height:844});await review(page,'today-mobile');
     await page.setViewportSize({width:320,height:844});await review(page,'today-320');
-    const other=await context.newPage();await other.setViewportSize({width:1440,height:1000});await other.goto('/admin/');await review(other,'administration');await other.close();
+    const other=await context.newPage();await other.setViewportSize({width:1440,height:1000});await other.goto('/admin/');await expect(other.locator('#status')).not.toContainText('Loading');await expect(other.locator('#account-content')).not.toBeEmpty();await review(other,'administration');await other.close();
     const signedOut=await context.browser().newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
-    const login=await signedOut.newPage();await login.addInitScript(()=>localStorage.setItem('timekeeper.theme','newspaper'));await login.goto('/web/');await review(login,'sign-in');await signedOut.close();
+    const login=await signedOut.newPage();await login.addInitScript(()=>localStorage.setItem('timekeeper.theme','newspaper'));await login.goto('/web/');await expect(login.locator('#login-form')).toBeVisible();await review(login,'sign-in');await signedOut.close();
   } finally {
     const current=await api('GET',`/day-notes/${date}/content`);await api('PUT',`/day-notes/${date}/content`,{body:original},{'If-Match':current.headers().etag});
     for(const [collection,id] of records) {const current=await api('GET','/'+collection+'/'+id);await api('DELETE','/'+collection+'/'+id,undefined,{'If-Match':current.headers().etag});}

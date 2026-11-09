@@ -155,6 +155,7 @@
   & .workspace-nav { border-block-start: 4px double #000 !important; box-shadow: none; }
   & :is(.workspace-nav .nav-link,#account-navigation .nav-link) { border-radius: 0; }
   & a { text-underline-offset: .15em; }
+  & hr { opacity: 1; }
   & ::selection { color: var(--newspaper-paper); background: #000; }
 
   /* A solid outline stays distinct without translucent focus rings. */
@@ -168,9 +169,12 @@
   & .form-select { --bs-form-select-bg-img: url('./assets/newspaper-select.svg'); }
   & .form-check-input { border-color: #000; background-color: var(--newspaper-paper); box-shadow: none; }
   & .form-check-input:checked { background-color: #000; }
-  & input[type=color] { filter: grayscale(1) contrast(1000); }
+  & input[type=color]::-webkit-color-swatch { background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px !important; }
+  & input[type=color]::-moz-color-swatch { background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px !important; }
   & :is(.btn,.form-check-input):disabled { opacity: 1; border-style: dotted; }
   & .btn:disabled { text-decoration: line-through; }
+  & .form-check-input:disabled ~ .form-check-label { opacity: 1; }
+  & button.calendar-summary-card:disabled { opacity: 1; border-style: dotted; }
   & .btn-light {
     --bs-btn-color: #000; --bs-btn-bg: var(--newspaper-paper); --bs-btn-border-color: #000;
     --bs-btn-hover-color: var(--newspaper-paper); --bs-btn-hover-bg: #000; --bs-btn-hover-border-color: #000;
@@ -211,6 +215,7 @@
   & .calendar-slot.hour { border-block-start-style: solid; }
   & .calendar-slot.unavailable { background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px; }
   & .calendar-session.preview { box-shadow: none; opacity: 1; border-style: dashed; }
+  & .calendar-session.drag-source { opacity: 1; border-style: dashed; }
   & :is(.track-today,.track-public-holiday .track-today,.today-month-day.selected) { color: var(--newspaper-paper); background: #000; }
   & .track-public-holiday { --track-holiday-color: #000; }
   & .table { --bs-table-bg: var(--newspaper-paper); --bs-table-hover-bg: transparent; --bs-table-striped-bg: transparent; --bs-table-active-bg: transparent; }
