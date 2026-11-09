@@ -1,3 +1,4 @@
+import {updateNoteClientDirectory} from './note-client.js';
 import {editorPreferences} from './editor-preferences.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {hashtagKey,tagNavigation} from './hashtags.js';
@@ -231,7 +232,7 @@ const auth = authentication({
     editorPreferences.reset();
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshing = null;reloadAgain = false;
-    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
+    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
     calendar.reset();track.reset();today.reset();notes.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
@@ -395,6 +396,7 @@ $('focus-select').addEventListener('change',()=>{
   focusId=$('focus-select').value;selectedDay=null;render();
 });
 function render() {
+  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision);
   paintFocus();
   const s = focusedSnapshot(snapshot,currentFocus()),zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;

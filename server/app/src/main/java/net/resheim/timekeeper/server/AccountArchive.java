@@ -110,6 +110,7 @@ class AccountArchive {
         final long[] vaultCounts={0,0};records(c,owner,VaultIndex.ENTRY,value->vaultCounts[0]++);VaultArchive.files(c,owner,(path,bytes)->vaultCounts[1]++);
         counts.put("notesEntries",vaultCounts[0]);counts.put("notesFiles",vaultCounts[1]);
         counts.put("bookmarks",NoteBookmarks.archive(c,owner,value->{}));
+        counts.put("noteClients",NoteClients.archive(c,owner,value->{}));
         var profile=profile(c,owner);var metadata=metadata(c,owner);
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
@@ -130,6 +131,7 @@ class AccountArchive {
             json.writeEndArray();
             VaultArchive.metadata(c,owner,json);
             NoteBookmarks.archive(c,owner,json);
+            NoteClients.archive(c,owner,json);
             json.writeArrayFieldStart("dayLabels");
             records(c,owner,DayLabels.TYPE,value->json.writeTree(object().put("date",value.path("date").asText()).put("text",value.path("text").asText())));
             json.writeEndArray();
