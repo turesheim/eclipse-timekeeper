@@ -516,9 +516,10 @@ test('Notes content search finds body text, keeps relevance order and pages on d
   await expect(page.locator('#notes-navigation').getByRole('button',{name:'Sort notes',exact:true})).toBeEnabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
   await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
   await page.locator('#refresh').evaluate(button=>button.click());await expect(page.locator('#status')).toHaveText('Up to date');await expect(navigation.locator('#notes-search-results')).toHaveAttribute('aria-busy','false');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
     await navigation.getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await searchNotes(page,word);await expect(rows).toHaveCount(50);
-    for(const width of [1440,390]){
+    if(theme==='newspaper'){await expect(navigation).toHaveCSS('box-shadow','none');await expect(rows.first().locator('mark').first()).toHaveCSS('background-image',/conic-gradient/);}
+    for(const width of [1440,390,320]){
       await page.setViewportSize({width,height:900});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-search-panel').analyze()).violations).toEqual([]);
       await captureScreenshot(page,{path:`test-results/notes-content-search-${theme}-${width}.png`});
