@@ -212,3 +212,12 @@ in Markdown source and downloads. Escaped colons, code, unknown names and link
 destinations remain literal. Emoji also appear in note headings and navigation.
 The bundled gemoji catalog works without an external emoji service; custom Slack
 workspace emoji are not available.
+
+In Formatted mode, typing or native text input preserves active `[[wikilinks]]`.
+If a linked note is missing, an editable note offers to create it and open a
+popup editor. Canceling leaves the collection unchanged. A bare name creates a
+Markdown note beside the current document; a path containing `/` is relative to
+the Notes collection root; required parent folders are created after confirmation.
+Aliases and heading targets do not become part of the
+filename. Ambiguous links require resolution, and read-only sessions cannot
+create notes. Existing files are never overwritten by this action.

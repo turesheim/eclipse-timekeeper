@@ -531,4 +531,4 @@ code, pre { font-size: var(--font-code); }
 .today-recent-note > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-recent-note-title { display: flex; align-items: center; gap: .4rem; min-width: 0; }
 .today-recent-note-title > .icon { flex: none; }
-.today-recent-note-title > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.today-recent-note-label { font-weight: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

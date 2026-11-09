@@ -99,6 +99,7 @@ export class MarkdownField {
     buildExperience(this);this.caret=new MarkdownCaret(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
+  focus(){if(this.rich.hidden)this.text.focus({preventScroll:true});else this.editor?.focus();}
   historyShortcut(event){
     if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||!this.editor||this.readOnly||this.loading||!event.target.closest?.('button,[role=menuitem]'))return false;
     const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return false;

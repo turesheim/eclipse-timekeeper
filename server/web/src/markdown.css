@@ -163,3 +163,10 @@
 .note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark { display: none; }
 .note-bookmark.is-bookmarked:enabled:is(:hover,:focus-visible) > .bi-bookmark-x { display: inline-block; }
 @media (hover: none) { .note-bookmark { opacity: 1; } }
+
+.journal-document-dialog[open] { display: flex; flex-direction: column; gap: .5rem; height: min(54rem,94dvh); }
+.journal-document-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.journal-document-dialog > .dialog-actions { flex: none; margin: 0; padding-top: .5rem; border-top: 1px solid var(--bs-border-color); }
+.journal-document-dialog > .dialog-actions [role="status"] { margin-inline-end: auto; }
+.week-note-heading > .btn-group { flex: none; }
+.week-note-heading h2 { min-width: 0; overflow-wrap: anywhere; }

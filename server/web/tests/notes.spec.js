@@ -519,3 +519,35 @@ test('refresh updates a bookmark changed in another client while preserving an u
   const source=await notesSource(page);await source.fill('Keep my unsaved draft');const markPath='/notes/bookmark?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey}),before=await api('GET',markPath);await api('PUT',markPath,{bookmarked:true},{'If-Match':before.headers().etag});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-bookmark')).toBeVisible();await expect(source).toHaveValue('Keep my unsaved draft');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Saved body');
 });
+
+test('missing wikilinks confirm creation and open a popup without overwriting existing notes',async({page,request})=>{
+  const api=await setup(page,request),body='# Source\n\n[[A new note|New document]] and [[Other/New note#Heading|Nested]] and [[New folder/Sub/New page]].\n';
+  await api('PUT','/notes/files?path=Notes%2FSource.md',Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Source.md').click();
+  const link=page.locator('#notes-formatted [data-wiki-reference="A new note|New document"]');await expect(link).toHaveAttribute('data-resolved','false');
+  const declined=page.waitForEvent('dialog').then(async dialog=>{expect(dialog.message()).toContain('Notes/A new note.md');await dialog.dismiss();});await link.click();await declined;await expect(page.locator('#note-popup-editor')).not.toBeVisible();
+  expect((await api('GET','/notes/entries?query=A+new+note')).ok()).toBe(true);expect((await(await api('GET','/notes/entries?query=A+new+note')).json()).items).toEqual([]);
+  const accepted=page.waitForEvent('dialog').then(dialog=>dialog.accept());await link.click();await accepted;const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('A new note');await expect(page.locator('#notes-document-title')).toHaveText('Source');
+  await popup.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#note-popup-body').fill('# New document\n\nCreated through the wikilink.\n');await saveMarkdown(popup,{close:true});
+  const created=await(await api('GET','/notes/resolve?path=Notes%2FA%20new%20note.md')).json();expect(await(await api('GET','/notes/entries/'+created.id+'/content')).text()).toBe('# New document\n\nCreated through the wikilink.\n');
+  const source=await(await api('GET','/notes/resolve?path=Notes%2FSource.md')).json();expect(await(await api('GET','/notes/entries/'+source.id+'/content')).text()).toBe(body);
+  // Another client can create a target after the unresolved link was displayed.
+  await api('POST','/notes/folders',{path:'Other'});await api('PUT','/notes/files?path=Other%2FNew%20note.md',Buffer.from('# Heading\n\nConcurrent content.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.locator('#notes-formatted [data-wiki-reference="Other/New note#Heading|Nested"]').click();await expect(page.locator('#notes-document-title')).toHaveText('Heading');
+  await noteEntry(page.locator('#notes-navigation'),'Notes/Source.md').click();const nested=page.locator('#notes-formatted [data-wiki-reference="New folder/Sub/New page"]');
+  const creation=page.waitForEvent('dialog').then(async dialog=>{expect(dialog.message()).toContain('New folder/Sub/New page.md');await dialog.accept();});await nested.click();await creation;await expect(popup).toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('New page');
+  expect((await(await api('GET','/notes/resolve?path=New%20folder%2FSub%2FNew%20page.md')).json()).kind).toBe('MARKDOWN');
+});
+
+test('read-only clients can open and maximize note popups without creating missing links',async({page,request,browser})=>{
+  const api=await setup(page,request),entry=await(await api('PUT','/notes/files?path=Notes%2FReadonly.md',Buffer.from('# Read only\n\n[[Never create this]].\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const token=await(await api('POST','/auth/tokens',{name:'Read-only popup','permissions':['read'],'expiresAt':null})).json();
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
+  try{
+    const reader=await context.newPage(),dialogs=[],writes=[];reader.on('dialog',dialog=>{dialogs.push(dialog.message());void dialog.dismiss();});reader.on('request',request=>{if(request.method()!=='GET'&&new URL(request.url()).pathname.startsWith('/api/v1/notes/'))writes.push(request.method());});
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();
+    await reader.locator(`[data-recent-note="${entry.id}"]`).click();const popup=reader.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(reader.locator('#note-popup-formatted .ProseMirror')).toHaveAttribute('aria-readonly','true');
+    await reader.locator('#note-popup-formatted [data-wiki-reference="Never create this"]').click();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#notes-document-title')).toHaveText('Read only');
+    expect(dialogs).toEqual([]);expect(writes).toEqual([]);expect((await(await api('GET','/notes/entries?query=Never+create+this')).json()).items).toEqual([]);
+  }finally{await context.close();}
+});

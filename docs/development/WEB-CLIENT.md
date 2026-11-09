@@ -1135,6 +1135,14 @@ other file extensions retain their literal names. Name sorting follows the displ
 Collection paths remain available for identification and keep their existing
 synchronization and link semantics.
 
+Recent-note titles use regular font weight. Selecting one opens the shared
+Markdown editor in a dialog while retaining the current workspace. **Open in
+workspace**, beside Close, flushes pending edits before opening a daily journal
+in Today or another document in Notes, with keyboard focus in the destination.
+Failed or conflicting saves retain the
+dialog and draft. Daily, weekly and event-note dialogs expose the same window
+action for saved notes.
+
 Today’s Recent notes includes ordinary, event and daily/weekly journal notes,
 excluding today's daily journal note in the account time zone. Entries use a
 single borderless title row without a path below it. The editable typography

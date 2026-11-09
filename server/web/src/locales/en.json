@@ -1470,5 +1470,7 @@
   "notes.search_tag": "Search notes for {{tag}}",
   "notes.bookmark_add": "Add bookmark",
   "notes.bookmark_remove": "Remove bookmark",
-  "notes.bookmarks": "Bookmarks"
+  "notes.bookmarks": "Bookmarks",
+  "notes.maximize": "Open in workspace",
+  "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?"
 }

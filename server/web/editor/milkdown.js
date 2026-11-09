@@ -7,6 +7,7 @@ import {codeTools} from './code-tools.js';
 import {plantumlDiagram,plantumlPresentation,plantumlBlock,isPlantUml} from './plantuml.js';
 import {hashtagPresentation} from './hashtags.js';
 import {bracketPairs} from './bracket-pairs.js';
+import {nativeWikiInput,wikiLiteralInput,wikiCompositionEnd} from './wiki-input.js';
 import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
@@ -135,6 +136,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     const position=transaction.doc.resolve(at),before=position.parent.textBetween(0,position.parentOffset,'','\ufffc'),match=/(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(before);if(!match)return;
     const from=at-match[0].length,node=wikiNode(view.state,match,from);if(!node)return;transaction.replaceWith(from,at,node).setSelection(TextSelection.near(transaction.doc.resolve(from+node.nodeSize)));
   });
+  let composing=false;
+  const wikiInput=nativeWikiInput(()=>readOnly,brackets.pending,()=>composing);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
   const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
@@ -175,7 +178,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       }},
       // Following a link leaves the document unchanged. Local note navigation
       // still delegates to the owner-aware resource adapter and its draft guard.
-      handleDOMEvents:{click:(_view,event)=>{
+      handleDOMEvents:{compositionstart:()=>{composing=true;return false;},compositionend:view=>{composing=false;setTimeout(()=>{if(!view.isDestroyed)view.dispatch(view.state.tr.setMeta(wikiCompositionEnd,true));},0);return false;},click:(_view,event)=>{
         if(hashtags.click(event))return true;
         const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
@@ -210,11 +213,11 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const html=event.clipboardData?.getData('text/html');
         if(!forcePlain&&!code){
           const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text,{insideTable:isInTable(view.state)});
-          if(slice){if(!pasteTable(view,slice))view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
+          if(slice){if(!pasteTable(view,slice))view.dispatch(view.state.tr.replaceSelection(slice).setMeta(wikiLiteralInput,!!html).scrollIntoView());return true;}
         }
         const match=/^(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(text);
         if(match&&wikiReference(match[2],!!match[1])&&!code&&!forcePlain){const date=!match[1]&&dailyNoteDate(match[2]);view.dispatch(view.state.tr.replaceSelectionWith(date?view.state.schema.nodes.daily_wikilink.create({date}):view.state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]}),true));}
-        else view.dispatch(view.state.tr.insertText(text));plainPaste=false;return true;
+        else view.dispatch(view.state.tr.insertText(text).setMeta(wikiLiteralInput,forcePlain));plainPaste=false;return true;
       },
       handleDrop:(view,event,slice,moved)=>{
         const files=[...(event.dataTransfer?.files||[])];if(readOnly)return true;
@@ -228,7 +231,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(hashtags.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
