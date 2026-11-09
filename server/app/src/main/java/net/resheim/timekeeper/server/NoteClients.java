@@ -55,7 +55,7 @@ final class NoteClients {
     static void validate(JsonNode archive){
         var choices=archive.path("noteClients");if(choices.isMissingNode())return;
         if(!choices.isArray()||choices.size()>250000)throw ApiFailure.validation();
-        var clients=new HashSet<String>();for(var value:archive.path("work").path("clients"))clients.add(value.path("id").asText());
+        var clients=new HashSet<UUID>();for(var value:archive.path("work").path("clients"))clients.add(archiveId(value.path("id").asText()));
         var files=new HashSet<String>();var events=new HashSet<String>();
         for(var entry:archive.path("vault").path("entries")){
             if(entry.path("kind").asText().equals("MARKDOWN")&&entry.path("sourceType").asText().equals(VaultContent.TYPE))files.add(entry.path("sourceId").asText());
@@ -66,11 +66,12 @@ final class NoteClients {
             var fields=new HashSet<String>();value.fieldNames().forEachRemaining(fields::add);
             if(!value.isObject()||!fields.equals(Set.of("sourceType","sourceKey","clientId"))||!value.path("sourceType").isTextual()||!value.path("sourceKey").isTextual()||!value.path("clientId").isTextual())throw ApiFailure.validation();
             var ref=NoteReferences.key(value.path("sourceType").asText(),value.path("sourceKey").asText());
-            String id=ContractInputs.pathId(value.path("clientId").asText()).toString();
+            UUID id=archiveId(value.path("clientId").asText());
             if(!clients.contains(id)||!seen.add(ref.type()+":"+ref.key()))throw ApiFailure.validation();
             if(ref.type().equals(VaultContent.TYPE)&&!files.contains(ref.key())||ref.type().equals(EventNotes.TYPE)&&!events.contains(ref.key()))throw ApiFailure.validation();
         }
     }
+    private static UUID archiveId(String value){try{return ContractInputs.pathId(value);}catch(ApiFailure invalid){throw ApiFailure.validation();}}
     void restore(JsonNode choices,JsonNode mappings){
         if(choices.isMissingNode())return;var clients=new HashMap<UUID,UUID>();
         for(var value:mappings)if(value.path("entityType").asText().equals("CLIENT"))clients.put(uuid(value.path("sourceId")),uuid(value.path("id")));

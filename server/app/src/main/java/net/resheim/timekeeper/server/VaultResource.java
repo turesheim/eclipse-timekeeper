@@ -61,7 +61,7 @@ public class VaultResource {
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return tx(false,()->{var clients=new NoteClients(store);var ref=clients.reference(type,key);return Response.ok(clients.get(ref)).header("ETag",clients.tag(ref)).build();});
     }
     @PUT @Path("/client") @Consumes("application/json") public Response client(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key,@HeaderParam("If-Match")String match,JsonNode input){
-        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");var value=inputs.validate("NoteClientInput",input);UUID client=value.path("clientId").isNull()?null:uuid(value.path("clientId").asText());
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");var value=inputs.validate("NoteClientInput",input);UUID client=value.path("clientId").isNull()?null:ContractInputs.pathId(value.path("clientId").asText());
         return tx(false,()->{var clients=new NoteClients(store);var ref=clients.reference(type,key);return Response.ok(clients.save(ref,match,client)).header("ETag",clients.tag(ref)).build();});
     }
     @DELETE @Path("/revisions/{revisionId}") public Response deleteRevision(@PathParam("revisionId")String revision,@QueryParam("sourceType")String type,@QueryParam("sourceId")String source,@HeaderParam("If-Match")String match){

@@ -64,7 +64,7 @@ class NoteClientsTest {
     @Test void httpAssociationRequiresOwnedReferencesWriteAuthorityAndItsOwnValidator(){
         UUID own=store.transaction("a",()->client("HTTP own")),foreign=store.transaction("b",()->client("HTTP foreign"));String day="2026-11-17",type=DayNotes.TYPE;
         var first=read("test-a",type,day);assertEquals(200,first.statusCode());inputs.validate("NoteClientState",parse(first.asString()));assertTrue(parse(first.asString()).path("clientId").isNull());String tag=first.header("ETag");
-        var body=object().put("clientId",own.toString());
+        var body=object().put("clientId",own.toString().toUpperCase(Locale.ROOT));
         assertEquals(428,save("test-a",type,day,null,body.toString()).statusCode());
         assertEquals(422,save("test-a",type,day,tag,"{\"clientId\":true}").statusCode());
         assertEquals(400,save("test-a",type,day,tag,"{}").statusCode());

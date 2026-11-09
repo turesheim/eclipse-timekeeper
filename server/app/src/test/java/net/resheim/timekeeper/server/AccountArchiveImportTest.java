@@ -175,6 +175,7 @@ class AccountArchiveImportTest {
             assertEquals(mapped,clients.get(clients.reference(DayNotes.TYPE,"2026-11-19")).path("clientId").asText());assertTrue(store.find(DayNotes.TYPE,DayNotes.id(DayNotes.date("2026-11-19"))).isEmpty());
             assertArrayEquals("Exact client note\r\n".getBytes(StandardCharsets.UTF_8),new VaultSources(store,store.vaultLimits(),source).read());return null;
         });
+        var equivalent=archive.deepCopy();((ObjectNode)equivalent.path("noteClients").get(0)).put("clientId",originalClient.toUpperCase(Locale.ROOT));assertDoesNotThrow(()->NoteClients.validate(equivalent));
         var duplicate=archive.deepCopy();duplicate.withArray("noteClients").add(duplicate.path("noteClients").get(0).deepCopy());assertEquals(422,assertThrows(ApiFailure.class,()->NoteClients.validate(duplicate)).status);
         var foreign=archive.deepCopy();((ObjectNode)foreign.path("noteClients").get(0)).put("clientId",UUID.randomUUID().toString());assertEquals(422,assertThrows(ApiFailure.class,()->NoteClients.validate(foreign)).status);
     }
