@@ -166,7 +166,7 @@
   & :is(.calendar-session-select,.calendar-resize):focus-visible { outline-color: #000; outline-offset: -3px; }
   & :is(.form-control,.form-select) { color: #000; background-color: var(--newspaper-paper); border-color: #000; }
   & :is(.form-control::placeholder,.form-control:disabled) { color: #000; opacity: 1; }
-  & .form-select { --bs-form-select-bg-img: url('./assets/newspaper-select.svg'); }
+  & .form-select { --bs-form-select-bg-img: url('/web/assets/newspaper-select.svg'); }
   & input::-webkit-datetime-edit-day-field:focus { color: var(--newspaper-paper); background: #000; }
   & input::-webkit-datetime-edit-month-field:focus { color: var(--newspaper-paper); background: #000; }
   & input::-webkit-datetime-edit-year-field:focus { color: var(--newspaper-paper); background: #000; }

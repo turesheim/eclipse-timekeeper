@@ -80,7 +80,12 @@ test('Newspaper prints records, journals and controls in two inks with serif typ
     const name=page.getByLabel('Name',{exact:true});await name.focus();await page.keyboard.press(browserName==='webkit' && process.platform==='darwin'?'Alt+Tab':'Tab');
     await expect(page.getByLabel('Color',{exact:true})).toBeFocused();
     await page.locator('#cancel').click();
-    await openThemeSettings(page);await review(page,'account');
+    await openThemeSettings(page);
+    expect(await page.locator('#theme').evaluate(async select=>{
+      const source=/url\("([^"]+)"\)/.exec(getComputedStyle(select).backgroundImage)?.[1];
+      const image=new Image();image.src=source;await image.decode();return image.naturalWidth>0;
+    })).toBe(true);
+    await review(page,'account');
     await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
     for(const view of ['tasks','notes']) {await page.locator(`[data-tab=${view}]`).click();await expect(page.locator(`[data-tab=${view}]`)).toHaveAttribute('aria-current','page');await review(page,view);}
     // Switching back restores the real client color; the theme never rewrites it.
