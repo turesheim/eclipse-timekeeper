@@ -57,3 +57,14 @@ test('a local note save and its change notification share one consistent account
     await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');expect(profileReads).toBe(2);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('# Draft\n\nOne saved edit.\n');
   }finally{releaseChanges();releaseProfile();await page.unrouteAll({behavior:'wait'});}
 });
+
+test('a change newer than an in-flight snapshot still triggers the required second refresh',async({page,request})=>{
+  const api=await setup(page,request);await page.locator('[data-tab=clients]').click();await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+  let reads=0,held=false,revision,release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/projects?*',async route=>{const number=++reads,reply=await route.fetch();if(number===2){revision=(await reply.json()).revision;held=true;await pending;}await route.fulfill({response:reply});});
+  try{
+    await page.locator('#refresh').click();await expect.poll(()=>held).toBe(true);const delivered=page.waitForResponse(async reply=>new URL(reply.url()).pathname==='/api/v1/changes'&&(await reply.json()).nextSequence>revision);
+    await api('POST','/clients',{name:'Arrived after the captured snapshot',color:'#305070'});await delivered;release();
+    await expect(page.locator('#clients')).toContainText('Arrived after the captured snapshot');await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');expect(reads).toBe(4);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
