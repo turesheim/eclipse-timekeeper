@@ -21,7 +21,7 @@ export class NoteClient {
     const label=node('label',t('notes.client'),'form-label');this.select=node('select',undefined,'form-select');this.select.id=id;label.htmlFor=id;
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.save=button(t('ui.save'),()=>void this.commit());this.save.className='btn btn-primary';this.cancel=button(t('ui.cancel'),()=>this.dialog.close());const actions=node('div',undefined,'dialog-actions');actions.append(this.cancel,this.save);this.dialog.append(heading,label,this.select,this.error,actions);field.root.append(this.dialog);
-    this.dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});
+    this.dialog.addEventListener('cancel',event=>{if(this.saving)event.preventDefault();});
     this.dialog.addEventListener('close',()=>{if(same(this.openContext,this.current())&&this.field.root.getClientRects().length)this.field.actionsTrigger.focus({preventScroll:true});if(this.refreshPending){this.refreshPending=false;this.revision=null;this.sync();}});
   }
   current(){const value=this.options.current?.();return value?.session===directory.session&&value?.sourceType&&value?.sourceKey?value:null;}
@@ -31,7 +31,7 @@ export class NoteClient {
   sync(){
     const context=this.current();
     if(!same(context,this.context)){
-      this.abort?.abort();++this.generation;this.context=context;this.data=this.etag=null;this.busy=false;this.revision=null;this.refreshPending=false;this.dialog.close();
+      this.abort?.abort();++this.generation;this.context=context;this.data=this.etag=null;this.busy=false;this.saving=false;this.revision=null;this.refreshPending=false;this.dialog.close();
     }
     if(context&&this.visible()&&this.revision!==directory.revision){
       if(this.dialog.open||this.busy)this.refreshPending=true;else{this.revision=directory.revision;void this.load();}
@@ -44,7 +44,7 @@ export class NoteClient {
     if(client){if(this.name.textContent!==client.name)this.name.textContent=client.name;if(this.label.title!==client.name)this.label.title=client.name;const color=/^#[a-f0-9]{6}$/i.test(client.color||'')?client.color:'';if(this.color!==color){this.color=color;this.swatch.style.backgroundColor=color||'var(--bs-secondary)';}}
     if(this.group.hidden!==!context)this.group.hidden=!context;
     const disabled=!context?.writable||this.busy;if(this.action.disabled!==disabled)this.action.disabled=disabled;
-    this.select.disabled=this.busy||!context?.writable;this.save.disabled=this.busy||!context?.writable;this.cancel.disabled=!!this.busy;this.field.syncActions();
+    this.select.disabled=this.busy||!context?.writable;this.save.disabled=this.busy||!context?.writable;this.cancel.disabled=!!this.saving;this.field.syncActions();
   }
   choices(){
     this.select.replaceChildren(new Option(t('notes.no_client'),''));
@@ -65,12 +65,12 @@ export class NoteClient {
   async commit(){
     const context=this.current(),generation=this.generation;if(!same(context,this.openContext)||!context.writable||this.busy)return;
     if(!this.etag){await this.load();return;}const clientId=this.select.value||null;if(clientId&&!directory.clients.some(value=>value.id===clientId))return;
-    if(clientId===this.data.clientId){this.dialog.close();return;}this.abort=new AbortController();this.busy=true;this.error.hidden=true;this.paint();
+    if(clientId===this.data.clientId){this.dialog.close();return;}this.abort=new AbortController();this.saving=true;this.busy=true;this.error.hidden=true;this.paint();
     try{
       const reply=await context.session.request(this.path(context),{method:'PUT',body:{clientId},etag:this.etag,signal:this.abort.signal});
       if(this.active(context,generation)){this.data=reply.data;this.etag=reply.etag;this.dialog.close();document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));}
     }catch(error){
-      if(this.active(context,generation)&&error.name!=='AbortError'){this.failure(error);this.busy=false;await this.load();}
-    }finally{if(this.active(context,generation)){this.busy=false;this.paint();}}
+      if(this.active(context,generation)&&error.name!=='AbortError'){this.failure(error);this.saving=false;this.busy=false;await this.load();}
+    }finally{if(this.active(context,generation)){this.saving=false;this.busy=false;this.paint();}}
   }
 }

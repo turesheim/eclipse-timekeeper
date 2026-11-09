@@ -47,6 +47,17 @@ class NoteClientsTest {
         store.transaction("note-client-other",()->{var clients=new NoteClients(store);var ref=clients.reference(DayNotes.TYPE,"2026-11-09");assertNotEquals(alice,clients.tag(ref));assertTrue(clients.get(ref).path("clientId").isNull());return null;});
     }
     private io.restassured.response.Response read(String token,String type,String key){return given().header("Authorization","Bearer "+token).queryParam("sourceType",type).queryParam("sourceKey",key).get("/api/v1/notes/client");}
+    @Test void savedEventAndEmptyWeekHaveDistinctPrivateAssociations(){
+        var event=new EventNotes.Key(UUID.randomUUID(),"a".repeat(64));
+        store.transaction("note-client-event",()->{
+            var events=new EventNotes(store);var document=object().put("subscriptionId",event.subscription().toString()).put("eventKey",event.event()).put("body","Exact event body\n");document.set("event",object().put("uid","private-event").put("recurrenceId","").put("title","Private event"));
+            byte[] bytes=EventNotes.document(document);events.restore(event.filename(),bytes);var clients=new NoteClients(store);UUID client=client("Event and week");
+            var ref=clients.reference(EventNotes.TYPE,event.filename());String tag=etag(events.get(event));var modified=events.modifiedAt(event);clients.save(ref,clients.tag(ref),client);
+            assertArrayEquals(bytes,events.document(event));assertEquals(tag,etag(events.get(event)));assertEquals(modified,events.modifiedAt(event));
+            var week=clients.reference(WeekNotes.TYPE,"2026-W46");clients.save(week,clients.tag(week),client);assertTrue(store.find(WeekNotes.TYPE,week.id()).isEmpty());assertEquals(client.toString(),clients.get(week).path("clientId").asText());return null;
+        });
+        store.transaction("note-client-event-other",()->{assertEquals(404,assertThrows(ApiFailure.class,()->new NoteClients(store).reference(EventNotes.TYPE,event.filename())).status);return null;});
+    }
     private io.restassured.response.Response save(String token,String type,String key,String tag,Object body){
         var request=given().header("Authorization","Bearer "+token).queryParam("sourceType",type).queryParam("sourceKey",key).contentType("application/json");if(tag!=null)request.header("If-Match",tag);return request.body(body).put("/api/v1/notes/client");
     }

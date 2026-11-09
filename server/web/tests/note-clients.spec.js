@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
+import {openAccountMenu} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
 
 test.beforeAll(async({request})=>{
@@ -32,7 +33,7 @@ const association=entry=>'/notes/client?'+new URLSearchParams({sourceType:entry.
 
 test('client choice includes clients outside the focus filter and preserves note bytes, dates and a failed body draft',async({page,request})=>{
   const {api,alpha,beta,entry,source}=await setup(page,request),focusId=randomUUID();const focus=await api('GET','/focus-areas');await api('PUT','/focus-areas',{areas:[{id:focusId,name:'Only Alpha',clientIds:[alpha.id]}]},{'If-Match':focus.headers().etag});
-  await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await page.locator('#focus-select').selectOption(focusId);await openNote(page);
+  await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await openAccountMenu(page);await page.locator('#focus-select').selectOption(focusId);await page.getByRole('button',{name:'Account menu',exact:true}).click();await openNote(page);
   const scope=page.locator('#notes-panel'),before=await api('GET','/notes/entries/'+entry.id),metadata=await before.json();
   await choose(page,scope,beta.id);await expect(scope.locator('.note-client-label')).toHaveText(beta.name);await expect(scope.locator('.note-client-swatch')).toHaveCSS('background-color','rgb(176, 48, 96)');
   const after=await api('GET','/notes/entries/'+entry.id),saved=await after.json();expect(after.headers().etag).toBe(before.headers().etag);expect(saved.createdAt).toBe(metadata.createdAt);expect(saved.modifiedAt).toBe(metadata.modifiedAt);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
@@ -91,4 +92,16 @@ test('a read-only session sees the client label and cannot change the associatio
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await openNote(reader);
     const scope=reader.locator('#notes-panel');await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);await expect((await noteActions(reader,scope)).getByRole('menuitem',{name:'Associate with client',exact:true})).toBeDisabled();expect(writes).toBe(0);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
   }finally{await context.close();}
+});
+
+test('a failed metadata read can be retried and the loading selector remains cancellable',async({page,request})=>{
+  const {entry,source,api}=await setup(page,request);let reads=0,writes=0,held=false,release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/notes/client?*',async route=>{
+    if(route.request().method()==='PUT'){writes++;return route.continue();}if(new URL(route.request().url()).searchParams.get('sourceKey')!==entry.sourceKey)return route.continue();
+    if(++reads===1)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'UNAVAILABLE'})});const response=await route.fetch();held=true;await pending;await route.fulfill({response});
+  });
+  try{
+    await openNote(page);await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client');await expect.poll(()=>held).toBe(true);
+    const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeDisabled();await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeEnabled();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();release();await page.unrouteAll({behavior:'wait'});expect(writes).toBe(0);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
