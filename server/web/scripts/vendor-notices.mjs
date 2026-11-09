@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 const root=new URL('../',import.meta.url),check=process.argv.includes('--check');
 const manifest=JSON.parse(await readFile(new URL('package.json',root)));
 const components=[
+  {id:'@plantuml/core',name:'PlantUML',homepage:'https://plantuml.com/',license:'MIT',directory:'plantuml',copyright:'Copyright 2009–2024, Arnaud Roques'},
   {id:'gemoji',name:'gemoji',homepage:'https://github.com/wooorm/gemoji',license:'MIT',directory:'emoji'},
   {id:'highlight.js',name:'highlight.js',homepage:'https://highlightjs.org/',license:'BSD-3-Clause',directory:'milkdown',licenseFile:'HIGHLIGHT-LICENSE',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
   {id:'@noble/hashes',name:'noble-hashes',homepage:'https://github.com/paulmillr/noble-hashes',license:'MIT',directory:'noble-hashes'},
