@@ -112,3 +112,11 @@ test('signing out clears client labels and the private chooser contents',async({
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login-form')).toBeVisible();
   expect(await page.locator('.note-client-label').allTextContents()).not.toContain(alpha.name);await expect(page.locator('.note-client-dialog option')).toHaveCount(0);
 });
+
+test('a client deleted while the chooser is open reports the conflict and permits a fresh choice',async({page,request})=>{
+  const {api,alpha,beta,entry}=await setup(page,request);await openNote(page);await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeEnabled();await dialog.locator('select').selectOption(beta.id);
+  const refreshed=page.waitForResponse(async response=>response.request().method()==='GET'&&new URL(response.url()).pathname==='/api/v1/clients'&&!(await response.json()).items.some(client=>client.id===beta.id));
+  const client=await api('GET','/clients/'+beta.id);await api('DELETE','/clients/'+beta.id,undefined,{'If-Match':client.headers().etag});await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));await refreshed;await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.locator(`option[value="${beta.id}"]`)).toHaveCount(0);await expect(dialog.locator('select')).toBeEnabled();
+  await dialog.locator('select').selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
+});

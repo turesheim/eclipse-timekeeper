@@ -66,7 +66,7 @@ export class NoteClient {
   }
   async commit(){
     const context=this.current(),generation=this.generation;if(!same(context,this.openContext)||!context.writable||this.busy)return;
-    if(!this.etag){await this.load();return;}const clientId=this.select.value||null;if(clientId&&!directory.clients.some(value=>value.id===clientId))return;
+    if(!this.etag){await this.load();return;}const clientId=this.select.value||null;
     if(clientId===this.data.clientId){this.dialog.close();return;}this.abort=new AbortController();this.saving=true;this.busy=true;this.error.hidden=true;this.paint();
     try{
       const reply=await context.session.request(this.path(context),{method:'PUT',body:{clientId},etag:this.etag,signal:this.abort.signal});
