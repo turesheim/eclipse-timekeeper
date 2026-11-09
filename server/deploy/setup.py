@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shlex
 import sys
 sys.path[:0] = [str(Path(__file__).resolve().parent), str(Path(__file__).resolve().parents[1] / "scripts")]
 from configure_accounts import create_challenge
@@ -44,6 +45,11 @@ def main():
             parser.error('Existing database requires its original secrets; restore them instead of generating replacements')
     credentials.mkdir(parents=True, exist_ok=True)
     credentials.chmod(0o700)
+    # Mount a dedicated directory so atomic restores remain visible to existing
+    # containers without exposing the database administrator's other secrets.
+    task_providers = credentials / 'task-providers'
+    task_providers.mkdir(exist_ok=True)
+    task_providers.chmod(0o755)
     for name in SECRET_NAMES:
         path = credentials / name
         try:
@@ -64,6 +70,10 @@ def main():
             'quarkus.mailer.port=587\nquarkus.mailer.from=timekeeper@localhost\n'
             'quarkus.mailer.username=\nquarkus.mailer.tls=false\nquarkus.mailer.start-tls=REQUIRED\n', 0o644),
         credentials / 'timekeeper_smtp_password': ('', 0o444),
+        task_providers / 'application.properties': (
+            '# Optional OAuth app registrations; see TASK-PROVIDERS.md.\n'
+            '# timekeeper.tasks.google.client-id=\n# timekeeper.tasks.google.client-secret=\n'
+            '# timekeeper.tasks.microsoft.client-id=\n# timekeeper.tasks.microsoft.client-secret=\n', 0o444),
     }
     for path, (value, mode) in optional_files.items():
         try:
@@ -91,7 +101,7 @@ def main():
         (state / name).mkdir(parents=True, exist_ok=True)
     env_file = HERE / '.env'
     if not env_file.exists():
-        env_file.write_text(f'TIMEKEEPER_STATE_DIR={state}\nTIMEKEEPER_BIND_ADDRESS=127.0.0.1\nTIMEKEEPER_HTTP_PORT=8080\n')
+        env_file.write_text(f'TIMEKEEPER_STATE_DIR={shlex.quote(str(state))}\nTIMEKEEPER_BIND_ADDRESS=127.0.0.1\nTIMEKEEPER_HTTP_PORT=8080\n')
     if setup_created:
         with env_file.open('a') as output:
             output.write('\nTIMEKEEPER_SERVER_SETUP_FILE=/config/account-setup.json\n')

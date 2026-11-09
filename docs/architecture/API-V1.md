@@ -215,6 +215,23 @@ Providers may expose only the flags, leaving participant details empty.
 `PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
 list updates preserve it. Portable JSON/CSV and account archives retain it.
 
+Cloud sign-in and import use `/task-providers`, separate from portable connection
+metadata. `GET` returns configured-provider availability and owned status with
+discovered/selected lists. `POST /task-providers/{provider}/authorize` starts a
+browser-bound PKCE flow for `google` or `microsoft`; `POST
+/task-providers/complete` consumes its one-use state and code. `POST
+/task-providers/cancel` cancels an attempt. Credentials remain private and are
+excluded from these responses and account archives. The callback is
+`/web/task-provider-callback.html` at the public origin; see
+[operator setup](../operations/TASK-PROVIDERS.md).
+
+`GET /task-providers/{id}` reads owned status. `PUT /task-providers/{id}/lists`
+replaces selected remote list IDs with `If-Match`; `DELETE /task-providers/{id}`
+disconnects with `If-Match`, retaining tasks. `POST /task-providers/{id}/refresh`
+queues a bounded background scan and returns 202. Private leases fence results
+after disconnect, reselection, reconnect or account disablement. These adapters
+advertise import-only capabilities and do not perform provider writes.
+
 `/task-list-sections` stores optional, owner-scoped provider groupings inside
 one task list. A section has a stable Timekeeper ID, remote section ID, name,
 `STANDARD` or `GROCERY_CATEGORY` kind, order, presence, and section write

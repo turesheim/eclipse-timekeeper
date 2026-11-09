@@ -21,6 +21,9 @@ python3 ./instance_material.py backup "$backup_dir"
 cp "$state_dir/config/tokens.json" "$backup_dir/tokens.json"
 cp "$state_dir/config/mail.properties" "$backup_dir/mail.properties"
 cp "$state_dir/secrets/timekeeper_smtp_password" "$backup_dir/smtp_password"
+if [ -f "$state_dir/secrets/task-providers/application.properties" ]; then
+  cp "$state_dir/secrets/task-providers/application.properties" "$backup_dir/task_providers.properties"
+fi
 # Read deployed identities from containers: after a mutable tag is replaced,
 # Compose's image listing may fail to inspect the old image by its ID.
 containers=$(docker compose ps --all --quiet)

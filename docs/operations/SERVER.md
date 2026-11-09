@@ -175,6 +175,14 @@ therefore requires pausing writes until every replica supports Work Sessions.
 Keep compatible server builds for subsequent image rollback; a downgrade to the
 previous domain model requires a matching pre-upgrade backup.
 
+## Cloud task connections
+
+Google Tasks and Microsoft To Do use separate account connections rather than
+ordinary calendar subscription URLs. Configure an operator app registration,
+then select lists under **Account → Task connections**. See
+[task-provider setup and recovery](TASK-PROVIDERS.md) for configuration,
+supported import behavior and verification limits.
+
 ## Distribution
 
 The Build workflow's `server-standalone` artifact contains the Java 21 server

@@ -105,7 +105,10 @@ func backup(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	files := backupFilesFor(s.Release.Schema)
+	if err := ensureTaskProviderConfiguration(root); err != nil {
+		return "", err
+	}
+	files := append(backupFilesFor(s.Release.Schema), taskProviderConfiguration)
 	if material != nil {
 		files = append(files, material.Files...)
 	}
@@ -204,7 +207,7 @@ func backup(root string) (string, error) {
 }
 func unpackBackup(path, stage string) (backupManifest, error) {
 	var manifest backupManifest
-	allowed := map[string]bool{"manifest.json": true}
+	allowed := map[string]bool{"manifest.json": true, taskProviderConfiguration: true}
 	for _, name := range backupFilesFor(currentSchema) {
 		allowed[name] = true
 	}
@@ -270,6 +273,9 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 		return manifest, err
 	}
 	files := backupFilesFor(manifest.ServerSchema)
+	if _, present := manifest.Files[taskProviderConfiguration]; present {
+		files = append(files, taskProviderConfiguration)
+	}
 	if (manifest.Format != 1 && manifest.Format != 2) || !supportedSchema(manifest.ServerSchema) || manifest.PostgreSQLMajor != 17 {
 		return manifest, errors.New("Unsupported Timekeeper backup version")
 	}
@@ -380,6 +386,9 @@ func restore(root, path, resources string) error {
 		if err = atomic(filepath.Join(root, name), content, mode); err != nil {
 			return err
 		}
+	}
+	if err = restoreTaskProviderConfiguration(root, stage); err != nil {
+		return err
 	}
 	if err = publishNativeMaterial(root, stage, material); err != nil {
 		return err
