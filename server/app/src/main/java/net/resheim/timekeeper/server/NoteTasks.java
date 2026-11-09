@@ -14,7 +14,7 @@ final class NoteTasks {
     private final ServerStore store;
     NoteTasks(ServerStore store){this.store=store;}
     private static UUID id(VaultSources.Ref ref){return UUID.nameUUIDFromBytes(("timekeeper-note-tasks:"+ref.type()+":"+ref.id()).getBytes(StandardCharsets.UTF_8));}
-    private static VaultSources.Ref reference(JsonNode value){return NoteBookmarks.key(value.path("sourceType").asText(),value.path("sourceKey").asText());}
+    private static VaultSources.Ref reference(JsonNode value){return NoteReferences.key(value.path("sourceType").asText(),value.path("sourceKey").asText());}
     private static NoteTaskMarkup.Item item(JsonNode value){return new NoteTaskMarkup.Item(value.path("marker").asInt(),value.path("summary").asText(),value.path("checked").asBoolean(),value.path("depth").asInt());}
     private static boolean completed(Task task){return task.planning().status()==TaskStatus.COMPLETED;}
     private Task task(UUID id){return store.find("TASK",id).map(value->(Task)decode("TASK",value)).orElse(null);}

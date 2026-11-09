@@ -36,7 +36,7 @@ final class NoteTaskArchive {
         if(values.isMissingNode())return;if(!values.isArray()||values.size()>250000)throw ApiFailure.validation();var sources=new HashSet<String>();var linked=new HashSet<UUID>();var tasks=new HashSet<UUID>();for(var task:work.path("tasks"))tasks.add(identifier(task.path("id")));long count=0;
         for(var value:values){
             if(!names(value).equals(Set.of("sourceType","sourceKey","items"))||!value.path("sourceType").isTextual()||!value.path("sourceKey").isTextual()||!value.path("items").isArray()||value.path("items").isEmpty()||value.path("items").size()>1000)throw ApiFailure.validation();
-            var ref=NoteBookmarks.key(value.path("sourceType").asText(),value.path("sourceKey").asText());if(!sources.add(ref.type()+":"+ref.id()))throw ApiFailure.validation();
+            var ref=NoteReferences.key(value.path("sourceType").asText(),value.path("sourceKey").asText());if(!sources.add(ref.type()+":"+ref.id()))throw ApiFailure.validation();
             for(var item:value.path("items")){
                 if(!names(item).equals(Set.of("taskId","marker","summary","checked","depth"))||!item.path("marker").isIntegralNumber()||!item.path("marker").canConvertToInt()||item.path("marker").asInt()<0||!item.path("summary").isTextual()||item.path("summary").asText().isBlank()||!item.path("checked").isBoolean()||!item.path("depth").isIntegralNumber()||!item.path("depth").canConvertToInt()||item.path("depth").asInt()<0||++count>250000)throw ApiFailure.validation();
                 if(!item.path("taskId").isNull()){if(!item.path("taskId").isTextual())throw ApiFailure.validation();UUID id=identifier(item.path("taskId"));if(!tasks.contains(id)||!linked.add(id))throw ApiFailure.validation();}
@@ -48,7 +48,7 @@ final class NoteTaskArchive {
     static void restore(JsonNode values,JsonNode mappings,ServerStore store){
         if(values.isMissingNode())return;var tasks=new HashMap<UUID,UUID>();for(var mapping:mappings)if(mapping.path("entityType").asText().equals("TASK"))tasks.put(uuid(mapping.path("sourceId")),uuid(mapping.path("id")));
         for(var value:values){
-            var ref=NoteBookmarks.key(value.path("sourceType").asText(),value.path("sourceKey").asText());byte[] bytes=source(store,ref);var actual=NoteTaskMarkup.items(new String(bytes,StandardCharsets.UTF_8));
+            var ref=NoteReferences.key(value.path("sourceType").asText(),value.path("sourceKey").asText());byte[] bytes=source(store,ref);var actual=NoteTaskMarkup.items(new String(bytes,StandardCharsets.UTF_8));
             if(actual.size()!=value.path("items").size())throw ApiFailure.validation();boolean active=!new VaultSources(store,store.vaultLimits(),ref).snapshot().deleted();var items=array();int index=0;
             for(var item:value.path("items")){
                 var parsed=actual.get(index++);if(parsed.marker()!=item.path("marker").asInt()||parsed.checked()!=item.path("checked").asBoolean()||parsed.depth()!=item.path("depth").asInt()||!parsed.summary().equals(item.path("summary").asText()))throw ApiFailure.validation();
