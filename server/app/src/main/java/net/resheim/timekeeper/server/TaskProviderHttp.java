@@ -36,8 +36,11 @@ final class TaskProviderHttp {
     private final Transport transport;
     TaskProviderHttp(Set<String> hosts){this(hosts,jdk());}
     TaskProviderHttp(Set<String> hosts,Transport transport){this.hosts=Set.copyOf(hosts);this.transport=transport;}
+    private static final class Jdk {
+        private static final HttpClient CLIENT=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
+    }
     private static Transport jdk(){
-        var client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
+        var client=Jdk.CLIENT;
         return request->{
             var pending=client.sendAsync(request,info->limitedBody(info.statusCode()));
             try{
