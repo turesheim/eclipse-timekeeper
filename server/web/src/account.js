@@ -10,8 +10,10 @@ import { renderAccountData } from './account-data.js';
 import {renderTypography} from './typography-account.js';
 import {renderNotesAccount} from './notes-account.js';
 import {renderStorage} from './storage-account.js';
+import {renderTaskProviders} from './task-providers-account.js';
 
 export async function renderAccount(view, part) {
+  if(part==='task-providers'){await renderTaskProviders(view);return;}
   if(part==='storage'){await renderStorage(view);return;}
   if (part === 'typography') {await renderTypography(view);return;}
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);

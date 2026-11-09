@@ -44,6 +44,19 @@ final class TaskCloudProvider {
         }
         return new Page<>(result,next(value,collection),delta(value,collection));
     }
+    List<RemoteList> catalog(String token){
+        var result=new ArrayList<RemoteList>();var ids=new HashSet<String>();var pages=new HashSet<String>();String next=null;int bytes=0;
+        long deadline=System.nanoTime()+Duration.ofMinutes(2).toNanos();
+        do{
+            if(Thread.currentThread().isInterrupted()||System.nanoTime()>deadline)throw new TaskProviderHttp.Failure("TASK_PROVIDER_SCAN_INCOMPLETE",0,0,false);
+            var page=lists(token,next);
+            for(var list:page.items()){
+                if(!ids.add(list.id()))throw invalid();bytes+=list.original().toString().getBytes(StandardCharsets.UTF_8).length;
+                if(result.size()>=1000||bytes>4*1024*1024)throw new TaskProviderHttp.Failure("TASK_PROVIDER_LIST_LIMIT",0,0,false);result.add(list);
+            }
+            next=page.next();if(next!=null&&(!pages.add(next)||pages.size()>100))throw new TaskProviderHttp.Failure("TASK_PROVIDER_SCAN_INCOMPLETE",0,0,false);
+        }while(next!=null);return List.copyOf(result);
+    }
     Page<RemoteTask> tasks(String token,String listId,String next){
         if(listId==null||listId.isBlank()||listId.length()>1024)throw invalid();
         String collection=provider==Provider.GOOGLE?GOOGLE+"lists/"+segment(listId)+"/tasks":GRAPH+"todo/lists/"+segment(listId)+"/tasks";

@@ -30,6 +30,27 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(validator('VaultTitleInput').is_valid({'title':'CVE-2026-111943'}))
         for value in [{},{'title':''},{'title':'x','ownerId':'foreign'},{'title':3}]:
             self.assertFalse(validator('VaultTitleInput').is_valid(value))
+
+    def test_task_provider_connections_keep_credentials_out_of_public_state(self):
+        connection={'id':ID,'ownerId':'owner-a','providerId':'google','remoteAccountId':'stable-account','name':'Tasks','enabled':True,
+                    'version':0,'direction':'IMPORT','syncing':False,'pendingCount':0,'listErrors':{},'lastAttempt':None,'lastSuccess':None,
+                    'nextRefresh':'2026-11-09T12:00:00Z','lastError':None,'selectedLists':[],
+                    'availableLists':[{'id':'remote-list','name':'Work','kind':'STANDARD','shared':False,'owner':True}]}
+        validator('TaskProviderConnection').validate(connection)
+        for field in ['accessToken','refreshToken','clientSecret','settingsHash','observation','scopes']:
+            self.assertFalse(validator('TaskProviderConnection').is_valid({**connection,field:'private'}))
+        self.assertTrue(validator('TaskProviderSelectionInput').is_valid({'selectedLists':['remote-list']}))
+        self.assertFalse(validator('TaskProviderSelectionInput').is_valid({'selectedLists':['remote-list','remote-list']}))
+        self.assertFalse(validator('TaskProviderSelectionInput').is_valid({'selectedLists':[],'ownerId':'foreign'}))
+        for name in ['TaskProviderCompleteInput','TaskProviderCancelInput']:
+            self.assertTrue(CONTRACT['components']['schemas'][name]['properties']['state']['writeOnly'])
+        self.assertTrue(CONTRACT['components']['schemas']['TaskProviderCompleteInput']['properties']['code']['writeOnly'])
+        validator('TaskProviderCompleteInput').validate({'state':'a'*43,'code':'private opaque code'})
+        for value in [{'state':'a'*43,'code':'private\ncode'},{'state':'a'*42,'code':'code'},{'state':'a'*43,'code':'code','ownerId':'foreign'}]:
+            self.assertFalse(validator('TaskProviderCompleteInput').is_valid(value))
+        for path,method in [('/task-providers/{id}','delete'),('/task-providers/{id}/lists','put')]:
+            self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path][method]['parameters'])
+        self.assertIn('202',CONTRACT['paths']['/task-providers/{id}/refresh']['post']['responses'])
     def test_note_bookmarks_have_separate_conditional_private_metadata(self):
         operations=CONTRACT['paths']['/notes/bookmark']
         self.assertEqual({'get','put'},set(operations))
@@ -727,6 +748,8 @@ class ContractTest(unittest.TestCase):
             'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
+            'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

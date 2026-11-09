@@ -97,4 +97,48 @@ class TaskProviderConnectionsTest {
         });
         tx(owner,()->{assertTrue(store.find(TaskProviderConnections.AUTH,id).isEmpty());assertFalse(store.find("TASK_CONNECTION",id).orElseThrow().path("enabled").asBoolean());assertEquals(1,store.list("TASK").size());assertEquals(1,store.list("TASK_LIST").size());return null;});
     }
+    @Test void concurrentReplicasCanOnlyClaimOneRefresh()throws Exception{
+        String owner=owner();var connection=connect(owner,grant(owner));UUID id=uuid(connection.get("id"));
+        tx(owner,()->connections().select(id,List.of("remote-list"),etag(connection)));
+        var start=new java.util.concurrent.CyclicBarrier(2);
+        try(var workers=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()){
+            var jobs=new ArrayList<java.util.concurrent.Future<TaskProviderConnections.Claim>>();
+            for(int i=0;i<2;i++)jobs.add(workers.submit(()->{start.await();return tx(owner,()->connections().claim(id,false));}));
+            int claims=0;for(var job:jobs)if(job.get()!=null)claims++;assertEquals(1,claims);
+        }
+    }
+    @Test void changedSelectionExpiredLeaseAndReconnectFenceOldCredentialsAndResults(){
+        String owner=owner();var connection=connect(owner,grant(owner));UUID id=uuid(connection.get("id"));
+        var selected=tx(owner,()->connections().select(id,List.of("remote-list"),etag(connection)));
+        var first=tx(owner,()->connections().claim(id,false));assertNotNull(first);
+        assertFalse(first.toString().contains("private-access"));
+        tx(owner,()->{var value=connections().required(id);value.put("leaseUntil",store.now().minusSeconds(1).toString()).put("nextRefresh",store.now().toString());connections().save(TaskProviderConnections.AUTH,value);return null;});
+        var second=tx(owner,()->connections().claim(id,false));assertNotNull(second);assertNotEquals(first.lease(),second.lease());
+        tx(owner,()->{assertFalse(connections().credentials(first,tokens()));assertFalse(connections().finish(first,null,"TASK_PROVIDER_UNAVAILABLE",0));return null;});
+        var before=tx(owner,()->connections().visible(connections().required(id)));
+        tx(owner,()->connections().select(id,List.of(),etag(before)));
+        tx(owner,()->{assertNull(connections().active(second));assertFalse(connections().credentials(second,tokens()));return null;});
+        var reconnected=connect(owner,grant(owner));assertEquals(id.toString(),reconnected.path("id").asText());assertFalse(reconnected.path("syncing").asBoolean());
+        tx(owner,()->{assertFalse(connections().finish(second,object(),null,0));return null;});
+    }
+    @Test void aRefreshRoundAdvancesListsAndOnlyPublishesSuccessWhenAllSelectedListsFinish(){
+        String owner=owner();var remote=new ArrayList<>(catalog());remote.add(new TaskCloudProvider.RemoteList("second-list","Home","STANDARD",false,true,parse("{\"id\":\"second-list\",\"title\":\"Home\"}")));
+        var grant=grant(owner);var connection=tx(owner,()->connections().connect(grant,settings(),new TaskCloudProvider.Account("stable-account","Name"),tokens(),remote));UUID id=uuid(connection.get("id"));
+        tx(owner,()->connections().select(id,List.of("remote-list","second-list"),etag(connection)));
+        var first=tx(owner,()->connections().claim(id,false));assertEquals("remote-list",first.remoteList());
+        assertTrue(tx(owner,()->connections().finish(first,object(),null,0)));
+        var partial=tx(owner,()->connections().visible(connections().required(id)));assertTrue(partial.path("syncing").asBoolean());assertTrue(partial.path("lastSuccess").isNull());
+        var second=tx(owner,()->connections().claim(id,false));assertEquals("second-list",second.remoteList());
+        assertFalse(tx(owner,()->connections().finish(second,object(),null,0)));
+        var complete=tx(owner,()->connections().visible(connections().required(id)));assertFalse(complete.path("syncing").asBoolean());assertTrue(complete.path("lastSuccess").isTextual());
+        assertNull(tx(owner,()->connections().claim(id,false)));
+    }
+    @Test void disabledAccountOrRevokedProviderAccessCannotPublishOrContinuePulls(){
+        String owner=owner();var connection=connect(owner,grant(owner));UUID id=uuid(connection.get("id"));
+        tx(owner,()->connections().select(id,List.of("remote-list"),etag(connection)));var claim=tx(owner,()->connections().claim(id,false));
+        tx(owner,()->{store.update("UPDATE tk_account SET username=?,password_hash='fixture-hash',state='DISABLED' WHERE owner_id=?","user-"+owner,owner);assertNull(connections().active(claim));assertFalse(connections().finish(claim,object(),null,0));return null;});
+        tx(owner,()->{store.update("UPDATE tk_account SET username=NULL,password_hash=NULL,state='UNCLAIMED' WHERE owner_id=?",owner);connections().finish(claim,null,"TASK_PROVIDER_RECONNECT_REQUIRED",0);return null;});
+        assertNull(tx(owner,()->connections().claim(id,false)));assertThrows(ApiFailure.class,()->tx(owner,()->connections().claim(id,true)));
+        var visible=tx(owner,()->connections().visible(connections().required(id)));assertFalse(visible.path("syncing").asBoolean());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",visible.path("lastError").asText());
+    }
 }

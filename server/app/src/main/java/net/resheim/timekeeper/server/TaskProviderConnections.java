@@ -15,6 +15,10 @@ final class TaskProviderConnections {
     record Grant(String owner,TaskCloudProvider.Provider provider,String verifier,String settingsHash) {
         @Override public String toString(){return "Consumed task-provider authorization grant";}
     }
+    record Claim(String owner,UUID id,String lease,TaskCloudProvider.Provider provider,String account,String remoteList,UUID list,boolean discover,boolean catalogOnly,
+            String settingsHash,TaskProviderOAuth.Tokens tokens) {
+        @Override public String toString(){return "Claimed task-provider refresh";}
+    }
     private final ServerStore store;
     TaskProviderConnections(ServerStore store){this.store=store;}
 
@@ -56,6 +60,7 @@ final class TaskProviderConnections {
         var scopes=value.putArray("scopes");tokens.scopes().stream().sorted().forEach(scopes::add);value.set("catalog",lists);
         if(!value.has("selected"))value.putArray("selected");
         value.putNull("lastError").putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().toString());
+        value.put("roundActive",false).put("roundIndex",0).put("blocked",false).put("requested",!value.path("selected").isEmpty()).put("pendingCount",0);value.putArray("pending");value.putObject("listErrors");
         value=previous.isEmpty()?insert(AUTH,id,value):save(AUTH,value);
         return visible(value);
     }
@@ -65,6 +70,8 @@ final class TaskProviderConnections {
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
         result.set("version",value.path("version"));result.put("direction","IMPORT");
+        result.put("syncing",value.hasNonNull("lease")||value.path("roundActive").asBoolean()||value.path("requested").asBoolean()).put("pendingCount",value.path("pendingCount").asInt());
+        result.set("listErrors",value.has("listErrors")?value.get("listErrors").deepCopy():object());
         for(String field:List.of("lastAttempt","lastSuccess","lastError","nextRefresh"))result.set(field,value.has(field)?value.get(field):com.fasterxml.jackson.databind.node.NullNode.instance);
         result.set("selectedLists",value.path("selected").deepCopy());var catalog=result.putArray("availableLists");
         for(var list:value.path("catalog")){var item=object();for(String field:List.of("id","name","kind","shared","owner"))item.set(field,list.path(field));catalog.add(item);}
@@ -75,11 +82,11 @@ final class TaskProviderConnections {
         if(selected.size()>20||new HashSet<>(selected).size()!=selected.size())throw ApiFailure.validation();
         var chosen=new HashSet<>(selected);var known=new HashSet<String>();
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
-        String provider=connection.path("providerId").asText();int position=0;
+        if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
+        String provider=connection.path("providerId").asText();int position=0;var existingLists=ownedLists(id);
         for(var remote:value.path("catalog")){
             String key=remote.path("id").asText();known.add(key);if(!chosen.contains(key))continue;
-            TaskList old=null;
-            for(var list:store.list("TASK_LIST"))if(list.path("connectionId").asText().equals(id.toString())&&list.path("remoteListId").asText().equals(key)){old=(TaskList)decode("TASK_LIST",list);break;}
+            TaskList old=existingLists.get(key);
             var payload=object();payload.set("observation",remote.path("observation").deepCopy());
             if(old!=null&&old.providerData().isPresent()){
                 var envelope=old.providerData().get();
@@ -93,7 +100,85 @@ final class TaskProviderConnections {
         }
         if(!known.containsAll(chosen))throw ApiFailure.validation();
         var ids=value.putArray("selected");selected.forEach(ids::add);value.put("nextRefresh",store.now().toString()).putNull("lease").putNull("leaseUntil");
+        value.put("roundActive",false).put("roundIndex",0).put("requested",!selected.isEmpty()).put("pendingCount",0).putNull("lastSuccess");
+        if(!value.path("blocked").asBoolean())value.putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         return visible(save(AUTH,value));
+    }
+    /** One list per lease bounds work and lets other accounts make progress between large lists. */
+    Claim claim(UUID id,boolean force){
+        var value=required(id);if(!enabled())return null;
+        var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
+        if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
+        boolean catalogOnly=value.path("selected").isEmpty();if(catalogOnly&&!force)return null;
+        Instant now=store.now();
+        if(value.hasNonNull("leaseUntil")&&Instant.parse(value.path("leaseUntil").asText()).isAfter(now))return null;
+        if(value.path("blocked").asBoolean()){if(force)throw new ApiFailure(409,value.path("lastError").asText("TASK_PROVIDER_RECONNECT_REQUIRED"));return null;}
+        if(force){
+            if(value.hasNonNull("lastAttempt")&&Instant.parse(value.path("lastAttempt").asText()).plusSeconds(30).isAfter(now))throw new ApiFailure(429,"TASK_PROVIDER_REFRESH_LIMIT");
+            value.put("roundActive",false).put("requested",true);
+        }else if(value.hasNonNull("nextRefresh")&&Instant.parse(value.path("nextRefresh").asText()).isAfter(now))return null;
+        if(!value.path("roundActive").asBoolean()){
+            value.put("roundActive",true).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
+        }
+        int index=value.path("roundIndex").asInt();if(index<0||!catalogOnly&&index>=value.path("selected").size())throw ApiFailure.conflict();
+        String remote=catalogOnly?null:value.path("selected").get(index).asText();UUID listId=null;
+        if(!catalogOnly)for(var list:store.list("TASK_LIST"))if(list.path("connectionId").asText().equals(id.toString())&&list.path("remoteListId").asText().equals(remote)){listId=uuid(list.get("id"));break;}
+        String lease=UUID.randomUUID().toString();value.put("lease",lease).put("leaseUntil",now.plusSeconds(600).toString()).put("lastAttempt",now.toString()).put("nextRefresh",now.plusSeconds(600).toString());
+        save(AUTH,value);var scopes=new HashSet<String>();value.path("scopes").forEach(scope->scopes.add(scope.asText()));
+        return new Claim(store.owner(),id,lease,TaskProviderConfiguration.provider(connection.path("providerId").asText()),connection.path("remoteAccountId").asText(),remote,listId,index==0||catalogOnly,catalogOnly,
+                value.path("settingsHash").asText(),new TaskProviderOAuth.Tokens(value.path("accessToken").asText(),value.path("refreshToken").asText(),Instant.parse(value.path("tokenExpires").asText()),scopes));
+    }
+    ObjectNode active(Claim claim){
+        if(!store.owner().equals(claim.owner())||!enabled())return null;
+        var value=store.find(AUTH,claim.id());var connection=store.find("TASK_CONNECTION",claim.id());
+        return value.isPresent()&&connection.isPresent()&&connection.get().path("enabled").asBoolean()&&connection.get().path("readable").asBoolean()
+                &&value.get().path("lease").asText().equals(claim.lease())?((ObjectNode)value.get()).deepCopy():null;
+    }
+    boolean credentials(Claim claim,TaskProviderOAuth.Tokens tokens){
+        var value=active(claim);if(value==null)return false;
+        value.put("accessToken",tokens.access()).put("refreshToken",tokens.refresh()).put("tokenExpires",tokens.expires().toString());
+        var scopes=value.putArray("scopes");tokens.scopes().stream().sorted().forEach(scopes::add);save(AUTH,value);return true;
+    }
+    boolean catalog(Claim claim,List<TaskCloudProvider.RemoteList> catalog){
+        var value=active(claim);if(value==null)return false;var result=array();var existingLists=ownedLists(claim.id());
+        for(var remote:catalog){
+            var item=object().put("id",remote.id()).put("name",remote.name()).put("kind",remote.kind()).put("shared",remote.shared()).put("owner",remote.owner());item.set("observation",remote.original().deepCopy());result.add(item);
+            var old=existingLists.get(remote.id());if(old!=null){
+                var payload=object();
+                if(old.providerData().isPresent()){
+                    var previous=old.providerData().get();if(!previous.namespace().equals(claim.provider().name().toLowerCase(Locale.ROOT)+".tasks")||previous.version()!=1)throw ApiFailure.conflict();payload=(ObjectNode)parse(previous.json());
+                }
+                payload.set("observation",remote.original().deepCopy());var envelope=object().put("namespace",claim.provider().name().toLowerCase(Locale.ROOT)+".tasks").put("version",1);envelope.set("payload",payload);var data=providerData(envelope);
+                boolean same=old.name().equals(remote.name().trim())&&old.kind().name().equals(remote.kind())&&old.shared()==remote.shared()&&old.owner()==remote.owner()&&old.providerData().isPresent()&&parse(old.providerData().get().json()).equals(payload);
+                if(!same){var updated=new TaskList(old.id(),old.connectionId(),old.remoteListId(),remote.name(),TaskListKind.valueOf(remote.kind()),old.readable(),old.writable(),remote.shared(),remote.owner(),old.present(),old.position(),old.sharing(),Optional.of(data),old.version()+1);store.save("TASK_LIST",updated);store.change("TASK_LIST","UPDATED",updated.id().toString());}
+            }
+        }
+        value.set("catalog",result);save(AUTH,value);return true;
+    }
+    private Map<String,TaskList> ownedLists(UUID connection){
+        var result=new HashMap<String,TaskList>();for(var list:store.list("TASK_LIST"))if(list.path("connectionId").asText().equals(connection.toString()))result.put(list.path("remoteListId").asText(),(TaskList)decode("TASK_LIST",list));return result;
+    }
+    boolean finish(Claim claim,ObjectNode outcome,String error,int retryAfter){
+        var value=active(claim);if(value==null)return false;
+        var errors=value.path("listErrors").isObject()?((ObjectNode)value.get("listErrors")).deepCopy():object();
+        int pending=outcome==null?0:outcome.path("pending").size();
+        if(pending>0)error="TASK_PROVIDER_CONFLICTS";
+        String errorKey=claim.remoteList()==null?"":claim.remoteList();if(error!=null)errors.put(errorKey,error);else errors.remove(errorKey);value.set("listErrors",errors);
+        value.put("pendingCount",value.path("pendingCount").asInt()+pending);
+        if(outcome!=null){var saved=(com.fasterxml.jackson.databind.node.ArrayNode)value.withArray("pending");for(var item:outcome.path("pending"))if(saved.size()<100){var row=((ObjectNode)item).deepCopy();row.remove("observation");row.put("remoteListId",claim.remoteList());saved.add(row);}}
+        boolean blocked=error!=null&&Set.of("TASK_PROVIDER_RECONNECT_REQUIRED","TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED","TASK_PROVIDER_PERMISSION_REQUIRED","TASK_PROVIDER_ACCOUNT_CHANGED","TASK_PROVIDER_CONFIGURATION_CHANGED").contains(error);
+        int next=value.path("roundIndex").asInt()+1;boolean more=!blocked&&next<value.path("selected").size();
+        value.put("roundIndex",more?next:0).put("roundActive",more).put("blocked",blocked).putNull("lease").putNull("leaseUntil");
+        if(!more)value.put("requested",false);
+        if(!more&&errors.isEmpty())value.put("lastSuccess",store.now().toString());
+        String first=errors.isEmpty()?null:errors.elements().next().asText();if(first==null)value.putNull("lastError");else value.put("lastError",first);
+        if(blocked)value.putNull("nextRefresh");
+        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,Math.min(900,retryAfter)),more?0:errors.isEmpty()?900:60)).toString());
+        save(AUTH,value);return more;
+    }
+    private boolean enabled(){
+        try(var query=store.statement("SELECT state FROM tk_account WHERE owner_id=?",store.owner());var rows=query.executeQuery()) {return rows.next()&&!rows.getString(1).equals("DISABLED");}
+        catch(java.sql.SQLException failure){throw new ApiFailure(503,"UNAVAILABLE");}
     }
     void disconnect(UUID id,String match){
         var value=required(id);ApiReplies.match(visible(value),match);

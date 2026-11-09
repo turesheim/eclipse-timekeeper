@@ -319,6 +319,7 @@ final class TaskSync {
         var found=store.byReference(key);
         if(found.isEmpty()) {
             if(item.path("deleted").asBoolean()) row.put("status","IGNORE_DELETED");
+            else if(tombstoned(key)) {row.put("status","CONFLICT");row.put("reason","LOCAL_DELETED");}
             else if(!connection.path("capabilities").path("fields").path("summary").path("readable").asBoolean()) {
                 row.put("status","UNSUPPORTED");row.put("reason","SUMMARY_UNSUPPORTED");
             } else if(item.path("fields").hasNonNull("summary")) {
