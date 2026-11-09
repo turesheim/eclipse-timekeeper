@@ -109,7 +109,7 @@ test('Notes shows saved creation and change times in the account zone, retaining
 test('Notes source and formatted editors stay above the menu at desktop and phone sizes',async({page,request})=>{
   const api=await setup(page,request),body='# Document\n\n'+Array.from({length:150},(_,index)=>'Paragraph '+index+' with enough text for scrolling.\n\n').join('');
   await api('PUT','/notes/files?path=Notes%2FViewport.md',Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
-  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Viewport.md').click();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Viewport.md').click();
   const save=page.locator('.notes-footer > [role=status]');await expect(save).toHaveText('Saved');
   for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
     await page.setViewportSize(viewport);await page.evaluate(()=>scrollTo(0,0));
@@ -613,6 +613,7 @@ test('missing wikilinks confirm creation and open a popup without overwriting ex
   const declined=page.waitForEvent('dialog').then(async dialog=>{expect(dialog.message()).toContain('Notes/A new note.md');await dialog.dismiss();});await link.click();await declined;await expect(page.locator('#note-popup-editor')).not.toBeVisible();
   expect((await api('GET','/notes/entries?query=A+new+note')).ok()).toBe(true);expect((await(await api('GET','/notes/entries?query=A+new+note')).json()).items).toEqual([]);
   const accepted=page.waitForEvent('dialog').then(dialog=>dialog.accept());await link.click();await accepted;const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('A new note');await expect(page.locator('#notes-document-title')).toHaveText('Source');
+  await expect(popup.locator('#note-popup-formatted .ProseMirror')).toBeVisible();
   await popup.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#note-popup-body').fill('# New document\n\nCreated through the wikilink.\n');await saveMarkdown(popup,{close:true});
   const created=await(await api('GET','/notes/resolve?path=Notes%2FA%20new%20note.md')).json();expect(await(await api('GET','/notes/entries/'+created.id+'/content')).text()).toBe('# New document\n\nCreated through the wikilink.\n');
   const source=await(await api('GET','/notes/resolve?path=Notes%2FSource.md')).json();expect(await(await api('GET','/notes/entries/'+source.id+'/content')).text()).toBe(body);
