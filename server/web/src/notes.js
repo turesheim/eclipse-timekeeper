@@ -9,6 +9,7 @@ import {vaultEditorResources} from './vault-editor-resources.js';
 import {imagePreview} from './image-preview.js';
 import {noteTitle} from './note-title.js';
 import {dateTimeFormat} from './formatters.js';
+import {RecentNotes} from './recent-notes.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const action=(label,run,name)=>{const value=node('button',name?'':label,'btn btn-outline-secondary');value.type='button';if(name)iconButton(value,name,label);value.addEventListener('click',run);return value;};
@@ -35,7 +36,7 @@ export class NotesView {
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.layout=node('div',undefined,'notes-layout');this.navigation=node('aside',undefined,'notes-navigation card');this.navigation.id='notes-navigation';this.navigation.setAttribute('aria-label',t('notes.navigation'));
     const tools=node('div',undefined,'btn-toolbar notes-navigation-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label',t('notes.navigation_actions'));
-    this.newNote=action(t('notes.new_note'),()=>this.pathDialog('note'),'file-earmark-plus');this.newFolder=action(t('notes.new_folder'),()=>this.pathDialog('folder'),'folder-plus');this.refresh=action(t('notes.refresh'),()=>void this.reload(),'refresh');
+    this.newNote=action(t('notes.new_note'),()=>this.pathDialog('note'),'file-earmark-plus');this.newFolder=action(t('notes.new_folder'),()=>this.pathDialog('folder'),'folder-plus');this.refresh=action(t('notes.refresh'),()=>{void this.reload();void this.recentNotes.refresh(true);},'refresh');
     this.trash=action(t('notes.trash'),()=>{this.showTrash=!this.showTrash;this.trash.setAttribute('aria-pressed',String(this.showTrash));this.trash.classList.toggle('active',this.showTrash);void this.reload();},'trash');this.trash.setAttribute('aria-pressed','false');
     this.sortButton=action(t('notes.sort'),event=>this.showSortMenu(event.detail===0),'sort-alpha-down');
     this.sortButton.setAttribute('aria-haspopup','menu');this.sortButton.setAttribute('aria-expanded','false');this.sortButton.setAttribute('aria-controls','notes-sort-menu');
@@ -73,7 +74,9 @@ export class NotesView {
     this.searchMore=action(t('notes.search_more'),()=>void this.moreSearch());this.searchMore.hidden=true;
     this.searchExcerpts=new Map();
     this.tree=node('div',undefined,'notes-tree');this.tree.setAttribute('role','tree');this.tree.setAttribute('aria-label',t('notes.navigation'));this.tree.addEventListener('keydown',event=>this.treeKey(event));
-    this.navigation.append(tools,this.searchMode,searchLabel,this.search,this.searchMessage,this.searchRetry,this.searchRebuild,this.tree,this.searchMore,this.sortMenu);
+    const navigator=node('div',undefined,'notes-navigation-browser');navigator.append(tools,this.searchMode,searchLabel,this.search,this.searchMessage,this.searchRetry,this.searchRebuild,this.tree,this.searchMore,this.sortMenu);
+    const recent=node('section',undefined,'notes-recent'),recentTitle=node('h3',t('today.recent_notes')),recentList=node('div');recentTitle.id='notes-recent-title';recentList.id='notes-recent-notes';recent.setAttribute('aria-labelledby',recentTitle.id);recent.append(recentTitle,recentList);
+    this.recentNotes=new RecentNotes(recentList,callbacks);this.navigation.append(navigator,recent);
     this.resize=node('div',undefined,'notes-resize');this.resize.tabIndex=0;this.resize.setAttribute('role','separator');this.resize.setAttribute('aria-orientation','vertical');this.resize.setAttribute('aria-label',t('notes.resize'));this.resize.setAttribute('aria-valuemin','180');this.resize.setAttribute('aria-valuemax','480');this.resize.setAttribute('aria-valuenow','260');
     const width=value=>{this.navWidth=Math.max(180,Math.min(480,value));this.root.style.setProperty('--notes-nav-width',this.navWidth+'px');this.resize.setAttribute('aria-valuenow',String(Math.round(this.navWidth)));};
     this.resize.addEventListener('pointerdown',event=>{event.preventDefault();this.resize.setPointerCapture(event.pointerId);});
@@ -154,12 +157,14 @@ export class NotesView {
   async retryCommit(){if(this.uncertain){await this.checkCommitted();return;}this.stale=false;this.error.hidden=true;await this.autosave.flush();}
   update(snapshot,connected,session,writable){
     if(this.session&&this.session!==session)this.reset();this.session=session;this.zone=snapshot?.profile?.data?.zoneId||'UTC';this.writable=connected&&writable;this.controls();
+    this.recentNotes.update(session,this.zone,snapshot?.revision);if(this.visible){this.recentNotes.show();this.pollRecent();}
     // Keep a content search's pages and focused controls until an explicit
     // search/refresh; its cursor already detects changes at the next page.
     if(this.visible&&!this.busy&&!this.loading&&!this.contentSearch())void this.reload();
   }
-  show(){this.visible=true;window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
-  hide(){this.visible=false;this.clearDrag();}
+  pollRecent(){if(!this.recentTimer)this.recentTimer=setInterval(()=>void this.recentNotes.refresh(),30000);}
+  show(){this.visible=true;this.recentNotes.show();this.pollRecent();window.scrollTo(0,0);this.fit();if(this.session)void this.reload();}
+  hide(){this.visible=false;this.recentNotes.hide();clearInterval(this.recentTimer);this.recentTimer=null;this.clearDrag();}
   clearDropTarget(){this.navigation.classList.remove('notes-drop-target');for(const node of this.navigation.querySelectorAll('.notes-drop-target'))node.classList.remove('notes-drop-target');}
   clearDrag(){
     const refresh=this.reloadAfterDrag,session=this.session;this.dragged=null;this.treePointerPending=false;this.reloadAfterDrag=false;this.clearDropTarget();
@@ -167,6 +172,7 @@ export class NotesView {
     if(refresh)setTimeout(()=>{if(this.visible&&this.session===session&&!this.busy)void this.reload();},0);
   }
   dropTarget(event){
+    if(event.target.closest?.('.notes-recent'))return null;
     const drag=this.dragged;if(!drag||drag.session!==this.session||drag.generation!==this.generation||!this.writable||this.stale||this.busy||this.showTrash||!this.visible||!event.dataTransfer?.types.includes('application/x-timekeeper-note'))return null;
     const source=this.entries.get(drag.id),row=event.target.closest?.('[role=treeitem]');
     const folder=row?this.entries.get(row.dataset.id):{id:this.info.rootId,path:'',kind:'FOLDER'};
@@ -189,7 +195,7 @@ export class NotesView {
     finally{if(drag.session===this.session&&drag.generation===this.generation){this.busy=false;this.controls();}}
   }
   clearPreview(){this.selectedImage?.destroy();this.selectedImage=null;this.preview.replaceChildren();this.preview.hidden=true;}
-  reset(){this.invalidateSearch();this.searchMode.value='filename';this.searchLabel.textContent=t('notes.search');this.moveFailed=false;this.autosave.reset();this.saving=false;this.titleSaving=null;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.updateTitle(true);this.controls();}
+  reset(){this.recentNotes.reset();clearInterval(this.recentTimer);this.recentTimer=null;this.invalidateSearch();this.searchMode.value='filename';this.searchLabel.textContent=t('notes.search');this.moveFailed=false;this.autosave.reset();this.saving=false;this.titleSaving=null;this.uncertain=null;this.saveFailed=false;this.clearPreview();this.clearDrag();this.moveStatus.textContent='';++this.generation;++this.loadGeneration;this.session=null;this.info=null;this.note=null;this.original='';this.binary=false;this.stale=false;this.busy=false;this.loading=false;this.expandAllRequested=false;this.showTrash=false;this.trash.setAttribute('aria-pressed','false');this.trash.classList.remove('active');this.sortOrder='name-asc';this.closeSortMenu(false);this.sortState();this.navCollapsed=false;this.root.classList.remove('notes-drawer-open');this.navigationState();this.positions.clear();this.entries.clear();this.children.clear();this.expanded.clear();this.tree.replaceChildren();this.markdown.clear();this.dialog.close();this.error.hidden=true;this.search.value='';this.status.textContent='';this.updateTitle(true);this.controls();}
   navigationState(){
     const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize||this.navigationFocused&&document.activeElement===document.body;
     this.root.classList.toggle('notes-navigation-collapsed',!!this.navCollapsed);

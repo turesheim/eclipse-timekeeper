@@ -1162,6 +1162,11 @@ tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
 
+Recent notes also appears below the Notes folder navigator. It shares Today's
+account-scoped metadata, paging and guarded popup navigation. The navigator and
+recent list scroll separately, and the list stays inside the navigation drawer
+on phones. Hiding Notes stops its recent-note polling and fences pending replies.
+
 Notes navigation and editor content scroll independently within the available
 viewport. Its flex layout fills the space above navigation after the old view's
 toolbar is hidden and adapts to visual viewport changes; nested scrolling does
