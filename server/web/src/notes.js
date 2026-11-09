@@ -83,6 +83,7 @@ export class NotesView {
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.timestamps=node('p',undefined,'hint notes-timestamps');this.timestamps.hidden=true;this.savedDates={};
     for(const [field,key]of [['createdAt','notes.created'],['modifiedAt','notes.modified']]){const label=node('span'),time=node('time');label.append(document.createTextNode(t(key)+' '),time);this.savedDates[field]=time;this.timestamps.append(label);}
+    this.documentPath=node('span',undefined,'notes-document-path');this.timestamps.append(this.documentPath);
     const footer=node('div',undefined,'notes-footer');footer.append(this.status,this.timestamps);this.retrySave=action(t('journal.retry_save'),()=>void this.retryCommit());this.retrySave.hidden=true;footer.append(this.retrySave);
     this.editor.append(fileTools,this.empty,host,this.preview,footer);this.layout.append(this.navigation,this.resize,this.editor);root.append(heading,this.error,this.layout);
     this.dialog=node('dialog',undefined,'app-dialog');this.dialogTitle=node('h2');this.dialogTitle.id='notes-path-title';this.dialog.setAttribute('aria-labelledby',this.dialogTitle.id);
@@ -184,6 +185,7 @@ export class NotesView {
     this.markdown.resourceTools.hidden=this.markdown.root.hidden;this.documentTools.hidden=!this.note;this.fileTools.hidden=!this.note||host!==this.fileTools;this.markdown.syncActions();
     if(!this.note)this.status.textContent='';else if(!this.busy)this.status.textContent=this.saving?t('journal.saving'):this.stale?t('notes.stale'):this.dirty()?t('journal.unsaved'):t('journal.saved');
     this.timestamps.hidden=!this.note;
+    this.documentPath.textContent=this.note?.path||'';this.documentPath.title=this.note?t('notes.path')+': '+this.note.path:'';
     for(const [field,time]of Object.entries(this.savedDates)){
       if(field==='createdAt'){time.parentElement.firstChild.textContent=t(this.note?.createdAtSource==='ORIGINAL'?'notes.created':this.note?.createdAtSource==='ADDED'?'notes.added':'notes.created_or_added')+' ';time.parentElement.title=t('notes.creation_date_help');}
       const value=this.note?.[field],date=new Date(value||NaN),valid=Number.isFinite(date.getTime());time.parentElement.hidden=!valid;

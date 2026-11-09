@@ -301,6 +301,28 @@ test('revision comparison restores an unsaved draft and leaves stale-write guard
   await dialog.getByRole('button',{name:'Use as unsaved draft',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue('First version.\n');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Second version.\n');
   await saveMarkdown(page.locator('#notes-panel'));await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('First version.\r\n');
 });
+test('journal wikilinks resolve CVE filenames and show the target document path',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/CVE-2026-111943.md',day='2026-11-09';
+  await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# CVE-2026-111943\n\nPrivate investigation.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await api('PUT','/notes/files?'+new URLSearchParams({path:'journal/'+day+'.md'}),Buffer.from('Follow up [[CVE-2026-111943]].\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');
+  const link=page.locator('#today-journal-formatted [data-wiki-reference="CVE-2026-111943"]');
+  await expect(link).toHaveAttribute('data-resolved','true');await link.click();
+  await expect(page.locator('#notes-document-title')).toHaveText('CVE-2026-111943');await expect(page.locator('#notes-formatted')).toContainText('Private investigation.');
+  const storedPath=page.locator('.notes-footer .notes-document-path');await expect(storedPath).toHaveText(path);
+  expect(await storedPath.evaluate(node=>!!node.previousElementSibling?.querySelector('time'))).toBe(true);
+  await clickNoteAction(page,page.locator('#notes-panel'),'Rename or move');const rename=page.getByRole('dialog',{name:'Rename or move',exact:true});
+  const movedPath='Notes/Renamed investigation '+('CVE-2026-111943-'.repeat(10))+'.md';
+  await rename.getByLabel('Path from collection root',{exact:true}).fill(movedPath);await rename.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(storedPath).toHaveText(movedPath);
+  for(const width of [1440,320]){
+    await page.setViewportSize({width,height:900});await expect(storedPath).toBeInViewport();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await captureScreenshot(page,{path:`test-results/notes-document-path-${width}.png`});
+  }
+  await page.locator('#logout').click();await expect(page.locator('.notes-footer')).not.toContainText('Renamed investigation.md');
+});
+
 test('vault wikilinks report ambiguity, navigate to headings and preview authenticated image embeds',async({page,request})=>{
   const api=await setup(page,request);await api('POST','/notes/folders',{path:'A'});await api('POST','/notes/folders',{path:'B'});
   for(const [path,text] of [['Notes/Design.md','# Design\n\n## Decisions\n\nKeep it portable.\n'],['A/Plan.md','First'],['B/Plan.md','Second'],['Notes/Links.md','[[Notes/Design#Decisions|Decision]] and [[Plan]].\n\n![[Notes/pixel.png|32]]\n']])await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
