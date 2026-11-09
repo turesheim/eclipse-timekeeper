@@ -1462,5 +1462,10 @@
   "notes.import_reviewed_overwrite": "{{count}} files selected. Replacements: {{replacements}}. Review before importing.",
   "notes.import_apply_selected": "Import selected files",
   "notes.import_reviewed_overwrite_one": "{{count}} file selected. Replacements: {{replacements}}. Review before importing.",
+  "markdown.plantuml_diagram": "PlantUML diagram",
+  "markdown.plantuml_loading": "Rendering diagram…",
+  "markdown.plantuml_too_large": "The diagram exceeds the 10 KB preview limit. Its Markdown source is preserved.",
+  "markdown.plantuml_external": "Diagram previews cannot load files, images, themes or external resources. Its Markdown source is preserved.",
+  "markdown.plantuml_invalid": "The diagram could not be rendered. Edit its Markdown source to correct or simplify it.",
   "notes.search_tag": "Search notes for {{tag}}"
 }

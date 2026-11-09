@@ -1462,5 +1462,10 @@
   "notes.import_reviewed_overwrite": "{{count}} filer er valgt. Erstatninger: {{replacements}}. Gjennomgå før import.",
   "notes.import_apply_selected": "Importer valgte filer",
   "notes.import_reviewed_overwrite_one": "{{count}} fil er valgt. Erstatninger: {{replacements}}. Gjennomgå før import.",
+  "markdown.plantuml_diagram": "PlantUML-diagram",
+  "markdown.plantuml_loading": "Tegner diagram…",
+  "markdown.plantuml_too_large": "Diagrammet overskrider grensen på 10 KB for forhåndsvisning. Markdown-kilden er bevart.",
+  "markdown.plantuml_external": "Forhåndsvisning av diagrammer kan ikke laste filer, bilder, temaer eller eksterne ressurser. Markdown-kilden er bevart.",
+  "markdown.plantuml_invalid": "Diagrammet kunne ikke tegnes. Rediger Markdown-kilden for å rette eller forenkle det.",
   "notes.search_tag": "Søk i notater etter {{tag}}"
 }

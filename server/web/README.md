@@ -46,3 +46,13 @@ fixture and requires `--https`. Safari's native macOS Password AutoFill UI also
 needs a manual check.
 
 See [web client development and acceptance](../../docs/development/WEB-CLIENT.md).
+
+PlantUML 1.2026.9 is the pinned official MIT distribution. `npm run
+vendor:plantuml` copies its unchanged engine and complete license and bundles
+the worker's inert SVG/font-metric adapter. The adapter supports SVG construction
+and OffscreenCanvas metrics without a page DOM, filesystem or network loader.
+`npm run check:assets` verifies these files. Graphviz/Wasm, external includes,
+themes, emoji and image companion packages are not shipped. Previews use one
+short-lived worker at a time with bounded source/output, initialization and CPU
+deadlines; cancellation terminates it. Only validated inert SVG images enter the
+editor. The language remains ordinary fenced Markdown in stored notes.

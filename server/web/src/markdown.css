@@ -19,11 +19,11 @@
 .markdown-editor .ProseMirror h6 { font-size: var(--font-markdown-h6); }
 .markdown-editor .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
 .markdown-editor .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
-.markdown-editor .ProseMirror .markdown-mermaid-block { margin-block: 1rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; overflow: hidden; }
-.markdown-mermaid-preview { padding: .5rem; background: var(--bs-body-bg); }
-.markdown-mermaid-preview p:empty { display: none; }
-.markdown-mermaid-preview p { margin: .25rem; color: var(--bs-secondary-color); }
-.markdown-mermaid-preview img { display: block; max-width: 100%; height: auto; margin-inline: auto; }
+.markdown-editor .ProseMirror :is(.markdown-mermaid-block,.markdown-plantuml-block) { margin-block: 1rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; overflow: hidden; }
+:is(.markdown-mermaid-preview,.markdown-diagram-preview) { padding: .5rem; background: var(--bs-body-bg); }
+:is(.markdown-mermaid-preview,.markdown-diagram-preview) p:empty { display: none; }
+:is(.markdown-mermaid-preview,.markdown-diagram-preview) p { margin: .25rem; color: var(--bs-secondary-color); }
+:is(.markdown-mermaid-preview,.markdown-diagram-preview) img { display: block; max-width: 100%; height: auto; margin-inline: auto; }
 .markdown-editor .ProseMirror code { color: inherit; }
 .markdown-editor .ProseMirror img { display: block; max-width: 100%; height: auto; margin-block: .75rem; }
 .markdown-editor .ProseMirror table { width: 100%; table-layout: auto; margin-block: .75rem; }
