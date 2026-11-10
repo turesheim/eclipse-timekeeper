@@ -30,4 +30,16 @@ class CalendarCloudProviderTest {
         var loop=new CalendarCloudProvider(TaskCloudProvider.Provider.MICROSOFT,new TaskProviderHttp(Set.of("graph.microsoft.com"),request->reply("{\"value\":[],\"@odata.nextLink\":\"https://graph.microsoft.com/v1.0/me/calendars?$top=200\"}")));
         assertThrows(ApiFailure.class,()->loop.catalog("token"));
     }
+    @Test void graphExceptionLimitsApplyToTheFirstPageAndToAccumulatedPages(){
+        var first=object().put("id","master");var many=first.putArray("exceptionOccurrences");for(int i=0;i<5001;i++)many.add(object().put("id","exception-"+i));
+        var excessive=new CalendarCloudProvider(TaskCloudProvider.Provider.MICROSOFT,new TaskProviderHttp(Set.of("graph.microsoft.com"),request->reply(first.toString())));
+        assertEquals("TASK_PROVIDER_RESPONSE_TOO_LARGE",assertThrows(ApiFailure.class,()->excessive.series("token","team","master")).code);
+        var count=new java.util.concurrent.atomic.AtomicInteger();String next="https://graph.microsoft.com/v1.0/me/calendars/team/events/master/exceptionOccurrences?$skiptoken=two";
+        var paged=new CalendarCloudProvider(TaskCloudProvider.Provider.MICROSOFT,new TaskProviderHttp(Set.of("graph.microsoft.com"),request->{
+            var page=object();boolean initial=count.incrementAndGet()==1;if(initial)page.put("id","master").put("exceptionOccurrences@odata.nextLink",next);
+            var values=page.putArray(initial?"exceptionOccurrences":"value");for(int i=0;i<500;i++)values.add(object().put("id","exception-"+count.get()+"-"+i).put("bodyPreview","x".repeat(4300)));
+            return reply(page.toString());
+        }));
+        assertEquals("TASK_PROVIDER_RESPONSE_TOO_LARGE",assertThrows(ApiFailure.class,()->paged.series("token","team","master")).code);assertEquals(2,count.get());
+    }
 }

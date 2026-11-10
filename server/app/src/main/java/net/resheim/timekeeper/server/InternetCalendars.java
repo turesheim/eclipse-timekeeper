@@ -80,7 +80,7 @@ final class InternetCalendars {
                 while(scan.path("masterIndex").asInt()<scan.path("masters").size()){
                     if(System.nanoTime()>deadline||Thread.currentThread().isInterrupted()){pending=true;break;}
                     int index=scan.path("masterIndex").asInt();String master=scan.path("masters").get(index).asText();var details=provider.series(token,remote,master);var expected=scan;
-                    scan=store.transaction(claim.owner(),()->{var current=current(claim,remote,id,expected);if(current==null)return null;((ObjectNode)current.get("events")).set(master,details);current.put("masterIndex",index+1);return connections().save(SCAN,current);});if(scan==null)break;
+                    scan=store.transaction(claim.owner(),()->{var current=current(claim,remote,id,expected);if(current==null)return null;((ObjectNode)current.get("events")).set(master,details);bounded(current.path("events"));current.put("masterIndex",index+1);return connections().save(SCAN,current);});if(scan==null)break;
                 }
                 if(scan==null||scan.path("masterIndex").asInt()<scan.path("masters").size())continue;
                 var records=new ArrayList<JsonNode>();scan.path("events").forEach(records::add);String body=InternetCalendarCodec.feed(claim.provider(),records);var completed=scan;
@@ -111,7 +111,7 @@ final class InternetCalendars {
             String key=event.path("id").asText();if(claim.provider()==TaskCloudProvider.Provider.GOOGLE&&event.path("status").asText().equals("cancelled")&&!event.hasNonNull("recurringEventId"))events.remove(key);else events.set(key,event.deepCopy());
             if(claim.provider()==TaskCloudProvider.Provider.MICROSOFT&&event.path("type").asText().equals("seriesMaster")){boolean present=false;for(var item:masters)if(item.asText().equals(key))present=true;if(!present)masters.add(key);}
         }
-        if(events.size()>5000||events.toString().getBytes(StandardCharsets.UTF_8).length>32*1024*1024)throw new ApiFailure(422,"TASK_PROVIDER_RESPONSE_TOO_LARGE");
+        bounded(events);
         String next=page.next();if(next!=null){for(var previous:current.path("pages"))if(previous.asText().equals(next))throw new ApiFailure(409,"TASK_PROVIDER_SCAN_INCOMPLETE");((com.fasterxml.jackson.databind.node.ArrayNode)current.get("pages")).add(next);current.put("cursor",next);}
         else{if(claim.provider()==TaskCloudProvider.Provider.GOOGLE&&page.syncToken()==null)throw new ApiFailure(409,"TASK_PROVIDER_SCAN_INCOMPLETE");current.put("state","READY").putNull("cursor").put("nextSyncToken",page.syncToken());}
         return connections().save(SCAN,current);
@@ -126,6 +126,7 @@ final class InternetCalendars {
         new CalendarSubscriptions(store).managedFinish(id,claim.id(),body,null);discard(SCAN,id);
     }
     private boolean selected(TaskProviderConnections.Claim claim,String remote){var auth=connections().active(claim);if(auth==null||!TaskProviderConnections.services(auth).path("calendars").asBoolean())return false;for(var item:auth.path("calendarSelected"))if(item.asText().equals(remote))return true;return false;}
+    private static void bounded(JsonNode events){long definitions=events.size();for(var event:events)if(event.path("exceptionOccurrences").isArray())definitions+=event.path("exceptionOccurrences").size();if(definitions>5000||events.toString().getBytes(StandardCharsets.UTF_8).length>32*1024*1024)throw new ApiFailure(422,"TASK_PROVIDER_RESPONSE_TOO_LARGE");}
     private void calendarFailure(TaskProviderConnections.Claim claim,UUID id){store.transaction(claim.owner(),()->{if(connections().active(claim)!=null)new CalendarSubscriptions(store).managedFinish(id,claim.id(),null,"CALENDAR_PROVIDER_UNAVAILABLE");return null;});}
     private void discard(String kind,UUID id){store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),kind,id);}
 }

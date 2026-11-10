@@ -138,6 +138,8 @@ separately from task import errors. Sources above 5,000 event definitions or
 32 MiB are rejected without replacing existing events; generated iCalendar also
 has the existing 2 MiB bound. Windows time zones use the vendored Unicode CLDR 48
 mapping and its bundled Unicode license.
+Microsoft exception definitions count toward the same calendar budget. Each
+recurring series also has a 4 MiB total response budget across its exception pages.
 
 ## Advanced: direct server registration
 

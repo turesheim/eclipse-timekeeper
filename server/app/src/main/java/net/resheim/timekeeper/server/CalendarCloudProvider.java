@@ -44,9 +44,11 @@ final class CalendarCloudProvider {
         var value=(ObjectNode)request(base+"?$expand=exceptionOccurrences&$select=id,subject,body,bodyPreview,start,end,isAllDay,isCancelled,type,recurrence,originalStartTimeZone,originalEndTimeZone,lastModifiedDateTime,location,cancelledOccurrences,exceptionOccurrences",token);
         if(!required(value,"id",1024).equals(id))throw invalid();
         var exceptions=value.path("exceptionOccurrences");if(!exceptions.isArray())throw invalid();
+        if(exceptions.size()>5000)throw limit();long bytes=value.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
         String next=optional(value,"exceptionOccurrences@odata.nextLink");var seen=new HashSet<String>();
         while(next!=null){
             if(!seen.add(next)||seen.size()>100)throw invalid();var page=request(continuation(base+"/exceptionOccurrences",next),token);
+            bytes+=page.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;if(bytes>TaskProviderHttp.MAX_BYTES)throw limit();
             for(var item:items(page)){if(!item.isObject())throw invalid();((com.fasterxml.jackson.databind.node.ArrayNode)exceptions).add(item.deepCopy());if(exceptions.size()>5000)throw limit();}
             next=next(page);
         }

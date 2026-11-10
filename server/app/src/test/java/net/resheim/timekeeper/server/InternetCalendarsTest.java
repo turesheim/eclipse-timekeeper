@@ -26,8 +26,11 @@ class InternetCalendarsTest {
     private <T>T tx(Account account,Supplier<T> work){return store.transaction(account.owner(),work);}
     private TaskProviderConnections connections(){return new TaskProviderConnections(store);}
     private Account account(boolean tasks){
+        return account(tasks,TaskCloudProvider.Provider.GOOGLE);
+    }
+    private Account account(boolean tasks,TaskCloudProvider.Provider provider){
         String owner="internet-calendar-"+UUID.randomUUID();return store.transaction(owner,()->{
-            var services=object().put("tasks",tasks).put("calendars",true).put("writableTasks",false);var pending=connections().beginShared(TaskCloudProvider.Provider.GOOGLE,URI.create("https://connect.example.test"),"browser",services);var grant=connections().consume(pending.state(),"browser");
+            var services=object().put("tasks",tasks).put("calendars",true).put("writableTasks",false);var pending=connections().beginShared(provider,URI.create("https://connect.example.test"),"browser",services);var grant=connections().consume(pending.state(),"browser");
             var tokens=new TaskProviderOAuth.Tokens("private-access","private-shared-grant",Instant.now().plusSeconds(3600),Set.of("openid","https://www.googleapis.com/auth/tasks.readonly","https://www.googleapis.com/auth/calendar.readonly"));
             var taskLists=tasks?List.of(new TaskCloudProvider.RemoteList("tasks","Tasks","STANDARD",false,true,parse("{\"id\":\"tasks\",\"title\":\"Tasks\"}"))):List.<TaskCloudProvider.RemoteList>of();
             var connection=connections().connectShared(grant,new TaskCloudProvider.Account("google-account","Google account"),tokens,taskLists);UUID id=uuid(connection.get("id"));
@@ -89,5 +92,17 @@ class InternetCalendarsTest {
         var calendars=new InternetCalendars(store);calendars.synchronize(claim,provider,"private-access");phase.set(1);calendars.synchronize(claim,provider,"private-access");
         UUID id=InternetCalendars.id(account.connection(),"work");tx(account,()->{assertEquals("old-token",store.find(InternetCalendars.CACHE,id).orElseThrow().path("syncToken").asText());assertEquals("Old",new CalendarSubscriptions(store).events("2026-11-09","2026-11-16").path("items").get(0).path("title").asText());var auth=connections().required(account.connection());auth.putNull("calendarRetryUntil");connections().save(TaskProviderConnections.AUTH,auth);return null;});
         phase.set(2);calendars.synchronize(claim,provider,"private-access");tx(account,()->{assertEquals("replacement-token",store.find(InternetCalendars.CACHE,id).orElseThrow().path("syncToken").asText());assertEquals("New",new CalendarSubscriptions(store).events("2026-11-09","2026-11-16").path("items").get(0).path("title").asText());return null;});assertTrue(addresses.stream().anyMatch(value->value.contains("syncToken=old-token")));
+    }
+    @Test void microsoftExceptionDefinitionsShareTheCalendarBudgetAndPreserveTheLastGoodCache(){
+        var account=account(false,TaskCloudProvider.Provider.MICROSOFT);select(account);var claim=claim(account);boolean[] expanded={false};var details=new AtomicInteger();
+        var provider=new CalendarCloudProvider(TaskCloudProvider.Provider.MICROSOFT,new TaskProviderHttp(Set.of("graph.microsoft.com"),request->{
+            if(request.uri().getPath().endsWith("/events")){
+                var page=object();var values=page.putArray("value");if(!expanded[0])values.add(parse("{\"id\":\"old\",\"type\":\"singleInstance\",\"subject\":\"Last good event\",\"start\":{\"dateTime\":\"2026-11-10T09:00:00\",\"timeZone\":\"UTC\"},\"end\":{\"dateTime\":\"2026-11-10T10:00:00\",\"timeZone\":\"UTC\"}}"));
+                else for(int i=0;i<11;i++)values.add(object().put("id","master-"+i).put("type","seriesMaster"));return reply(200,page);
+            }
+            String master=request.uri().getPath().substring(request.uri().getPath().lastIndexOf('/')+1);details.incrementAndGet();var value=object().put("id",master);var exceptions=value.putArray("exceptionOccurrences");for(int i=0;i<500;i++)exceptions.add(object().put("id",master+"-exception-"+i));return reply(200,value);
+        }));
+        var calendars=new InternetCalendars(store);calendars.synchronize(claim,provider,"private-access");expanded[0]=true;calendars.synchronize(claim,provider,"private-access");
+        tx(account,()->{assertEquals("TASK_PROVIDER_RESPONSE_TOO_LARGE",connections().view(account.connection()).path("calendarLastError").asText());assertEquals("Last good event",new CalendarSubscriptions(store).events("2026-11-09","2026-11-16").path("items").get(0).path("title").asText());assertEquals(1,store.find(InternetCalendars.CACHE,InternetCalendars.id(account.connection(),"work")).orElseThrow().path("events").size());return null;});assertEquals(10,details.get());
     }
 }
