@@ -6,6 +6,7 @@ import {escapedBracket} from '../src/markdown-brackets.js';
 
 export const wikiLiteralInput='timekeeper:wiki-literal-input';
 export const wikiCompositionEnd='timekeeper:wiki-composition-end';
+export const wikiInputComplete='timekeeper:wiki-input-complete';
 
 const references=doc=>{
   const values=[];
@@ -22,7 +23,18 @@ const references=doc=>{
 /** Native DOM edits and composition can bypass input rules. Keep authored literals literal. */
 export function nativeWikiInput(readOnly,pendingClosers,composing){
   const key=new PluginKey('timekeeper-native-wikilinks');
-  return $prose(()=>new Plugin({key,state:{
+  const convert=(state,finish=false)=>{
+    const protectedValues=key.getState(state)||[],values=references(state.doc).filter(value=>!value.escaped
+      &&(finish||!pendingClosers(state,value.from,value.to))&&!protectedValues.some(previous=>previous.from<=value.from&&previous.to>=value.to));
+    if(!values.length)return null;
+    const transaction=state.tr;
+    for(const value of values.reverse()){
+      const date=!value.embed&&dailyNoteDate(value.value),node=date?state.schema.nodes.daily_wikilink.create({date}):state.schema.nodes.vault_wikilink.create({value:value.value,embed:value.embed});
+      transaction.replaceWith(value.from,value.to,node.mark(value.marks));
+    }
+    return transaction;
+  };
+  const plugin=$prose(()=>new Plugin({key,state:{
     init:(_config,state)=>references(state.doc),
     apply:(transaction,previous,before)=>{
       if(transaction.getMeta(wikiLiteralInput)||transaction.getMeta('uiEvent')==='drop'||before.doc.attrs.sourceEpoch!==transaction.doc.attrs.sourceEpoch)return references(transaction.doc);
@@ -32,15 +44,10 @@ export function nativeWikiInput(readOnly,pendingClosers,composing){
       });
     }
   },appendTransaction:(transactions,_before,state)=>{
-    if(readOnly()||composing()||!transactions.some(transaction=>transaction.docChanged||transaction.getMeta(wikiCompositionEnd)))return null;
-    const protectedValues=key.getState(state)||[],values=references(state.doc).filter(value=>!value.escaped
-      &&!pendingClosers(state,value.from,value.to)&&!protectedValues.some(previous=>previous.from<=value.from&&previous.to>=value.to));
-    if(!values.length)return null;
-    const transaction=state.tr;
-    for(const value of values.reverse()){
-      const date=!value.embed&&dailyNoteDate(value.value),node=date?state.schema.nodes.daily_wikilink.create({date}):state.schema.nodes.vault_wikilink.create({value:value.value,embed:value.embed});
-      transaction.replaceWith(value.from,value.to,node.mark(value.marks));
-    }
-    return transaction;
+    if(readOnly()||composing()||!transactions.some(transaction=>transaction.docChanged||transaction.selectionSet||transaction.getMeta(wikiCompositionEnd)||transaction.getMeta(wikiInputComplete)))return null;
+    return convert(state,transactions.some(transaction=>transaction.getMeta(wikiInputComplete)));
   }}));
+  // A generated closing pair is already valid Markdown during typing. Project
+  // it for saving without replacing the live text or moving the editing caret.
+  return {plugin,project:state=>composing()?state.doc:convert(state,true)?.doc||state.doc};
 }
