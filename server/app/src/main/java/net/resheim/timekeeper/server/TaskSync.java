@@ -105,9 +105,13 @@ final class TaskSync {
     }
 
     /** Apply non-conflicting remote fields after an ETag-guarded three-way comparison. */
-    ApiReplies apply(JsonNode input,String match) {
+    ApiReplies apply(JsonNode input,String match) {return reconcile(input,match,null);}
+    /** Connector-owned, explicitly reviewed conflict resolution; ordinary apply retains its strict conflict guard. */
+    ApiReplies resolve(JsonNode input,String match,boolean takeRemote){return reconcile(input,match,takeRemote);}
+    private ApiReplies reconcile(JsonNode input,String match,Boolean takeRemote){
         var observed=input.get("item");String operation=observed.path("operationId").asText();
-        return receipts.execute(operation,"POST","/task-sync/apply",match,input,() -> {
+        var receiptInput=object();receiptInput.set("input",input);if(takeRemote!=null)receiptInput.put("takeRemote",takeRemote);
+        return receipts.execute(operation,"POST",takeRemote==null?"/task-sync/apply":"/task-sync/resolve",match,takeRemote==null?input:receiptInput,() -> {
             var connection=store.find("TASK_CONNECTION",uuid(input.get("connectionId"))).orElseThrow(ApiFailure::notFound);
             var list=store.find("TASK_LIST",uuid(input.get("listId"))).orElseThrow(ApiFailure::notFound);
             if(!list.path("connectionId").asText().equals(connection.path("id").asText())) throw ApiFailure.validation();
@@ -119,7 +123,8 @@ final class TaskSync {
             var current=store.byReference(key).orElseThrow(ApiFailure::notFound);
             ApiReplies.match(current,match);
             var preview=previewItem(observed,key,connection,list,true,false);
-            if(Set.of("CONFLICT","RECONCILE_ID","INCOMPLETE","DELETE_DEFERRED","DELETE_CONFLICT","DELETE_REVIEW").contains(preview.path("status").asText())) throw ApiFailure.conflict();
+            if(Set.of("RECONCILE_ID","INCOMPLETE","DEFERRED","DELETE_DEFERRED","DELETE_CONFLICT","DELETE_REVIEW").contains(preview.path("status").asText())||preview.path("status").asText().equals("CONFLICT")&&takeRemote==null||preview.path("reason").asText().equals("OTHER_LIST"))throw ApiFailure.conflict();
+            for(var decision:preview.path("decisions"))if(Set.of("INCOMPLETE_GROUP","OTHER_LIST").contains(decision.path("outcome").asText()))throw ApiFailure.conflict();
             var candidate=((ObjectNode)current).deepCopy();
             var refs=(ArrayNode)candidate.get("externalReferences");ObjectNode reference=null;
             for(var value:refs) if(value.path("providerId").asText().equals(key.providerId())
@@ -133,13 +138,13 @@ final class TaskSync {
             for(var decision:preview.path("decisions")) {
                 String field=decision.path("field").asText(),outcome=decision.path("outcome").asText();
                 var remote=observedFields.get(field);
-                if(outcome.equals("REMOTE_ONLY")) {
+                if(outcome.equals("REMOTE_ONLY")||Boolean.TRUE.equals(takeRemote)&&Set.of("CONFLICT","NO_BASELINE").contains(outcome)) {
                     if(field.equals("parentTaskId") && remote.isTextual()) validateParent(current,key,list.path("id").asText(),remote.asText());
                     if(Set.of("taskListId","sectionId","assignment").contains(field)) reference.set(field,remote.deepCopy());
-                    else setTaskField(candidate,field,remote.deepCopy());
+                    else setTaskField(candidate,field,takeRemote!=null&&field.equals(METADATA_LINKS)?resolvedLinks(current,baselineFields(baseline).get(METADATA_LINKS),remote):remote.deepCopy());
                     changed=true;
                 }
-                if(outcome.equals("REMOTE_ONLY") || outcome.equals("CONVERGED")) {
+                if(outcome.equals("REMOTE_ONLY") || outcome.equals("CONVERGED") || takeRemote!=null&&!outcome.equals("UNSUPPORTED")) {
                     setField(baseline,field,remote.deepCopy());changed=true;
                 }
             }
@@ -150,6 +155,11 @@ final class TaskSync {
             store.save("TASK",updated);store.change("TASK","UPDATED",uuid(current.get("id")).toString());
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
+    }
+    /** Keep resources absent from this source's previous and current observations; never put them in its baseline. */
+    private static JsonNode resolvedLinks(JsonNode task,JsonNode baseline,JsonNode remote){
+        var sourceIds=new HashSet<String>();if(baseline!=null)baseline.forEach(link->sourceIds.add(link.path("id").asText()));remote.forEach(link->sourceIds.add(link.path("id").asText()));
+        var result=array();for(var link:task.path(METADATA).path(LINKS))if(!sourceIds.contains(link.path("id").asText()))result.add(link.deepCopy());remote.forEach(link->result.add(link.deepCopy()));return result;
     }
     private JsonNode providerParent(UUID parentId,String providerId,String listId) {
         var parent=store.find("TASK",parentId).orElseThrow(ApiFailure::conflict);
