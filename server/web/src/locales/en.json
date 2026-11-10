@@ -1478,7 +1478,7 @@
   "notes.maximize": "Open in workspace",
   "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?",
   "notes.search_title": "Search notes",
-  "notes.search_help": "Search all note contents. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
+  "notes.search_help": "Search notes and event details. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
   "notes.client": "Associate with client",
   "notes.no_client": "No client",
   "notes.client_associations": "Notes linked to clients",
