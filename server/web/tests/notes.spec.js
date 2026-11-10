@@ -29,7 +29,7 @@ test('shared search prepares indexes before a query and presents normal-weight b
   let prepared=0,queries=0,failures=2;
   await page.route('**/api/v1/notes/search/status',route=>{prepared++;return route.continue();});
   await page.route('**/api/v1/notes/search?**',route=>{
-    queries++;if(failures-->0)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'NOTES_SEARCH_INDEXING',message:'Indexing'}})});
+    queries++;if(failures-->0)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'NOTES_SEARCH_INDEXING',message:'Indexing'})});
     return route.continue();
   });
   const api=await setup(page,request);await expect.poll(()=>prepared).toBeGreaterThan(0);expect(queries).toBe(0);

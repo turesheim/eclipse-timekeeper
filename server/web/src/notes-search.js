@@ -63,7 +63,7 @@ export class NotesSearch {
         for(;;){
           try{reply=await session.request('/notes/search?'+params);break;}
           catch(error){
-            if(error.status!==503||more||Date.now()>=deadline)throw error;
+            if(error.status!==503||error.code!=='NOTES_SEARCH_INDEXING'||more||Date.now()>=deadline)throw error;
             do{
               await new Promise(resolve=>setTimeout(resolve,250));if(!current())return;
               const status=(await session.request('/notes/search/status')).data;
