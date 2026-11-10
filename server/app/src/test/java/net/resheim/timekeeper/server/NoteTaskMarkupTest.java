@@ -5,6 +5,10 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class NoteTaskMarkupTest {
+    @Test void assignmentTokensAreProseRatherThanCodeEscapesLinksOrEmailAddresses(){
+        var items=NoteTaskMarkup.items("- [ ] Review @Client_Name @project:Internal_Work `@Code` \\@Escaped [@Linked](https://example.invalid) user@example.invalid\n");
+        assertEquals(List.of("Client_Name","project:Internal_Work"),items.getFirst().assignments());
+    }
     @Test void realListTasksExcludeFrontmatterEscapesAndCodeExamples(){
         String source="\ufeff---\nexample: '- [ ] Metadata'\n---\n\n```md\n- [ ] Fenced example\n```\n\n    - [ ] Indented example\n\n- \\[ ] Escaped marker\n\n[ ] Not a list\n\n- [ ] Real task\n";
         var tasks=NoteTaskMarkup.items(source);assertEquals(1,tasks.size());assertEquals("Real task",tasks.get(0).summary());assertEquals(source.indexOf("[ ] Real"),tasks.get(0).marker());assertFalse(tasks.get(0).checked());

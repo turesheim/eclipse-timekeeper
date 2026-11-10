@@ -19,6 +19,7 @@ import {NotePopup} from './note-popup.js';
 import {CalendarSearchEditor,calendarSearchNavigation} from './calendar-search-editor.js';
 import {calendarSearchHit} from './calendar-search-navigation.js';
 import { TasksView } from './tasks.js';
+import {taskEditorFields} from './task-editor-fields.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
 import { UndoNotice } from './undo.js';
@@ -76,7 +77,7 @@ const calendarSearchPopup=new CalendarSearchEditor($('workspace'),searchEditorCa
 const calendarSearchWorkspace=new CalendarSearchEditor(calendarSearchPanel,searchEditorCallbacks,{inline:true});
 let calendarNavigation=0;
 async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave()&&await calendarSearchWorkspace.canLeave();}
-const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
+const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error))),onDelete:id=>void openDelete('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,tag=hashtagKey(event.detail.tag);
@@ -570,6 +571,7 @@ function clientField(value) {
 }
 function refreshClientChoices() {
   const input = $('field-clientId');if (!input || editor?.busy || editor?.uncertain) return;
+  if(editor?.taskFields){editor.taskFields.refresh();return;}
   const selected = input.value;input.replaceChildren();
   for (const [id, label] of [['', i18nText("ui.choose_a_client")], ...snapshot.clients.map((client) => [client.id, client.name])]) {const option = element('option', label);option.value = id;input.append(option);}
   if (selected && !snapshot.clients.some((client) => client.id === selected)) {const option = element('option', i18nText("ui.removed_client_choose_another"));option.value = selected;input.append(option);}
@@ -595,7 +597,7 @@ function begin(title, state) {
   if (editor || $('editor').open) return false;
   editor = { ...state, session: api, zone: snapshot.profile.data.zoneId, busy: false, uncertain: false };$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
   $('save').className = `btn ${state.remove ? 'btn-danger' : 'btn-primary'}`;
-  $('editor-delete').hidden = state.collection !== 'work-sessions' || !state.id || !!state.remove || !!state.command;
+  $('editor-delete').hidden = !['work-sessions','tasks'].includes(state.collection) || !state.id || !!state.remove || !!state.command;
   $('editor-delete').disabled = !connected || !canWrite;
   $('editor-title').textContent = title;$('save').textContent = i18nText("ui.save");$('save').disabled = false;$('cancel').disabled = false;return true;
 }
@@ -621,8 +623,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   if (collection === 'labels') field(i18nText("ui.color_optional"), 'color', value.color, { hint: i18nText("ui.hex_color_for_example_176653") });
   if (collection === 'tasks') {
     field(i18nText("ui.summary"), 'summary', value.summary, { required: true, max: 1024 });
-    field(i18nText("ui.project"), 'projectId', value.projectId, { choices: [['', i18nText("ui.unassigned")], ...snapshot.projects.map((v) => [v.id, v.name])] });
-    field(i18nText("ui.parent_task"), 'parentTaskId', value.parentTaskId, { choices: [['', i18nText("ui.no_parent")], ...snapshot.tasks.filter((v) => v.id !== id).map((v) => [v.id, taskPresentation(v).title])] });
+    editor.taskFields=taskEditorFields(field,value,()=>snapshot,id);
     field(i18nText('record.url_optional'), 'url', value.url, { type: 'url', max: 4096 });
   }
   if (collection === 'activities') {
@@ -736,7 +737,7 @@ function values() {
     case 'clients':return { name: get('name'), color: get('color') };
     case 'projects':return { name: get('name'), clientId: get('clientId'), icon: $('fields').querySelector('[name=icon]:checked')?.value || null };
     case 'labels':return { name: get('name'), color: get('color') || null };
-    case 'tasks':return { summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null };
+    case 'tasks':return { summary: get('summary'), clientId:get('clientId')||null,projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null,priority:get('priority'),due:editor.taskFields.due() };
     case 'activities':return { ...(editor.id ? {} : { taskId: get('taskId') || null, projectId: get('taskId') ? null : get('projectId') || null }), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels() };
     case 'work-sessions':return { ...(editor.legacyLabelIds?.length ? { labelIds: [...editor.legacyLabelIds] } : {}), clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
   }
@@ -777,10 +778,11 @@ async function saveEditor(event, remove = editor?.remove) {
 }
 $('editor-form').addEventListener('submit', saveEditor);
 $('editor-delete').addEventListener('click', () => {
-  if (!editor || editor.collection !== 'work-sessions' || !editor.id || editor.command || editor.remove || editor.busy || editor.loading || editor.uncertain || editor.reviewRequired || editor.session !== api || !connected || !canWrite) return;
+  if (!editor || !['work-sessions','tasks'].includes(editor.collection) || !editor.id || editor.command || editor.remove || editor.busy || editor.loading || editor.uncertain || editor.reviewRequired || editor.session !== api || !connected || !canWrite) return;
   deleteCandidate = editor;
   $('editor-delete-confirm').querySelector('[value=delete]').disabled = false;
-  $('editor-delete-description').textContent = i18nText('ui.delete_681b54', {value0: editor.deletionLabel || i18nText('ui.work_session_21aa04'), value1: i18nText('ui.undo_will_be_available_for_ten_minutes')});
+  $('editor-delete-title').textContent=i18nText(editor.collection==='tasks'?'tasks.delete':'ui.delete_work_session');
+  $('editor-delete-description').textContent = i18nText('ui.delete_681b54', {value0: editor.deletionLabel || i18nText('ui.work_session_21aa04'), value1: i18nText(editor.collection==='tasks'?'ui.this_cannot_be_undone_records_with_dependencies_may_be_rejected':'ui.undo_will_be_available_for_ten_minutes')});
   $('editor-delete-confirm').returnValue = '';$('editor-delete-confirm').showModal();
 });
 $('editor-delete-confirm').addEventListener('close', () => {

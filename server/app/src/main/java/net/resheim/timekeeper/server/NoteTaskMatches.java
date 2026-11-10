@@ -14,7 +14,7 @@ final class NoteTaskMatches {
         if(before.size()==1&&after.size()==1){result[after.getFirst()]=before.getFirst();return result;}
         // A bounded comparison also recognizes an edited title next to newly
         // added items. Ambiguous replacements get new identities; existing
-        // normal tasks can then be retained instead of silently repurposed.
+        // tasks with recorded work are retained instead of silently repurposed.
         if(before.size()>64||after.size()>64)return result;
         record Candidate(int old,int next,double score){}
         var candidates=new ArrayList<Candidate>();

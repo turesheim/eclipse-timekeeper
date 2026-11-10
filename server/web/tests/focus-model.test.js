@@ -43,3 +43,9 @@ test('task moves follow the same project association as API reports and retain v
   const s=focusedSnapshot(source,{clientIds:['a']});assert.deepEqual(s.activities.map(value=>value.id),['moved-in']);
   assert.equal(durationNanos(s.report.total),3600000000000n);assert.equal(focusIncludesActivity(s,source.activities[0]),true);assert.equal(focusIncludesActivity(s,source.activities[1]),false);
 });
+
+test('a direct client task and its recorded work remain in that client focus without a project',()=>{
+  const source=fixture();source.tasks.push({id:'direct',projectId:null,clientId:'a'});source.activities.push({id:'direct-work',taskId:'direct',start:'2025-10-26T10:00:00Z',end:'2025-10-26T11:00:00Z'});
+  const focused=focusedSnapshot(source,{clientIds:['a']});assert.ok(focused.tasks.some(task=>task.id==='direct'));assert.ok(focused.activities.some(activity=>activity.id==='direct-work'));
+  assert.equal(focusedSnapshot(source,{clientIds:['b']}).tasks.some(task=>task.id==='direct'),false);
+});

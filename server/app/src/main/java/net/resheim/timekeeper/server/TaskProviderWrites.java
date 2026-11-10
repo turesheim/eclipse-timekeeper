@@ -108,7 +108,7 @@ final class TaskProviderWrites {
         var source=((ObjectNode)reference.path("source")).deepCopy();source.setAll(remote.source());
         var key=new ExternalTaskReferenceKey("google",row.path("repositoryId").asText(),row.path("externalId").asText());
         task=store.service().updateExternalTaskSyncState(new UpdateExternalTaskSyncState(task.id(),task.version(),key,source(source),Optional.of(new ExternalTaskBaseline(1,store.now(),accepted.toString()))));
-        new TaskCloudPull(store,receipts,inputs).remember(snapshot(store.owner(),task),"google",row.path("repositoryId").asText(),remote);
+        new TaskCloudPull(store,receipts,inputs).remember(store.taskSnapshot(task),"google",row.path("repositoryId").asText(),remote);
         row.put("state",uncertain?"RECONCILED":"DONE").put("resolution",takeRemote?"REMOTE":"LOCAL").putNull("lastError");return visible(connections().save(KIND,row));
     }
     void cancel(UUID connection,UUID id,String match){

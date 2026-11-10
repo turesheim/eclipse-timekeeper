@@ -26,11 +26,16 @@ An ordinary newline in Markdown is a soft break. Newly formatted rules use `---`
 Unknown extensions, HTML other than safe anchors, reference-style links and code
 fences with extra metadata remain inert, editable source fragments. Their HTML is never executed.
 
-Saved checklist items such as `- [ ] Follow up` are also ordinary, unassigned
+Saved checklist items such as `- [ ] Follow up` are also ordinary
 Dagsverk tasks. Checking or unchecking an item updates the task's completion;
 completing or reopening the task updates the linked checkbox. Fenced/indented
 code examples, escaped markers and empty items do not create tasks. Existing
-notes are enrolled when their content is next changed, rather than on opening.
+notes are enrolled in the background, without needing to open or edit them.
+Add `@Client_Name` or `@Project_Name` to assign a task; use underscores for spaces.
+Names must identify one of your own clients or projects unambiguously. When a
+client and project share a name, use `@client:Name` or `@project:Name`. Conflicting
+or unknown names remain as text. Code, escaped annotations and link labels do not
+assign tasks. The note retains its original text and annotation spelling.
 Each document supports up to 1,000 nonempty checklist items. Task titles longer
 than 1,024 characters are shortened with an ellipsis; the note keeps the full text.
 
@@ -39,7 +44,9 @@ renaming the file retains its links. Distinct titles can be reordered; repeated
 identical titles remain separate in their relative order. Unambiguous title edits
 in the note update their tasks; editing a task title separately leaves the note's
 wording intact. Replacing several unrelated items can create new tasks while
-retaining the previous tasks. Removing an item or deleting its note retains the ordinary task. Deleting
+deleting unused previous tasks. Removing an item deletes its task unless recorded
+work or subtasks require retaining it; in that case, only its note link is removed.
+Trashing a note retains its tasks for restoration. Deleting
 a task does not recreate it during unrelated note edits; editing that item's
 title or checkbox can create a new task. Restoring a trashed note retains its
 links and uses the tasks' current completion states.
@@ -50,6 +57,19 @@ Task completion is a normal note change with a new content validator and history
 a concurrent unsaved note draft is retained for explicit review. An open Notes
 editor reports a server change; use **Reload from server** to review the updated
 checkbox state.
+
+In **Tasks**, **Hide completed tasks** applies to every category and both native
+and calendar tasks. Emoji shortcodes in titles are displayed as emoji. A native
+task's details offer **Delete task** and an **Open source note** link with the
+note's type icon. The shared note popup preserves normal draft and concurrency
+guards. The task editor supports a client without a project, priority, and either
+a date-only or timed deadline with its original time zone. Editing other fields
+preserves the exact stored deadline, start, flags and urgency.
+
+Canonical saves, including WebDAV and imports, reconcile immediately. The
+background worker processes up to 25 sources of each kind every 30 seconds and
+resumes scanning after restart. `TIMEKEEPER_NOTE_TASKS_AUTOMATIC=false` disables
+only background enrollment; normal Markdown saves continue synchronizing tasks.
 
 Vault extensions include:
 

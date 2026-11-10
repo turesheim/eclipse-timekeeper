@@ -10,7 +10,8 @@ import org.commonmark.parser.*;
 final class NoteTaskMarkup {
     private static final Parser MARKDOWN=Parser.builder().extensions(List.of(YamlFrontMatterExtension.create(),StrikethroughExtension.create()))
             .includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES).build();
-    record Item(int marker,String summary,boolean checked,int depth){
+    record Item(int marker,String summary,boolean checked,int depth,List<String> assignments){
+        Item(int marker,String summary,boolean checked,int depth){this(marker,summary,checked,depth,List.of());}
         @Override public String toString(){return "NoteTaskMarkup.Item[marker="+marker+", checked="+checked+", depth="+depth+"]";}
     }
     static List<Item> items(String source){
@@ -25,11 +26,24 @@ final class NoteTaskMarkup {
                 String summary=summary(paragraph,input.substring(marker,marker+3),marker);
                 if(!summary.isEmpty()){
                     int depth=0;for(Node parent=node.getParent();parent!=null;parent=parent.getParent())if(parent instanceof ListItem)depth++;
-                    result.add(new Item(marker+prefix,summary,input.charAt(marker+1)!=' ',depth));
+                    result.add(new Item(marker+prefix,summary,input.charAt(marker+1)!=' ',depth,assignments(paragraph,input)));
                 }
             }
         }
         for(Node child=node.getFirstChild();child!=null;child=child.getNext())collect(child,input,prefix,result);
+    }
+    private static List<String> assignments(Paragraph paragraph,String input){
+        var tokens=new LinkedHashSet<String>();var pattern=java.util.regex.Pattern.compile("(?U)(?<!\\S)@([\\p{L}\\p{N}][\\p{L}\\p{N}_:.-]*)(?=$|\\s|[,;!?])");
+        paragraph.accept(new AbstractVisitor(){
+            @Override public void visit(Text text){
+                for(var span:text.getSourceSpans()){
+                    String raw=input.substring(span.getInputIndex(),span.getInputIndex()+span.getLength());var matcher=pattern.matcher(raw);
+                    while(matcher.find())tokens.add(matcher.group(1));
+                }
+            }
+            @Override public void visit(Link link){}
+            @Override public void visit(Image image){}
+        });return List.copyOf(tokens);
     }
     private static String summary(Paragraph paragraph,String marker,int start){
         var text=new StringBuilder();paragraph.accept(new AbstractVisitor(){
