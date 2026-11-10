@@ -1454,7 +1454,7 @@
   "notes.search_results": "Results ordered by relevance.",
   "notes.search_none": "No matching notes.",
   "notes.search_changed": "Search results changed or expired. Search again for current results.",
-  "notes.search_invalid": "Use up to 32 words, quoted phrases or tag:#name filters (up to 512 characters).",
+  "notes.search_invalid": "Use up to 32 words, quoted phrases or tag:, file:, event:, journal: and note: filters (up to 512 characters).",
   "notes.search_unavailable": "Content search is being prepared or is unavailable. Try again shortly; browsing files still works.",
   "notes.search_preparing": "Preparing content search…",
   "notes.added": "Added:",
@@ -1480,5 +1480,9 @@
   "notes.client": "Associate with client",
   "notes.no_client": "No client",
   "notes.client_associations": "Notes linked to clients",
-  "notes.task_count": "Note checklist items"
+  "notes.task_count": "Note checklist items",
+  "notes.search_title": "Search notes",
+  "notes.search_help": "Search notes and event details. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
+  "notes.search_event_series": "Recurring series details",
+  "notes.search_event_no_note": "This event has no saved note."
 }

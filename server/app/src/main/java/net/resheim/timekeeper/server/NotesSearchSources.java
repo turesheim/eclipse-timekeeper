@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Short SQL snapshots copy canonical bytes; parsing and Lucene work follow after close. */
-final class NotesSearchSources {
+class NotesSearchSources {
     record State(NotesLuceneIndex.Identity identity,NotesSearchChanges.Snapshot changes,boolean configuration,String hiddenJournal){
         @Override public String toString(){return "NotesSearchSources.State[generation="+changes.generation()+"]";}
     }

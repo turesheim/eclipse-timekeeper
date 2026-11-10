@@ -14,6 +14,16 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 /** Replica-local derived caches. Cache failures never participate in canonical writes. */
 @ApplicationScoped
 class NotesSearchService implements AutoCloseable {
+    interface Backend {
+        String key();
+        NotesSearchSources sources(ServerStore store);
+        NotesIndexReplay open(Path path,NotesSearchSources sources,NotesSearchSources.State state)throws IOException;
+    }
+    static final Backend NOTES=new Backend(){
+        public String key(){return "notes";}
+        public NotesSearchSources sources(ServerStore store){return new NotesSearchSources(store);}
+        public NotesIndexReplay open(Path path,NotesSearchSources sources,NotesSearchSources.State state)throws IOException{return NotesSearchReplay.open(path,sources,state);}
+    };
     @Inject ServerStore store;
     @ConfigProperty(name="timekeeper.notes.search.cache-directory",defaultValue="AUTO") String configuredDirectory="AUTO";
     @ConfigProperty(name="timekeeper.notes.search.open-owners",defaultValue="8") int maximumOwners=8;
@@ -23,6 +33,7 @@ class NotesSearchService implements AutoCloseable {
     private static final String MARKER="Dagsverk private Notes search cache 1\n";
     private static final org.jboss.logging.Logger LOG=org.jboss.logging.Logger.getLogger(NotesSearchService.class);
     private final LinkedHashMap<String,Handle> handles=new LinkedHashMap<>(16,.75f,true);
+    private final Set<String> backends=new HashSet<>(Set.of(NOTES.key()));
     private final ArrayDeque<Handle> closing=new ArrayDeque<>();
     private final Set<String> closingOwners=new HashSet<>();
     private final Semaphore queries=new Semaphore(2);
@@ -34,18 +45,20 @@ class NotesSearchService implements AutoCloseable {
     private long sweepAt,measureAt,measuredBytes;
     private int rotation;
     private static final class Handle {
-        final String owner;final Path folder;
-        volatile NotesSearchReplay current,building;
+        final String owner,key;final Path folder;final Backend backend;
+        volatile NotesIndexReplay current,building;
         volatile Path currentPath,buildingPath;
         volatile boolean rebuild,removed,broken;
         volatile String error;
         volatile long touched=System.nanoTime(),retryAfter,nextPoll;
-        Handle(String owner,Path folder){this.owner=owner;this.folder=folder;}
+        Handle(String owner,String key,Path folder,Backend backend){this.owner=owner;this.key=key;this.folder=folder;this.backend=backend;}
     }
     record Status(String state,long generation,long target,boolean rebuilding,String error){}
     NotesSearchService(){}
     NotesSearchService(ServerStore store,Path directory){this.store=store;configuredDirectory=directory.toString();}
+    synchronized void register(Backend backend){if(!backend.key().matches("[a-z][a-z0-9-]{0,31}"))throw new IllegalArgumentException("Invalid search backend key");backends.add(backend.key());}
     private static String ownerKey(String owner){return ArchiveJournalFiles.digest(owner.getBytes(StandardCharsets.UTF_8));}
+    private static String ownerKey(String owner,String backend){return backend.equals(NOTES.key())?ownerKey(owner):ownerKey(owner+"\0"+backend);}
     private synchronized void initialize()throws IOException{
         if(closed)throw new IOException("Notes search is stopped");if(worker!=null)return;
         if(maximumOwners<1||maximumOwners>32||maximumBytes<1||minimumFreeBytes<0)throw new IOException("Invalid search cache owner limit");
@@ -75,28 +88,45 @@ class NotesSearchService implements AutoCloseable {
             if(failure instanceof IOException io)throw io;throw new IOException("Notes search cache unavailable",failure);
         }
     }
-    private synchronized Handle prepare(NotesSearchSources.State state)throws IOException{
-        initialize();String owner=state.identity().owner();if(closingOwners.contains(owner))throw new IOException("Notes search cache is busy");var existing=handles.get(owner);if(existing!=null){existing.touched=System.nanoTime();var current=existing.current;if(current==null||!current.caughtUp(state))existing.nextPoll=0;return existing;}
-        if(handles.size()>=maximumOwners){
-            if(closing.size()>=4)throw new IOException("Notes search cache is busy");var iterator=handles.values().iterator();var evicted=iterator.next();iterator.remove();evicted.removed=true;closingOwners.add(evicted.owner);closing.add(evicted);
+    private synchronized Handle prepare(NotesSearchSources.State state,Backend backend)throws IOException{
+        if(!backend.key().matches("[a-z][a-z0-9-]{0,31}"))throw new IllegalArgumentException("Invalid search backend key");
+        backends.add(backend.key());initialize();String owner=state.identity().owner(),key=ownerKey(owner,backend.key());
+        if(closingOwners.contains(key))throw new IOException("Notes search cache is busy");var existing=handles.get(key);if(existing!=null){existing.touched=System.nanoTime();var current=existing.current;if(current==null||!current.caughtUp(state))existing.nextPoll=0;return existing;}
+        boolean owned=handles.values().stream().anyMatch(handle->handle.owner.equals(owner));
+        if(!owned&&handles.values().stream().map(handle->handle.owner).distinct().count()>=maximumOwners){
+            var activity=new HashMap<String,Long>();for(var handle:handles.values())activity.merge(handle.owner,handle.touched,Math::max);
+            String retiredOwner=activity.entrySet().stream().min(Map.Entry.comparingByValue()).orElseThrow().getKey();
+            var retired=handles.values().stream().filter(handle->handle.owner.equals(retiredOwner)).toList();
+            if(closing.size()+retired.size()>4)throw new IOException("Notes search cache is busy");
+            for(var evicted:retired){handles.remove(evicted.key);evicted.removed=true;closingOwners.add(evicted.key);closing.add(evicted);}
         }
-        var handle=new Handle(owner,root.resolve(ownerKey(owner)));handles.put(owner,handle);return handle;
+        var handle=new Handle(owner,key,root.resolve(key),backend);handles.put(key,handle);return handle;
     }
     Status status(NotesSearchSources.State state){
-        try{var handle=prepare(state);var current=handle.current;var saved=current==null?null:current.index().watermark();
+        return status(state,NOTES);
+    }
+    Status status(NotesSearchSources.State state,Backend backend){
+        try{var handle=prepare(state,backend);var current=handle.current;var saved=current==null?null:current.index().watermark();
             return new Status(!handle.broken&&current!=null&&current.caughtUp(state)?"READY":handle.error==null?"INDEXING":"UNAVAILABLE",saved==null?0:saved.generation(),state.changes().generation(),handle.rebuild||handle.building!=null,handle.error);
         }catch(IOException|RuntimeException unavailable){return new Status("UNAVAILABLE",0,state.changes().generation(),false,"CACHE_UNAVAILABLE");}
     }
-    void rebuild(NotesSearchSources.State state)throws IOException{var handle=prepare(state);handle.rebuild=true;handle.retryAfter=0;handle.nextPoll=0;}
+    void rebuild(NotesSearchSources.State state)throws IOException{rebuild(state,NOTES);}
+    void rebuild(NotesSearchSources.State state,Backend backend)throws IOException{var handle=prepare(state,backend);handle.rebuild=true;handle.retryAfter=0;handle.nextPoll=0;}
     NotesLuceneIndex.Page search(NotesSearchSources.State state,NotesSearchQuery.Parsed query,int limit,NotesLuceneIndex.Position after,long waitMillis)throws IOException{
-        if(waitMillis<0||waitMillis>1000)throw new IllegalArgumentException("Invalid search wait budget");var handle=prepare(state);long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(waitMillis);
+        return search(state,query,limit,after,waitMillis,NOTES);
+    }
+    NotesLuceneIndex.Page search(NotesSearchSources.State state,NotesSearchQuery.Parsed query,int limit,NotesLuceneIndex.Position after,long waitMillis,Backend backend)throws IOException{
+        return search(state,query,limit,after,waitMillis,backend,Set.of());
+    }
+    NotesLuceneIndex.Page search(NotesSearchSources.State state,NotesSearchQuery.Parsed query,int limit,NotesLuceneIndex.Position after,long waitMillis,Backend backend,Set<String> excluded)throws IOException{
+        if(waitMillis<0||waitMillis>1000)throw new IllegalArgumentException("Invalid search wait budget");var handle=prepare(state,backend);long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(waitMillis);
         do{
             if(handle.removed)throw new NotesLuceneIndex.Unavailable();var current=handle.current;
             if(!handle.broken&&current!=null&&current.caughtUp(state)){
                 boolean acquired;
                 try{acquired=queries.tryAcquire(50,TimeUnit.MILLISECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
                 if(!acquired)throw new NotesLuceneIndex.Unavailable();
-                try{return current.index().search(query,state.changes().generation(),limit,after,state.configuration(),state.hiddenJournal(),1000);}
+                try{return current.index().search(query,state.changes().generation(),limit,after,state.configuration(),state.hiddenJournal(),1000,excluded);}
                 catch(NotesLuceneIndex.Unavailable pending){throw pending;}
                 catch(IOException|RuntimeException corrupt){handle.broken=true;handle.rebuild=true;handle.retryAfter=0;throw new NotesLuceneIndex.Unavailable();}finally{queries.release();}
             }
@@ -104,11 +134,31 @@ class NotesSearchService implements AutoCloseable {
             try{Thread.sleep(10);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
         }while(true);
     }
+    @FunctionalInterface private interface IndexRead<T>{T read(NotesLuceneIndex index)throws IOException;}
+    private <T>T read(NotesSearchSources.State state,Backend backend,IndexRead<T> query)throws IOException{
+        var handle=prepare(state,backend);var current=handle.current;
+        if(handle.removed||handle.broken||current==null||!current.caughtUp(state))throw new NotesLuceneIndex.Unavailable();
+        boolean acquired;try{acquired=queries.tryAcquire(50,TimeUnit.MILLISECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
+        if(!acquired)throw new NotesLuceneIndex.Unavailable();
+        try{return query.read(current.index());}
+        catch(NotesLuceneIndex.Unavailable pending){throw pending;}
+        catch(IOException|RuntimeException corrupt){handle.broken=true;handle.rebuild=true;handle.retryAfter=0;throw new NotesLuceneIndex.Unavailable();}
+        finally{queries.release();}
+    }
+    Set<String> sourceFences(NotesSearchSources.State state,Backend backend,String type)throws IOException{return read(state,backend,index->index.sourceFences(type,state.changes().generation()));}
+    NotesLuceneIndex.Hit lookup(NotesSearchSources.State state,Backend backend,UUID id)throws IOException{
+        long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(250);
+        do{
+            try{return read(state,backend,index->index.lookup(id,state.changes().generation(),state.configuration(),state.hiddenJournal()));}
+            catch(NotesLuceneIndex.Unavailable pending){if(System.nanoTime()>=deadline)throw pending;}
+            try{Thread.sleep(10);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
+        }while(true);
+    }
     private void tick(){
         try{
             Handle selected,retired;List<Handle> snapshot;
             synchronized(this){if(closed)return;retired=closing.poll();snapshot=List.copyOf(handles.values());selected=snapshot.isEmpty()?null:snapshot.get(Math.floorMod(rotation++,snapshot.size()));}
-            if(retired!=null)try{closeHandle(retired,false);}finally{synchronized(this){closingOwners.remove(retired.owner);}}
+            if(retired!=null)try{closeHandle(retired,false);}finally{synchronized(this){closingOwners.remove(retired.key);}}
             if(System.nanoTime()>=sweepAt){sweepAt=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);sweep();}
             if(selected!=null&&!selected.removed){
                 long now=System.nanoTime();
@@ -119,7 +169,7 @@ class NotesSearchService implements AutoCloseable {
     }
     private void advance(Handle handle){
         try{
-            var sources=new NotesSearchSources(store);var state=sources.state(handle.owner);NotesLuceneIndex.privateDirectory(handle.folder);
+            var sources=handle.backend.sources(store);var state=sources.state(handle.owner);NotesLuceneIndex.privateDirectory(handle.folder);
             if(handle.current==null&&handle.building==null)discover(handle,sources,state);
             boolean work=handle.rebuild||handle.building!=null||handle.current==null||!handle.current.caughtUp(state);
             if(work&&!capacity()){fail(handle,"CACHE_CAPACITY");return;}
@@ -166,13 +216,13 @@ class NotesSearchService implements AutoCloseable {
         });return bytes[0];
     }
     private void createBuild(Handle handle,NotesSearchSources sources,NotesSearchSources.State state)throws IOException{
-        handle.buildingPath=handle.folder.resolve("index-"+UUID.randomUUID());handle.building=NotesSearchReplay.open(handle.buildingPath,sources,state);
+        handle.buildingPath=handle.folder.resolve("index-"+UUID.randomUUID());handle.building=handle.backend.open(handle.buildingPath,sources,state);
     }
     private void discover(Handle handle,NotesSearchSources sources,NotesSearchSources.State state)throws IOException{
         List<Path> folders;try(var entries=Files.list(handle.folder)){folders=entries.filter(path->path.getFileName().toString().matches("index-[0-9a-f-]{36}")).sorted().toList();}
         for(var path:folders){
-            NotesSearchReplay replay;
-            try{replay=NotesSearchReplay.open(path,sources,state);}catch(org.apache.lucene.store.LockObtainFailedException busy){throw busy;}catch(IOException|RuntimeException corrupt){remove(path);continue;}
+            NotesIndexReplay replay;
+            try{replay=handle.backend.open(path,sources,state);}catch(org.apache.lucene.store.LockObtainFailedException busy){throw busy;}catch(IOException|RuntimeException corrupt){remove(path);continue;}
             var saved=replay.index().watermark();boolean ready=saved.ready()&&saved.generation()<=state.changes().generation();
             var previous=ready?handle.current:handle.building;
             if(previous==null||saved.generation()>=previous.index().watermark().generation()){
@@ -183,13 +233,14 @@ class NotesSearchService implements AutoCloseable {
     }
     private void fail(Handle handle,String code){handle.error=code;handle.retryAfter=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);LOG.warnf("Notes search cache unavailable code=%s",code);}
     private void sweep()throws IOException{
-        var allowed=new HashSet<String>();for(String owner:store.notesSearchOwners())allowed.add(ownerKey(owner));
+        Set<String> registered;synchronized(this){registered=Set.copyOf(backends);}
+        var allowed=new HashSet<String>();for(String owner:store.notesSearchOwners())for(String backend:registered)allowed.add(ownerKey(owner,backend));
         List<Handle> snapshot;synchronized(this){snapshot=List.copyOf(handles.values());}
-        for(var handle:snapshot)if(!allowed.contains(ownerKey(handle.owner)))retire(handle,true);
+        for(var handle:snapshot)if(!allowed.contains(handle.key))retire(handle,true);
         Set<Path> active;synchronized(this){active=new HashSet<>();handles.values().forEach(handle->active.add(handle.folder));}
         try(var folders=Files.list(root)){for(var folder:folders.toList())if(folder.getFileName().toString().matches("[0-9a-f]{64}")&&!allowed.contains(folder.getFileName().toString())&&!active.contains(folder))remove(folder);}
     }
-    private void retire(Handle handle,boolean purge){synchronized(this){if(handles.get(handle.owner)==handle)handles.remove(handle.owner);handle.removed=true;closingOwners.add(handle.owner);}try{closeHandle(handle,purge);}catch(IOException failure){LOG.warn("Notes search cache cleanup unavailable");}finally{synchronized(this){closingOwners.remove(handle.owner);}}}
+    private void retire(Handle handle,boolean purge){synchronized(this){if(handles.get(handle.key)==handle)handles.remove(handle.key);handle.removed=true;closingOwners.add(handle.key);}try{closeHandle(handle,purge);}catch(IOException failure){LOG.warn("Notes search cache cleanup unavailable");}finally{synchronized(this){closingOwners.remove(handle.key);}}}
     private static void closeHandle(Handle handle,boolean purge)throws IOException{
         IOException failure=null;
         try{if(handle.current!=null)handle.current.close();}catch(IOException problem){failure=problem;}

@@ -21,6 +21,16 @@ class NotesLuceneIndexTest {
     private static NotesLuceneIndex.Page search(NotesLuceneIndex index,String query,long generation,int limit,NotesLuceneIndex.Position position)throws IOException{
         return index.search(NotesSearchQuery.parse(query),generation,limit,position,false,null,5000);
     }
+    @Test void anEnrichedCalendarSnapshotCannotSuppressANewerCanonicalNote()throws Exception{
+        try(var index=new NotesLuceneIndex(temporary.resolve("fences"),identity)){
+            var original=source(1,"Notes/One.md","original needle");index.put(original);ready(index,1);
+            var excluded=Set.of(NotesLuceneIndex.fence(original));
+            assertTrue(index.search(NotesSearchQuery.parse("needle"),1,50,null,false,null,5000,excluded).items().isEmpty());
+            var updated=new NotesLuceneIndex.Source(original.id(),original.path(),original.kind(),original.sourceType(),original.sourceId(),2,"updated-tag","updated-hash",12,"",NotesSearchText.extract("newer needle".getBytes(StandardCharsets.UTF_8)));index.put(updated);ready(index,2);
+            var hit=index.search(NotesSearchQuery.parse("needle"),2,50,null,false,null,5000,excluded).items().getFirst();
+            assertEquals(2,hit.sourceVersion());assertEquals("newer needle",hit.excerpt().text());
+        }
+    }
     @Test void exactProseTagsStayDistinctFromWordsPrefixesCodeLinksAndMetadata()throws Exception{
         try(var index=new NotesLuceneIndex(temporary.resolve("tags"),identity)){
             index.put(source(1,"Notes/Tagged.md","A #Open**Shift** deployment and #Cafe\u0301 notes. #work/openshift #Straße"));
@@ -99,6 +109,8 @@ class NotesLuceneIndexTest {
             var result=index.search(NotesSearchQuery.parse("needle"),1,1,null,false,"journal",5000);
             assertEquals(new UUID(0,3),result.items().getFirst().id());assertNull(result.next());
             assertEquals(3,index.search(NotesSearchQuery.parse("needle"),1,50,null,true,null,5000).items().size());
+            assertNull(index.lookup(new UUID(0,1),1,false,null));assertNull(index.lookup(new UUID(0,2),1,true,"journal"));
+            assertNotNull(index.lookup(new UUID(0,1),1,true,null));assertNotNull(index.lookup(new UUID(0,3),1,false,"journal"));
         }
     }
     @Test void ownerCollectionEpochAndRestoreGenerationFencePersistentCaches()throws Exception{

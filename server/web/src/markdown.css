@@ -173,6 +173,9 @@
 @media (hover: none) { .note-bookmark { opacity: 1; } }
 
 .journal-document-dialog[open] { display: flex; flex-direction: column; gap: .5rem; height: min(54rem,94dvh); }
+.journal-document-inline { display:flex; flex-direction:column; gap:.5rem; width:100%; max-height:none; height:calc(100dvh - 11rem); min-height:20rem; margin:0; box-shadow:none; }
+.calendar-search-details { flex:none; max-height:35dvh; overflow:auto; overflow-wrap:anywhere; }
+.journal-document-dialog.calendar-search-no-note[open] { height:fit-content; }
 .journal-document-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .journal-document-dialog > .dialog-actions { flex: none; margin: 0; padding-top: .5rem; border-top: 1px solid var(--bs-border-color); }
 .journal-document-dialog > .dialog-actions [role="status"] { margin-inline-end: auto; }
