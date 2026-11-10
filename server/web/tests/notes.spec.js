@@ -537,6 +537,17 @@ test('event search finds calendar details without creating a note and keeps the 
     for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#calendar-search-popup-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-saved-${theme}-${width}.png`});}
     await popup.getByRole('button',{name:'Close',exact:true}).click();await panel.getByRole('button',{name:'Close',exact:true}).click();
   }
+  await api('PUT','/notes/files?path=Notes%2FLater%20choice.md',Buffer.from('# Later choice\n\nObservatory follow-up.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=observatory');return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(2);
+  await searchNotes(page,'observatory');let releaseChoice,arriveChoice;
+  const choiceHeld=new Promise(resolve=>{releaseChoice=resolve;}),choiceStarted=new Promise(resolve=>{arriveChoice=resolve;});
+  await page.route('**/api/v1/notes/search/calendar/*',async route=>{const response=await route.fetch();arriveChoice();await choiceHeld;await route.fulfill({response});});
+  try{
+    await result.click();await choiceStarted;await panel.getByRole('button',{name:/Later choice/}).click();const later=page.locator('#note-popup-editor');await expect(later.locator('.ProseMirror')).toContainText('Observatory follow-up.');
+    const delivered=page.waitForResponse(response=>new URL(response.url()).pathname.startsWith('/api/v1/notes/search/calendar/'));releaseChoice();await delivered;
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await expect(popup).toBeHidden();await expect(later).toBeVisible();await expect(later.locator('h2')).toHaveText('Later choice');await later.getByRole('button',{name:'Close',exact:true}).click();
+  }finally{releaseChoice();await page.unrouteAll({behavior:'wait'});}
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=event:observatory');return reply.status();},{timeout:30000}).toBe(200);await searchNotes(page,'event:observatory');
   let release,arrive,completed=false;const held=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{arrive=resolve;});
   await page.route('**/api/v1/notes/search/calendar/*',async route=>{const response=await route.fetch();arrive();await held;try{await route.fulfill({response});}catch{}finally{completed=true;}});

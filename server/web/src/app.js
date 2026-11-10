@@ -76,12 +76,12 @@ async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave(
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
-  event.preventDefault();const session=api,tag=hashtagKey(event.detail.tag);
+  event.preventDefault();++calendarNavigation;const session=api,tag=hashtagKey(event.detail.tag);
   if(!tag||!session||!await navigationGuards(event.detail.guards,session))return;
   event.detail.leave.forEach(leave=>leave());noteSearch.show('tag:'+tag);
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
-  event.preventDefault();const session=api,detail=event.detail;
+  event.preventDefault();++calendarNavigation;const session=api,detail=event.detail;
   if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
   detail.leave.forEach(leave=>leave());
   if(detail.popup){calendarSearchPopup.close(true);await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
@@ -114,7 +114,7 @@ document.addEventListener(calendarSearchNavigation,async event=>{
   }catch(error){if(current()){if(error.status===401)auth.clear(errorText(error));else if(calendarSearchPopup.opened){calendarSearchPopup.error.textContent=errorText(error);calendarSearchPopup.error.hidden=false;}else setStatus(errorText(error));}}
 });
 document.addEventListener(dayNoteNavigation,async event=>{
-  event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
+  event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
   if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
   if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
@@ -595,6 +595,7 @@ function begin(title, state) {
 }
 function showEditor() {$('editor').showModal();$('fields').querySelector('input,select,textarea')?.focus();}
 async function openRecord(collection, id = null, initial = {}, caption = null) {
+  ++calendarNavigation;
   const session = api;
   const loaded = id ? await session.request(`/${collection}/${id}`) : { data: initial, etag: null };
   if (session !== api || !connected) return;
@@ -631,6 +632,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   showEditor();
 }
 async function openCalendarActivity(event,range) {
+  ++calendarNavigation;
   const session=api;if(!connected||!canWrite||editor||$('editor').open)return;
   const summary=[event.title,event.description].filter(Boolean).join('\n\n');
   await openRecord('activities',null,{summary:summary.slice(0,2000),start:event.start,end:event.end},i18nText('calendar.create_activity'));
@@ -699,6 +701,7 @@ async function changeCalendarSession(original, proposal, scope) {
   }
 }
 async function openDelete(collection, id) {
+  ++calendarNavigation;
   const session = api,loaded = await session.request(`/${collection}/${id}`);
   if (session !== api || !connected || !begin(i18nText("ui.delete_record"), { collection, id, etag: loaded.etag, remove: true })) return;
   $('fields').append(element('p', i18nText("ui.delete_681b54", { value0: loaded.data.name || loaded.data.summary || (collection === 'work-sessions' ? i18nText("ui.work_session_21aa04") : i18nText("ui.activity")), value1: collection === 'work-sessions' ? i18nText("ui.undo_will_be_available_for_ten_minutes") : i18nText("ui.this_cannot_be_undone_records_with_dependencies_may_be_rejected") })));
