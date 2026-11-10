@@ -19,13 +19,18 @@ const source=page=>page.evaluate(()=>globalThis.experience.markdown());
 test('extended inline styles render and retain exact source, nested formatting and literal code',async({page})=>{
   const value='# ==**Focus**==\r\n\r\n==Very **important** words==: H~2~O, X^2^ and ~~obsolete~~. **==Reverse==**\r\n\r\n`==literal== H~2~O X^2^`\r\n';
   await field(page,value);const rich=page.locator('#experience-formatted .ProseMirror');
-  await expect(rich.locator('mark')).toHaveText(['Focus','Very important words','Reverse']);await expect(rich.locator('mark strong')).toHaveText('important');
+  await expect(rich.locator('mark')).toHaveText(['Focus','Very important words','Reverse']);await expect(rich.locator('mark strong')).toHaveText(['Focus','important','Reverse']);
   await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');await expect(rich.locator('del')).toHaveText('obsolete');
   await expect(rich.locator('code')).toHaveText('==literal== H~2~O X^2^');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
   await appendEditorText(rich.locator('p').first(),' Edited.');
   const changed=await page.evaluate(()=>globalThis.field.value());expect(changed).toContain('==Very **important** words==');expect(changed).toContain('H~2~O');expect(changed).toContain('X^2^');
   const host=page.locator('#experience-field');await host.getByRole('button',{name:'Markdown source',exact:true}).click();await host.getByRole('button',{name:'Formatted',exact:true}).click();
   await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    const mark=rich.locator('mark').first();await expect(mark).toBeVisible();
+    expect(await mark.evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  }
 });
 
 test('typed inline styles and their toolbar controls stay editable with undo and read-only guards',async({page})=>{

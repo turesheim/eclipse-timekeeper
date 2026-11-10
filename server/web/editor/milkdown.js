@@ -64,14 +64,14 @@ const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
 const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type==='code'&&!!node.meta||!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value.replace(/\[![A-Za-z]+\][+-]?/g,''))||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
+const inlineFormatting=new Set(['strong','emphasis','delete','highlight','subscript','superscript']);
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
   // Inline format order does not change the text's meaning. ProseMirror keeps
   // one mark order, while authored Markdown may nest these marks either way.
-  const formatting=new Set(['strong','emphasis','delete','highlight','subscript','superscript']);
-  if(value&&formatting.has(value.type)){
+  if(value&&inlineFormatting.has(value.type)){
     const marks=[value.type];let leaf=value;
-    while(leaf.children?.length===1&&formatting.has(leaf.children[0].type)){leaf=leaf.children[0];marks.push(leaf.type);}
+    while(leaf.children?.length===1&&inlineFormatting.has(leaf.children[0].type)){leaf=leaf.children[0];marks.push(leaf.type);}
     if(marks.length>1&&marks.some(name=>['highlight','subscript','superscript'].includes(name)))return {type:'inlineFormatting',marks:marks.sort(),children:semantic(leaf.children)};
   }
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).sort(([left],[right])=>left<right?-1:left>right?1:0).map(([key,entry])=>[key,semantic(entry)]));
