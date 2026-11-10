@@ -120,7 +120,7 @@ for(const language of ['en-GB','nb-NO'])test('Internet accounts and both synchro
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),client={id:randomUUID(),name:'Client'},row=connection(owner,{services:{tasks:true,calendars:true,writableTasks:false},availableCalendars:[{id:'team',name:'Team calendar',readable:true}],selectedCalendars:['team'],calendarMappings:{team:client.id},calendarConfigurationVersion:1});await providerFixture(page,owner,{rows:[row],clients:[client]});await open(page);const nb=language==='nb-NO';
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
     await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Internettkontoer':'Internet accounts',exact:true}).click();
-    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(card(page,row.id).getByRole('button',{name:nb?'Lagre kalendere':'Save calendars',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(card(page,row.id).getByRole('button',{name:nb?'Lagre kalendere':'Save calendars',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(width!==320)await captureScreenshot(page,{path:`test-results/internet-accounts-${language}-${theme}-${width}.png`,fullPage:true});}
   }
   const accessibility=await new AxeBuilder({page}).include('#account-content').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/internet-accounts-'+language+'-320.png',fullPage:true});
 });
@@ -168,7 +168,7 @@ test('initial import is reviewed before approval and stale previews retain the d
   expect(model.writes).toEqual([]);model.previewVersion++;
   await panel.getByRole('button',{name:'Import this list',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(panel.getByText('Source <img src=x onerror=alert(1)>',{exact:true})).toBeVisible();expect(row.imports).toHaveLength(1);
   await panel.getByRole('button',{name:'Review import for Work',exact:true}).click();await panel.getByRole('button',{name:'Import this list',exact:true}).click();
-  await expect(panel.getByRole('button',{name:'Review import for Work',exact:true})).toHaveCount(0);await expect(panel.getByRole('heading',{name:'Google Tasks · Fixture account',exact:true})).toBeFocused();
+  await expect(panel.getByRole('button',{name:'Review import for Work',exact:true})).toHaveCount(0);await expect(panel.getByRole('heading',{name:'Google · Fixture account',exact:true})).toBeFocused();
   expect(model.writes.filter(value=>value.method==='POST')).toHaveLength(2);expect(row.imports).toEqual([]);
 });
 
