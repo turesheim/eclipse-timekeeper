@@ -17,7 +17,7 @@ export function focusedSnapshot(source,area){
   if(!area)return source;
   const clientIds=new Set(area.clientIds),clients=source.clients.filter(value=>clientIds.has(value.id));
   const projects=source.projects.filter(value=>clientIds.has(value.clientId)),projectIds=new Set(projects.map(value=>value.id));
-  const tasks=source.tasks.filter(value=>projectIds.has(value.projectId)),taskIds=new Set(tasks.map(value=>value.id));
+  const tasks=source.tasks.filter(value=>value.projectId?projectIds.has(value.projectId):clientIds.has(value.clientId)),taskIds=new Set(tasks.map(value=>value.id));
   // Match the API's report semantics: task-backed work follows the task's
   // current project, while taskless work uses its explicit recorded project.
   const activities=source.activities.filter(value=>value.taskId?taskIds.has(value.taskId):projectIds.has(value.projectId));

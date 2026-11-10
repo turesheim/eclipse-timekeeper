@@ -19,6 +19,10 @@
 .tasks-status { font-weight:600; }
 .task-details h2 { overflow-wrap:anywhere; }
 .task-details-close { float:right;margin-inline-start:.75rem; }
+#task-details .btn-outline-danger,#editor-delete {
+  --bs-btn-color:color-mix(in srgb,var(--bs-danger-text-emphasis) 65%,var(--bs-body-color));
+  --bs-btn-border-color:var(--bs-btn-color);
+}
 .task-metadata { display:grid;grid-template-columns:auto minmax(0,1fr);gap:.25rem 1rem; }
 .task-metadata dd { margin:0;overflow-wrap:anywhere; }
 .task-plain-body { white-space:pre-wrap;overflow-wrap:anywhere; }

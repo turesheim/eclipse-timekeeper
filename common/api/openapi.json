@@ -21756,6 +21756,81 @@
           }
         }
       }
+    },
+    "/tasks/{id}/note": {
+      "get": {
+        "operationId": "getTaskSourceNote",
+        "summary": "Resolve the current owned source note of a checklist task",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful owner-private collection operation.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -21942,6 +22017,30 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Url"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
               },
               {
                 "type": "null"
@@ -22422,6 +22521,17 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/TaskMetadata"
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
           }
         },
         "required": [
@@ -23044,6 +23154,17 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/TaskMetadata"
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
           }
         },
         "required": [
@@ -23636,6 +23757,17 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/TaskMetadata"
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
           }
         },
         "required": [

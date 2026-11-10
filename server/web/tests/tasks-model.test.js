@@ -29,3 +29,10 @@ test('calendar paging restarts on a changed source snapshot and never mixes old 
   const calls=[];let count=0;const session={async request(path,options){calls.push([path,options.etag]);count++;if(count===2)throw Object.assign(new Error(),{code:'STALE_VERSION'});return {data:{items:[{id:count===1?'old':'fresh'}],revision:count===1?1:2,snapshot:count===1?'old':'fresh',nextCursor:count===1?'next':null,zoneId:'UTC',errors:{}}};}};
   assert.deepEqual((await calendarTasks(session,new AbortController().signal)).items,[{id:'fresh'}]);assert.equal(calls[1][1],'old');assert.equal(calls[2][1],null);
 });
+
+test('direct clients, emoji titles and completed filtering apply to both task sources',()=>{
+  const rows=taskRows({...data,tasks:[{id:'direct',summary:'Review :smiley:',clientId:'client-only',projectId:null,status:'COMPLETED'}]},[{id:'calendar-finished',summary:'Published',status:'COMPLETED'},{id:'calendar-open',summary:'Open',status:'NOT_STARTED'}]);
+  assert.equal(rows[0].clientId,'client-only');assert.equal(rows[0].title,'Review 😃');
+  assert.equal(taskMatches(rows[0],{kind:'client',value:'client-only'},'2026-11-10'),true);
+  assert.deepEqual(rows.filter(row=>taskMatches(row,{kind:'smart',value:'all'},'2026-11-10',{hideCompleted:true})).map(row=>row.id),['calendar-open']);
+});

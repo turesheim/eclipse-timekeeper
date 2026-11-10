@@ -34,11 +34,11 @@ class NoteTasksTest {
             completed(task,false);assertArrayEquals(bytes(text),vault.read(vault.get(VaultCollection.id(entry))));return null;
         });
     }
-    @Test void taskIdentityFollowsReorderingAndFileMovesButRemovalKeepsTheNormalTask(){
+    @Test void taskIdentityFollowsReorderingAndFileMovesAndRemovalDeletesUnusedTasks(){
         store.transaction("tasks-identity",()->{
             var vault=vault();var entry=vault.put(new VaultPath("Before.md"),null,true,bytes("- [ ] Alpha\n- [ ] Beta\n"));var ids=new HashMap<String,TaskId>();store.service().tasks().forEach(task->ids.put(task.summary(),task.id()));
             entry=vault.move(entry,new VaultPath("After.md"),vault.tag(entry));entry=vault.put(new VaultPath("After.md"),vault.tag(entry),false,bytes("- [x] Beta\n- [ ] Added\n- [ ] Alpha\n"));assertEquals(ids.get("Beta"),store.service().tasks().stream().filter(task->task.summary().equals("Beta")).findFirst().orElseThrow().id());
-            entry=vault.put(new VaultPath("After.md"),vault.tag(entry),false,bytes("- [ ] Alpha\n"));assertEquals(3,store.service().tasks().size());Task beta=store.service().task(ids.get("Beta")).orElseThrow();completed(beta,false);assertArrayEquals(bytes("- [ ] Alpha\n"),vault.read(vault.get(VaultCollection.id(entry))));return null;
+            entry=vault.put(new VaultPath("After.md"),vault.tag(entry),false,bytes("- [ ] Alpha\n"));assertEquals(1,store.service().tasks().size());assertTrue(store.service().task(ids.get("Beta")).isEmpty());assertArrayEquals(bytes("- [ ] Alpha\n"),vault.read(vault.get(VaultCollection.id(entry))));return null;
         });
     }
     @Test void deletingANormalTaskDoesNotRecreateItOnUnrelatedNoteEdits(){

@@ -148,7 +148,12 @@ their day; timed dates use the account zone. Unknown zones or ambiguous times
 that cannot be projected across zones retain their original values in details
 and show a date-review hint. No UTC instant is invented.
 
-Native tasks can be created or edited through the existing conditional editor.
+Native tasks can be created or edited through the existing conditional editor,
+including direct client assignment without a project, priority and civil or timed
+deadlines. The editor retains unedited start values, flags and deadline precision.
+**Hide completed tasks** applies to all sidebar filters and sources. Details
+include guarded deletion and a type-specific link to the current source note
+for Markdown checklist tasks. Title labels render the shared emoji shortcodes.
 Calendar tasks remain in their source collection and cannot be edited or
 converted to worked time from Tasks. Read-only sessions retain browsing and
 details. Catalog paging restarts if a source snapshot changes, and the list

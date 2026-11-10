@@ -1,5 +1,6 @@
 import {dateTimeFormat,numberFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
+import {emojiText} from './emoji.js';
 import { t as i18nText } from "./i18n.js"; // Dates and report totals are independent of the browser's local time zone.
 export function dateInZone(instant, zone) {
   const parts = dateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instant));
@@ -143,7 +144,7 @@ export function taskPresentation(task) {
     if (jira) {try {id = decodeURIComponent(jira[1]);} catch {/* Keep the recorded ID. */}} else
     if (github && (reference.providerId.toLowerCase().includes('github') || new URL(url).hostname === 'github.com')) id = `#${github[1]}`;
   }
-  const summary = task.summary || i18nText("ui.unassigned");
+  const summary = emojiText(task.summary || i18nText("ui.unassigned"));
   return { title: id && !summary.startsWith(`${id}:`) ? `${id}: ${summary}` : summary, url };
 }
 

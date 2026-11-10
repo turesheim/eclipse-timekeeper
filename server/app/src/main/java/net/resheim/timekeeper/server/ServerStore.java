@@ -418,6 +418,10 @@ public class ServerStore {
     }
     public <T> T save(String type,T value) {
         var node = snapshot(owner(),value);
+        if(type.equals("TASK")) {
+            var previous=find(type,uuid(node.get("id"))).orElse(null);
+            if(!node.hasNonNull("projectId")&&previous!=null&&previous.hasNonNull("clientId"))node.set("clientId",previous.get("clientId").deepCopy());
+        }
         if (type.equals("PROJECT") || type.equals("WORK_SESSION")) {
             var previous=find(type,uuid(node.get("id"))).orElse(null);
             node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText()
@@ -480,6 +484,12 @@ public class ServerStore {
         if(value instanceof Task task)new NoteTasks(this).task(task);
         return value;
     }
+    /** Task HTTP responses include server-owned client metadata and its canonical ETag. */
+    ObjectNode taskSnapshot(Task task){
+        var value=(ObjectNode)find("TASK",task.id().value()).orElseThrow(ApiFailure::notFound);
+        if(value.path("version").asLong()!=task.version())throw new ApiFailure(412,"STALE_VERSION");
+        return value.deepCopy();
+    }
     private JsonNode defaultClient() {
         UUID id=UUID.nameUUIDFromBytes(("timekeeper-default-client:"+owner()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return find("CLIENT",id).orElseGet(() -> {
@@ -529,7 +539,13 @@ public class ServerStore {
     JsonNode clientDetails(String type,UUID id,JsonNode input) {
         var node=((ObjectNode)find(type,id).orElseThrow(ApiFailure::notFound)).deepCopy();
         if(input.has("clientId")) {
-            UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());
+            if(type.equals("TASK")&&input.get("clientId").isNull())node.remove("clientId");
+            else {UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());}
+        }
+        if(type.equals("TASK")&&node.hasNonNull("projectId")) {
+            var project=find("PROJECT",uuid(node.get("projectId"))).orElseThrow(ApiFailure::notFound);
+            if(input.hasNonNull("clientId")&&!input.get("clientId").equals(project.get("clientId")))throw ApiFailure.conflict();
+            node.remove("clientId");
         }
         if(type.equals("PROJECT") && input.has("icon")) node.set("icon",input.get("icon").deepCopy());
         if(type.equals("PROJECT") && input.has("clientId")) {
@@ -558,7 +574,7 @@ public class ServerStore {
         }
         if(update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),owner(),type,id,node.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=? AND kind='client'",owner(),type,id);
-        relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
+        if(node.hasNonNull("clientId"))relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
     }
     private boolean sessionUsesProject(UUID project) {
         try(var query=statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND kind='project' AND to_type='PROJECT' AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),project);var rows=query.executeQuery()) {return rows.next();}

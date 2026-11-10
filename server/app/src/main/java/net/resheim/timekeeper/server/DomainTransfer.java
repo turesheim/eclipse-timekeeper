@@ -74,6 +74,7 @@ final class DomainTransfer {
             }
             var project=optionalText(item.get("projectId")).map(UUID::fromString);
             if(project.isPresent() && !sourceProjects.contains(project.get())) throw ApiFailure.validation();
+            if(item.hasNonNull("clientId")&&!java.util.stream.StreamSupport.stream(input.path("clients").spliterator(),false).anyMatch(client->client.path("id").equals(item.get("clientId"))))throw ApiFailure.validation();
             Set<UUID> seen=new HashSet<>();JsonNode current=item;
             while(!current.get("parentTaskId").isNull()) {
                 UUID parentId=uuid(current.get("parentTaskId"));if(!seen.add(parentId)) throw ApiFailure.validation();
@@ -184,6 +185,7 @@ final class DomainTransfer {
                         new TaskPlanning(optionalText(item.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                                 optionalText(item.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(item.get("completedAt")).map(java.time.Instant::parse)),
                         checklist(item.get("checklistItems")),timing(item),importance(item),body(item),item.path("siblingOrder").asInt(0),aliases(item.get("externalAliases")),recurrence(item.get("recurrence")),reminders(item.get("reminders")),metadata(item.get("metadata"))));
+                if(item.hasNonNull("clientId"))store.clientDetails("TASK",created.id().value(),object().put("clientId",required(clients,uuid(item.get("clientId"))).toString()));
                 tasks.put(entry.getKey(),created.id());mapping(mappings,"TASK",item,created.id().value());iterator.remove();progressed=true;
             }
             if(!progressed) throw ApiFailure.validation();

@@ -14,7 +14,7 @@ export function taskMomentDate(moment,zone){
 export function taskRows(data,calendars=[]){
   const zone=data.profile.data.zoneId,projects=new Map(data.projects.map(value=>[value.id,value]));
   const make=(record,source)=>{
-    const project=source==='task'?projects.get(record.projectId):null,clientId=source==='task'?project?.clientId||null:record.clientId;
+    const project=source==='task'?projects.get(record.projectId):null,clientId=source==='task'?project?.clientId||record.clientId||null:record.clientId;
     const start=taskMomentDate(record.start,zone),due=taskMomentDate(record.due,zone),presentation=taskPresentation(record);
     return {key:source+':'+record.id,id:record.id,source,record,clientId,projectName:project?.name||'',title:presentation.title,url:presentation.url,
       status:record.status==='NEEDS-ACTION'?'NOT_STARTED':record.status==='IN-PROCESS'?'IN_PROGRESS':record.status||'NOT_STARTED',
@@ -24,7 +24,8 @@ export function taskRows(data,calendars=[]){
   };
   return [...data.tasks.map(value=>make(value,'task')),...calendars.filter(value=>!data.focusClientIds||data.focusClientIds.includes(value.clientId)).map(value=>make(value,'calendar'))];
 }
-export function taskMatches(row,selection,today){
+export function taskMatches(row,selection,today,{hideCompleted=false}={}){
+  if(hideCompleted&&['COMPLETED','CANCELLED'].includes(row.status))return false;
   const unfinished=!['COMPLETED','CANCELLED'].includes(row.status);
   if(selection.kind==='client')return row.clientId===selection.value;
   if(selection.kind==='category')return row.categories.includes(selection.value);

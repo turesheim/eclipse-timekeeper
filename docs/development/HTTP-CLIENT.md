@@ -61,7 +61,8 @@ compatibility; current exports leave it null and imports ignore its value.
 Activity context is derived from time overlap within the same account.
 The v3 session file accepts an optional `labelIds` column containing JSON arrays;
 exports include it when session label metadata is present. Earlier v3 files
-without that column remain supported.
+without that column remain supported. Task extras retain optional direct client
+assignments for tasks without a project; imports remap these client IDs.
 Import also accepts v1/v2 directories. Their projects and sessions are assigned
 to the General client; v1 has no work-session file, and v2 adds
 `workSessions.csv` without v3 client/title fields.

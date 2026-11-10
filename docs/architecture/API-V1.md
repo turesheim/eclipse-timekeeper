@@ -109,8 +109,16 @@ JSON processing; transfer limits also apply to exported snapshots. Successful
 JSON is `application/json`; errors are `application/problem+json` with matching
 HTTP/body status and stable `code`. Clients branch on status/code, not prose.
 
-Tasks may be unassigned, but a subtask must have the same non-null project as its
-parent. Self-parenting, cycles, and moving a task with children to another project
+Tasks may be unassigned. A task without a project can have an optional, owned
+`clientId`; tasks in a project inherit that project's client. This business-client
+metadata lives in the server adapter, like project and work-session clients.
+Legacy writes that omit `clientId` retain the direct assignment. Supplying null
+clears it. A supplied client must agree with the selected project. Portable JSON,
+CSV and account archives retain direct clients and remap their IDs on import.
+Task section and provider responses retain this metadata and return the same
+canonical task validators as ordinary reads, so their ETags can be reused.
+Subtasks have the same project as their parent, including when both are unassigned.
+Self-parenting, cycles, and moving a task with children to another project
 are conflicts (409). Deleting a project containing tasks, a task with children
 or activities, or a label assigned to activities returns 409; no implicit cascade
 loses recorded time. All referenced projects/tasks/labels must be owned.
@@ -156,6 +164,9 @@ supplies all three fields and changes no other task data. A provider connector
 must retain unsupported flags in Timekeeper without inventing a corresponding
 provider value. Legacy task, planning, checklist, and timing updates preserve
 importance.
+The ordinary task editor can also supply optional `priority` and `due` in
+`PUT /tasks/{id}`. These fields and the legacy fields commit atomically under
+the supplied task ETag, preserving start values, flags, urgency and other sections.
 
 Task notes use a separate conditional `PUT /tasks/{id}/body` with a complete
 `{ "format": "TEXT" | "HTML", "content": "..." }` value. Empty plain text clears
@@ -1415,14 +1426,22 @@ instance backups retain the underlying owner-private records.
 
 Canonical Markdown writes for daily, weekly, saved event and ordinary Notes
 resources reconcile nonempty Markdown checklist items into shared-domain tasks.
-Read-only reads do not enroll existing notes. Tasks remain unassigned unless the
-user explicitly assigns them. Source creation and task creation/updates commit
+Read-only reads do not enroll existing notes. A bounded background worker enrolls
+older active Markdown independently of browser reads. Source creation and task creation/updates commit
 under the same account transaction; normal task completion patches only the
 checkbox marker in the current source and changes its content ETag. Stale note
 writers receive the existing 412 response and must retain/review their draft.
 Code examples, escapes, YAML frontmatter and binary files are not task sources.
-A document is limited to 1,000 checklist items. Removal detaches a link without
-deleting a task; a deliberately deleted task is not recreated by prose-only edits.
+A document is limited to 1,000 checklist items. Prose annotations `@Client_Name`
+or `@Project_Name` select an unambiguous owned client or project; underscores
+stand for spaces. `@client:Name` and `@project:Name` resolve collisions between
+the two catalogs. Unknown, ambiguous or conflicting names do not assign a task;
+code, escapes, link labels and email addresses are not annotations. Source bytes
+and annotation text are retained. Removing an item deletes its unused task. Tasks
+with recorded work or subtasks are retained and unlinked. A deliberately deleted
+task is not recreated by prose-only edits. Trash retains task identities for restore.
+`GET /tasks/{id}/note` resolves the current active source as `VaultEntry`, following
+file moves and renames, and returns 404 for an unlinked, deleted or foreign source.
 
 Account snapshots may include `noteTasks`, an array of source references and
 ordered checklist identities. Every non-null task ID must reference the owned
