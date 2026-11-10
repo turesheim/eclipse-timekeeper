@@ -164,6 +164,24 @@ class TaskProviderResourceHttpTest {
         assertTrue(store.transaction(owner,()->store.find("TASK",uuid(task.get("id"))).isPresent()));assertEquals(412,call("POST",deletePath+"/confirm",null,deletion.header("ETag")).statusCode());assertEquals(2,provider.writes.get());
         var archive=given().header("Authorization","Bearer test-a").get("/api/v1/data/export");assertEquals(200,archive.statusCode());assertFalse(archive.asString().contains("TASK_WRITE"));
     }
+    @Test void googleCompletionAndReviewedReopeningRetainTheOriginalNoteChecklistTask()throws Exception{
+        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+        var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
+        String title="Note Google "+UUID.randomUUID(),source="- [ ] "+title+"\r\n",path="Google checklist "+UUID.randomUUID()+".md";
+        var note=given().header("Authorization","Bearer test-a").queryParam("path",path).header("If-None-Match","*").contentType("application/octet-stream").body(source.getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files");assertEquals(201,note.statusCode(),note.asString());String entry=note.jsonPath().getString("id");
+        var task=store.transaction(owner,()->store.list("TASK").stream().filter(value->value.path("summary").asText().equals(title)).findFirst().orElseThrow());String taskId=task.path("id").asText();
+        var prepared=call("POST","/"+id+"/writes",object().put("listId",list.path("id").asText()).put("taskId",taskId).put("action","CREATE"),null);String writePath="/"+id+"/writes/"+json(prepared,201).path("id").asText();json(call("POST",writePath+"/confirm",null,prepared.header("ETag")),202);idle(id);assertEquals("DONE",json(call("GET",writePath,null,null),200).path("state").asText());
+        var linked=store.transaction(owner,()->store.find("TASK",UUID.fromString(taskId)).orElseThrow());var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());String external=linked.path("externalReferences").get(0).path("externalId").asText(),key="list-1/"+external;
+        provider.created.get(key).put("status","completed").put("completed","2026-11-10T05:00:00Z").put("etag","\"cloud-completed\"");
+        store.transaction(owner,()->{var connections=new TaskProviderConnections(store);var auth=connections.required(UUID.fromString(id));auth.put("lastAttempt",store.now().minusSeconds(31).toString());connections.save(TaskProviderConnections.AUTH,auth);return null;});json(call("POST","/"+id+"/refresh",null,null),202);idle(id);
+        String content="/api/v1/notes/entries/"+entry+"/content";var completed=given().header("Authorization","Bearer test-a").get(content);assertEquals(200,completed.statusCode());assertEquals(source.replace("[ ]","[x]"),completed.asString());assertEquals(1,provider.writes.get());
+        assertEquals(412,given().header("Authorization","Bearer test-a").header("If-Match",note.header("ETag")).contentType("application/octet-stream").body(source.getBytes(StandardCharsets.UTF_8)).put(content).statusCode());
+        assertEquals(200,given().header("Authorization","Bearer test-a").header("If-Match",completed.header("ETag")).contentType("application/octet-stream").body(source.getBytes(StandardCharsets.UTF_8)).put(content).statusCode());assertEquals(1,provider.writes.get());
+        var reopen=call("POST","/"+id+"/writes",object().put("listId",list.path("id").asText()).put("taskId",taskId).put("action","UPDATE"),null);var preview=json(reopen,201);assertEquals("NOT_STARTED",preview.path("writeFields").path("status").asText());String reopenPath="/"+id+"/writes/"+preview.path("id").asText();json(call("POST",reopenPath+"/confirm",null,reopen.header("ETag")),202);idle(id);assertEquals("DONE",json(call("GET",reopenPath,null,null),200).path("state").asText());
+        assertEquals("needsAction",provider.created.get(key).path("status").asText());assertEquals(2,provider.writes.get());assertEquals(source,given().header("Authorization","Bearer test-a").get(content).asString());
+        store.transaction(owner,()->{var saved=store.find("TASK",UUID.fromString(taskId)).orElseThrow();assertEquals(external,saved.path("externalReferences").get(0).path("externalId").asText());assertEquals(1,store.list("TASK").stream().filter(value->value.path("summary").asText().equals(title)).count());return null;});
+    }
+
     @Test void googleCreationLinksTheOriginalNativeTaskAndUncertainIdentityRecoveryUsesOwnedConditionalRoutes()throws Exception{
         for(boolean uncertain:List.of(false,true)){
             var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");

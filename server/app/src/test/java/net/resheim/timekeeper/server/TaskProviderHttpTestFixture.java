@@ -58,11 +58,19 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
                 state.writes.incrementAndGet();String id="created-"+UUID.randomUUID();var task=JsonValues.object().put("id",id).put("position","999").put("status","needsAction").put("etag","\"created-1\"");task.setAll((com.fasterxml.jackson.databind.node.ObjectNode)JsonValues.parse(bytes(request)));state.created.put(list+"/"+id,task);
                 if(state.loseCreationReply)throw new java.io.IOException("Fixture lost insert response");return reply(201,task.toString());
             }
-            if(!request.uri().getPath().endsWith("/task-"+list))throw new AssertionError("Unexpected task mutation identity");
-            var before=googleTask(state,list);if(request.method().equals("GET"))return reply(200,before.toString());
+            String externalId=request.uri().getPath().substring(request.uri().getPath().lastIndexOf('/')+1);var created=state.created.get(list+"/"+externalId);
+            if(created==null&&!externalId.equals("task-"+list))throw new AssertionError("Unexpected task mutation identity");
+            var before=created==null?googleTask(state,list):created.deepCopy();if(request.method().equals("GET"))return reply(200,before.toString());
             if(!state.writable)throw new AssertionError("Read-only grant cannot mutate Google");
             if(!request.headers().firstValue("If-Match").orElse("").equals(before.path("etag").asText()))return reply(412,"{}");
             state.writes.incrementAndGet();state.revisions.computeIfAbsent(list,key->new AtomicInteger(1)).incrementAndGet();
+            if(created!=null){
+                if(request.method().equals("DELETE"))before.put("deleted",true);
+                else if(request.method().equals("PATCH"))before.setAll((com.fasterxml.jackson.databind.node.ObjectNode)JsonValues.parse(bytes(request)));
+                else throw new AssertionError("Unexpected Google mutation");
+                before.put("etag","\"created-"+state.writes.get()+"\"");state.created.put(list+"/"+externalId,before);
+                return request.method().equals("DELETE")?new TaskProviderHttp.Reply(204,Map.of(),new byte[0]):reply(200,before.toString());
+            }
             if(request.method().equals("DELETE")){state.patches.computeIfAbsent(list,key->JsonValues.object()).put("deleted",true);return new TaskProviderHttp.Reply(204,Map.of(),new byte[0]);}
             if(!request.method().equals("PATCH"))throw new AssertionError("Unexpected Google mutation");
             state.patches.computeIfAbsent(list,key->JsonValues.object()).setAll((com.fasterxml.jackson.databind.node.ObjectNode)JsonValues.parse(bytes(request)));return reply(200,googleTask(state,list).toString());
