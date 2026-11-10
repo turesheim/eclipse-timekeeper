@@ -60,8 +60,14 @@ def main():
                    check=True, stdout=subprocess.DEVNULL)
     # Keep generic contract acceptance offline. Shared sign-in is exercised by
     # SharedConnectResourceHttpTest rather than a public discovery request.
-    with (state / 'secrets/task-providers/application.properties').open('a') as fixture:
-        fixture.write('\ntimekeeper.connect.shared=false\n')
+    fixture_properties=state / 'secrets/task-providers/application.properties'
+    fixture_mode=fixture_properties.stat().st_mode & 0o777
+    try:
+        fixture_properties.chmod(fixture_mode | 0o200)
+        with fixture_properties.open('a') as fixture:
+            fixture.write('\ntimekeeper.connect.shared=false\n')
+    finally:
+        fixture_properties.chmod(fixture_mode)
     setup_code, _ = create_challenge(state / 'config/account-setup.json', owner='owner-a', replace=True)
     (state / 'config/account-setup.json').chmod(0o644)
     tokens = {role: secrets.token_urlsafe(32) for role in ('a', 'b', 'read', 'expired')}
