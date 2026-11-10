@@ -313,6 +313,17 @@ test('generated bracket closers skip typed closers and empty pairs delete togeth
   }
 });
 
+test('generated wikilink closers can be accepted by moving past them without escaping the link',async({page})=>{
+  await field(page,'',true,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);
+  const rich=page.locator('#experience-formatted .ProseMirror');await rich.click();
+  await page.keyboard.type('[[New document');await expect(rich).toHaveText('[[New document]]');
+  await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
+  await expect(rich.locator('[data-wiki-reference="New document"]')).toHaveText('New document');
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[New document]]');
+  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
+  await expect(page.locator('#experience-body')).toHaveValue('[[New document]]\n');
+});
+
 
 test('bracket assistance leaves code, escaped links and read-only documents literal',async({page})=>{
   const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'}];
