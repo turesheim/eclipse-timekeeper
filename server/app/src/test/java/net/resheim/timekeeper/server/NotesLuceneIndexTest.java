@@ -109,6 +109,8 @@ class NotesLuceneIndexTest {
             var result=index.search(NotesSearchQuery.parse("needle"),1,1,null,false,"journal",5000);
             assertEquals(new UUID(0,3),result.items().getFirst().id());assertNull(result.next());
             assertEquals(3,index.search(NotesSearchQuery.parse("needle"),1,50,null,true,null,5000).items().size());
+            assertNull(index.lookup(new UUID(0,1),1,false,null));assertNull(index.lookup(new UUID(0,2),1,true,"journal"));
+            assertNotNull(index.lookup(new UUID(0,1),1,true,null));assertNotNull(index.lookup(new UUID(0,3),1,false,"journal"));
         }
     }
     @Test void ownerCollectionEpochAndRestoreGenerationFencePersistentCaches()throws Exception{

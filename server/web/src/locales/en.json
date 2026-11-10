@@ -1482,6 +1482,6 @@
   "notes.client": "Associate with client",
   "notes.no_client": "No client",
   "notes.client_associations": "Notes linked to clients",
-  "notes.search_event_series": "Recurring series definition",
+  "notes.search_event_series": "Recurring series details",
   "notes.search_event_no_note": "This event has no saved note."
 }

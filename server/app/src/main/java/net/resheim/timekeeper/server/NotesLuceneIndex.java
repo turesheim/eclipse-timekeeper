@@ -183,11 +183,12 @@ final class NotesLuceneIndex implements AutoCloseable {
             var values=Set.copyOf(result);sourceValues.put(key,values);return values;
         }finally{if(searcher!=null)readers.release(searcher);lock.readLock().unlock();}
     }
-    Hit lookup(UUID id,long expectedGeneration)throws IOException{
+    Hit lookup(UUID id,long expectedGeneration,boolean configuration,String hiddenJournal)throws IOException{
         readLock();IndexSearcher searcher=null;
         try{
             open();if(!watermark.ready()||watermark.generation()!=expectedGeneration)throw new Unavailable();searcher=readers.acquire();
-            var hits=searcher.search(new TermQuery(new Term("id",id.toString())),1);if(hits.scoreDocs.length==0)return null;
+            var query=NotesSearchQuery.scoped(new NotesSearchQuery.Parsed("",new TermQuery(new Term("id",id.toString()))),identity.owner(),configuration,hiddenJournal);
+            var hits=searcher.search(query,1);if(hits.scoreDocs.length==0)return null;
             int doc=hits.scoreDocs[0].doc;var values=searcher.storedFields().document(doc,METADATA);
             return hit(values,excerpt(searcher,doc,values.getField("body_size").numericValue().intValue(),null),new Position(0,values.get("path_key"),id));
         }finally{if(searcher!=null)readers.release(searcher);lock.readLock().unlock();}

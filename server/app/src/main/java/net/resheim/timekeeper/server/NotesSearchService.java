@@ -146,7 +146,7 @@ class NotesSearchService implements AutoCloseable {
         finally{queries.release();}
     }
     Set<String> sourceFences(NotesSearchSources.State state,Backend backend,String type)throws IOException{return read(state,backend,index->index.sourceFences(type,state.changes().generation()));}
-    NotesLuceneIndex.Hit lookup(NotesSearchSources.State state,Backend backend,UUID id)throws IOException{return read(state,backend,index->index.lookup(id,state.changes().generation()));}
+    NotesLuceneIndex.Hit lookup(NotesSearchSources.State state,Backend backend,UUID id)throws IOException{return read(state,backend,index->index.lookup(id,state.changes().generation(),state.configuration(),state.hiddenJournal()));}
     private void tick(){
         try{
             Handle selected,retired;List<Handle> snapshot;
