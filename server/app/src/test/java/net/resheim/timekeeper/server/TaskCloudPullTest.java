@@ -45,6 +45,39 @@ class TaskCloudPullTest {
     private JsonNode stored(Fixture f,String id){return tx(f,()->store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("remote-account","remote-list"),id)).orElseThrow());}
     private TaskProviderHttp.Reply reply(int code,String json){return new TaskProviderHttp.Reply(code,Map.of(),json.getBytes(StandardCharsets.UTF_8));}
 
+    @Test void googleCompletionUpdatesTheLinkedNoteCheckboxAndKeepsLocalReopeningInImportOnlyMode(){
+        var f=fixture();var first=task("one","Checklist task",null,"001");
+        String original="\ufeff- [ ] Checklist **task**\r\n";TaskId[] nativeId={null};UUID[] entryId={null};
+        tx(f,()->{
+            var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();
+            var entry=vault.put(new VaultPath("Google checklist.md"),null,true,original.getBytes(StandardCharsets.UTF_8));
+            var local=store.service().tasks().getFirst();nativeId[0]=local.id();entryId[0]=VaultCollection.id(entry);
+            var fields=GoogleTaskContext.fields(first,TaskCloudPull.repository("remote-account","remote-list"));
+            fields.putNull("parentTaskId").put("siblingOrder",0);
+            var reference=new ExternalTaskReference("google",TaskCloudPull.repository("remote-account","remote-list"),"one",Optional.empty())
+                    .withTaskList(Optional.of(f.list())).withBaseline(Optional.of(new ExternalTaskBaseline(1,TIME,fields.toString())));
+            store.service().linkExternalReference(new net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference(local.id(),local.version(),reference));
+            return null;
+        });
+        assertTrue(apply(f,scan(first)).path("complete").asBoolean());
+        var changed=((ObjectNode)first.original()).deepCopy().put("status","completed").put("completed","2026-11-09T12:00:00Z").put("etag","provider-v2");
+        var completed=google().normalize(changed);assertTrue(apply(f,scan(completed)).path("complete").asBoolean());
+        tx(f,()->{
+            var vault=new VaultCollection(store,store.vaultLimits());var entry=vault.get(entryId[0]);
+            assertArrayEquals(original.replace("[ ]","[x]").getBytes(StandardCharsets.UTF_8),vault.read(entry));
+            assertEquals(TaskStatus.COMPLETED,store.service().task(nativeId[0]).orElseThrow().planning().status());
+            vault.put(new VaultPath("Google checklist.md"),vault.tag(entry),false,original.getBytes(StandardCharsets.UTF_8));
+            return null;
+        });
+        assertTrue(apply(f,scan(completed)).path("complete").asBoolean());
+        tx(f,()->{
+            var vault=new VaultCollection(store,store.vaultLimits());assertArrayEquals(original.getBytes(StandardCharsets.UTF_8),vault.read(vault.get(entryId[0])));
+            assertEquals(TaskStatus.NOT_STARTED,store.service().task(nativeId[0]).orElseThrow().planning().status());
+            assertEquals(nativeId[0].value().toString(),stored(f,"one").path("id").asText());assertEquals(1,store.service().tasks().size());
+            return null;
+        });
+    }
+
     @Test void googleSourceContextImportsWithoutReplacingTheUsersPrimaryUrlAndSurvivesRepeatedScans(){
         var f=fixture();var raw=object().put("id","one").put("title","Source task").put("status","needsAction").put("position","001").put("webViewLink","https://tasks.google.com/one");
         raw.putArray("links").add(object().put("type","email").put("description","Email source").put("link","https://mail.google.com/mail/u/0/#inbox/source"));raw.putObject("assignmentInfo").put("linkToTask","https://docs.google.com/document/d/source/edit").putObject("driveResourceInfo").put("driveFileId","source");
