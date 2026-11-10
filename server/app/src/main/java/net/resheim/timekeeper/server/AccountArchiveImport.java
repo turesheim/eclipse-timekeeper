@@ -29,6 +29,7 @@ final class AccountArchiveImport {
         }catch(RuntimeException|Error failure){file.close();throw failure;}
     }
     private void restoreJournals(Document document,JsonNode mappings){
+        store.withNoteTaskSync(()->{
         store.withJournalSource(DayNoteHistory.Source.ARCHIVE_RESTORE,()->{
         var archive=document.data();
         VaultArchive.prepare(archive.path("vault"),store);
@@ -38,7 +39,8 @@ final class AccountArchiveImport {
         VaultArchive.restore(document.file().file(),archive.path("vault"),store);
         new NoteBookmarks(store).restore(archive.path("bookmarks"));
         new NoteClients(store).restore(archive.path("noteClients"),mappings);
-        return null;});
+        NoteTaskArchive.restore(archive.path("noteTasks"),mappings,store);
+        return null;});return null;});
     }
     private JsonNode importWork(Document document){
         var archive=document.data();

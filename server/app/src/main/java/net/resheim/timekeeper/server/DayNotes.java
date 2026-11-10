@@ -134,6 +134,7 @@ final class DayNotes {
         // understand profile invalidations; no Eclipse/domain type is added.
         new DayNoteHistory(store).note(date,previous,value);
         VaultCatalog.complete(vault);
+        if(!deleted)new NoteTasks(store).source(new VaultSources.Ref(TYPE,id(date),date.toString()),markdown.getBytes(StandardCharsets.UTF_8));
         store.change("PROFILE","UPDATED",store.owner());return get(date);
     }
     void restoreDocument(LocalDate date,byte[] bytes){

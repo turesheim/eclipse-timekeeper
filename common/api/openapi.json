@@ -1680,7 +1680,7 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1828,7 +1828,7 @@
             }
           }
         },
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1894,7 +1894,7 @@
     "/activities/active": {
       "get": {
         "operationId": "getActiveActivity",
-        "summary": "Read the authenticated owner\u2019s current interval",
+        "summary": "Read the authenticated owner’s current interval",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -1959,7 +1959,7 @@
     "/activities/start": {
       "post": {
         "operationId": "startActivity",
-        "summary": "Atomically activate or switch the owner\u2019s task",
+        "summary": "Atomically activate or switch the owner’s task",
         "x-required-permission": "write",
         "responses": {
           "201": {
@@ -2140,7 +2140,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2210,7 +2210,7 @@
       },
       "put": {
         "operationId": "updateProfile",
-        "summary": "Set the owner\u2019s reporting time zone",
+        "summary": "Set the owner’s reporting time zone",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -2340,7 +2340,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Use the owner\u2019s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
+        "description": "Use the owner’s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
         "parameters": [
           {
             "name": "from",
@@ -2440,7 +2440,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner\u2019s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
+        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner’s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
         "parameters": [
           {
             "name": "after",
@@ -3452,7 +3452,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -7566,7 +7566,7 @@
       },
       "get": {
         "operationId": "listPendingAccountArchives",
-        "summary": "List this account\u2019s resumable archive uploads",
+        "summary": "List this account’s resumable archive uploads",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -8050,7 +8050,7 @@
     "/data/account/imports": {
       "get": {
         "operationId": "listAccountArchiveRestores",
-        "summary": "List this account\u2019s completed archive restores",
+        "summary": "List this account’s completed archive restores",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -10589,7 +10589,7 @@
             }
           }
         },
-        "description": "Conditional replacement or explicit clearing of one linked identity\u2019s provider-data envelope. Legacy link and source updates preserve the envelope."
+        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
       }
     },
     "/task-connections": {
@@ -12834,7 +12834,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "Matches a deleted task\u2019s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
+        "description": "Matches a deleted task’s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
       }
     },
     "/task-list-sections": {
@@ -15598,7 +15598,7 @@
     "/admin/instance/uploads/{id}/staging": {
       "get": {
         "operationId": "getInstanceRestoreStage",
-        "summary": "Read the initiating session\u2019s restore preparation status",
+        "summary": "Read the initiating session’s restore preparation status",
         "tags": [
           "Accounts"
         ],
@@ -18414,7 +18414,7 @@
     "/notes/search/status": {
       "get": {
         "operationId": "getNotesSearchStatus",
-        "summary": "Read this replica\u2019s search readiness",
+        "summary": "Read this replica’s search readiness",
         "x-required-permission": "read",
         "parameters": [
           {
@@ -18474,7 +18474,7 @@
     "/notes/search/rebuild": {
       "post": {
         "operationId": "rebuildNotesSearch",
-        "summary": "Rebuild this account\u2019s private search cache on this replica",
+        "summary": "Rebuild this account’s private search cache on this replica",
         "x-required-permission": "write",
         "parameters": [
           {
@@ -26665,6 +26665,10 @@
           "noteClients": {
             "type": "integer",
             "minimum": 0
+          },
+          "noteTasks": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -32210,7 +32214,7 @@
           "baseline"
         ],
         "additionalProperties": false,
-        "description": "Atomically replace a linked identity\u2019s source revision and last-common field snapshot. Null baseline clears the snapshot."
+        "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
       },
       "TaskTombstone": {
         "type": "object",
@@ -33914,6 +33918,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -33985,6 +33997,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -34068,6 +34088,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -36153,6 +36181,14 @@
               "$ref": "#/components/schemas/ArchivedNoteClient"
             },
             "description": "Private note-to-client associations. Client IDs are remapped with imported work records; Markdown bytes and dates are unchanged."
+          },
+          "noteTasks": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTasks"
+            },
+            "description": "Private checklist identities referencing the work graph. Imported task IDs are remapped; null retains a deliberately deleted task without recreating it."
           }
         },
         "required": [
@@ -37140,6 +37176,111 @@
           }
         }
       },
+      "NotesSearchCalendarEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "A published VEVENT definition or live details linked to a saved event note. Recurring series are finite definitions, not expanded occurrences; inherited saved-occurrence details may omit timing. eventKey is null for a series definition. noteEntryId identifies the real saved vault note when present.",
+        "required": [
+          "id",
+          "definitionId",
+          "subscriptionId",
+          "uid",
+          "recurrenceId",
+          "title",
+          "description",
+          "location",
+          "recurring",
+          "seriesDefinition",
+          "eventKey",
+          "calendarName",
+          "clientId",
+          "clientName",
+          "color"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "definitionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "uid": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "recurrenceId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "recurring": {
+            "type": "boolean"
+          },
+          "seriesDefinition": {
+            "type": "boolean"
+          },
+          "eventKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "calendarName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "clientName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          },
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "firstDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "noteEntryId": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      },
       "TaskProviderAuthorizeInput": {
         "type": "object",
         "properties": {
@@ -38072,111 +38213,6 @@
         ],
         "additionalProperties": false
       },
-      "NotesSearchCalendarEvent": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "A published VEVENT definition or live details linked to a saved event note. Recurring series are finite definitions, not expanded occurrences; inherited saved-occurrence details may omit timing. eventKey is null for a series definition. noteEntryId identifies the real saved vault note when present.",
-        "required": [
-          "id",
-          "definitionId",
-          "subscriptionId",
-          "uid",
-          "recurrenceId",
-          "title",
-          "description",
-          "location",
-          "recurring",
-          "seriesDefinition",
-          "eventKey",
-          "calendarName",
-          "clientId",
-          "clientName",
-          "color"
-        ],
-        "properties": {
-          "id": {
-            "$ref": "#/components/schemas/Id"
-          },
-          "definitionId": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "subscriptionId": {
-            "$ref": "#/components/schemas/Id"
-          },
-          "uid": {
-            "type": "string",
-            "maxLength": 1024
-          },
-          "recurrenceId": {
-            "type": "string",
-            "maxLength": 4096
-          },
-          "title": {
-            "type": "string",
-            "maxLength": 4000
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 16000
-          },
-          "location": {
-            "type": "string",
-            "maxLength": 4000
-          },
-          "recurring": {
-            "type": "boolean"
-          },
-          "seriesDefinition": {
-            "type": "boolean"
-          },
-          "eventKey": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "calendarName": {
-            "$ref": "#/components/schemas/Name"
-          },
-          "clientId": {
-            "$ref": "#/components/schemas/Id"
-          },
-          "clientName": {
-            "$ref": "#/components/schemas/Name"
-          },
-          "color": {
-            "$ref": "#/components/schemas/Color"
-          },
-          "start": {
-            "$ref": "#/components/schemas/Instant"
-          },
-          "end": {
-            "$ref": "#/components/schemas/Instant"
-          },
-          "allDay": {
-            "type": "boolean"
-          },
-          "firstDate": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date"
-          },
-          "endDate": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date"
-          },
-          "noteEntryId": {
-            "$ref": "#/components/schemas/Id"
-          }
-        }
-      },
       "TaskProviderReviewInput": {
         "type": "object",
         "properties": {
@@ -38537,6 +38573,75 @@
             ]
           }
         ]
+      },
+      "ArchivedNoteTasks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey",
+          "items"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedNoteTaskItem"
+            }
+          }
+        }
+      },
+      "ArchivedNoteTaskItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "marker",
+          "summary",
+          "checked",
+          "depth"
+        ],
+        "properties": {
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "marker": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        }
       }
     },
     "parameters": {
@@ -38910,7 +39015,7 @@
     },
     {
       "name": "Accounts",
-      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user\u2019s business data."
+      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user’s business data."
     }
   ]
 }

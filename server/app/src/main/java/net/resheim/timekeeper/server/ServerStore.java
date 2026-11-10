@@ -58,6 +58,7 @@ public class ServerStore {
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
+    private final ThreadLocal<Boolean> noteTaskSync = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now, boolean readOnly) { }
     Connection currentConnection(){var current=context.get();return current==null?null:current.connection();}
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
@@ -234,6 +235,8 @@ public class ServerStore {
         var previous=journalSource.get();journalSource.set(source);
         try{return work.get();}finally{if(previous==null)journalSource.remove();else journalSource.set(previous);}
     }
+    boolean noteTaskSync(){return Boolean.TRUE.equals(noteTaskSync.get());}
+    <T> T withNoteTaskSync(Supplier<T> work){var previous=noteTaskSync.get();noteTaskSync.set(true);try{return work.get();}finally{if(previous==null)noteTaskSync.remove();else noteTaskSync.set(previous);}}
     DayNoteHistory.Source journalSource(){return Optional.ofNullable(journalSource.get()).orElse(DayNoteHistory.Source.INTERNAL);}
     ObjectNode journalClient(){var value=journalPrincipal.get();return value==null?object().put("authentication","INTERNAL").putNull("tokenId"):safeJournalClient(value);}
     ObjectNode journalBuild(){return serverInfo.journalIdentity();}
@@ -464,6 +467,7 @@ public class ServerStore {
             node.path("labelIds").forEach(label -> relation(type,id,"label","LABEL",uuid(label)));
             if(node.hasNonNull("projectId")) relation(type,id,"project","PROJECT",uuid(node.get("projectId")));
         }
+        if(value instanceof Task task)new NoteTasks(this).task(task);
         return value;
     }
     private JsonNode defaultClient() {
