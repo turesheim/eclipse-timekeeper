@@ -89,7 +89,7 @@ final class TaskCloudProvider {
                 sourceTime(source,"modifiedAt",value,"updated");sourceString(source,"remoteEtag",value,"etag");
                 if(!deleted){
                     GoogleTaskContext.validate(value);var assigned=GoogleTaskContext.assigned(value);if(!assigned.isMissingNode())fields.set("assignment",assigned);
-                    fields.put("summary",required(value,"title",1024).trim());
+                    fields.put("summary",title(value).trim());
                     // Assigned tasks may not expose notes; omission is not an observed clear.
                     if(value.has("notes")||!value.hasNonNull("assignmentInfo"))body(fields,"TEXT",text(value,"notes",65536).orElse(""));
                     String status=required(value,"status",32);
@@ -174,6 +174,9 @@ final class TaskCloudProvider {
         if(!field.isTextual()||field.asText().length()>max)throw invalid();return Optional.of(field.asText());
     }
     private static String requiredText(JsonNode value,String field,int max){return text(value,field,max).orElseThrow(TaskCloudProvider::invalid);}
+    private static String title(JsonNode value){
+        var node=value.get("title");if(node==null||!node.isTextual()||node.asText().isBlank()||node.asText().codePointCount(0,node.asText().length())>1024)throw invalid();return node.asText();
+    }
     private static String required(JsonNode value,String field,int max){var text=requiredText(value,field,max);if(text.isBlank())throw invalid();return text;}
     private static boolean booleanValue(JsonNode value,String field,boolean fallback){
         if(!value.has(field))return fallback;if(!value.get(field).isBoolean())throw invalid();return value.get(field).asBoolean();

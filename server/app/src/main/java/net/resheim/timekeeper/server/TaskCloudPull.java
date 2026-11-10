@@ -88,6 +88,8 @@ final class TaskCloudPull {
                     String count=status.equals("CREATE")?"created":status.equals("UPDATE")?"updated":"unchanged";result.put(count,result.path(count).asInt()+1);
                 }else if(!status.equals("IGNORE_DELETED")){
                     var row=((ObjectNode)decision).deepCopy();row.set("observation",item.deepCopy());pending.add(row);blocked.add(remote.id());
+                    // A genuine live observation ends an earlier deletion acknowledgement even when fields still conflict.
+                    if(!remote.deleted()&&deletionAcknowledged(existing,scan.provider(),repository,remote.id()))remember(existing.orElseThrow(),scan.provider(),repository,remote);
                 }
                 iterator.remove();progressed=true;
             }

@@ -154,4 +154,11 @@ class TaskCloudProviderTest {
             for(String field:List.of("flagged","urgent","recurrence.series","attachments","reminders.ABSOLUTE"))assertFalse(provider.capabilities().path("fields").has(field));
         }
     }
+    @Test void googleTitleLimitCountsUnicodeCharactersAndRetainsOpaqueIdentityValidation(){
+        String title="😀".repeat(1024);var value=JsonValues.object().put("id","task-id").put("title",title).put("status","needsAction");
+        assertEquals(title,google().normalize(value).fields().path("summary").asText());
+        assertThrows(TaskProviderHttp.Failure.class,()->google().normalize(value.deepCopy().put("title",title+"x")));
+        assertThrows(TaskProviderHttp.Failure.class,()->google().normalize(value.deepCopy().put("id","x".repeat(1025))));
+    }
+
 }

@@ -134,7 +134,7 @@ class TaskProviderScansTest {
     }
     private TaskProviderReviews reviews(){return new TaskProviderReviews(store,receipts,inputs);}
     private ObjectNode incoming(Fixture f,TaskCloudProvider.RemoteTask...items){
-        var claim=reclaim(f);var start=tx(f,()->scans().begin(claim));var ready=tx(f,()->scans().acknowledge(claim,start,page(null,items)));
+        var claim=tx(f,()->{var auth=connections().required(f.connection());auth.putNull("lease").putNull("leaseUntil").put("lastAttempt",store.now().minusSeconds(31).toString());connections().save(TaskProviderConnections.AUTH,auth);return connections().claim(f.connection(),true);});var start=tx(f,()->scans().begin(claim));var ready=tx(f,()->scans().acknowledge(claim,start,page(null,items)));
         tx(f,()->scans().reconcile(claim));return ready;
     }
     private void localTitle(Fixture f,String id,String title){
@@ -162,7 +162,7 @@ class TaskProviderScansTest {
         tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),object().put("decision","LOCAL").put("taskEtag",row.path("taskEtag").asText())));
         assertEquals(before.path("summary"),stored(f,"one").path("summary"));assertTrue(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));assertEquals("APPLIED",tx(f,()->store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).path("state").asText());
         incoming(f,deleted);assertEquals("APPLIED",tx(f,()->store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).path("state").asText());
-        incoming(f,task("one",null,"001","Keep this"));incoming(f,deleted);var again=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);assertTrue(again.path("canDelete").asBoolean());
+        localTitle(f,"one","Local draft after deletion");incoming(f,task("one",null,"001","Live again with a conflicting title"));assertEquals("Local draft after deletion",stored(f,"one").path("summary").asText());assertFalse(stored(f,"one").path("externalReferences").get(0).path("providerData").path("payload").path("deletionReview").asBoolean());incoming(f,deleted);var again=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);assertTrue(again.path("canDelete").asBoolean());
         var result=tx(f,()->reviews().resolve(f.connection(),f.list(),id,again.path("reviewEtag").asText(),object().put("decision","DELETE").put("taskEtag",again.path("taskEtag").asText())));assertTrue(result.body().path("deleted").asBoolean());assertTrue(tx(f,()->store.find("TASK",id).isEmpty()));assertFalse(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));
     }
 
