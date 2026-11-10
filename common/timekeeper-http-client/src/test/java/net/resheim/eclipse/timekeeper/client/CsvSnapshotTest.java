@@ -28,7 +28,7 @@ class CsvSnapshotTest {
     @Test void taskExtrasPreservePlanningTimingNotesOrderAliasesRecurrenceRemindersAndMetadata() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"labels":[],"activities":[],"workSessions":[],
-             "tasks":[{"id":"new","projectId":null,"parentTaskId":null,"summary":"Future","url":null,"externalReferences":[],
+             "tasks":[{"id":"new","projectId":null,"clientId":"client-only","parentTaskId":null,"summary":"Future","url":null,"externalReferences":[],
                        "status":"NOT_STARTED","scheduledDate":"2026-10-26","completedAt":null,"checklistItems":[],
                        "start":null,"due":{"kind":"DATE","date":"2026-10-27"},"priority":"HIGH","flagged":true,"urgent":false,
                        "body":{"format":"TEXT","content":"Keep me"},"siblingOrder":7,

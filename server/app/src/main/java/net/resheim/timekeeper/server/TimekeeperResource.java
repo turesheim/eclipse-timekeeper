@@ -319,8 +319,22 @@ public class TimekeeperResource {
         });
     }
     private JsonNode stored(String type,Object value,JsonNode input) {
+        if(type.equals("TASK")) {
+            var task=(Task)value;
+            if(input.has("priority")&&!task.importance().priority().name().equals(input.path("priority").asText()))
+                task=store.service().updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),new TaskImportance(TaskPriority.valueOf(input.path("priority").asText()),task.importance().flagged(),task.importance().urgent())));
+            if(input.has("due")) {
+                var proposed=object();proposed.set("due",input.get("due"));proposed.set("start",snapshot(store.owner(),task).get("start"));var next=timing(proposed);
+                if(!task.timing().equals(next))task=store.service().updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),next));
+            }
+            return store.clientDetails(type,task.id().value(),input);
+        }
         var node=snapshot(store.owner(),value);
         return Set.of("PROJECT","WORK_SESSION").contains(type) ? store.clientDetails(type,uuid(node.get("id")),input) : node;
+    }
+    @GET @Path("/tasks/{id}/note") public Response taskNote(@PathParam("id") String id) {
+        UUID key=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {required("TASK",key);return ApiReplies.resource(200,new NoteTasks(store).origin(key),null);});
     }
     private JsonNode sessionSnapshot(WorkSession value) {return required("WORK_SESSION",value.id().value());}
     @GET @Path("/tasks/by-external-reference") public Response external() {

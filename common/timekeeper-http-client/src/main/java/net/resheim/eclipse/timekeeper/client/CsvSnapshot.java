@@ -20,7 +20,7 @@ import com.google.gson.JsonParser;
 public final class CsvSnapshot {
     private static final int MAX_BYTES = 48 * 1024 * 1024;
     private static final List<String> TASK_EXTRAS = List.of("status","scheduledDate","completedAt","checklistItems","externalAliases","recurrence","reminders","metadata",
-            "start","due","priority","flagged","urgent","body","siblingOrder");
+            "start","due","priority","flagged","urgent","body","siblingOrder","clientId");
     private static final Map<String,List<String>> COLUMNS = new LinkedHashMap<>();
     static {
         COLUMNS.put("projects", List.of("id", "name"));

@@ -41,10 +41,11 @@ final class NoteTasks {
     private void reconcile(VaultSources.Ref ref,String source){
         var previous=record(ref);var old=new ArrayList<NoteTaskMarkup.Item>();previous.path("items").forEach(value->old.add(item(value)));
         var next=NoteTaskMarkup.items(source);if(next.size()>1000)throw ApiFailure.validation();
-        if(old.isEmpty()&&next.isEmpty())return;
         int[] matches=NoteTaskMatches.previous(old,next);var result=previous.deepCopy();var items=result.putArray("items");var retained=new HashSet<UUID>();String normalized=source;
+        var assignments=next.stream().anyMatch(value->!value.assignments().isEmpty())?new NoteTaskAssignments(store):null;
         for(int i=0;i<next.size();i++){
             var current=next.get(i);var before=matches[i]<0?null:previous.path("items").get(matches[i]);UUID taskId=before==null?null:uuid(before.path("taskId"));Task task=taskId==null?null:task(taskId);
+            long initialVersion=task==null?-1:task.version();
             boolean edited=before==null||!current.summary().equals(before.path("summary").asText())||current.checked()!=before.path("checked").asBoolean();
             // Deleting a normal task is deliberate. Unrelated prose edits must
             // not resurrect it; editing its checkbox/title can create a new task.
@@ -55,15 +56,47 @@ final class NoteTasks {
                 else if(completed(task)!=current.checked())normalized=NoteTaskMarkup.checked(normalized,current,completed(task));
             }
             if(taskId==null)throw new IllegalStateException("Missing checklist identity");
+            if(task!=null&&assignments!=null&&(before==null||!previous.has("contentTag")||!current.summary().equals(before.path("summary").asText()))) {
+                var assignment=assignments.resolve(current.assignments()).orElse(null);
+                if(assignment!=null){
+                    if(!task.projectId().equals(assignment.project()))task=store.service().updateTask(new UpdateTask(task.id(),task.version(),assignment.project(),task.parentTaskId(),task.summary(),task.url()));
+                    var priorClient=store.find("TASK",task.id().value()).orElseThrow().get("clientId");
+                    if(before!=null&&task.version()==initialVersion&&!Objects.equals(priorClient==null||priorClient.isNull()?null:uuid(priorClient),assignment.client()))
+                        task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),task.summary(),task.url()));
+                    var fields=object();if(assignment.client()==null)fields.putNull("clientId");else fields.put("clientId",assignment.client().toString());store.clientDetails("TASK",task.id().value(),fields);
+                }
+            }
             retained.add(taskId);boolean checked=task==null?current.checked():completed(task);
             items.add(object().put("taskId",taskId.toString()).put("marker",current.marker()).put("summary",current.summary()).put("checked",checked).put("depth",current.depth()));
             save(LINK,taskId,object().put("documentId",id(ref).toString()));
         }
-        for(var value:previous.path("items")){UUID taskId=uuid(value.path("taskId"));if(!retained.contains(taskId))store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),LINK,taskId);}
-        save(DOCUMENT,id(ref),result);
+        for(var value:previous.path("items")){UUID taskId=uuid(value.path("taskId"));if(!retained.contains(taskId)){
+            var removed=task(taskId);
+            // Preserve recorded work and independently managed subtasks.
+            if(removed!=null&&!store.related("task","TASK",taskId)&&!store.related("parent","TASK",taskId))store.service().deleteTask(new DeleteTask(removed.id(),removed.version()));
+            store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),LINK,taskId);
+        }}
         // A task may have changed while its source was in Trash. Restore its
         // current completion without reformatting the restored document.
         if(!normalized.equals(source))write(ref,normalized);
+        result.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag());save(DOCUMENT,id(ref),result);
+    }
+    /** Bounded maintenance enrolls older files without needing a browser read or edit. */
+    void existing(String type,UUID sourceId){
+        var stored=store.find(type,sourceId).orElse(null);if(stored==null)return;
+        VaultSources.Ref ref;
+        if(type.equals(VaultContent.TYPE)){
+            var entry=new VaultIndex(store).referenced(type,sourceId);
+            if(entry==null||entry.path("deleted").asBoolean()||!entry.path("kind").asText().equals("MARKDOWN")||!new VaultSettings(store).allowed(VaultCollection.path(entry)))return;
+            ref=VaultSources.fromEntry(entry);
+        }else ref=VaultSources.fromStored(type,stored);
+        var source=new VaultSources(store,store.vaultLimits(),ref);var state=source.snapshot();
+        if(!state.deleted()&&!record(ref).path("contentTag").asText().equals(state.tag()))source(ref,source.read());
+    }
+    ObjectNode origin(UUID task){
+        var link=store.find(LINK,task).orElseThrow(ApiFailure::notFound);var document=store.find(DOCUMENT,uuid(link.path("documentId"))).orElseThrow(ApiFailure::notFound);var ref=reference(document);
+        var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();var entry=new VaultIndex(store).referenced(ref.type(),ref.id());
+        if(entry==null||entry.path("deleted").asBoolean())throw ApiFailure.notFound();return vault.metadata(vault.get(VaultCollection.id(entry)));
     }
     /** Called by the canonical task repository; guarded against source -> task recursion. */
     void task(Task task){
@@ -86,7 +119,7 @@ final class NoteTasks {
     }
     void install(VaultSources.Ref ref,JsonNode items){
         var previous=record(ref);if(!previous.path("items").isEmpty())throw ApiFailure.conflict();
-        var value=previous.deepCopy();value.set("items",items.deepCopy());save(DOCUMENT,id(ref),value);
+        var value=previous.deepCopy();value.set("items",items.deepCopy());value.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag());save(DOCUMENT,id(ref),value);
         for(var item:items){UUID taskId=uuid(item.path("taskId"));if(store.find(LINK,taskId).isPresent())throw ApiFailure.conflict();save(LINK,taskId,object().put("documentId",id(ref).toString()));}
     }
 }

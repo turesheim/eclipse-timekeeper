@@ -396,6 +396,11 @@ are independent task values. Missing values on older payloads read as
 `UNSPECIFIED`/false/false. Ordinary task edits preserve them, and both portable
 exports and account archives retain them. Provider capabilities determine
 which of these fields a connector may write remotely.
+Tasks without a project can also carry a nullable, server-owned `clientId` in
+their JSON resource, protected by an owned client relation. Project tasks inherit
+their project's client. Domain mutations retain direct client metadata; legacy
+tasks read without an assignment. Portable JSON/CSV and account imports remap
+direct client IDs without creating projects. No SQL schema change is required.
 Task notes are an embedded `body` value with an explicit `TEXT` or `HTML`
 format. Missing values on older payloads read as empty plain text. The
 conditional body endpoint can clear notes with empty text; ordinary task edits

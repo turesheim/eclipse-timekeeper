@@ -1742,5 +1742,19 @@
   "notes.search_action": "Søk",
   "markdown.highlight": "Uthev med farge",
   "markdown.subscript": "Senket skrift",
-  "markdown.superscript": "Hevet skrift"
+  "markdown.superscript": "Hevet skrift",
+  "tasks.hide_completed": "Skjul fullførte oppgaver",
+  "tasks.delete": "Slett oppgave",
+  "tasks.source_note": "Åpne kildenotat: {{title}}",
+  "tasks.priority": "Prioritet",
+  "tasks.priority_unspecified": "Ingen prioritet",
+  "tasks.priority_low": "Lav",
+  "tasks.priority_normal": "Normal",
+  "tasks.priority_high": "Høy",
+  "tasks.deadline_type": "Type tidsfrist",
+  "tasks.no_deadline": "Ingen tidsfrist",
+  "tasks.deadline_date": "Dato",
+  "tasks.deadline_time": "Dato og klokkeslett",
+  "tasks.deadline_clock": "Klokkeslett for tidsfrist",
+  "tasks.deadline_zone": "Tidssone for tidsfrist"
 }
