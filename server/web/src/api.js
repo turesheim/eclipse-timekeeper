@@ -3,6 +3,7 @@ import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
+  NOTES_SEARCH_INDEXING:'notes.search_unavailable',
   VAULT_CONFIG_DISABLED:'notes.error_config_disabled',
   VAULT_CONFIG_PRESENT:'notes.error_config_present',
   VAULT_SPECIAL_FOLDER:'notes.error_special_folder',
