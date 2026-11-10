@@ -645,6 +645,7 @@ public class ServerStore {
             public Task save(Task value) { check(); return ServerStore.this.save("TASK",value); }
             public void delete(TaskId id) {
                 check();var task=get("TASK",id.value(),Task.class).orElseThrow(ApiFailure::notFound);
+                TaskProviderWrites.deleted(ServerStore.this,task);
                 var identities=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());
                 task.externalReferences().forEach(reference -> identities.add(reference.key()));
                 for(var attachment:ServerStore.this.list("TASK_ATTACHMENT")) if(attachment.path("taskId").asText().equals(id.value().toString())) {

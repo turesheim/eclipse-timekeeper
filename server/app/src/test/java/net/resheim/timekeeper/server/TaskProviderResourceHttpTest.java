@@ -164,4 +164,23 @@ class TaskProviderResourceHttpTest {
         assertTrue(store.transaction(owner,()->store.find("TASK",uuid(task.get("id"))).isPresent()));assertEquals(412,call("POST",deletePath+"/confirm",null,deletion.header("ETag")).statusCode());assertEquals(2,provider.writes.get());
         var archive=given().header("Authorization","Bearer test-a").get("/api/v1/data/export");assertEquals(200,archive.statusCode());assertFalse(archive.asString().contains("TASK_WRITE"));
     }
+    @Test void googleCreationLinksTheOriginalNativeTaskAndUncertainIdentityRecoveryUsesOwnedConditionalRoutes()throws Exception{
+        for(boolean uncertain:List.of(false,true)){
+            var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+            var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
+            var task=store.transaction(owner,()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(Optional.empty(),"HTTP native task",Optional.empty())));
+            var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());provider.loseCreationReply=uncertain;
+            var response=call("POST","/"+id+"/writes",object().put("listId",list.path("id").asText()).put("taskId",task.id().value().toString()).put("action","CREATE"),null);var preview=json(response,201);inputs.validate("TaskProviderWrite",preview);assertEquals(0,provider.writes.get());String path="/"+id+"/writes/"+preview.path("id").asText();
+            json(call("POST",path+"/confirm",null,response.header("ETag")),202);idle(id);var completed=call("GET",path,null,null);assertEquals(uncertain?"UNKNOWN":"DONE",json(completed,200).path("state").asText());assertEquals(1,provider.writes.get());
+            if(uncertain){
+                assertEquals(409,call("GET",path+"/candidates",null,null).statusCode());json(call("POST",path+"/check",null,completed.header("ETag")),202);idle(id);
+                var choices=json(call("GET",path+"/candidates?q=HTTP",null,null),200);inputs.validate("TaskProviderCreationCandidates",choices);assertEquals(1,choices.path("count").asInt());
+                var current=call("GET",path,null,null);var body=json(current,200);var identity=object().put("externalId",choices.path("items").get(0).path("externalId").asText()).put("scanEtag",choices.path("scanEtag").asText()).put("taskEtag",body.path("currentTaskEtag").asText());
+                assertEquals(404,call("b",BROWSER,"GET",path+"/candidates",null,null).statusCode());assertEquals(403,call("read",BROWSER,"POST",path+"/identity",identity,current.header("ETag")).statusCode());assertEquals(428,call("POST",path+"/identity",identity,null).statusCode());
+                var reconciled=json(call("POST",path+"/identity",identity,current.header("ETag")),200);inputs.validate("TaskProviderWrite",reconciled);assertEquals("RECONCILED",reconciled.path("state").asText());assertEquals(1,provider.writes.get());
+            }
+            var linked=store.transaction(owner,()->store.find("TASK",task.id().value()).orElseThrow());assertEquals(task.id().value().toString(),linked.path("id").asText());assertEquals(1,linked.path("externalReferences").size());
+        }
+    }
+
 }

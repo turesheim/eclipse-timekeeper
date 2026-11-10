@@ -24,7 +24,7 @@ final class TaskProviderScans {
             if(same&&old.path("state").asText().equals("FETCHING")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(86400).isAfter(now))return ((ObjectNode)old).deepCopy();
             if(same&&!claim.forced()&&old.path("state").asText().equals("READY")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(900).isAfter(now))return ((ObjectNode)old).deepCopy();
         }
-        boolean full=claim.provider()!=TaskCloudProvider.Provider.GOOGLE||!approved(auth,claim.remoteList())||before.isEmpty()
+        boolean full=TaskProviderWrites.needsFullScan(store,claim.id(),claim.list())||claim.provider()!=TaskCloudProvider.Provider.GOOGLE||!approved(auth,claim.remoteList())||before.isEmpty()
                 ||!before.get().hasNonNull("lastFullAt")||!Instant.parse(before.get().path("lastFullAt").asText()).plusSeconds(86400).isAfter(now);
         var value=object().put("connectionId",claim.id().toString()).put("remoteListId",claim.remoteList()).put("providerId",claim.provider().name().toLowerCase(Locale.ROOT))
                 .put("accountId",claim.account()).put("generation",claim.generation()).put("scanId",UUID.randomUUID().toString()).put("startedAt",now.toString())

@@ -14,7 +14,7 @@ import jakarta.enterprise.inject.Alternative;
 /** Test-only transport replacement; production keeps its fixed HTTPS provider hosts. */
 @Alternative @ApplicationScoped
 public class TaskProviderHttpTestFixture extends TaskProviderClients {
-    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;volatile boolean writable;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();final AtomicInteger writes=new AtomicInteger();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> patches=new ConcurrentHashMap<>();final Map<String,AtomicInteger> revisions=new ConcurrentHashMap<>();}
+    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;volatile boolean writable;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();final AtomicInteger writes=new AtomicInteger();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> patches=new ConcurrentHashMap<>();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> created=new ConcurrentHashMap<>();volatile boolean loseCreationReply;final Map<String,AtomicInteger> revisions=new ConcurrentHashMap<>();}
     static final Map<String,State> STATES=new ConcurrentHashMap<>();
     @Override TaskProviderOAuth oauth(TaskCloudProvider.Provider provider){
         return new TaskProviderOAuth(provider,new TaskProviderHttp(Set.of("oauth2.googleapis.com","login.microsoftonline.com"),request->{
@@ -39,7 +39,7 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
                 state.reads.incrementAndGet();if(state.failure!=0)return new TaskProviderHttp.Reply(state.failure,Map.of("retry-after","60"),"{\"private\":\"provider detail\"}".getBytes(StandardCharsets.UTF_8));
                 String list=path.contains("list-2/")?"list-2":"list-1";
                 var task=google?googleTask(state,list):JsonValues.object().put("id","task-"+list).put("title",state.title+" "+list).put("status","notStarted").put("position","001");
-                var result=JsonValues.object();result.putArray(google?"items":"value").add(task);return reply(200,result.toString());
+                var result=JsonValues.object();var items=result.putArray(google?"items":"value");items.add(task);if(google)state.created.forEach((key,value)->{if(key.startsWith(list+"/"))items.add(value.deepCopy());});return reply(200,result.toString());
             }
             if(path.endsWith("/lists")){
                 var result=JsonValues.object();var items=result.putArray(google?"items":"value");
@@ -52,7 +52,13 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
     @Override GoogleTasksWriter googleWriter(){
         return new GoogleTasksWriter(new TaskProviderHttp(Set.of("tasks.googleapis.com"),request->{
             String token=request.headers().firstValue("Authorization").orElseThrow().substring("Bearer fixture-access-".length());var state=STATES.get(token);state.requests.incrementAndGet();
-            String list=request.uri().getPath().contains("/list-2/")?"list-2":"list-1";if(!request.uri().getPath().endsWith("/task-"+list))throw new AssertionError("Unexpected task mutation identity");
+            String list=request.uri().getPath().contains("/list-2/")?"list-2":"list-1";
+            if(request.method().equals("POST")&&request.uri().getPath().endsWith("/tasks")){
+                if(!state.writable)throw new AssertionError("Read-only grant cannot create Google tasks");if(request.headers().firstValue("If-Match").isPresent())throw new AssertionError("New task has no provider revision yet");
+                state.writes.incrementAndGet();String id="created-"+UUID.randomUUID();var task=JsonValues.object().put("id",id).put("position","999").put("status","needsAction").put("etag","\"created-1\"");task.setAll((com.fasterxml.jackson.databind.node.ObjectNode)JsonValues.parse(bytes(request)));state.created.put(list+"/"+id,task);
+                if(state.loseCreationReply)throw new java.io.IOException("Fixture lost insert response");return reply(201,task.toString());
+            }
+            if(!request.uri().getPath().endsWith("/task-"+list))throw new AssertionError("Unexpected task mutation identity");
             var before=googleTask(state,list);if(request.method().equals("GET"))return reply(200,before.toString());
             if(!state.writable)throw new AssertionError("Read-only grant cannot mutate Google");
             if(!request.headers().firstValue("If-Match").orElse("").equals(before.path("etag").asText()))return reply(412,"{}");

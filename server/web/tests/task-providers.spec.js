@@ -22,8 +22,8 @@ function connection(owner,overrides={}){
   return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[]}={}){
-  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,providerWrites:0};
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[],candidates=[]}={}){
+  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0};
   for(const [path,items]of [['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
     const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
@@ -44,8 +44,10 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
         if(method==='POST'){const value=writeJob({connectionId:row.id,taskId:input.taskId,listId:input.listId,action:input.action,title:tasks.find(task=>task.id===input.taskId)?.summary||'Imported Google task'});model.jobs.push(value);row.pendingWrites=model.jobs.length;return reply(value,201);}
       }
       const job=model.jobs.find(job=>path.includes('/writes/'+job.id));if(!job)return reply({type:'about:blank',title:'Not found',status:404,code:'NOT_FOUND'},404);
+      if(method==='GET'&&path.endsWith('/candidates'))return reply({scanEtag:`"scan-${model.candidateVersion}"`,observedAt:'2026-11-10T00:00:00Z',count:model.candidates.length,items:model.candidates});
       if(method==='GET')return reply(job);
       if(request.headers()['if-match']!==`"provider-${job.version}"`)return reply({type:'about:blank',title:'Stale version',status:412,code:'STALE_VERSION'},412);
+      if(path.endsWith('/identity')){expect(input.taskEtag).toBe(job.currentTaskEtag);if(input.scanEtag!==`"scan-${model.candidateVersion}"`)return reply({type:'about:blank',title:'Stale scan',status:412,code:'STALE_VERSION'},412);job.version++;job.state='RECONCILED';job.externalId=input.externalId;return reply(job);}
       if(path.endsWith('/confirm')){model.providerWrites++;job.version++;job.state='DONE';job.canConfirm=false;return reply(job,202);}
       if(path.endsWith('/check')){job.version++;job.remoteFields={summary:'Changed at Google'};job.conflictFields=['summary'];job.canResolve=true;return reply(job,202);}
       if(path.endsWith('/resolve')){expect(input.taskEtag).toBe(job.currentTaskEtag);job.version++;job.state='RECONCILED';job.canResolve=false;return reply(job);}
@@ -161,7 +163,7 @@ test('preparing a change selects a real owned task and retains the selection dur
   const created=await api.post('/api/v1/tasks',{headers:{...headers,'Idempotency-Key':randomUUID()},data:{summary:'Changed locally',projectId:null,parentTaskId:null,url:null}});expect(created.status()).toBe(201);const task=await created.json();
   const linked=await api.put('/api/v1/tasks/'+task.id+'/external-references',{headers:{...headers,'If-Match':created.headers().etag},data:{providerId:'google',repositoryId:'fixture-account/work',externalId:'task-id',externalUrl:null,taskListId:list.id}});expect(linked.status()).toBe(200);
   const row=connection(owner,{id:sourceValue.id,direction:'TWO_WAY'}),model=await providerFixture(page,owner,{rows:[row],tasks:[await linked.json()],lists:[list]});await open(page);const panel=card(page,row.id);
-  await panel.getByText('Prepare a Google change',{exact:true}).click();const taskChoice=panel.getByRole('combobox',{name:'Imported Google task',exact:true});await taskChoice.selectOption({label:'Work / Changed locally'});const captured=await taskChoice.inputValue();
+  await panel.getByText('Prepare a Google change',{exact:true}).click();const taskChoice=panel.getByRole('combobox',{name:'Dagsverk task and Google list',exact:true});await taskChoice.selectOption({label:'Work / Changed locally'});const captured=await taskChoice.inputValue();
   await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(taskChoice).toHaveValue(captured);await panel.getByRole('button',{name:'Review change',exact:true}).click();
   await expect(panel.getByRole('heading',{name:'Review Google change · Changed locally',exact:true})).toBeVisible();expect(model.writes.find(write=>write.path.endsWith('/writes')).input).toEqual({taskId:task.id,listId:list.id,action:'UPDATE'});expect(model.providerWrites).toBe(0);
 });
@@ -201,6 +203,24 @@ for(const language of ['en-GB','nb-NO'])test('Google write comparisons stay read
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   }
   expect(model.providerWrites).toBe(0);await captureScreenshot(page,{path:'test-results/task-writes-320-'+language+'.png',fullPage:true});
+});
+
+test('creating a Google task reviews an existing native task and target list before sending',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY'}),taskId=randomUUID(),listId=randomUUID();
+  const model=await providerFixture(page,owner,{rows:[row],tasks:[{id:taskId,summary:'Native root',parentTaskId:null,externalReferences:[]}],lists:[{id:listId,connectionId:row.id,remoteListId:'work',name:'Work',present:true}]});await open(page);const panel=card(page,row.id);
+  await panel.getByText('Prepare a Google change',{exact:true}).click();const action=panel.getByRole('combobox',{name:'Change to review',exact:true});await expect(action).toBeEnabled();await action.selectOption('CREATE');
+  await panel.getByRole('combobox',{name:'Dagsverk task and Google list',exact:true}).selectOption({label:'Work / Native root'});await panel.getByRole('button',{name:'Review change',exact:true}).click();
+  await expect(panel.getByRole('heading',{name:'Review Google change · Native root',exact:true})).toBeVisible();await expect(panel.getByText('Create a Google task linked to this existing Dagsverk task.',{exact:false})).toBeVisible();
+  expect(model.writes.find(write=>write.path.endsWith('/writes')).input).toEqual({taskId,listId,action:'CREATE'});expect(model.providerWrites).toBe(0);
+});
+
+test('uncertain creation identity remains an explicit choice and a stale scan preserves the comparison',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false}),candidates=[{externalId:'first-id',fields:{summary:'Same title',body:{format:'TEXT',content:'First Google task'}}},{externalId:'second-id',fields:{summary:'Same title',body:{format:'TEXT',content:'Second Google task'}}}];
+  const model=await providerFixture(page,owner,{rows:[row],jobs:[job],candidates});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();
+  const choice=panel.getByRole('combobox',{name:'Google identity to link',exact:true}),bind=panel.getByRole('button',{name:'Link this identity; keep Dagsverk fields',exact:true});await expect(choice).toHaveValue('');await expect(bind).toBeDisabled();
+  await choice.selectOption('second-id');await expect(panel.getByText('Second Google task',{exact:true})).toBeVisible();model.candidateVersion++;await bind.click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(choice).toHaveValue('second-id');await expect(panel.getByText('Second Google task',{exact:true})).toBeVisible();expect(job.state).toBe('UNKNOWN');expect(model.providerWrites).toBe(0);
+  await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();await choice.selectOption('second-id');await bind.click();await expect(panel.getByText('Imported Google task · Observed values reconciled',{exact:true})).toBeVisible();
+  expect(model.writes.filter(write=>write.path.endsWith('/identity')).at(-1).input).toEqual({externalId:'second-id',scanEtag:'"scan-2"',taskEtag:'"task-current"'});expect(model.providerWrites).toBe(0);
 });
 
 test('authorization responses cannot navigate to an unrelated host',async({page,request})=>{

@@ -26,6 +26,26 @@ Google's title and note limits are checked before writing. Assigned tasks cannot
 be deleted here, and their notes must be edited at the original source. A Google
 deletion keeps the ordinary Dagsverk task for separate review.
 
+For an existing unlinked root task, choose **Create in Google**, select the task
+and target list, then review and send. A confirmed result links the returned
+Google ID to that same native task; its project, rich text and unsupported
+fields remain intact, including edits made while the request was in flight.
+Hierarchy and order stay local for tasks created this way, as stated in the
+preview. Imported Google hierarchy/order still synchronize normally.
+
+If an insert response is lost, Dagsverk never repeats the insert or guesses an
+identity from its title. New unlinked items from that provider/account/list are
+held for review; already linked tasks continue to synchronize. Choose **Check
+Google result** to obtain a fresh full scan, then **Find unlinked Google tasks**.
+Search titles or exact IDs, review both sets of values, and explicitly link the
+correct provider identity. Results show at most 100 matching tasks; refine the
+search to find another result. The scan and local task must still match the
+reviewed versions. This local reconciliation sends no provider mutation and
+does not claim that the original insert succeeded. If the local task was
+explicitly deleted during the request, identifying the result records that
+provider ID as locally deleted rather than recreating the task. If no correct
+identity can be established, retain the uncertain result for investigation.
+
 Concurrent changes are retained for reconciliation. Disconnecting or
 deselecting a list keeps imported tasks. Missing tasks are not automatically
 deleted; provider-reported deletions require review. Connection status reports

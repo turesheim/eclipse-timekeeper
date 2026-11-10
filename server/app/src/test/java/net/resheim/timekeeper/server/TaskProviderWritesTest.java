@@ -64,6 +64,73 @@ class TaskProviderWritesTest {
             public void onSubscribe(Flow.Subscription subscription){subscription.request(Long.MAX_VALUE);}public void onNext(ByteBuffer buffer){byte[] value=new byte[buffer.remaining()];buffer.get(value);bytes.writeBytes(value);}public void onComplete(){finished.complete(null);}public void onError(Throwable error){finished.completeExceptionally(error);}
         });finished.join();return parse(bytes.toString(StandardCharsets.UTF_8));
     }
+    private Fixture nativeTask(){
+        var f=fixture();return tx(f,()->{var project=store.service().createProject(new CreateProject("Native project"));var task=store.service().createTask(new CreateTask(Optional.of(project.id()),"Native task",Optional.empty()));
+            task=store.service().updateTaskBody(new UpdateTaskBody(task.id(),task.version(),new TaskBody(TaskBodyFormat.HTML,"<b>Native rich notes</b>")));
+            store.service().updateTaskOrder(new UpdateTaskOrder(task.id(),task.version(),7));return new Fixture(f.owner(),f.connection(),f.list(),task.id().value());});
+    }
+    private void delete(Fixture f){tx(f,()->{var task=(Task)decode("TASK",store.find("TASK",f.task()).orElseThrow());store.service().deleteTask(new DeleteTask(task.id(),task.version()));return null;});}
+    private ObjectNode pull(Fixture f,String remoteId){return tx(f,()->new TaskCloudPull(store,receipts,inputs).apply(f.connection(),f.list(),new TaskCloudPull.Scan("google","account","remote-list",List.of(new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Native task","\"new-revision\"").put("id",remoteId))),store.now())));}
+    @Test void creatingLinksTheSameNativeTaskAndPreservesItsProjectRichNotesAndOrder(){
+        var f=nativeTask();var before=task(f);var preview=preview(f,TaskProviderWrites.Action.CREATE);assertTrue(preview.path("canConfirm").asBoolean());assertTrue(preview.path("externalId").isNull());assertTrue(preview.path("providerEtag").isNull());
+        assertEquals(object().put("summary","Native task"),preview.path("writeFields"));assertTrue(preview.path("warnings").toString().contains("TEXT_ONLY"));
+        UUID id=uuid(confirm(f,preview).get("id"));var claim=claim(f);var calls=new AtomicInteger();
+        writes().drain(claim,"private-access",writer(request->{calls.incrementAndGet();assertEquals("POST",request.method());assertTrue(request.headers().firstValue("If-Match").isEmpty());assertEquals(object().put("title","Native task"),body(request));assertEquals("SENDING",job(f,id).path("state").asText());return reply(200,raw("Native task","\"created\"").put("id","new-id"));}));
+        assertEquals(1,calls.get());assertEquals("DONE",job(f,id).path("state").asText());var linked=task(f);assertEquals(before.path("id"),linked.path("id"));assertEquals(before.path("projectId"),linked.path("projectId"));assertEquals(before.path("body"),linked.path("body"));assertEquals(7,linked.path("siblingOrder").asInt());
+        assertEquals("new-id",linked.path("externalReferences").get(0).path("externalId").asText());assertEquals("Native task",baseline(f));pull(f,"new-id");assertEquals(7,task(f).path("siblingOrder").asInt());assertEquals(2,tx(f,()->store.list("TASK").size()));
+    }
+    @Test void aConcurrentNativeEditDuringInsertIsPreservedAlongsideTheAcknowledgedBaseline(){
+        var f=nativeTask();UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));var claim=claim(f);
+        writes().drain(claim,"private-access",writer(request->{rename(f,"New native title");return reply(200,raw("Native task","\"created\"").put("id","new-id"));}));
+        assertEquals("DONE",job(f,id).path("state").asText());assertEquals("New native title",task(f).path("summary").asText());assertEquals("Native task",baseline(f));
+    }
+    @Test void deletingANativeTaskDuringInsertCreatesATombstoneForTheNewGoogleIdentity(){
+        var f=nativeTask();UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));var claim=claim(f);
+        writes().drain(claim,"private-access",writer(request->{delete(f);return reply(200,raw("Native task","\"created\"").put("id","new-id"));}));
+        assertEquals("DONE",job(f,id).path("state").asText());assertTrue(tx(f,()->store.find("TASK",f.task()).isEmpty()));
+        var marker=tx(f,()->store.list("TASK_TOMBSTONE").getFirst());assertEquals(f.task().toString(),marker.path("taskId").asText());assertEquals("new-id",marker.path("externalReferences").get(0).path("externalId").asText());
+        assertEquals("LOCAL_DELETED",pull(f,"new-id").path("pending").get(0).path("reason").asText());assertTrue(tx(f,()->store.find("TASK",f.task()).isEmpty()));
+    }
+    @Test void anUncertainInsertHoldsNewIdentitiesAcrossTheRepositoryWithoutMatchingTitlesOrResending(){
+        var f=nativeTask();UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));var claim=claim(f);var calls=new AtomicInteger();
+        assertTrue(assertThrows(TaskProviderHttp.Failure.class,()->writes().drain(claim,"private-access",writer(request->{calls.incrementAndGet();throw new IOException("Lost insert response");}))).uncertain);
+        assertEquals("UNKNOWN",job(f,id).path("state").asText());assertEquals("CREATE_IDENTITY_REQUIRED",pull(f,"unknown-id").path("pending").get(0).path("reason").asText());
+        var resumed=reclaim(f);writes().drain(resumed,"private-access",writer(request->{throw new AssertionError("Never resend an uncertain insert");}));assertEquals(1,calls.get());assertEquals(2,tx(f,()->store.list("TASK").size()));
+        assertEquals(409,assertThrows(ApiFailure.class,()->preview(f,TaskProviderWrites.Action.CREATE)).status);
+        tx(f,()->{var auth=connections().required(f.connection());connections().select(f.connection(),List.of(),etag(connections().visible(auth)));return null;});
+        assertTrue(tx(f,()->TaskProviderWrites.holdsImport(store,new ExternalTaskReferenceKey("google",TaskCloudPull.repository("account","remote-list"),"unknown-id"))));
+        assertFalse(tx(f,()->TaskProviderWrites.holdsImport(store,new ExternalTaskReferenceKey("google",TaskCloudPull.repository("other-account","remote-list"),"unknown-id"))));
+    }
+    @Test void unsentCreationIsInvalidatedWhenItsNativeTaskChangesOrIsDeleted(){
+        var f=nativeTask();var preview=preview(f,TaskProviderWrites.Action.CREATE);rename(f,"Edited");assertEquals(412,assertThrows(ApiFailure.class,()->confirm(f,preview)).status);tx(f,()->{writes().cancel(f.connection(),uuid(preview.get("id")),etag(writes().get(f.connection(),uuid(preview.get("id")))));return null;});
+        UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));delete(f);var claim=claim(f);writes().drain(claim,"private-access",writer(request->{throw new AssertionError("Deleted task cannot be sent");}));assertEquals("STALE",job(f,id).path("state").asText());
+    }
+    private UUID uncertainCreate(Fixture f){
+        UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));var claim=claim(f);
+        assertThrows(TaskProviderHttp.Failure.class,()->writes().drain(claim,"private-access",writer(request->{throw new IOException("Insert response lost");})));return id;
+    }
+    private void creationScan(Fixture f,UUID id){
+        var before=job(f,id);tx(f,()->writes().check(f.connection(),id,etag(before)));var claim=reclaim(f);
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);assertTrue(scan.path("full").asBoolean());
+            scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Native task","\"created\"").put("id","new-id")),new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Native task","\"other\"").put("id","same-title-different-id"))),null,null));scans.reconcile(claim);return null;});
+        writes().drain(claim,"private-access",writer(request->{throw new AssertionError("Identity discovery does not retry or guess a task ID");}));
+    }
+    @Test void anUncertainCreationRequiresAFreshScanAndAnExplicitIdChoiceWithBothCapturedRevisions(){
+        var f=nativeTask();UUID id=uncertainCreate(f);assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().candidates(f.connection(),id,""))).status);creationScan(f,id);
+        var candidates=tx(f,()->writes().candidates(f.connection(),id,"Native task"));inputs.validate("TaskProviderCreationCandidates",candidates);assertEquals(2,candidates.path("count").asInt());assertEquals("UNKNOWN",job(f,id).path("state").asText());assertEquals(0,task(f).path("externalReferences").size());
+        var before=job(f,id);var input=object().put("externalId","new-id").put("scanEtag",candidates.path("scanEtag").asText()).put("taskEtag",before.path("currentTaskEtag").asText());
+        assertEquals(404,assertThrows(ApiFailure.class,()->store.transaction("other-owner",()->writes().identify(f.connection(),id,etag(before),input))).status);
+        assertEquals(412,assertThrows(ApiFailure.class,()->tx(f,()->writes().identify(f.connection(),id,etag(before),input.deepCopy().put("scanEtag","\"old-scan\"")))).status);
+        rename(f,"Newer local title");assertEquals(412,assertThrows(ApiFailure.class,()->tx(f,()->writes().identify(f.connection(),id,etag(before),input))).status);var current=job(f,id);input.put("taskEtag",current.path("currentTaskEtag").asText());
+        var result=tx(f,()->writes().identify(f.connection(),id,etag(current),input));assertEquals("RECONCILED",result.path("state").asText());assertEquals("Newer local title",task(f).path("summary").asText());assertEquals("Native task",baseline(f));
+        assertFalse(tx(f,()->TaskProviderWrites.holdsImport(store,new ExternalTaskReferenceKey("google",TaskCloudPull.repository("account","remote-list"),"same-title-different-id"))));
+    }
+    @Test void identityRecoveryRejectsAnAlreadyBoundOrDeletedGoogleIdentity(){
+        var f=nativeTask();UUID id=uncertainCreate(f);creationScan(f,id);var list=tx(f,()->writes().candidates(f.connection(),id,""));
+        tx(f,()->{store.service().createTask(new CreateTask(Optional.empty(),Optional.empty(),"Other native task",Optional.empty(),Set.of(new ExternalTaskReference("google",TaskCloudPull.repository("account","remote-list"),"new-id",Optional.empty()))));return null;});
+        var before=job(f,id);var input=object().put("externalId","new-id").put("scanEtag",list.path("scanEtag").asText()).put("taskEtag",before.path("currentTaskEtag").asText());
+        assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().identify(f.connection(),id,etag(before),input))).status);assertEquals(1,tx(f,()->writes().candidates(f.connection(),id,"")).path("count").asInt());
+    }
     @Test void importOnlyAndAnotherOwnerCannotPrepareOrSendGoogleWrites(){
         var f=fixture(false,false);rename(f,"Changed locally");assertEquals(409,assertThrows(ApiFailure.class,()->preview(f,TaskProviderWrites.Action.UPDATE)).status);
         var claim=claim(f);var calls=new AtomicInteger();writes().drain(claim,"private-access",writer(request->{calls.incrementAndGet();throw new AssertionError("Import-only cannot contact writer");}));assertEquals(0,calls.get());assertEquals("Original",baseline(f));

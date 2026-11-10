@@ -77,7 +77,7 @@ final class TaskSync {
                 }
                 throw ApiFailure.conflict();
             }
-            if(tombstoned(key)) throw ApiFailure.conflict();
+            if(tombstoned(key)||TaskProviderWrites.holdsImport(store,key)) throw ApiFailure.conflict();
             var parentId=optionalText(accepted.get("parentTaskId")).map(TaskSync::uuidText);
             var parent=parentId.map(value -> providerParent(value,key.providerId(),list.path("id").asText()));
             var projectId=parent.flatMap(value -> optionalText(value.get("projectId"))).map(TaskSync::uuidText).map(ProjectId::new);
@@ -178,12 +178,8 @@ final class TaskSync {
 
     /** Describe outbound changes without making a provider call or losing local-only fields. */
     ApiReplies exportPreview(JsonNode input) {
-        var connection=store.find("TASK_CONNECTION",uuid(input.get("connectionId"))).orElseThrow(ApiFailure::notFound);
-        var list=store.find("TASK_LIST",uuid(input.get("listId"))).orElseThrow(ApiFailure::notFound);
-        var task=store.find("TASK",uuid(input.get("taskId"))).orElseThrow(ApiFailure::notFound);
-        if(!list.path("connectionId").asText().equals(connection.path("id").asText())) throw ApiFailure.validation();
-        if(!connection.path("enabled").asBoolean() || !connection.path("writable").asBoolean()
-                || !list.path("present").asBoolean() || !list.path("writable").asBoolean()) throw ApiFailure.conflict();
+        var context=exportContext(uuid(input.get("connectionId")),uuid(input.get("listId")),uuid(input.get("taskId")));
+        var connection=context.connection();var list=context.list();var task=context.task();
         var key=new ExternalTaskReferenceKey(input.path("providerId").asText(),input.path("repositoryId").asText(),input.path("externalId").asText());
         if(!key.providerId().equals(connection.path("providerId").asText())) throw ApiFailure.validation();
         JsonNode reference=null;
@@ -191,6 +187,22 @@ final class TaskSync {
                 && value.path("repositoryId").asText().equals(key.repositoryId())
                 && value.path("externalId").asText().equals(key.externalId())) {reference=value;break;}
         if(reference==null || !reference.path("taskListId").asText().equals(list.path("id").asText())) throw ApiFailure.notFound();
+        return exportFields(connection,task,reference);
+    }
+    /** New provider objects have documented defaults, rather than a previously linked remote identity. */
+    ApiReplies exportCreatePreview(UUID connectionId,UUID listId,UUID taskId,JsonNode defaults){
+        var context=exportContext(connectionId,listId,taskId);var reference=object().put("taskListId",listId.toString());
+        reference.putObject("baseline").set("fields",defaults.deepCopy());return exportFields(context.connection(),context.task(),reference);
+    }
+    private record ExportContext(JsonNode connection,JsonNode list,JsonNode task){}
+    private ExportContext exportContext(UUID connectionId,UUID listId,UUID taskId){
+        var connection=store.find("TASK_CONNECTION",connectionId).orElseThrow(ApiFailure::notFound);
+        var list=store.find("TASK_LIST",listId).orElseThrow(ApiFailure::notFound);var task=store.find("TASK",taskId).orElseThrow(ApiFailure::notFound);
+        if(!list.path("connectionId").asText().equals(connection.path("id").asText()))throw ApiFailure.validation();
+        if(!connection.path("enabled").asBoolean()||!connection.path("writable").asBoolean()||!list.path("present").asBoolean()||!list.path("writable").asBoolean())throw ApiFailure.conflict();
+        return new ExportContext(connection,list,task);
+    }
+    private ApiReplies exportFields(JsonNode connection,JsonNode task,JsonNode reference){
         var baseline=baselineFields(reference.path("baseline").path("fields"));var writes=object();var warnings=array();
         for(var field:FIELDS.stream().sorted().toList()) {
             var local=local(task,reference,field);
@@ -328,6 +340,7 @@ final class TaskSync {
         if(found.isEmpty()) {
             if(item.path("deleted").asBoolean()) row.put("status","IGNORE_DELETED");
             else if(tombstoned(key)) {row.put("status","CONFLICT");row.put("reason","LOCAL_DELETED");}
+            else if(TaskProviderWrites.holdsImport(store,key)){row.put("status","DEFERRED");row.put("reason","CREATE_IDENTITY_REQUIRED");}
             else if(!connection.path("capabilities").path("fields").path("summary").path("readable").asBoolean()) {
                 row.put("status","UNSUPPORTED");row.put("reason","SUMMARY_UNSUPPORTED");
             } else if(item.path("fields").hasNonNull("summary")) {

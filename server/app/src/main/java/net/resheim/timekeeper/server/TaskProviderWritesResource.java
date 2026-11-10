@@ -36,4 +36,13 @@ public class TaskProviderWritesResource {
         UUID key=ContractInputs.pathId(connection),write=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderWriteResolutionInput",body);
         return tx(()->ApiReplies.resource(200,writes().resolve(key,write,match,input.path("taskEtag").asText(),input.path("decision").asText().equals("REMOTE")),null));
     }
+    @GET @Path("/{id}/candidates") public Response candidates(@PathParam("connection")String connection,@PathParam("id")String id,@QueryParam("q")String query){
+        UUID key=ContractInputs.pathId(connection),write=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters(),"q");
+        return store.authenticated(identity,()->new ApiReplies(200,writes().candidates(key,write,query),null,null).response());
+    }
+    @POST @Path("/{id}/identity") public Response identify(@PathParam("connection")String connection,@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
+        UUID key=ContractInputs.pathId(connection),write=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderCreationIdentityInput",body);
+        return tx(()->ApiReplies.resource(200,writes().identify(key,write,match,input),null));
+    }
+
 }

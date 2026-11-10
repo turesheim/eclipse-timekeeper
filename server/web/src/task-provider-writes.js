@@ -9,14 +9,14 @@ const valueText=(field,value)=>value===null||value===undefined?t('task_writes.em
 
 /** Owner-bound proposals; polling never replaces the comparison the user is reviewing. */
 export function taskProviderWrites(view,root,{reload,controls:parentControls}){
-  let connection=null,generation=0,catalogGeneration=0,disposed=false,loaded=false,signature='',selected=[];
+  let connection=null,generation=0,catalogGeneration=0,disposed=false,loaded=false,signature='',selected=[],catalog=[],reviewGeneration=0;
   const valid=()=>!disposed&&view.valid(),base=()=>'/task-providers/'+connection.id+'/writes';
   const heading=node('h3',t('task_writes.title'),'h5'),help=node('p',t('task_writes.help'),'hint');
   const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
   const details=node('details'),summary=node('summary',t('task_writes.prepare'),'mb-2'),form=node('form');details.append(summary,form);
   const taskLabel=node('label',t('task_writes.task'),'form-label'),task=node('select',undefined,'form-select mb-2');task.required=true;taskLabel.append(task);
   const actionLabel=node('label',t('task_writes.action'),'form-label'),action=node('select',undefined,'form-select mb-2');
-  for(const kind of ['UPDATE','DELETE'])action.append(new Option(t('task_writes.action_'+kind),kind));actionLabel.append(action);
+  for(const kind of ['UPDATE','DELETE','CREATE'])action.append(new Option(t('task_writes.action_'+kind),kind));actionLabel.append(action);
   const prepare=node('button',t('task_writes.review'),'btn btn-primary');prepare.type='submit';form.append(taskLabel,actionLabel,prepare);
   const history=node('div'),comparison=node('div',undefined,'mt-3');comparison.hidden=true;root.append(heading,help,details,feedback,history,comparison);
   function controls(){
@@ -28,16 +28,25 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
   const run=(work,submit,write=true)=>void view.run(async()=>{parentControls();controls();await work();},{submit,feedback,write}).finally(()=>{if(valid()){parentControls();controls();}});
   async function candidates(){
     const current=++catalogGeneration;const [tasks,lists]=await Promise.all([view.session.page('/tasks'),view.session.page('/task-lists')]);if(!valid()||current!==catalogGeneration)return;
-    const previous=task.value;
+    catalog=tasks.items;
     selected=lists.items.filter(list=>list.connectionId===connection.id&&connection.selectedLists.includes(list.remoteListId)&&list.present);
-    const options=[];for(const item of tasks.items)for(const ref of item.externalReferences||[]){const list=selected.find(list=>list.id===ref.taskListId);if(ref.providerId==='google'&&list)options.push({taskId:item.id,listId:list.id,title:list.name+' / '+item.summary});}
+    loaded=true;taskOptions();controls();
+  }
+  function taskOptions(){
+    const previous=task.value,options=[];
+    for(const item of catalog){
+      if(action.value==='CREATE'){
+        if(!item.parentTaskId)for(const list of selected)if(!(item.externalReferences||[]).some(ref=>ref.providerId==='google'&&ref.taskListId===list.id))options.push({taskId:item.id,listId:list.id,title:list.name+' / '+item.summary});
+      }else for(const ref of item.externalReferences||[]){const list=selected.find(list=>list.id===ref.taskListId);if(ref.providerId==='google'&&list)options.push({taskId:item.id,listId:list.id,title:list.name+' / '+item.summary});}
+    }
     task.replaceChildren(new Option(t('task_writes.choose_task'),''));for(const item of options)task.append(new Option(item.title,JSON.stringify({taskId:item.taskId,listId:item.listId})));
     if([...task.options].some(option=>option.value===previous))task.value=previous;
-    loaded=true;controls();if(!options.length)feedback.textContent=t('task_writes.no_tasks');
+    feedback.textContent=options.length?'':t('task_writes.no_tasks');
   }
   const refreshTasks=button(t('task_writes.refresh_tasks'),()=>run(candidates,refreshTasks,false));refreshTasks.dataset.writeReview='tasks';details.append(refreshTasks);
   details.addEventListener('toggle',()=>{if(details.open&&(!loaded||!view.dirty.has(form)))run(candidates,prepare,false);});
   form.addEventListener('change',()=>view.dirty.add(form));
+  action.addEventListener('change',()=>{taskOptions();controls();});
   form.addEventListener('submit',event=>{event.preventDefault();run(async()=>{
     if(!task.value)return;const identity=JSON.parse(task.value);
     const reply=await view.session.request(base(),{method:'POST',body:{...identity,action:action.value}});if(!valid())return;
@@ -51,14 +60,15 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     }
   }
   function show(reply){
-    if(!valid())return;const row=reply.data,path=base()+'/'+row.id;comparison.replaceChildren();comparison.hidden=false;
+    if(!valid())return;const review=++reviewGeneration,row=reply.data,path=base()+'/'+row.id;comparison.replaceChildren();comparison.hidden=false;
     const title=node('h3',t('task_writes.review_title',{title:row.title}),'h5 text-break');title.tabIndex=-1;comparison.append(title,node('p',t('task_writes.state_'+row.state),'hint'));
+    if(row.action==='CREATE')comparison.append(node('p',t('task_writes.create_help'),'hint'));
     if(row.action==='DELETE')comparison.append(node('p',t('task_writes.delete_help'),'alert alert-warning'));
     else changeValues(comparison,row.writeFields,t('task_writes.proposed'));
     if(row.state==='PREVIEW'&&row.action==='UPDATE'&&!Object.keys(row.writeFields).length&&!row.warnings.length)comparison.append(node('p',t('task_writes.no_changes'),'hint'));
     if(row.warnings.length){const warnings=node('ul',undefined,'alert alert-warning');for(const warning of row.warnings)warnings.append(node('li',fieldName(warning.field)+': '+translated('task_writes.warning_'+warning.reason,'task_writes.warning_default'),'text-break'));comparison.append(warnings);}
     if(row.remoteFields){changeValues(comparison,row.localFields,t('task_writes.local'),row.conflictFields);changeValues(comparison,row.remoteFields,t('task_writes.google'),row.conflictFields);}
-    if(row.state==='UNKNOWN')comparison.append(node('p',t('task_writes.unknown_help'),'alert alert-warning'));
+    if(row.state==='UNKNOWN')comparison.append(node('p',t(row.action==='CREATE'?'task_writes.unknown_create_help':'task_writes.unknown_help'),'alert alert-warning'));
     const actions=node('div',undefined,'d-flex flex-wrap gap-2');
     const add=(label,work,allowed)=>{const pick=button(t(label),()=>run(work,pick));pick.dataset.writeAction='true';pick.dataset.allowed=String(allowed);actions.append(pick);};
     if(row.state==='PREVIEW')add(row.action==='DELETE'?'task_writes.confirm_delete':'task_writes.confirm',async()=>{await view.session.request(path+'/confirm',{method:'POST',etag:reply.etag});if(!valid())return;comparison.hidden=true;await reload();},row.canConfirm&&connection.direction==='TWO_WAY');
@@ -68,7 +78,26 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
       add('task_writes.keep_local',resolve('LOCAL'),true);if(row.conflictFields.length)add('task_writes.use_google',resolve('REMOTE'),true);
     }
     if(['PREVIEW','QUEUED','CHECKING','CONFLICT'].includes(row.state))add('task_writes.cancel',async()=>{await view.session.request(path,{method:'DELETE',etag:reply.etag});if(!valid())return;comparison.hidden=true;await reload();},true);
-    const close=button(t('ui.close'),()=>{comparison.hidden=true;comparison.replaceChildren();heading.tabIndex=-1;heading.focus();});actions.append(close);comparison.append(actions);controls();title.focus();
+    if(row.action==='CREATE'&&row.state==='UNKNOWN'&&!row.externalId)identityPicker(path,reply,review);
+    const close=button(t('ui.close'),()=>{++reviewGeneration;comparison.hidden=true;comparison.replaceChildren();heading.tabIndex=-1;heading.focus();});actions.append(close);comparison.append(actions);controls();title.focus();
+  }
+  function identityPicker(path,reply,review){
+    const picker=node('form',undefined,'border rounded p-2 mt-3'),label=node('label',t('task_writes.identity_search'),'form-label'),query=node('input',undefined,'form-control');query.type='search';query.maxLength=1024;label.append(query);
+    const search=node('button',t('task_writes.find_candidates'),'btn btn-secondary mt-2');search.type='submit';search.dataset.writeReview='candidates';
+    const results=node('div');picker.append(label,search,results);comparison.append(picker);let snapshot=null;
+    picker.addEventListener('submit',event=>{event.preventDefault();run(async()=>{
+      const response=await view.session.request(path+'/candidates?q='+encodeURIComponent(query.value));if(!valid()||review!==reviewGeneration)return;snapshot=response.data;results.replaceChildren();
+      results.append(node('p',t('task_writes.candidates_count',{shown:snapshot.items.length,count:snapshot.count}),'hint mt-2'));
+      if(!snapshot.items.length)return;
+      const chooseLabel=node('label',t('task_writes.identity_choice'),'form-label'),choose=node('select',undefined,'form-select');chooseLabel.append(choose);choose.append(new Option(t('task_writes.choose_identity'),''));
+      for(const item of snapshot.items)choose.append(new Option(item.fields.summary+' · '+item.externalId,item.externalId));
+      const values=node('div'),bind=button(t('task_writes.link_identity'),()=>run(async()=>{
+        if(!choose.value)return;await view.session.request(path+'/identity',{method:'POST',etag:reply.etag,body:{externalId:choose.value,scanEtag:snapshot.scanEtag,taskEtag:reply.data.currentTaskEtag}});
+        if(!valid()||review!==reviewGeneration)return;++reviewGeneration;comparison.hidden=true;await reload();
+      },bind));bind.dataset.writeAction='identity';bind.dataset.allowed='false';
+      choose.addEventListener('change',()=>{values.replaceChildren();const chosen=snapshot.items.find(item=>item.externalId===choose.value);if(chosen){changeValues(values,reply.data.localFields,t('task_writes.local'));changeValues(values,chosen.fields,t('task_writes.google'));}bind.dataset.allowed=String(Boolean(chosen));controls();});
+      results.append(chooseLabel,values,bind);controls();
+    },search,false);});
   }
   async function refresh(){
     if(!valid()||root.hidden)return;const current=++generation,reply=await view.session.request(base());if(!valid()||current!==generation)return;
@@ -80,5 +109,5 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     }
     if(focused)[...history.querySelectorAll('[data-write-review]')].find(pick=>pick.dataset.writeReview===focused)?.focus();controls();
   }
-  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||value.direction!=='TWO_WAY'&&!value.pendingWrites;details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;view.clean(form);}};
+  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||value.direction!=='TWO_WAY'&&!value.pendingWrites;details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;++reviewGeneration;view.clean(form);}};
 }

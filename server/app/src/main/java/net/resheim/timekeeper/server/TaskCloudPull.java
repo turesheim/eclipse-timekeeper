@@ -66,7 +66,9 @@ final class TaskCloudPull {
             boolean progressed=false;
             for(var iterator=remaining.iterator();iterator.hasNext();){
                 var remote=iterator.next();var fields=remote.fields().deepCopy();
-                if(scan.provider().equals("google")&&!remote.deleted()){
+                var existing=store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository,remote.id()));
+                boolean localHierarchy=false;if(existing.isPresent())for(var ref:existing.get().path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(remote.id()))localHierarchy=ref.path("providerData").path("payload").path("policy").path("localHierarchy").asBoolean();
+                if(scan.provider().equals("google")&&!remote.deleted()&&!localHierarchy){
                     if(remote.position()==null||remote.position().isBlank()){
                         deferred(pending,remote.id(),"POSITION_UNOBSERVED");blocked.add(remote.id());iterator.remove();progressed=true;continue;
                     }
@@ -80,7 +82,7 @@ final class TaskCloudPull {
                 }
                 var item=object().put("providerId",scan.provider()).put("repositoryId",repository).put("externalId",remote.id()).put("deleted",remote.deleted());item.set("fields",fields);
                 // Include the local version in the receipt identity: recomputed proposals after edits get a new operation.
-                var current=store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository,remote.id()));
+                var current=existing;
                 String operation=UUID.nameUUIDFromBytes(("dagsverk-cloud-pull:"+store.owner()+":"+connectionId+":"+listId+":"
                         +canonical(item)+":"+current.map(JsonValues::etag).orElse("new")+":"+project).getBytes(StandardCharsets.UTF_8)).toString();
                 item.put("operationId",operation);
