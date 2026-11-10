@@ -76,7 +76,7 @@ final class VaultCollection {
         UUID content=UUID.randomUUID();var storage=new VaultContent(store);
         storage.save(content,etag(storage.metadata(content)),bytes,limits.fileBytes());
         var entry=index.create(target,markdown?VaultIndex.Kind.MARKDOWN:VaultIndex.Kind.BINARY,VaultContent.TYPE,content,content.toString());
-        var next=source(entry).snapshot();entry=index.content(id(entry),next,bytes.length);state.changed(bytes.length,1,false);changed();return entry;
+        var next=source(entry).snapshot();entry=index.content(id(entry),next,bytes.length);state.changed(bytes.length,1,false);changed();if(markdown)new NoteTasks(store).source(VaultSources.fromEntry(entry),bytes);return index.get(id(entry));
     }
     private ObjectNode update(ObjectNode entry,byte[] bytes){
         var ref=VaultSources.fromEntry(entry);var src=source(entry);String before=tag(entry);
@@ -148,7 +148,7 @@ final class VaultCollection {
             var ref=VaultSources.fromEntry(item);var src=source(item);var current=src.snapshot();
             if(!current.deleted()||current.version()!=item.path("contentVersion").asLong())throw ApiFailure.conflict();
             if(ref.type().equals(VaultContent.TYPE)){
-                new VaultContent(store).restore(ref.id(),current.tag());var next=src.snapshot();index.content(id(item),next,item.path("retainedBytes").asLong());state.changed(0,0,false);
+                new VaultContent(store).restore(ref.id(),current.tag());var next=src.snapshot();index.content(id(item),next,item.path("retainedBytes").asLong());state.changed(0,0,false);if(item.path("kind").asText().equals("MARKDOWN"))new NoteTasks(store).source(ref,src.read());
             }else{
                 byte[] bytes=new VaultRecycle(store).read(id(item),current.version());src.write(current.tag(),bytes,true);
             }

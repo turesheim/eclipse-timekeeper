@@ -156,11 +156,18 @@ final class BackendSwitchScenario {
     private static void mark(String prefix,Task task) throws Exception {
         RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(task).isPresent(),"Projection missing before persisting backend marker");
         var projected=MylynIntegration.getDefault().linked(task).orElseThrow();String marker=UUID.randomUUID().toString();
-        RemoteTestSupport.onUi(()->{projected.setAttribute(MARKER,marker);return null;});
+        RemoteTestSupport.onUi(()->{
+            projected.setAttribute(MARKER,marker);
+            org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().notifyElementChanged((org.eclipse.mylyn.internal.tasks.core.AbstractTask)projected);
+            return null;
+        });
         put("switch."+prefix+".task",task.id().value().toString());put("switch."+prefix+".handle",projected.getHandleIdentifier());
         put("switch."+prefix+".marker",marker);put("switch."+prefix+".identity",ui().backendIdentity());
     }
     private static ITask projection(String prefix) {
+        RemoteTestSupport.waitFor(()->org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().getAllTasks().stream()
+                .anyMatch(task->proof("switch."+prefix+".marker").equals(task.getAttribute(MARKER))),
+                "Persisted Mylyn projection did not load for backend "+prefix);
         return org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().getAllTasks().stream()
                 .filter(task->proof("switch."+prefix+".marker").equals(task.getAttribute(MARKER))).findFirst().orElseThrow();
     }
@@ -200,6 +207,14 @@ final class BackendSwitchScenario {
         var plugin=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getDefault();
         assertTrue(java.nio.file.Path.of(plugin.getDataDirectory()).toAbsolutePath().startsWith(RemoteBootstrap.fixtureFolder().getParent()));
         plugin.getExternalizationManager().saveNow();
+        var file=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskListExternalizationParticipant().getFile(plugin.getDataDirectory());
+        try(var archive=new java.util.zip.ZipFile(file)) {
+            var xml=new StringBuilder();var entries=archive.entries();
+            while(entries.hasMoreElements()){var entry=entries.nextElement();if(!entry.isDirectory())try(var input=archive.getInputStream(entry)){xml.append(new String(input.readAllBytes(),StandardCharsets.UTF_8));}}
+            for(String prefix:new String[]{"primary","secondary","local"}){
+                String marker=proof("switch."+prefix+".marker");if(marker!=null)assertTrue("Saved Task List must contain the "+prefix+" backend marker before restart",xml.indexOf(marker)>=0);
+            }
+        }
         if(ui().getPreferenceStore() instanceof org.eclipse.jface.preference.IPersistentPreferenceStore persistent) persistent.save();
     }
     private static void assertServersUnchanged() throws Exception {

@@ -88,6 +88,7 @@ final class WeekNotes {
             else state.update(JournalState.Kind.WEEK_NOTE_DELETE,marker.get().put("noteVersion",version+1));
         }
         VaultCatalog.complete(vault);
+        if(!deleted)new NoteTasks(store).source(new VaultSources.Ref(TYPE,id(week),week.name()),body.getBytes(StandardCharsets.UTF_8));
         store.change("PROFILE","UPDATED",store.owner());return publicValue(value);
     }
     private static ObjectNode publicValue(ObjectNode value){var result=value.deepCopy();result.remove("modifiedAt");return result;}

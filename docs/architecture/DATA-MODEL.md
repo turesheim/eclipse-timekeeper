@@ -813,3 +813,15 @@ and four byte/count values are updated atomically without changing the outer
 service settings version, active version or authentication epoch. No table or
 schema-version change is needed. Encrypted instance backups retain the object;
 account archives do not carry authority to alter it.
+
+Checklist/task links use owner-private `NOTE_TASK_DOC` and `NOTE_TASK_LINK`
+resources. The document record is keyed by a deterministic UUID containing the
+canonical source type/ID; its ordered items keep task IDs, parsed summaries,
+checkbox states and source offsets. The task-keyed link permits constant-time
+completion lookup without adding metadata to Markdown or duplicating task data.
+Task creation, updates and planning use the canonical shared service. Removed
+items drop the private link while retaining the ordinary task. Deleted tasks
+leave an inert item identity until an explicit checklist edit or item removal.
+These resources are included in instance backups and exported as logical,
+validated `noteTasks` records in account archives; runtime IDs are rebuilt during
+restore. All operations use the existing owner lock and conditional resource writes.
