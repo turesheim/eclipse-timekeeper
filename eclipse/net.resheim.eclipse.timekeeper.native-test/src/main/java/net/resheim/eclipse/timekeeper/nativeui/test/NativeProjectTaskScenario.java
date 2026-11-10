@@ -506,22 +506,23 @@ public abstract class NativeProjectTaskScenario {
 			var parent = parentRow(bot, project.name(), task.summary()).expand();
 			var row = parent.getNode(activity.summary());
 			onUi(tree::deselectAll);
-			row.click(column);
+			clickActivityCell(row.widget, column, false);
 			onUi(() -> {
 				assertNull("First click must only select", cellEditor(tree));
 				assertEquals(activity.id(), ((net.resheim.eclipse.timekeeper.domain.Activity)
 						tree.getSelection()[0].getData()).id());
 			});
-			parent.getNode("Other activity").click(column);
+			clickActivityCell(parent.getNode("Other activity").widget, column, false);
 			onUi(() -> assertNull("Switching rows must only select", cellEditor(tree)));
-			row.click(column);
+			clickActivityCell(row.widget, column, false);
 			onUi(() -> assertNull("Returning to a previously selected row must only select", cellEditor(tree)));
-			row.click(column);
+			clickActivityCell(row.widget, column, false);
 			String original = column == 0 ? activity.summary() : "09:00-10:00";
 			String changed = column == 0 ? "Edited activity name" : "09:15-10:30";
 			onUi(() -> {
 				Text editor = cellEditor(tree);
 				assertNotNull("Second click must edit the clicked cell", editor);
+				assertTrue("The clicked editor must retain keyboard focus", editor.isFocusControl());
 				assertEquals(original, editor.getText());
 				editor.setText(changed);
 				key(editor, SWT.CR);
@@ -537,13 +538,14 @@ public abstract class NativeProjectTaskScenario {
 			row = parentRow(bot, project.name(), task.summary()).expand().getNode(saved.summary());
 			// Focus the time or name cell with a selection-only click, then edit with either Enter key.
 			onUi(tree::deselectAll);
-			row.click(column);
+			clickActivityCell(row.widget, column, false);
 			for (int enter : new int[] { SWT.CR, SWT.KEYPAD_CR }) {
 				onUi(() -> {
 					assertNull(cellEditor(tree));
 					key(tree, enter);
 					Text editor = cellEditor(tree);
 					assertNotNull("Enter must edit the focused selected cell", editor);
+					assertTrue("The keyboard editor must own focus", editor.isFocusControl());
 					assertEquals(changed, editor.getText());
 					editor.setText(column == 0 ? "Cancelled name" : "08:00-11:00");
 					key(editor, SWT.ESC);
@@ -551,7 +553,7 @@ public abstract class NativeProjectTaskScenario {
 				});
 				assertEquals("Escape must preserve the saved activity", saved, service.activity(activity.id()).orElseThrow());
 			}
-			row.doubleClick(column);
+			clickActivityCell(row.widget, column, true);
 			onUi(() -> {
 				assertNotNull("A quick second click must also edit", cellEditor(tree));
 				key(cellEditor(tree), SWT.ESC);
@@ -582,6 +584,67 @@ public abstract class NativeProjectTaskScenario {
 			cleanup(service, project, java.util.List.of(task.id()));
 			bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
 		}
+	}
+
+	/**
+	 * SWTBot 4.3 ends tree clicks with synthetic Deactivate/FocusOut events.
+	 * Cell editing needs the resulting editor to retain focus. Send the mouse
+	 * gesture in one UI turn, retaining JFace's real activation listeners and
+	 * changing the native selection only when a different row is clicked.
+	 */
+	private static void clickActivityCell(org.eclipse.swt.widgets.TreeItem item, int column,
+			boolean doubleClick) throws Exception {
+		onUi(() -> {
+			Tree tree = item.getParent();
+			tree.showItem(item);
+			tree.showColumn(tree.getColumn(column));
+			assertTrue("The activity tree must receive focus", tree.setFocus());
+		});
+		// GTK applies scrolling while dispatching native events, after showItem returns.
+		new SWTWorkbenchBot().waitUntil(new DefaultCondition() {
+			@Override
+			public boolean test() throws Exception {
+				boolean[] visible = { false };
+				onUi(() -> {
+					var bounds = item.getBounds(column).intersection(item.getParent().getClientArea());
+					visible[0] = bounds.width > 0 && bounds.height > 0;
+				});
+				return visible[0];
+			}
+
+			@Override
+			public String getFailureMessage() {
+				return "The activity cell did not scroll into view";
+			}
+		});
+		onUi(() -> {
+			Tree tree = item.getParent();
+			var bounds = item.getBounds(column).intersection(tree.getClientArea());
+			assertTrue("The clicked cell must be visible", bounds.width > 0 && bounds.height > 0);
+			for (int count = 1; count <= (doubleClick ? 2 : 1); count++) {
+				Event mouse = new Event();
+				mouse.x = bounds.x + bounds.width / 2;
+				mouse.y = bounds.y + bounds.height / 2;
+				mouse.button = 1;
+				mouse.count = count;
+				tree.notifyListeners(SWT.MouseDown, mouse);
+				if (tree.getSelectionCount() != 1 || tree.getSelection()[0] != item) {
+					tree.setSelection(item);
+					Event selection = new Event();
+					selection.item = item;
+					selection.stateMask = SWT.BUTTON1;
+					tree.notifyListeners(SWT.Selection, selection);
+				}
+				if (count == 2) {
+					tree.notifyListeners(SWT.MouseDoubleClick, mouse);
+					Event selection = new Event();
+					selection.item = item;
+					tree.notifyListeners(SWT.DefaultSelection, selection);
+				}
+				mouse.stateMask = SWT.BUTTON1;
+				tree.notifyListeners(SWT.MouseUp, mouse);
+			}
+		});
 	}
 
 	private static Text cellEditor(Tree tree) {
