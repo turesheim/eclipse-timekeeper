@@ -11,7 +11,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'server/scripts'))
 import test_synology_package as fixtures
 from promote_synology import preview, promote
-from synology_acceptance import RECORD, template
+from synology_acceptance import RECORD, template, validate_record
 from synology_catalog import build
 from validate_synology import validate
 
@@ -33,7 +33,7 @@ class SynologyPromotionTest(unittest.TestCase):
         # Synthetic acceptance is confined to this archive fixture, never a real SPK.
         self.record['checks'] = dict.fromkeys(self.record['checks'], True)
         self.record['testedAt'] = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        self.record['target'].update(dsmVersion='7.4.1-90080', containerManagerVersion='24.0.2-1706', postgresqlVersion='17.11-6')
+        self.record['target'].update(dsmVersion='7.4.1-90080', containerManagerVersion='24.0.2-1706', postgresqlVersion='17.11-6', hyperBackupVersion='4.2.2-4262')
         self.acceptance = self.root / 'acceptance.json'
 
     def promote(self):
@@ -83,6 +83,53 @@ class SynologyPromotionTest(unittest.TestCase):
             with self.subTest(record=self.record), self.assertRaises(ValueError):
                 self.promote()
             self.assertFalse((self.root / 'stable').exists())
+
+    def test_hyper_backup_requires_its_installed_version_and_every_real_repository_scenario(self):
+        checks = (
+            'hyperBackupDiscoveryAndSummary', 'hyperBackupCallbackContract',
+            'hyperBackupApplicationOnly', 'hyperBackupRunningAndStoppedState',
+            'hyperBackupAllDataRecovery', 'hyperBackupCleanDestination',
+            'hyperBackupFailedExport', 'hyperBackupFailedRestore',
+            'hyperBackupCancellationAndRetry', 'hyperBackupFailedRestart',
+            'hyperBackupClientEncryption',
+        )
+        self.assertTrue(set(checks).issubset(self.record['checks']))
+        original = json.loads(json.dumps(self.record))
+        for check in checks:
+            for missing in (False, True):
+                self.record = json.loads(json.dumps(original))
+                if missing:
+                    del self.record['checks'][check]
+                else:
+                    self.record['checks'][check] = False
+                with self.subTest(check=check, missing=missing), self.assertRaisesRegex(ValueError, 'real-NAS'):
+                    self.promote()
+                self.assertFalse((self.root / 'stable').exists())
+        for version in (None, '', 'latest', '4.2.2', 4262):
+            self.record = json.loads(json.dumps(original))
+            self.record['target']['hyperBackupVersion'] = version
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, 'hyperBackupVersion'):
+                self.promote()
+            self.assertFalse((self.root / 'stable').exists())
+        self.record = json.loads(json.dumps(original))
+        del self.record['target']['hyperBackupVersion']
+        with self.assertRaises(ValueError):
+            self.promote()
+
+    def test_legacy_record_cannot_bypass_hyper_backup_acceptance(self):
+        self.record['format'] = 1
+        with self.assertRaisesRegex(ValueError, 'template'):
+            self.promote()
+        self.assertFalse((self.root / 'stable').exists())
+
+    def test_each_package_identity_requires_its_own_acceptance_record(self):
+        for identity in ('timekeeper', 'dagsverk'):
+            checked = {**self.checked, 'package': identity}
+            record = {**self.record, 'package': identity}
+            validate_record(record, checked)
+            record['package'] = 'dagsverk' if identity == 'timekeeper' else 'timekeeper'
+            with self.subTest(identity=identity), self.assertRaisesRegex(ValueError, 'package'):
+                validate_record(record, checked)
 
     def test_provenance_image_identity_is_checked_and_existing_outputs_are_never_replaced(self):
         self.provenance['imageId'] = 'sha256:' + '0' * 64

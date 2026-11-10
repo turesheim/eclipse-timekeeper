@@ -10,6 +10,12 @@ CHECKS = (
     'startStop', 'nasRestart', 'upgrade', 'failedUpgradeRecovery',
     'migration18to17', 'backupRestore', 'reinstall', 'uninstallRetention',
     'unrelatedDataUntouched', 'repositoryDiscovery', 'repositoryUpgrade',
+    'hyperBackupDiscoveryAndSummary', 'hyperBackupCallbackContract',
+    'hyperBackupApplicationOnly', 'hyperBackupRunningAndStoppedState',
+    'hyperBackupAllDataRecovery', 'hyperBackupCleanDestination',
+    'hyperBackupFailedExport', 'hyperBackupFailedRestore',
+    'hyperBackupCancellationAndRetry', 'hyperBackupFailedRestart',
+    'hyperBackupClientEncryption',
 )
 RECORD = 'DSM_ACCEPTANCE.json'
 
@@ -37,20 +43,21 @@ def content_digest(archive):
 
 def template(checked):
     return {
-        'format': 1, 'sourceCommit': checked['sourceCommit'],
+        'format': 2, 'package': checked['package'], 'sourceCommit': checked['sourceCommit'],
         'previewSha256': checked['sha256'], 'imageId': checked['imageId'],
         'contentSha256': checked['contentSha256'], 'testedAt': None,
         'target': {'model': 'DS923+', 'architecture': 'r1000', 'dsmVersion': '',
-                   'containerManagerVersion': '', 'postgresqlVersion': ''},
+                   'containerManagerVersion': '', 'postgresqlVersion': '',
+                   'hyperBackupVersion': ''},
         'checks': dict.fromkeys(CHECKS, False),
     }
 
 
 def validate_record(record, checked, preview_sha=None):
     expected = set(template(checked))
-    if not isinstance(record, dict) or set(record) != expected or type(record['format']) is not int or record['format'] != 1:
-        raise ValueError('Use the DSM acceptance template without additional fields')
-    for key in ('sourceCommit', 'imageId', 'contentSha256'):
+    if not isinstance(record, dict) or set(record) != expected or type(record['format']) is not int or record['format'] != 2:
+        raise ValueError('Use the current DSM acceptance template without additional fields')
+    for key in ('package', 'sourceCommit', 'imageId', 'contentSha256'):
         if record[key] != checked[key]:
             raise ValueError('DSM acceptance does not describe these package contents: ' + key)
     if not isinstance(record['previewSha256'], str) or not re.fullmatch('[a-f0-9]{64}', record['previewSha256']):
@@ -62,7 +69,7 @@ def validate_record(record, checked, preview_sha=None):
     target = record['target']
     if not isinstance(target, dict) or set(target) != set(template(checked)['target']) or target['model'] != 'DS923+' or target['architecture'] != 'r1000':
         raise ValueError('Record the supported DS923+ / r1000 NAS target')
-    for key in ('dsmVersion', 'containerManagerVersion', 'postgresqlVersion'):
+    for key in ('dsmVersion', 'containerManagerVersion', 'postgresqlVersion', 'hyperBackupVersion'):
         if not isinstance(target[key], str) or not re.fullmatch(r'[0-9]+(?:\.[0-9]+)*-[0-9]+', target[key]):
             raise ValueError('Record the full installed package/DSM version: ' + key)
     if not target['postgresqlVersion'].startswith('17.'):

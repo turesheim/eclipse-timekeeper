@@ -42,7 +42,7 @@ class SynologyReleaseTest(unittest.TestCase):
         record = template(checked)
         record['checks'] = dict.fromkeys(record['checks'], True)
         record['testedAt'] = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        record['target'].update(dsmVersion='7.4.1-90080', containerManagerVersion='24.0.2-1706', postgresqlVersion='17.11-6')
+        record['target'].update(dsmVersion='7.4.1-90080', containerManagerVersion='24.0.2-1706', postgresqlVersion='17.11-6', hyperBackupVersion='4.2.2-4262')
         self.binaries = {55: json.dumps(record).encode()}
         self.remote = {'id': 20, 'tag_name': 'v2.0.0', 'draft': False, 'prerelease': False,
                        'published_at': '2026-10-14T00:00:00Z',
