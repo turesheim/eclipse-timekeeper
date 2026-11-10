@@ -219,7 +219,7 @@ exact source identity when a list has more than 100 decisions. Polling retains
 an open comparison; a changed task, list selection or scan requires reopening
 it. Comparisons expire after 15 minutes; refresh synchronization for a new scan.
 
-Choose **Keep Dagsverk for conflicts** or **Use Google for conflicts**. Both
+Choose **Keep Dagsverk for conflicts** or **Use Google Tasks for conflicts**. Both
 choices accept independent remote changes and preserve unsupported local
 fields. Related resources added locally remain present when accepting changed
 Google source links. This action updates Dagsverk's comparison baseline and
@@ -234,3 +234,19 @@ service's deletion rules. Other source links, unresolved identities and
 incomplete hierarchy remain review decisions. Missing access or absent items
 never imply deletion. Dagsverk sessions with read-only access can inspect
 comparisons but cannot resolve them.
+
+If an uncertain creation cannot be identified, its review offers **Allow imports
+without linking**. Acknowledge that a late Google result may be imported as a
+separate task before choosing it. This records **Left unlinked · imports
+allowed**: it does not assert that Google failed, cancel the original request,
+change the native task or resend the creation. An identical retry returns the
+stored decision. The acknowledgement also works while the connection is paused
+or disconnected, without provider access. Read-only Dagsverk sessions cannot
+make this decision. Subsequent imports may add a separate task for a late result;
+no title-based matching is performed.
+
+Disconnected accounts with pending requests remain visible using public
+connection metadata only; their credentials are still removed. Unsent requests
+can be cancelled there, and unidentified creations can be left unlinked. After
+the last pending request is settled, the disconnected card disappears. Checking
+Google or accepting a known provider result still requires reconnecting.

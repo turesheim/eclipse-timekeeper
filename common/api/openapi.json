@@ -21179,6 +21179,109 @@
           }
         }
       }
+    },
+    "/task-providers/{connection}/writes/{id}/leave-unresolved": {
+      "post": {
+        "operationId": "leaveTaskProviderCreationUnresolved",
+        "summary": "Leave an unidentified Google creation unlinked and allow future imports",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrite"
+                }
+              }
+            }
+          }
+        },
+        "description": "An owner explicitly acknowledges that a late Google result may be imported as a separate task. Only an UNKNOWN CREATE with no provider identity can transition to UNRESOLVED. The native task and provider are unchanged; the connector never automatically resends this request. The exact review If-Match and a true acknowledgement are required. Paused or disconnected connections can be settled without provider access. Identical replay returns its stored receipt.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskProviderLeaveUnresolvedInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -37399,7 +37502,8 @@
               "CANCELLED",
               "FAILED",
               "STALE",
-              "RECONCILED"
+              "RECONCILED",
+              "UNRESOLVED"
             ]
           },
           "taskEtag": {
@@ -37522,6 +37626,9 @@
                 "scheduledDate"
               ]
             }
+          },
+          "canLeaveUnresolved": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false,
@@ -37621,7 +37728,8 @@
               "CANCELLED",
               "FAILED",
               "STALE",
-              "RECONCILED"
+              "RECONCILED",
+              "UNRESOLVED"
             ]
           },
           "createdAt": {
@@ -38010,6 +38118,19 @@
         "required": [
           "taskId",
           "deleted"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderLeaveUnresolvedInput": {
+        "type": "object",
+        "properties": {
+          "acknowledgePossibleSeparateImport": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "acknowledgePossibleSeparateImport"
         ],
         "additionalProperties": false
       }

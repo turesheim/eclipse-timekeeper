@@ -1646,5 +1646,10 @@
   "task_reviews.field_assignment": "Kildetildeling",
   "task_reviews.field_metadata.links": "Relaterte ressurser",
   "task_reviews.find": "Finn valg",
-  "task_reviews.use_remote": "Bruk {{provider}} ved konflikter"
+  "task_reviews.use_remote": "Bruk {{provider}} ved konflikter",
+  "task_writes.state_UNRESOLVED": "Beholdt uten kobling · import tillatt",
+  "task_writes.leave_unresolved": "Tillat import uten å koble",
+  "task_writes.leave_unresolved_help": "Hvis du ikke kan identifisere Google-resultatet, kan du oppheve sperren for ny import. Den lokale oppgaven forblir uten kobling. Dette avbryter ikke den opprinnelige Google-forespørselen og beviser ikke at den mislyktes. Et sent resultat kan bli importert som en egen oppgave. Forespørselen sendes ikke automatisk på nytt.",
+  "task_writes.leave_unresolved_ack": "Jeg forstår at et Google-resultat kan dukke opp som en egen importert oppgave.",
+  "task_writes.unresolved_help": "Du valgte å la denne forespørselen forbli uavklart. Resultatet er fortsatt ukjent. Ny import er tillatt; den opprinnelige lokale oppgaven ble ikke endret eller koblet."
 }

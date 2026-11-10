@@ -14,7 +14,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 final class TaskProviderWrites {
     static final String KIND="TASK_WRITE";
     enum Action { CREATE, UPDATE, DELETE }
-    private static final Set<String> DONE=Set.of("DONE","RECONCILED","CANCELLED","FAILED","STALE");
+    private static final Set<String> DONE=Set.of("DONE","RECONCILED","CANCELLED","FAILED","STALE","UNRESOLVED");
     private static final Set<String> FIELDS=Set.of("summary","body","status","completedAt","scheduledDate");
     private final ServerStore store;
     private final CommandReceipts receipts;
@@ -72,7 +72,7 @@ final class TaskProviderWrites {
         auth.put("requested",true).put("nextRefresh",store.now().toString());connections().save(TaskProviderConnections.AUTH,auth);return visible(saved);
     }
     ObjectNode list(UUID connection){
-        connections().required(connection);var result=object();var items=result.putArray("items");var rows=new ArrayList<JsonNode>();
+        required("TASK_CONNECTION",connection);var result=object();var items=result.putArray("items");var rows=new ArrayList<JsonNode>();
         for(var row:store.list(KIND))if(row.path("connectionId").asText().equals(connection.toString()))rows.add(row);
         rows.sort(Comparator.comparing((JsonNode row)->row.path("createdAt").asText()).reversed());int history=0;
         for(var row:rows){if(DONE.contains(row.path("state").asText())&&history++>=20)continue;var summary=object();for(String field:List.of("id","title","action","state","createdAt","lastError"))summary.set(field,row.path(field).deepCopy());items.add(summary);}
@@ -112,10 +112,21 @@ final class TaskProviderWrites {
         row.put("state",uncertain?"RECONCILED":"DONE").put("resolution",takeRemote?"REMOTE":"LOCAL").putNull("lastError");return visible(connections().save(KIND,row));
     }
     void cancel(UUID connection,UUID id,String match){
-        connections().required(connection);var value=owned(connection,id);ApiReplies.match(visible(value),match);
+        required("TASK_CONNECTION",connection);var value=owned(connection,id);ApiReplies.match(visible(value),match);
         if(!Set.of("PREVIEW","QUEUED","CHECKING","CONFLICT").contains(value.path("state").asText()))throw ApiFailure.conflict();
         value.put("state","CANCELLED");connections().save(KIND,value);
     }
+    ApiReplies leaveUnresolved(UUID connection,UUID id,String match,JsonNode input){
+        required("TASK_CONNECTION",connection);String path="/task-providers/"+connection+"/writes/"+id+"/leave-unresolved";
+        String operation=UUID.nameUUIDFromBytes(("dagsverk-leave-creation-unresolved:"+store.owner()+":"+path+":"+match+":"+canonical(input)).getBytes(StandardCharsets.UTF_8)).toString();
+        return receipts.execute(operation,"POST",path,match,input,()->{
+            var row=owned(connection,id);ApiReplies.match(visible(row),match);
+            if(!unidentifiedCreation(row)||!input.path("acknowledgePossibleSeparateImport").asBoolean())throw ApiFailure.conflict();
+            row.put("state","UNRESOLVED").put("leftUnresolvedAt",store.now().toString()).put("checkRequested",false).putNull("checkLease");
+            return ApiReplies.resource(200,visible(connections().save(KIND,row)),null);
+        });
+    }
+    private static boolean unidentifiedCreation(JsonNode row){return row.path("action").asText().equals("CREATE")&&row.path("state").asText().equals("UNKNOWN")&&!row.hasNonNull("externalId");}
     private ObjectNode visible(JsonNode value){
         var result=object();for(String field:List.of("id","version","connectionId","listId","taskId","title","externalId","action","state","taskEtag","providerEtag","createdAt","expiresAt","lastError","writeFields","warnings"))result.set(field,value.path(field).deepCopy());
         var task=store.find("TASK",uuid(value.get("taskId")));result.putNull("currentTaskEtag").putNull("localFields").putNull("remoteFields").putNull("remoteObservedAt").putNull("resolution");
@@ -134,7 +145,7 @@ final class TaskProviderWrites {
             canResolve=preview.path("taskId").asText().equals(value.path("taskId").asText())&&!Set.of("RECONCILE_ID","DEFERRED").contains(preview.path("status").asText());
             for(var decision:preview.path("decisions"))if(Set.of("CONFLICT","NO_BASELINE").contains(decision.path("outcome").asText()))conflicts.add(decision.path("field").asText());
         }catch(ApiFailure unavailable){canResolve=false;}
-        result.put("canResolve",canResolve);return result;
+        result.put("canResolve",canResolve).put("canLeaveUnresolved",unidentifiedCreation(value));return result;
     }
     private JsonNode resolutionPreview(JsonNode row,TaskCloudProvider.RemoteTask remote){
         var proposal=object().put("connectionId",row.path("connectionId").asText()).put("listId",row.path("listId").asText()).put("sourceState","HEALTHY").put("scanComplete",false);

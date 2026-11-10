@@ -253,4 +253,38 @@ class TaskProviderWritesTest {
             var stage=scans.begin(fresh);var remote=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(object().put("id","remote-task").put("deleted",true));scans.acknowledge(fresh,stage,new TaskCloudProvider.Page<>(List.of(remote),null,null));return null;});
         writes().drain(fresh,"private-access",writer(request->{throw new AssertionError("The acknowledged deletion record needs no mutation or guessed 404");}));assertEquals("DONE",job(f,id).path("state").asText());assertEquals("Original",task(f).path("summary").asText());
     }
+    @Test void explicitlyLeavingAnUnidentifiedInsertUnlinkedReleasesImportsWithoutResendingOrChangingTheTask(){
+        var f=nativeTask();UUID id=uncertainCreate(f);var before=task(f);var review=job(f,id);var input=object().put("acknowledgePossibleSeparateImport",true);assertTrue(review.path("canLeaveUnresolved").asBoolean());
+        assertEquals(412,assertThrows(ApiFailure.class,()->tx(f,()->writes().leaveUnresolved(f.connection(),id,"\"old\"",input))).status);
+        assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(review),object().put("acknowledgePossibleSeparateImport",false)))).status);
+        assertThrows(ApiFailure.class,()->store.transaction("foreign-"+UUID.randomUUID(),()->writes().leaveUnresolved(f.connection(),id,etag(review),input)));
+        var attempt=tx(f,()->store.find(TaskProviderWrites.KIND,id).orElseThrow()).path("attempt").asText();
+        var result=tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(review),input));inputs.validate("TaskProviderWrite",result.body());assertEquals("UNRESOLVED",result.body().path("state").asText());assertEquals(before,task(f));
+        assertEquals(result.body().toString(),tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(review),input)).body().toString());
+        assertFalse(tx(f,()->writes().acknowledge(id,attempt,new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Late Google result","\"g2\"").put("id","late-id")))));assertEquals(before,task(f));
+        assertFalse(tx(f,()->TaskProviderWrites.references(store,"TASK_LIST",f.list())));assertEquals(0,tx(f,()->TaskProviderWrites.pending(store,f.connection())));
+        assertTrue(pull(f,"late-id").path("complete").asBoolean());assertEquals(before,task(f));assertEquals(3,tx(f,()->store.list("TASK").size()));
+        var resumed=reclaim(f);writes().drain(resumed,"private-access",writer(request->{throw new AssertionError("An unresolved request must never be sent again");}));assertEquals("UNRESOLVED",job(f,id).path("state").asText());
+    }
+    @Test void aDisconnectedAccountCanReleaseAnUnidentifiedCreationWithoutProviderAccess(){
+        var f=nativeTask();UUID id=uncertainCreate(f);var before=task(f);
+        tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().disconnect(f.connection(),etag(auth));return null;});
+        var orphan=tx(f,()->connections().view(f.connection()));inputs.validate("TaskProviderConnection",orphan);assertFalse(orphan.path("enabled").asBoolean());assertTrue(orphan.path("paused").asBoolean());assertEquals(1,orphan.path("pendingWrites").asInt());assertTrue(tx(f,()->store.find(TaskProviderConnections.AUTH,f.connection()).isEmpty()));assertEquals(1,tx(f,()->connections().list()).path("items").size());assertEquals(1,tx(f,()->writes().list(f.connection())).path("items").size());
+        var row=job(f,id);var result=tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(row),object().put("acknowledgePossibleSeparateImport",true)));
+        assertEquals("UNRESOLVED",result.body().path("state").asText());assertEquals(before,task(f));assertTrue(tx(f,()->connections().list()).path("items").isEmpty());
+    }
+    @Test void unsentOrSendingCreationsCannotBeLeftUnresolved(){
+        var f=nativeTask();var preview=preview(f,TaskProviderWrites.Action.CREATE);UUID id=uuid(preview.get("id"));var input=object().put("acknowledgePossibleSeparateImport",true);
+        assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(preview),input))).status);
+        var queued=confirm(f,preview);assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(queued),input))).status);
+        var claim=claim(f);tx(f,()->writes().next(claim));tx(f,()->writes().creating(claim,id));var sending=job(f,id);assertEquals("SENDING",sending.path("state").asText());assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().leaveUnresolved(f.connection(),id,etag(sending),input))).status);
+    }
+
+    @Test void unsentCreationCanBeCancelledAfterDisconnectWithoutProviderAccess(){
+        var f=nativeTask();var before=task(f);var prepared=preview(f,TaskProviderWrites.Action.CREATE);UUID id=uuid(prepared.get("id"));
+        tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().disconnect(f.connection(),etag(auth));return null;});
+        assertEquals(1,tx(f,()->connections().list()).path("items").size());var row=job(f,id);tx(f,()->{writes().cancel(f.connection(),id,etag(row));return null;});
+        assertEquals("CANCELLED",job(f,id).path("state").asText());assertEquals(before,task(f));assertTrue(tx(f,()->connections().list()).path("items").isEmpty());
+    }
+
 }

@@ -31,7 +31,7 @@ export async function renderTaskProviders(view){
       for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
       card.save.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       card.refresh.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused||card.data.syncing||!card.data.enabled||!configured[card.data.providerId];
-      card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain;card.reconnect.disabled=!view.canWrite||view.busy||view.uncertain||!configured[card.data.providerId];
+      card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;card.reconnect.disabled=!view.canWrite||view.busy||view.uncertain||!configured[card.data.providerId];
       card.pause.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       for(const input of card.imports.querySelectorAll('button'))input.disabled=view.busy||view.uncertain||card.data.paused;
       if(card.approve)card.approve.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused;

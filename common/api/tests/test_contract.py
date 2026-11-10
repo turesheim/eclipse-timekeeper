@@ -22,6 +22,15 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_unidentified_creation_requires_an_explicit_separate_import_acknowledgement(self):
+        command={'acknowledgePossibleSeparateImport':True}
+        validator('TaskProviderLeaveUnresolvedInput').validate(command)
+        for invalid in [{},{'acknowledgePossibleSeparateImport':False},{**command,'externalId':'guessed'},{**command,'ownerId':'foreign'}]:
+            self.assertFalse(validator('TaskProviderLeaveUnresolvedInput').is_valid(invalid))
+        path='/task-providers/{connection}/writes/{id}/leave-unresolved'
+        self.assertEqual('write',CONTRACT['paths'][path]['post']['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path]['post']['parameters'])
+
     def test_incoming_reviews_require_fresh_comparison_and_cannot_inject_observations(self):
         base='/task-providers/{connection}/reviews/{list}'
         self.assertEqual('read',CONTRACT['paths'][base]['get']['x-required-permission'])
@@ -803,7 +812,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'leaveTaskProviderCreationUnresolved', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

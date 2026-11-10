@@ -44,5 +44,9 @@ public class TaskProviderWritesResource {
         UUID key=ContractInputs.pathId(connection),write=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderCreationIdentityInput",body);
         return tx(()->ApiReplies.resource(200,writes().identify(key,write,match,input),null));
     }
+    @POST @Path("/{id}/leave-unresolved") public Response leaveUnresolved(@PathParam("connection")String connection,@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
+        UUID key=ContractInputs.pathId(connection),write=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderLeaveUnresolvedInput",body);
+        return tx(()->writes().leaveUnresolved(key,write,match,input));
+    }
 
 }

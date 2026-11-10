@@ -53,6 +53,7 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
       if(method==='GET'&&path.endsWith('/candidates'))return reply({scanEtag:`"scan-${model.candidateVersion}"`,observedAt:'2026-11-10T00:00:00Z',count:model.candidates.length,items:model.candidates});
       if(method==='GET')return reply(job);
       if(request.headers()['if-match']!==`"provider-${job.version}"`)return reply({type:'about:blank',title:'Stale version',status:412,code:'STALE_VERSION'},412);
+      if(path.endsWith('/leave-unresolved')){expect(input).toEqual({acknowledgePossibleSeparateImport:true});expect(job.canLeaveUnresolved).toBe(true);job.version++;job.state='UNRESOLVED';job.canLeaveUnresolved=false;row.pendingWrites=0;return reply(job);}
       if(path.endsWith('/identity')){expect(input.taskEtag).toBe(job.currentTaskEtag);if(input.scanEtag!==`"scan-${model.candidateVersion}"`)return reply({type:'about:blank',title:'Stale scan',status:412,code:'STALE_VERSION'},412);job.version++;job.state='RECONCILED';job.externalId=input.externalId;return reply(job);}
       if(path.endsWith('/confirm')){model.providerWrites++;job.version++;job.state='DONE';job.canConfirm=false;return reply(job,202);}
       if(path.endsWith('/check')){job.version++;job.remoteFields={summary:'Changed at Google'};job.conflictFields=['summary'];job.canResolve=true;return reply(job,202);}
@@ -230,7 +231,7 @@ test('uncertain creation identity remains an explicit choice and a stale scan pr
 });
 
 for(const language of ['en-GB','nb-NO'])test('creation identity review fits every theme and remains accessible in '+language,async({page,request})=>{
-  test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false}),remoteId='google-identity-'.repeat(60);
+  test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true}),remoteId='google-identity-'.repeat(60);
   await providerFixture(page,owner,{rows:[row],jobs:[job],candidates:[{externalId:remoteId,fields:{summary:'A very long task title '.repeat(30),body:{format:'TEXT',content:'Google source notes '.repeat(10)}}}]});await open(page);
   const nb=language==='nb-NO',nav=nb?'Oppgavekoblinger':'Task connections',review=nb?'Gjennomgå resultat':'Review result',find=nb?'Finn Google-oppgaver uten kobling':'Find unlinked Google tasks',label=nb?'Google-identitet som skal kobles':'Google identity to link';
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
@@ -291,4 +292,16 @@ for(const language of ['en-GB','nb-NO'])test('incoming review remains readable i
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(panel.getByRole('button',{name:nb?'Behold Dagsverk ved konflikter':'Keep Dagsverk for conflicts',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   }
   const accessibility=await new AxeBuilder({page}).include('[data-task-provider-id="'+row.id+'"]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/task-incoming-review-'+language+'.png',fullPage:true});
+});
+
+test('unidentified Google creation needs explicit acknowledgement before releasing imports',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();
+  const release=panel.getByRole('button',{name:'Allow imports without linking',exact:true});await expect(release).toBeDisabled();await expect(panel.getByText(/does not cancel the original Google request/)).toBeVisible();
+  await panel.getByRole('checkbox',{name:'I understand that a Google result may appear as a separate imported task.',exact:true}).check();await expect(release).toBeEnabled();await release.click();expect(model.providerWrites).toBe(0);expect(job.state).toBe('UNRESOLVED');await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText(/Its outcome remains unknown/)).toBeVisible();await expect(panel.getByRole('button',{name:'Allow imports without linking',exact:true})).toHaveCount(0);
+});
+test('a paused or disconnected task account can settle unknown creation without provider access',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'IMPORT',pendingWrites:1,enabled:false,paused:true,selectedLists:[],availableLists:[]}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('button',{name:'Check Google result',exact:true})).toBeDisabled();await panel.getByRole('checkbox',{name:'I understand that a Google result may appear as a separate imported task.',exact:true}).check();await panel.getByRole('button',{name:'Allow imports without linking',exact:true}).click();expect(job.state).toBe('UNRESOLVED');expect(model.providerWrites).toBe(0);
+});
+test('read-only Dagsverk sessions cannot acknowledge or release unidentified creation',async({page,request})=>{
+  const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true});await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('checkbox',{name:'I understand that a Google result may appear as a separate imported task.',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:'Allow imports without linking',exact:true})).toBeDisabled();
 });

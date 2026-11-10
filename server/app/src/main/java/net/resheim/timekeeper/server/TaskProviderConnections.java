@@ -74,7 +74,22 @@ final class TaskProviderConnections {
         TaskProviderWrites.retire(store,id,value.path("generation").asText());
         return visible(value);
     }
-    ObjectNode list(){var result=object();var items=result.putArray("items");for(var value:store.list(AUTH))if(store.find("TASK_CONNECTION",uuid(value.get("id"))).isPresent())items.add(visible(value));return result;}
+    ObjectNode list(){
+        var result=object();var items=result.putArray("items");var present=new HashSet<String>();
+        for(var value:store.list(AUTH))if(store.find("TASK_CONNECTION",uuid(value.get("id"))).isPresent()){items.add(visible(value));present.add(value.path("id").asText());}
+        for(var value:store.list("TASK_CONNECTION"))if(!present.contains(value.path("id").asText())&&TaskProviderWrites.pending(store,uuid(value.get("id")))>0)items.add(disconnected(value));
+        return result;
+    }
+    ObjectNode view(UUID id){
+        var auth=store.find(AUTH,id);if(auth.isPresent())return visible(auth.get());
+        var metadata=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);if(TaskProviderWrites.pending(store,id)==0)throw ApiFailure.notFound();return disconnected(metadata);
+    }
+    /** No credential placeholder is persisted: disconnected decisions remain visible using owned public metadata only. */
+    private ObjectNode disconnected(JsonNode metadata){
+        var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","version"))result.set(field,metadata.path(field));
+        result.put("configurationVersion",metadata.path("version").asLong()).put("enabled",false).put("paused",true).put("direction","IMPORT").put("syncing",false).put("pendingCount",0).put("pendingWrites",TaskProviderWrites.pending(store,uuid(metadata.get("id"))));
+        result.putNull("lastAttempt").putNull("lastSuccess").putNull("nextRefresh").put("lastError","TASK_PROVIDER_RECONNECT_REQUIRED");result.putArray("selectedLists");result.putArray("availableLists");result.putArray("imports");result.putArray("reviews");result.putObject("projectMappings");result.putObject("listErrors");return result;
+    }
     ObjectNode required(UUID id){return store.find(AUTH,id).map(node->((ObjectNode)node).deepCopy()).orElseThrow(ApiFailure::notFound);}
     ObjectNode visible(JsonNode value){
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);

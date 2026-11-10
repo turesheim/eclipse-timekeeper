@@ -1646,5 +1646,10 @@
   "task_reviews.field_assignment": "Source assignment",
   "task_reviews.field_metadata.links": "Related resources",
   "task_reviews.find": "Find decisions",
-  "task_reviews.use_remote": "Use {{provider}} for conflicts"
+  "task_reviews.use_remote": "Use {{provider}} for conflicts",
+  "task_writes.state_UNRESOLVED": "Left unlinked · imports allowed",
+  "task_writes.leave_unresolved": "Allow imports without linking",
+  "task_writes.leave_unresolved_help": "If you cannot identify the Google result, you can stop holding new imports. The local task stays unlinked. This does not cancel the original Google request or prove that it failed. A late result may be imported as a separate task. The request will not be sent again automatically.",
+  "task_writes.leave_unresolved_ack": "I understand that a Google result may appear as a separate imported task.",
+  "task_writes.unresolved_help": "This request was left unresolved by your choice. Its outcome remains unknown. New imports are allowed; the original local task was not changed or linked."
 }

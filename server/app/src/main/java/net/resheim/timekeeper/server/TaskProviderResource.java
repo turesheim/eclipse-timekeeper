@@ -34,7 +34,7 @@ public class TaskProviderResource {
         });
     }
     @GET @Path("/{id}") public Response get(@PathParam("id")String id){
-        UUID key=ContractInputs.pathId(id);queries();return tx(()->ApiReplies.resource(200,connections().visible(connections().required(key)),null));
+        UUID key=ContractInputs.pathId(id);queries();return tx(()->ApiReplies.resource(200,connections().view(key),null));
     }
     @POST @Path("/{provider}/authorize") public Response authorize(@PathParam("provider")String provider,JsonNode body){
         var input=inputs.validate("TaskProviderAuthorizeInput",body);queries();var kind=TaskProviderConfiguration.provider(provider);var settings=configuration.settings(kind);String browser=browser();
