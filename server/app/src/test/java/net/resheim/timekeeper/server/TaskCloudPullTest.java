@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(TaskCloudPullTest.Profile.class)
 class TaskCloudPullTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:task_cloud_pull");}
+        public Map<String,String> getConfigOverrides(){var config=TaskProviderTestDatabase.settings("task_cloud_pull");return config;}
     }
     @Inject ServerStore store;
     @Inject CommandReceipts receipts;

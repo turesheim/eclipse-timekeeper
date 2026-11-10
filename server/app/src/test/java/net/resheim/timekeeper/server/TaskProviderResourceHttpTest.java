@@ -16,9 +16,9 @@ import org.junit.jupiter.api.*;
 @QuarkusTest @TestProfile(TaskProviderResourceHttpTest.Profile.class)
 class TaskProviderResourceHttpTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:task_provider_http","timekeeper.auth.public-origin","https://localhost",
+        public Map<String,String> getConfigOverrides(){var config=TaskProviderTestDatabase.settings("task_provider_http");config.putAll(Map.of("timekeeper.auth.public-origin","https://localhost",
                 "timekeeper.tasks.google.client-id","fixture-google-id","timekeeper.tasks.google.client-secret","fixture-google-secret",
-                "timekeeper.tasks.microsoft.client-id","fixture-microsoft-id","timekeeper.tasks.microsoft.client-secret","fixture-microsoft-secret");}
+                "timekeeper.tasks.microsoft.client-id","fixture-microsoft-id","timekeeper.tasks.microsoft.client-secret","fixture-microsoft-secret"));return config;}
         public Set<Class<?>> getEnabledAlternatives(){return Set.of(TaskProviderHttpTestFixture.class);}
     }
     @Inject ContractInputs inputs;

@@ -25,7 +25,8 @@ class ContractTest(unittest.TestCase):
     def test_reviewed_google_writes_bind_an_owned_task_and_exact_proposal(self):
         command={'taskId':ID,'listId':ID,'action':'UPDATE'}
         validator('TaskProviderWriteInput').validate(command)
-        for value in [{**command,'action':'CREATE'},{**command,'accessToken':'private'},{**command,'ownerId':'foreign'},{'taskId':ID,'action':'DELETE'}]:
+        validator('TaskProviderWriteInput').validate({**command,'action':'CREATE'})
+        for value in [{**command,'action':'UPSERT'},{**command,'accessToken':'private'},{**command,'ownerId':'foreign'},{'taskId':ID,'action':'DELETE'}]:
             self.assertFalse(validator('TaskProviderWriteInput').is_valid(value))
         base='/task-providers/{connection}/writes'
         self.assertEqual('write',CONTRACT['paths'][base]['post']['x-required-permission'])
@@ -34,6 +35,18 @@ class ContractTest(unittest.TestCase):
             self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path][method]['parameters'])
         self.assertIn('202',CONTRACT['paths'][base+'/{id}/confirm']['post']['responses'])
         self.assertFalse(validator('TaskProviderWriteInput').is_valid({**command,'writeFields':{'summary':'unreviewed'}}))
+
+    def test_creation_identity_recovery_is_conditional_owned_and_cannot_accept_raw_provider_fields(self):
+        base='/task-providers/{connection}/writes/{id}'
+        self.assertEqual('read',CONTRACT['paths'][base+'/candidates']['get']['x-required-permission'])
+        identity=CONTRACT['paths'][base+'/identity']['post']
+        self.assertEqual('write',identity['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},identity['parameters'])
+        value={'externalId':'provider-id','scanEtag':'"scan-current"','taskEtag':'"task-current"'}
+        validator('TaskProviderCreationIdentityInput').validate(value)
+        validator('TaskProviderCreationIdentityInput').validate({**value,'taskEtag':None})
+        for invalid in [{k:v for k,v in value.items() if k!='scanEtag'},{**value,'externalId':''},{**value,'ownerId':'foreign'},{**value,'fields':{'summary':'unreviewed'}},{**value,'accessToken':'private'}]:
+            self.assertFalse(validator('TaskProviderCreationIdentityInput').is_valid(invalid))
 
     def test_document_title_rename_is_private_conditional_and_strict(self):
         operation=CONTRACT['paths']['/notes/entries/{id}/title']['put']
@@ -767,7 +780,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

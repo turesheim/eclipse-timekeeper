@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(TaskProviderScansTest.Profile.class)
 class TaskProviderScansTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:task_provider_scans","timekeeper.tasks.automatic","false");}
+        public Map<String,String> getConfigOverrides(){var config=TaskProviderTestDatabase.settings("task_provider_scans");config.put("timekeeper.tasks.automatic","false");return config;}
     }
     @Inject ServerStore store;
     @Inject CommandReceipts receipts;
