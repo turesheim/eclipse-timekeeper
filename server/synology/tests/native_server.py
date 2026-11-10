@@ -21,6 +21,8 @@ def verify(command,database_container,folder,image):
     command('docker','cp',database_container+':/var/packages/timekeeper/target/private/config',str(prepared))
     command('docker','cp',database_container+':/var/packages/timekeeper/target/private/secrets/database_password',str(password))
     command('docker','cp',database_container+':/var/packages/timekeeper/target/private/secrets/smtp_password',str(smtp_password))
+    task_providers=folder/'native-task-providers.properties'
+    command('docker','cp',database_container+':/var/packages/timekeeper/target/private/secrets/task_providers.properties',str(task_providers))
     config=folder/'native-config';secrets=folder/'native-secrets'
     config.mkdir(mode=0o755);secrets.mkdir(mode=0o755)
     name=database_container+'-server'
@@ -48,6 +50,7 @@ def verify(command,database_container,folder,image):
         for path in prepared.iterdir():shutil.copyfile(path,config/path.name);(config/path.name).chmod(0o644)
         shutil.copyfile(password,secrets/'database_password');(secrets/'database_password').chmod(0o444)
         shutil.copyfile(smtp_password,secrets/'smtp_password');(secrets/'smtp_password').chmod(0o444)
+        shutil.copyfile(task_providers,secrets/'task_providers.properties');(secrets/'task_providers.properties').chmod(0o444)
         pending.write_text('{}');pending.chmod(0o644)
         command(*compose,'start')
         if command('docker','wait',name).stdout.strip()!='1':raise AssertionError('Pending maintenance allowed server startup')

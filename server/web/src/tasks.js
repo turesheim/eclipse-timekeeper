@@ -8,6 +8,13 @@ import {calendarTasks} from './tasks-api.js';
 const node=(tag,text,classes)=>{const result=document.createElement(tag);if(text!==undefined)result.textContent=text;if(classes)result.className=classes;return result;};
 const button=(text,run,glyph)=>{const result=node('button',text,'btn btn-outline-secondary');result.type='button';if(glyph)iconButton(result,glyph,text);result.addEventListener('click',run);return result;};
 const selectionKey=value=>JSON.stringify([value.kind,value.value]);
+const contextLink=(label,value,mail=false)=>{
+  if(typeof value!=='string'||value.length>4096||/[\u0000-\u001f\u007f]/.test(value))return null;
+  try{const url=new URL(value);if(!['https:','http:',...(mail?['mailto:']:[])].includes(url.protocol)||url.username||url.password)return null;}
+  catch{return null;}
+  const link=node('a',label,'text-break');link.href=value;link.target='_blank';link.rel='noopener noreferrer';return link;
+};
+
 
 /** All sources remain in their original collections. Filters only change presentation. */
 export class TasksView {
@@ -95,9 +102,29 @@ export class TasksView {
     add('tasks.scheduled',row.scheduledDate);add('tasks.start',moment(row.record.start));add('tasks.due_label',moment(row.record.due));this.detailBody.append(fields);
     if(row.source==='calendar')this.detailBody.append(node('p',t('calendar.todo_read_only'),'hint'));
     if(row.unresolvedTiming)this.detailBody.append(node('p',t('tasks.unresolved_help'),'hint'));
-    if(row.url){const link=node('a',t('tasks.open_source'));link.href=row.url;link.target='_blank';link.rel='noopener noreferrer';this.detailBody.append(link);}
+    if(row.source==='task'){const link=contextLink(t('tasks.open_task_url'),row.record.url);if(link)this.detailBody.append(link);}
+    else if(row.url){const link=node('a',t('tasks.open_source'));link.href=row.url;link.target='_blank';link.rel='noopener noreferrer';this.detailBody.append(link);}
+    if(row.source==='task')this.providerContext(row.record);
     const body=row.source==='calendar'?row.record.description:row.record.body?.content||'';
     if(body){if(row.source==='calendar'||row.record.body?.format==='HTML')this.detailBody.append(calendarDescription(body));else{const text=node('p',undefined,'task-plain-body');text.append(linkedText(body));this.detailBody.append(text);}}
     this.edit.hidden=row.source!=='task';this.edit.disabled=!this.writable;this.detail.showModal();
   }
+  providerContext(task){
+    const references=task.externalReferences||[],links=task.metadata?.links||[];if(!references.length&&!links.length)return;
+    const context=node('section',undefined,'mt-3');context.append(node('h3',t('tasks.provider_context'),'h6'));
+    for(const reference of references){
+      const provider=reference.providerId==='google'?t('task_providers.google'):reference.providerId==='microsoft'?t('task_providers.microsoft'):reference.providerId;
+      context.append(node('p',provider+' · '+reference.repositoryId,'hint text-break mb-1'),node('p',reference.externalId,'small text-break'));
+      const open=contextLink(t('tasks.provider_open',{provider}),reference.externalUrl);if(open)context.append(open);
+      const assignment=reference.assignment;
+      if(assignment){
+        const details=node('dl',undefined,'task-metadata mt-2');
+        for(const [key,value]of [['tasks.assignee',assignment.assigneeName||assignment.assigneeId],['tasks.assigned_by',assignment.assignedByName||assignment.assignedById],['tasks.assignment_context',assignment.sourceId]])if(value)details.append(node('dt',t(key)),node('dd',value,'text-break'));
+        context.append(details);const source=contextLink(t('tasks.assignment_open'),assignment.sourceUrl);if(source)context.append(source);
+      }
+    }
+    if(links.length){const items=node('ul');for(const value of links){const link=contextLink(value.title||value.url,value.url,true);if(link){const item=node('li');item.append(link);items.append(item);}}if(items.childElementCount){context.append(node('h4',t('tasks.resources'),'h6 mt-3'),items);}}
+    this.detailBody.append(context);
+  }
+
 }

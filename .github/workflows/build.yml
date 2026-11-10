@@ -121,6 +121,14 @@ jobs:
     - name: Verify packaged HTTP server, durable restart and authorization
       if: needs.Changes.outputs.server_tests == 'true'
       run: python server/scripts/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+    - name: Package shared sign-in service for review
+      run: python server/scripts/package_connect.py --output server/target/connect-distribution --commit "$GITHUB_SHA"
+    - name: Upload shared sign-in service
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: shared-sign-in-service
+        if-no-files-found: error
+        path: server/target/connect-distribution/
     - name: Upload server reports and acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1

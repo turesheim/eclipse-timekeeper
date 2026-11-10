@@ -558,6 +558,7 @@ public class ServerStore {
         update("INSERT INTO tk_relation(owner_id,from_type,from_id,kind,to_type,to_id) VALUES(?,?,?,?,?,?)",owner(),fromType,fromId,kind,toType,toId);
     }
     public void delete(String type,UUID id) {
+        if(Set.of("TASK_CONNECTION","TASK_LIST").contains(type)&&TaskProviderWrites.references(this,type,id))throw ApiFailure.conflict();
         // Older replicas may have written a legacy link after startup cleanup.
         if(type.equals("WORK_SESSION")) update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='ACTIVITY' AND kind='workSession' AND to_type='WORK_SESSION' AND to_id=?",owner(),id);
         JsonNode existing = find(type,id).orElseThrow(ApiFailure::notFound);
@@ -649,6 +650,7 @@ public class ServerStore {
             public Task save(Task value) { check(); return ServerStore.this.save("TASK",value); }
             public void delete(TaskId id) {
                 check();var task=get("TASK",id.value(),Task.class).orElseThrow(ApiFailure::notFound);
+                TaskProviderWrites.deleted(ServerStore.this,task);
                 var identities=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());
                 task.externalReferences().forEach(reference -> identities.add(reference.key()));
                 for(var attachment:ServerStore.this.list("TASK_ATTACHMENT")) if(attachment.path("taskId").asText().equals(id.value().toString())) {

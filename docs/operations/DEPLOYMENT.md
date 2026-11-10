@@ -124,6 +124,10 @@ containers leaves these directories in place. Keep them outside the Container
 Manager project directory, and preserve them during project cleanup.
 The application uses a separate, non-superuser database role.
 
+Internet accounts use shared sign-in without per-server OAuth setup. Optional
+legacy direct task registrations use a retained private properties file. See
+[Internet accounts](TASK-PROVIDERS.md) for both modes and recovery.
+
 The server database is separate from Eclipse's embedded H2 database. Existing
 H2 files cannot be mounted as PostgreSQL storage. Move user data through the
 API's supported export/import flow; this deployment never converts or merges
@@ -136,7 +140,8 @@ sh backup.sh
 ```
 
 The resulting directory contains a PostgreSQL custom-format dump, the token
-registry, SMTP settings/password and the deployed image list. Configure a daily DSM task to run this
+registry, SMTP settings/password, optional task-provider app registrations and the
+deployed image list. Configure a daily DSM task to run this
 command, monitor failures, and back up `backups`, `config`, `.env` and `secrets`
 to another host/location using Hyper Backup. Set retention for those backups.
 Copying live PostgreSQL data directories is not a consistent backup.

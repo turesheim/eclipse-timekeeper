@@ -215,6 +215,52 @@ Providers may expose only the flags, leaving participant details empty.
 `PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
 list updates preserve it. Portable JSON/CSV and account archives retain it.
 
+Administrator-only `GET /admin/internet-accounts` returns redacted installation
+setup and callback URLs. It does not contact a provider by default. With
+`?check=true`, it resolves the operator-controlled shared service and reads
+`/v1/providers` to report configured registrations. The response is `no-store`
+and never includes client secrets, account grants or tokens. The administrator
+can inspect the installation client ID and saved/effective sign-in settings.
+`PUT` requires a browser administrator session, CSRF, `If-Match` and the current
+administrator password. Secret updates explicitly preserve, replace or clear
+the private value; changes activate only after a coordinated restart. Shared
+service registrations remain independent. A configured registration does not
+establish successful live provider consent.
+
+Internet account sign-in and synchronization use `/task-providers`, separate from portable connection
+metadata. `GET` returns configured-provider availability and owned status with
+discovered/selected lists. Its `calendarSynchronization` flag describes whether
+new sign-ins support calendars; direct registration is task-only. A direct
+calendar request is rejected without requesting task access in its place.
+`POST /task-providers/{provider}/authorize` starts a
+browser-bound PKCE flow for `google` or `microsoft`; `POST
+/task-providers/complete` consumes its one-use state and code. `POST
+/task-providers/cancel` cancels an attempt. Credentials remain private and are
+excluded from these responses and account archives. The callback is
+`/web/task-provider-callback.html` at the public origin; see
+[operator setup](../operations/TASK-PROVIDERS.md).
+
+Shared sign-in is the default: authorize accepts the selected `services`
+(`tasks`, `calendars`) and `language` (`en`, `nb`), and returns a validated
+`authorizationOrigin` with its authorization URL. The NAS retains owner/browser
+state and PKCE; the shared service holds provider registrations and refresh
+tokens. A one-use handoff returns only to the initiating installation. Legacy
+direct task registration remains an explicit operator opt-out.
+
+`PUT /task-providers/{id}/calendars` saves selected calendar IDs and optional
+owned-client mappings with `If-Match`. Its `calendarConfigurationVersion` is
+independent of task-list configuration. Managed calendar subscriptions are
+read-only API sources refreshed by the account worker, never by the URL feed
+fetcher. Calendar-only accounts do not create task lists. Plain calendar
+subscriptions remain independent and require no provider sign-in.
+
+`GET /task-providers/{id}` reads owned status. `PUT /task-providers/{id}/lists`
+replaces selected remote list IDs with `If-Match`; `DELETE /task-providers/{id}`
+disconnects with `If-Match`, retaining tasks. `POST /task-providers/{id}/refresh`
+queues a bounded background scan and returns 202. Private leases fence results
+after disconnect, reselection, reconnect or account disablement. These adapters
+advertise import-only capabilities and do not perform provider writes.
+
 `/task-list-sections` stores optional, owner-scoped provider groupings inside
 one task list. A section has a stable Timekeeper ID, remote section ID, name,
 `STANDARD` or `GROCERY_CATEGORY` kind, order, presence, and section write

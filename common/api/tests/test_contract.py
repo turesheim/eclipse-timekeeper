@@ -22,6 +22,94 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_internet_account_setup_redacts_credentials_and_guards_secret_updates(self):
+        value={'mode':'SHARED','status':'NOT_CHECKED','publicOrigin':'https://dagsverk.example.test',
+               'callbackUrl':'https://dagsverk.example.test/web/task-provider-callback.html',
+               'serviceUrl':None,'discoveryUrl':'https://turesheim.github.io/eclipse-timekeeper/connect/service.json',
+               'googleRedirectUrl':None,'googleConfigured':None,'microsoftConfigured':None,
+               'version':0,'effectiveVersion':0,'restartRequired':False,'canEdit':True,
+               'saved':{'mode':'SHARED','serviceUrl':None,'googleClientId':'','googleClientSecretConfigured':False},
+               'effective':{'mode':'SHARED','serviceUrl':None,'googleClientId':'','googleClientSecretConfigured':False}}
+        validator('AdministrationInternetAccounts').validate(value)
+        for secret in ['clientId','clientSecret','accessToken','refreshToken','grantCredential']:
+            self.assertFalse(validator('AdministrationInternetAccounts').is_valid({**value,secret:'private'}))
+        operation=CONTRACT['paths']['/admin/internet-accounts']['get']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertEqual('no-store',operation['responses']['200']['headers']['Cache-Control']['schema']['const'])
+        self.assertEqual({'get','put'},set(CONTRACT['paths']['/admin/internet-accounts']))
+        command={'mode':'DIRECT','serviceUrl':None,'googleClientId':'public-id','googleSecretAction':'REPLACE','googleClientSecret':'private','currentPassword':'proof'}
+        validator('AdministrationInternetAccountsInput').validate(command)
+        self.assertFalse(validator('AdministrationInternetAccountsInput').is_valid({k:v for k,v in command.items() if k!='googleClientSecret'}))
+        self.assertFalse(validator('AdministrationInternetAccountsInput').is_valid({**command,'googleSecretAction':'PRESERVE'}))
+
+    def test_internet_account_services_and_calendar_choices_have_separate_owned_commands(self):
+        for tasks,calendars in [(True,False),(False,True),(True,True)]:
+            validator('TaskProviderAuthorizeInput').validate({'services':{'tasks':tasks,'calendars':calendars},'direction':'IMPORT'})
+        for value in [{'services':{'tasks':False,'calendars':False}}, {'services':{'tasks':True,'calendars':True,'clientSecret':'private'}}, {'clientId':'operator-registration'}, {'services':{'tasks':True,'calendars':True,'writableTasks':True}}]:
+            self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid(value))
+        command={'selectedCalendars':['work'],'calendarMappings':{'work':ID}}
+        validator('InternetCalendarSelectionInput').validate(command)
+        for extra in ({'selectedLists':['tasks']},{'ownerId':'another-owner'},{'accessToken':'private'}):
+            self.assertFalse(validator('InternetCalendarSelectionInput').is_valid({**command,**extra}))
+        operation=CONTRACT['paths']['/task-providers/{id}/calendars']['put']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+
+    def test_identity_decisions_cannot_inject_remote_fields_or_replace_without_a_native_revision(self):
+        create={'externalId':'observed-id','decision':'IMPORT'}
+        validator('TaskProviderIdentityDecisionInput').validate(create)
+        replacement={**create,'decision':'REPLACE','taskId':ID,'taskEtag':'"task-current"','previous':{'providerId':'google','repositoryId':'account/list','externalId':'old-id'}}
+        validator('TaskProviderIdentityDecisionInput').validate(replacement)
+        for invalid in [{**create,'fields':{'summary':'injected'}},{**create,'taskId':ID},{**replacement,'taskEtag':'*'},{**replacement,'ownerId':'foreign'}, {k:v for k,v in replacement.items() if k!='previous'}]:
+            self.assertFalse(validator('TaskProviderIdentityDecisionInput').is_valid(invalid))
+        validator('TaskProviderSelectionInput').validate({'selectedLists':['list'],'reviewAdditions':False})
+
+    def test_unidentified_creation_requires_an_explicit_separate_import_acknowledgement(self):
+        command={'acknowledgePossibleSeparateImport':True}
+        validator('TaskProviderLeaveUnresolvedInput').validate(command)
+        for invalid in [{},{'acknowledgePossibleSeparateImport':False},{**command,'externalId':'guessed'},{**command,'ownerId':'foreign'}]:
+            self.assertFalse(validator('TaskProviderLeaveUnresolvedInput').is_valid(invalid))
+        path='/task-providers/{connection}/writes/{id}/leave-unresolved'
+        self.assertEqual('write',CONTRACT['paths'][path]['post']['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path]['post']['parameters'])
+
+    def test_incoming_reviews_require_fresh_comparison_and_cannot_inject_observations(self):
+        base='/task-providers/{connection}/reviews/{list}'
+        self.assertEqual('read',CONTRACT['paths'][base]['get']['x-required-permission'])
+        operation=CONTRACT['paths'][base+'/{task}']['post']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+        for decision in ['LOCAL','REMOTE','DELETE']:
+            validator('TaskProviderReviewInput').validate({'decision':decision,'taskEtag':'"current"'})
+        for invalid in [{'decision':'LOCAL'}, {'decision':'LOCAL','taskEtag':'*'}, {'decision':'REMOTE','taskEtag':'"v1"','fields':{'summary':'unobserved'}}, {'decision':'DELETE','taskEtag':'"v1"','ownerId':'foreign'}]:
+            self.assertFalse(validator('TaskProviderReviewInput').is_valid(invalid))
+
+    def test_reviewed_google_writes_bind_an_owned_task_and_exact_proposal(self):
+        command={'taskId':ID,'listId':ID,'action':'UPDATE'}
+        validator('TaskProviderWriteInput').validate(command)
+        validator('TaskProviderWriteInput').validate({**command,'action':'CREATE'})
+        for value in [{**command,'action':'UPSERT'},{**command,'accessToken':'private'},{**command,'ownerId':'foreign'},{'taskId':ID,'action':'DELETE'}]:
+            self.assertFalse(validator('TaskProviderWriteInput').is_valid(value))
+        base='/task-providers/{connection}/writes'
+        self.assertEqual('write',CONTRACT['paths'][base]['post']['x-required-permission'])
+        self.assertEqual('read',CONTRACT['paths'][base]['get']['x-required-permission'])
+        for path,method in [(base+'/{id}/confirm','post'),(base+'/{id}','delete')]:
+            self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path][method]['parameters'])
+        self.assertIn('202',CONTRACT['paths'][base+'/{id}/confirm']['post']['responses'])
+        self.assertFalse(validator('TaskProviderWriteInput').is_valid({**command,'writeFields':{'summary':'unreviewed'}}))
+
+    def test_creation_identity_recovery_is_conditional_owned_and_cannot_accept_raw_provider_fields(self):
+        base='/task-providers/{connection}/writes/{id}'
+        self.assertEqual('read',CONTRACT['paths'][base+'/candidates']['get']['x-required-permission'])
+        identity=CONTRACT['paths'][base+'/identity']['post']
+        self.assertEqual('write',identity['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},identity['parameters'])
+        value={'externalId':'provider-id','scanEtag':'"scan-current"','taskEtag':'"task-current"'}
+        validator('TaskProviderCreationIdentityInput').validate(value)
+        validator('TaskProviderCreationIdentityInput').validate({**value,'taskEtag':None})
+        for invalid in [{k:v for k,v in value.items() if k!='scanEtag'},{**value,'externalId':''},{**value,'ownerId':'foreign'},{**value,'fields':{'summary':'unreviewed'}},{**value,'accessToken':'private'}]:
+            self.assertFalse(validator('TaskProviderCreationIdentityInput').is_valid(invalid))
+
     def test_search_calendar_details_are_typed_and_do_not_require_a_saved_note(self):
         operation=CONTRACT['paths']['/notes/search/calendar/{id}']['get']
         self.assertEqual('read',operation['x-required-permission'])
@@ -42,6 +130,32 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(validator('VaultTitleInput').is_valid({'title':'CVE-2026-111943'}))
         for value in [{},{'title':''},{'title':'x','ownerId':'foreign'},{'title':3}]:
             self.assertFalse(validator('VaultTitleInput').is_valid(value))
+
+    def test_task_provider_connections_keep_credentials_out_of_public_state(self):
+        connection={'id':ID,'ownerId':'owner-a','providerId':'google','remoteAccountId':'stable-account','name':'Tasks','enabled':True,
+                    'version':0,'direction':'IMPORT','syncing':False,'pendingCount':0,'listErrors':{},'lastAttempt':None,'lastSuccess':None,
+                    'nextRefresh':'2026-11-09T12:00:00Z','lastError':None,'selectedLists':[],
+                    'availableLists':[{'id':'remote-list','name':'Work','kind':'STANDARD','shared':False,'owner':True}]}
+        validator('TaskProviderConnection').validate(connection)
+        for field in ['accessToken','refreshToken','clientSecret','settingsHash','observation','scopes']:
+            self.assertFalse(validator('TaskProviderConnection').is_valid({**connection,field:'private'}))
+        self.assertTrue(validator('TaskProviderSelectionInput').is_valid({'selectedLists':['remote-list']}))
+        self.assertFalse(validator('TaskProviderSelectionInput').is_valid({'selectedLists':['remote-list','remote-list']}))
+        self.assertFalse(validator('TaskProviderSelectionInput').is_valid({'selectedLists':[],'ownerId':'foreign'}))
+        for value in [{},{'direction':'IMPORT'},{'direction':'TWO_WAY'}]:
+            self.assertTrue(validator('TaskProviderAuthorizeInput').is_valid(value))
+        for value in [{'direction':'EXPORT'},{'direction':'TWO_WAY','ownerId':'foreign'},{'writable':True}]:
+            self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid(value))
+        validator('TaskProviderConnection').validate({**connection,'direction':'TWO_WAY'})
+        for name in ['TaskProviderCompleteInput','TaskProviderCancelInput']:
+            self.assertTrue(CONTRACT['components']['schemas'][name]['properties']['state']['writeOnly'])
+        self.assertTrue(CONTRACT['components']['schemas']['TaskProviderCompleteInput']['properties']['code']['writeOnly'])
+        validator('TaskProviderCompleteInput').validate({'state':'a'*43,'code':'private opaque code'})
+        for value in [{'state':'a'*43,'code':'private\ncode'},{'state':'a'*42,'code':'code'},{'state':'a'*43,'code':'code','ownerId':'foreign'}]:
+            self.assertFalse(validator('TaskProviderCompleteInput').is_valid(value))
+        for path,method in [('/task-providers/{id}','delete'),('/task-providers/{id}/lists','put')]:
+            self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path][method]['parameters'])
+        self.assertIn('202',CONTRACT['paths']['/task-providers/{id}/refresh']['post']['responses'])
     def test_note_bookmarks_have_separate_conditional_private_metadata(self):
         operations=CONTRACT['paths']['/notes/bookmark']
         self.assertEqual({'get','put'},set(operations))
@@ -739,6 +853,9 @@ class ContractTest(unittest.TestCase):
             'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
+            'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
+            'selectInternetAccountCalendars',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'leaveTaskProviderCreationUnresolved', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview', 'listTaskProviderIdentityReviews', 'decideTaskProviderIdentity',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',
@@ -763,7 +880,7 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
-            'getAdministrationSettings', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
+            'getAdministrationSettings', 'getAdministrationInternetAccounts', 'updateAdministrationInternetAccounts', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}

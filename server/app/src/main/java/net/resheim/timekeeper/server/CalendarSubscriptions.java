@@ -29,6 +29,7 @@ final class CalendarSubscriptions {
     ObjectNode visible(JsonNode value){
         var result=object();for(String field:List.of("id","ownerId","version","name","clientId","visible","createdAt","lastAttempt","lastSuccess","lastError","nextRefresh"))result.set(field,value.path(field));
         result.put("includeEvents",value.path("includeEvents").asBoolean(true)).put("includeTodos",value.path("includeTodos").asBoolean(false));
+        if(value.hasNonNull("managedConnectionId")){result.put("managed",true);result.set("connectionId",value.get("managedConnectionId"));}
         try{result.put("origin",new java.net.URI(value.get("url").asText()).getHost());}catch(Exception failure){throw ApiFailure.conflict();}return result;
     }
     ObjectNode list(){var result=object().put("refreshMinutes",REFRESH_MINUTES);var items=result.putArray("items");store.list(SUB).stream().sorted(Comparator.comparing(value->value.path("name").asText(),String.CASE_INSENSITIVE_ORDER)).forEach(value->items.add(visible(value)));return result;}
@@ -38,6 +39,7 @@ final class CalendarSubscriptions {
         configuration(value,input,policy,true);UUID id=UUID.randomUUID();value=insert(SUB,id,value);clientRelation(id,uuid(value.get("clientId")));new CalendarSearchState(store).changed();return value;
     }
     private void configuration(ObjectNode value,JsonNode input,CalendarDownload policy,boolean create){
+        if(value.hasNonNull("managedConnectionId")&&(!input.path("url").asText("").isBlank()||input.has("includeEvents")&&!input.path("includeEvents").asBoolean()||input.path("includeTodos").asBoolean()))throw new ApiFailure(409,"CALENDAR_MANAGED_SOURCE");
         store.find("CLIENT",uuid(input.get("clientId"))).orElseThrow(ApiFailure::notFound);
         String url=input.path("url").asText("");if(create||!url.isBlank()) {
             try{value.put("url",policy.address(url).toString());}catch(CalendarFailure failure){throw new ApiFailure(422,failure.code);}
@@ -71,6 +73,7 @@ final class CalendarSubscriptions {
     private boolean enabled(){try(var query=store.statement("SELECT state FROM tk_account WHERE owner_id=?",store.owner());var rows=query.executeQuery()){return rows.next()&&!rows.getString(1).equals("DISABLED");}catch(SQLException failure){throw new ApiFailure(503,"UNAVAILABLE");}}
     Claim claim(UUID id,boolean force){
         var value=required(id);if(!enabled())return null;Instant now=store.now();
+        if(value.hasNonNull("managedConnectionId"))return null;
         var previous=store.find(FEED,id);var feed=previous.map(node->((ObjectNode)node).deepCopy()).orElseGet(JsonValues::object);
         if(feed.hasNonNull("leaseUntil")&&Instant.parse(feed.get("leaseUntil").asText()).isAfter(now))return null;
         if(!force&&value.hasNonNull("nextRefresh")&&Instant.parse(value.get("nextRefresh").asText()).isAfter(now))return null;
@@ -79,6 +82,30 @@ final class CalendarSubscriptions {
         if(previous.isEmpty())feed=insert(FEED,id,feed);else feed=save(FEED,feed);
         value.put("lastAttempt",now.toString()).put("nextRefresh",now.plusSeconds(REFRESH_MINUTES*60L).toString());value=save(SUB,value);
         return new Claim(store.owner(),id,lease,configuration(value),value.get("url").asText(),optionalText(feed.get("body")).orElse(null),optionalText(feed.get("etag")).orElse(null),optionalText(feed.get("modified")).orElse(null),value.path("includeEvents").asBoolean(true),value.path("includeTodos").asBoolean(false));
+    }
+    ObjectNode managed(UUID id,UUID connection,String remote,String name,UUID client,String source){
+        store.find("CLIENT",client).orElseThrow(ApiFailure::notFound);var previous=store.find(SUB,id);
+        if(previous.isEmpty()&&store.list(SUB).size()>=20)throw new ApiFailure(422,"CALENDAR_SUBSCRIPTION_LIMIT");
+        if(previous.isPresent()&&!previous.get().path("managedConnectionId").asText().equals(connection.toString()))throw ApiFailure.conflict();
+        var value=previous.map(node->((ObjectNode)node).deepCopy()).orElseGet(()->object().put("createdAt",store.now().toString()).put("visible",true).putNull("lastAttempt").putNull("lastSuccess").putNull("lastError"));
+        boolean changed=previous.isEmpty()||!value.path("name").asText().equals(name)||!value.path("clientId").asText().equals(client.toString());
+        value.put("name",name).put("clientId",client.toString()).put("url",source).put("includeEvents",true).put("includeTodos",false).put("managedConnectionId",connection.toString()).put("remoteCalendarId",remote).put("nextRefresh",store.now().toString());
+        if(!changed)return value;
+        value=previous.isEmpty()?insert(SUB,id,value):save(SUB,value);store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='CAL_SUB' AND from_id=?",store.owner(),id);clientRelation(id,client);new CalendarSearchState(store).changed();return value;
+    }
+    void managedAttempt(UUID id,UUID connection){
+        var found=store.find(SUB,id);if(found.isEmpty()||!found.get().path("managedConnectionId").asText().equals(connection.toString()))return;
+        var value=((ObjectNode)found.get()).deepCopy();value.put("lastAttempt",store.now().toString()).put("nextRefresh",store.now().plusSeconds(900).toString());save(SUB,value);
+    }
+    void managedFinish(UUID id,UUID connection,String body,String error){
+        var found=store.find(SUB,id);if(found.isEmpty()||!found.get().path("managedConnectionId").asText().equals(connection.toString()))return;
+        var value=((ObjectNode)found.get()).deepCopy();
+        if(error==null){
+            var cached=store.find(FEED,id);var feed=cached.map(node->((ObjectNode)node).deepCopy()).orElseGet(JsonValues::object);boolean changed=!Objects.equals(feed.path("body").asText(null),body);
+            feed.put("body",body).putNull("etag").putNull("modified");if(cached.isEmpty())insert(FEED,id,feed);else save(FEED,feed);
+            value.put("lastSuccess",store.now().toString()).putNull("lastError");if(changed)new CalendarSearchState(store).changed();
+        }else value.put("lastError",error);
+        save(SUB,value);
     }
     void finish(Claim claim,CalendarDownload.Result result,String error){
         if(!store.owner().equals(claim.owner()))throw ApiFailure.notFound();

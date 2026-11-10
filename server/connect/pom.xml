@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>net.resheim.timekeeper.server</groupId><artifactId>timekeeper-server-parent</artifactId><version>2.0.0-SNAPSHOT</version></parent>
+  <artifactId>timekeeper-connect</artifactId>
+  <name>Dagsverk shared sign-in service</name>
+  <properties><git.commit.id.full>unknown</git.commit.id.full><git.dirty>unknown</git.dirty></properties>
+  <dependencies>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-provider-http</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-h2</artifactId></dependency>
+    <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><version>2.4.240</version></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-junit</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>io.rest-assured</groupId><artifactId>rest-assured</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.2.0</version>
+      <executions><execution><id>connect-build-identity</id><phase>process-resources</phase><goals><goal>run</goal></goals>
+        <configuration><target>
+          <exec executable="git" dir="${project.basedir}" failonerror="false" failifexecutionfails="false" outputproperty="connect.git.commit" resultproperty="connect.git.commit.result"><arg value="rev-parse"/><arg value="HEAD"/></exec>
+          <exec executable="git" dir="${project.basedir}" failonerror="false" failifexecutionfails="false" outputproperty="connect.status" resultproperty="connect.git.status.result"><arg value="status"/><arg value="--porcelain"/></exec>
+          <condition property="connect.commit" value="${git.commit.id.full}"><not><equals arg1="${git.commit.id.full}" arg2="unknown"/></not></condition>
+          <condition property="connect.commit" value="${connect.git.commit}"><equals arg1="${connect.git.commit.result}" arg2="0"/></condition>
+          <property name="connect.commit" value="unknown"/>
+          <condition property="connect.dirty" value="${git.dirty}"><not><equals arg1="${git.dirty}" arg2="unknown"/></not></condition>
+          <condition property="connect.dirty" value="false"><and><equals arg1="${connect.git.status.result}" arg2="0"/><equals arg1="${connect.status}" arg2=""/></and></condition>
+          <condition property="connect.dirty" value="true"><equals arg1="${connect.git.status.result}" arg2="0"/></condition>
+          <property name="connect.dirty" value="unknown"/>
+          <echo file="${project.build.outputDirectory}/connect-build.properties">commit=${connect.commit}
+dirty=${connect.dirty}
+          </echo>
+        </target></configuration>
+      </execution></executions>
+    </plugin>
+    <plugin><groupId>io.quarkus.platform</groupId><artifactId>quarkus-maven-plugin</artifactId><version>${quarkus.platform.version}</version><extensions>true</extensions>
+      <executions><execution><goals><goal>build</goal><goal>generate-code</goal><goal>generate-code-tests</goal></goals></execution></executions>
+    </plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
+      <configuration><systemPropertyVariables><java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager></systemPropertyVariables></configuration>
+    </plugin>
+  </plugins></build>
+</project>

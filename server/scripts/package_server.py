@@ -75,6 +75,7 @@ def package(output, tag, commit):
               'docs/operations/LOCAL-DOCKER.md': 'LOCAL-DOCKER.md',
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
+              'docs/operations/TASK-PROVIDERS.md': 'TASK-PROVIDERS.md',
               'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
               'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
