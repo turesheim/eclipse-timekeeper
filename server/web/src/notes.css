@@ -84,7 +84,7 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-search-path { grid-column:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.9em; font-weight:400; color:var(--bs-secondary-color); }
 
 .titlebar-notes-search { display:flex; flex:0 1 22rem; min-width:8rem; gap:.25rem; margin:0; }
-.titlebar-notes-search input { min-width:0; }
+.titlebar-notes-search input { min-width:0; margin:0; }
 .notes-search-panel { position:fixed; inset:0 0 0 auto; z-index:1035; width:min(30rem,100vw); display:flex; flex-direction:column; gap:.75rem; padding:1rem; border-inline-start:1px solid var(--bs-border-color); background:var(--bs-body-bg); color:var(--bs-body-color); box-shadow:var(--bs-box-shadow-lg); }
 .notes-search-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .notes-search-heading h2 { margin:0; font-size:1.25rem; }
@@ -103,4 +103,4 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .app-header .titlebar-notes-search { margin-inline-start:auto; align-items:stretch; }
 .app-header .titlebar-notes-search:not([hidden]) + #session { margin-inline-start:0; }
 .titlebar-notes-search .icon-button { min-height:0; min-width:2.375rem; padding:.375rem .625rem; }
-@media (max-width:575px) { .titlebar-notes-search .icon-button { min-height:2.75rem; min-width:2.75rem; } }
+@media (max-width:767px) { .titlebar-notes-search .icon-button { min-height:2.75rem; min-width:2.75rem; } }

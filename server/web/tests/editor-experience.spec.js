@@ -17,9 +17,9 @@ async function engine(page,value,options={}){
 const source=page=>page.evaluate(()=>globalThis.experience.markdown());
 
 test('extended inline styles render and retain exact source, nested formatting and literal code',async({page})=>{
-  const value='# ==Focus==\r\n\r\n==Very **important** words==: H~2~O, X^2^ and ~~obsolete~~.\r\n\r\n`==literal== H~2~O X^2^`\r\n';
+  const value='# ==**Focus**==\r\n\r\n==Very **important** words==: H~2~O, X^2^ and ~~obsolete~~. **==Reverse==**\r\n\r\n`==literal== H~2~O X^2^`\r\n';
   await field(page,value);const rich=page.locator('#experience-formatted .ProseMirror');
-  await expect(rich.locator('mark')).toHaveText(['Focus','Very important words']);await expect(rich.locator('mark strong')).toHaveText('important');
+  await expect(rich.locator('mark')).toHaveText(['Focus','Very important words','Reverse']);await expect(rich.locator('mark strong')).toHaveText('important');
   await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');await expect(rich.locator('del')).toHaveText('obsolete');
   await expect(rich.locator('code')).toHaveText('==literal== H~2~O X^2^');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
   await appendEditorText(rich.locator('p').first(),' Edited.');

@@ -12,7 +12,7 @@ for(const [name,tag,pattern]of definitions){
     excludes:name==='highlight'?'highlight':'subscript superscript',
     parseDOM:[{tag}],toDOM:()=>[tag,0],
     parseMarkdown:{match:node=>node.type===name,runner:(state,node,type)=>state.openMark(type).next(node.children).closeMark(type)},
-    toMarkdown:{match:mark=>mark.type.name===name,runner:(state,mark)=>state.withMark(mark,name)}
+    toMarkdown:{match:mark=>mark.type.name===name,runner:(state,mark)=>{state.withMark(mark,name);}}
   }));
   const command=$command('Toggle'+name,ctx=>()=>toggleMark(schema.type(ctx)));
   const input=$inputRule(ctx=>{

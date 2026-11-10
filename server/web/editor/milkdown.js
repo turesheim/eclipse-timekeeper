@@ -66,6 +66,14 @@ const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type=
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
+  // Inline format order does not change the text's meaning. ProseMirror keeps
+  // one mark order, while authored Markdown may nest these marks either way.
+  const formatting=new Set(['strong','emphasis','delete','highlight','subscript','superscript']);
+  if(value&&formatting.has(value.type)){
+    const marks=[value.type];let leaf=value;
+    while(leaf.children?.length===1&&formatting.has(leaf.children[0].type)){leaf=leaf.children[0];marks.push(leaf.type);}
+    if(marks.length>1&&marks.some(name=>['highlight','subscript','superscript'].includes(name)))return {type:'inlineFormatting',marks:marks.sort(),children:semantic(leaf.children)};
+  }
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).sort(([left],[right])=>left<right?-1:left>right?1:0).map(([key,entry])=>[key,semantic(entry)]));
   return typeof value==='string'?value.replace(/\r\n?/g,'\n'):value;
 };
@@ -240,7 +248,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema,strikethroughInputRule].includes(plugin))).use(history).use(inlineStyles).use(doubleStrike).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
+  }).use(dialect.guard).use(inlineStyles).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema,strikethroughInputRule].includes(plugin))).use(history).use(doubleStrike).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
