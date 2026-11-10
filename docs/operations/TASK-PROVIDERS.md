@@ -141,12 +141,46 @@ mapping and its bundled Unicode license.
 Microsoft exception definitions count toward the same calendar budget. Each
 recurring series also has a 4 MiB total response budget across its exception pages.
 
+## Check the installation in Administration
+
+Open **Administration → Internet accounts**. The page shows the active sign-in
+mode, public address, installation return address and Google redirect URI.
+**Check setup** resolves shared-service discovery and reads its configured
+Google/Microsoft registrations. Loading the page alone makes no provider request;
+the check does not start consent or read personal calendars or tasks.
+
+If the public address is missing, use **Set public HTTPS address** to open
+General settings, save the exact public origin and restart Dagsverk. Shared mode
+uses `https://SHARED_HOST/oauth/google/callback` in Google Cloud; the displayed
+installation return address is a separate handoff and is not Google's redirect.
+
+Shared-service client IDs and secrets stay in the service's private environment.
+For a self-managed Google registration, **Google application settings** lets an
+administrator edit this installation's client ID and replace or clear its
+write-only secret. Blank preserves the saved secret. Saves require the current
+administrator password and a current version, then a coordinated restart.
+Shared-service registrations remain separate from these installation settings.
+A configured registration is not proof that Google APIs, consent, refresh or reconnect work;
+perform those live checks before making the shared service public. The complete
+operator setup is in [shared sign-in operations](SHARED-SIGN-IN.md).
+
 ## Advanced: direct server registration
 
+Installation settings are stored privately with the service configuration and
+retained by protected instance backups. They are excluded from portable account
+archives. The Google secret is never returned by the Admin API. General settings
+and Internet accounts share an optimistic version, preventing either page from
+overwriting newer saved settings. Authentication recovery preserves these values.
+
 Existing self-managed registrations remain supported for task-only connections.
-Opt out of shared sign-in with `timekeeper.connect.shared=false` (or
-`TIMEKEEPER_CONNECT_SHARED=false`) before using these settings. Direct legacy
-registration does not add the new calendar API synchronizer. No provider password
+In **Administration → Internet accounts → Google application settings**, choose
+**Direct registration (tasks only)**. Register the displayed **Google redirect
+URI for direct registration** in Google Cloud, enter the client ID and secret,
+save with the current administrator password and restart every server instance.
+Use **Check setup** after restart, then connect Google under Account → Internet
+accounts with Tasks selected. The optional environment settings below initialize
+new installations; settings saved in Administration take precedence. Direct
+registration does not add the calendar API synchronizer. No provider password
 is entered into Dagsverk.
 
 Configure Dagsverk's public HTTPS origin first, including its port. For example,

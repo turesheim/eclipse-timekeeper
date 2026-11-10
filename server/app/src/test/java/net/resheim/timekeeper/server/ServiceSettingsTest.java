@@ -34,6 +34,9 @@ class ServiceSettingsTest {
     @Inject AccountStore accounts;
     @Inject ServerStore store;
     @Inject ServiceSettings settings;
+    @Inject TaskProviderConfiguration taskProviders;
+    @Inject SharedConnectConfiguration sharedConnect;
+    @Inject ContractInputs inputs;
     @Inject RecoveryOrigin origin;
     @Inject BrowserOrigins origins;
     @Inject PasskeyRealm realm;
@@ -69,7 +72,35 @@ class ServiceSettingsTest {
     }
     private Response save(Browser browser,ObjectNode input,Response previous) {return call(browser,"PUT","/admin/settings",input,previous.header("ETag"),true);}
     private Response noteLimits(Browser browser){return call(browser,"GET","/admin/notes/limits",null,null,false);}
+    @Test void internetAccountSetupIsAdministratorOnlyRedactedAndUncached()throws Exception{
+        var admin=setup();assertEquals(401,call(null,"GET","/admin/internet-accounts",null,null,false).statusCode());
+        var response=call(admin,"GET","/admin/internet-accounts",null,null,false);var data=success(response,200);
+        inputs.validate("AdministrationInternetAccounts",data);assertEquals("no-store",response.header("Cache-Control"));assertFalse(data.has("clientSecret"));
+        assertEquals("PUBLIC_ORIGIN_REQUIRED",data.path("status").asText());
+        assertEquals(422,call(admin,"GET","/admin/internet-accounts?check=invalid",null,null,false).statusCode());
+        success(call(admin,"POST","/admin/users",object().put("username","ordinary").put("password",PASSWORD).put("displayName","Ordinary").put("email","ordinary@example.org").put("administrator",false),null,true),201);
+        var ordinary=browser(call(null,"POST","/auth/login",object().put("username","ordinary").put("password",PASSWORD).put("remember",false),null,false));
+        assertEquals(403,call(ordinary,"GET","/admin/internet-accounts?check=true",null,null,false).statusCode());
+    }
     private Response noteLimits(Browser browser,Response previous,ObjectNode values){var body=object().put("currentPassword",PASSWORD);body.set("limits",values);return call(browser,"PUT","/admin/notes/limits",body,previous.header("ETag"),true);}
+    @Test void googleCredentialsAreWriteOnlyVersionedAndActivateOnlyOnRestart()throws Exception{
+        var admin=setup();String path="/admin/internet-accounts",secret="private-google-application-secret";
+        var initial=call(admin,"GET",path,null,null,false);success(initial,200);
+        var input=object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","installation-google-id").put("googleSecretAction","REPLACE").put("googleClientSecret",secret).put("currentPassword",PASSWORD);
+        assertEquals(403,call(admin,"PUT",path,input,initial.header("ETag"),false).statusCode());
+        assertEquals(428,call(admin,"PUT",path,input,null,true).statusCode());
+        assertEquals(422,call(admin,"PUT",path,input.deepCopy().put("currentPassword","wrong-password"),initial.header("ETag"),true).statusCode());
+        var written=call(admin,"PUT",path,input,initial.header("ETag"),true);var data=success(written,200);inputs.validate("AdministrationInternetAccounts",data);
+        assertEquals("no-store",written.header("Cache-Control"));assertTrue(data.path("saved").path("googleClientSecretConfigured").asBoolean());assertFalse(data.path("effective").path("googleClientSecretConfigured").asBoolean());assertTrue(data.path("restartRequired").asBoolean());
+        assertFalse(written.asString().contains(secret));assertFalse(current(admin).asString().contains("installation-google-id"));assertFalse(current(admin).asString().contains(secret));
+        var preserve=input.deepCopy();preserve.remove("googleClientSecret");preserve.put("googleSecretAction","PRESERVE").put("googleClientId","updated-google-id");
+        assertEquals(412,call(admin,"PUT",path,preserve,initial.header("ETag"),true).statusCode());
+        var kept=call(admin,"PUT",path,preserve,written.header("ETag"),true);assertTrue(success(kept,200).path("saved").path("googleClientSecretConfigured").asBoolean());
+        settings.initialize();assertFalse(sharedConnect.enabled());assertEquals("updated-google-id",ClientProxy.unwrap(taskProviders).googleId.orElseThrow());assertEquals(secret,ClientProxy.unwrap(taskProviders).googleSecret.orElseThrow());
+        var active=call(admin,"GET",path,null,null,false);assertFalse(success(active,200).path("restartRequired").asBoolean());
+        var clear=preserve.deepCopy().put("googleSecretAction","CLEAR");var cleared=call(admin,"PUT",path,clear,active.header("ETag"),true);var empty=success(cleared,200);assertFalse(empty.path("saved").path("googleClientSecretConfigured").asBoolean());assertTrue(empty.path("effective").path("googleClientSecretConfigured").asBoolean());
+        settings.initialize();assertTrue(ClientProxy.unwrap(taskProviders).googleSecret.isEmpty());assertFalse(call(admin,"GET",path,null,null,false).asString().contains(secret));
+    }
     @Test void notesQuotasAreLiveSharedDurableAndIndependentOfPendingAuthenticationSettings() throws Exception {
         var admin=setup();var defaults=noteLimits(admin);var initial=success(defaults,200);
         assertEquals(160_000_000,initial.path("limits").path("fileBytes").asInt());assertEquals(10_000_000,initial.path("limits").path("markdownBytes").asInt());assertEquals(5_000_000_000L,initial.path("limits").path("totalBytes").asLong());assertEquals(100_000,initial.path("limits").path("entries").asInt());
@@ -180,7 +211,7 @@ class ServiceSettingsTest {
     }
     @Test void restartActivatesSavedPolicyFencesStaleReplicasAndPreservesAccountsAndWork() throws Exception {
         var admin=setup();var client=success(call(admin,"POST","/clients",object().put("name","Keep private work").put("color","#176653"),null,true),201);
-        var stale=new ServiceSettings();stale.accounts=accounts;stale.origin=origin;stale.realm=realm;stale.browserOrigins=origins;stale.mail=mail;stale.initialize();assertTrue(stale.available());
+        var stale=new ServiceSettings();stale.accounts=accounts;stale.origin=origin;stale.realm=realm;stale.browserOrigins=origins;stale.mail=mail;stale.taskProviders=taskProviders;stale.sharedConnect=sharedConnect;stale.initialize();assertTrue(stale.available());
         var previous=current(admin);var saved=save(admin,input(previous).put("smtpPort",2525),previous);assertEquals(200,saved.statusCode());assertTrue(stale.available());
         settings.initialize();realm.initialize();assertFalse(stale.available());assertTrue(settings.available());
         assertEquals(401,call(admin,"GET","/auth/session",null,null,false).statusCode());
@@ -196,7 +227,7 @@ class ServiceSettingsTest {
     }
     @Test void explicitOperatorRecoveryRequiresANewerEpochAndNormalRestartNeverRestoresOldDefaults() throws Exception {
         var admin=setup();var previous=current(admin);success(save(admin,input(previous).put("smtpPort",2525),previous),200);
-        settings.initialize();realm.initialize();var recovering=new ServiceSettings();recovering.accounts=accounts;recovering.origin=origin;recovering.realm=realm;recovering.browserOrigins=origins;recovering.mail=mail;recovering.recover=true;
+        settings.initialize();realm.initialize();var recovering=new ServiceSettings();recovering.accounts=accounts;recovering.origin=origin;recovering.realm=realm;recovering.browserOrigins=origins;recovering.mail=mail;recovering.taskProviders=taskProviders;recovering.sharedConnect=sharedConnect;recovering.recover=true;
         assertThrows(IllegalStateException.class,recovering::initialize);assertTrue(settings.available());
         String old=System.getProperty("timekeeper.auth.origin-epoch");
         try {

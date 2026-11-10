@@ -89,6 +89,22 @@ Only publish a hostname controlled by the project. No discovery file containing
 a placeholder is included. Installations can optionally override discovery with
 `TIMEKEEPER_CONNECT_SERVICE_URL`; users do not need to configure this setting.
 
+## Confirm setup in Dagsverk
+
+On an installation with its public HTTPS origin saved and active, open
+**Administration → Internet accounts → Check setup**. Confirm the resolved
+service address and that Google is configured. Copy **Google authorized redirect
+URI** to the Web application's authorized redirect list in Google Cloud. It ends
+in `/oauth/google/callback`; the installation's `/web/task-provider-callback.html`
+is the return handoff, not the shared Google callback.
+
+Then open **Account → Internet accounts**, choose Google Calendars, Tasks or both,
+and connect a test user. Save calendar choices and task-list choices separately;
+review the first task import. Verify background refresh, disconnect and reconnect.
+The Admin check only reads `/v1/providers`; it does not contact Google or verify
+API enablement and consent. No service deployment or real provider acceptance is
+implied by a successful synthetic test.
+
 ## Protocol and retained data
 
 The installation creates a ten-minute request with its exact callback origin,

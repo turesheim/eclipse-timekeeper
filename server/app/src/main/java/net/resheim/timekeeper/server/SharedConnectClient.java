@@ -16,6 +16,11 @@ final class SharedConnectClient {
     private final TaskProviderHttp http;
     SharedConnectClient(URI endpoint){this(endpoint,new TaskProviderHttp(Set.of(endpoint.getHost())));}
     SharedConnectClient(URI endpoint,TaskProviderHttp http){this.endpoint=endpoint;this.http=http;}
+    JsonNode providers(){
+        var reply=http.send(HttpRequest.newBuilder(http.address(endpoint+"/v1/providers")).timeout(Duration.ofSeconds(10)).header("Accept","application/json").GET().build());
+        if(reply.path("protocol").asInt()!=1||!reply.path("google").isBoolean()||!reply.path("microsoft").isBoolean())throw new ApiFailure(503,"TASK_PROVIDER_INVALID_RESPONSE");
+        return reply;
+    }
     JsonNode begin(String provider,String callback,String state,String challenge,JsonNode services,String language){
         var input=object().put("provider",provider).put("returnUri",callback).put("state",state).put("challenge",challenge).put("language",language);input.set("services",services);
         var reply=post("/v1/requests",input);String target=reply.path("authorizationUrl").asText();

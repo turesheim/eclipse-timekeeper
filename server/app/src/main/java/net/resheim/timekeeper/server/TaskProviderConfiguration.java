@@ -11,10 +11,11 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 class TaskProviderConfiguration {
     @Inject BrowserOrigins origins;
     @Inject SharedConnectConfiguration shared;
-    @ConfigProperty(name="timekeeper.tasks.google.client-id") Optional<String> googleId;
-    @ConfigProperty(name="timekeeper.tasks.google.client-secret") Optional<String> googleSecret;
+    @ConfigProperty(name="timekeeper.tasks.google.client-id") volatile Optional<String> googleId;
+    @ConfigProperty(name="timekeeper.tasks.google.client-secret") volatile Optional<String> googleSecret;
     @ConfigProperty(name="timekeeper.tasks.microsoft.client-id") Optional<String> microsoftId;
     @ConfigProperty(name="timekeeper.tasks.microsoft.client-secret") Optional<String> microsoftSecret;
+    void configureGoogle(String id,String secret){googleId=Optional.of(id).filter(value->!value.isBlank());googleSecret=Optional.of(secret).filter(value->!value.isBlank());}
     TaskProviderOAuth.Settings settings(TaskCloudProvider.Provider provider){
         try{
             var id=provider==TaskCloudProvider.Provider.GOOGLE?googleId:microsoftId;

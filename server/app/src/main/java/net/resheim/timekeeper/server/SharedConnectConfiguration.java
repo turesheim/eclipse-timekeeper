@@ -21,6 +21,8 @@ class SharedConnectConfiguration {
     private Instant expires=Instant.EPOCH;
     private Instant failedUntil=Instant.EPOCH;
     boolean enabled(){return enabled;}
+    Optional<URI> configuredEndpoint(){return configured.map(SharedConnectConfiguration::validate);}
+    synchronized void configure(boolean shared,String address){enabled=shared;configured=Optional.ofNullable(address);cached=null;expires=Instant.EPOCH;failedUntil=Instant.EPOCH;}
     String callback(){return origins.currentOrigin()+"/web/task-provider-callback.html";}
     synchronized URI endpoint(){
         if(configured.isPresent())return validate(configured.get());

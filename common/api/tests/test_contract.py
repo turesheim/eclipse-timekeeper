@@ -22,6 +22,26 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_internet_account_setup_redacts_credentials_and_guards_secret_updates(self):
+        value={'mode':'SHARED','status':'NOT_CHECKED','publicOrigin':'https://dagsverk.example.test',
+               'callbackUrl':'https://dagsverk.example.test/web/task-provider-callback.html',
+               'serviceUrl':None,'discoveryUrl':'https://turesheim.github.io/eclipse-timekeeper/connect/service.json',
+               'googleRedirectUrl':None,'googleConfigured':None,'microsoftConfigured':None,
+               'version':0,'effectiveVersion':0,'restartRequired':False,'canEdit':True,
+               'saved':{'mode':'SHARED','serviceUrl':None,'googleClientId':'','googleClientSecretConfigured':False},
+               'effective':{'mode':'SHARED','serviceUrl':None,'googleClientId':'','googleClientSecretConfigured':False}}
+        validator('AdministrationInternetAccounts').validate(value)
+        for secret in ['clientId','clientSecret','accessToken','refreshToken','grantCredential']:
+            self.assertFalse(validator('AdministrationInternetAccounts').is_valid({**value,secret:'private'}))
+        operation=CONTRACT['paths']['/admin/internet-accounts']['get']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertEqual('no-store',operation['responses']['200']['headers']['Cache-Control']['schema']['const'])
+        self.assertEqual({'get','put'},set(CONTRACT['paths']['/admin/internet-accounts']))
+        command={'mode':'DIRECT','serviceUrl':None,'googleClientId':'public-id','googleSecretAction':'REPLACE','googleClientSecret':'private','currentPassword':'proof'}
+        validator('AdministrationInternetAccountsInput').validate(command)
+        self.assertFalse(validator('AdministrationInternetAccountsInput').is_valid({k:v for k,v in command.items() if k!='googleClientSecret'}))
+        self.assertFalse(validator('AdministrationInternetAccountsInput').is_valid({**command,'googleSecretAction':'PRESERVE'}))
+
     def test_internet_account_services_and_calendar_choices_have_separate_owned_commands(self):
         for tasks,calendars in [(True,False),(False,True),(True,True)]:
             validator('TaskProviderAuthorizeInput').validate({'services':{'tasks':tasks,'calendars':calendars},'direction':'IMPORT'})
@@ -860,7 +880,7 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
-            'getAdministrationSettings', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
+            'getAdministrationSettings', 'getAdministrationInternetAccounts', 'updateAdministrationInternetAccounts', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}

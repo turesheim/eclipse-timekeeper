@@ -17,6 +17,7 @@ public class AdministrationResource {
     @Inject BrowserOrigins origins;
     @Inject RecoveryMail recoveryMail;
     @Inject ServiceSettings settings;
+    @Inject InternetAccountSetup internetAccounts;
     @Inject NotesLimitSettings notesLimits;
     @Inject InstanceAdministrator administrators;
     @ConfigProperty(name="quarkus.datasource.db-kind",defaultValue="h2") String databaseType;
@@ -37,6 +38,19 @@ public class AdministrationResource {
     private Response settingsReply(ServiceSettings.Reply reply) {
         reply.data().put("databaseType",databaseType);
         return Response.ok(reply.data()).header("ETag",reply.etag()).header("Cache-Control","no-store").build();
+    }
+    @GET @Path("/internet-accounts") public Response internetAccounts(@QueryParam("check") @DefaultValue("false") String check){
+        ContractInputs.queries(uri.getQueryParameters(),"check");var reply=settings.internetSettings(identity.principal());
+        if(!java.util.Set.of("true","false").contains(check))throw ApiFailure.validation();
+        return internetAccountsReply(reply,check.equals("true"));
+    }
+    @PUT @Path("/internet-accounts") public Response internetAccounts(@HeaderParam("If-Match")String match,JsonNode body){
+        origin();ContractInputs.queries(uri.getQueryParameters());var input=inputs.validate("AdministrationInternetAccountsInput",body);
+        try{return internetAccountsReply(settings.saveInternet(administrators.verify(identity.principal(),input.path("currentPassword").asText()),match,input),false);}
+        finally{((com.fasterxml.jackson.databind.node.ObjectNode)input).remove(java.util.List.of("currentPassword","googleClientSecret"));}
+    }
+    private Response internetAccountsReply(ServiceSettings.Reply reply,boolean check){
+        reply.data().setAll(internetAccounts.inspect(check));return Response.ok(reply.data()).header("ETag",reply.etag()).header("Cache-Control","no-store").build();
     }
     @GET @Path("/notes/limits") public Response notesLimits(){
         ContractInputs.queries(uri.getQueryParameters());return notesLimitsReply(notesLimits.get(identity.principal()));

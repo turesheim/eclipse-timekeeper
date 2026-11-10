@@ -215,6 +215,18 @@ Providers may expose only the flags, leaving participant details empty.
 `PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
 list updates preserve it. Portable JSON/CSV and account archives retain it.
 
+Administrator-only `GET /admin/internet-accounts` returns redacted installation
+setup and callback URLs. It does not contact a provider by default. With
+`?check=true`, it resolves the operator-controlled shared service and reads
+`/v1/providers` to report configured registrations. The response is `no-store`
+and never includes client secrets, account grants or tokens. The administrator
+can inspect the installation client ID and saved/effective sign-in settings.
+`PUT` requires a browser administrator session, CSRF, `If-Match` and the current
+administrator password. Secret updates explicitly preserve, replace or clear
+the private value; changes activate only after a coordinated restart. Shared
+service registrations remain independent. A configured registration does not
+establish successful live provider consent.
+
 Internet account sign-in and synchronization use `/task-providers`, separate from portable connection
 metadata. `GET` returns configured-provider availability and owned status with
 discovered/selected lists. `POST /task-providers/{provider}/authorize` starts a

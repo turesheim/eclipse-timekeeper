@@ -21586,6 +21586,172 @@
           }
         }
       }
+    },
+    "/admin/internet-accounts": {
+      "get": {
+        "operationId": "getAdministrationInternetAccounts",
+        "summary": "Inspect Internet account setup and optionally check the shared sign-in service",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrationInternetAccounts"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque version required by If-Match on saves."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "check",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator-only redacted setup. The default reads local configuration without contacting a provider. check=true resolves the operator-controlled shared service and checks its provider registrations without starting consent or reading account data."
+      },
+      "put": {
+        "operationId": "updateAdministrationInternetAccounts",
+        "summary": "Save installation Google credentials and sign-in settings for coordinated restart",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrationInternetAccounts"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque version required by If-Match on saves."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Requires a browser administrator session, CSRF, If-Match and current administrator password. Google client secret is write-only with explicit preserve, replace and clear actions; shared-service registrations remain managed centrally.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdministrationInternetAccountsInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -38932,6 +39098,209 @@
           "calendarMappings"
         ],
         "additionalProperties": false
+      },
+      "AdministrationInternetAccounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "status",
+          "publicOrigin",
+          "callbackUrl",
+          "serviceUrl",
+          "discoveryUrl",
+          "googleRedirectUrl",
+          "googleConfigured",
+          "microsoftConfigured",
+          "version",
+          "effectiveVersion",
+          "restartRequired",
+          "canEdit",
+          "saved",
+          "effective"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "SHARED",
+              "DIRECT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_CHECKED",
+              "READY",
+              "PUBLIC_ORIGIN_REQUIRED",
+              "UNAVAILABLE"
+            ]
+          },
+          "publicOrigin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "callbackUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serviceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "discoveryUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "googleRedirectUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "googleConfigured": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "microsoftConfigured": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "effectiveVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "saved": {
+            "$ref": "#/components/schemas/AdministrationInternetAccountSettings"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/AdministrationInternetAccountSettings"
+          }
+        }
+      },
+      "AdministrationInternetAccountSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "serviceUrl",
+          "googleClientId",
+          "googleClientSecretConfigured"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "SHARED",
+              "DIRECT"
+            ]
+          },
+          "serviceUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "googleClientId": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "googleClientSecretConfigured": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdministrationInternetAccountsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "serviceUrl",
+          "googleClientId",
+          "googleSecretAction",
+          "currentPassword"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "SHARED",
+              "DIRECT"
+            ]
+          },
+          "serviceUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "googleClientId": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "googleSecretAction": {
+            "type": "string",
+            "enum": [
+              "PRESERVE",
+              "REPLACE",
+              "CLEAR"
+            ]
+          },
+          "googleClientSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "googleSecretAction": {
+                  "const": "REPLACE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "googleClientSecret"
+              ]
+            },
+            "else": {
+              "properties": {
+                "googleClientSecret": false
+              }
+            }
+          }
+        ]
       }
     },
     "parameters": {
