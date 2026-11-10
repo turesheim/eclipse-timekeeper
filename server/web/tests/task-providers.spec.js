@@ -71,7 +71,7 @@ function writeJob(overrides={}){
 }
 async function open(page){await page.goto('/web/#account/task-providers');await expect(page.locator('#account-content [data-task-provider-connect="google"]')).toBeVisible();}
 const card=(page,id)=>page.locator(`[data-task-provider-id="${id}"]`);
-test.afterEach(async({request})=>{await locale(request,'en-GB');});
+test.afterEach(async({page,request})=>{await page.unrouteAll({behavior:'wait'});await locale(request,'en-GB');});
 
 test('provider setup availability and read-only sessions do not acquire write controls',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],providers:{google:true,microsoft:false}});await open(page);
