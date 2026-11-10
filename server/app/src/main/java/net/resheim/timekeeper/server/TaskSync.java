@@ -99,7 +99,7 @@ final class TaskSync {
                     optionalText(accepted.get("url")),Set.of(ref),planning,checklist(accepted.get("checklistItems")),timing(accepted),
                     importance(accepted),JsonValues.body(accepted),accepted.path("siblingOrder").asInt(0),Set.of(),
                     recurrence(accepted.get("recurrence")),reminders(reminderArray(accepted.get(REMINDERS))),metadata(accepted.get(METADATA))));
-            var value=snapshot(store.owner(),created);
+            var value=store.taskSnapshot(created);
             return ApiReplies.resource(201,value,"/api/v1/tasks/"+value.path("id").asText());
         });
     }
@@ -153,7 +153,7 @@ final class TaskSync {
             reference.set("baseline",snapshot);candidate.put("version",current.path("version").asLong()+1);
             var updated=(Task)decode("TASK",candidate);
             store.save("TASK",updated);store.change("TASK","UPDATED",uuid(current.get("id")).toString());
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,store.taskSnapshot(updated),null);
         });
     }
     /** Keep resources absent from this source's previous and current observations; never put them in its baseline. */

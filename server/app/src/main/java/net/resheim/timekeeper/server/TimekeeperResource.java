@@ -107,7 +107,7 @@ public class TimekeeperResource {
                     throw ApiFailure.conflict();
                 }
                 store.save(type,candidate);store.change(type,"CREATED",candidate.id().toString());
-                return ApiReplies.resource(201,snapshot(store.owner(),candidate),"/api/v1/task-connections/"+candidate.id());
+                return ApiReplies.resource(201,resourceSnapshot(candidate),"/api/v1/task-connections/"+candidate.id());
             }
             if(type.equals("TASK_LIST")) {
                 var candidate=taskList(input,UUID.randomUUID(),0);
@@ -121,7 +121,7 @@ public class TimekeeperResource {
                     throw ApiFailure.conflict();
                 }
                 store.save(type,candidate);store.change(type,"CREATED",candidate.id().toString());
-                return ApiReplies.resource(201,snapshot(store.owner(),candidate),"/api/v1/task-lists/"+candidate.id());
+                return ApiReplies.resource(201,resourceSnapshot(candidate),"/api/v1/task-lists/"+candidate.id());
             }
             if(type.equals("TASK_SECTION")) {
                 var candidate=taskListSection(input,UUID.randomUUID(),0);required("TASK_LIST",candidate.taskListId());
@@ -133,7 +133,7 @@ public class TimekeeperResource {
                     throw ApiFailure.conflict();
                 }
                 store.save(type,candidate);store.change(type,"CREATED",candidate.id().toString());
-                return ApiReplies.resource(201,snapshot(store.owner(),candidate),"/api/v1/task-list-sections/"+candidate.id());
+                return ApiReplies.resource(201,resourceSnapshot(candidate),"/api/v1/task-list-sections/"+candidate.id());
             }
             if(type.equals("TASK_SYNC_CURSOR")) {
                 var candidate=taskSyncCursor(input,UUID.randomUUID(),0);validateCursorParent(candidate);
@@ -146,7 +146,7 @@ public class TimekeeperResource {
                     throw ApiFailure.conflict();
                 }
                 store.save(type,candidate);store.change(type,"CREATED",candidate.id().toString());
-                return ApiReplies.resource(201,snapshot(store.owner(),candidate),"/api/v1/task-sync-cursors/"+candidate.id());
+                return ApiReplies.resource(201,resourceSnapshot(candidate),"/api/v1/task-sync-cursors/"+candidate.id());
             }
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
@@ -164,7 +164,7 @@ public class TimekeeperResource {
         return tx(() -> {var before=required("TASK_CONNECTION",key);ApiReplies.match(before,match);
             var current=(TaskConnection)decode("TASK_CONNECTION",before);
             var updated=current.withCapabilities(capabilities(input));store.save("TASK_CONNECTION",updated);store.change("TASK_CONNECTION","UPDATED",key.toString());
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/task-lists/{id}/sharing") public Response updateTaskListSharing(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -172,7 +172,7 @@ public class TimekeeperResource {
         return tx(() -> {var before=required("TASK_LIST",key);ApiReplies.match(before,match);
             var updated=((TaskList)decode("TASK_LIST",before)).withSharing(sharing(input));
             store.save("TASK_LIST",updated);store.change("TASK_LIST","UPDATED",key.toString());
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/task-lists/{id}/provider-data") public Response updateTaskListProviderData(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -192,31 +192,31 @@ public class TimekeeperResource {
             Object updated=type.equals("TASK_LIST")?((TaskList)decode(type,before)).withProviderData(data)
                     :((TaskListSection)decode(type,before)).withProviderData(data);
             store.save(type,updated);store.change(type,"UPDATED",key.toString());
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/planning") public Response planTask(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskPlanningInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskPlanning(new UpdateTaskPlanning(new TaskId(key),version,planning(input)))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskPlanning(new UpdateTaskPlanning(new TaskId(key),version,planning(input)))),null);
         });
     }
     @PUT @Path("/tasks/{id}/checklist") public Response updateTaskChecklist(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskChecklistInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskChecklist(new UpdateTaskChecklist(new TaskId(key),version,checklist(input.get("items"))))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskChecklist(new UpdateTaskChecklist(new TaskId(key),version,checklist(input.get("items"))))),null);
         });
     }
     @PUT @Path("/tasks/{id}/timing") public Response updateTaskTiming(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskTimingInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskTiming(new UpdateTaskTiming(new TaskId(key),version,timing(input)))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskTiming(new UpdateTaskTiming(new TaskId(key),version,timing(input)))),null);
         });
     }
     @PUT @Path("/tasks/{id}/importance") public Response updateTaskImportance(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskImportanceInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskImportance(new UpdateTaskImportance(new TaskId(key),version,importance(input)))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskImportance(new UpdateTaskImportance(new TaskId(key),version,importance(input)))),null);
         });
     }
     @PUT @Path("/tasks/{id}/body") public Response updateTaskBody(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -224,37 +224,37 @@ public class TimekeeperResource {
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
             var updated=store.service().updateTaskBody(new UpdateTaskBody(new TaskId(key),version,
                     new TaskBody(TaskBodyFormat.valueOf(input.get("format").asText()),input.get("content").asText())));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/recurrence") public Response updateTaskRecurrence(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskRecurrence",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskRecurrence(new UpdateTaskRecurrence(new TaskId(key),version,recurrence(input)))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskRecurrence(new UpdateTaskRecurrence(new TaskId(key),version,recurrence(input)))),null);
         });
     }
     @PUT @Path("/tasks/{id}/occurrences") public Response updateTaskOccurrences(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskOccurrencesInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskOccurrences(new UpdateTaskOccurrences(new TaskId(key),version,occurrences(input.get("occurrences"))))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskOccurrences(new UpdateTaskOccurrences(new TaskId(key),version,occurrences(input.get("occurrences"))))),null);
         });
     }
     @PUT @Path("/tasks/{id}/reminders") public Response updateTaskReminders(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskRemindersInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskReminders(new UpdateTaskReminders(new TaskId(key),version,reminders(input.get("reminders"))))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskReminders(new UpdateTaskReminders(new TaskId(key),version,reminders(input.get("reminders"))))),null);
         });
     }
     @PUT @Path("/tasks/{id}/metadata") public Response updateTaskMetadata(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskMetadata",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskMetadata(new UpdateTaskMetadata(new TaskId(key),version,metadata(input)))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskMetadata(new UpdateTaskMetadata(new TaskId(key),version,metadata(input)))),null);
         });
     }
     @PUT @Path("/tasks/{id}/order") public Response updateTaskOrder(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskOrderInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskOrder(new UpdateTaskOrder(new TaskId(key),version,input.get("siblingOrder").asInt()))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().updateTaskOrder(new UpdateTaskOrder(new TaskId(key),version,input.get("siblingOrder").asInt()))),null);
         });
     }
     @PUT @Path("/{collection}/{id}") public Response update(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("X-Timekeeper-Undo") String undo,JsonNode body) {
@@ -266,26 +266,26 @@ public class TimekeeperResource {
             if(type.equals("TASK_CONNECTION")) {
                 var old=(TaskConnection)decode(type,before);
                 var updated=old.update(input.get("name").asText(),input.get("readable").asBoolean(),input.get("writable").asBoolean(),input.get("enabled").asBoolean());
-                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,resourceSnapshot(updated),null);
             }
             if(type.equals("TASK_LIST")) {
                 var old=(TaskList)decode(type,before);
                 var updated=old.update(input.get("name").asText(),TaskListKind.valueOf(input.get("kind").asText()),input.get("readable").asBoolean(),
                         input.get("writable").asBoolean(),input.get("shared").asBoolean(),input.get("owner").asBoolean(),
                         input.get("present").asBoolean(),input.get("position").asInt());
-                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,resourceSnapshot(updated),null);
             }
             if(type.equals("TASK_SECTION")) {
                 var old=(TaskListSection)decode(type,before);
                 var updated=old.update(input.get("name").asText(),TaskListSectionKind.valueOf(input.get("kind").asText()),
                         input.get("position").asInt(),input.get("present").asBoolean(),input.get("writable").asBoolean());
-                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,resourceSnapshot(updated),null);
             }
             if(type.equals("TASK_SYNC_CURSOR")) {
                 var old=(TaskSyncCursor)decode(type,before);
                 var updated=old.update(TaskSyncMode.valueOf(input.get("mode").asText()),optionalText(input.get("cursor")),
                         optionalText(input.get("lastObservedAt")).map(Instant::parse),optionalText(input.get("lastCompleteAt")).map(Instant::parse));
-                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,resourceSnapshot(updated),null);
             }
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.updateProject(new UpdateProject(new ProjectId(key),version,input.get("name").asText()));
@@ -318,18 +318,19 @@ public class TimekeeperResource {
             }return reversible ? new WorkSessionUndo(store).offer(before,null,empty()):empty();
         });
     }
+    private ObjectNode resourceSnapshot(Object value){return value instanceof Task task?store.taskSnapshot(task):snapshot(store.owner(),value);}
     private JsonNode stored(String type,Object value,JsonNode input) {
         if(type.equals("TASK")) {
             var task=(Task)value;
             if(input.has("priority")&&!task.importance().priority().name().equals(input.path("priority").asText()))
                 task=store.service().updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),new TaskImportance(TaskPriority.valueOf(input.path("priority").asText()),task.importance().flagged(),task.importance().urgent())));
             if(input.has("due")) {
-                var proposed=object();proposed.set("due",input.get("due"));proposed.set("start",snapshot(store.owner(),task).get("start"));var next=timing(proposed);
+                var proposed=object();proposed.set("due",input.get("due"));proposed.set("start",resourceSnapshot(task).get("start"));var next=timing(proposed);
                 if(!task.timing().equals(next))task=store.service().updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),next));
             }
             return store.clientDetails(type,task.id().value(),input);
         }
-        var node=snapshot(store.owner(),value);
+        var node=resourceSnapshot(value);
         return Set.of("PROJECT","WORK_SESSION").contains(type) ? store.clientDetails(type,uuid(node.get("id")),input) : node;
     }
     @GET @Path("/tasks/{id}/note") public Response taskNote(@PathParam("id") String id) {
@@ -339,7 +340,7 @@ public class TimekeeperResource {
     private JsonNode sessionSnapshot(WorkSession value) {return required("WORK_SESSION",value.id().value());}
     @GET @Path("/tasks/by-external-reference") public Response external() {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var query=uri.getQueryParameters();
-        var ref=referenceQuery(query);return tx(() -> ApiReplies.resource(200,snapshot(store.owner(),store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
+        var ref=referenceQuery(query);return tx(() -> ApiReplies.resource(200,resourceSnapshot(store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
     }
     @GET @Path("/task-tombstones/by-external-reference") public Response deletedExternal() {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");
@@ -362,7 +363,7 @@ public class TimekeeperResource {
     }
     @PUT @Path("/tasks/{id}/external-references") public Response link(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReference",body);ContractInputs.queries(uri.getQueryParameters());
-        return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,checkedReference(reference(input))))),null); });
+        return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,resourceSnapshot(store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,checkedReference(reference(input))))),null); });
     }
     @PUT @Path("/tasks/{id}/external-references/location") public Response updateExternalTaskLocation(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskLocationInput",body);ContractInputs.queries(uri.getQueryParameters());
@@ -373,7 +374,7 @@ public class TimekeeperResource {
             var sectionId=optionalText(input.get("sectionId")).map(UUID::fromString);
             checkedLocation(reference.providerId(),listId,sectionId);
             var updated=store.service().updateExternalTaskLocation(new UpdateExternalTaskLocation(new TaskId(key),version,reference,listId,sectionId));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/external-references/assignment") public Response updateExternalTaskAssignment(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -383,7 +384,7 @@ public class TimekeeperResource {
             var reference=alias(input);
             var assignment=Optional.ofNullable(input.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
             var updated=store.service().updateExternalTaskAssignment(new UpdateExternalTaskAssignment(new TaskId(key),version,reference,assignment));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/external-references/replace") public Response replaceExternalReference(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -391,7 +392,7 @@ public class TimekeeperResource {
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
             var current=checkedReference(reference(input.get("current")));
             var updated=store.service().replaceExternalReference(new ReplaceExternalReference(new TaskId(key),version,alias(input.get("previous")),current));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/external-references/source") public Response updateExternalTaskSource(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -399,7 +400,7 @@ public class TimekeeperResource {
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
             var reference=new ExternalTaskReferenceKey(input.get("providerId").asText(),input.get("repositoryId").asText(),input.get("externalId").asText());
             var updated=store.service().updateExternalTaskSource(new UpdateExternalTaskSource(new TaskId(key),version,reference,source(input.get("source"))));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/external-references/sync-state") public Response updateExternalTaskSyncState(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -408,7 +409,7 @@ public class TimekeeperResource {
             var reference=new ExternalTaskReferenceKey(input.get("providerId").asText(),input.get("repositoryId").asText(),input.get("externalId").asText());
             var baseline=Optional.ofNullable(input.get("baseline")).filter(value -> !value.isNull()).map(JsonValues::baseline);
             var updated=store.service().updateExternalTaskSyncState(new UpdateExternalTaskSyncState(new TaskId(key),version,reference,source(input.get("source")),baseline));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/external-references/provider-data") public Response updateExternalTaskProviderData(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -418,12 +419,12 @@ public class TimekeeperResource {
             var data=Optional.ofNullable(input.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData)
                     .map(value -> checkedProviderData(reference.providerId(),value));
             var updated=store.service().updateExternalTaskProviderData(new UpdateExternalTaskProviderData(new TaskId(key),version,reference,data));
-            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            return ApiReplies.resource(200,resourceSnapshot(updated),null);
         });
     }
     @DELETE @Path("/tasks/{id}/external-references") public Response unlink(@PathParam("id") String id,@HeaderParam("If-Match") String match) {
         UUID key=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var reference=referenceQuery(uri.getQueryParameters());
-        return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().unlinkExternalReference(new UnlinkExternalReference(new TaskId(key),version,reference))),null); });
+        return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,resourceSnapshot(store.service().unlinkExternalReference(new UnlinkExternalReference(new TaskId(key),version,reference))),null); });
     }
     @GET @Path("/activities/active") public Response active() {
         ContractInputs.queries(uri.getQueryParameters());return tx(() -> store.active().map(value -> ApiReplies.resource(200,value,null)).orElseGet(TimekeeperResource::empty));
@@ -439,7 +440,7 @@ public class TimekeeperResource {
             if(task!=null && active.isPresent() && active.get().get("taskId").asText().equals(task.toString())) return ApiReplies.resource(200,active.get(),null);
             var service=store.service();if(active.isPresent()) service.stopActivity(new StopActivity(new ActivityId(uuid(active.get().get("id"))),active.get().get("version").asLong()));
             var created=service.startActivity(new StartActivity(task==null ? null : new TaskId(task),new OwnerId(store.owner()),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
-            return ApiReplies.resource(201,snapshot(store.owner(),created),"/api/v1/activities/"+created.id().value());
+            return ApiReplies.resource(201,resourceSnapshot(created),"/api/v1/activities/"+created.id().value());
         }));
     }
     @POST @Path("/activities/{id}/stop") public Response stop(@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("Idempotency-Key") String key) {
@@ -447,7 +448,7 @@ public class TimekeeperResource {
         return tx(() -> receipts.execute(key,"POST","/activities/"+activity+"/stop",match,null,() -> {
             JsonNode current=required("ACTIVITY",activity);long version=ApiReplies.match(current,match);
             if(!current.get("end").isNull()) return ApiReplies.resource(200,current,null);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.service().stopActivity(new StopActivity(new ActivityId(activity),version))),null);
+            return ApiReplies.resource(200,resourceSnapshot(store.service().stopActivity(new StopActivity(new ActivityId(activity),version))),null);
         }));
     }
     @GET @Path("/work-sessions/active") public Response activeWorkSession() {
@@ -474,7 +475,7 @@ public class TimekeeperResource {
             long version=ApiReplies.match(required("ACTIVITY",activity),match);
             var result=store.workSessionService().associateWorkSession(new AssociateWorkSession(new ActivityId(activity),version,
                     optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new)));
-            var value=snapshot(store.owner(),result.activity());var response=object();response.set("activity",value);response.put("outsideSession",result.outsideSession());
+            var value=resourceSnapshot(result.activity());var response=object();response.set("activity",value);response.put("outsideSession",result.outsideSession());
             return new ApiReplies(200,response,etag(value),null);
         });
     }
@@ -482,7 +483,7 @@ public class TimekeeperResource {
         var session=new WorkSessionId(ContractInputs.pathId(id));ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {
             var report=store.workSessionService().workSessionReport(session);var response=object();response.set("session",sessionSnapshot(report.session()));
-            var activities=response.putArray("activities");report.activities().forEach(value -> activities.add(snapshot(store.owner(),value)));
+            var activities=response.putArray("activities");report.activities().forEach(value -> activities.add(resourceSnapshot(value)));
             var time=response.putObject("time");time.put("duration",report.time().duration().toString());time.put("trackedActivityTime",report.time().trackedActivityTime().toString());
             time.put("allocatedTime",report.time().allocatedTime().toString());time.put("unallocatedTime",report.time().unallocatedTime().toString());
             var outside=time.putArray("outsideSession");report.time().outsideSession().stream().map(ActivityId::value).sorted().forEach(value -> outside.add(value.toString()));
@@ -516,7 +517,7 @@ public class TimekeeperResource {
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
         return tx(() -> {
             validateFilters(query);List<JsonNode> values;
-            if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)snapshot(store.owner(),value)).toList();
+            if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)resourceSnapshot(value)).toList();
             else values=store.list(type).stream().filter(value -> {
                 if(type.equals("TASK_TOMBSTONE")) return true;
                 if(!value.path(Set.of("WORK_SESSION","TASK").contains(type) ? "summary" : type.equals("TASK_SYNC_CURSOR") ? "mode" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;

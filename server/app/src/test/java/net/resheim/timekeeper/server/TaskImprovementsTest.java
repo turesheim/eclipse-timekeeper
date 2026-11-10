@@ -28,10 +28,10 @@ class TaskImprovementsTest {
             var entry=vault().put(new VaultPath("Assignments.md"),null,true,bytes(source));var tasks=store.list("TASK");assertEquals(4,tasks.size());
             var direct=tasks.stream().filter(task->task.path("summary").asText().startsWith("Direct")).findFirst().orElseThrow();assertEquals(client.get("id"),direct.get("clientId"));assertTrue(direct.path("projectId").isNull());
             var assigned=tasks.stream().filter(task->task.path("summary").asText().startsWith("Project")).findFirst().orElseThrow();assertEquals(project.id().value().toString(),assigned.path("projectId").asText());
-            assertTrue(tasks.stream().filter(task->!task.equals(direct)&&!task.equals(assigned)).allMatch(task->task.path("clientId").isNull()&&task.path("projectId").isNull()));assertArrayEquals(bytes(source),vault().read(entry));
+            assertTrue(tasks.stream().filter(task->!task.equals(direct)&&!task.equals(assigned)).allMatch(task->!task.hasNonNull("clientId")&&task.path("projectId").isNull()));assertArrayEquals(bytes(source),vault().read(entry));
             entry=vault().move(entry,new VaultPath("Renamed.md"),vault().tag(entry));assertEquals("Renamed.md",new NoteTasks(store).origin(uuid(direct.get("id"))).path("path").asText());return null;
         });
-        store.transaction("assignment-foreign",()->{vault().put(new VaultPath("Foreign.md"),null,true,bytes("- [ ] Private @Client_With_Spaces\n"));assertTrue(store.list("TASK").getFirst().path("clientId").isNull());return null;});
+        store.transaction("assignment-foreign",()->{vault().put(new VaultPath("Foreign.md"),null,true,bytes("- [ ] Private @Client_With_Spaces\n"));assertTrue(!store.list("TASK").getFirst().hasNonNull("clientId"));return null;});
     }
     @Test void ambiguousNamesStayUnassignedAndExplicitKindsDisambiguate(){
         store.transaction("assignment-ambiguous",()->{
@@ -81,6 +81,8 @@ class TaskImprovementsTest {
         var foreign=call("test-b","POST","/clients",object().put("name","Foreign").put("color","#654321"),null);edit.put("clientId",foreign.jsonPath().getString("id"));assertEquals(404,call("test-a","PUT",path,edit,updated.header("ETag")).statusCode());
         assertEquals(updated.asString(),call("test-a","GET",path,null,null).asString());
         edit.remove(List.of("clientId","priority","due"));var legacy=call("test-a","PUT",path,edit,updated.header("ETag"));assertEquals(200,legacy.statusCode());actual=parse(legacy.asString());assertEquals(clientId,actual.path("clientId").asText());assertEquals("LOW",actual.path("priority").asText());assertEquals("DATE_TIME",actual.path("due").path("kind").asText());
+        var importance=call("test-a","PUT",path+"/importance",object().put("priority","HIGH").put("flagged",true).put("urgent",true),legacy.header("ETag"));assertEquals(200,importance.statusCode());assertEquals(clientId,importance.jsonPath().getString("clientId"));
+        var planning=call("test-a","PUT",path+"/planning",object().put("status","COMPLETED").putNull("scheduledDate").put("completedAt","2026-11-10T12:00:00Z"),importance.header("ETag"));assertEquals(200,planning.statusCode(),planning.asString());assertEquals(clientId,planning.jsonPath().getString("clientId"));assertEquals(planning.header("ETag"),call("test-a","GET",path,null,null).header("ETag"));
     }
     @Test void portableTransfersRemapDirectClientsWithoutInventingAProject(){
         var exported=store.transaction("portable-clients",()->{

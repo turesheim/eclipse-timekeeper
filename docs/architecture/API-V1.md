@@ -106,6 +106,8 @@ metadata lives in the server adapter, like project and work-session clients.
 Legacy writes that omit `clientId` retain the direct assignment. Supplying null
 clears it. A supplied client must agree with the selected project. Portable JSON,
 CSV and account archives retain direct clients and remap their IDs on import.
+Task section and provider responses retain this metadata and return the same
+canonical task validators as ordinary reads, so their ETags can be reused.
 Subtasks have the same project as their parent, including when both are unassigned.
 Self-parenting, cycles, and moving a task with children to another project
 are conflicts (409). Deleting a project containing tasks, a task with children
