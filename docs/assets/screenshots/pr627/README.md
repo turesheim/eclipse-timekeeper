@@ -1,7 +1,7 @@
 # PR #627 review captures
 
-Captured in Chromium against candidate `1a00ae7b5ead922b4f343bfb435a0c060e65947e`.
-Distribution SHA-256: `3e71c7ccfcce6bfbb81faf57f545dbb7b1379be6c498cb0479edabe0d485f071`.
+Captured in Chromium against candidate `e9471f03707854d4e14ea869ec7d432035150be8`.
+Distribution SHA-256: `a822e670079ddc4b8aca1c9fab5117fb61c8fb0fb4a730b1ac562a1b168a4a5e`.
 All records are synthetic acceptance fixtures. This branch contains review
 artifacts; the implementation remains in PR #627's source branch.
 
