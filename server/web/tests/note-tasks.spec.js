@@ -88,9 +88,10 @@ test('search popups and maximized event notes synchronize their ordinary checkli
   const workspace=page.locator('#calendar-search-workspace-editor');await expect(workspace.getByRole('checkbox',{name:'Task: Event workspace follow up',exact:true})).toBeChecked();
   const linked=(await tasks(api)).find(value=>value.summary==='Event workspace follow up');expect(linked).toMatchObject({status:'COMPLETED'});expect(await tasks(api)).toHaveLength(2);
   await captureScreenshot(page,{path:'test-results/note-task-event-workspace.png'});
-  await complete(api,linked.id,false);expect((await(await api('GET',path)).json()).body).toBe('- [ ] Event workspace follow up\n');
+  const saved=(await(await api('GET',path)).json()).body;expect(saved).toContain('[x] Event workspace follow up');
+  await complete(api,linked.id,false);expect((await(await api('GET',path)).json()).body).toBe(saved.replace('[x]','[ ]'));
   await page.locator('[data-tab=today]').click();panel=await indexed(page,'event:"Event workspace follow up"');await panel.locator('[data-search-note]').click();
-  await expect(popup.getByRole('checkbox',{name:'Task: Event workspace follow up',exact:true})).not.toBeChecked();await popup.getByRole('button',{name:'Close',exact:true}).click();await panel.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(popup).toBeVisible();await expect(popup.getByRole('checkbox',{name:'Task: Event workspace follow up',exact:true})).not.toBeChecked();await popup.getByRole('button',{name:'Close',exact:true}).click();await panel.getByRole('button',{name:'Close',exact:true}).click();
   await page.locator('[data-tab=tasks]').click();await expect(page.locator('#tasks-list').getByRole('button',{name:'Open task Event workspace follow up',exact:true})).toBeVisible();
   expect((await tasks(api)).map(value=>value.id).sort()).toEqual([ordinary.id,linked.id].sort());await captureScreenshot(page,{path:'test-results/note-task-search-tasks.png'});
 });
