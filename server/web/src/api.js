@@ -38,6 +38,7 @@ const messages = {
   TASK_PROVIDER_CHANGED:'task_providers.unavailable',
   TASK_PROVIDER_INVALID_ADDRESS:'task_providers.unavailable',
   TASK_PROVIDER_INVALID_REQUEST:'task_providers.unavailable',
+  NOTES_SEARCH_INDEXING:'notes.search_unavailable',
   VAULT_CONFIG_DISABLED:'notes.error_config_disabled',
   VAULT_CONFIG_PRESENT:'notes.error_config_present',
   VAULT_SPECIAL_FOLDER:'notes.error_special_folder',

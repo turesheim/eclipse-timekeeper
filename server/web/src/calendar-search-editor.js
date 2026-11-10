@@ -15,7 +15,7 @@ export class CalendarSearchEditor extends JournalNoteEditor {
   }
   async openHit(hit,session,writable,zone,origin={}){
     if(this.opened)return;
-    const event=hit.calendarEvent;this.details.replaceChildren();
+    const event=hit.calendarEvent;this.preparing=false;this.details.replaceChildren();
     this.details.append(node('p',event.clientName+' · '+event.calendarName,'hint'));
     if(event.seriesDefinition)this.details.append(node('p',t('notes.search_event_series'),'hint'));
     else if(event.start&&event.end)this.details.append(node('p',calendarItemWhen(event,zone)));
@@ -26,10 +26,17 @@ export class CalendarSearchEditor extends JournalNoteEditor {
     await super.open({...origin,hit,entry:hit.entry,detailsOnly:!hit.entry,path:hit.entry?'/notes/entries/'+hit.entry.id+'/content':null,title:event.title||t('calendar.untitled')},session,!!hit.entry&&writable);
   }
   readNote(session=this.session,path=this.path){return this.context.entry?super.readNote(session,path):Promise.resolve({data:{body:''},etag:null});}
+  controls(){
+    super.controls();if(!this.context?.hit)return;
+    this.status.parentElement.hidden=this.context.detailsOnly&&!this.preparing;
+    if(this.preparing)this.status.textContent=t('notes.search_preparing');
+  }
   async maximize(){
     if(this.inline||this.maximizeButton.disabled)return;
-    const session=this.session,generation=this.generation;
-    this.dialog.dispatchEvent(new CustomEvent(calendarSearchNavigation,{bubbles:true,cancelable:true,detail:{id:this.context.hit.calendarEvent.id,maximize:true,guards:[()=>session===this.session&&generation===this.generation],leave:[]}}));
+    const session=this.session,generation=this.generation,current=()=>session===this.session&&generation===this.generation;
+    this.maximizing=true;this.preparing=false;this.error.hidden=true;this.controls();
+    const finished=()=>{if(current()){this.maximizing=this.preparing=false;this.controls();}};
+    if(this.dialog.dispatchEvent(new CustomEvent(calendarSearchNavigation,{bubbles:true,cancelable:true,detail:{id:this.context.hit.calendarEvent.id,maximize:true,guards:[current],leave:[],pending:()=>{if(current()){this.preparing=true;this.controls();}},finished}})))finished();
   }
-  reset(){super.reset();this.details.replaceChildren();this.resources.invalidate();this.context=this.path=this.origin=null;this.title.textContent='';this.error.textContent='';this.error.hidden=true;this.status.textContent='';}
+  reset(){super.reset();this.preparing=false;this.details.replaceChildren();this.resources.invalidate();this.context=this.path=this.origin=null;this.title.textContent='';this.error.textContent='';this.error.hidden=true;this.status.textContent='';}
 }

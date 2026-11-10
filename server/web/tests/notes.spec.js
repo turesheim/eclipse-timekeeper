@@ -521,7 +521,19 @@ test('event search finds calendar details without creating a note and keeps the 
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q='+encodeURIComponent('event:observatory commissioning'));return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(1);
   await searchNotes(page,'event:observatory commissioning');await expect(panel.locator('[data-search-note]')).toHaveCount(1);await result.click();await expect(popup.locator('.ProseMirror')).toContainText('Private commissioning checklist.');await expect(popup).toContainText(location);
   await popup.getByRole('button',{name:'Markdown source',exact:true}).click();await popup.locator('textarea').fill('Private commissioning checklist updated.');
-  await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(panel).toBeHidden();const workspace=page.locator('#calendar-search-workspace-editor');await expect(workspace).toBeVisible();await expect(workspace.locator('.ProseMirror')).toContainText('checklist updated.');await expect(workspace).toContainText(description);
+  // A successful save can invalidate the derived index before its worker catches up.
+  let attempts=0,releaseIndex;const indexHeld=new Promise(resolve=>{releaseIndex=resolve;});
+  await page.route('**/api/v1/notes/search/calendar/*',async route=>{
+    if(++attempts===1)return route.fulfill({status:503,json:{code:'NOTES_SEARCH_INDEXING',message:'Preparing'}});
+    await indexHeld;await route.continue();
+  });
+  try{
+    await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();
+    await expect.poll(()=>attempts).toBeGreaterThan(1);await expect(popup.getByRole('button',{name:'Open in workspace',exact:true})).toBeDisabled();await expect(popup.getByRole('status')).toHaveText('Preparing content search…');
+    await expect(popup).toBeVisible();await expect(popup.locator('textarea')).toHaveValue('Private commissioning checklist updated.');
+    await captureScreenshot(page,{path:'test-results/event-search-index-preparing.png'});releaseIndex();await expect(popup).toBeHidden();
+  }finally{releaseIndex();await page.unrouteAll({behavior:'wait'});}
+  await expect(panel).toBeHidden();const workspace=page.locator('#calendar-search-workspace-editor');await expect(workspace).toBeVisible();await expect(workspace.locator('.ProseMirror')).toContainText('checklist updated.');await expect(workspace).toContainText(description);
   for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#calendar-search-workspace-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-saved-workspace-${width}.png`});}
   expect((await(await api('GET',notePath)).json()).body).toBe('Private commissioning checklist updated.');
   await workspace.getByRole('button',{name:'Markdown source',exact:true}).click();await workspace.locator('textarea').fill('Private commissioning checklist workspace edit.');await page.locator('[data-tab=today]').click();await expect(workspace).toBeHidden();expect((await(await api('GET',notePath)).json()).body).toBe('Private commissioning checklist workspace edit.');
@@ -539,11 +551,11 @@ test('event search finds calendar details without creating a note and keeps the 
   }
   await api('PUT','/notes/files?path=Notes%2FLater%20choice.md',Buffer.from('# Later choice\n\nObservatory follow-up.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=observatory');return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(2);
-  await searchNotes(page,'observatory');let releaseChoice,arriveChoice;
+  await searchNotes(page,'observatory');let releaseChoice,arriveChoice,choiceAttempts=0;
   const choiceHeld=new Promise(resolve=>{releaseChoice=resolve;}),choiceStarted=new Promise(resolve=>{arriveChoice=resolve;});
-  await page.route('**/api/v1/notes/search/calendar/*',async route=>{const response=await route.fetch();arriveChoice();await choiceHeld;await route.fulfill({response});});
+  await page.route('**/api/v1/notes/search/calendar/*',async route=>{if(++choiceAttempts===1)return route.fulfill({status:503,json:{code:'NOTES_SEARCH_INDEXING',message:'Preparing'}});const response=await route.fetch();arriveChoice();await choiceHeld;await route.fulfill({response});});
   try{
-    await result.click();await choiceStarted;await panel.getByRole('button',{name:/Later choice/}).click();const later=page.locator('#note-popup-editor');await expect(later.locator('.ProseMirror')).toContainText('Observatory follow-up.');
+    await result.click();await choiceStarted;await expect(result).toBeDisabled();await expect(panel).toContainText('Preparing content search…');await panel.getByRole('button',{name:/Later choice/}).click();const later=page.locator('#note-popup-editor');await expect(later.locator('.ProseMirror')).toContainText('Observatory follow-up.');
     const delivered=page.waitForResponse(response=>new URL(response.url()).pathname.startsWith('/api/v1/notes/search/calendar/'));releaseChoice();await delivered;
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await expect(popup).toBeHidden();await expect(later).toBeVisible();await expect(later.locator('#note-popup-title')).toHaveText('Later choice');await later.getByRole('button',{name:'Close',exact:true}).click();

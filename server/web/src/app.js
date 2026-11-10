@@ -16,6 +16,7 @@ import { NotesView } from './notes.js';
 import {NotesSearch} from './notes-search.js';
 import {NotePopup} from './note-popup.js';
 import {CalendarSearchEditor,calendarSearchNavigation} from './calendar-search-editor.js';
+import {calendarSearchHit} from './calendar-search-navigation.js';
 import { TasksView } from './tasks.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
@@ -99,8 +100,8 @@ document.addEventListener(calendarSearchNavigation,async event=>{
   const current=()=>session===api&&request===calendarNavigation;
   try{
     if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current())return;
-    const reply=await session.request('/notes/search/calendar/'+detail.id);
-    if(!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
+    const reply=await calendarSearchHit(session,detail.id,async()=>current()&&await navigationGuards(detail.guards,session)&&current(),detail.pending);
+    if(!reply||!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
     detail.leave.forEach(leave=>leave());
     if(detail.maximize){
       if(await tab('calendar-search')===false||session!==api)return;
@@ -111,7 +112,8 @@ document.addEventListener(calendarSearchNavigation,async event=>{
       notePopup.close(true);calendarSearchPopup.close(true);
       await calendarSearchPopup.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
     }
-  }catch(error){if(current()){if(error.status===401)auth.clear(errorText(error));else if(calendarSearchPopup.opened){calendarSearchPopup.error.textContent=errorText(error);calendarSearchPopup.error.hidden=false;}else setStatus(errorText(error));}}
+  }catch(error){if(current()&&await navigationGuards(detail.guards,session)){if(error.status===401)auth.clear(errorText(error));else if(calendarSearchPopup.opened){calendarSearchPopup.error.textContent=errorText(error);calendarSearchPopup.error.hidden=false;}else setStatus(errorText(error));}}
+  finally{detail.finished?.();}
 });
 document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
