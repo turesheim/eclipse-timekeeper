@@ -1,4 +1,3 @@
-import {RecentNotes} from './recent-notes.js';
 import {dateNavigation} from './date-navigation.js';
 import {calendarDescription,calendarLocation} from './tooltip-description.js';
 import {richTooltip} from './tooltips.js';
@@ -23,7 +22,6 @@ const byId=id=>document.getElementById(id);
 /** A selected civil day, with the journal in the main column. */
 export class TodayView {
   constructor(root,callbacks){
-    this.recentNotes=new RecentNotes(byId('today-recent-notes'),callbacks);
     this.root=root;this.callbacks=callbacks;this.dateInput=byId('today-date');this.grid=byId('today-month-grid');this.monthTitle=byId('today-month-title');this.journalRoot=byId('today-journal');
     this.sidebar=root.querySelector('.today-sidebar');this.sidebar.id='today-sidebar';
     this.sidebarResize=node('div',undefined,'today-resize');this.sidebarResize.tabIndex=0;
@@ -63,13 +61,13 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){this.recentNotes.reset();clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
-  pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>{void this.loadEvents(true);void this.recentNotes.refresh();},30000);}
-  show(){this.visible=true;this.recentNotes.show();this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
-  hide(){this.recentNotes.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
+  show(){this.visible=true;this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
+  hide(){clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;}
-    this.data=data;this.connected=connected;this.recentNotes.update(scope,data.profile.data.zoneId,data.revision);if(this.visible)this.recentNotes.show();
+    this.data=data;this.connected=connected;
     if(!this.date)this.initialize(dateInZone(data.report.generatedAt,data.profile.data.zoneId));
     if(this.visible){this.pollEvents();this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}
   }

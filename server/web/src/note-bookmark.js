@@ -1,5 +1,16 @@
-import {icon} from './icons.js';
 import {t} from './i18n.js';
+
+// The ribbon meets the card edge with a straight top in every action state.
+function bookmarkIcon(name){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','icon bi-'+name);svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
+  const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('fill','currentColor');path.setAttribute('fill-rule','evenodd');
+  path.setAttribute('d','M2 0h12v16l-6-3-6 3z'+(name==='bookmark-fill'?'':'M3 1v13.382l5-2.5 5 2.5V1z'));svg.append(path);
+  if(name!=='bookmark-fill'){
+    const mark=document.createElementNS(svg.namespaceURI,'path');mark.setAttribute('d','M5.5 6.5h5'+(name==='bookmark-plus'?'M8 4v5':''));mark.setAttribute('stroke','currentColor');mark.setAttribute('stroke-linecap','round');svg.append(mark);
+  }
+  return svg;
+}
 
 /** Page metadata has its own request lifetime and never touches the body draft. */
 export class NoteBookmark {
@@ -26,7 +37,7 @@ export class NoteBookmark {
     this.button.disabled=!context?.writable||this.busy||!this.etag&&!this.failed;
     this.button.classList.toggle('is-bookmarked',marked);this.button.setAttribute('aria-pressed',String(marked));this.button.setAttribute('aria-label',label);this.button.title=label;
     // Keep pointer-down/up targets stable while editor controls refresh.
-    if(this.iconState!==marked){this.iconState=marked;this.button.replaceChildren(icon(marked?'bookmark-fill':'bookmark-plus'));if(marked)this.button.append(icon('bookmark-dash'));}
+    if(this.iconState!==marked){this.iconState=marked;this.button.replaceChildren(bookmarkIcon(marked?'bookmark-fill':'bookmark-plus'));if(marked)this.button.append(bookmarkIcon('bookmark-dash'));}
   }
   async load(){
     const context=this.context;if(!context?.session)return;const generation=this.generation;

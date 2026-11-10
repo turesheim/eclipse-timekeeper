@@ -725,7 +725,9 @@ test('a delayed bookmark response cannot paint the next selected note',async({pa
   await page.route('**/api/v1/notes/bookmark?**',async route=>{
     if(new URL(route.request().url()).searchParams.get('sourceKey')!==first.sourceKey||delayed)return route.continue();delayed=true;const response=await route.fetch();arrive();await gate;try{await route.fulfill({response});}finally{deliver();}
   });
-  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/First.md').click();await arrived;await noteEntry(page.locator('#notes-navigation'),'Notes/Second.md').click();const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveAttribute('aria-pressed','false');release();await delivered;await expect(button).toHaveAttribute('aria-pressed','false');await expect(page.locator('#notes-document-title')).toHaveText('Second');
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/First.md').click();await arrived;
+  await expect(page.locator('#notes-formatted .ProseMirror')).toHaveText('First note');await expect(page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true})).toBeEnabled();
+  await noteEntry(page.locator('#notes-navigation'),'Notes/Second.md').click();const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveAttribute('aria-pressed','false');release();await delivered;await expect(button).toHaveAttribute('aria-pressed','false');await expect(page.locator('#notes-document-title')).toHaveText('Second');
 });
 
 test('refresh updates a bookmark changed in another client while preserving an unsaved draft',async({page,request})=>{

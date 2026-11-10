@@ -25,9 +25,10 @@ test('Notes sidebar keeps Recent notes below the navigator and restores its own 
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const put=async(path,body)=>await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   const current=await put('Notes/Current.md','# Current\n\nCurrent body.\n'),other=await put('Notes/Other.md','# Other\n\nOther body.\n');
-  await page.reload();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(2);await page.locator('[data-tab=notes]').click();
+  await page.reload();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(2);
+  await page.evaluate(()=>{window.sharedRecentSection=document.querySelector('#today-recent-notes').closest('section');});await page.locator('[data-tab=notes]').click();
   const recent=page.locator('#notes-recent-notes'),section=page.getByRole('region',{name:'Recent notes',exact:true});await expect(section).toBeVisible();await expect(recent.locator('[data-recent-note]')).toHaveCount(2);
-  expect(await section.evaluate(node=>node.previousElementSibling.classList.contains('notes-navigation-browser'))).toBe(true);await expect(recent.locator(`[data-recent-note="${other.id}"] .today-recent-note-label`)).toHaveText('Other');
+  expect(await section.evaluate(node=>node===window.sharedRecentSection)).toBe(true);expect(await section.evaluate(node=>node.parentElement.previousElementSibling.classList.contains('notes-navigation-browser'))).toBe(true);await expect(recent.locator(`[data-recent-note="${other.id}"] .today-recent-note-label`)).toHaveText('Other');
   const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,current.path).click();
   const pick=recent.locator(`[data-recent-note="${other.id}"]`);await pick.focus();await pick.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(page.locator('#notes-document-title .notes-title-input')).toHaveValue('Current');
   let refreshed=false;await page.route('**/api/v1/notes/recent?*',async route=>{await route.continue();refreshed=true;});await page.evaluate(()=>document.dispatchEvent(new Event('timekeeper:notes-changed')));await expect.poll(()=>refreshed).toBe(true);await expect(recent).toHaveAttribute('aria-busy','false');
@@ -42,6 +43,9 @@ test('Notes Recent notes scrolls independently and fits the drawer in every them
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   for(let index=0;index<23;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Sidebar'+String(index).padStart(2,'0')+'.md'}),Buffer.from('# Sidebar note '+index+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.reload();await page.locator('[data-tab=notes]').click();const navigation=page.locator('#notes-navigation'),recent=page.locator('#notes-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
+  const requests=[];page.on('request',request=>{if(request.url().includes('/notes/recent?'))requests.push(request.url());});
+  await page.locator('[data-tab=today]').click();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(23);await expect(page.locator('#notes-recent-notes')).toHaveCount(0);
+  await page.locator('[data-tab=notes]').click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);expect(requests).toEqual([]);
   for(const width of [1280,390]){
     await page.setViewportSize({width,height:844});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){

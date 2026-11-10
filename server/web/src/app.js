@@ -1,5 +1,6 @@
 import {updateNoteClientDirectory} from './note-client.js';
 import {editorPreferences} from './editor-preferences.js';
+import {RecentNotes} from './recent-notes.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {hashtagKey,tagNavigation} from './hashtags.js';
 import {dateTimeFormat} from './formatters.js';
@@ -59,6 +60,7 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onChange: changeCalendarSession
 });
 const track = new MonthTrack($('track-panel'), { onUnauthorized:error=>auth.clear(errorText(error)), onChanged:()=>void refresh().catch(()=>{}), onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))) });
+const recentNotes=new RecentNotes($('today-recent-notes'),{onUnauthorized:error=>auth.clear(errorText(error))},{section:$('today-recent-notes').closest('section')});
 const today = new TodayView($('today-panel'), {
   canWrite:()=>canWrite,
   onUnauthorized:error=>auth.clear(errorText(error)),
@@ -66,7 +68,7 @@ const today = new TodayView($('today-panel'), {
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
 const noteSearch=new NotesSearch($('titlebar-notes-search'),{onUnauthorized:error=>auth.clear(errorText(error))});
-const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
+const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{}),onRefreshRecentNotes:()=>void recentNotes.refresh(true)});
 const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))});
 const calendarSearchPanel=element('section');calendarSearchPanel.id='calendar-search-panel';calendarSearchPanel.hidden=true;$('workspace').append(calendarSearchPanel);
 const searchEditorCallbacks={onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))};
@@ -220,6 +222,7 @@ async function tab(name) {
   if(name==='tasks')tasks.show();else tasks.hide();
   if (name === 'track') track.show();else track.hide();
   if (name === 'today') today.show();else today.hide();
+  if(name==='today')recentNotes.show(today.sidebar,'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
   if (name === 'week') weekSessions.show();else weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
@@ -264,7 +267,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
+    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -443,6 +446,7 @@ function render() {
   track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
   today.update(s, connected, api);
   notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite);
+  recentNotes.update(api,s.profile.data.zoneId,s.revision);
   tasks.update(s,connected,api,canWrite);
 }
 function renderChangedList(id,records,paint){
