@@ -24,8 +24,10 @@ function connection(owner,overrides={}){
 }
 async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[]}={}){
   const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,providerWrites:0};
-  if(projects.length)await page.route('**/api/v1/projects?*',route=>route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({items:projects,revision:1,nextCursor:null})}));
-  for(const [path,items]of [['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',route=>route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({items,revision:1,nextCursor:null})}));
+  for(const [path,items]of [['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
+    const response=await route.fetch();if(!response.ok())return route.fulfill({response});
+    const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
+  });
   await page.route('**/api/v1/task-providers**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname.slice('/api/v1/task-providers'.length),method=request.method(),input=JSON.parse(request.postData()||'{}');
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')};
