@@ -44,7 +44,7 @@ def main():
                 '-e', 'POSTGRES_PASSWORD=' + password, args.postgres_image, stdout=subprocess.DEVNULL)
             owned = True
             deadline = time.monotonic() + 30
-            while subprocess.run(['docker', 'exec', name, 'pg_isready', '-U', 'postgres'],
+            while subprocess.run(['docker', 'exec', name, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
                 if time.monotonic() >= deadline:
                     raise RuntimeError('Owned PostgreSQL restart fixture did not become ready')
