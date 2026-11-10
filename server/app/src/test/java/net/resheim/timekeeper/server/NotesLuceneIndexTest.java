@@ -18,6 +18,19 @@ class NotesLuceneIndexTest {
         return new NotesLuceneIndex.Source(id,path,"MARKDOWN","VAULT_FILE",id,1,"source-tag","source-hash",markdown.getBytes(StandardCharsets.UTF_8).length,text.title(),text);
     }
     private static void ready(NotesLuceneIndex index,long generation)throws IOException{index.commit(new NotesLuceneIndex.Watermark(generation,true,null));}
+    @Test void bookmarksBreakRelevanceTiesWithoutOvertakingTitleMatchesOrAddingNonmatches()throws Exception{
+        try(var index=new NotesLuceneIndex(temporary.resolve("bookmarks"),identity)){
+            index.put(source(1,"Notes/A.md","needle"));
+            var marked=source(2,"Notes/Z.md","needle");
+            index.put(new NotesLuceneIndex.Source(marked.id(),marked.path(),marked.kind(),marked.sourceType(),marked.sourceId(),marked.sourceVersion(),marked.sourceTag(),marked.sourceHash(),marked.byteLength(),marked.title(),marked.text(),null,true));
+            index.put(source(3,"Notes/Heading.md","# needle"));
+            var unrelated=source(4,"Notes/Unrelated.md","Different body");
+            index.put(new NotesLuceneIndex.Source(unrelated.id(),unrelated.path(),unrelated.kind(),unrelated.sourceType(),unrelated.sourceId(),unrelated.sourceVersion(),unrelated.sourceTag(),unrelated.sourceHash(),unrelated.byteLength(),unrelated.title(),unrelated.text(),null,true));ready(index,1);
+            assertEquals(List.of(new UUID(0,3),new UUID(0,2),new UUID(0,1)),search(index,"needle",1,10,null).items().stream().map(NotesLuceneIndex.Hit::id).toList());
+            var first=search(index,"needle",1,1,null);var next=search(index,"needle",1,1,first.next());assertEquals(new UUID(0,2),next.items().getFirst().id());
+            assertEquals(new UUID(0,1),search(index,"needle",1,1,next.next()).items().getFirst().id());
+        }
+    }
     private static NotesLuceneIndex.Page search(NotesLuceneIndex index,String query,long generation,int limit,NotesLuceneIndex.Position position)throws IOException{
         return index.search(NotesSearchQuery.parse(query),generation,limit,position,false,null,5000);
     }

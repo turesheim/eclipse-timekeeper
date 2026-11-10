@@ -66,7 +66,7 @@ final class CalendarSearchSources extends NotesSearchSources {
         var note=new NotesSearchSources(store).load(owner,uuid(entry.path("id")));if(note==null)return null;
         var envelope=envelope(feed,definition,zone,note.id()).put("noteFence",NotesLuceneIndex.fence(note));((ObjectNode)envelope.path("event")).put("noteEntryId",note.id().toString());
         var text=text(definition,note);
-        return new NotesLuceneIndex.Source(note.id(),note.path(),note.kind(),note.sourceType(),note.sourceId(),note.sourceVersion(),note.sourceTag(),note.sourceHash(),note.byteLength()+text.body().getBytes(StandardCharsets.UTF_8).length,definition.path("title").asText(),text,envelope);
+        return new NotesLuceneIndex.Source(note.id(),note.path(),note.kind(),note.sourceType(),note.sourceId(),note.sourceVersion(),note.sourceTag(),note.sourceHash(),note.byteLength()+text.body().getBytes(StandardCharsets.UTF_8).length,definition.path("title").asText(),text,envelope,note.bookmarked());
     }
     /** Caller holds the final authorized transaction and has rechecked both source snapshots. */
     ObjectNode currentCalendar(NotesLuceneIndex.Hit hit,Map<UUID,String> bindings){

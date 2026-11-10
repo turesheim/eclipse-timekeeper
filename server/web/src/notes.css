@@ -92,9 +92,15 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-search-results { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; list-style:none; padding:0; margin:0; }
 .notes-search-results li + li { margin-top:.5rem; }
 .notes-search-result { display:flex; flex-direction:column; align-items:stretch; gap:.25rem; width:100%; text-align:start; overflow-wrap:anywhere; }
-.notes-search-result-title { display:flex; align-items:baseline; gap:.5rem; font-weight:600; }
+.notes-search-result-title { display:flex; align-items:baseline; gap:.5rem; font-weight:400; }
 .notes-search-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
 @media (max-width:767px) {
   .titlebar-notes-search { flex:0 0 auto; min-width:0; }
   .titlebar-notes-search input { display:none; }
 }
+
+/* Keep the shared search controls together at the right edge of the title bar. */
+.app-header .titlebar-notes-search { margin-inline-start:auto; align-items:stretch; }
+.app-header .titlebar-notes-search:not([hidden]) + #session { margin-inline-start:0; }
+.titlebar-notes-search .icon-button { min-height:0; min-width:2.375rem; padding:.375rem .625rem; }
+@media (max-width:575px) { .titlebar-notes-search .icon-button { min-height:2.75rem; min-width:2.75rem; } }

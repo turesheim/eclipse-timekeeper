@@ -6,6 +6,13 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class NotesSearchTextTest {
+    @Test void extendedInlineStylesProjectVisibleTextWithoutChangingLiteralCodeOrEscapes(){
+        String source="# ==Important== H~2~O and X^2^\n\n==Very **important** words== and ~~old~~.\n\n`==literal== H~2~O X^2^`\n\n\\==escaped== \\~2~ \\^2^";
+        var projection=NotesSearchText.extract(source.getBytes(StandardCharsets.UTF_8));
+        assertEquals("Important H2O and X2",projection.title());assertEquals(projection.title(),NoteTitles.heading(source));
+        assertTrue(projection.body().contains("Very important words and old."));assertTrue(projection.body().contains("==literal== H~2~O X^2^"));
+        assertTrue(projection.body().contains("==escaped== ~2~ ^2^"));
+    }
     @Test void proseCodeListsQuotesAndLinkLabelsRemainSeparateFromSyntaxAndFrontmatter(){
         String source="\ufeff---\r\nprivate: excludedfrontmatter\r\n---\r\n\r\n# **Cafe\u0301** \u0060foo_bar\u0060\r\n\r\nProse [label](https://not-indexed.invalid/destination) ![alt words](asset.png).\r\n\r\n- First item\r\n- Second ~~old~~ item\r\n\r\n> Quoted paragraph\r\n\r\n~~~shell\r\nkubectl exec service.cluster.local\r\n~~~\r\n";
         byte[] original=source.getBytes(StandardCharsets.UTF_8),copy=original.clone();var projection=NotesSearchText.extract(original);

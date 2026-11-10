@@ -3,6 +3,7 @@ import {dateInZone,instantText} from './model.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {noteTitle} from './note-title.js';
 import {icon} from './icons.js';
+import {noteIcon} from './note-presentation.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 
@@ -58,9 +59,9 @@ export class RecentNotes {
       const list=node('ul',undefined,'today-list today-recent-list'),scope=this.scope,generation=this.generation;
       for(const entry of this.items){
         const item=node('li'),action=node('button',undefined,'btn btn-outline-secondary today-recent-note');action.type='button';action.dataset.recentNote=entry.id;
-        const [glyph,key]=entry.kind==='EVENT'?['calendar-event','notes.type_event']:['DAY','WEEK'].includes(entry.kind)?['journal-text','notes.type_journal']:['file-earmark-text','notes.type_ordinary'];
+        const key=entry.kind==='EVENT'?'notes.type_event':['DAY','WEEK'].includes(entry.kind)?'notes.type_journal':'notes.type_ordinary';
         const title=node('span',undefined,'today-recent-note-title');
-        title.append(icon(glyph),node('span',t(key)+': ','visually-hidden'),node('span',noteTitle(entry),'today-recent-note-label'));
+        title.append(icon(noteIcon(entry)),node('span',t(key)+': ','visually-hidden'),node('span',noteTitle(entry),'today-recent-note-label'));
         action.append(title);
         action.title=t(key)+'\n'+(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
         action.addEventListener('click',()=>{

@@ -54,6 +54,7 @@ export class MarkdownField {
     this.tools.append(this.blockTrigger);
     for(const [name,glyph] of [
       ['bold','type-bold'],['italic','type-italic'],['strike','type-strikethrough'],
+      ['highlight','highlighter'],['subscript','subscript'],['superscript','superscript'],
       ['inline_code','code'],['code_block','code-square'],['list','list-ul'],['ordered','list-ol'],['tasks','list-check'],
       ['link','link-45deg'],['quote','quote'],['table','table'],['hr','hr']
     ]){

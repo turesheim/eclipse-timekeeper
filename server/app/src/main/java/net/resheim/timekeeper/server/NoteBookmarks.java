@@ -32,6 +32,7 @@ final class NoteBookmarks {
         // Namespace snapshots include presentation metadata. Content ETags and
         // modification dates deliberately remain owned by the source resource.
         if(new VaultState(store,store.vaultLimits()).get().path("initialized").asBoolean())new VaultState(store,store.vaultLimits()).changed(0,0,false);
+        new NotesSearchChanges(store).bookmarkChanged(ref);
         store.change("PROFILE","UPDATED",store.owner());return get(ref);
     }
     ObjectNode annotate(ObjectNode entry){
@@ -42,6 +43,9 @@ final class NoteBookmarks {
         var result=new TreeSet<LocalDate>();for(var value:store.list(TYPES.get(DayNotes.TYPE),DayNotes.id(first),DayNotes.id(last)))if(value.path("bookmarked").asBoolean())result.add(DayNotes.date(value.path("sourceKey").asText()));return result;
     }
     boolean day(LocalDate date){return get(new VaultSources.Ref(DayNotes.TYPE,DayNotes.id(date),date.toString())).path("bookmarked").asBoolean();}
+    Set<UUID> events(){
+        var result=new HashSet<UUID>();for(var value:store.list(TYPES.get(EventNotes.TYPE)))if(value.path("bookmarked").asBoolean())result.add(uuid(value.path("id")));return result;
+    }
     @FunctionalInterface interface Item {void accept(ObjectNode value)throws IOException;}
     static int archive(Connection connection,String owner,Item output)throws SQLException,IOException{
         int[] count={0};for(String source:new TreeSet<>(TYPES.keySet()))AccountArchive.records(connection,owner,TYPES.get(source),value->{if(value.path("bookmarked").asBoolean()){count[0]++;output.accept(object().put("sourceType",source).put("sourceKey",value.path("sourceKey").asText()));}});return count[0];

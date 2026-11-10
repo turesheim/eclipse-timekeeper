@@ -1477,7 +1477,7 @@
   "notes.bookmarks": "Bokmerker",
   "notes.maximize": "Åpne i arbeidsområdet",
   "notes.create_linked_confirm": "Notatet «{{path}}» finnes ikke. Vil du opprette det og åpne redigeringsvinduet?",
-  "notes.search_title": "Søk i notater",
+  "notes.search_title": "Søkeresultater",
   "notes.search_help": "Søk i notater og hendelsesdetaljer. Bruk tag:#navn, file:navn, event:ord, journal:ord eller note:ord for å avgrense treffene. Sett fraser i doble anførselstegn.",
   "notes.client": "Knytt til kunde",
   "notes.no_client": "Ingen kunde",
@@ -1737,5 +1737,10 @@
   "internet_admin.active": "Lagrede innstillinger er aktive.",
   "internet_admin.direct_callback": "Google-omdirigeringsadresse for direkte registrering",
   "internet_accounts.tasks_only_help": "Logg på for å synkronisere oppgavelister. Legg til et kalenderabonnement for kalenderhendelser.",
-  "task_providers.calendars_unsupported": "Denne påloggingsmåten støtter bare oppgaver. Legg til et kalenderabonnement for hendelser."
+  "task_providers.calendars_unsupported": "Denne påloggingsmåten støtter bare oppgaver. Legg til et kalenderabonnement for hendelser.",
+  "notes.search_terms": "Søkeord",
+  "notes.search_action": "Søk",
+  "markdown.highlight": "Uthev med farge",
+  "markdown.subscript": "Senket skrift",
+  "markdown.superscript": "Hevet skrift"
 }

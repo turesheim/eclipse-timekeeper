@@ -1477,7 +1477,7 @@
   "notes.bookmarks": "Bookmarks",
   "notes.maximize": "Open in workspace",
   "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?",
-  "notes.search_title": "Search notes",
+  "notes.search_title": "Search results",
   "notes.search_help": "Search notes and event details. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
   "notes.client": "Associate with client",
   "notes.no_client": "No client",
@@ -1737,5 +1737,10 @@
   "internet_admin.active": "Saved settings are active.",
   "internet_admin.direct_callback": "Google redirect URI for direct registration",
   "internet_accounts.tasks_only_help": "Sign in to synchronize task lists. Add a calendar subscription for calendar events.",
-  "task_providers.calendars_unsupported": "This sign-in method supports tasks only. Add a calendar subscription for events."
+  "task_providers.calendars_unsupported": "This sign-in method supports tasks only. Add a calendar subscription for events.",
+  "notes.search_terms": "Search terms",
+  "notes.search_action": "Search",
+  "markdown.highlight": "Highlight",
+  "markdown.subscript": "Subscript",
+  "markdown.superscript": "Superscript"
 }

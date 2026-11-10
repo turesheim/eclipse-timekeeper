@@ -1302,7 +1302,9 @@ normal content edits retain their existing timestamp semantics.
 journal/event notes and published calendar event details independently from filename substring navigation. Its
 `NotesSearchPage` contains current entry metadata and/or `calendarEvent` details and bounded plain-text excerpts
 with UTF-16 highlight ranges, plus an opaque snapshot and optional continuation.
-All words are required across boosted title/path/body fields; double quotes form
+Bookmarked notes receive a small, deterministic relevance bonus. Bookmark changes
+advance the search generation and invalidate existing cursors without changing
+source bytes or content validators. All words are required across boosted title/path/body fields; double quotes form
 phrases. An unquoted `tag:#name` requires an exact prose hashtag and can be
 combined with words, phrases or other tags. Tag keys use NFC and case folding;
 each tag is at most 128 UTF-16 code units including `#`. Unicode letters,

@@ -11,7 +11,7 @@ class NotesSearchSources {
     record State(NotesLuceneIndex.Identity identity,NotesSearchChanges.Snapshot changes,boolean configuration,String hiddenJournal){
         @Override public String toString(){return "NotesSearchSources.State[generation="+changes.generation()+"]";}
     }
-    private record Raw(ObjectNode entry,long sourceVersion,byte[] bytes,String eventTitle){
+    private record Raw(ObjectNode entry,long sourceVersion,byte[] bytes,String eventTitle,boolean bookmarked){
         @Override public String toString(){return "NotesSearchSources.Raw[]";}
     }
     private final ServerStore store;
@@ -35,7 +35,7 @@ class NotesSearchSources {
             case "MARKDOWN"->entry.hasNonNull("title")?entry.path("title").asText():projection.title();case "EVENT"->raw.eventTitle();default->"";
         };
         return new NotesLuceneIndex.Source(id,entry.path("path").asText(),entry.path("kind").asText(),entry.path("sourceType").asText(),uuid(entry.path("sourceId")),
-                raw.sourceVersion(),entry.path("contentTag").asText(),entry.path("sha256").asText(),raw.bytes().length,title,projection);
+                raw.sourceVersion(),entry.path("contentTag").asText(),entry.path("sha256").asText(),raw.bytes().length,title,projection,null,raw.bookmarked());
     }
     private Raw capture(UUID id){
         var found=store.find(VaultIndex.ENTRY,id).orElse(null);if(!eligible(found))return null;
@@ -49,7 +49,7 @@ class NotesSearchSources {
             case EventNotes.TYPE->EventNotes.document(source);
             default->throw unavailable();
         };
-        return new Raw(entry,source.path("version").asLong(),bytes,source.path("event").path("title").asText().strip());
+        return new Raw(entry,source.path("version").asLong(),bytes,source.path("event").path("title").asText().strip(),new NoteBookmarks(store).get(ref).path("bookmarked").asBoolean());
     }
     /** Caller holds the final authorized owner transaction and rechecks the global generation. */
     ObjectNode current(NotesLuceneIndex.Hit hit){

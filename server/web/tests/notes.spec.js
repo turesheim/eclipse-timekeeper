@@ -25,6 +25,33 @@ async function setup(page,request){
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return api;
 }
 
+test('shared search prepares indexes before a query and presents normal-weight bookmarked notes',async({page,request})=>{
+  let prepared=0,queries=0,failures=2;
+  await page.route('**/api/v1/notes/search/status',route=>{prepared++;return route.continue();});
+  await page.route('**/api/v1/notes/search?**',route=>{
+    queries++;if(failures-->0)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'NOTES_SEARCH_INDEXING',message:'Indexing'}})});
+    return route.continue();
+  });
+  const api=await setup(page,request);await expect.poll(()=>prepared).toBeGreaterThan(0);expect(queries).toBe(0);
+  const entries=[];
+  for(const name of ['A presentation','Z bookmarked'])entries.push(await(await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/'+name+'.md'}),Buffer.from('# '+name+'\n\nsharedpresentationneedle'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json());
+  const entry=entries[1],bookmark='/notes/bookmark?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey});
+  const metadata=await api('GET',bookmark);await api('PUT',bookmark,{bookmarked:true},{'If-Match':metadata.headers().etag});
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();
+  await expect(noteEntry(page.locator('#notes-navigation'),entry.path).locator('.bi-journal-bookmark')).toBeVisible();
+  await expect(page.locator('#notes-recent-notes [data-recent-note="'+entry.id+'"] .bi-journal-bookmark')).toBeVisible();
+  const panel=await searchNotes(page,'sharedpresentationneedle');await expect(panel.getByRole('heading',{name:'Search results',exact:true})).toBeVisible();await expect(panel.getByRole('searchbox',{name:'Search terms',exact:true})).toBeVisible();
+  const results=panel.locator('[data-search-note]');await expect(results).toHaveCount(2);await expect(results.first()).toHaveAttribute('data-search-note',entry.id);await expect(results.first().locator('.bi-journal-bookmark')).toBeVisible();
+  await expect(results.first().locator('.notes-search-result-title')).toHaveCSS('font-weight','400');await expect(panel.getByRole('button',{name:'Retry search',exact:true})).toBeHidden();
+  const field=await page.locator('#titlebar-notes-query').boundingBox(),button=await page.locator('#titlebar-notes-search button').boundingBox(),account=await page.locator('#session').boundingBox();
+  expect(Math.abs(field.height-button.height)).toBeLessThanOrEqual(1);expect(account.x-button.x-button.width).toBeLessThanOrEqual(18);
+  for(const width of [1280,390]){
+    await page.setViewportSize({width,height:844});await expect(panel).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await captureScreenshot(page,{path:`test-results/search-presentation-${width}.png`,fullPage:true});
+  }
+});
+
 test('pasted URLs survive saving and reopening a private Notes document without escapes',async({page,request})=>{
   const api=await setup(page,request),url='https://example.org/a_b/one_(two)?name[0]=value&next=a_b#part_one',path='Notes/Pasted URL.md';
   const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('Before.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
@@ -222,7 +249,7 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
     const result=await new AxeBuilder({page}).include('#notes-panel').analyze();expect(result.violations).toEqual([]);
   }
   const me=await api('GET','/me'),profile=await me.json();await api('PUT','/me',{zoneId:profile.zoneId,locale:'nb-NO'},{'If-Match':me.headers().etag});
-  await page.reload();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toHaveText('Notater');await expect(page.locator('#titlebar-notes-query')).toHaveAccessibleName('Søk i notater');
+  await page.reload();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toHaveText('Notater');await expect(page.locator('#titlebar-notes-query')).toHaveAccessibleName('Søkeord');
   const token=await(await api('POST','/auth/tokens',{name:'Read-only Notes browser','permissions':['read'],'expiresAt':null})).json();
   const session=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
   try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#titlebar-notes-query')).toBeVisible();
@@ -687,7 +714,7 @@ test('bookmarks persist in Notes without changing a rejected body draft, bytes o
   const api=await setup(page,request),path='Notes/Bookmark.md',body='# Bookmark\r\n\r\nExact spaces  \r\n';
   const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
-  const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('border-top-width','0px');expect(Math.abs((await button.boundingBox()).y-(await page.locator('.notes-editor').boundingBox()).y)).toBeLessThanOrEqual(1.5);await page.mouse.move(0,0);await expect(button).toHaveCSS('opacity','0');await button.hover();await expect(button.locator('.bi-bookmark-plus')).toBeVisible();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await page.mouse.move(0,0);await expect(button.locator('.bi-bookmark-fill')).toBeVisible();await expect(button).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-bookmark')).toBeVisible();
+  const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('border-top-width','0px');expect(Math.abs((await button.boundingBox()).y-(await page.locator('.notes-editor').boundingBox()).y)).toBeLessThanOrEqual(1.5);await page.mouse.move(0,0);await expect(button).toHaveCSS('opacity','0');await button.hover();await expect(button.locator('.bi-bookmark-plus')).toBeVisible();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await page.mouse.move(0,0);await expect(button.locator('.bi-bookmark-fill')).toBeVisible();await expect(button).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-journal-bookmark')).toBeVisible();
   await page.reload();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();await expect(button).toHaveAttribute('aria-pressed','true');
   await page.route('**/api/v1/notes/entries/'+entry.id+'/content',route=>route.request().method()==='PUT'?route.fulfill({status:412,contentType:'application/json',body:JSON.stringify({error:{code:'STALE_VERSION',message:'Concurrent edit'}})}):route.continue());
   const source=await notesSource(page);await source.fill('# Unsaved bookmark draft\n');await saveMarkdown(page.locator('#notes-panel'),{wait:false});await expect(page.locator('.notes-footer > [role=status]')).toContainText('changed');
@@ -736,7 +763,7 @@ test('refresh updates a bookmark changed in another client while preserving an u
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveAttribute('aria-pressed','false');
   await page.route('**/api/v1/notes/entries/'+entry.id+'/content',route=>route.request().method()==='PUT'?route.fulfill({status:412,contentType:'application/json',body:JSON.stringify({error:{code:'STALE_VERSION',message:'Concurrent edit'}})}):route.continue());
   const source=await notesSource(page);await source.fill('Keep my unsaved draft');const markPath='/notes/bookmark?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey}),before=await api('GET',markPath);await api('PUT',markPath,{bookmarked:true},{'If-Match':before.headers().etag});
-  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-bookmark')).toBeVisible();await expect(source).toHaveValue('Keep my unsaved draft');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Saved body');
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-journal-bookmark')).toBeVisible();await expect(source).toHaveValue('Keep my unsaved draft');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Saved body');
 });
 
 test('Notes autosaves generated wikilink closers without escaping and opens the missing target in a popup',async({page,request})=>{

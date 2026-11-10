@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** One replica's private owner index. Inputs must come from committed SQL snapshots. */
 final class NotesLuceneIndex implements AutoCloseable {
-    static final String FORMAT="notes-search-3";
+    static final String FORMAT="notes-search-4";
     static final int CHUNK=65_536,EXCERPT=320;
     private static final Sort ORDER=new Sort(SortField.FIELD_SCORE,new SortField("path_key",SortField.Type.STRING),new SortField("id",SortField.Type.STRING));
     private static final FieldType BODY;
@@ -30,8 +30,9 @@ final class NotesLuceneIndex implements AutoCloseable {
     record Watermark(long generation,boolean ready,UUID afterEntry){
         Watermark{if(generation<0||generation>9007199254740991L)throw new IllegalArgumentException("Invalid search watermark");}
     }
-    record Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text,ObjectNode calendar){
-        Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text){this(id,path,kind,sourceType,sourceId,sourceVersion,sourceTag,sourceHash,byteLength,title,text,null);}
+    record Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text,ObjectNode calendar,boolean bookmarked){
+        Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text){this(id,path,kind,sourceType,sourceId,sourceVersion,sourceTag,sourceHash,byteLength,title,text,null,false);}
+        Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text,ObjectNode calendar){this(id,path,kind,sourceType,sourceId,sourceVersion,sourceTag,sourceHash,byteLength,title,text,calendar,false);}
         Source{if(calendar!=null)calendar=calendar.deepCopy();}
         @Override public String toString(){return "NotesLuceneIndex.Source[id="+id+"]";}
     }
@@ -93,6 +94,7 @@ final class NotesLuceneIndex implements AutoCloseable {
         var document=new Document();String id=source.id().toString(),pathKey=VaultPath.searchKey(source.path());
         document.add(new StringField("id",id,Field.Store.YES));document.add(new SortedDocValuesField("id",new BytesRef(id)));
         document.add(new StringField("owner",identity.owner(),Field.Store.NO));document.add(new StringField("deleted","false",Field.Store.NO));
+        document.add(new StringField("bookmarked",Boolean.toString(source.bookmarked()),Field.Store.NO));
         document.add(new StringField("kind",source.kind(),Field.Store.YES));document.add(new StringField("configuration",Boolean.toString(VaultSettings.configurationPath(new VaultPath(source.path()))),Field.Store.NO));
         document.add(new StringField("path_key",pathKey,Field.Store.YES));document.add(new SortedDocValuesField("path_key",new BytesRef(pathKey)));
         document.add(new StoredField("path",source.path()));document.add(new TextField("path",NotesSearchText.normalized(source.path()),Field.Store.NO));

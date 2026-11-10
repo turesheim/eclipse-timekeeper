@@ -1,4 +1,6 @@
 import {emojiPlugin} from './emoji.js';
+import {inlineStyles,inlineStyleCommands} from './inline-styles.js';
+import {markRule} from '@milkdown/kit/prose';
 import {emojiFor} from '../src/emoji.js';
 import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
@@ -13,7 +15,7 @@ import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,docSchema,paragraphSchema,linkSchema,codeBlockSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
-import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
+import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand,remarkGFMPlugin,strikethroughInputRule,strikethroughSchema} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection,NodeSelection} from '@milkdown/kit/prose/state';
@@ -32,7 +34,8 @@ import {t} from '../src/i18n.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
-const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const commands={...inlineStyleCommands,bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const doubleStrike=$inputRule(ctx=>markRule(/(?<![\w:/])~~([^~]+)~~(?![\w/])$/,strikethroughSchema.type(ctx)));
 const dailyWikilink=$node('daily_wikilink',()=>({
   inline:true,group:'inline',atom:true,selectable:true,leafText:node=>'[['+node.attrs.date+']]',
   attrs:{date:{default:'',validate:'string'}},
@@ -149,6 +152,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   }})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
+    ctx.set(remarkGFMPlugin.options.key,{singleTilde:false});
     ctx.update(paragraphSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toMarkdown:{...schema.toMarkdown,runner:(state,node)=>{if(node.content.size)schema.toMarkdown.runner(state,node);else state.openNode('paragraph').addNode('html',undefined,emptyMarker).closeNode();}}};});
     ctx.update(linkSchema.key,previous=>schemaContext=>autolinkSchema(previous(schemaContext)));
     ctx.update(codeBlockSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,parseMarkdown:{...schema.parseMarkdown,match:node=>node.type==='code'&&String(node.lang).toLowerCase()!=='mermaid'&&!isPlantUml(node.lang)}};});
@@ -236,7 +240,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema,strikethroughInputRule].includes(plugin))).use(history).use(inlineStyles).use(doubleStrike).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;

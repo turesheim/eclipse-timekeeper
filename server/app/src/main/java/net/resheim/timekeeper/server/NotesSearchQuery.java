@@ -102,6 +102,9 @@ final class NotesSearchQuery {
                 .add(new TermQuery(new Term("owner",owner)),BooleanClause.Occur.FILTER)
                 .add(new TermQuery(new Term("deleted","false")),BooleanClause.Occur.FILTER)
                 .add(new TermInSetQuery("kind",List.of(new BytesRef("MARKDOWN"),new BytesRef("DAY"),new BytesRef("WEEK"),new BytesRef("EVENT"))),BooleanClause.Occur.FILTER);
+        // A small corpus-independent bonus preserves portable relevance/cursors
+        // and cannot outrank a stronger title/path match on bookmark alone.
+        query.add(new BoostQuery(new ConstantScoreQuery(new TermQuery(new Term("bookmarked","true"))),0.1f),BooleanClause.Occur.SHOULD);
         if(!configurationAllowed)query.add(new TermQuery(new Term("configuration","true")),BooleanClause.Occur.MUST_NOT);
         if(hiddenJournalRoot!=null&&!hiddenJournalRoot.isBlank())
             query.add(new PrefixQuery(new Term("path_key",VaultPath.searchKey(hiddenJournalRoot)+"/")),BooleanClause.Occur.MUST_NOT);

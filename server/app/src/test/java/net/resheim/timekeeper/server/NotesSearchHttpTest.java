@@ -13,6 +13,21 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(NotesSearchHttpTest.Profile.class)
 class NotesSearchHttpTest {
+    @Test void bookmarkRankingReplaysAndExpiresCursorsWithoutChangingCanonicalBytes()throws Exception{
+        String word="bookmarkrankingneedle",first="search-http/A-bookmark-ranking.md",last="search-http/Z-bookmark-ranking.md";
+        create("a",first,word);create("a",last,word);create("b","search-http/foreign-bookmark-ranking.md",word);
+        var initial=page(word,1,null);assertEquals(first,initial.path("items").get(0).path("entry").path("path").asText());assertTrue(initial.hasNonNull("nextCursor"));
+        var before=store.transaction("a",()->new VaultCollection(store,limits).get(new VaultPath(last)).deepCopy());
+        store.transaction("a",()->{var bookmarks=new NoteBookmarks(store);var ref=VaultSources.fromEntry(before);bookmarks.save(ref,bookmarks.tag(ref),true);return null;});
+        assertEquals(412,request("test-a",word,1,initial.path("nextCursor").asText()).statusCode());
+        var marked=page(word,10,null);assertEquals(2,marked.path("items").size());assertEquals(last,marked.path("items").get(0).path("entry").path("path").asText());assertTrue(marked.path("items").get(0).path("entry").path("bookmarked").asBoolean());
+        store.transaction("a",()->{
+            var vault=new VaultCollection(store,limits);var entry=vault.get(new VaultPath(last));
+            assertEquals(before.path("contentTag"),entry.path("contentTag"));assertEquals(before.path("modifiedAt"),entry.path("modifiedAt"));assertArrayEquals(word.getBytes(StandardCharsets.UTF_8),vault.read(entry));
+            var bookmarks=new NoteBookmarks(store);var ref=VaultSources.fromEntry(entry);bookmarks.save(ref,bookmarks.tag(ref),false);return null;
+        });
+        assertEquals(first,page(word,10,null).path("items").get(0).path("entry").path("path").asText());
+    }
     public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("searchhttp",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:notes_search_http_test"));}}
     @Inject ServerStore store;
     @Inject VaultLimits limits;
