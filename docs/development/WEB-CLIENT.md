@@ -1280,3 +1280,28 @@ writes reload metadata and require a new explicit decision; body drafts stay in
 memory. Optional `bookmarks` metadata is included in account ZIP archives and in
 the normal full database backup. A plain folder import/export carries document
 files and dates; it does not carry these application bookmarks.
+
+## Note search panel
+
+The title-bar search and right-side results panel use the owner-bound Notes
+search API. Unqualified queries search all note types and published event details; `event:`, `journal:` and
+`note:` filters narrow them. Pure `file:` queries use the existing filename
+catalog to retain folder and attachment results. Search generations reject late
+queries and account changes, while signed cursors detect stale paging. The panel
+is modeless so users can keep editing or open guarded note popups without losing
+results. Maximizing a popup closes the panel; ordinary Close returns focus to the
+result that opened it.
+
+Calendar results include description and location from visible event-enabled
+subscriptions, even without saved notes. Opening details does not create a note.
+Where a saved event note exists, the same guarded Markdown editor edits its real
+canonical entry alongside current event details. Recurring series are labelled
+as definitions rather than expanded into unlimited occurrences.
+
+Opening or maximizing a calendar result retries `NOTES_SEARCH_INDEXING` within
+one 15-second budget when a recent save is ahead of the derived index. The
+selected action shows preparation status and rejects repeat clicks; other
+results, editing and Close remain available. Closing the source, changing the
+selection/query or ending the session prevents the pending result from opening.
+Other failures return immediately, and an exhausted index wait leaves the draft
+and a recoverable error in place.

@@ -12,18 +12,19 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 
 /** Shared guarded Markdown dialog for vault and journal notes. */
 export class JournalNoteEditor {
-  constructor(root,callbacks,prefix,fieldPrefix=prefix+'-journal',{vault=false}={}){
-    this.callbacks=callbacks;this.vault=vault;this.generation=0;this.positions=new Map();
-    this.dialog=node('dialog',undefined,'app-dialog journal-dialog journal-document-dialog shadow-lg');this.dialog.id=prefix+'-editor';
+  constructor(root,callbacks,prefix,fieldPrefix=prefix+'-journal',{vault=false,inline=false}={}){
+    this.callbacks=callbacks;this.vault=vault;this.inline=inline;this.generation=0;this.positions=new Map();
+    this.dialog=node(inline?'section':'dialog',undefined,'app-dialog journal-dialog journal-document-dialog '+(inline?'journal-document-inline':'shadow-lg'));this.dialog.id=prefix+'-editor';
+    if(inline){this.dialog.hidden=true;this.dialog.setAttribute('role','region');}
     this.title=node('h2');this.title.id=prefix+'-title';this.dialog.setAttribute('aria-labelledby',this.title.id);
     this.closeButton=iconButton(button('','btn btn-outline-secondary'),'close',t('ui.close'));this.closeButton.addEventListener('click',()=>this.close());
     this.maximizeButton=iconButton(button('','btn btn-outline-secondary'),'maximize',t('notes.maximize'));this.maximizeButton.addEventListener('click',()=>void this.maximize());
-    const windowTools=node('div',undefined,'btn-group');windowTools.append(this.maximizeButton,this.closeButton);
+    const windowTools=node('div',undefined,'btn-group');windowTools.append(this.maximizeButton,this.closeButton);windowTools.hidden=inline;
     const heading=node('div',undefined,'week-note-heading');heading.append(this.title,windowTools);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
     this.resources=vaultEditorResources(()=>this.session,()=>this.vault&&!['DAY','WEEK','EVENT'].includes((this.note||this.context?.entry)?.kind)?(this.note?.path||this.context?.entry?.path||''):this.source(),undefined,{canCreate:()=>this.writable&&!this.busy&&!this.stale,beforeCreate:()=>this.canLeave()});
-    const host=node('div',undefined,'journal-document-content');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,(file,image)=>this.uploadAsset(file,image),{...noteRevisionResources(()=>this.session,()=>{const {sourceType,sourceId}=this.source();return {sourceType,sourceId};},{bodyOnly:!vault,latest:async()=>{const reply=await this.readNote();return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.session),...this.resources});
+    const host=node('div',undefined,'journal-document-content');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,(file,image)=>this.uploadAsset(file,image),{noteClient:{current:()=>this.note&&(this.vault||this.source().sourceType!=='EVENT_NOTE'||this.note.version)?{session:this.session,...this.source(),writable:this.writable&&!this.busy}:null,error:error=>{this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized(error);}},...noteRevisionResources(()=>this.session,()=>{const {sourceType,sourceId}=this.source();return {sourceType,sourceId};},{bodyOnly:!vault,latest:async()=>{const reply=await this.readNote();return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.session),...this.resources});
     const actions=node('div',undefined,'dialog-actions');
     this.delete=iconButton(button('','btn btn-outline-secondary'),'trash',t('journal.delete_note'));this.delete.addEventListener('click',()=>void this.remove());
     const documentTools=node('div');documentTools.append(this.delete);this.markdown.addActionsGroup(documentTools);
@@ -41,6 +42,7 @@ export class JournalNoteEditor {
     if(this.vault){const entry=this.note||this.context?.entry;return {sourceType:entry?.sourceType,sourceId:entry?.sourceId,sourceKey:entry?.sourceKey};}
     return {sourceType:this.path?.startsWith('/week-notes/')?'WEEK_NOTE':'EVENT_NOTE',sourceId:this.note?.id,sourceKey:this.note?.week||this.note?.subscriptionId&&('event-'+this.note.subscriptionId+'-'+this.note.eventKey+'.md')};
   }
+  get opened(){return this.inline?!this.dialog.hidden:this.dialog.open;}
   async readNote(session=this.session,path=this.path){
     if(!this.vault)return session.request(path);
     const metadata=await session.request(path.replace(/\/content$/,''));
@@ -96,16 +98,17 @@ export class JournalNoteEditor {
     if(session!==this.session||generation!==this.generation)throw new Error(t('markdown.upload_failed'));return 'assets/'+filename;
   }
   async open(context,session,writable){
-    if(!session||this.dialog.open)return;
+    if(!session||this.opened)return;
     if(this.positionSession&&this.positionSession!==session)this.positions.clear();this.positionSession=session;
     this.autosave.reset();this.maximizing=false;this.saveFailed=false;this.uncertain=null;this.saving=false;this.context=context;this.path=context.path;this.origin=context.originElement||document.activeElement;this.session=session;this.writable=writable;this.note=null;this.stale=false;this.busy=false;
     this.title.textContent=context.title;this.error.hidden=true;this.status.textContent=t('day_notes.loading');
-    this.markdown.clear();this.controls();this.dialog.showModal();
+    this.markdown.clear();this.controls();if(this.inline)this.dialog.hidden=false;else this.dialog.showModal();
     const generation=++this.generation;
     try{
       const reply=await this.readNote(session);
-      if(generation!==this.generation||!this.dialog.open)return;
+      if(generation!==this.generation||!this.opened)return;
       this.note={...reply.data,etag:reply.etag};this.markdown.setValue(reply.data.body);this.status.textContent=writable?t('journal.saved'):t('journal.read_only');this.controls();
+      if(context.detailsOnly)return;
       const position=this.positions.get(this.path);if(position)await this.markdown.restorePosition({...position,formatted:true});else void this.markdown.showFormatted(false);
     }catch(error){
       if(generation!==this.generation)return;
@@ -113,11 +116,11 @@ export class JournalNoteEditor {
     }
   }
   async close(force=false){
-    if(!this.dialog.open)return;
+    if(!this.opened)return;
     if(!force&&(this.busy||!await this.autosave.flush()))return;
     this.autosave.reset();
     if(this.path&&this.note)this.positions.set(this.path,this.markdown.position());
-    ++this.generation;this.maximizing=false;this.dialog.close();this.note=null;this.session=null;this.markdown.clear();
+    ++this.generation;this.maximizing=false;if(this.inline)this.dialog.hidden=true;else this.dialog.close();this.note=null;this.session=null;this.markdown.clear();
   }
   reset(){this.close(true);this.positions.clear();this.positionSession=null;}
   async commit({keepalive=false}={}){

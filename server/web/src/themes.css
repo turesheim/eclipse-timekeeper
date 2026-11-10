@@ -166,6 +166,11 @@
   & :is(.calendar-session-select,.calendar-resize):focus-visible { outline-color: #000; outline-offset: -3px; }
   & :is(.form-control,.form-select) { color: #000; background-color: var(--newspaper-paper); border-color: #000; }
   & :is(.form-control::placeholder,.form-control:disabled) { color: #000; opacity: 1; }
+  & input[type=search]::-webkit-search-cancel-button {
+    -webkit-appearance: none; appearance: none; width: 1rem; height: 1rem; margin-inline-start: .5rem; cursor: pointer;
+    background: linear-gradient(45deg, transparent 43%, #000 0 57%, transparent 0),
+      linear-gradient(-45deg, transparent 43%, #000 0 57%, transparent 0);
+  }
   & .form-select { --bs-form-select-bg-img: url('/web/assets/newspaper-select.svg'); }
   & input::-webkit-datetime-edit-day-field:focus { color: var(--newspaper-paper); background: #000; }
   & input::-webkit-datetime-edit-month-field:focus { color: var(--newspaper-paper); background: #000; }
@@ -198,7 +203,7 @@
   & :is(.btn-outline-secondary:hover,.btn-outline-secondary:active,.workspace-nav .nav-link:not(.active):hover,
     .project-icon-option:has(:checked),.day,.calendar-heading.today:not(.public-holiday),.calendar-day.weekend,
     .calendar-heading.public-holiday,.calendar-day.public-holiday,.track-public-holiday,.today-public-holiday,
-    .alert,.markdown-source-fragment,.markdown-revision-diff,.markdown-editor .ProseMirror pre,
+    .alert,.markdown-source-fragment,.markdown-revision-diff,.notes-search-excerpt mark,.markdown-editor .ProseMirror pre,
     .markdown-editor .ProseMirror th,.calendar-task,.calendar-create-preview) {
     background-color: var(--newspaper-paper); background-image: var(--newspaper-dots); background-size: 4px 4px;
   }
@@ -217,6 +222,7 @@
   & :is(button.calendar-summary-card,.calendar-session,.calendar-planned,.calendar-all-day-event):hover { border-inline-start-color: #000; }
   & .work-session { border-block-start-color: #000; }
   & .client-color::before { border-radius: 0; background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px; }
+  & .note-client-swatch { border-radius: 0; background: var(--newspaper-paper) var(--newspaper-dots) 0 0 / 2px 2px !important; }
   & .calendar-task { border-color: #000; }
   & .calendar-slot { border-color: #000; border-block-start-style: dotted; }
   & .calendar-slot.hour { border-block-start-style: solid; }

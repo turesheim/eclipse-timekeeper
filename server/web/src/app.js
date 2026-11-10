@@ -1,3 +1,4 @@
+import {updateNoteClientDirectory} from './note-client.js';
 import {editorPreferences} from './editor-preferences.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {hashtagKey,tagNavigation} from './hashtags.js';
@@ -12,7 +13,10 @@ import { sameSession } from './calendar-model.js';
 import { MonthTrack } from './track.js';
 import { TodayView } from './today.js';
 import { NotesView } from './notes.js';
+import {NotesSearch} from './notes-search.js';
 import {NotePopup} from './note-popup.js';
+import {CalendarSearchEditor,calendarSearchNavigation} from './calendar-search-editor.js';
+import {calendarSearchHit} from './calendar-search-navigation.js';
 import { TasksView } from './tasks.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
@@ -61,33 +65,59 @@ const today = new TodayView($('today-panel'), {
   onNotesChanged:()=>void refresh().catch(()=>{}),
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
+const noteSearch=new NotesSearch($('titlebar-notes-search'),{onUnauthorized:error=>auth.clear(errorText(error))});
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
 const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))});
+const calendarSearchPanel=element('section');calendarSearchPanel.id='calendar-search-panel';calendarSearchPanel.hidden=true;$('workspace').append(calendarSearchPanel);
+const searchEditorCallbacks={onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))};
+const calendarSearchPopup=new CalendarSearchEditor($('workspace'),searchEditorCallbacks);
+const calendarSearchWorkspace=new CalendarSearchEditor(calendarSearchPanel,searchEditorCallbacks,{inline:true});
+let calendarNavigation=0;
+async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave()&&await calendarSearchWorkspace.canLeave();}
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
-  event.preventDefault();const session=api,tag=hashtagKey(event.detail.tag);
+  event.preventDefault();++calendarNavigation;const session=api,tag=hashtagKey(event.detail.tag);
   if(!tag||!session||!await navigationGuards(event.detail.guards,session))return;
-  if($('workspace').dataset.view!=='notes'&&await tab('notes')===false||session!==api)return;
-  event.detail.leave.forEach(leave=>leave());await notes.findTag(tag);
+  event.detail.leave.forEach(leave=>leave());noteSearch.show('tag:'+tag);
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
-  event.preventDefault();const session=api,detail=event.detail;
-  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return;
+  event.preventDefault();++calendarNavigation;const session=api,detail=event.detail;
+  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
   detail.leave.forEach(leave=>leave());
-  if(detail.popup){await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
-  if(detail.maximize){today.closeEvent();calendar.subscriptions.details.close();}
+  if(detail.popup){calendarSearchPopup.close(true);await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
+  if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}
   if(detail.maximize&&detail.entry.kind==='DAY'){
     const date=dailyNoteDate(detail.entry.sourceKey);if(!date)return;
     if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}return;
   }
-  if(await tab('notes')===false||session!==api)return;await notes.select(detail.entry.id,!!detail.maximize);
+  if(await tab('notes')===false||session!==api)return;if(detail.searchFolder){await notes.revealFolder(detail.entry);return;}await notes.select(detail.entry.id,!!detail.maximize);
   if(detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(detail.heading);
   if(detail.maximize&&notes.note?.id===detail.entry.id)notes.markdown.focus();
 });
+document.addEventListener(calendarSearchNavigation,async event=>{
+  event.preventDefault();const session=api,detail=event.detail,request=++calendarNavigation;
+  const current=()=>session===api&&request===calendarNavigation;
+  try{
+    if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current())return;
+    const reply=await calendarSearchHit(session,detail.id,async()=>current()&&await navigationGuards(detail.guards,session)&&current(),detail.pending);
+    if(!reply||!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
+    detail.leave.forEach(leave=>leave());
+    if(detail.maximize){
+      if(await tab('calendar-search')===false||session!==api)return;
+      noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();
+      await calendarSearchWorkspace.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
+      if(session===api&&calendarSearchWorkspace.opened){calendarSearchWorkspace.title.tabIndex=-1;calendarSearchWorkspace.title.focus({preventScroll:true});}
+    }else{
+      notePopup.close(true);calendarSearchPopup.close(true);
+      await calendarSearchPopup.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
+    }
+  }catch(error){if(current()&&await navigationGuards(detail.guards,session)){if(error.status===401)auth.clear(errorText(error));else if(calendarSearchPopup.opened){calendarSearchPopup.error.textContent=errorText(error);calendarSearchPopup.error.hidden=false;}else setStatus(errorText(error));}}
+  finally{detail.finished?.();}
+});
 document.addEventListener(dayNoteNavigation,async event=>{
-  event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
-  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
+  event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
+  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
   if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });
@@ -173,6 +203,7 @@ function readOnlyWhileDisconnected() {
   today.journal.setWritable(connected && canWrite);
   notes.writable=connected && canWrite;notes.controls();
   notePopup.writable=connected&&canWrite;notePopup.controls();
+  for(const view of [calendarSearchPopup,calendarSearchWorkspace]){view.writable=connected&&canWrite&&!!view.context?.entry;view.controls();}
   tasks.writable=connected && canWrite;tasks.controls();
   weekSessions.setWritable(connected && canWrite);
   $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
@@ -180,9 +211,9 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 async function tab(name) {
-  const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return false;
-  notePopup.close(true);
-  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks']) $(`${item}-panel`).hidden = item !== name;
+  ++calendarNavigation;const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return false;
+  notePopup.close(true);calendarSearchPopup.close(true);calendarSearchWorkspace.close(true);
+  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks','calendar-search']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if(name==='notes')notes.show();else notes.hide();
@@ -199,8 +230,8 @@ async function tab(name) {
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
-  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave(),
-  beforeNavigate:async()=>{if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave())return false;notePopup.close(true);return true;},
+  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave()&&await canLeaveSearchEvents(),
+  beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
@@ -231,9 +262,9 @@ const auth = authentication({
     editorPreferences.reset();
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshing = null;reloadAgain = false;
-    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
+    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
+    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -395,6 +426,7 @@ $('focus-select').addEventListener('change',()=>{
   focusId=$('focus-select').value;selectedDay=null;render();
 });
 function render() {
+  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision);
   paintFocus();
   const s = focusedSnapshot(snapshot,currentFocus()),zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;
@@ -410,7 +442,7 @@ function render() {
   calendar.update(s, connected, api);
   track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
   today.update(s, connected, api);
-  notes.update(s,connected,api,canWrite);
+  notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite);
   tasks.update(s,connected,api,canWrite);
 }
 function renderChangedList(id,records,paint){
@@ -565,6 +597,7 @@ function begin(title, state) {
 }
 function showEditor() {$('editor').showModal();$('fields').querySelector('input,select,textarea')?.focus();}
 async function openRecord(collection, id = null, initial = {}, caption = null) {
+  ++calendarNavigation;
   const session = api;
   const loaded = id ? await session.request(`/${collection}/${id}`) : { data: initial, etag: null };
   if (session !== api || !connected) return;
@@ -601,6 +634,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   showEditor();
 }
 async function openCalendarActivity(event,range) {
+  ++calendarNavigation;
   const session=api;if(!connected||!canWrite||editor||$('editor').open)return;
   const summary=[event.title,event.description].filter(Boolean).join('\n\n');
   await openRecord('activities',null,{summary:summary.slice(0,2000),start:event.start,end:event.end},i18nText('calendar.create_activity'));
@@ -669,6 +703,7 @@ async function changeCalendarSession(original, proposal, scope) {
   }
 }
 async function openDelete(collection, id) {
+  ++calendarNavigation;
   const session = api,loaded = await session.request(`/${collection}/${id}`);
   if (session !== api || !connected || !begin(i18nText("ui.delete_record"), { collection, id, etag: loaded.etag, remove: true })) return;
   $('fields').append(element('p', i18nText("ui.delete_681b54", { value0: loaded.data.name || loaded.data.summary || (collection === 'work-sessions' ? i18nText("ui.work_session_21aa04") : i18nText("ui.activity")), value1: collection === 'work-sessions' ? i18nText("ui.undo_will_be_available_for_ten_minutes") : i18nText("ui.this_cannot_be_undone_records_with_dependencies_may_be_rejected") })));

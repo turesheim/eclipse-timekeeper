@@ -22,9 +22,29 @@ class NotesSearchServiceTest {
     private NotesSearchSources sources(){return new NotesSearchSources(store);}
     private UUID create(String owner,String text){return store.transaction(owner,()->{var vault=new VaultCollection(store,limits);vault.initialize();new NotesSearchChanges(store).snapshot();return VaultCollection.id(vault.put(new VaultPath("note.md"),null,true,bytes(text)));});}
     private NotesLuceneIndex.Page waitFor(NotesSearchService service,NotesSearchSources.State state,String text)throws Exception{
+        return waitFor(service,state,text,NotesSearchService.NOTES);
+    }
+    private NotesLuceneIndex.Page waitFor(NotesSearchService service,NotesSearchSources.State state,String text,NotesSearchService.Backend backend)throws Exception{
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);IOException last=null;
-        do{try{return service.search(state,NotesSearchQuery.parse(text),50,null,500);}catch(IOException unavailable){last=unavailable;Thread.sleep(10);}}while(System.nanoTime()<deadline);
+        do{try{return service.search(state,NotesSearchQuery.parse(text),50,null,500,backend);}catch(IOException unavailable){last=unavailable;Thread.sleep(10);}}while(System.nanoTime()<deadline);
         throw new AssertionError("Search cache did not become ready",last);
+    }
+    @Test void sourceNamespacesShareTheOwnerLimitWithoutSharingAnIndexOrLeakingResults()throws Exception{
+        var backend=new NotesSearchService.Backend(){
+            public String key(){return "calendar-probe";}
+            public NotesSearchSources sources(ServerStore store){return new NotesSearchSources(store);}
+            public NotesIndexReplay open(Path path,NotesSearchSources sources,NotesSearchSources.State state)throws IOException{return NotesSearchReplay.open(path,sources,state);}
+        };
+        String owner="search-source-owner",other="search-source-other";UUID own=create(owner,"ownedneedle"),foreign=create(other,"foreignneedle");
+        var state=sources().state(owner);var otherState=sources().state(other);
+        try(var service=new NotesSearchService(store,temporary.resolve("source-namespaces"))){
+            service.maximumOwners=1;
+            assertEquals(own,waitFor(service,state,"ownedneedle").items().getFirst().id());assertEquals(own,waitFor(service,state,"ownedneedle",backend).items().getFirst().id());
+            assertEquals("READY",service.status(state).state());assertEquals("READY",service.status(state,backend).state());
+            assertTrue(service.search(state,NotesSearchQuery.parse("foreignneedle"),50,null,500,backend).items().isEmpty());
+            assertEquals(foreign,waitFor(service,otherState,"foreignneedle",backend).items().getFirst().id());
+            assertEquals(own,waitFor(service,state,"ownedneedle",backend).items().getFirst().id());assertEquals(own,waitFor(service,state,"ownedneedle").items().getFirst().id());
+        }
     }
     @Test void independentReplicasCatchUpAfterSavesAndKeepOwnerResultsPrivate()throws Exception{
         String owner="search-runtime-owner";UUID id=create(owner,"needle original");create("search-runtime-other","foreignneedle");var initial=sources().state(owner);
