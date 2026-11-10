@@ -351,6 +351,7 @@ final class TaskSync {
             if(item.path("deleted").asBoolean()) row.put("status","IGNORE_DELETED");
             else if(tombstoned(key)) {row.put("status","CONFLICT");row.put("reason","LOCAL_DELETED");}
             else if(TaskProviderWrites.holdsImport(store,key)){row.put("status","DEFERRED");row.put("reason","CREATE_IDENTITY_REQUIRED");}
+            else if(TaskProviderIdentities.holdsImport(store,connection,list,key)){row.put("status","DEFERRED");row.put("reason","NEW_IDENTITY_REVIEW");}
             else if(!connection.path("capabilities").path("fields").path("summary").path("readable").asBoolean()) {
                 row.put("status","UNSUPPORTED");row.put("reason","SUMMARY_UNSUPPORTED");
             } else if(item.path("fields").hasNonNull("summary")) {
@@ -369,7 +370,7 @@ final class TaskSync {
         for(var value:task.path("externalReferences")) if(value.path("providerId").asText().equals(key.providerId())
                 && value.path("repositoryId").asText().equals(key.repositoryId())
                 && value.path("externalId").asText().equals(key.externalId())) {reference=value;break;}
-        if(reference==null) {row.put("status","RECONCILE_ID");row.put("reason","IDENTITY_ALIAS");return row;}
+        if(reference==null) {row.put("status",item.path("deleted").asBoolean()?"IGNORE_DELETED":"RECONCILE_ID");row.put("reason",item.path("deleted").asBoolean()?"RETIRED_IDENTITY":"IDENTITY_ALIAS");return row;}
         if(!reference.path("taskListId").asText().equals(list.path("id").asText())) {
             row.put("status","CONFLICT");row.put("reason","OTHER_LIST");return row;
         }

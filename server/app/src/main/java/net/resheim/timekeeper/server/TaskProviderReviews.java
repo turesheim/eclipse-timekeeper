@@ -24,6 +24,7 @@ final class TaskProviderReviews {
         var result=object().put("observedAt",scan.observedAt().toString()).put("count",0);var items=result.putArray("items");
         for(var remote:scan.tasks()){
             ObjectNode row;try{row=review(connection,list,value,scan,remote);}catch(ApiFailure failure){if(failure.status!=409)throw failure;row=object().put("externalId",remote.id()).put("status","DEFERRED").put("canResolve",false);}
+            if(Set.of("NEW_IDENTITY_REVIEW","IDENTITY_ALIAS").contains(row.path("reason").asText()))continue;
             if(Set.of("CREATE","UPDATE","KEEP_LOCAL","UNCHANGED","IGNORE_DELETED").contains(row.path("status").asText()))continue;
             if(!filter.isEmpty()&&!(remote.id()+" "+remote.fields().path("summary").asText()+" "+row.path("localFields").path("summary").asText()).toLowerCase(Locale.ROOT).contains(filter))continue;
             result.put("count",result.path("count").asInt()+1);if(items.size()<100){row.put("reviewEtag",etag(row));items.add(row);}

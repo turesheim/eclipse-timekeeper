@@ -274,3 +274,36 @@ versions run in container CI and upload the JSON report with the corresponding
 acceptance artifacts. `--expected-commit` requires the exact clean checkout;
 reports record the commit and whether local source was dirty. The normal Maven
 suite skips this one opt-in process-restart test.
+
+### New identities and moved tasks
+
+Google connections default to **Review new Google identities before importing**.
+The first selected-list import still has its complete preview and approval.
+After that, linked tasks continue to update automatically; new identities wait
+for **Review new identities**. Uncheck the setting and save the selected lists
+if you prefer automatic additions. A provider ID change can then appear as a
+separate task; titles are never used to decide that records are the same.
+
+Each observed identity offers **Import as a new task** or **Use the existing
+Dagsverk task**. For replacement, choose the exact existing task and source link
+from the same provider account, compare current and observed
+values, and acknowledge the choice. The scan and native task each have their
+own revision guard, and scans expire after 15 minutes. Stale choices retain the
+comparison and require a fresh review. The target list must be selected and
+readable. Explicitly retiring an existing owned link also works if its old list
+is unselected or unavailable; it does not modify or fetch that old list.
+
+Replacement keeps the native task ID and project, retains unrelated references,
+records the previous key as a lookup alias, and preserves native hierarchy.
+Hierarchy stays local for the reconciled identity, as it does for tasks created
+at Google from native tasks. Independent observed field changes are accepted;
+conflicting local values stay. Source resources refresh while unrelated or
+locally edited resources remain. An explicit deletion of a retired alias cannot
+delete the retained task; a live retired identity can be explicitly made current
+again. Deliberate local deletion markers and uncertain outgoing creations cannot
+be bypassed by identity review. These local decisions send no provider writes.
+
+The [Google move API](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks/move)
+returns a task resource, but does not promise cross-list ID stability. This
+connector therefore requires explicit identity choices instead of assuming a
+move from a title match or an absent record.

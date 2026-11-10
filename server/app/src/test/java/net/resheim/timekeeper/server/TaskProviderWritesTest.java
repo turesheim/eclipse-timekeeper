@@ -42,7 +42,7 @@ class TaskProviderWritesTest {
             var connection=connections().connect(connections().consume(state,"browser"),settings,new TaskCloudProvider.Account("account","Google Tasks"),
                     new TaskProviderOAuth.Tokens("private-access","private-refresh",store.now().plusSeconds(3600),Set.of("openid","https://www.googleapis.com/auth/tasks"+(writable?"":".readonly"))),
                     List.of(new TaskCloudProvider.RemoteList("remote-list","Work","STANDARD",false,true,parse("{\"id\":\"remote-list\",\"title\":\"Work\"}"))));
-            UUID id=uuid(connection.get("id"));connections().select(id,List.of("remote-list"),etag(connection));UUID list=uuid(store.list("TASK_LIST").getFirst().get("id"));
+            UUID id=uuid(connection.get("id"));connections().select(id,List.of("remote-list"),null,etag(connection),false);UUID list=uuid(store.list("TASK_LIST").getFirst().get("id"));
             var original=raw("Original","\"g1\"");if(assigned)original.putObject("assignmentInfo").put("surfaceType","DOCUMENT").put("linkToTask","https://docs.google.com/document/d/source/edit");
             var claim=connections().claim(id,false);var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);
             scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(original)),null,null));

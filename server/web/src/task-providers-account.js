@@ -4,6 +4,7 @@ import {instantText} from './model.js';
 import {node,button,section} from './account-ui.js';
 import {taskProviderWrites} from './task-provider-writes.js';
 import {taskProviderReviews} from './task-provider-reviews.js';
+import {taskProviderIdentities} from './task-provider-identities.js';
 
 const providerName=id=>t('task_providers.'+id);
 const providerError=code=>new ApiError(code).message;
@@ -28,14 +29,14 @@ export async function renderTaskProviders(view){
     for(const [provider,pick]of connectButtons)pick.disabled=!view.canWrite||view.busy||view.uncertain||!configured[provider];
     access.disabled=!view.canWrite||view.busy||view.uncertain||!configured.google;
     for(const card of cards.values()){
-      for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
+      for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
       card.save.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       card.refresh.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused||card.data.syncing||!card.data.enabled||!configured[card.data.providerId];
       card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;card.reconnect.disabled=!view.canWrite||view.busy||view.uncertain||!configured[card.data.providerId];
       card.pause.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       for(const input of card.imports.querySelectorAll('button'))input.disabled=view.busy||view.uncertain||card.data.paused;
       if(card.approve)card.approve.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused;
-      if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!configured.google;card.writes.controls();card.incoming.controls();
+      if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!configured.google;card.writes.controls();card.incoming.controls();card.identities.controls();
     }
   };
   const run=(work,submit,target=feedback)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true}).finally(()=>{if(view.valid())controls();});
@@ -52,15 +53,16 @@ export async function renderTaskProviders(view){
     const card={data},panel=section(view,t('task_providers.account',{provider:providerName(data.providerId),name:data.name}));card.panel=panel;panel.dataset.taskProviderId=data.id;panel.firstElementChild.classList.add('text-break');
     card.status=node('p','','hint');card.status.setAttribute('role','status');card.direction=node('p','','hint');card.error=node('p','','alert alert-warning');card.error.hidden=true;card.retry=node('p','','hint');card.retry.hidden=true;
     card.form=node('form');card.form.addEventListener('change',()=>{view.dirty.add(card.form);controls();});
+    const additions=node('label',undefined,'d-flex gap-2 align-items-start mb-3');card.additions=node('input',undefined,'form-check-input');card.additions.type='checkbox';card.additions.checked=data.reviewAdditions!==false;additions.hidden=data.providerId!=='google';additions.append(card.additions,node('span',t('task_identities.review_additions')));card.form.append(additions);
     const fields=node('fieldset');fields.append(node('legend',t('task_providers.lists'),'h6 mb-2'));card.choices=node('div');fields.append(card.choices);card.form.append(fields);
     card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('ui.save'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
     card.form.append(card.feedback,card.save);card.form.addEventListener('submit',event=>{
       event.preventDefault();run(async()=>{
-        const selectedLists=[...card.form.querySelectorAll('input:checked')].map(input=>input.value);
+        const selectedLists=[...card.form.querySelectorAll('input[name=selectedLists]:checked')].map(input=>input.value);
         const projectMappings=Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null]));
         const latest=await view.session.request('/task-providers/'+data.id);if(!view.valid())return;
         if((latest.data.configurationVersion??latest.data.version)!==card.draftVersion)throw new ApiError('STALE_VERSION',412);
-        await view.session.request('/task-providers/'+data.id+'/lists',{method:'PUT',etag:latest.etag,body:{selectedLists,projectMappings}});if(!view.valid())return;
+        await view.session.request('/task-providers/'+data.id+'/lists',{method:'PUT',etag:latest.etag,body:{selectedLists,projectMappings,...(data.providerId==='google'?{reviewAdditions:card.additions.checked}:{})}});if(!view.valid())return;
         view.clean(card.form);card.feedback.textContent=t('task_providers.selection_saved');await load();
       },card.save,card.feedback);
     });
@@ -81,10 +83,11 @@ export async function renderTaskProviders(view){
       view.clean(card.form);await load();feedback.textContent=t('task_providers.disconnected');
     },card.disconnect,card.feedback));
     card.imports=node('div',undefined,'mt-3');card.reviewPanel=node('div',undefined,'mt-3');card.reviewPanel.hidden=true;
+    const identities=node('div',undefined,'mt-3');card.identities=taskProviderIdentities(view,identities,{reload:load,controls,projects});
     const incoming=node('div',undefined,'mt-3');card.incoming=taskProviderReviews(view,incoming,{reload:load,controls});
     const writes=node('div',undefined,'mt-3');card.writes=taskProviderWrites(view,writes,{reload:load,controls});
     const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.refresh,card.pause,card.reconnect,card.disconnect);
-    panel.append(card.status,card.direction,card.error,card.retry,card.form,card.imports,card.reviewPanel,incoming,writes,accessLabel,actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));cards.set(data.id,card);return card;
+    panel.append(card.status,card.direction,card.error,card.retry,card.form,card.imports,card.reviewPanel,identities,incoming,writes,accessLabel,actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));cards.set(data.id,card);return card;
   }
   function paintImports(card){
     const values=card.data.imports||[],signature=JSON.stringify(values);if(signature===card.importSignature)return;
@@ -115,11 +118,11 @@ export async function renderTaskProviders(view){
       if(value.ownerId!==view.session.owner)throw new ApiError('OWNER_CHANGED',401);present.add(value.id);const card=cards.get(value.id)||cardFor(value);card.data=value;
       card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('task_providers.last_success',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});
       card.direction.textContent=t(value.direction==='TWO_WAY'?'task_providers.mode_two_way':'task_providers.mode_import');card.pause.textContent=t(value.paused?'task_providers.resume':'task_providers.pause');paintImports(card);
-      if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);
+      if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);
       card.error.hidden=!value.lastError;card.error.textContent=value.lastError?providerError(value.lastError)+(value.pendingCount?' '+t('task_providers.pending',{count:value.pendingCount}):''):'';
       card.retry.hidden=!value.lastError||!value.nextRefresh;card.retry.textContent=card.retry.hidden?'':t('task_providers.next_attempt',{date:instantText(value.nextRefresh,zone)});
       if(!view.dirty.has(card.form)){
-        card.draftVersion=value.configurationVersion??value.version;
+        card.draftVersion=value.configurationVersion??value.version;card.additions.checked=value.reviewAdditions!==false;
         const signature=JSON.stringify([value.availableLists,value.selectedLists,value.projectMappings]);if(signature!==card.signature){
           card.signature=signature;card.choices.replaceChildren();
           for(const list of value.availableLists){
@@ -134,7 +137,7 @@ export async function renderTaskProviders(view){
         }
       }
     }
-    for(const [id,card]of cards)if(!present.has(id)){view.clean(card.form);card.writes.dispose();card.incoming.dispose();card.panel.remove();cards.delete(id);}
+    for(const [id,card]of cards)if(!present.has(id)){view.clean(card.form);card.writes.dispose();card.incoming.dispose();card.identities.dispose();card.panel.remove();cards.delete(id);}
     configured=data.providers;setup.hidden=Object.values(configured).every(Boolean);controls();
   }
   async function load(){
@@ -148,7 +151,7 @@ export async function renderTaskProviders(view){
     if(view.busy||document.hidden){timer=setTimeout(poll,2000);return;}
     try{await load();}catch(error){if(!view.valid())return;if(error.status===401){view.signOut(error.message);return;}feedback.textContent=error.message;timer=setTimeout(poll,30000);}
   }
-  view.cleanup.add(()=>{++generation;clearTimeout(timer);controller?.abort();for(const card of cards.values()){card.writes.dispose();card.incoming.dispose();}});
+  view.cleanup.add(()=>{++generation;clearTimeout(timer);controller?.abort();for(const card of cards.values()){card.writes.dispose();card.incoming.dispose();card.identities.dispose();}});
   const [profile,projectPage,clientPage]=await Promise.all([view.session.request('/me'),view.session.page('/projects'),view.session.page('/clients')]);if(!view.valid())return;
   zone=profile.data.zoneId;projects=projectPage.items.map(project=>({...project,label:[clientPage.items.find(client=>client.id===project.clientId)?.name,project.name].filter(Boolean).join(' / ')}));await load();
 }

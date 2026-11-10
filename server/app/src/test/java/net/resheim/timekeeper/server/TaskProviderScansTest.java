@@ -35,7 +35,7 @@ class TaskProviderScansTest {
                     new TaskProviderOAuth.Tokens("private-access","private-refresh",store.now().plusSeconds(3600),Set.of("openid","https://www.googleapis.com/auth/tasks.readonly")),
                     List.of(new TaskCloudProvider.RemoteList("remote-list","Work","STANDARD",false,true,parse("{\"id\":\"remote-list\",\"title\":\"Work\"}"))));
             UUID project=UUID.randomUUID();store.save("PROJECT",new Project(new ProjectId(project),"Imported",0));
-            connections().select(uuid(connection.get("id")),List.of("remote-list"),object().put("remote-list",project.toString()),etag(connection));
+            connections().select(uuid(connection.get("id")),List.of("remote-list"),object().put("remote-list",project.toString()),etag(connection),false);
             return new Fixture(owner,uuid(connection.get("id")),uuid(store.list("TASK_LIST").getFirst().get("id")),project);
         });
     }

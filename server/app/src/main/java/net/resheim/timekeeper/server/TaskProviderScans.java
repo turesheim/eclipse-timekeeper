@@ -98,10 +98,12 @@ final class TaskProviderScans {
         UUID project=optionalText(auth.path("projects").get(value.path("remoteListId").asText())).map(UUID::fromString).orElse(null);
         var scan=new TaskCloudPull.Scan(value.path("providerId").asText(),value.path("accountId").asText(),value.path("remoteListId").asText(),tasks(value),Instant.parse(value.path("startedAt").asText()),value.path("full").asBoolean());
         var result=new TaskCloudPull(store,receipts,inputs).apply(connection,list,scan,project,true);
+        int identities=0;for(var row:result.path("pending"))if(Set.of("NEW_IDENTITY_REVIEW","IDENTITY_ALIAS").contains(row.path("reason").asText()))identities++;
+        boolean countChanged=value.path("identityCount").asInt(-1)!=identities;value.put("identityCount",identities);
         if(result.path("complete").asBoolean()){
             value.put("state","APPLIED").put("lastAppliedAt",value.path("startedAt").asText());if(value.path("full").asBoolean())value.put("lastFullAt",value.path("startedAt").asText());
             connections().save(SCAN,value);
-        }
+        }else if(countChanged)connections().save(SCAN,value);
         return result;
     }
     static boolean approved(JsonNode auth,String remote){for(var item:auth.path("approved"))if(item.asText().equals(remote))return true;return false;}
@@ -118,13 +120,18 @@ final class TaskProviderScans {
         }
         if(result.size()!=value.path("count").asInt())throw failure("TASK_PROVIDER_SCAN_INCOMPLETE");return List.copyOf(result);
     }
-    ObjectNode ready(UUID connection,UUID list){
+    ObjectNode ready(UUID connection,UUID list){return ready(connection,list,true);}
+    ObjectNode ready(UUID connection,UUID list,boolean requireApproved){
         var auth=connections().required(connection);var value=required(list);check(connection,value,auth);
-        if(!approved(auth,value.path("remoteListId").asText())||!value.path("state").asText().equals("READY"))throw new ApiFailure(409,"TASK_PROVIDER_PREVIEW_NOT_READY");
+        if(requireApproved&&!approved(auth,value.path("remoteListId").asText())||!value.path("state").asText().equals("READY"))throw new ApiFailure(409,"TASK_PROVIDER_PREVIEW_NOT_READY");
         if(Instant.parse(value.path("startedAt").asText()).plusSeconds(900).isBefore(store.now()))throw new ApiFailure(409,"TASK_PROVIDER_PREVIEW_EXPIRED");
         return value;
     }
-    ObjectNode applyReviewed(ObjectNode value){return apply(value,connections().required(uuid(value.get("connectionId"))));}
+    ObjectNode applyReviewed(ObjectNode value){
+        var auth=connections().required(uuid(value.get("connectionId")));
+        if(!approved(auth,value.path("remoteListId").asText()))return object().put("awaitingImport",true);
+        return apply(value,auth);
+    }
     private void check(UUID connection,ObjectNode scan,ObjectNode auth){
         var metadata=store.find("TASK_CONNECTION",connection).orElseThrow(ApiFailure::notFound);var list=store.find("TASK_LIST",uuid(scan.get("id"))).orElseThrow(ApiFailure::notFound);
         if(!scan.path("connectionId").asText().equals(connection.toString())||!scan.path("generation").equals(auth.path("generation"))||!metadata.path("enabled").asBoolean()||!list.path("present").asBoolean()||auth.path("paused").asBoolean()||auth.path("blocked").asBoolean()||!metadata.path("readable").asBoolean()||!list.path("readable").asBoolean()||!list.path("connectionId").asText().equals(connection.toString())||!metadata.path("providerId").equals(scan.path("providerId"))||!metadata.path("remoteAccountId").equals(scan.path("accountId"))||!list.path("remoteListId").equals(scan.path("remoteListId")))throw ApiFailure.conflict();

@@ -22,6 +22,15 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_identity_decisions_cannot_inject_remote_fields_or_replace_without_a_native_revision(self):
+        create={'externalId':'observed-id','decision':'IMPORT'}
+        validator('TaskProviderIdentityDecisionInput').validate(create)
+        replacement={**create,'decision':'REPLACE','taskId':ID,'taskEtag':'"task-current"','previous':{'providerId':'google','repositoryId':'account/list','externalId':'old-id'}}
+        validator('TaskProviderIdentityDecisionInput').validate(replacement)
+        for invalid in [{**create,'fields':{'summary':'injected'}},{**create,'taskId':ID},{**replacement,'taskEtag':'*'},{**replacement,'ownerId':'foreign'}, {k:v for k,v in replacement.items() if k!='previous'}]:
+            self.assertFalse(validator('TaskProviderIdentityDecisionInput').is_valid(invalid))
+        validator('TaskProviderSelectionInput').validate({'selectedLists':['list'],'reviewAdditions':False})
+
     def test_unidentified_creation_requires_an_explicit_separate_import_acknowledgement(self):
         command={'acknowledgePossibleSeparateImport':True}
         validator('TaskProviderLeaveUnresolvedInput').validate(command)
@@ -812,7 +821,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'leaveTaskProviderCreationUnresolved', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'leaveTaskProviderCreationUnresolved', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview', 'listTaskProviderIdentityReviews', 'decideTaskProviderIdentity',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

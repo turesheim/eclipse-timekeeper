@@ -60,7 +60,7 @@ public class TaskProviderResource {
     @PUT @Path("/{id}/lists") public Response select(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
         UUID key=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderSelectionInput",body);queries();
         var selected=new ArrayList<String>();input.path("selectedLists").forEach(value->selected.add(value.asText()));
-        var response=tx(()->ApiReplies.resource(200,connections().select(key,selected,input.get("projectMappings"),match),null));refresh.wake();return response;
+        var response=tx(()->ApiReplies.resource(200,connections().select(key,selected,input.get("projectMappings"),match,input.has("reviewAdditions")?input.path("reviewAdditions").asBoolean():null),null));refresh.wake();return response;
     }
     @GET @Path("/{id}/imports/{list}") public Response importPreview(@PathParam("id")String id,@PathParam("list")String list){
         UUID key=ContractInputs.pathId(id),listKey=ContractInputs.pathId(list);queries();return tx(()->ApiReplies.resource(200,new TaskProviderScans(store,receipts,inputs).review(key,listKey),null));
