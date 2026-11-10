@@ -735,6 +735,33 @@ test('refresh updates a bookmark changed in another client while preserving an u
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(noteEntry(page.locator('#notes-navigation'),path).locator('.bi-bookmark')).toBeVisible();await expect(source).toHaveValue('Keep my unsaved draft');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe('Saved body');
 });
 
+test('Notes autosaves generated wikilink closers without escaping and opens the missing target in a popup',async({page,request})=>{
+  const api=await setup(page,request),path='Notes/Generated links.md';
+  const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(''),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
+  const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,path).click();
+  const rich=page.locator('#notes-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.click();await page.keyboard.type('[[New linked');
+  const saved=async()=>(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).trim();
+  await expect.poll(saved).toBe('[[New linked]]');
+  // Autosave must preserve the caret between the generated closing brackets.
+  await page.keyboard.type(' document');await expect(rich).toHaveText('[[New linked document]]');await expect.poll(saved).toBe('[[New linked document]]');
+  await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');const link=rich.locator('[data-wiki-reference="New linked document"]');await expect(link).toHaveText('New linked document');
+  const accepted=page.waitForEvent('dialog').then(dialog=>dialog.accept());await link.click();await accepted;
+  const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('New linked document');
+  const created=await(await api('GET','/notes/resolve?path=Notes%2FNew%20linked%20document.md')).json();expect(created.kind).toBe('MARKDOWN');expect(await saved()).toBe('[[New linked document]]');
+});
+
+test('Today autosaves generated wikilink closers and offers to create the linked journal document',async({page,request})=>{
+  const api=await setup(page,request),day='2026-11-14',settings=(await(await api('GET','/notes')).json()).settings;
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);
+  const rich=page.locator('#today-journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.click();await page.keyboard.type('[[New journal document');
+  await expect.poll(async()=>(await(await api('GET','/day-notes/'+day+'/content')).json()).body.trim()).toBe('[[New journal document]]');
+  await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');const link=rich.locator('[data-wiki-reference="New journal document"]');await expect(link).toBeVisible();
+  const accepted=page.waitForEvent('dialog').then(dialog=>dialog.accept());await link.click();await accepted;
+  await expect(page.locator('#note-popup-editor')).toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('New journal document');
+  const path=settings.journalFolder+'/New journal document.md';expect((await(await api('GET','/notes/resolve?'+new URLSearchParams({path}))).json()).kind).toBe('MARKDOWN');
+});
+
 test('missing wikilinks confirm creation and open a popup without overwriting existing notes',async({page,request})=>{
   const api=await setup(page,request),body='# Source\n\n[[A new note|New document]] and [[Other/New note#Heading|Nested]] and [[New folder/Sub/New page]].\n';
   await api('PUT','/notes/files?path=Notes%2FSource.md',Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});

@@ -7,7 +7,7 @@ import {codeTools} from './code-tools.js';
 import {plantumlDiagram,plantumlPresentation,plantumlBlock,isPlantUml} from './plantuml.js';
 import {hashtagPresentation} from './hashtags.js';
 import {bracketPairs} from './bracket-pairs.js';
-import {nativeWikiInput,wikiLiteralInput,wikiCompositionEnd} from './wiki-input.js';
+import {nativeWikiInput,wikiLiteralInput,wikiCompositionEnd,wikiInputComplete} from './wiki-input.js';
 import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
@@ -236,7 +236,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput).use(hashtags.plugin).use(changePlugin);
+  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -308,7 +308,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       if(focus)view.focus();return true;
     };
     let snapshot=original,snapshotText=value,comparisonText,comparisonDocument;
-    const markdown=()=>{const current=view.state.doc,result=(origins.get(current.attrs.sourceEpoch)?.render||serialize)(current);snapshot=current;snapshotText=result;return result;};
+    const markdown=()=>{const current=view.state.doc,result=(origins.get(current.attrs.sourceEpoch)?.render||serialize)(wikiInput.project(view.state));snapshot=current;snapshotText=result;return result;};
     const matchesSource=text=>{
       const current=view.state.doc;
       const origin=origins.get(current.attrs.sourceEpoch);
@@ -343,6 +343,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       position:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source);return {anchor:map.source(view.state.selection.anchor),head:map.source(view.state.selection.head,view.state.selection.head>view.state.selection.anchor?-1:1),scrollTop:view.dom.scrollTop};},
       restorePosition:position=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source),anchor=map.rich(position.anchor),head=map.rich(position.head??position.anchor);view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor),view.state.doc.resolve(head))));view.dom.scrollTop=position.scrollTop||0;},
       composing:()=>view.composing,
+      finishWiki:()=>{if(!readOnly&&!view.composing)view.dispatch(view.state.tr.setMeta(wikiInputComplete,true));},
       context:()=>({text:view.state.selection.$from.parent.textContent,table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
       selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},
