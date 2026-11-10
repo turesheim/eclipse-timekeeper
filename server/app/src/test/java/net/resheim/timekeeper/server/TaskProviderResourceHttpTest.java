@@ -183,4 +183,15 @@ class TaskProviderResourceHttpTest {
         }
     }
 
+    @Test void incomingReviewHttpChecksOwnerPermissionComparisonAndDoesNotSendToGoogle()throws Exception{
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+        var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
+        store.transaction(owner,()->{var changed=((ObjectNode)task).deepCopy();changed.put("summary","Local draft").put("version",task.path("version").asLong()+1);store.save("TASK",(net.resheim.eclipse.timekeeper.domain.Task)decode("TASK",changed));var auth=new TaskProviderConnections(store).required(UUID.fromString(id));auth.put("lastAttempt",store.now().minusSeconds(31).toString());new TaskProviderConnections(store).save(TaskProviderConnections.AUTH,auth);return null;});
+        var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());provider.title="Changed Google title";assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());var after=idle(id);assertEquals(1,after.path("reviews").size());
+        String path="/"+id+"/reviews/"+after.path("reviews").get(0).path("listId").asText();var page=json(call("GET",path,null,null),200);inputs.validate("TaskProviderReviews",page);var row=page.path("items").get(0);String resolution=path+"/"+row.path("taskId").asText();var choice=object().put("decision","REMOTE").put("taskEtag",row.path("taskEtag").asText());
+        assertEquals(404,call("b",BROWSER,"GET",path,null,null).statusCode());assertEquals(403,call("read",BROWSER,"POST",resolution,choice,row.path("reviewEtag").asText()).statusCode());assertEquals(428,call("POST",resolution,choice,null).statusCode());assertEquals(412,call("POST",resolution,choice,"\"old\"").statusCode());assertEquals(400,call("POST",resolution,choice.deepCopy().put("accessToken","untrusted"),row.path("reviewEtag").asText()).statusCode());
+        var result=json(call("POST",resolution,choice,row.path("reviewEtag").asText()),200);inputs.validate("TaskProviderReviewResult",result);assertEquals(result,json(call("POST",resolution,choice,row.path("reviewEtag").asText()),200));idle(id);assertEquals(0,provider.writes.get());
+        assertEquals("Changed Google title list-1",store.transaction(owner,()->store.find("TASK",uuid(task.get("id"))).orElseThrow()).path("summary").asText());
+    }
+
 }

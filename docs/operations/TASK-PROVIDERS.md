@@ -209,3 +209,28 @@ consent return navigation in Chromium and WebKit. They do not prove real app
 registration acceptance. Verify sign-in, selected-list import, provider edits,
 token refresh and reconnect with a disposable provider list before enabling a
 deployment.
+
+### Incoming conflicts and confirmed deletions
+
+Open **Account → Task connections → Review incoming changes** for the affected
+list. The comparison uses the saved complete provider scan and shows its time,
+source identity, local values and observed remote values. Filter by title or
+exact source identity when a list has more than 100 decisions. Polling retains
+an open comparison; a changed task, list selection or scan requires reopening
+it. Comparisons expire after 15 minutes; refresh synchronization for a new scan.
+
+Choose **Keep Dagsverk for conflicts** or **Use Google for conflicts**. Both
+choices accept independent remote changes and preserve unsupported local
+fields. Related resources added locally remain present when accepting changed
+Google source links. This action updates Dagsverk's comparison baseline and
+sends no writes to Google, including with a read-only provider grant.
+
+A provider's explicit deletion offers **Keep the Dagsverk task** or **Delete the
+Dagsverk task**. Keeping it acknowledges that deleted identity without inventing
+a tombstone or removing the native task. A later live observation clears the
+acknowledgement; a subsequent deletion needs another decision. Deletion is
+available only with one active source link and passes the canonical task
+service's deletion rules. Other source links, unresolved identities and
+incomplete hierarchy remain review decisions. Missing access or absent items
+never imply deletion. Dagsverk sessions with read-only access can inspect
+comparisons but cannot resolve them.

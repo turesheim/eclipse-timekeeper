@@ -22,6 +22,17 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_incoming_reviews_require_fresh_comparison_and_cannot_inject_observations(self):
+        base='/task-providers/{connection}/reviews/{list}'
+        self.assertEqual('read',CONTRACT['paths'][base]['get']['x-required-permission'])
+        operation=CONTRACT['paths'][base+'/{task}']['post']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+        for decision in ['LOCAL','REMOTE','DELETE']:
+            validator('TaskProviderReviewInput').validate({'decision':decision,'taskEtag':'"current"'})
+        for invalid in [{'decision':'LOCAL'}, {'decision':'LOCAL','taskEtag':'*'}, {'decision':'REMOTE','taskEtag':'"v1"','fields':{'summary':'unobserved'}}, {'decision':'DELETE','taskEtag':'"v1"','ownerId':'foreign'}]:
+            self.assertFalse(validator('TaskProviderReviewInput').is_valid(invalid))
+
     def test_reviewed_google_writes_bind_an_owned_task_and_exact_proposal(self):
         command={'taskId':ID,'listId':ID,'action':'UPDATE'}
         validator('TaskProviderWriteInput').validate(command)
@@ -792,7 +803,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

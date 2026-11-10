@@ -87,6 +87,7 @@ final class TaskProviderConnections {
         if(value.hasNonNull("nextRefresh")&&value.hasNonNull("retryUntil")&&Instant.parse(value.path("retryUntil").asText()).isAfter(Instant.parse(value.path("nextRefresh").asText())))result.set("nextRefresh",value.get("retryUntil"));
         result.set("selectedLists",value.path("selected").deepCopy());var catalog=result.putArray("availableLists");
         result.set("projectMappings",value.path("projects").isObject()?value.path("projects").deepCopy():object());result.set("imports",TaskProviderScans.previews(store,value));
+        var reviews=result.putArray("reviews");for(var scan:store.list(TaskProviderScans.SCAN))if(scan.path("connectionId").equals(value.path("id"))&&scan.path("generation").equals(value.path("generation"))&&scan.path("state").asText().equals("READY")&&TaskProviderScans.approved(value,scan.path("remoteListId").asText()))reviews.add(object().put("listId",scan.path("id").asText()).put("remoteListId",scan.path("remoteListId").asText()));
         result.put("pendingWrites",TaskProviderWrites.pending(store,uuid(value.get("id"))));
         for(var list:value.path("catalog")){var item=object();for(String field:List.of("id","name","kind","shared","owner"))item.set(field,list.path(field));catalog.add(item);}
         return result;

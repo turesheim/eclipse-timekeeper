@@ -50,25 +50,14 @@ final class TaskCloudPull {
         var result=object().put("created",0).put("updated",0).put("unchanged",0);var pending=result.putArray("pending");
         var sync=new TaskSync(store,receipts);var remaining=new ArrayList<>(scan.tasks());
         remaining.sort(Comparator.comparing((TaskCloudProvider.RemoteTask task)->Objects.toString(task.position(),"" )).thenComparing(TaskCloudProvider.RemoteTask::id));
-        var ordering=new HashMap<String,TaskCloudProvider.RemoteTask>();
-        if(!scan.full()&&scan.provider().equals("google"))for(var task:store.list("TASK"))for(var reference:task.path("externalReferences")){
-            if(reference.path("providerId").asText().equals(scan.provider())&&reference.path("repositoryId").asText().equals(repository)){
-                var observation=reference.path("providerData").path("payload").path("observation");
-                if(observation.isObject()){var known=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(observation);ordering.put(known.id(),known);}
-            }
-        }
-        for(var task:remaining)if(task.deleted())ordering.remove(task.id());else ordering.put(task.id(),task);
-        var orders=new HashMap<String,Integer>();var ordinal=new HashMap<String,Integer>();
-        ordering.values().stream().sorted(Comparator.comparing((TaskCloudProvider.RemoteTask task)->Objects.toString(task.position(),"")).thenComparing(TaskCloudProvider.RemoteTask::id))
-                .forEach(task->ordinal.put(task.id(),orders.merge(Objects.toString(task.parent(),""),1,Integer::sum)-1));
+        var ordinal=ordinals(scan);
         var blocked=new HashSet<String>();
         while(!remaining.isEmpty()){
             boolean progressed=false;
             for(var iterator=remaining.iterator();iterator.hasNext();){
-                var remote=iterator.next();var fields=scan.provider().equals("google")?GoogleTaskContext.fields(remote,repository):remote.fields().deepCopy();
+                var remote=iterator.next();var fields=sourceFields(scan,remote);
                 var existing=store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository,remote.id()));
-                boolean localHierarchy=false;if(existing.isPresent())for(var ref:existing.get().path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(remote.id()))localHierarchy=ref.path("providerData").path("payload").path("policy").path("localHierarchy").asBoolean();
-                if(scan.provider().equals("google")&&!remote.deleted()&&!localHierarchy){
+                if(scan.provider().equals("google")&&!remote.deleted()&&!localHierarchy(scan,remote)){
                     if(remote.position()==null||remote.position().isBlank()){
                         deferred(pending,remote.id(),"POSITION_UNOBSERVED");blocked.add(remote.id());iterator.remove();progressed=true;continue;
                     }
@@ -86,6 +75,7 @@ final class TaskCloudPull {
                 String operation=UUID.nameUUIDFromBytes(("dagsverk-cloud-pull:"+store.owner()+":"+connectionId+":"+listId+":"
                         +canonical(item)+":"+current.map(JsonValues::etag).orElse("new")+":"+project).getBytes(StandardCharsets.UTF_8)).toString();
                 item.put("operationId",operation);
+                if(remote.deleted()&&deletionAcknowledged(existing,scan.provider(),repository,remote.id())){iterator.remove();progressed=true;result.put("unchanged",result.path("unchanged").asInt()+1);continue;}
                 var preview=object().put("connectionId",connectionId.toString()).put("listId",listId.toString()).put("sourceState","HEALTHY").put("scanComplete",acknowledgedScan);
                 preview.putArray("items").add(item);inputs.validate("TaskSyncPreviewInput",preview);
                 var decision=sync.preview(preview,acknowledgedScan).body().path("items").get(0);String status=decision.path("status").asText();
@@ -107,6 +97,42 @@ final class TaskCloudPull {
         if(pending.isEmpty())checkpoint(connectionId,listId,scan.observedAt(),scan.full());
         result.put("complete",pending.isEmpty());return result;
     }
+    private boolean deletionAcknowledged(Optional<JsonNode> task,String provider,String repository,String id){
+        if(task.isPresent())for(var ref:task.get().path("externalReferences"))if(ref.path("providerId").asText().equals(provider)&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(id))return ref.path("providerData").path("payload").path("deletionReview").asBoolean();
+        return false;
+    }
+    private Map<String,Integer> ordinals(Scan scan){
+        String repository=repository(scan.account(),scan.list());
+        var ordering=new HashMap<String,TaskCloudProvider.RemoteTask>();
+        if(!scan.full()&&scan.provider().equals("google"))for(var task:store.list("TASK"))for(var reference:task.path("externalReferences")){
+            if(reference.path("providerId").asText().equals(scan.provider())&&reference.path("repositoryId").asText().equals(repository)){
+                var observation=reference.path("providerData").path("payload").path("observation");
+                if(observation.isObject()){var known=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(observation);ordering.put(known.id(),known);}
+            }
+        }
+        for(var task:scan.tasks())if(task.deleted())ordering.remove(task.id());else ordering.put(task.id(),task);
+        var orders=new HashMap<String,Integer>();var ordinal=new HashMap<String,Integer>();
+        ordering.values().stream().sorted(Comparator.comparing((TaskCloudProvider.RemoteTask task)->Objects.toString(task.position(),"")).thenComparing(TaskCloudProvider.RemoteTask::id))
+                .forEach(task->ordinal.put(task.id(),orders.merge(Objects.toString(task.parent(),""),1,Integer::sum)-1));
+        return ordinal;
+    }
+    private boolean localHierarchy(Scan scan,TaskCloudProvider.RemoteTask remote){
+        var found=store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository(scan.account(),scan.list()),remote.id()));
+        if(found.isPresent())for(var ref:found.get().path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(repository(scan.account(),scan.list()))&&ref.path("externalId").asText().equals(remote.id()))return ref.path("providerData").path("payload").path("policy").path("localHierarchy").asBoolean();
+        return false;
+    }
+    private ObjectNode sourceFields(Scan scan,TaskCloudProvider.RemoteTask remote){return scan.provider().equals("google")?GoogleTaskContext.fields(remote,repository(scan.account(),scan.list())):remote.fields().deepCopy();}
+    /** Build reviews from the same complete, owned scan and hierarchy observations as automatic reconciliation. */
+    ObjectNode observation(Scan scan,TaskCloudProvider.RemoteTask remote){
+        String repository=repository(scan.account(),scan.list());var fields=sourceFields(scan,remote);
+        if(scan.provider().equals("google")&&!remote.deleted()&&!localHierarchy(scan,remote)){
+            if(remote.position()==null||remote.position().isBlank())throw ApiFailure.conflict();
+            if(remote.parent()==null)fields.putNull("parentTaskId");
+            else fields.put("parentTaskId",store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository,remote.parent())).orElseThrow(ApiFailure::conflict).path("id").asText());
+            fields.put("siblingOrder",ordinals(scan).get(remote.id()));
+        }
+        var item=object().put("providerId",scan.provider()).put("repositoryId",repository).put("externalId",remote.id()).put("deleted",remote.deleted());item.set("fields",fields);return item;
+    }
     void remember(JsonNode task,String provider,String repository,TaskCloudProvider.RemoteTask remote){
         var candidate=((ObjectNode)task).deepCopy();ObjectNode reference=null;
         for(var ref:candidate.path("externalReferences"))if(ref.path("providerId").asText().equals(provider)&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(remote.id())){reference=(ObjectNode)ref;break;}
@@ -116,8 +142,8 @@ final class TaskCloudPull {
         if(reference.hasNonNull("providerData")){
             var existing=reference.path("providerData");
             if(!existing.path("namespace").asText().equals(provider+".tasks")||existing.path("version").asInt()!=1)throw ApiFailure.conflict();
-            var payload=((ObjectNode)existing.path("payload")).deepCopy();payload.set("observation",remote.original().deepCopy());envelope.set("payload",payload);
-        }else{var payload=object();payload.set("observation",remote.original().deepCopy());envelope.set("payload",payload);}
+            var payload=((ObjectNode)existing.path("payload")).deepCopy();payload.set("observation",remote.original().deepCopy());if(!remote.deleted())payload.remove("deletionReview");envelope.set("payload",payload);
+        }else{var payload=object();payload.set("observation",remote.original().deepCopy());if(!remote.deleted())payload.remove("deletionReview");envelope.set("payload",payload);}
         providerData(envelope);
         if(provider.equals("google"))GoogleTaskContext.taskUrl(remote.original()).ifPresent(url->referenceUrl(candidate,provider,repository,remote.id(),url));
         var source=reference.path("source").isObject()?((ObjectNode)reference.path("source")).deepCopy():object();

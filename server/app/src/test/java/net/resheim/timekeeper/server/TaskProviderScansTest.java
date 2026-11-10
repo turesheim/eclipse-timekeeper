@@ -132,4 +132,38 @@ class TaskProviderScansTest {
         tx(f,()->scans().acknowledge(claim,start,page(null,deleted)));var outcome=tx(f,()->scans().reconcile(claim));
         assertFalse(outcome.path("complete").asBoolean());assertEquals("DELETE_REVIEW",outcome.path("pending").get(0).path("status").asText());assertEquals(before,stored(f,"one"));assertEquals(cursor,tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst()));
     }
+    private TaskProviderReviews reviews(){return new TaskProviderReviews(store,receipts,inputs);}
+    private ObjectNode incoming(Fixture f,TaskCloudProvider.RemoteTask...items){
+        var claim=reclaim(f);var start=tx(f,()->scans().begin(claim));var ready=tx(f,()->scans().acknowledge(claim,start,page(null,items)));
+        tx(f,()->scans().reconcile(claim));return ready;
+    }
+    private void localTitle(Fixture f,String id,String title){
+        tx(f,()->{var task=((ObjectNode)store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("account","remote-list"),id)).orElseThrow()).deepCopy();task.put("summary",title).put("version",task.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",task));return null;});
+    }
+    @Test void incomingConflictReviewBindsBothVersionsAndIdenticalReplayKeepsItsReceipt(){
+        var f=fixture();imported(f,task("one",null,"001","Original"));localTitle(f,"one","Local title");incoming(f,task("one",null,"001","Google title"));
+        var page=tx(f,()->reviews().list(f.connection(),f.list(),null));inputs.validate("TaskProviderReviews",page);var row=page.path("items").get(0);assertTrue(row.path("canResolve").asBoolean());assertEquals("Local title",row.path("localFields").path("summary").asText());assertEquals("Google title",row.path("remoteFields").path("summary").asText());
+        UUID id=uuid(row.get("taskId"));var input=object().put("decision","REMOTE").put("taskEtag",row.path("taskEtag").asText());
+        assertEquals(412,assertThrows(ApiFailure.class,()->tx(f,()->reviews().resolve(f.connection(),f.list(),id,"\"old\"",input))).status);
+        assertThrows(ApiFailure.class,()->store.transaction("foreign-"+UUID.randomUUID(),()->reviews().list(f.connection(),f.list(),null)));
+        var result=tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),input));inputs.validate("TaskProviderReviewResult",result.body());assertEquals("Google title",stored(f,"one").path("summary").asText());var after=stored(f,"one");
+        var replay=tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),input));assertEquals(result.body().toString(),replay.body().toString());assertEquals(after,stored(f,"one"));
+    }
+    @Test void incomingReviewCannotOverwriteAnEditOrUseAPausedOrExpiredScan(){
+        var f=fixture();imported(f,task("one",null,"001","Original"));localTitle(f,"one","Local");incoming(f,task("one",null,"001","Google"));
+        var row=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);UUID id=uuid(row.get("taskId"));var input=object().put("decision","LOCAL").put("taskEtag",row.path("taskEtag").asText());
+        localTitle(f,"one","New draft");assertEquals(412,assertThrows(ApiFailure.class,()->tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),input))).status);assertEquals("New draft",stored(f,"one").path("summary").asText());
+        tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().pause(f.connection(),true,etag(auth));return null;});assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->reviews().list(f.connection(),f.list(),null))).status);
+        tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().pause(f.connection(),false,etag(auth));var scan=((ObjectNode)store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).deepCopy();scan.put("startedAt",store.now().minusSeconds(901).toString());connections().save(TaskProviderScans.SCAN,scan);return null;});assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->reviews().list(f.connection(),f.list(),null))).status);
+    }
+    @Test void explicitDeleteCanKeepTheNativeTaskAndLaterLiveObservationRequiresANewDeleteReview(){
+        var f=fixture();imported(f,task("one",null,"001","Keep this"));var deleted=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(object().put("id","one").put("deleted",true));incoming(f,deleted);
+        var row=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);UUID id=uuid(row.get("taskId"));var before=stored(f,"one");
+        tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),object().put("decision","LOCAL").put("taskEtag",row.path("taskEtag").asText())));
+        assertEquals(before.path("summary"),stored(f,"one").path("summary"));assertTrue(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));assertEquals("APPLIED",tx(f,()->store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).path("state").asText());
+        incoming(f,deleted);assertEquals("APPLIED",tx(f,()->store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).path("state").asText());
+        incoming(f,task("one",null,"001","Keep this"));incoming(f,deleted);var again=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);assertTrue(again.path("canDelete").asBoolean());
+        var result=tx(f,()->reviews().resolve(f.connection(),f.list(),id,again.path("reviewEtag").asText(),object().put("decision","DELETE").put("taskEtag",again.path("taskEtag").asText())));assertTrue(result.body().path("deleted").asBoolean());assertTrue(tx(f,()->store.find("TASK",id).isEmpty()));assertFalse(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));
+    }
+
 }

@@ -1680,7 +1680,7 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1828,7 +1828,7 @@
             }
           }
         },
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1894,7 +1894,7 @@
     "/activities/active": {
       "get": {
         "operationId": "getActiveActivity",
-        "summary": "Read the authenticated owner’s current interval",
+        "summary": "Read the authenticated owner\u2019s current interval",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -1959,7 +1959,7 @@
     "/activities/start": {
       "post": {
         "operationId": "startActivity",
-        "summary": "Atomically activate or switch the owner’s task",
+        "summary": "Atomically activate or switch the owner\u2019s task",
         "x-required-permission": "write",
         "responses": {
           "201": {
@@ -2140,7 +2140,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2210,7 +2210,7 @@
       },
       "put": {
         "operationId": "updateProfile",
-        "summary": "Set the owner’s reporting time zone",
+        "summary": "Set the owner\u2019s reporting time zone",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -2340,7 +2340,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Use the owner’s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
+        "description": "Use the owner\u2019s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
         "parameters": [
           {
             "name": "from",
@@ -2440,7 +2440,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner’s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
+        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner\u2019s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
         "parameters": [
           {
             "name": "after",
@@ -3452,7 +3452,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -7566,7 +7566,7 @@
       },
       "get": {
         "operationId": "listPendingAccountArchives",
-        "summary": "List this account’s resumable archive uploads",
+        "summary": "List this account\u2019s resumable archive uploads",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -8050,7 +8050,7 @@
     "/data/account/imports": {
       "get": {
         "operationId": "listAccountArchiveRestores",
-        "summary": "List this account’s completed archive restores",
+        "summary": "List this account\u2019s completed archive restores",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -10589,7 +10589,7 @@
             }
           }
         },
-        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
+        "description": "Conditional replacement or explicit clearing of one linked identity\u2019s provider-data envelope. Legacy link and source updates preserve the envelope."
       }
     },
     "/task-connections": {
@@ -12834,7 +12834,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "Matches a deleted task’s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
+        "description": "Matches a deleted task\u2019s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
       }
     },
     "/task-list-sections": {
@@ -15598,7 +15598,7 @@
     "/admin/instance/uploads/{id}/staging": {
       "get": {
         "operationId": "getInstanceRestoreStage",
-        "summary": "Read the initiating session’s restore preparation status",
+        "summary": "Read the initiating session\u2019s restore preparation status",
         "tags": [
           "Accounts"
         ],
@@ -18414,7 +18414,7 @@
     "/notes/search/status": {
       "get": {
         "operationId": "getNotesSearchStatus",
-        "summary": "Read this replica’s search readiness",
+        "summary": "Read this replica\u2019s search readiness",
         "x-required-permission": "read",
         "parameters": [
           {
@@ -18474,7 +18474,7 @@
     "/notes/search/rebuild": {
       "post": {
         "operationId": "rebuildNotesSearch",
-        "summary": "Rebuild this account’s private search cache on this replica",
+        "summary": "Rebuild this account\u2019s private search cache on this replica",
         "x-required-permission": "write",
         "parameters": [
           {
@@ -20958,6 +20958,226 @@
           }
         },
         "description": "Owner-authorized current indexed calendar details and optional saved note entry. Returns 404 for an unknown result, and 503 while its current calendar index is unavailable. This read never creates or changes an event note."
+      }
+    },
+    "/task-providers/{connection}/reviews/{list}": {
+      "get": {
+        "operationId": "listTaskProviderReviews",
+        "summary": "Review incoming conflicts and explicit deletions from a complete selected-list scan",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "list",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderReviews"
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires a fresh complete owned scan explicitly requested after the uncertain insert. Returns at most 100 matching unlinked, nondeleted identities, with the total matching count. Searching never chooses an identity or sends a provider write."
+      }
+    },
+    "/task-providers/{connection}/reviews/{list}/{task}": {
+      "post": {
+        "operationId": "resolveTaskProviderReview",
+        "summary": "Resolve an incoming comparison without writing to the provider",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "name": "list",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderReviewResult"
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires the exact review ETag and current task ETag. Reviews expire after 15 minutes and are fenced by connection selection, account, readable access, pause and reconnect state. LOCAL keeps conflicting local values while accepting independent remote changes; REMOTE accepts conflicting observed values. DELETE applies only to explicitly deleted provider identities with one active source link and the canonical task deletion guards. An identical replay returns its stored receipt. No provider write is issued.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskProviderReviewInput"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -31677,7 +31897,7 @@
           "baseline"
         ],
         "additionalProperties": false,
-        "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
+        "description": "Atomically replace a linked identity\u2019s source revision and last-common field snapshot. Null baseline clears the snapshot."
       },
       "TaskTombstone": {
         "type": "object",
@@ -36888,6 +37108,26 @@
           "pendingWrites": {
             "type": "integer",
             "minimum": 0
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "listId": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "remoteListId": {
+                  "type": "string",
+                  "maxLength": 1024
+                }
+              },
+              "required": [
+                "listId",
+                "remoteListId"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -37587,6 +37827,191 @@
             "$ref": "#/components/schemas/Id"
           }
         }
+      },
+      "TaskProviderReviewInput": {
+        "type": "object",
+        "properties": {
+          "taskEtag": {
+            "type": "string",
+            "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "LOCAL",
+              "REMOTE",
+              "DELETE"
+            ]
+          }
+        },
+        "required": [
+          "taskEtag",
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderReview": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taskEtag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DEFERRED",
+              "IGNORE_DELETED",
+              "CREATE",
+              "INCOMPLETE",
+              "RECONCILE_ID",
+              "DELETE_DEFERRED",
+              "DELETE_CONFLICT",
+              "DELETE_REVIEW",
+              "CONFLICT",
+              "UPDATE",
+              "UNSUPPORTED",
+              "KEEP_LOCAL",
+              "UNCHANGED"
+            ]
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncFieldDecision"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scanId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "generation": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          },
+          "reviewEtag": {
+            "type": "string",
+            "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+          },
+          "remoteFields": {
+            "$ref": "#/components/schemas/TaskSyncFields"
+          },
+          "localFields": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Task"
+              },
+              {
+                "type": "object",
+                "maxProperties": 0
+              }
+            ]
+          }
+        },
+        "required": [
+          "externalId",
+          "status",
+          "canResolve",
+          "reviewEtag"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderReviews": {
+        "type": "object",
+        "properties": {
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/TaskProviderReview"
+            }
+          }
+        },
+        "required": [
+          "observedAt",
+          "count",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderReviewResult": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taskId",
+          "deleted"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {
@@ -37960,7 +38385,7 @@
     },
     {
       "name": "Accounts",
-      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user’s business data."
+      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user\u2019s business data."
     }
   ]
 }

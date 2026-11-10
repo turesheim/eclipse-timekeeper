@@ -22,8 +22,8 @@ function connection(owner,overrides={}){
   return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[],candidates=[]}={}){
-  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0};
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[]}={}){
+  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1};
   for(const [path,items]of [['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
     const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
@@ -38,6 +38,12 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     if(path==='/complete'){model.completed++;expect(input).toEqual({state,code});expect(new URL(page.url()).search).toBe('');expect(request.headers().referer).not.toContain(code);expect(request.headers().referer).not.toContain(state);return reply(model.rows[0]);}
     if(path==='/cancel'){model.cancelled++;expect(input).toEqual({state});return reply(null,204);}
     const row=model.rows.find(value=>path.startsWith('/'+value.id));if(!row)return reply({type:'about:blank',title:'Not found',status:404,code:'NOT_FOUND'},404);
+    if(path.includes('/reviews/')){
+      if(method==='GET'){const q=(new URL(request.url()).searchParams.get('q')||'').toLowerCase(),items=model.reviews.filter(item=>(item.externalId+' '+item.localFields?.summary+' '+item.remoteFields?.summary).toLowerCase().includes(q));return reply({observedAt:'2026-11-10T00:00:00Z',count:items.length,items:items.slice(0,100).map(item=>({...item,reviewEtag:`"incoming-${model.reviewVersion}"`}))});}
+      const review=model.reviews.find(item=>path.endsWith('/'+item.taskId));if(!review)return reply({code:'NOT_FOUND',status:404},404);
+      if(request.headers()['if-match']!==`"incoming-${model.reviewVersion}"`||input.taskEtag!==review.taskEtag)return reply({code:'STALE_VERSION',status:412},412);
+      model.reviews=model.reviews.filter(item=>item!==review);row.reviews=[];return reply({taskId:review.taskId,deleted:input.decision==='DELETE'});
+    }
     if(path.includes('/writes')){
       if(path.endsWith('/writes')){
         if(method==='GET')return reply({items:model.jobs.map(({id,title,action,state,createdAt,lastError})=>({id,title,action,state,createdAt,lastError}))});
@@ -258,4 +264,31 @@ test('late connection responses cannot paint account data after sign-out',async(
   await page.route('**/api/v1/task-providers',async route=>{started();await waiting;await route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({items:[connection(owner,{name:'Private provider account title'})],providers:{google:true,microsoft:true},refreshMinutes:15})}).catch(()=>{});});
   await page.goto('/web/#account/task-providers',{waitUntil:'domcontentloaded'});await observed;await page.locator('#account-menu > summary').click();await page.locator('#sign-out').click();await expect(page.locator('#login-form')).toBeVisible();release();
   await expect(page.getByText('Private provider account title',{exact:false})).toHaveCount(0);await expect(page.locator('#account-content')).toBeEmpty();
+});
+
+function incomingReview(overrides={}){
+  return {taskId:randomUUID(),taskEtag:'"task-4"',externalId:'google-task-id',status:'CONFLICT',deleted:false,canResolve:true,canDelete:false,decisions:[{field:'summary',outcome:'CONFLICT'},{field:'body',outcome:'REMOTE_ONLY'}],localFields:{summary:'Local title',body:{format:'HTML',content:'<img src=x onerror=alert(1)> Local draft'}},remoteFields:{summary:'Google title',body:{format:'TEXT',content:'Google notes'}},...overrides};
+}
+test('incoming comparisons survive polling and stale decisions cannot replace the captured task',async({page,request})=>{
+  const owner=await signIn(page,request),listId=randomUUID(),row=connection(owner,{reviews:[{listId,remoteListId:'work'}],pendingCount:1,lastError:'TASK_PROVIDER_CONFLICTS'}),review=incomingReview(),model=await providerFixture(page,owner,{rows:[row],reviews:[review]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review incoming changes: Work',exact:true}).click();await expect(panel.getByText('Local title',{exact:true}).first()).toBeVisible();await expect(panel.getByText('Google title',{exact:true})).toBeVisible();await expect(panel.locator('img')).toHaveCount(0);
+  model.reviews[0].remoteFields.summary='New Google observation';model.reviewVersion++;await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(panel.getByText('Google title',{exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'Use Google for conflicts',exact:true}).click();await expect(panel.getByText(/This record changed/)).toBeVisible();expect(model.reviews).toHaveLength(1);
+  await panel.getByRole('button',{name:'Review incoming changes: Work',exact:true}).click();await expect(panel.getByText('New Google observation',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true}).click();await expect(panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true})).toHaveCount(0);expect(model.providerWrites).toBe(0);expect(model.writes.at(-1).input).toEqual({decision:'LOCAL',taskEtag:'"task-4"'});
+});
+test('incoming deletion reviews offer explicit native deletion without a provider write',async({page,request})=>{
+  const owner=await signIn(page,request),listId=randomUUID(),row=connection(owner,{reviews:[{listId,remoteListId:'work'}]}),review=incomingReview({deleted:true,status:'DELETE_REVIEW',canDelete:true,decisions:[],remoteFields:{}}),model=await providerFixture(page,owner,{rows:[row],reviews:[review]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review incoming changes: Work',exact:true}).click();await expect(panel.getByRole('button',{name:'Keep the Dagsverk task',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'Delete the Dagsverk task',exact:true}).click();expect(model.writes.at(-1).input.decision).toBe('DELETE');expect(model.providerWrites).toBe(0);
+});
+test('read-only Dagsverk sessions can inspect incoming conflicts without resolving them',async({page,request})=>{
+  const owner=await signIn(page,request,{readOnly:true}),listId=randomUUID(),row=connection(owner,{reviews:[{listId,remoteListId:'work'}]});await providerFixture(page,owner,{rows:[row],reviews:[incomingReview()]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review incoming changes: Work',exact:true}).click();await expect(panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:'Use Google for conflicts',exact:true})).toBeDisabled();
+});
+for(const language of ['en-GB','nb-NO'])test('incoming review remains readable in every theme and narrow layout in '+language,async({page,request})=>{
+  test.setTimeout(120000);const owner=await signIn(page,request,{language}),listId=randomUUID(),row=connection(owner,{reviews:[{listId,remoteListId:'work'}]}),review=incomingReview({externalId:'google-id-'.repeat(90),localFields:{summary:'Local '+ 'Task title '.repeat(20),body:{format:'HTML',content:'<b>Local draft</b>'+ 'unbroken'.repeat(80)}},remoteFields:{summary:'Google '+ 'Task title '.repeat(20),body:{format:'TEXT',content:'Google notes '+ 'unbroken'.repeat(80)}}});await providerFixture(page,owner,{rows:[row],reviews:[review]});await open(page);
+  const nb=language==='nb-NO';for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Oppgavekoblinger':'Task connections',exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:nb?'Gjennomgå innkommende endringer: Work':'Review incoming changes: Work',exact:true}).click();
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(panel.getByRole('button',{name:nb?'Behold Dagsverk ved konflikter':'Keep Dagsverk for conflicts',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  }
+  const accessibility=await new AxeBuilder({page}).include('[data-task-provider-id="'+row.id+'"]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/task-incoming-review-'+language+'.png',fullPage:true});
 });
