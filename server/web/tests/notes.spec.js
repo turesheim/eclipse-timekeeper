@@ -498,8 +498,8 @@ test('title-bar search filters note types, finds folders and keeps results behin
   for(const width of [320,390]){await page.setViewportSize({width,height:568});await expect(page.locator('#titlebar-notes-query')).toBeHidden();const toggle=page.locator('#titlebar-notes-search button');await toggle.focus();await toggle.press('Enter');await expect(page.locator('#notes-search-query')).toBeFocused();await searchNotes(page,'file:Plain.md');await expect(rows).toHaveCount(1);await page.locator('#notes-search-query').press('Escape');await expect(panel).toBeHidden();await expect(toggle).toBeFocused();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });
 
-test('event search finds calendar details without creating a note and keeps the result through maximize',async({page,request})=>{
-  test.setTimeout(60000);const api=await setup(page,request);
+test('event search finds calendar details without creating a note and keeps the result through maximize',async({page,request,browser})=>{
+  test.setTimeout(120000);const api=await setup(page,request);
   const description='Spectrograph calibration session.',location='North observatory',title='Sky planning';
   const body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Dagsverk//Event search fixture//EN','BEGIN:VEVENT','UID:search-unsaved-event','DTSTAMP:20260101T000000Z','DTSTART:20260504T100000Z','DTEND:20260504T110000Z','SUMMARY:'+title,'DESCRIPTION:'+description,'LOCATION:'+location,'END:VEVENT','END:VCALENDAR',''].join('\r\n');
   const feed=await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}});expect(feed.status()).toBe(201);
@@ -507,11 +507,36 @@ test('event search finds calendar details without creating a note and keeps the 
   const subscription=await(await api('POST','/calendar-subscriptions',{name:'Event search calendar',clientId:client.id,url:(await feed.json()).url,visible:true,includeEvents:true,includeTodos:false},{'Idempotency-Key':randomUUID()})).json();
   let event;await expect.poll(async()=>{const catalog=await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json();event=catalog.items.find(item=>item.subscriptionId===subscription.id);return event?.title;},{timeout:30000}).toBe(title);
   const notePath='/event-notes/'+subscription.id+'/'+event.key;expect((await(await api('GET',notePath)).json()).version).toBe(0);
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=event:observatory');return reply.status();},{timeout:30000}).toBe(200);
   const panel=await searchNotes(page,'event:observatory'),result=panel.getByRole('button',{name:new RegExp(title)});await expect(result).toBeVisible();
   for(const query of ['event:spectrograph','event:"calibration session"','event:observatory calibration','observatory']){await searchNotes(page,query);await expect(result).toBeVisible();}
   await result.click();const popup=page.getByRole('dialog').filter({hasText:title});await expect(popup).toBeVisible();await expect(popup).toContainText(description);await expect(popup).toContainText(location);await expect(panel).toBeVisible();
+  await expect(popup.locator('.markdown-editor')).toBeHidden();
+  for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#calendar-search-popup-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-details-${width}.png`});}
   await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(panel).toBeHidden();await expect(popup).toBeHidden();await expect(page.locator('#workspace')).toContainText(description);await expect(page.locator('#workspace')).toContainText(location);
+  await captureScreenshot(page,{path:'test-results/event-search-workspace.png'});
   expect((await(await api('GET',notePath)).json()).version).toBe(0);
+  await page.locator('[data-tab=notes]').click();const original=await api('GET',notePath);
+  await api('PUT',notePath,{fromDate:'2026-05-04',toDate:'2026-05-05',body:'Private commissioning checklist.'},{'If-Match':original.headers().etag});
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q='+encodeURIComponent('event:observatory commissioning'));return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(1);
+  await searchNotes(page,'event:observatory commissioning');await expect(panel.locator('[data-search-note]')).toHaveCount(1);await result.click();await expect(popup.locator('.ProseMirror')).toContainText('Private commissioning checklist.');await expect(popup).toContainText(location);
+  await popup.getByRole('button',{name:'Source',exact:true}).click();await popup.locator('textarea').fill('Private commissioning checklist updated.');
+  await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(panel).toBeHidden();const workspace=page.locator('#calendar-search-workspace-editor');await expect(workspace).toBeVisible();await expect(workspace.locator('.ProseMirror')).toContainText('checklist updated.');await expect(workspace).toContainText(description);
+  expect((await(await api('GET',notePath)).json()).body).toBe('Private commissioning checklist updated.');
+  await workspace.getByRole('button',{name:'Source',exact:true}).click();await workspace.locator('textarea').fill('Private commissioning checklist workspace edit.');await page.locator('[data-tab=today]').click();await expect(workspace).toBeHidden();expect((await(await api('GET',notePath)).json()).body).toBe('Private commissioning checklist workspace edit.');
+  const token=await(await api('POST','/auth/tokens',{name:'Read-only event search','permissions':['read'],'expiresAt':null})).json(),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
+  try{
+    const reader=await context.newPage(),writes=[];reader.on('request',request=>{if(request.method()!=='GET'&&/\/api\/v1\/(notes|event-notes)\//.test(new URL(request.url()).pathname))writes.push(request.method());});
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();
+    const results=await searchNotes(reader,'event:observatory');await expect(results.locator('[data-search-note]')).toHaveCount(1);await results.locator('[data-search-note]').click();const preview=reader.locator('#calendar-search-popup-editor');await expect(preview.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');
+    await preview.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#calendar-search-workspace-editor .ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
+  }finally{await context.close();}
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=event:observatory');return reply.status();},{timeout:30000}).toBe(200);await searchNotes(page,'event:observatory');
+  let release,arrive,completed=false;const held=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{arrive=resolve;});
+  await page.route('**/api/v1/notes/search/calendar/*',async route=>{const response=await route.fetch();arrive();await held;try{await route.fulfill({response});}catch{}finally{completed=true;}});
+  try{
+    await result.click();await started;await panel.getByRole('button',{name:'Close',exact:true}).click();await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await setup(page,request);release();await expect.poll(()=>completed).toBe(true);await expect(page.locator('#calendar-search-popup-editor')).toBeHidden();await expect(page.locator('#workspace')).not.toContainText(location);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
 
 test('a delayed search cannot display the signed-out account in a new session',async({page,request})=>{

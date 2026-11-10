@@ -56,6 +56,7 @@ class NotesSearchService implements AutoCloseable {
     record Status(String state,long generation,long target,boolean rebuilding,String error){}
     NotesSearchService(){}
     NotesSearchService(ServerStore store,Path directory){this.store=store;configuredDirectory=directory.toString();}
+    synchronized void register(Backend backend){if(!backend.key().matches("[a-z][a-z0-9-]{0,31}"))throw new IllegalArgumentException("Invalid search backend key");backends.add(backend.key());}
     private static String ownerKey(String owner){return ArchiveJournalFiles.digest(owner.getBytes(StandardCharsets.UTF_8));}
     private static String ownerKey(String owner,String backend){return backend.equals(NOTES.key())?ownerKey(owner):ownerKey(owner+"\0"+backend);}
     private synchronized void initialize()throws IOException{
@@ -115,6 +116,9 @@ class NotesSearchService implements AutoCloseable {
         return search(state,query,limit,after,waitMillis,NOTES);
     }
     NotesLuceneIndex.Page search(NotesSearchSources.State state,NotesSearchQuery.Parsed query,int limit,NotesLuceneIndex.Position after,long waitMillis,Backend backend)throws IOException{
+        return search(state,query,limit,after,waitMillis,backend,Set.of());
+    }
+    NotesLuceneIndex.Page search(NotesSearchSources.State state,NotesSearchQuery.Parsed query,int limit,NotesLuceneIndex.Position after,long waitMillis,Backend backend,Set<String> excluded)throws IOException{
         if(waitMillis<0||waitMillis>1000)throw new IllegalArgumentException("Invalid search wait budget");var handle=prepare(state,backend);long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(waitMillis);
         do{
             if(handle.removed)throw new NotesLuceneIndex.Unavailable();var current=handle.current;
@@ -122,7 +126,7 @@ class NotesSearchService implements AutoCloseable {
                 boolean acquired;
                 try{acquired=queries.tryAcquire(50,TimeUnit.MILLISECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
                 if(!acquired)throw new NotesLuceneIndex.Unavailable();
-                try{return current.index().search(query,state.changes().generation(),limit,after,state.configuration(),state.hiddenJournal(),1000);}
+                try{return current.index().search(query,state.changes().generation(),limit,after,state.configuration(),state.hiddenJournal(),1000,excluded);}
                 catch(NotesLuceneIndex.Unavailable pending){throw pending;}
                 catch(IOException|RuntimeException corrupt){handle.broken=true;handle.rebuild=true;handle.retryAfter=0;throw new NotesLuceneIndex.Unavailable();}finally{queries.release();}
             }
@@ -130,6 +134,19 @@ class NotesSearchService implements AutoCloseable {
             try{Thread.sleep(10);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
         }while(true);
     }
+    @FunctionalInterface private interface IndexRead<T>{T read(NotesLuceneIndex index)throws IOException;}
+    private <T>T read(NotesSearchSources.State state,Backend backend,IndexRead<T> query)throws IOException{
+        var handle=prepare(state,backend);var current=handle.current;
+        if(handle.removed||handle.broken||current==null||!current.caughtUp(state))throw new NotesLuceneIndex.Unavailable();
+        boolean acquired;try{acquired=queries.tryAcquire(50,TimeUnit.MILLISECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new NotesLuceneIndex.Unavailable();}
+        if(!acquired)throw new NotesLuceneIndex.Unavailable();
+        try{return query.read(current.index());}
+        catch(NotesLuceneIndex.Unavailable pending){throw pending;}
+        catch(IOException|RuntimeException corrupt){handle.broken=true;handle.rebuild=true;handle.retryAfter=0;throw new NotesLuceneIndex.Unavailable();}
+        finally{queries.release();}
+    }
+    Set<String> sourceFences(NotesSearchSources.State state,Backend backend,String type)throws IOException{return read(state,backend,index->index.sourceFences(type,state.changes().generation()));}
+    NotesLuceneIndex.Hit lookup(NotesSearchSources.State state,Backend backend,UUID id)throws IOException{return read(state,backend,index->index.lookup(id,state.changes().generation()));}
     private void tick(){
         try{
             Handle selected,retired;List<Handle> snapshot;

@@ -18323,7 +18323,7 @@
     "/notes/search": {
       "get": {
         "operationId": "searchNotes",
-        "summary": "Search note titles, paths and Markdown content",
+        "summary": "Search notes and published calendar event details",
         "x-required-permission": "read",
         "parameters": [
           {
@@ -18408,7 +18408,7 @@
             }
           }
         },
-        "description": "Words are required across title, path and body; double quotes form phrases. Unquoted tag:#name requires an exact Unicode-normalized, case-insensitive prose hashtag (up to 128 UTF-16 code units including #); tags can be combined with words, phrases or other tags. Code, link destinations, frontmatter and attachments do not define tags. file:value requires a literal case-insensitive path substring; quote values containing spaces. event:, journal: and note: constrain results to event notes, daily/weekly journal notes, or ordinary Markdown respectively, optionally with a following word or quoted phrase. Filters combine with other words and filters. No user wildcard or other Lucene query syntax is interpreted. Results exclude deleted entries and hidden/configuration paths before paging. Excerpts are plain text; highlight start/end offsets use UTF-16 code units. Relevance order is server-defined with stable portable-path and entry-ID ties. Signed snapshot and continuation tokens expire after ten minutes and bind the account, query, visibility, collection, restore epoch and committed search generation. A stale token returns 412. An unavailable or catching-up replica returns 503 instead of stale results. Responses are private, no-store."
+        "description": "Words are required across title, path and body; double quotes form phrases. Unquoted tag:#name requires an exact Unicode-normalized, case-insensitive prose hashtag (up to 128 UTF-16 code units including #); tags can be combined with words, phrases or other tags. Code, link destinations, frontmatter and attachments do not define tags. file:value requires a literal case-insensitive path substring; quote values containing spaces. event:, journal: and note: constrain results to published event details and saved event notes, daily/weekly journal notes, or ordinary Markdown respectively, optionally with a following word or quoted phrase. Filters combine with other words and filters. No user wildcard or other Lucene query syntax is interpreted. Results exclude deleted entries and hidden/configuration paths before paging. Excerpts are plain text; highlight start/end offsets use UTF-16 code units. Relevance order is server-defined with stable portable-path and entry-ID ties. Signed snapshot and continuation tokens expire after ten minutes and bind the account, query, visibility, collection, restore epoch and committed note and calendar search generations. A stale token returns 412. An unavailable or catching-up replica returns 503 instead of stale results. Responses are private, no-store. Calendar results include title, description and location from visible subscriptions with events enabled, including events without saved notes. Linked saved notes and live details share one result. Recurring events use finite published definitions. file: excludes unsaved calendar definitions. Opening a calendar result uses GET /notes/search/calendar/{id} to recheck the current source without creating a note."
       }
     },
     "/notes/search/status": {
@@ -19135,6 +19135,75 @@
           }
         },
         "description": "The client must belong to the authenticated account. Daily and weekly keys may name an empty page. A null clientId removes the association. Writes require the current independent association ETag. Content bytes, dates, history and content validators remain unchanged. Responses are private, no-store."
+      }
+    },
+    "/notes/search/calendar/{id}": {
+      "get": {
+        "operationId": "getCalendarSearchResult",
+        "summary": "Read current calendar search result details without creating a note",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "507": {
+            "$ref": "#/components/responses/507"
+          },
+          "200": {
+            "description": "Owner-private search operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesSearchHit"
+                }
+              }
+            }
+          }
+        },
+        "description": "Owner-authorized current indexed calendar details and optional saved note entry. Returns 404 for an unknown result, and 503 while its current calendar index is unavailable. This read never creates or changes an event note."
       }
     }
   },
@@ -34505,7 +34574,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "entry",
           "excerpt"
         ],
         "properties": {
@@ -34514,8 +34582,23 @@
           },
           "excerpt": {
             "$ref": "#/components/schemas/NotesSearchExcerpt"
+          },
+          "calendarEvent": {
+            "$ref": "#/components/schemas/NotesSearchCalendarEvent"
           }
-        }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "entry"
+            ]
+          },
+          {
+            "required": [
+              "calendarEvent"
+            ]
+          }
+        ]
       },
       "NotesSearchPage": {
         "type": "object",
@@ -34755,6 +34838,111 @@
             "maxLength": 1024
           },
           "clientId": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      },
+      "NotesSearchCalendarEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "A published VEVENT definition or live details linked to a saved event note. Recurring series are finite definitions, not expanded occurrences; inherited saved-occurrence details may omit timing. eventKey is null for a series definition. noteEntryId identifies the real saved vault note when present.",
+        "required": [
+          "id",
+          "definitionId",
+          "subscriptionId",
+          "uid",
+          "recurrenceId",
+          "title",
+          "description",
+          "location",
+          "recurring",
+          "seriesDefinition",
+          "eventKey",
+          "calendarName",
+          "clientId",
+          "clientName",
+          "color"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "definitionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "uid": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "recurrenceId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "recurring": {
+            "type": "boolean"
+          },
+          "seriesDefinition": {
+            "type": "boolean"
+          },
+          "eventKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "calendarName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "clientName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          },
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "firstDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "noteEntryId": {
             "$ref": "#/components/schemas/Id"
           }
         }

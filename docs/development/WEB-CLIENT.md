@@ -1284,10 +1284,16 @@ files and dates; it does not carry these application bookmarks.
 ## Note search panel
 
 The title-bar search and right-side results panel use the owner-bound Notes
-search API. Unqualified queries search all note types; `event:`, `journal:` and
+search API. Unqualified queries search all note types and published event details; `event:`, `journal:` and
 `note:` filters narrow them. Pure `file:` queries use the existing filename
 catalog to retain folder and attachment results. Search generations reject late
 queries and account changes, while signed cursors detect stale paging. The panel
 is modeless so users can keep editing or open guarded note popups without losing
 results. Maximizing a popup closes the panel; ordinary Close returns focus to the
 result that opened it.
+
+Calendar results include description and location from visible event-enabled
+subscriptions, even without saved notes. Opening details does not create a note.
+Where a saved event note exists, the same guarded Markdown editor edits its real
+canonical entry alongside current event details. Recurring series are labelled
+as definitions rather than expanded into unlimited occurrences.

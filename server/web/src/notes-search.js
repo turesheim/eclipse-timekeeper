@@ -3,6 +3,7 @@ import {icon,iconButton} from './icons.js';
 import {noteTitle} from './note-title.js';
 import {notesEntryVisible} from './notes-links.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
+import {calendarSearchNavigation} from './calendar-search-editor.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=(label,operation)=>{const value=node('button',label,'btn btn-outline-secondary');value.type='button';value.addEventListener('click',operation);return value;};
@@ -69,9 +70,9 @@ export class NotesSearch {
   paint(){
     const active=this.results.contains(document.activeElement)?document.activeElement.closest('[data-search-note]')?.dataset.searchNote:null;this.results.replaceChildren();
     const session=this.session,generation=this.generation;
-    for(const {entry,excerpt}of this.items){
-      const item=node('li'),pick=button('',()=>pick.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,popup:['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind),searchFolder:entry.kind==='FOLDER',originSelector:`#notes-search-results [data-search-note="${entry.id}"]`,originElement:pick,guards:[()=>session===this.session&&generation===this.generation],leave:[]}})));
-      pick.dataset.searchNote=entry.id;pick.className='btn btn-outline-secondary notes-search-result';const title=node('span',undefined,'notes-search-result-title');title.append(icon(entry.kind==='FOLDER'?'folder':entry.kind==='EVENT'?'calendar-event':['DAY','WEEK'].includes(entry.kind)?'journal-text':'file-earmark-text'),node('span',noteTitle(entry,entry.path)));pick.append(title,node('small',entry.path,'notes-search-path'));
+    for(const {entry,calendarEvent,excerpt}of this.items){
+      const id=calendarEvent?.id||entry.id,item=node('li'),pick=button('',()=>pick.dispatchEvent(new CustomEvent(calendarEvent?calendarSearchNavigation:vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{id,entry,popup:calendarEvent||['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind),searchFolder:entry?.kind==='FOLDER',originSelector:`#notes-search-results [data-search-note="${id}"]`,originElement:pick,guards:[()=>session===this.session&&generation===this.generation],leave:[]}})));
+      pick.dataset.searchNote=id;pick.className='btn btn-outline-secondary notes-search-result';const title=node('span',undefined,'notes-search-result-title');title.append(icon(calendarEvent?'calendar-event':entry.kind==='FOLDER'?'folder':entry.kind==='EVENT'?'calendar-event':['DAY','WEEK'].includes(entry.kind)?'journal-text':'file-earmark-text'),node('span',calendarEvent?(calendarEvent.title||t('calendar.untitled')):noteTitle(entry,entry.path)));pick.append(title,node('small',calendarEvent?calendarEvent.clientName+' · '+calendarEvent.calendarName:entry.path,'notes-search-path'));
       if(excerpt){const text=node('span',undefined,'notes-search-excerpt');let offset=0;for(const range of excerpt.highlights){text.append(document.createTextNode(excerpt.text.slice(offset,range.start)),node('mark',excerpt.text.slice(range.start,range.end)));offset=range.end;}text.append(document.createTextNode(excerpt.text.slice(offset)));pick.append(text);}
       item.append(pick);this.results.append(item);
     }

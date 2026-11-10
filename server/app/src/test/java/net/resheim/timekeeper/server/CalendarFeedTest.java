@@ -31,6 +31,16 @@ class CalendarFeedTest {
         assertEquals("Detached details",value.path("description").asText());assertEquals("South observatory",value.path("location").asText());
         assertEquals(week(source,"2026-05-09","UTC").getFirst().key(),value.path("eventKey").asText());
     }
+    @Test void savedOccurrenceDetailsUseApplicableRangeChangesWithoutInventingAnActualSchedule(){
+        var source=feed(event("UID:note-series\nDTSTART;TZID=Europe/Oslo:20260504T090000\nDURATION:PT1H\nRRULE:FREQ=DAILY\nSUMMARY:Planning\nDESCRIPTION:Master details\nLOCATION:North observatory"),
+                event("UID:note-series\nRECURRENCE-ID;TZID=Europe/Oslo;RANGE=THISANDFUTURE:20260505T090000\nDTSTART;TZID=Europe/Oslo:20260505T110000\nLOCATION:South observatory"),
+                event("UID:note-series\nRECURRENCE-ID;TZID=Europe/Oslo:20260507T090000\nDTSTART;TZID=Europe/Oslo:20260507T150000\nDURATION:PT2H\nDESCRIPTION:Detached details"),
+                event("UID:note-series\nRECURRENCE-ID;TZID=Europe/Oslo;RANGE=THISANDFUTURE:20260509T090000\nSTATUS:CANCELLED"));
+        var later=source.eventDefinition("note-series","T:2026-05-06T07:00:00Z",ZoneId.of("Europe/Oslo")).orElseThrow();
+        assertEquals("South observatory",later.path("location").asText());assertEquals("Master details",later.path("description").asText());assertTrue(later.path("seriesDefinition").asBoolean());assertFalse(later.has("start"));
+        var detached=source.eventDefinition("note-series","T:2026-05-07T07:00:00Z",ZoneId.of("Europe/Oslo")).orElseThrow();assertEquals("Detached details",detached.path("description").asText());assertEquals("2026-05-07T13:00:00Z",detached.path("start").asText());
+        assertTrue(source.eventDefinition("note-series","T:2026-05-10T07:00:00Z",ZoneId.of("Europe/Oslo")).isEmpty());assertTrue(source.eventDefinition("note-series","single",ZoneOffset.UTC).isEmpty());assertTrue(source.eventDefinition("note-series","invalid",ZoneOffset.UTC).isEmpty());
+    }
     @Test void recurrenceRetainsWallClockAcrossDstAndRespectsExdatesAndRdates() {
         var source=feed(event("UID:weekly\nDTSTART;TZID=Europe/Oslo:20260322T090000\nDTEND;TZID=Europe/Oslo:20260322T100000\nRRULE:FREQ=WEEKLY;COUNT=4\nEXDATE;TZID=Europe/Oslo:20260405T090000\nRDATE;TZID=Europe/Oslo:20260406T090000\nSUMMARY:Planning"));
         assertEquals("2026-03-22T08:00:00Z",week(source,"2026-03-22","Europe/Oslo").getFirst().start().toString());

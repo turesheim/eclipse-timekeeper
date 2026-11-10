@@ -15,6 +15,7 @@ import { TodayView } from './today.js';
 import { NotesView } from './notes.js';
 import {NotesSearch} from './notes-search.js';
 import {NotePopup} from './note-popup.js';
+import {CalendarSearchEditor,calendarSearchNavigation} from './calendar-search-editor.js';
 import { TasksView } from './tasks.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
@@ -66,6 +67,12 @@ const today = new TodayView($('today-panel'), {
 const noteSearch=new NotesSearch($('titlebar-notes-search'),{onUnauthorized:error=>auth.clear(errorText(error))});
 const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
 const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))});
+const calendarSearchPanel=element('section');calendarSearchPanel.id='calendar-search-panel';calendarSearchPanel.hidden=true;$('workspace').append(calendarSearchPanel);
+const searchEditorCallbacks={onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))};
+const calendarSearchPopup=new CalendarSearchEditor($('workspace'),searchEditorCallbacks);
+const calendarSearchWorkspace=new CalendarSearchEditor(calendarSearchPanel,searchEditorCallbacks,{inline:true});
+let calendarNavigation=0;
+async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave()&&await calendarSearchWorkspace.canLeave();}
 const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
@@ -75,9 +82,9 @@ document.addEventListener(tagNavigation,async event=>{
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
   event.preventDefault();const session=api,detail=event.detail;
-  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return;
+  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
   detail.leave.forEach(leave=>leave());
-  if(detail.popup){await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
+  if(detail.popup){calendarSearchPopup.close(true);await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
   if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}
   if(detail.maximize&&detail.entry.kind==='DAY'){
     const date=dailyNoteDate(detail.entry.sourceKey);if(!date)return;
@@ -87,9 +94,28 @@ document.addEventListener(vaultNoteNavigation,async event=>{
   if(detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(detail.heading);
   if(detail.maximize&&notes.note?.id===detail.entry.id)notes.markdown.focus();
 });
+document.addEventListener(calendarSearchNavigation,async event=>{
+  event.preventDefault();const session=api,detail=event.detail,request=++calendarNavigation;
+  const current=()=>session===api&&request===calendarNavigation;
+  try{
+    if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current())return;
+    const reply=await session.request('/notes/search/calendar/'+detail.id);
+    if(!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
+    detail.leave.forEach(leave=>leave());
+    if(detail.maximize){
+      if(await tab('calendar-search')===false||session!==api)return;
+      noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();
+      await calendarSearchWorkspace.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
+      if(session===api&&calendarSearchWorkspace.opened){calendarSearchWorkspace.title.tabIndex=-1;calendarSearchWorkspace.title.focus({preventScroll:true});}
+    }else{
+      notePopup.close(true);calendarSearchPopup.close(true);
+      await calendarSearchPopup.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
+    }
+  }catch(error){if(current()){if(error.status===401)auth.clear(errorText(error));else setStatus(errorText(error));}}
+});
 document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
-  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
+  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
   if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });
@@ -175,6 +201,7 @@ function readOnlyWhileDisconnected() {
   today.journal.setWritable(connected && canWrite);
   notes.writable=connected && canWrite;notes.controls();
   notePopup.writable=connected&&canWrite;notePopup.controls();
+  for(const view of [calendarSearchPopup,calendarSearchWorkspace]){view.writable=connected&&canWrite&&!!view.context?.entry;view.controls();}
   tasks.writable=connected && canWrite;tasks.controls();
   weekSessions.setWritable(connected && canWrite);
   $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
@@ -182,9 +209,9 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 async function tab(name) {
-  const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||session!==api)return false;
-  notePopup.close(true);
-  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks']) $(`${item}-panel`).hidden = item !== name;
+  ++calendarNavigation;const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return false;
+  notePopup.close(true);calendarSearchPopup.close(true);calendarSearchWorkspace.close(true);
+  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks','calendar-search']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if(name==='notes')notes.show();else notes.hide();
@@ -201,8 +228,8 @@ async function tab(name) {
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
-  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave(),
-  beforeNavigate:async()=>{if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave())return false;notePopup.close(true);return true;},
+  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave()&&await canLeaveSearchEvents(),
+  beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
@@ -235,7 +262,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();noteSearch.reset();notePopup.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
+    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();

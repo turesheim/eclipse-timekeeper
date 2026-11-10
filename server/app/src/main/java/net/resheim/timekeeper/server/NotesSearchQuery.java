@@ -64,7 +64,8 @@ final class NotesSearchQuery {
                     // The qualifier is a literal path substring, never user-supplied
                     // wildcard syntax. The existing search deadline still applies.
                     String literal=value.replace("\\","\\\\").replace("*","\\*").replace("?","\\?");
-                    required.add(new WildcardQuery(new Term("path_key","*"+literal+"*")),BooleanClause.Occur.FILTER);continue;
+                    required.add(new WildcardQuery(new Term("path_key","*"+literal+"*")),BooleanClause.Occur.FILTER);
+                    required.add(new TermQuery(new Term("source_type","CALENDAR_EVENT")),BooleanClause.Occur.MUST_NOT);continue;
                 }
                 if(Set.of("event","journal","note").contains(field)){
                     if(++count>MAX_TERMS)throw ApiFailure.validation();
