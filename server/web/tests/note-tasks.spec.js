@@ -3,6 +3,8 @@ import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
 import {noteEntry} from './note-entry.js';
 import {notesSource,saveMarkdown,clickNoteAction} from './editor-interactions.js';
+import {searchNotes} from './notes-search.js';
+import {captureScreenshot} from './screenshots.js';
 
 test.beforeAll(async({request})=>{
   const headers={Origin:new URL(process.env.TIMEKEEPER_WEB_URL).origin},status=await request.get('/api/v1/auth/status',{headers});
@@ -23,6 +25,10 @@ async function open(page,path){
 async function tasks(api){return(await(await api('GET','/tasks?limit=500')).json()).items;}
 async function complete(api,id,checked){const previous=await api('GET','/tasks/'+id);return api('PUT','/tasks/'+id+'/planning',{status:checked?'COMPLETED':'NOT_STARTED',scheduledDate:null,completedAt:checked?new Date().toISOString():null},{'If-Match':previous.headers().etag});}
 const checkbox=(page,title)=>page.locator('#notes-panel').getByRole('checkbox',{name:'Task: '+title,exact:true});
+async function indexed(page,query){
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:query}));return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(1);
+  return searchNotes(page,query);
+}
 
 test('saving and checking note items creates ordinary tasks with separate stable identities',async({page,request})=>{
   const api=await setup(page,request),entry=await create(api,'Checklist.md','Plan\n'),client=await(await api('POST','/clients',{name:'Checklist client',color:'#285ca8'})).json(),link='/notes/client?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey}),before=await api('GET',link);await api('PUT',link,{clientId:client.id},{'If-Match':before.headers().etag});await open(page,'Checklist.md');await expect(page.locator('#notes-panel .note-client-label')).toHaveText(client.name);
@@ -57,4 +63,34 @@ test('Today and weekly Markdown writers create the same ordinary tasks and reope
   await api('PUT','/day-notes/'+day+'/content',{body:'- [ ] Daily follow up\n'},{'If-Match':daily.headers().etag});await api('PUT','/week-notes/'+week,{body:'- [x] Weekly follow up\n'},{'If-Match':weekly.headers().etag});expect(await tasks(api)).toHaveLength(2);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const dailyCheckbox=page.locator('#today-journal-formatted').getByRole('checkbox',{name:'Task: Daily follow up',exact:true});await expect(dailyCheckbox).not.toBeChecked();await dailyCheckbox.check();await saveMarkdown(page.locator('#today-note-editor'));await expect.poll(async()=>(await tasks(api)).find(value=>value.summary==='Daily follow up').status).toBe('COMPLETED');
   const task=(await tasks(api)).find(value=>value.summary==='Daily follow up');await complete(api,task.id,false);await page.locator('#today-date').fill('2026-11-10');await page.locator('#today-date').fill(day);await expect(dailyCheckbox).not.toBeChecked();
+});
+
+test('search popups and maximized event notes synchronize their ordinary checklist tasks',async({page,request})=>{
+  test.setTimeout(120000);const api=await setup(page,request);
+  await create(api,'Search.md','- [ ] Search popup follow up\n');
+  let panel=await indexed(page,'note:"Search popup follow up"');await panel.locator('[data-search-note]').click();
+  const note=page.locator('#note-popup-editor');await note.getByRole('checkbox',{name:'Task: Search popup follow up',exact:true}).check();await saveMarkdown(note);
+  const ordinary=(await tasks(api)).find(value=>value.summary==='Search popup follow up');expect(ordinary).toMatchObject({status:'COMPLETED'});
+  await note.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(note).toBeHidden();await expect(panel).toBeHidden();await expect(checkbox(page,'Search popup follow up')).toBeChecked();
+  await page.locator('[data-tab=today]').click();
+
+  const title='Event checklist result',body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Dagsverk//Checklist search fixture//EN','BEGIN:VEVENT','UID:checklist-search-event','DTSTAMP:20260101T000000Z','DTSTART:20260504T100000Z','DTEND:20260504T110000Z','SUMMARY:'+title,'DESCRIPTION:Telescope checklist bridge','END:VEVENT','END:VCALENDAR',''].join('\r\n');
+  const feed=await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}});expect(feed.status()).toBe(201);
+  const client=await(await api('POST','/clients',{name:'Checklist calendar client',color:'#305070'})).json();
+  const subscription=await(await api('POST','/calendar-subscriptions',{name:'Checklist calendar',clientId:client.id,url:(await feed.json()).url,visible:true,includeEvents:true,includeTodos:false})).json();
+  let event;await expect.poll(async()=>{event=(await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json()).items.find(value=>value.subscriptionId===subscription.id);return event?.title;},{timeout:30000}).toBe(title);
+  const path='/event-notes/'+subscription.id+'/'+event.key,original=await api('GET',path);
+  await api('PUT',path,{fromDate:'2026-05-04',toDate:'2026-05-05',body:'- [ ] Event workspace follow up\n'},{'If-Match':original.headers().etag});
+  panel=await indexed(page,'event:"Event workspace follow up"');await panel.locator('[data-search-note]').click();
+  const popup=page.locator('#calendar-search-popup-editor');await popup.getByRole('checkbox',{name:'Task: Event workspace follow up',exact:true}).check();
+  // Maximize must flush the checkbox edit, task update and resulting index change together.
+  await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(panel).toBeHidden();
+  const workspace=page.locator('#calendar-search-workspace-editor');await expect(workspace.getByRole('checkbox',{name:'Task: Event workspace follow up',exact:true})).toBeChecked();
+  const linked=(await tasks(api)).find(value=>value.summary==='Event workspace follow up');expect(linked).toMatchObject({status:'COMPLETED'});expect(await tasks(api)).toHaveLength(2);
+  await captureScreenshot(page,{path:'test-results/note-task-event-workspace.png'});
+  await complete(api,linked.id,false);expect((await(await api('GET',path)).json()).body).toBe('- [ ] Event workspace follow up\n');
+  await page.locator('[data-tab=today]').click();panel=await indexed(page,'event:"Event workspace follow up"');await panel.locator('[data-search-note]').click();
+  await expect(popup.getByRole('checkbox',{name:'Task: Event workspace follow up',exact:true})).not.toBeChecked();await popup.getByRole('button',{name:'Close',exact:true}).click();await panel.getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('[data-tab=tasks]').click();await expect(page.locator('#tasks-list').getByRole('button',{name:'Open task Event workspace follow up',exact:true})).toBeVisible();
+  expect((await tasks(api)).map(value=>value.id).sort()).toEqual([ordinary.id,linked.id].sort());await captureScreenshot(page,{path:'test-results/note-task-search-tasks.png'});
 });
