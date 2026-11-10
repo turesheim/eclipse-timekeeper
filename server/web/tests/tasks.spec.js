@@ -95,3 +95,16 @@ for(const locale of ['en-GB','nb-NO'])test(`Tasks supports keyboard/mobile brows
     }
   }
 });
+
+for(const locale of ['en-GB','nb-NO'])test('provider source links and assignment stay separate from the editable task URL in '+locale,async({page,request})=>{
+  test.setTimeout(120000);const {api}=await setup(page,request,{locale,remoteCount:0}),google='https://tasks.google.com/fixture',own='https://example.invalid/own-task-url',assignment='https://docs.google.com/document/d/fixture/edit';
+  const created=await api('POST','/tasks',{summary:'Google context',projectId:null,parentTaskId:null,url:own,externalReferences:[{providerId:'google',repositoryId:'account/list',externalId:'g-context',externalUrl:google,assignment:{sourceId:'drive:fixture',sourceUrl:assignment,writable:false}},{providerId:'unsafe',repositoryId:'malformed-source',externalId:'bad-link',externalUrl:'javascript:alert(1)'}],metadata:{tags:[],categories:[],links:[{id:randomUUID(),kind:'PROVIDER_SOURCE',url:'https://mail.google.com/mail/u/0/#inbox/source',title:'Email <source>',providerId:'google',remoteId:null},{id:randomUUID(),kind:'LOCAL',url:'https://example.invalid/retained-link',title:'My local resource',providerId:null,remoteId:null}]}});const task=await created.json();
+  await page.reload();await page.locator('[data-tab=tasks]').click();await page.locator('#tasks-list button').filter({hasText:'Google context'}).click();const detail=page.locator('#task-details'),nb=locale==='nb-NO';
+  await expect(detail.getByRole('link',{name:nb?'Åpne oppgavens nettadresse':'Open task URL',exact:true})).toHaveAttribute('href',own);await expect(detail.getByRole('link',{name:nb?'Åpne i Google Tasks':'Open in Google Tasks',exact:true})).toHaveAttribute('href',google);await expect(detail.getByRole('link',{name:nb?'Åpne tildelingskilden':'Open assignment source',exact:true})).toHaveAttribute('href',assignment);
+  await expect(detail.getByRole('link',{name:'Email <source>',exact:true})).toHaveAttribute('rel','noopener noreferrer');await expect(detail.getByRole('link',{name:'My local resource',exact:true})).toBeVisible();await expect(detail.locator('a[href^="javascript:"]')).toHaveCount(0);await expect(detail.locator('source')).toHaveCount(0);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light','newspaper'].includes(theme)?'light':'dark';},theme);
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#task-details').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
+  }
+  expect((await(await api('GET','/tasks/'+task.id)).json()).url).toBe(own);await captureScreenshot(page,{path:'test-results/task-context-'+locale+'-320.png'});
+});

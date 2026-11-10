@@ -45,6 +45,20 @@ class TaskCloudPullTest {
     private JsonNode stored(Fixture f,String id){return tx(f,()->store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("remote-account","remote-list"),id)).orElseThrow());}
     private TaskProviderHttp.Reply reply(int code,String json){return new TaskProviderHttp.Reply(code,Map.of(),json.getBytes(StandardCharsets.UTF_8));}
 
+    @Test void googleSourceContextImportsWithoutReplacingTheUsersPrimaryUrlAndSurvivesRepeatedScans(){
+        var f=fixture();var raw=object().put("id","one").put("title","Source task").put("status","needsAction").put("position","001").put("webViewLink","https://tasks.google.com/one");
+        raw.putArray("links").add(object().put("type","email").put("description","Email source").put("link","https://mail.google.com/mail/u/0/#inbox/source"));raw.putObject("assignmentInfo").put("linkToTask","https://docs.google.com/document/d/source/edit").putObject("driveResourceInfo").put("driveFileId","source");
+        var observed=google().normalize(raw);assertTrue(apply(f,scan(observed)).path("complete").asBoolean());var imported=stored(f,"one");assertTrue(imported.path("url").isNull());assertEquals("https://tasks.google.com/one",imported.path("externalReferences").get(0).path("externalUrl").asText());assertEquals("drive:source",imported.path("externalReferences").get(0).path("assignment").path("sourceId").asText());assertEquals(1,imported.path("metadata").path("links").size());
+        assertTrue(apply(f,scan(observed)).path("complete").asBoolean());assertEquals(imported,stored(f,"one"));
+        tx(f,()->{var task=(Task)decode("TASK",stored(f,"one"));store.service().updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),task.summary(),Optional.of("https://example.invalid/own-url")));return null;});
+        raw.put("webViewLink","https://tasks.google.com/updated");assertTrue(apply(f,scan(google().normalize(raw))).path("complete").asBoolean());assertEquals("https://example.invalid/own-url",stored(f,"one").path("url").asText());assertEquals("https://tasks.google.com/updated",stored(f,"one").path("externalReferences").get(0).path("externalUrl").asText());
+    }
+    @Test void providerLinkChangesCannotReplaceLocalResourcesAndRetainTheCompletedCheckpoint(){
+        var f=fixture();var raw=object().put("id","one").put("title","Source task").put("status","needsAction").put("position","001");raw.putArray("links").add(object().put("type","email").put("link","https://mail.google.com/source"));apply(f,scan(google().normalize(raw)));
+        tx(f,()->{var task=(ObjectNode)stored(f,"one");var local=task.withObject("metadata").withArray("links").addObject();local.put("id",UUID.randomUUID().toString()).put("kind","LOCAL").put("url","https://example.invalid/own-link").putNull("title").putNull("providerId").putNull("remoteId");task.put("version",task.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",task));return null;});
+        var before=stored(f,"one");var cursor=tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst());raw.withArray("links").add(object().put("type","generic").put("link","https://docs.google.com/new-source"));var result=apply(f,scan(google().normalize(raw)));
+        assertFalse(result.path("complete").asBoolean());assertEquals("CONFLICT",result.path("pending").get(0).path("status").asText());assertEquals(before,stored(f,"one"));assertEquals(cursor,tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst()));
+    }
     @Test void childBeforeParentImportsTheOwnedHierarchyAndRepeatedScansDoNotDuplicateOrAdvanceTaskVersions(){
         var f=fixture();var child=task("child"," Child ","parent","0001");var parent=task("parent","Parent",null,"0002");
         var result=apply(f,scan(child,parent));assertTrue(result.path("complete").asBoolean());assertEquals(2,result.path("created").asInt());

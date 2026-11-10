@@ -72,7 +72,7 @@ final class TaskCloudProvider {
         var result=object().put("version",1).put("providerApiVersion",provider==Provider.GOOGLE?"tasks-v1/dagsverk-1":"graph-v1.0/dagsverk-read-1");
         var fields=result.putObject("fields");
         var names=new ArrayList<>(List.of("summary","body","status","completedAt"));
-        if(provider==Provider.GOOGLE)names.addAll(List.of("scheduledDate","parentTaskId","siblingOrder"));
+        if(provider==Provider.GOOGLE)names.addAll(List.of("scheduledDate","parentTaskId","siblingOrder","assignment","metadata.links"));
         else names.addAll(List.of("start","due","priority","metadata.categories"));
         for(String name:names)fields.putObject(name).put("readable",true).put("writable",false).put("deletable",false).putNull("note");
         if(writable&&provider==Provider.GOOGLE)for(String name:List.of("summary","body","status","completedAt","scheduledDate")){
@@ -88,6 +88,7 @@ final class TaskCloudProvider {
             if(provider==Provider.GOOGLE){
                 sourceTime(source,"modifiedAt",value,"updated");sourceString(source,"remoteEtag",value,"etag");
                 if(!deleted){
+                    GoogleTaskContext.validate(value);var assigned=GoogleTaskContext.assigned(value);if(!assigned.isMissingNode())fields.set("assignment",assigned);
                     fields.put("summary",required(value,"title",1024).trim());
                     // Assigned tasks may not expose notes; omission is not an observed clear.
                     if(value.has("notes")||!value.hasNonNull("assignmentInfo"))body(fields,"TEXT",text(value,"notes",65536).orElse(""));

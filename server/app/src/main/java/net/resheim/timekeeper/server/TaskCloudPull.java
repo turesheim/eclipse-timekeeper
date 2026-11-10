@@ -65,7 +65,7 @@ final class TaskCloudPull {
         while(!remaining.isEmpty()){
             boolean progressed=false;
             for(var iterator=remaining.iterator();iterator.hasNext();){
-                var remote=iterator.next();var fields=remote.fields().deepCopy();
+                var remote=iterator.next();var fields=scan.provider().equals("google")?GoogleTaskContext.fields(remote,repository):remote.fields().deepCopy();
                 var existing=store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository,remote.id()));
                 boolean localHierarchy=false;if(existing.isPresent())for(var ref:existing.get().path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(remote.id()))localHierarchy=ref.path("providerData").path("payload").path("policy").path("localHierarchy").asBoolean();
                 if(scan.provider().equals("google")&&!remote.deleted()&&!localHierarchy){
@@ -119,11 +119,15 @@ final class TaskCloudPull {
             var payload=((ObjectNode)existing.path("payload")).deepCopy();payload.set("observation",remote.original().deepCopy());envelope.set("payload",payload);
         }else{var payload=object();payload.set("observation",remote.original().deepCopy());envelope.set("payload",payload);}
         providerData(envelope);
+        if(provider.equals("google"))GoogleTaskContext.taskUrl(remote.original()).ifPresent(url->referenceUrl(candidate,provider,repository,remote.id(),url));
         var source=reference.path("source").isObject()?((ObjectNode)reference.path("source")).deepCopy():object();
         source.setAll(remote.source());
-        if(reference.path("source").equals(source)&&reference.path("providerData").equals(envelope))return;
+        if(candidate.equals(task)&&reference.path("source").equals(source)&&reference.path("providerData").equals(envelope))return;
         reference.set("source",source);reference.set("providerData",envelope);
         candidate.put("version",task.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",candidate));store.change("TASK","UPDATED",task.path("id").asText());
+    }
+    private static void referenceUrl(ObjectNode task,String provider,String repository,String external,String url){
+        for(var ref:task.path("externalReferences"))if(ref.path("providerId").asText().equals(provider)&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(external))((ObjectNode)ref).put("externalUrl",url);
     }
     private void checkpoint(UUID connection,UUID list,Instant observed,boolean full){
         TaskSyncCursor cursor=null;

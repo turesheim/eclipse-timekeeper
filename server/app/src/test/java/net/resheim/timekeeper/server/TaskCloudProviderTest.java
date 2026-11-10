@@ -53,6 +53,27 @@ class TaskCloudProviderTest {
         assertFalse(task.fields().has("body"));assertFalse(task.fields().has("url"));assertEquals(original,task.original());
         assertFalse(google().capabilities().path("fields").has("url"));
     }
+    @Test void googleAssignmentExposesReadOnlySourceContextWithoutInventingPersonIdentities(){
+        var task=google().normalize(json("""
+            {"id":"assigned","title":"Review","status":"needsAction","assignmentInfo":{"surfaceType":"DOCUMENT","linkToTask":"https://docs.google.com/document/d/file/edit#task-id","driveResourceInfo":{"driveFileId":"file","resourceKey":"opaque-key"}}}
+            """));
+        var assigned=task.fields().path("assignment");assertEquals("drive:file",assigned.path("sourceId").asText());assertEquals("https://docs.google.com/document/d/file/edit#task-id",assigned.path("sourceUrl").asText());assertFalse(assigned.path("writable").asBoolean());
+        for(String field:List.of("assigneeId","assigneeName","assignedById","assignedByName"))assertFalse(assigned.hasNonNull(field));
+        for(String field:List.of("assignment","metadata.links")){assertTrue(google().capabilities(true).path("fields").path(field).path("readable").asBoolean());assertFalse(google().capabilities(true).path("fields").path(field).path("writable").asBoolean());}
+    }
+    @Test void googleSourceLinksAreAccountScopedReadOnlyAndDoNotChangeThePrimaryUrl(){
+        var task=google().normalize(json("""
+            {"id":"task-id","title":"Review","status":"needsAction","webViewLink":"https://tasks.google.com/task-id","links":[{"type":"email","description":"Read source","link":"https://mail.google.com/mail/u/0/#inbox/message"}]}
+            """));
+        var one=GoogleTaskContext.fields(task,TaskCloudPull.repository("account-one","list"));var two=GoogleTaskContext.fields(task,TaskCloudPull.repository("account-two","list"));
+        var link=one.path("metadata").path("links").get(0);assertEquals("PROVIDER_SOURCE",link.path("kind").asText());assertEquals("google",link.path("providerId").asText());assertFalse(one.has("url"));
+        assertNotEquals(link.path("id"),two.path("metadata").path("links").get(0).path("id"));assertEquals(one,GoogleTaskContext.fields(task,TaskCloudPull.repository("account-one","list")));
+    }
+    @Test void malformedGoogleContextCannotBecomeANavigableLinkOrEraseCanonicalValues(){
+        for(String fragment:List.of("\"webViewLink\":\"javascript:alert(1)\"","\"webViewLink\":\"https://user:secret@tasks.google.com/id\"","\"links\":[{\"link\":\"javascript:alert(1)\"}]","\"assignmentInfo\":{\"linkToTask\":\"http://docs.google.com/source\"}","\"links\":{}")){
+            var failed=assertThrows(TaskProviderHttp.Failure.class,()->google().normalize(json("{\"id\":\"id\",\"title\":\"Title\",\"status\":\"needsAction\","+fragment+"}")));assertEquals("TASK_PROVIDER_INVALID_RESPONSE",failed.getMessage());assertFalse(failed.toString().contains("secret"));
+        }
+    }
     @Test void observedGoogleClearsAndCompletionAreExplicit(){
         var task=google().normalize(json("{\"id\":\"one\",\"title\":\"Done\",\"status\":\"completed\",\"completed\":\"2026-11-08T10:00:00Z\"}"));
         assertEquals("COMPLETED",task.fields().path("status").asText());assertEquals("2026-11-08T10:00:00Z",task.fields().path("completedAt").asText());

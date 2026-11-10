@@ -234,7 +234,7 @@ final class TaskProviderWrites {
             var payload=object();payload.set("observation",remote.original().deepCopy());payload.putObject("policy").put("localHierarchy",true);
             var data=new ExternalTaskProviderData("google.tasks",1,payload.toString());
             var baseline=object();for(String field:FIELDS)if(remote.fields().has(field))baseline.set(field,remote.fields().get(field).deepCopy());
-            var ref=new ExternalTaskReference("google",key.repositoryId(),key.externalId(),Optional.empty(),source(remote.source()),Optional.of(uuid(row.get("listId"))),Optional.empty(),Optional.empty(),Optional.of(data),Optional.of(new ExternalTaskBaseline(1,store.now(),baseline.toString())));
+            var ref=new ExternalTaskReference("google",key.repositoryId(),key.externalId(),GoogleTaskContext.taskUrl(remote.original()),source(remote.source()),Optional.of(uuid(row.get("listId"))),Optional.empty(),Optional.ofNullable(remote.fields().get("assignment")).filter(value->!value.isNull()).map(JsonValues::assignment),Optional.of(data),Optional.of(new ExternalTaskBaseline(1,store.now(),baseline.toString())));
             store.service().linkExternalReference(new LinkExternalReference(task.id(),task.version(),ref));
         }
         row.put("state","DONE").putNull("lastError");connections().save(KIND,row);

@@ -1615,5 +1615,13 @@
   "notes.search_help": "Search notes and event details. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
   "notes.search_event_series": "Recurring series details",
   "notes.search_event_no_note": "This event has no saved note.",
-  "task_writes.google_id": "Google task ID"
+  "task_writes.google_id": "Google task ID",
+  "tasks.provider_context": "Provider context",
+  "tasks.provider_open": "Open in {{provider}}",
+  "tasks.assignee": "Assigned to",
+  "tasks.assigned_by": "Assigned by",
+  "tasks.assignment_context": "Assignment source",
+  "tasks.assignment_open": "Open assignment source",
+  "tasks.resources": "Related links",
+  "tasks.open_task_url": "Open task URL"
 }

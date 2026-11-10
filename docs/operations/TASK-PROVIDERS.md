@@ -53,6 +53,16 @@ deselecting a list keeps imported tasks. Missing tasks are not automatically
 deleted; provider-reported deletions require review. Connection status reports
 errors and the number of tasks needing review.
 
+Tasks shows a provider's web link, assignment source and readable related links
+separately from the task's own editable URL. Google's assignment context identifies
+the original document or Chat space; it does not supply a person's identity.
+These source fields are read-only, following the [Google Task resource](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks). Source-link identities include the Google
+account/list namespace, so another connected account's resources are not matched
+by title or provider name. Missing link observations retain existing resources;
+a changed Google link array conflicts with independent local resource changes
+rather than removing those resources. The full original provider context remains
+in its namespaced task payload.
+
 Google changes use conditional PATCH/DELETE with the observed provider ETag.
 The server records a durable intent before the request and its acknowledgement
 before changing a common baseline. A lost response or interrupted in-flight
