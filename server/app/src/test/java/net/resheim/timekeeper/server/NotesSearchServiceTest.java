@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import io.quarkus.test.junit.*;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -112,6 +112,42 @@ class NotesSearchServiceTest {
             store.transaction(owner,()->{var vault=new VaultCollection(store,limits);var entry=vault.get(id);vault.put(VaultCollection.path(entry),vault.tag(entry),false,bytes("saved despite full cache"));return null;});
             service.minimumFreeBytes=0;var changed=sources().state(owner);service.rebuild(changed);
             assertEquals(1,waitFor(service,changed,"saved").items().size());
+        }
+    }
+    @Test void shutdownLetsAnActiveBatchFinishWithoutInterruptingItsWriter()throws Exception{
+        String owner="search-runtime-shutdown";UUID id=create(owner,"needle shutdown");var state=sources().state(owner);Path cache=temporary.resolve("shutdown");
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var interrupted=new CountDownLatch(1);
+        var backend=new NotesSearchService.Backend(){
+            public String key(){return "shutdown-probe";}
+            public NotesSearchSources sources(ServerStore store){return new NotesSearchSources(store);}
+            public NotesIndexReplay open(Path path,NotesSearchSources sources,NotesSearchSources.State state)throws IOException{
+                var delegate=NotesSearchReplay.open(path,sources,state);
+                return new NotesIndexReplay(){
+                    public NotesLuceneIndex index(){return delegate.index();}
+                    public boolean caughtUp(NotesSearchSources.State state){return delegate.caughtUp(state);}
+                    public NotesSearchReplay.Step advance(NotesSearchReplay.Budget budget)throws IOException{
+                        entered.countDown();
+                        // Hold an open writer mid-batch while another thread stops the service.
+                        for(;;)try{release.await();break;}catch(InterruptedException stopped){interrupted.countDown();}
+                        return delegate.advance(budget);
+                    }
+                    public void close()throws IOException{delegate.close();}
+                };
+            }
+        };
+        try(var service=new NotesSearchService(store,cache);var closer=Executors.newSingleThreadExecutor()){
+            try{
+                service.status(state,backend);assertTrue(entered.await(5,TimeUnit.SECONDS));
+                var closing=new CountDownLatch(1);
+                var stopped=closer.submit(()->{closing.countDown();service.close();return null;});
+                assertTrue(closing.await(5,TimeUnit.SECONDS));
+                assertFalse(interrupted.await(500,TimeUnit.MILLISECONDS),"Shutdown must not interrupt Lucene file I/O");
+                assertFalse(stopped.isDone(),"Shutdown must wait for the active batch before closing its writer");
+                release.countDown();stopped.get(5,TimeUnit.SECONDS);
+            }finally{release.countDown();}
+        }
+        try(var restarted=new NotesSearchService(store,cache)){
+            assertEquals(id,waitFor(restarted,state,"needle",backend).items().getFirst().id());
         }
     }
     @Test void aLockedIndexIsNotDeletedAndSearchRecoversAfterItsWriterCloses()throws Exception{

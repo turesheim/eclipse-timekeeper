@@ -23,9 +23,7 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-navigation-collapsed .notes-document-title { grid-column:2; grid-row:1; }
 .notes-navigation { display:flex; flex-direction:column; overflow:hidden; padding:.75rem; min-width:0; }
 .notes-navigation-browser { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; }
-.notes-recent { display:flex; flex-direction:column; min-height:0; max-height:40%; margin-top:.75rem; padding-top:.75rem; border-top:1px solid var(--bs-border-color); }
-.notes-recent h3 { flex-shrink:0; margin:0; font-size:var(--font-notes-heading); }
-#notes-recent-notes { min-height:0; overflow:auto; overscroll-behavior:contain; }
+.notes-recent { display:flex; flex-direction:column; min-height:0; max-height:40%; margin-top:.75rem; }
 .notes-drop-target { outline:2px solid var(--bs-primary); outline-offset:-2px; background:var(--bs-primary-bg-subtle); }
 .notes-navigation-tools,.notes-file-tools,.notes-footer { display:flex; gap:.5rem; align-items:center; }
 .notes-navigation-tools { margin-bottom:.75rem; gap:.25rem; flex-wrap:wrap; }

@@ -527,6 +527,9 @@ code, pre { font-size: var(--font-code); }
 @media(forced-colors: active) { .css-editor.is-highlighted textarea { color: CanvasText; background: Canvas; caret-color: CanvasText; }.css-editor-highlight { visibility: hidden; } }
 
 .today-recent-list { display: grid; gap: .35rem; }
+.recent-notes { --today-sidebar-heading-font-size: var(--font-today-sidebar-heading); display:flex; flex-direction:column; min-height:0; }
+.recent-notes > h3 { flex-shrink:0; }
+.recent-notes > div { min-height:0; overflow:auto; overscroll-behavior:contain; }
 .today-recent-note { display: grid; width: 100%; min-width: 0; border: 0; text-align: start; font-size: var(--font-today-recent-note); }
 .today-recent-note > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-recent-note-title { display: flex; align-items: center; gap: .4rem; min-width: 0; }

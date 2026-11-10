@@ -332,10 +332,12 @@ test('a conflicting or stale title rename retains the draft and never overwrites
   await api('PUT','/notes/files?path=Notes%2FExisting.md',Buffer.from('Existing exact bytes'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
   const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await title.fill('Existing');await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('Existing');await expect(page.locator('.notes-document-path')).toHaveText(path);
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();
   const existing=await(await api('GET','/notes/resolve?path=Notes%2FExisting.md')).json();expect(await(await api('GET','/notes/entries/'+existing.id+'/content')).text()).toBe('Existing exact bytes');
   await title.press('Escape');await title.fill('My pending title');const current=await api('GET','/notes/entries/'+entry.id);await api('PUT','/notes/entries/'+entry.id+'/title',{title:'Peer title'},{'If-Match':current.headers().etag});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');await expect(title).toHaveValue('My pending title');
   await title.press('Enter');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('My pending title');expect((await(await api('GET','/notes/entries/'+entry.id)).json()).title).toBe('Peer title');
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().evaluate(button=>button.click());await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await expect(title).toHaveValue('My pending title');
   page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Reload from server');await expect(title).toHaveValue('Peer title');await expect(page.locator('.notes-document-path')).toHaveText('Notes/Peer title.md');
 });
 
@@ -724,7 +726,9 @@ test('a delayed bookmark response cannot paint the next selected note',async({pa
   await page.route('**/api/v1/notes/bookmark?**',async route=>{
     if(new URL(route.request().url()).searchParams.get('sourceKey')!==first.sourceKey||delayed)return route.continue();delayed=true;const response=await route.fetch();arrive();await gate;try{await route.fulfill({response});}finally{deliver();}
   });
-  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/First.md').click();await arrived;await noteEntry(page.locator('#notes-navigation'),'Notes/Second.md').click();const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveAttribute('aria-pressed','false');release();await delivered;await expect(button).toHaveAttribute('aria-pressed','false');await expect(page.locator('#notes-document-title')).toHaveText('Second');
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/First.md').click();await arrived;
+  await expect(page.locator('#notes-formatted .ProseMirror')).toHaveText('First note');await expect(page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true})).toBeEnabled();
+  await noteEntry(page.locator('#notes-navigation'),'Notes/Second.md').click();const button=page.locator('#notes-panel .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveAttribute('aria-pressed','false');release();await delivered;await expect(button).toHaveAttribute('aria-pressed','false');await expect(page.locator('#notes-document-title')).toHaveText('Second');
 });
 
 test('refresh updates a bookmark changed in another client while preserving an unsaved draft',async({page,request})=>{

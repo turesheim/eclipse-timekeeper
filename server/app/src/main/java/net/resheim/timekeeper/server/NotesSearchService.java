@@ -257,7 +257,9 @@ class NotesSearchService implements AutoCloseable {
     }
     @Override @jakarta.annotation.PreDestroy public void close()throws IOException{
         ScheduledExecutorService running;synchronized(this){if(closed)return;closed=true;running=worker;}
-        if(running!=null){running.shutdownNow();try{if(!running.awaitTermination(5,TimeUnit.SECONDS)){LOG.warn("Notes search worker exceeded shutdown deadline");return;}}catch(InterruptedException interrupted){Thread.currentThread().interrupt();return;}}
+        // Interrupting Lucene file I/O can close its channel and invalidate the writer lock.
+        // Let the bounded active batch finish before closing writers and releasing the cache.
+        if(running!=null){running.shutdown();try{if(!running.awaitTermination(5,TimeUnit.SECONDS)){LOG.warn("Notes search worker exceeded shutdown deadline");return;}}catch(InterruptedException interrupted){Thread.currentThread().interrupt();return;}}
         IOException failure=null;var all=new ArrayList<>(handles.values());all.addAll(closing);
         for(var handle:all)try{closeHandle(handle,false);}catch(IOException problem){if(failure==null)failure=problem;else failure.addSuppressed(problem);}
         try{if(fileLock!=null)fileLock.close();}catch(IOException problem){if(failure==null)failure=problem;else failure.addSuppressed(problem);}
