@@ -29,7 +29,7 @@ test('themes cover tracking, records, editors and account settings with accessib
     await signIn(page);await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
     await page.locator('[data-tab=week]').click();await page.locator('#week-date').fill('2025-10-20');await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
     await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');
-    for(const id of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
+    for(const id of ['timekeeper','timekeeper-dark','timekeeper-reinvented','timekeeper-reinvented-dark','solarized-light','solarized-dark','nord','dracula']) {
       await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
       await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
@@ -55,7 +55,7 @@ test('themes cover tracking, records, editors and account settings with accessib
   }
 });
 
-test('Dagsverk style guide keeps local fonts, journal typography and Bootstrap controls usable in both modes',async({page,request})=>{
+test('Dagsverk-reinvented style guide keeps local fonts, journal typography and Bootstrap controls usable in both modes',async({page,request})=>{
   test.setTimeout(90000);
   const headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},path='/api/v1/day-notes/2026-11-10/content';
   const original=await request.get(path,{headers}),body=await original.json();
@@ -65,7 +65,7 @@ test('Dagsverk style guide keeps local fonts, journal typography and Bootstrap c
   try {
     await signIn(page);await page.locator('#today-date').fill('2026-11-10');
     const rich=page.locator('#today-note-editor .ProseMirror'),source=page.locator('#today-journal-body');
-    for(const id of ['timekeeper','timekeeper-dark']) {
+    for(const id of ['timekeeper-reinvented','timekeeper-reinvented-dark']) {
       await setTheme(page,id);await page.locator('[data-tab=today]').click();
       await page.locator('#today-note-editor').getByRole('button',{name:'Formatted',exact:true}).click();
       await expect(rich).toContainText('ÆØÅ æøå');
@@ -76,7 +76,7 @@ test('Dagsverk style guide keeps local fonts, journal typography and Bootstrap c
       });
       expect(fonts.length).toBeGreaterThanOrEqual(2);expect(fonts.every(status=>status==='loaded')).toBe(true);
       await expect(page.locator('body')).toHaveCSS('font-family',/Inter Variable/);
-      await expect(page.locator('#workspace-navigation')).toHaveCSS('background-color',id==='timekeeper'?'rgb(255, 255, 255)':'rgb(28, 48, 41)');
+      await expect(page.locator('#workspace-navigation')).toHaveCSS('background-color',id==='timekeeper-reinvented'?'rgb(255, 255, 255)':'rgb(28, 48, 41)');
       await expect(rich).toHaveCSS('font-family',/Source Serif 4 Variable/);
       expect(parseFloat(await rich.evaluate(node=>getComputedStyle(node).fontSize))).toBeCloseTo(18,2);
       expect(parseFloat(await rich.evaluate(node=>getComputedStyle(node).lineHeight))).toBeCloseTo(29,1);
@@ -98,7 +98,7 @@ test('Dagsverk style guide keeps local fonts, journal typography and Bootstrap c
       const save=page.locator('#save'),field=page.getByLabel('Summary',{exact:true});
       expect(Math.abs((await save.boundingBox()).height-34)).toBeLessThanOrEqual(1);
       await expect(field).toHaveCSS('border-top-color','rgb(123, 145, 135)');
-      await field.focus();await expect(field).toHaveCSS('border-top-color',id==='timekeeper'?'rgb(23, 102, 83)':'rgb(121, 208, 173)');
+      await field.focus();await expect(field).toHaveCSS('border-top-color',id==='timekeeper-reinvented'?'rgb(23, 102, 83)':'rgb(121, 208, 173)');
       expect(await field.evaluate(node=>getComputedStyle(node).boxShadow)).not.toBe('none');
       await page.locator('#cancel').click();
     }
@@ -114,6 +114,44 @@ test('Dagsverk style guide keeps local fonts, journal typography and Bootstrap c
     const current=await request.get(path,{headers});
     expect((await request.put(path,{headers:{...headers,'If-Match':current.headers().etag},data:{body:body.body}})).ok()).toBe(true);
   }
+});
+
+test('Dagsverk-reinvented is opt-in and can be compared with the original Dagsverk themes',async({page,context})=>{
+  await signIn(page);
+  await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
+  await expect(page.locator('body')).not.toHaveCSS('font-family',/Inter Variable/);
+  await expect(page.locator('.brand-logo-light')).toBeVisible();
+  await expect(page.locator('.brand-symbol:visible')).toHaveCount(0);
+  await openThemeSettings(page);
+  await expect(page.locator('#theme option[value=timekeeper-reinvented]')).toHaveText('Dagsverk-reinvented');
+  await expect(page.locator('#theme option[value=timekeeper-reinvented-dark]')).toHaveText('Dagsverk-reinvented Dark');
+  await setTheme(page,'timekeeper-reinvented-dark');
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper-reinvented-dark');
+  await expect(page.locator('html')).toHaveAttribute('data-bs-theme','dark');
+  const other=await context.newPage();
+  try {
+    await other.goto('/admin/');
+    await expect(other.locator('html')).toHaveAttribute('data-theme','timekeeper-reinvented-dark');
+    await expect(other.locator('body')).toHaveCSS('font-family',/Inter Variable/);
+    await expect(other.locator('.brand-symbol-dark')).toBeVisible();
+    for(const [id,logo] of [['timekeeper-dark','dark'],['timekeeper','light']]) {
+      await setTheme(page,id);
+      await expect(other.locator('html')).toHaveAttribute('data-theme',id);
+      for(const tab of [page,other]) {
+        await expect(tab.locator('body')).not.toHaveCSS('font-family',/Inter Variable/);
+        await expect(tab.locator('.brand-logo-'+logo)).toBeVisible();
+        await expect(tab.locator('.brand-symbol:visible')).toHaveCount(0);
+        await expect(tab.locator('link[rel=icon]')).toHaveAttribute('href',/favicon\.svg$/);
+      }
+      await page.locator('[data-tab=today]').click();
+      expect(parseFloat(await page.locator('#today-note-editor .ProseMirror').evaluate(node=>getComputedStyle(node).fontSize))).toBeCloseTo(14,2);
+    }
+    await setTheme(page,'timekeeper-reinvented');
+    await expect(other.locator('html')).toHaveAttribute('data-theme','timekeeper-reinvented');
+    await expect(other.locator('.brand-symbol-light')).toBeVisible();
+    expect(await page.evaluate(()=>localStorage.getItem('timekeeper.theme'))).toBe('timekeeper-reinvented');
+  } finally {await other.close();}
 });
 
 test('theme choice persists before rendering, follows other tabs and tolerates unavailable browser storage',async({page,context})=>{

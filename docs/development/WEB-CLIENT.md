@@ -336,7 +336,8 @@ data license; loading failures and Retry remain available in the monthly view.
 ## Themes
 
 Choose **Theme** under **My Account → Profile** to switch between Dagsverk (the default),
-Dagsverk Dark, Solarized Light, Solarized Dark, Nord and Dracula. The selection
+Dagsverk Dark, Dagsverk-reinvented, Dagsverk-reinvented Dark, Solarized Light,
+Solarized Dark, Nord and Dracula. The selection
 is saved on this browser and shared with other open Dagsverk tabs, including
 Administration. A saved theme also applies to sign-in and loads before the
 stylesheets to avoid flashing a light page. If browser storage is unavailable,
@@ -352,8 +353,10 @@ web controls. All styles and checkbox/radio assets are bundled locally.
 settings, persistence, cross-tab updates and unavailable storage. It captures
 desktop and mobile previews for every theme under `server/web/test-results/`.
 
-Dagsverk and Dagsverk Dark follow the Dagsverk style guide v0.2 (10 November
-2026). The light palette uses green `#176653`, text `#233b38`, muted text
+Dagsverk-reinvented and Dagsverk-reinvented Dark are opt-in previews of the
+Dagsverk style guide v0.2 (10 November 2026). The original Dagsverk choices
+retain their appearance and saved selections; Dagsverk remains the default.
+The light palette uses green `#176653`, text `#233b38`, muted text
 `#52655d`, page `#f3f6f5`, white surfaces and decorative dividers `#d8e2dc`.
 Fields have a stronger `#7b9187` border. Dark uses mint `#79d0ad`, text
 `#edf5f0`, muted text `#b8d0c2`, page `#14231e` and surfaces `#1c3029`.
@@ -361,7 +364,9 @@ Errors use `#9b3b36` and warnings `#8a5b16` in light mode, with lighter
 contrast adaptations in dark mode. Error and warning alerts pair an icon with
 their existing text. The supplied book/clock/checkmark symbol appears at 32px
 with 8px clear space in the header and supplies the favicon in both modes.
-Theme IDs and the `timekeeper.theme` storage key remain compatible.
+The preview uses the new `timekeeper-reinvented` and
+`timekeeper-reinvented-dark` IDs. Existing theme IDs and the `timekeeper.theme`
+storage key remain compatible. Choose an original theme at any time to compare.
 
 Inter supplies the interface; Source Serif 4 supplies formatted Markdown notes
 at 18px/29px. Source and code keep the monospace font. The interface retains a

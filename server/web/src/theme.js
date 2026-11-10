@@ -2,6 +2,7 @@
 (() => {
   const key='timekeeper.theme';
   const themes=[['timekeeper','Dagsverk','light'],['timekeeper-dark','Dagsverk Dark','dark'],
+    ['timekeeper-reinvented','Dagsverk-reinvented','light'],['timekeeper-reinvented-dark','Dagsverk-reinvented Dark','dark'],
     ['solarized-light','Solarized Light','light'],['solarized-dark','Solarized Dark','dark'],
     ['nord','Nord','dark'],['dracula','Dracula','dark']];
   const normalize=value=>themes.some(([id])=>id===value) ? value:'timekeeper';
@@ -11,8 +12,8 @@
     selected=normalize(value);document.documentElement.dataset.theme=selected;
     document.documentElement.dataset.bsTheme=themes.find(([id])=>id===selected)[2];
     if(picker)picker.value=selected;
-    if(favicon)favicon.href=selected==='timekeeper' ? new URL('dagsverk-symbol.svg',branding) :
-      selected==='timekeeper-dark' ? new URL('dagsverk-symbol-dark.svg',branding) : originalIcon;
+    if(favicon)favicon.href=selected==='timekeeper-reinvented' ? new URL('dagsverk-symbol.svg',branding) :
+      selected==='timekeeper-reinvented-dark' ? new URL('dagsverk-symbol-dark.svg',branding) : originalIcon;
   };
   try {selected=normalize(localStorage.getItem(key));} catch { /* Browser storage is optional. */ }
   apply(selected);

@@ -7,7 +7,12 @@
   --holiday-bg: color-mix(in srgb, var(--bs-danger) 14%, var(--bs-body-bg));
   --holiday-color: color-mix(in srgb, var(--bs-danger-text-emphasis) 70%, var(--bs-body-color));
 }
-:root[data-theme=timekeeper] {
+:root[data-theme=timekeeper-dark] {
+  --theme-page: #14231e; --bs-body-bg: #1c3029; --bs-body-color: #edf5f0;
+  --bs-secondary-color: #b8d0c2; --bs-primary: #79d0ad; --bs-primary-rgb: 121,208,173;
+  --theme-on-accent: #14231e; --theme-scheme: dark;
+}
+:root[data-theme=timekeeper-reinvented] {
   --theme-page: #f3f6f5; --bs-body-bg: #fff; --bs-body-color: #233b38;
   --bs-body-bg-rgb: 255,255,255; --bs-body-color-rgb: 35,59,56;
   --bs-secondary-color: #52655d; --bs-primary: #176653; --bs-primary-rgb: 23,102,83;
@@ -18,7 +23,7 @@
   --bs-warning: #8a5b16; --bs-warning-rgb: 138,91,22; --bs-warning-text-emphasis: #8a5b16;
   --bs-warning-bg-subtle: #fbf3e5; --bs-warning-border-subtle: #d0b689;
 }
-:root[data-theme=timekeeper-dark] {
+:root[data-theme=timekeeper-reinvented-dark] {
   --theme-page: #14231e; --bs-body-bg: #1c3029; --bs-body-color: #edf5f0;
   --bs-body-bg-rgb: 28,48,41; --bs-body-color-rgb: 237,245,240;
   --bs-secondary-color: #b8d0c2; --bs-primary: #79d0ad; --bs-primary-rgb: 121,208,173;
@@ -51,7 +56,7 @@
 }
 
 /* Shared tokens cover every view, native forms, account pages and administration. */
-:root[data-theme] {
+:root[data-theme]:not([data-theme=timekeeper]) {
   color-scheme: var(--theme-scheme);
   --accent: var(--bs-primary); --muted: var(--bs-secondary-color);
   --line: var(--bs-border-color);
@@ -109,13 +114,13 @@
   & .calendar-create-preview { background: var(--theme-selected); color: var(--bs-body-color); }
   & .calendar-session-select:focus-visible { outline-color: var(--bs-body-color); }
 }
-:root[data-theme]:not([data-theme=timekeeper]) {
+:root[data-theme]:not([data-theme=timekeeper]):not([data-theme=timekeeper-reinvented]) {
   --bs-border-color: color-mix(in srgb, var(--bs-body-color) 30%, var(--bs-body-bg));
 }
 
-/* Dagsverk style guide v0.2. Theme defaults remain overridable by account font
+/* Dagsverk-reinvented: style guide v0.2. Theme defaults remain overridable by account font
    preferences. Bootstrap owns control padding, radii and interaction states. */
-:root:is([data-theme=timekeeper],[data-theme=timekeeper-dark]) {
+:root:is([data-theme=timekeeper-reinvented],[data-theme=timekeeper-reinvented-dark]) {
   --bs-body-font-family: 'Inter Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --bs-font-sans-serif: var(--bs-body-font-family);
   --font-page-title: 2.285714rem; --font-section-heading: 1.714286rem; --font-subsection-heading: 1.428571rem;
@@ -133,7 +138,7 @@
   & :is(.form-control,.form-select) { min-height: 0; --bs-border-color: var(--theme-field-border); }
   & :is(.form-control-sm,.form-select-sm) { font-size: .875rem; }
   & .form-check-input { --bs-border-color: var(--theme-field-border); }
-  & .btn-outline-secondary { --bs-btn-border-color: var(--theme-field-border); }
+  & .btn.btn-outline-secondary { --bs-btn-border-color: var(--theme-field-border); }
   & .today-month-day.selected { color: var(--theme-on-accent); }
   & .table { font-variant-numeric: tabular-nums; }
   & .brand-logo { display: none; }
@@ -169,8 +174,8 @@
   & .alert-warning:not(:empty)::before { mask-image: url('./assets/bootstrap-icons/exclamation-triangle.svg'); }
 }
 .brand-symbol { display: none; }
-:root[data-theme=timekeeper-dark] .brand-symbol-light { display: none; }
-:root[data-theme=timekeeper-dark] .brand-symbol-dark { display: block; }
+:root[data-theme=timekeeper-reinvented-dark] .brand-symbol-light { display: none; }
+:root[data-theme=timekeeper-reinvented-dark] .brand-symbol-dark { display: block; }
 :root[data-bs-theme=dark] .form-check-input[type=checkbox]:checked { background-image: url('./assets/check-dark.svg'); }
 :root[data-bs-theme=dark] .form-check-input[type=radio]:checked { background-image: url('./assets/radio-dark.svg'); }
 .theme-choice { display: block; padding: .5rem .75rem; margin: 0; font-size: var(--font-theme-choice); font-weight: 600; }
