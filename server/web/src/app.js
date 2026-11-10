@@ -111,7 +111,7 @@ document.addEventListener(calendarSearchNavigation,async event=>{
       notePopup.close(true);calendarSearchPopup.close(true);
       await calendarSearchPopup.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
     }
-  }catch(error){if(current()){if(error.status===401)auth.clear(errorText(error));else setStatus(errorText(error));}}
+  }catch(error){if(current()){if(error.status===401)auth.clear(errorText(error));else if(calendarSearchPopup.opened){calendarSearchPopup.error.textContent=errorText(error);calendarSearchPopup.error.hidden=false;}else setStatus(errorText(error));}}
 });
 document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;

@@ -22,7 +22,7 @@ export class CalendarSearchEditor extends JournalNoteEditor {
     if(event.location){const location=node('p');location.append(calendarLocation(t('calendar.location',{location:event.location})));this.details.append(location);}
     if(event.description){const description=calendarDescription(event.description);description.classList.add('calendar-description');this.details.append(description);}
     if(!hit.entry)this.details.append(node('p',t('notes.search_event_no_note'),'hint'));
-    this.markdown.root.hidden=!hit.entry;this.dialog.classList.toggle('calendar-search-no-note',!hit.entry);
+    this.markdown.root.hidden=!hit.entry;this.status.parentElement.hidden=!hit.entry;this.dialog.classList.toggle('calendar-search-no-note',!hit.entry);
     await super.open({...origin,hit,entry:hit.entry,detailsOnly:!hit.entry,path:hit.entry?'/notes/entries/'+hit.entry.id+'/content':null,title:event.title||t('calendar.untitled')},session,!!hit.entry&&writable);
   }
   readNote(session=this.session,path=this.path){return this.context.entry?super.readNote(session,path):Promise.resolve({data:{body:''},etag:null});}
