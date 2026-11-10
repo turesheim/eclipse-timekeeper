@@ -15,6 +15,8 @@ final class TaskCloudPull {
         Scan(String provider,String account,String list,List<TaskCloudProvider.RemoteTask> tasks,Instant observedAt){this(provider,account,list,tasks,observedAt,true);}
         Scan {tasks=List.copyOf(tasks);}
     }
+    private Scan orderedScan;
+    private Map<String,Integer> orderingResult;
     private final ServerStore store;
     private final CommandReceipts receipts;
     private final ContractInputs inputs;
@@ -104,6 +106,7 @@ final class TaskCloudPull {
         return false;
     }
     private Map<String,Integer> ordinals(Scan scan){
+        if(orderedScan==scan)return orderingResult;
         String repository=repository(scan.account(),scan.list());
         var ordering=new HashMap<String,TaskCloudProvider.RemoteTask>();
         if(!scan.full()&&scan.provider().equals("google"))for(var task:store.list("TASK"))for(var reference:task.path("externalReferences")){
@@ -116,7 +119,7 @@ final class TaskCloudPull {
         var orders=new HashMap<String,Integer>();var ordinal=new HashMap<String,Integer>();
         ordering.values().stream().sorted(Comparator.comparing((TaskCloudProvider.RemoteTask task)->Objects.toString(task.position(),"")).thenComparing(TaskCloudProvider.RemoteTask::id))
                 .forEach(task->ordinal.put(task.id(),orders.merge(Objects.toString(task.parent(),""),1,Integer::sum)-1));
-        return ordinal;
+        orderedScan=scan;orderingResult=Map.copyOf(ordinal);return orderingResult;
     }
     private boolean localHierarchy(Scan scan,TaskCloudProvider.RemoteTask remote){
         var found=store.byReference(new ExternalTaskReferenceKey(scan.provider(),repository(scan.account(),scan.list()),remote.id()));

@@ -166,4 +166,15 @@ class TaskProviderScansTest {
         var result=tx(f,()->reviews().resolve(f.connection(),f.list(),id,again.path("reviewEtag").asText(),object().put("decision","DELETE").put("taskEtag",again.path("taskEtag").asText())));assertTrue(result.body().path("deleted").asBoolean());assertTrue(tx(f,()->store.find("TASK",id).isEmpty()));assertFalse(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));
     }
 
+    @Test void incomingReviewLimitRetainsSearchableDecisionsBeyondTheFirstHundred(){
+        var f=fixture();var firstClaim=claim(f);var page=tx(f,()->scans().begin(firstClaim));
+        for(int offset=0;offset<220;offset+=100){var tasks=new ArrayList<TaskCloudProvider.RemoteTask>();for(int index=offset;index<Math.min(offset+100,220);index++)tasks.add(task("id-"+index,null,String.format("%05d",index),"Original "+index));var before=page;String next=offset+100<220?"page-"+offset:null;page=tx(f,()->scans().acknowledge(firstClaim,before,new TaskCloudProvider.Page<>(tasks,next,null)));}
+        var preview=tx(f,()->scans().review(f.connection(),f.list()));tx(f,()->scans().approve(f.connection(),f.list(),etag(preview)));
+        tx(f,()->{for(var stored:store.list("TASK")){var changed=((ObjectNode)stored).deepCopy();changed.put("summary","Local "+stored.path("summary").asText()).put("version",stored.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",changed));}return null;});
+        var nextClaim=reclaim(f);var scan=tx(f,()->scans().begin(nextClaim));
+        for(int offset=0;offset<220;offset+=100){var tasks=new ArrayList<TaskCloudProvider.RemoteTask>();for(int index=offset;index<Math.min(offset+100,220);index++)tasks.add(task("id-"+index,null,String.format("%05d",index),"Remote "+index));var before=scan;String next=offset+100<220?"changed-"+offset:null;scan=tx(f,()->scans().acknowledge(nextClaim,before,new TaskCloudProvider.Page<>(tasks,next,null)));}
+        tx(f,()->scans().reconcile(nextClaim));var reviews=tx(f,()->reviews().list(f.connection(),f.list(),null));inputs.validate("TaskProviderReviews",reviews);assertEquals(220,reviews.path("count").asInt());assertEquals(100,reviews.path("items").size());
+        var filtered=tx(f,()->reviews().list(f.connection(),f.list(),"id-219"));assertEquals(1,filtered.path("count").asInt());assertEquals("id-219",filtered.path("items").get(0).path("externalId").asText());assertEquals("Remote 219",filtered.path("items").get(0).path("remoteFields").path("summary").asText());
+    }
+
 }

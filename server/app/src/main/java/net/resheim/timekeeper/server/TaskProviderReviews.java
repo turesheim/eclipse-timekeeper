@@ -14,9 +14,10 @@ final class TaskProviderReviews {
     private final ServerStore store;
     private final CommandReceipts receipts;
     private final ContractInputs inputs;
-    TaskProviderReviews(ServerStore store,CommandReceipts receipts,ContractInputs inputs){this.store=store;this.receipts=receipts;this.inputs=inputs;}
+    private final TaskCloudPull pull;
+    TaskProviderReviews(ServerStore store,CommandReceipts receipts,ContractInputs inputs){this.store=store;this.receipts=receipts;this.inputs=inputs;this.pull=new TaskCloudPull(store,receipts,inputs);}
     private TaskProviderScans scans(){return new TaskProviderScans(store,receipts,inputs);}
-    private TaskCloudPull pull(){return new TaskCloudPull(store,receipts,inputs);}
+    private TaskCloudPull pull(){return pull;}
     private TaskCloudPull.Scan scan(JsonNode value){return new TaskCloudPull.Scan(value.path("providerId").asText(),value.path("accountId").asText(),value.path("remoteListId").asText(),scans().tasks(value),Instant.parse(value.path("startedAt").asText()),value.path("full").asBoolean());}
     ObjectNode list(UUID connection,UUID list,String query){
         var value=scans().ready(connection,list);var scan=scan(value);String filter=Objects.toString(query,"").strip().toLowerCase(Locale.ROOT);if(filter.length()>1024)throw ApiFailure.badRequest();
