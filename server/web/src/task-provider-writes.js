@@ -9,7 +9,7 @@ const valueText=(field,value)=>value===null||value===undefined?t('task_writes.em
 
 /** Owner-bound proposals; polling never replaces the comparison the user is reviewing. */
 export function taskProviderWrites(view,root,{reload,controls:parentControls}){
-  let connection=null,generation=0,disposed=false,loaded=false,signature='',selected=[];
+  let connection=null,generation=0,catalogGeneration=0,disposed=false,loaded=false,signature='',selected=[];
   const valid=()=>!disposed&&view.valid(),base=()=>'/task-providers/'+connection.id+'/writes';
   const heading=node('h3',t('task_writes.title'),'h5'),help=node('p',t('task_writes.help'),'hint');
   const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
@@ -27,7 +27,7 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
   }
   const run=(work,submit,write=true)=>void view.run(async()=>{parentControls();controls();await work();},{submit,feedback,write}).finally(()=>{if(valid()){parentControls();controls();}});
   async function candidates(){
-    const [tasks,lists]=await Promise.all([view.session.page('/tasks'),view.session.page('/task-lists')]);if(!valid())return;
+    const current=++catalogGeneration;const [tasks,lists]=await Promise.all([view.session.page('/tasks'),view.session.page('/task-lists')]);if(!valid()||current!==catalogGeneration)return;
     const previous=task.value;
     selected=lists.items.filter(list=>list.connectionId===connection.id&&connection.selectedLists.includes(list.remoteListId)&&list.present);
     const options=[];for(const item of tasks.items)for(const ref of item.externalReferences||[]){const list=selected.find(list=>list.id===ref.taskListId);if(ref.providerId==='google'&&list)options.push({taskId:item.id,listId:list.id,title:list.name+' / '+item.summary});}
@@ -80,5 +80,5 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     }
     if(focused)[...history.querySelectorAll('[data-write-review]')].find(pick=>pick.dataset.writeReview===focused)?.focus();controls();
   }
-  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||value.direction!=='TWO_WAY'&&!value.pendingWrites;details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;view.clean(form);}};
+  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||value.direction!=='TWO_WAY'&&!value.pendingWrites;details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;view.clean(form);}};
 }

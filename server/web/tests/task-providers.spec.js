@@ -190,6 +190,17 @@ test('read-only Dagsverk sessions can review Google results without confirming o
   await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('button',{name:'Send to Google',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);expect(model.providerWrites).toBe(0);
 });
 
+for(const language of ['en-GB','nb-NO'])test('Google write comparisons stay readable and accessible across themes in '+language,async({page,request})=>{
+  test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id,state:'ACK_REVIEW',canConfirm:false,canResolve:true,conflictFields:['summary'],title:'Imported '+ 'Long task title '.repeat(15),remoteFields:{summary:'Changed at Google',body:{format:'TEXT',content:'Provider notes\n'+ 'LongUnbrokenProviderText'.repeat(40)}},localFields:{summary:'Changed locally',body:{format:'HTML',content:'<img src=x onerror=alert(1)>\nLocal notes stay here'}}});
+  const model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:language==='nb-NO'?'Oppgavekoblinger':'Task connections',exact:true}).click();
+    const panel=card(page,row.id);await panel.getByRole('button',{name:language==='nb-NO'?'Gjennomgå resultat':'Review result',exact:true}).click();await expect(panel.locator('img')).toHaveCount(0);
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
+  }
+  expect(model.providerWrites).toBe(0);await captureScreenshot(page,{path:'test-results/task-writes-320-'+language+'.png',fullPage:true});
+});
+
 test('authorization responses cannot navigate to an unrelated host',async({page,request})=>{
   const owner=await signIn(page,request);await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
   await page.getByRole('button',{name:'Connect Google Tasks',exact:true}).click();await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(new URL(page.url()).pathname).toBe('/web/');
