@@ -44,7 +44,9 @@ reviewed versions. This local reconciliation sends no provider mutation and
 does not claim that the original insert succeeded. If the local task was
 explicitly deleted during the request, identifying the result records that
 provider ID as locally deleted rather than recreating the task. If no correct
-identity can be established, retain the uncertain result for investigation.
+identity can be established, retain the uncertain result for investigation. An
+unresolved write protects its connection and list from catalog deletion, so
+reconnecting can still reach its recovery record. Disconnect remains available.
 
 Concurrent changes are retained for reconciliation. Disconnecting or
 deselecting a list keeps imported tasks. Missing tasks are not automatically

@@ -305,6 +305,7 @@ jobs:
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_passkeys
           TIMEKEEPER_TEST_CALENDAR_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_calendars
+          TIMEKEEPER_TEST_TASK_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_tasks
           TIMEKEEPER_TEST_SETTINGS_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_settings
           TIMEKEEPER_TEST_ARCHIVE_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_archive
           TIMEKEEPER_TEST_PG_USER: postgres

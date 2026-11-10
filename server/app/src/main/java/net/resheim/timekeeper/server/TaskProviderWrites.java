@@ -290,6 +290,10 @@ final class TaskProviderWrites {
             }
         }
     }
+    static boolean references(ServerStore store,String type,UUID id){
+        String field=type.equals("TASK_CONNECTION")?"connectionId":"listId";
+        for(var row:store.list(KIND))if(row.path(field).asText().equals(id.toString())&&!DONE.contains(row.path("state").asText()))return true;return false;
+    }
     static boolean needsFullScan(ServerStore store,UUID connection,UUID list){
         for(var row:store.list(KIND))if(row.path("connectionId").asText().equals(connection.toString())&&row.path("listId").asText().equals(list.toString())&&row.path("action").asText().equals("CREATE")&&row.path("checkRequested").asBoolean()&&!row.hasNonNull("externalId"))return true;return false;
     }

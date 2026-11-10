@@ -131,6 +131,22 @@ class TaskProviderWritesTest {
         var before=job(f,id);var input=object().put("externalId","new-id").put("scanEtag",list.path("scanEtag").asText()).put("taskEtag",before.path("currentTaskEtag").asText());
         assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->writes().identify(f.connection(),id,etag(before),input))).status);assertEquals(1,tx(f,()->writes().candidates(f.connection(),id,"")).path("count").asInt());
     }
+    @Test void deletingAnUncertainNativeTaskCanRecoverTheChosenIdentityWithoutResurrectingIt(){
+        var f=nativeTask();UUID id=uncertainCreate(f);delete(f);creationScan(f,id);var candidates=tx(f,()->writes().candidates(f.connection(),id,""));var before=job(f,id);assertTrue(before.path("currentTaskEtag").isNull());
+        var input=object().put("externalId","new-id").put("scanEtag",candidates.path("scanEtag").asText()).putNull("taskEtag");var result=tx(f,()->writes().identify(f.connection(),id,etag(before),input));assertEquals("RECONCILED",result.path("state").asText());assertTrue(tx(f,()->store.find("TASK",f.task()).isEmpty()));assertEquals("LOCAL_DELETED",pull(f,"new-id").path("pending").get(0).path("reason").asText());
+    }
+    @Test void unresolvedWritesKeepTheirConnectionAndListAvailableForRecovery(){
+        var f=nativeTask();UUID id=uncertainCreate(f);assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->{store.delete("TASK_LIST",f.list());return null;})).status);
+        assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->{store.delete("TASK_CONNECTION",f.connection());return null;})).status);
+        tx(f,()->{var auth=connections().required(f.connection());connections().disconnect(f.connection(),etag(connections().visible(auth)));return null;});assertEquals("UNKNOWN",tx(f,()->store.find(TaskProviderWrites.KIND,id).orElseThrow()).path("state").asText());
+        assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->{store.delete("TASK_CONNECTION",f.connection());return null;})).status);
+    }
+    @Test void anAcknowledgedInsertReconcilesOnceAfterLeaseRecoveryWithoutContactingGoogle(){
+        var f=nativeTask();UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));var first=claim(f);tx(f,()->writes().next(first));var sending=tx(f,()->writes().creating(first,id));
+        tx(f,()->writes().acknowledge(id,sending.path("attempt").asText(),new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Native task","\"created\"").put("id","new-id"))));
+        assertEquals("ACK",job(f,id).path("state").asText());var resumed=reclaim(f);writes().drain(resumed,"private-access",writer(request->{throw new AssertionError("Known insert result needs no repeated provider request");}));assertEquals("DONE",job(f,id).path("state").asText());assertEquals("new-id",task(f).path("externalReferences").get(0).path("externalId").asText());
+        writes().drain(resumed,"private-access",writer(request->{throw new AssertionError("Completed insert cannot repeat");}));assertEquals(1,task(f).path("externalReferences").size());
+    }
     @Test void importOnlyAndAnotherOwnerCannotPrepareOrSendGoogleWrites(){
         var f=fixture(false,false);rename(f,"Changed locally");assertEquals(409,assertThrows(ApiFailure.class,()->preview(f,TaskProviderWrites.Action.UPDATE)).status);
         var claim=claim(f);var calls=new AtomicInteger();writes().drain(claim,"private-access",writer(request->{calls.incrementAndGet();throw new AssertionError("Import-only cannot contact writer");}));assertEquals(0,calls.get());assertEquals("Original",baseline(f));
