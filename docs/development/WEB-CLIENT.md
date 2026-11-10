@@ -1297,3 +1297,11 @@ subscriptions, even without saved notes. Opening details does not create a note.
 Where a saved event note exists, the same guarded Markdown editor edits its real
 canonical entry alongside current event details. Recurring series are labelled
 as definitions rather than expanded into unlimited occurrences.
+
+Opening or maximizing a calendar result retries `NOTES_SEARCH_INDEXING` within
+one 15-second budget when a recent save is ahead of the derived index. The
+selected action shows preparation status and rejects repeat clicks; other
+results, editing and Close remain available. Closing the source, changing the
+selection/query or ending the session prevents the pending result from opening.
+Other failures return immediately, and an exhausted index wait leaves the draft
+and a recoverable error in place.

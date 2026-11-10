@@ -71,7 +71,12 @@ export class NotesSearch {
     const active=this.results.contains(document.activeElement)?document.activeElement.closest('[data-search-note]')?.dataset.searchNote:null;this.results.replaceChildren();
     const session=this.session,generation=this.generation;
     for(const {entry,calendarEvent,excerpt}of this.items){
-      const id=calendarEvent?.id||entry.id,item=node('li'),pick=button('',()=>pick.dispatchEvent(new CustomEvent(calendarEvent?calendarSearchNavigation:vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{id,entry,popup:calendarEvent||['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind),searchFolder:entry?.kind==='FOLDER',originSelector:`#notes-search-results [data-search-note="${id}"]`,originElement:pick,guards:[()=>session===this.session&&generation===this.generation],leave:[]}})));
+      const current=()=>session===this.session&&generation===this.generation&&!this.root.hidden;
+      const id=calendarEvent?.id||entry.id,item=node('li'),pick=button('',()=>{
+        if(calendarEvent){pick.disabled=true;pick.setAttribute('aria-busy','true');}
+        const finished=()=>{if(current()){pick.disabled=false;pick.removeAttribute('aria-busy');this.message.textContent=t('notes.search_results');}};
+        if(pick.dispatchEvent(new CustomEvent(calendarEvent?calendarSearchNavigation:vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{id,entry,popup:calendarEvent||['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind),searchFolder:entry?.kind==='FOLDER',originSelector:`#notes-search-results [data-search-note="${id}"]`,originElement:pick,guards:[current],leave:[],pending:()=>{if(current())this.message.textContent=t('notes.search_preparing');},finished}})))finished();
+      });
       pick.dataset.searchNote=id;pick.className='btn btn-outline-secondary notes-search-result';const title=node('span',undefined,'notes-search-result-title');title.append(icon(calendarEvent?'calendar-event':entry.kind==='FOLDER'?'folder':entry.kind==='EVENT'?'calendar-event':['DAY','WEEK'].includes(entry.kind)?'journal-text':'file-earmark-text'),node('span',calendarEvent?(calendarEvent.title||t('calendar.untitled')):noteTitle(entry,entry.path)));pick.append(title,node('small',calendarEvent?calendarEvent.clientName+' · '+calendarEvent.calendarName:entry.path,'notes-search-path'));
       if(excerpt){const text=node('span',undefined,'notes-search-excerpt');let offset=0;for(const range of excerpt.highlights){text.append(document.createTextNode(excerpt.text.slice(offset,range.start)),node('mark',excerpt.text.slice(range.start,range.end)));offset=range.end;}text.append(document.createTextNode(excerpt.text.slice(offset)));pick.append(text);}
       item.append(pick);this.results.append(item);
