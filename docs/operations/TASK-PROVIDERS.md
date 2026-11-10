@@ -250,3 +250,27 @@ connection metadata only; their credentials are still removed. Unsent requests
 can be cancelled there, and unidentified creations can be left unlinked. After
 the last pending request is settled, the disconnected card disappears. Checking
 Google or accepting a known provider result still requires reconnecting.
+
+### Automated restart acceptance
+
+From the repository root, with Java 21, Python 3.13 and Docker available:
+
+```sh
+python3 server/scripts/task_provider_restart.py --output server/target/verification/task-provider-restart.json
+```
+
+The runner starts its own disposable PostgreSQL 17 fixture and launches two
+separate Quarkus server test JVMs against that same database. It records distinct
+process IDs and checks acknowledged-page continuation, repeated synchronization
+without duplicate tasks, an expired SENDING lease becoming UNKNOWN without a
+provider request, and a durable ACK updating its baseline without another
+provider request. The expiry fixture advances both stored lease and refresh
+deadlines; this checks timeout recovery rather than claiming instant lease
+reclamation after a crash. The provider observations are synthetic. No deployed
+server or live Google account is contacted.
+
+Use `--postgres-image postgres:18.6-bookworm` for PostgreSQL 18. Both supported
+versions run in container CI and upload the JSON report with the corresponding
+acceptance artifacts. `--expected-commit` requires the exact clean checkout;
+reports record the commit and whether local source was dirty. The normal Maven
+suite skips this one opt-in process-restart test.
