@@ -1742,5 +1742,6 @@
   "notes.search_action": "Søk",
   "markdown.highlight": "Uthev med farge",
   "markdown.subscript": "Senket skrift",
-  "markdown.superscript": "Hevet skrift"
+  "markdown.superscript": "Hevet skrift",
+  "password.passkey_help": "Velg Eksisterende passnøkkel for å angi et nytt passord uten å kjenne det nåværende passordet. Nettleseren ber deg bekrefte med en registrert passnøkkel."
 }

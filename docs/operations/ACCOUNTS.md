@@ -134,7 +134,10 @@ supported for development by browsers that accept Secure cookies on loopback.
 **API tokens** sections. Profile includes the username, optional display name
 (blank uses the username), and time zone with a local-time preview and a
 **Use this device's time zone** action. Each form saves independently. Password
-changes require the current password and confirmation of the new password;
+changes require either the current password or fresh verification with a registered
+passkey, plus confirmation of the new password. Choose **Confirm with → Existing
+passkey** to set a replacement when the original password is unavailable, including
+for administrator accounts. A signed-in session alone cannot authorize this change;
 show/hide controls keep the current/new password autocomplete roles distinct.
 Password changes revoke all that
 account's existing sessions and tokens and require signing in again. **Sign out**

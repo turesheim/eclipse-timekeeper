@@ -4482,6 +4482,9 @@
           },
           "413": {
             "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
           }
         },
         "parameters": [
@@ -4502,7 +4505,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Change the signed-in account password using its current password or a fresh PASSWORD passkey proof. Passkey proof requires an account browser session and is bound to that owner, session, browser, origin and account version. Success revokes all existing sessions and API tokens while preserving registered passkeys."
       }
     },
     "/auth/tokens": {
@@ -24378,7 +24382,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "currentPassword",
           "newPassword"
         ],
         "properties": {
@@ -24391,8 +24394,25 @@
             "maxLength": 1024,
             "minLength": 15,
             "description": "15 or more Unicode code points; at most 1024 UTF-8 bytes. Never trimmed."
+          },
+          "proof": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "currentPassword"
+            ]
+          },
+          {
+            "required": [
+              "proof"
+            ]
+          }
+        ]
       },
       "TokenInput": {
         "type": "object",
@@ -25627,6 +25647,18 @@
               "etag": {
                 "type": "string",
                 "maxLength": 130
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "const": "PASSWORD"
               }
             }
           }

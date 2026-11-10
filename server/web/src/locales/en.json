@@ -1742,5 +1742,6 @@
   "notes.search_action": "Search",
   "markdown.highlight": "Highlight",
   "markdown.subscript": "Subscript",
-  "markdown.superscript": "Superscript"
+  "markdown.superscript": "Superscript",
+  "password.passkey_help": "Choose Existing passkey to set a new password without knowing your current password. Your browser will ask you to verify with a registered passkey."
 }

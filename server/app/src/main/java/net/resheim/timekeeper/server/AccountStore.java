@@ -357,6 +357,9 @@ public class AccountStore {
         tx(c->{lock(c);guard(c,principal);
             try(var statement=query(c,"SELECT password_hash FROM tk_account WHERE owner_id=?",principal.owner());var rows=statement.executeQuery()) {if(!rows.next() || !AccountPasswords.matches(oldPassword,rows.getString(1)==null ? DUMMY : rows.getString(1))) throw ApiFailure.unauthorized(false);}
             catch(SQLException failure) {throw databaseFailure(failure);}
-            execute(c,"UPDATE tk_account SET password_hash=?,version=version+1 WHERE owner_id=?",encoded,principal.owner());revokeAll(c,principal.owner());return null;});
+            replacePassword(c,principal.owner(),encoded);return null;});
+    }
+    static void replacePassword(Connection c,String owner,String encoded) {
+        execute(c,"UPDATE tk_account SET password_hash=?,version=version+1 WHERE owner_id=?",encoded,owner);revokeAll(c,owner);
     }
 }

@@ -1,7 +1,8 @@
 import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
-import {openAccountMenu} from './navigation.js';
+import {openAccountMenu,openThemeSettings} from './navigation.js';
+import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 
 test.skip(({browserName})=>browserName!=='chromium' || process.env.TIMEKEEPER_WEB_PASSKEY_FIXTURE!=='true','Requires the HTTPS localhost RP and Chromium virtual authenticators');
@@ -16,9 +17,9 @@ async function login(page,user) {
 async function account(page) {await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Passkeys',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');}
 async function signOut(page) {await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();}
 const addForm=page=>page.getByRole('heading',{name:'Add passkey',exact:true}).locator('..');
-async function fresh(request) {
+async function fresh(request, administrator=false) {
   const username='key-'+randomUUID().slice(0,8);
-  const reply=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}});
+  const reply=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator}});
   expect(reply.status()).toBe(201);return {...(await reply.json()).user,password};
 }
 async function virtual(page,automatic=true) {
@@ -128,4 +129,62 @@ test('passkeys: unsupported browsers keep password fallback and token-derived se
     await expect(tokenPage.locator('#account-content')).toContainText('An API token cannot authorize this change');await expect(tokenPage.getByRole('heading',{name:'Add passkey',exact:true})).toHaveCount(0);
     await tokenPage.getByRole('button',{name:'Sign in with your account',exact:true}).click();await expect(tokenPage.locator('#login')).toBeVisible();
   } finally {await context.close();}
+});
+
+
+test('passkeys: an administrator can replace a forgotten password after fresh passkey verification',async({page,request})=>{
+  const user=await fresh(request,true),key=await virtual(page);
+  await login(page,user);await account(page);
+  const add=addForm(page);await add.getByLabel('Passkey name',{exact:true}).fill('Administrator recovery key');
+  await add.getByLabel('Current password',{exact:true}).fill(password);await add.getByRole('button',{name:'Add passkey',exact:true}).click();await expect(add).toContainText('Passkey added.');
+  await signOut(page);await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#owner')).toHaveText(user.username);
+  await account(page);await page.getByRole('link',{name:'Password',exact:true}).click();
+  const editor=page.getByRole('heading',{name:'Change password',exact:true}).locator('..');
+  await expect(editor).toContainText('without knowing your current password');
+  await editor.getByLabel('Current password',{exact:true}).fill('will be cleared');
+  await editor.getByLabel('Confirm with',{exact:true}).selectOption('passkey');
+  await expect(editor.getByLabel('Current password',{exact:true})).toBeHidden();await expect(editor.getByLabel('Current password',{exact:true})).toHaveValue('');
+  const replacement='A new password set with the administrator passkey';
+  await editor.getByLabel('New password',{exact:true}).fill(replacement);await editor.getByLabel('Confirm new password',{exact:true}).fill(replacement);
+  // Cancel a real native prompt, keeping the signed-in account and draft usable.
+  await key.presence(false);await editor.getByRole('button',{name:'Change password and sign out',exact:true}).click();
+  const cancel=editor.getByRole('button',{name:'Cancel passkey request',exact:true});await expect(cancel).toBeEnabled();await cancel.click();
+  await expect(editor).toContainText('Passkey request canceled.');await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
+  await expect(editor.getByLabel('New password',{exact:true})).toHaveValue(replacement);
+  expect((await browserRequest(page).get('/api/v1/auth/session')).status()).toBe(200);
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await captureScreenshot(page,{path:'test-results/passkey-password-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:900});await captureScreenshot(page,{path:'test-results/passkey-password-desktop.png',fullPage:true});
+  await key.presence(true);
+  const changed=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/v1/auth/password');
+  await editor.getByRole('button',{name:'Change password and sign out',exact:true}).click();
+  const payload=(await changed).postDataJSON();expect(payload).not.toHaveProperty('currentPassword');expect(payload.proof).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#login-error')).toContainText('Password changed.');
+  expect((await page.context().cookies()).some(value=>value.name==='__Host-timekeeper-session')).toBe(false);
+  await login(page,{...user,password:replacement});await openAccountMenu(page);await expect(page.getByRole('link',{name:'Administration',exact:true})).toBeVisible();
+  await signOut(page);await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#owner')).toHaveText(user.username);
+  expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length,cookies:document.cookie}))).toEqual({local:0,session:0,cookies:''});
+});
+
+
+test('passkeys: password confirmation is accessible in Norwegian, light and dark themes',async({page,request})=>{
+  const user=await fresh(request);await virtual(page);await login(page,user);await account(page);
+  const add=addForm(page);await add.getByLabel('Passkey name',{exact:true}).fill('Personal verification key');await add.getByLabel('Current password',{exact:true}).fill(password);
+  await add.getByRole('button',{name:'Add passkey',exact:true}).click();await expect(add).toContainText('Passkey added.');
+  const context=await (await browserRequest(page).get('/api/v1/auth/session')).json(),profile=await browserRequest(page).get('/api/v1/me');
+  expect((await browserRequest(page).put('/api/v1/me',{headers:{'X-CSRF-Token':context.csrf,'If-Match':profile.headers().etag},data:{zoneId:(await profile.json()).zoneId,locale:'nb-NO'}})).status()).toBe(200);
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('lang','nb-NO');
+  for (const theme of ['timekeeper','timekeeper-dark']) {
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.locator('#account-navigation a[href="#account/password"]').click();
+    const editor=page.getByRole('heading',{name:'Endre passord',exact:true}).locator('..');
+    await editor.getByLabel('Bekreft med',{exact:true}).selectOption('passkey');await expect(editor).toContainText('uten å kjenne det nåværende passordet');
+    await expect(editor.getByLabel('Gjeldende passord',{exact:true})).toBeHidden();
+    for (const width of [1440,390,320]) {
+      await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      expect((await new AxeBuilder({page}).include('#account-page').analyze()).violations).toEqual([]);
+      if (width!==320) await captureScreenshot(page,{path:`test-results/passkey-password-nb-${theme}-${width}.png`,fullPage:true});
+    }
+    // Changing the confirmation choice is protected as a form draft.
+    page.once('dialog',dialog=>dialog.accept());
+  }
 });

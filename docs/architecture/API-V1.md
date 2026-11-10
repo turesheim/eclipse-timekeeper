@@ -31,6 +31,15 @@ secrets never appear in resource DTOs, URLs, logs, errors or change notification
 Web requests may instead use the HttpOnly Secure cookie; unsafe cookie requests
 require the memory-only CSRF value returned by `/auth/session`.
 
+`POST /auth/password` accepts `newPassword` and exactly one of `currentPassword`
+or `proof`. Obtain a passkey proof through `/auth/passkeys/proof/options` with
+`{"action":"PASSWORD"}` and `/auth/passkeys/proof/finish`. This requires a genuine
+account browser session and fresh user-verified WebAuthn assertion. The two-minute,
+one-use proof is bound to the password action, owner, browser, session, origin, RP
+and account version; it cannot be borrowed from enrollment or removal. Proof
+consumption and password replacement are atomic. Success preserves passkeys and
+revokes all sessions and API tokens for that owner. Other owners are unaffected.
+
 Stateful clients bind their session to the first authenticated owner. Authorized
 responses include `X-Timekeeper-Owner`, the canonical unpadded base64url encoding
 of that owner's UTF-8 ID, including empty pages and 204 responses. Send that
