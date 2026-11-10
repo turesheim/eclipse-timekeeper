@@ -9,6 +9,38 @@ class CalendarFeedTest {
     private static String event(String fields) {return "BEGIN:VEVENT\r\nDTSTAMP:20260101T000000Z\r\n"+fields.replace("\n","\r\n")+"\r\nEND:VEVENT\r\n";}
     private static CalendarFeed feed(String... events) {return new CalendarFeed("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Timekeeper//Calendar test//EN\r\n"+String.join("",events)+"END:VCALENDAR\r\n",true,true);}
     private static List<CalendarFeed.Occurrence> week(CalendarFeed feed,String from,String zone) {var start=LocalDate.parse(from);return feed.occurrences(start,start.plusDays(7),ZoneId.of(zone));}
+    @Test void searchableEventDefinitionsKeepDetailsAndDetachedRevisionsWithoutExpandingRecurrence(){
+        String master=event("UID:search-series\nDTSTART:20260504T090000\nDURATION:PT1H\nRRULE:FREQ=SECONDLY\nEXDATE:20260504T090000\nSUMMARY:Series\nDESCRIPTION:Spectrograph calibration\nLOCATION:North observatory");
+        String moved=event("UID:search-series\nRECURRENCE-ID:20260504T100000\nDTSTART:20260505T120000\nSEQUENCE:2\nSUMMARY:Moved observation");
+        String older=moved.replace("SEQUENCE:2","SEQUENCE:1").replace("Moved observation","Superseded");
+        var source=feed(master,moved,older,event("UID:search-cancelled\nDTSTART:20260504T090000Z\nSTATUS:CANCELLED"),event("UID:search-single\nDTSTART;VALUE=DATE:20260504\nDTEND;VALUE=DATE:20260506\nSUMMARY:Conference"),todo("UID:search-task\nSUMMARY:Separate task"));
+        var definitions=source.eventDefinitions(ZoneId.of("Europe/Oslo"));assertEquals(3,definitions.size());
+        var series=definitions.stream().filter(value->value.path("title").asText().equals("Series")).findFirst().orElseThrow();
+        assertTrue(series.path("seriesDefinition").asBoolean());assertTrue(series.path("eventKey").isNull());assertEquals("2026-05-04T07:00:00Z",series.path("start").asText());
+        var override=definitions.stream().filter(value->value.path("title").asText().equals("Moved observation")).findFirst().orElseThrow();
+        assertEquals("Spectrograph calibration",override.path("description").asText());assertEquals("North observatory",override.path("location").asText());assertEquals("2026-05-05T11:00:00Z",override.path("end").asText());
+        assertFalse(override.path("seriesDefinition").asBoolean());assertTrue(override.path("eventKey").asText().matches("[a-f0-9]{64}"));
+        var single=definitions.stream().filter(value->value.path("title").asText().equals("Conference")).findFirst().orElseThrow();
+        assertTrue(single.path("allDay").asBoolean());assertEquals("2026-05-06",single.path("endDate").asText());assertEquals(week(feed(event("UID:search-single\nDTSTART;VALUE=DATE:20260504\nDTEND;VALUE=DATE:20260506")),"2026-05-04","Europe/Oslo").getFirst().key(),single.path("eventKey").asText());
+        var otherZone=source.eventDefinitions(ZoneId.of("America/Los_Angeles"));assertEquals(definitions.stream().map(value->value.path("id").asText()).toList(),otherZone.stream().map(value->value.path("id").asText()).toList());
+    }
+    @Test void standaloneDetachedEventDefinitionsRetainTheirOccurrenceKey(){
+        var source=feed(event("UID:search-detached\nRECURRENCE-ID;VALUE=DATE:20260508\nDTSTART;VALUE=DATE:20260509\nSUMMARY:Moved detached event\nDESCRIPTION:Detached details\nLOCATION:South observatory"));
+        var definitions=source.eventDefinitions(ZoneOffset.UTC);assertEquals(1,definitions.size());var value=definitions.getFirst();
+        assertTrue(value.path("recurring").asBoolean());assertFalse(value.path("seriesDefinition").asBoolean());
+        assertEquals("Detached details",value.path("description").asText());assertEquals("South observatory",value.path("location").asText());
+        assertEquals(week(source,"2026-05-09","UTC").getFirst().key(),value.path("eventKey").asText());
+    }
+    @Test void savedOccurrenceDetailsUseApplicableRangeChangesWithoutInventingAnActualSchedule(){
+        var source=feed(event("UID:note-series\nDTSTART;TZID=Europe/Oslo:20260504T090000\nDURATION:PT1H\nRRULE:FREQ=DAILY\nSUMMARY:Planning\nDESCRIPTION:Master details\nLOCATION:North observatory"),
+                event("UID:note-series\nRECURRENCE-ID;TZID=Europe/Oslo;RANGE=THISANDFUTURE:20260505T090000\nDTSTART;TZID=Europe/Oslo:20260505T110000\nLOCATION:South observatory"),
+                event("UID:note-series\nRECURRENCE-ID;TZID=Europe/Oslo:20260507T090000\nDTSTART;TZID=Europe/Oslo:20260507T150000\nDURATION:PT2H\nDESCRIPTION:Detached details"),
+                event("UID:note-series\nRECURRENCE-ID;TZID=Europe/Oslo;RANGE=THISANDFUTURE:20260509T090000\nSTATUS:CANCELLED"));
+        var later=source.eventDefinition("note-series","T:2026-05-06T07:00:00Z",ZoneId.of("Europe/Oslo")).orElseThrow();
+        assertEquals("South observatory",later.path("location").asText());assertEquals("Master details",later.path("description").asText());assertTrue(later.path("seriesDefinition").asBoolean());assertFalse(later.has("start"));
+        var detached=source.eventDefinition("note-series","T:2026-05-07T07:00:00Z",ZoneId.of("Europe/Oslo")).orElseThrow();assertEquals("Detached details",detached.path("description").asText());assertEquals("2026-05-07T13:00:00Z",detached.path("start").asText());
+        assertTrue(source.eventDefinition("note-series","T:2026-05-10T07:00:00Z",ZoneId.of("Europe/Oslo")).isEmpty());assertTrue(source.eventDefinition("note-series","single",ZoneOffset.UTC).isEmpty());assertTrue(source.eventDefinition("note-series","invalid",ZoneOffset.UTC).isEmpty());
+    }
     @Test void recurrenceRetainsWallClockAcrossDstAndRespectsExdatesAndRdates() {
         var source=feed(event("UID:weekly\nDTSTART;TZID=Europe/Oslo:20260322T090000\nDTEND;TZID=Europe/Oslo:20260322T100000\nRRULE:FREQ=WEEKLY;COUNT=4\nEXDATE;TZID=Europe/Oslo:20260405T090000\nRDATE;TZID=Europe/Oslo:20260406T090000\nSUMMARY:Planning"));
         assertEquals("2026-03-22T08:00:00Z",week(source,"2026-03-22","Europe/Oslo").getFirst().start().toString());

@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /** Bounded, idempotent replica work. No canonical transaction encloses Lucene work. */
-final class NotesSearchReplay implements AutoCloseable {
+final class NotesSearchReplay implements NotesIndexReplay {
     record Budget(int records,long bytes,long milliseconds){
         Budget{if(records<1||records>256||bytes<1||bytes>64_000_000||milliseconds<1||milliseconds>5000)throw new IllegalArgumentException("Invalid search replay budget");}
     }
@@ -21,9 +21,9 @@ final class NotesSearchReplay implements AutoCloseable {
     static NotesSearchReplay open(Path path,NotesSearchSources sources,NotesSearchSources.State initial)throws IOException{
         return new NotesSearchReplay(new NotesLuceneIndex(path,initial.identity(),new NotesLuceneIndex.Watermark(initial.changes().generation(),false,null)),sources);
     }
-    NotesLuceneIndex index(){return index;}
-    boolean caughtUp(NotesSearchSources.State state){var saved=index.watermark();return identity.equals(state.identity())&&saved.ready()&&saved.generation()==state.changes().generation();}
-    synchronized Step advance(Budget budget)throws IOException{
+    @Override public NotesLuceneIndex index(){return index;}
+    @Override public boolean caughtUp(NotesSearchSources.State state){var saved=index.watermark();return identity.equals(state.identity())&&saved.ready()&&saved.generation()==state.changes().generation();}
+    @Override public synchronized Step advance(Budget budget)throws IOException{
         long started=System.nanoTime(),spent=0;int records=0;var state=sources.state(identity.owner());var saved=progress;long target=state.changes().generation();
         if(!identity.equals(state.identity())||saved.generation()>target||saved.generation()<state.changes().historyFloor())throw new NotesLuceneIndex.RebuildRequired();
         if(saved.ready()&&saved.generation()==target){checkpoint(saved,true);return new Step(true,target,target,0);}

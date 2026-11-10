@@ -48,6 +48,18 @@ class ContractTest(unittest.TestCase):
         for invalid in [{k:v for k,v in value.items() if k!='scanEtag'},{**value,'externalId':''},{**value,'ownerId':'foreign'},{**value,'fields':{'summary':'unreviewed'}},{**value,'accessToken':'private'}]:
             self.assertFalse(validator('TaskProviderCreationIdentityInput').is_valid(invalid))
 
+    def test_search_calendar_details_are_typed_and_do_not_require_a_saved_note(self):
+        operation=CONTRACT['paths']['/notes/search/calendar/{id}']['get']
+        self.assertEqual('read',operation['x-required-permission'])
+        event={'id':ID,'definitionId':'a'*64,'subscriptionId':ID,'uid':'event-uid','recurrenceId':'',
+               'title':'Sky planning','description':'Calibration','location':'Observatory','recurring':True,
+               'seriesDefinition':True,'eventKey':None,'calendarName':'Calendar','clientId':ID,'clientName':'Client','color':'#305070'}
+        hit={'calendarEvent':event,'excerpt':{'text':'Calibration','highlights':[{'start':0,'end':11}]}}
+        self.assertTrue(validator('NotesSearchHit').is_valid(hit))
+        self.assertFalse(validator('NotesSearchHit').is_valid({'excerpt':hit['excerpt']}))
+        for extra in ({'url':'https://private.example/feed'},{'ownerId':'foreign'},{'noteEntryId':'invalid'}):
+            self.assertFalse(validator('NotesSearchHit').is_valid({**hit,'calendarEvent':{**event,**extra}}))
+        self.assertTrue(validator('NotesSearchCalendarEvent').is_valid({**event,'noteEntryId':ID}))
     def test_document_title_rename_is_private_conditional_and_strict(self):
         operation=CONTRACT['paths']['/notes/entries/{id}/title']['put']
         self.assertEqual('write',operation['x-required-permission'])
@@ -793,7 +805,7 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'listEventNotes', 'getEventNote', 'saveEventNote', 'deleteEventNote', 'downloadEventNote',
-            'getNoteClient', 'updateNoteClient', 'getNoteBookmark', 'updateNoteBookmark', 'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
+            'getNoteClient', 'updateNoteClient', 'getNoteBookmark', 'updateNoteBookmark', 'listNoteRevisions', 'getNoteRevision', 'deleteNoteRevision', 'getNotesCollection', 'getNotesSettings', 'updateNotesSettings', 'resolveNotePath', 'listNoteEntries', 'listRecentNotes', 'searchNotes', 'getCalendarSearchResult', 'getNotesSearchStatus', 'rebuildNotesSearch', 'getNotesStorage',
             'createNoteFolder', 'createNoteFile', 'getNoteEntry', 'deleteNoteEntry', 'getNoteBytes', 'replaceNoteBytes', 'importNoteBytes', 'moveNoteEntry', 'renameNoteTitle', 'restoreNoteEntry', 'exportNotes',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',

@@ -1,3 +1,4 @@
+import {searchNotes} from './notes-search.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
@@ -52,21 +53,21 @@ test('clicking a hashtag searches exact private tags and retains the current Not
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/A-current.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
   await appendEditorText(page.locator('#notes-formatted p'),' Keep this private draft.');await page.locator('#notes-formatted [data-hashtag="#openshift"]').click();
-  await expect(page.locator('#notes-search-mode')).toHaveValue('content');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');
-  const rows=page.locator('#notes-navigation .notes-tree > [role=treeitem]');await expect(rows).toHaveCount(2);await expect(rows.first()).toContainText('A-current.md');await expect(rows.last()).toContainText('B-tagged.md');await expect(page.locator('#notes-formatted')).toContainText('Keep this private draft.');
+  await expect(page.locator('#notes-search-mode')).toHaveCount(0);await expect(page.locator('#notes-search-query')).toHaveValue('tag:#openshift');
+  const rows=page.locator('#notes-search-results [data-search-note]');await expect(rows).toHaveCount(2);await expect(rows.first()).toContainText('A-current.md');await expect(rows.last()).toContainText('B-tagged.md');await expect(page.locator('#notes-formatted')).toContainText('Keep this private draft.');
   const read=await api('GET','/notes/entries/'+current.id+'/content');expect(await read.text()).not.toContain('Keep this private draft.');
-  await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true})).toHaveAttribute('aria-expanded','false');
-  await page.locator('#notes-formatted [data-hashtag="#openshift"]').focus();await page.locator('#notes-formatted [data-hashtag="#openshift"]').press('Enter');await expect(page.locator('#notes-search')).toBeVisible();await expect(rows).toHaveCount(2);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.locator('#notes-search-panel').getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true})).toHaveAttribute('aria-expanded','false');
+  await page.locator('#notes-formatted [data-hashtag="#openshift"]').focus();await page.locator('#notes-formatted [data-hashtag="#openshift"]').press('Enter');await expect(page.locator('#notes-search-query')).toBeVisible();await expect(rows).toHaveCount(2);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
 test('a Today hashtag opens Notes tag search using the current private journal',async({page,request})=>{
   const api=await setup(page,request),day='2026-11-03',entry=await api('GET','/day-notes/'+day+'/content');await api('PUT','/day-notes/'+day+'/content',{body:'A #OpenShift journal entry.'},{'If-Match':entry.headers().etag});
   await expect.poll(async()=>{const response=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'tag:#openshift'}));return response.status();},{timeout:30000}).toBe(200);
   await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const tag=page.locator('#today-journal-formatted [data-hashtag="#openshift"]');await expect(tag).toHaveText('#OpenShift');await tag.focus();await tag.press('Enter');
-  await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');
-  await expect(page.locator('#notes-navigation .notes-tree > [role=treeitem]')).toHaveCount(1);
+  await expect(page.locator('#workspace')).toHaveAttribute('data-view','today');await expect(page.locator('#notes-search-query')).toHaveValue('tag:#openshift');
+  await expect(page.locator('#notes-search-results [data-search-note]')).toHaveCount(1);await page.locator('#notes-search-panel').getByRole('button',{name:'Close',exact:true}).click();
   await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-11');await page.locator('[data-track-note-date="'+day+'"]').click();const dialog=page.locator('#track-note-editor');await expect(dialog).toBeVisible();
-  await dialog.locator('[data-hashtag="#openshift"]').click();await expect(dialog).toBeHidden();await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-search')).toHaveValue('tag:#openshift');await expect(page.locator('#notes-navigation .notes-tree > [role=treeitem]')).toHaveCount(1);
+  await dialog.locator('[data-hashtag="#openshift"]').click();await expect(dialog).toBeHidden();await expect(page.locator('#workspace')).toHaveAttribute('data-view','track');await expect(page.locator('#notes-search-query')).toHaveValue('tag:#openshift');await expect(page.locator('#notes-search-results [data-search-note]')).toHaveCount(1);
 });
 
 test('Notes account imports a vault with review, guarded conflicts and exact file bytes',async({page,request})=>{
@@ -189,7 +190,7 @@ test('Notes supports nested creation, keyboard resize, rename and recovery on mo
   await clickNoteAction(page,page.locator('#notes-panel'),'Rename or move');await page.locator('#notes-path').fill('Notes/Renamed.md');await page.getByRole('dialog',{name:'Rename or move',exact:true}).getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Renamed');
   page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,page.locator('#notes-panel'),'Delete file or folder');await expect(page.locator('#notes-body')).not.toBeVisible();
   await page.locator('#notes-panel').getByRole('button',{name:'Recently deleted',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes/Renamed.md').click();await clickNoteAction(page,page.locator('#notes-panel'),'Restore deleted item');await expect(page.locator('#notes-body')).toHaveValue('Body');
-  await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-navigation')).not.toBeVisible();await page.locator('.notes-drawer-toggle').click();await expect(page.locator('#notes-navigation')).toBeVisible();await page.locator('#notes-search').fill('Renamed');await expect(noteEntry(page.locator('#notes-navigation'),'Notes/Renamed.md')).toBeVisible();
+  await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-navigation')).not.toBeVisible();await page.locator('.notes-drawer-toggle').click();await expect(page.locator('#notes-navigation')).toBeVisible();const results=await searchNotes(page,'file:Renamed');await expect(results.locator('[data-search-note]')).toContainText('Notes/Renamed.md');
   expect(await page.locator('#workspace-navigation [data-tab]').evaluateAll(buttons=>buttons.every(button=>Math.abs(button.getBoundingClientRect().top-buttons[0].getBoundingClientRect().top)<1))).toBe(true);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -221,10 +222,10 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
     const result=await new AxeBuilder({page}).include('#notes-panel').analyze();expect(result.violations).toEqual([]);
   }
   const me=await api('GET','/me'),profile=await me.json();await api('PUT','/me',{zoneId:profile.zoneId,locale:'nb-NO'},{'If-Match':me.headers().etag});
-  await page.reload();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toHaveText('Notater');await expect(page.locator('#notes-search')).toHaveAccessibleName('Søk i filnavn');
+  await page.reload();await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toHaveText('Notater');await expect(page.locator('#titlebar-notes-query')).toHaveAccessibleName('Søk i notater');
   const token=await(await api('POST','/auth/tokens',{name:'Read-only Notes browser','permissions':['read'],'expiresAt':null})).json();
   const session=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
-  try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#notes-search')).toBeVisible();
+  try{const reader=await session.newPage();await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=notes]').click();await expect(reader.locator('#titlebar-notes-query')).toBeVisible();
     await reader.locator('#notes-navigation').getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(reader.locator('#notes-navigation'),'Notes/Theme.md').click();await expect(reader.locator('#notes-body')).toHaveValue('# Theme note\n');await expect(reader.locator('#notes-body')).not.toBeEditable();await expect(reader.locator('.notes-title-input')).not.toBeEditable();await expect(reader.locator('.notes-footer button')).toBeDisabled();await expect(reader.locator('#notes-panel .note-bookmark')).toHaveAttribute('aria-pressed','true');await expect(reader.locator('#notes-panel .note-bookmark')).toBeDisabled();
     await reader.evaluate(()=>location.hash='#account/notes');await expect(reader.locator('#notes-import-folder')).toBeDisabled();await expect(reader.locator('#account-content button[type=submit]')).toBeDisabled();for(const input of await reader.locator('#account-content input[type=text]').all())await expect(input).toBeDisabled();
   }finally{await session.close();}
@@ -284,9 +285,8 @@ test('Notes can hide the configured journal without losing drafts or journal acc
   await expect(page.locator('#account-content')).toContainText('Notes settings saved.');await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
   await expect(page.locator('#notes-body')).toHaveValue('Private unsaved draft');
   expect((await(await api('GET','/day-notes/'+day+'/content')).json()).body).toBe('Private unsaved draft');
-  await page.locator('#notes-search').fill('2026');await expect(page.locator('.notes-tree [role=treeitem]')).toHaveCount(0);
-  await page.locator('#notes-search').fill('Keep');await expect(noteEntry(page.locator('#notes-navigation'),'Notes/Keep.md')).toBeVisible();
-  await noteEntry(page.locator('#notes-navigation'),'Notes/Keep.md').click();
+  const results=await searchNotes(page,'file:2026');await expect(results.locator('[data-search-note]')).toHaveCount(0);await expect(results).toContainText('No matching notes.');
+  await searchNotes(page,'file:Keep');await expect(results.locator('[data-search-note]')).toContainText('Notes/Keep.md');await results.locator('[data-search-note]').click();const popup=page.locator('#note-popup-editor');await expect(popup.locator('.ProseMirror')).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(results).toBeHidden();
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();
   await page.evaluate(()=>location.hash='#account/notes');await expect(page.locator('#account-navigation a[href=\"#account/notes\"]')).toHaveAttribute('aria-current','page');await expect(page.getByLabel('Hide journal folder',{exact:true})).toBeChecked();
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
@@ -480,30 +480,117 @@ test('opening a weekly note survives a metadata refresh between pointer down and
   await expect(page.locator('#today-week-note-editor')).toBeVisible();await expect(page.locator('#today-week-note-editor .ProseMirror')).toHaveAttribute('contenteditable','true');
 });
 
+test('title-bar search filters note types, finds folders and keeps results behind its popup',async({page,request})=>{
+  const api=await setup(page,request),upload=async(path,text)=>await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const ordinary=await upload('Notes/Plain.md','# Plain title\n\nSundial #work.\n');await upload('journal/2020-01-02.md','Sundial #work.\n');await upload('journal/2020-W01.md','Sundial #work.\n');
+  const subscription=randomUUID(),eventKey='ab'.repeat(32);await upload(`events/event-${subscription}-${eventKey}.md`,'---\ntimekeeper-event: '+JSON.stringify({subscriptionId:subscription,eventKey,event:{uid:'search-type',recurrenceId:'',title:'Sundial meeting'}})+'\n---\n\nSundial #work.\n');
+  const folder=await(await api('POST','/notes/folders',{path:'Notes/Sundial folder'})).json();await page.locator('[data-tab=today]').click();
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'Sundial'}));return reply.status();},{timeout:30000}).toBe(200);
+  const panel=await searchNotes(page,'Sundial'),rows=panel.locator('[data-search-note]');await expect(rows).toHaveCount(4);
+  for(const [query,count]of [['note:Sundial',1],['journal:Sundial',2],['event:Sundial',1],['event:',1],['tag:#work',4],['file:Notes note:Sundial',1]]){await searchNotes(page,query);await expect(rows).toHaveCount(count);}
+  let heldRoot=false,captured,releaseRoot;const rootStarted=new Promise(resolve=>{captured=resolve;}),rootGate=new Promise(resolve=>{releaseRoot=resolve;});
+  await page.route('**/api/v1/notes/entries?*',async route=>{if(!new URL(route.request().url()).searchParams.has('parentId')||heldRoot)return route.continue();const reply=await route.fetch();heldRoot=true;captured();await rootGate;await route.fulfill({response:reply});});
+  await page.route('**/api/v1/notes/resolve?*',async route=>{if(new URL(route.request().url()).searchParams.get('path')!==folder.path)return route.continue();await rootStarted;releaseRoot();await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');await route.continue();});
+  try{await searchNotes(page,'file:"Sundial folder"');await expect(rows).toHaveCount(1);await expect(rows).toContainText('Notes/Sundial folder');await searchNotes(page,'file:Sundial');await expect(rows).toHaveCount(1);await rows.click();await expect(page.locator('#workspace')).toHaveAttribute('data-view','notes');await expect(page.locator('#notes-navigation [data-id="'+folder.id+'"]')).toHaveAttribute('aria-expanded','true');}
+  finally{releaseRoot();await page.unrouteAll({behavior:'wait'});}
+  await searchNotes(page,'note:Sundial');const pick=panel.locator('[data-search-note="'+ordinary.id+'"]');await pick.click();const popup=page.locator('#note-popup-editor');await expect(popup.locator('.ProseMirror')).toContainText('Sundial');await expect(panel).toBeVisible();await popup.getByRole('button',{name:'Close',exact:true}).click();await expect(pick).toBeFocused();
+  await pick.press('Enter');await expect(popup.locator('.ProseMirror')).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(panel).toBeHidden();await expect(page.locator('#notes-formatted')).toContainText('Sundial');await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();
+  for(const width of [320,390]){await page.setViewportSize({width,height:568});await expect(page.locator('#titlebar-notes-query')).toBeHidden();const toggle=page.locator('#titlebar-notes-search button');await toggle.focus();await toggle.press('Enter');await expect(page.locator('#notes-search-query')).toBeFocused();await searchNotes(page,'file:Plain.md');await expect(rows).toHaveCount(1);await page.locator('#notes-search-query').press('Escape');await expect(panel).toBeHidden();await expect(toggle).toBeFocused();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+});
+
+test('event search finds calendar details without creating a note and keeps the result through maximize',async({page,request,browser})=>{
+  test.setTimeout(120000);const api=await setup(page,request);
+  const description='Spectrograph calibration session.',location='North observatory',title='Sky planning';
+  const body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Dagsverk//Event search fixture//EN','BEGIN:VEVENT','UID:search-unsaved-event','DTSTAMP:20260101T000000Z','DTSTART:20260504T100000Z','DTEND:20260504T110000Z','SUMMARY:'+title,'DESCRIPTION:'+description,'LOCATION:'+location,'END:VEVENT','END:VCALENDAR',''].join('\r\n');
+  const feed=await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}});expect(feed.status()).toBe(201);
+  const client=await(await api('POST','/clients',{name:'Event search client',color:'#305070'})).json();
+  const subscription=await(await api('POST','/calendar-subscriptions',{name:'Event search calendar',clientId:client.id,url:(await feed.json()).url,visible:true,includeEvents:true,includeTodos:false},{'Idempotency-Key':randomUUID()})).json();
+  let event;await expect.poll(async()=>{const catalog=await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05')).json();event=catalog.items.find(item=>item.subscriptionId===subscription.id);return event?.title;},{timeout:30000}).toBe(title);
+  const notePath='/event-notes/'+subscription.id+'/'+event.key;expect((await(await api('GET',notePath)).json()).version).toBe(0);
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=event:observatory');return reply.status();},{timeout:30000}).toBe(200);
+  const panel=await searchNotes(page,'event:observatory'),result=panel.getByRole('button',{name:new RegExp(title)});await expect(result).toBeVisible();
+  for(const query of ['event:spectrograph','event:"calibration session"','event:observatory calibration','observatory']){await searchNotes(page,query);await expect(result).toBeVisible();}
+  await result.click();const popup=page.getByRole('dialog').filter({hasText:title});await expect(popup).toBeVisible();await expect(popup).toContainText(description);await expect(popup).toContainText(location);await expect(panel).toBeVisible();
+  await expect(popup.locator('.markdown-editor')).toBeHidden();
+  for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await popup.boundingBox()).height).toBeLessThan(600);expect((await new AxeBuilder({page}).include('#calendar-search-popup-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-details-${width}.png`});}
+  await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(panel).toBeHidden();await expect(popup).toBeHidden();await expect(page.locator('#workspace')).toContainText(description);await expect(page.locator('#workspace')).toContainText(location);
+  await captureScreenshot(page,{path:'test-results/event-search-workspace.png'});
+  expect((await(await api('GET',notePath)).json()).version).toBe(0);
+  await page.locator('[data-tab=notes]').click();const original=await api('GET',notePath);
+  await api('PUT',notePath,{fromDate:'2026-05-04',toDate:'2026-05-05',body:'Private commissioning checklist.'},{'If-Match':original.headers().etag});
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q='+encodeURIComponent('event:observatory commissioning'));return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(1);
+  await searchNotes(page,'event:observatory commissioning');await expect(panel.locator('[data-search-note]')).toHaveCount(1);await result.click();await expect(popup.locator('.ProseMirror')).toContainText('Private commissioning checklist.');await expect(popup).toContainText(location);
+  await popup.getByRole('button',{name:'Markdown source',exact:true}).click();await popup.locator('textarea').fill('Private commissioning checklist updated.');
+  await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(panel).toBeHidden();const workspace=page.locator('#calendar-search-workspace-editor');await expect(workspace).toBeVisible();await expect(workspace.locator('.ProseMirror')).toContainText('checklist updated.');await expect(workspace).toContainText(description);
+  for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#calendar-search-workspace-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-saved-workspace-${width}.png`});}
+  expect((await(await api('GET',notePath)).json()).body).toBe('Private commissioning checklist updated.');
+  await workspace.getByRole('button',{name:'Markdown source',exact:true}).click();await workspace.locator('textarea').fill('Private commissioning checklist workspace edit.');await page.locator('[data-tab=today]').click();await expect(workspace).toBeHidden();expect((await(await api('GET',notePath)).json()).body).toBe('Private commissioning checklist workspace edit.');
+  const token=await(await api('POST','/auth/tokens',{name:'Read-only event search','permissions':['read'],'expiresAt':null})).json(),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
+  try{
+    const reader=await context.newPage(),writes=[];reader.on('request',request=>{if(request.method()!=='GET'&&/\/api\/v1\/(notes|event-notes)\//.test(new URL(request.url()).pathname))writes.push(request.method());});
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();
+    const results=await searchNotes(reader,'event:observatory');await expect(results.locator('[data-search-note]')).toHaveCount(1);await results.locator('[data-search-note]').click();const preview=reader.locator('#calendar-search-popup-editor');await expect(preview.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');
+    await preview.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#calendar-search-workspace-editor .ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
+  }finally{await context.close();}
+  for(const theme of ['timekeeper','timekeeper-dark','newspaper']){
+    await setTheme(page,theme);await searchNotes(page,'event:observatory');await result.click();await expect(popup.locator('.ProseMirror')).toContainText('workspace edit.');
+    for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#calendar-search-popup-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-saved-${theme}-${width}.png`});}
+    await popup.getByRole('button',{name:'Close',exact:true}).click();await panel.getByRole('button',{name:'Close',exact:true}).click();
+  }
+  await api('PUT','/notes/files?path=Notes%2FLater%20choice.md',Buffer.from('# Later choice\n\nObservatory follow-up.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=observatory');return reply.status()===200?(await reply.json()).items.length:0;},{timeout:30000}).toBe(2);
+  await searchNotes(page,'observatory');let releaseChoice,arriveChoice;
+  const choiceHeld=new Promise(resolve=>{releaseChoice=resolve;}),choiceStarted=new Promise(resolve=>{arriveChoice=resolve;});
+  await page.route('**/api/v1/notes/search/calendar/*',async route=>{const response=await route.fetch();arriveChoice();await choiceHeld;await route.fulfill({response});});
+  try{
+    await result.click();await choiceStarted;await panel.getByRole('button',{name:/Later choice/}).click();const later=page.locator('#note-popup-editor');await expect(later.locator('.ProseMirror')).toContainText('Observatory follow-up.');
+    const delivered=page.waitForResponse(response=>new URL(response.url()).pathname.startsWith('/api/v1/notes/search/calendar/'));releaseChoice();await delivered;
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await expect(popup).toBeHidden();await expect(later).toBeVisible();await expect(later.locator('#note-popup-title')).toHaveText('Later choice');await later.getByRole('button',{name:'Close',exact:true}).click();
+  }finally{releaseChoice();await page.unrouteAll({behavior:'wait'});}
+  await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=event:observatory');return reply.status();},{timeout:30000}).toBe(200);await searchNotes(page,'event:observatory');
+  let release,arrive,completed=false;const held=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{arrive=resolve;});
+  await page.route('**/api/v1/notes/search/calendar/*',async route=>{const response=await route.fetch();arrive();await held;try{await route.fulfill({response});}catch{}finally{completed=true;}});
+  try{
+    await result.click();await started;await panel.getByRole('button',{name:'Close',exact:true}).click();await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await setup(page,request);release();await expect.poll(()=>completed).toBe(true);await expect(page.locator('#calendar-search-popup-editor')).toBeHidden();await expect(page.locator('#workspace')).not.toContainText(location);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('a delayed search cannot display the signed-out account in a new session',async({page,request})=>{
+  const api=await setup(page,request),entry=await(await api('PUT','/notes/files?path=Notes%2FPrivate.md',Buffer.from('Private owner result.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  let release,arrive;const held=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{arrive=resolve;});
+  await page.route('**/api/v1/notes/search?*',async route=>{if(new URL(route.request().url()).searchParams.get('q')!=='private')return route.continue();arrive();await held;try{await route.fulfill({headers:{'X-Timekeeper-Owner':Buffer.from(entry.ownerId).toString('base64url')},json:{snapshot:'old',items:[{entry,excerpt:{text:'Private owner result.',highlights:[]}}]}});}catch{}});
+  try{const panel=await searchNotes(page,'private');await started;await panel.getByRole('button',{name:'Close',exact:true}).click();await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await setup(page,request);release();await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=different');return reply.status();},{timeout:30000}).toBe(200);await searchNotes(page,'different');await expect(panel).toContainText('No matching notes.');await expect(panel).not.toContainText('Private owner result.');await expect(page.locator('#owner')).toBeVisible();}
+  finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('Notes content search finds body text, keeps relevance order and pages on demand without replacing a draft',async({page,request})=>{
   test.setTimeout(150000);const api=await setup(page,request),word='sparrow';
   for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await api('PUT','/notes/files?path=Notes%2Fbinary.txt',Buffer.from(word),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:word}));return reply.status();},{timeout:30000}).toBe(200);
-  const navigation=page.locator('#notes-navigation'),rows=navigation.locator('.notes-tree > [role=treeitem]');
-  await page.locator('#notes-search').fill(word);await expect(navigation).toContainText('No matching files or folders.');
-  await page.locator('#notes-search-mode').selectOption('content');await expect(rows).toHaveCount(50);await expect(rows.first()).toContainText('Sparrow priority');
-  await expect(navigation.getByRole('button',{name:'Sort notes',exact:true})).toBeDisabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
+  const navigation=await searchNotes(page,word),rows=navigation.locator('[data-search-note]');
+  await expect(page.locator('#notes-search-mode')).toHaveCount(0);await expect(rows).toHaveCount(50);await expect(rows.first()).toContainText('Sparrow priority');
+  await expect(page.locator('#notes-navigation').getByRole('button',{name:'Sort notes',exact:true})).toBeEnabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
   await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
-  await page.locator('#refresh').evaluate(button=>button.click());await expect(page.locator('#status')).toHaveText('Up to date');await expect(navigation.locator('.notes-tree')).toHaveAttribute('aria-busy','false');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await expect(rows).toHaveCount(50);
-    for(const width of [1440,390]){
-      await page.setViewportSize({width,height:900});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
-      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
+  await page.locator('#refresh').evaluate(button=>button.click());await expect(page.locator('#status')).toHaveText('Up to date');await expect(navigation.locator('#notes-search-results')).toHaveAttribute('aria-busy','false');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
+    await navigation.getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await searchNotes(page,word);await expect(rows).toHaveCount(50);
+    if(theme==='newspaper'){await expect(navigation).toHaveCSS('box-shadow','none');await expect(rows.first().locator('mark').first()).toHaveCSS('background-image',/conic-gradient/);}
+    for(const width of [1440,390,320]){
+      await page.setViewportSize({width,height:900});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-search-panel').analyze()).violations).toEqual([]);
+      if(theme==='newspaper'){
+        const query=page.locator('#notes-search-query'),box=await query.boundingBox();await query.click({position:{x:box.width-20,y:box.height/2}});await expect(query).toHaveValue('');await expect(rows).toHaveCount(0);await searchNotes(page,word);await expect(rows).toHaveCount(50);
+      }
       await captureScreenshot(page,{path:`test-results/notes-content-search-${theme}-${width}.png`});
     }
   }
   await page.setViewportSize({width:1440,height:900});
-  await rows.first().locator('button').click();const source=await notesSource(page);await expect(source).toHaveValue(/Sparrow priority/);
+  await rows.first().click();const popup=page.locator('#note-popup-editor');await expect(popup.locator('.ProseMirror')).toBeVisible();await expect(navigation).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(navigation).toBeHidden();const source=await notesSource(page);await searchNotes(page,word);await expect(source).toHaveValue(/Sparrow priority/);
   await page.route('**/api/v1/notes/entries/*/content',route=>route.request().method()==='PUT'?route.abort('internetdisconnected'):route.continue());
-  await source.fill('# Sparrow priority\n\nUnsaved private draft.');await page.locator('#notes-search').fill('absentword');await expect(navigation).toContainText('No matching notes.');await expect(source).toHaveValue('# Sparrow priority\n\nUnsaved private draft.');
-  await page.locator('#notes-search').fill(word);await expect(rows).toHaveCount(50);await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
+  await source.fill('# Sparrow priority\n\nUnsaved private draft.');await searchNotes(page,'absentword');await expect(navigation).toContainText('No matching notes.');await expect(source).toHaveValue('# Sparrow priority\n\nUnsaved private draft.');
+  await searchNotes(page,word);await expect(rows).toHaveCount(50);await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
 });
 
 test('Notes content search rejects delayed old queries and explains unavailable or stale pages',async({page,request})=>{
@@ -518,11 +605,11 @@ test('Notes content search rejects delayed old queries and explains unavailable 
     if(url.searchParams.has('cursor'))return route.fulfill({status:412,json:{error:{code:'NOTES_SEARCH_SNAPSHOT_EXPIRED',message:'Changed'}}});
     return route.fulfill({headers:routeHeaders,json:result('Fresh body.','fixture-cursor')});
   });
-  const navigation=page.locator('#notes-navigation');await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('old');await started;
-  await page.locator('#notes-search').fill('fresh');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');releaseOld();await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');
+  const navigation=await searchNotes(page,'old');await started;
+  await searchNotes(page,'fresh');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');releaseOld();await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Fresh body.');
   await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeFocused();await expect(navigation).toContainText('Search results changed or expired. Search again');await expect(navigation.locator('.notes-search-excerpt')).toHaveCount(0);
-  await page.locator('#notes-search').fill('unavailable');await expect(navigation).toContainText('Content search is being prepared or is unavailable');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeVisible();
-  await page.locator('#notes-search-mode').selectOption('filename');await page.locator('#notes-search').fill('Search.md');await expect(noteEntry(navigation,'Notes/Search.md')).toBeVisible();
+  await searchNotes(page,'unavailable');await expect(navigation).toContainText('Content search is being prepared or is unavailable');await expect(navigation.getByRole('button',{name:'Search again',exact:true})).toBeVisible();
+  await searchNotes(page,'file:Search.md');await expect(navigation.locator('[data-search-note]')).toContainText('Notes/Search.md');
 });
 
 
@@ -536,8 +623,8 @@ test('Notes content paging leaves focus in the editor when the user moves there 
     return route.fulfill({headers:routeHeaders,json:{snapshot:'fixture',items:[hit],nextCursor:'fixture-cursor'}});
   });
   const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Focus.md').click();const source=await notesSource(page);
-  await page.locator('#notes-search-mode').selectOption('content');await page.locator('#notes-search').fill('body');await expect(navigation.locator('.notes-search-excerpt')).toHaveText('Body result.');
-  const more=navigation.getByRole('button',{name:'More results',exact:true});await more.focus();await more.press('Enter');await started;await source.focus();releaseMore();
+  const results=await searchNotes(page,'body');await expect(results.locator('.notes-search-excerpt')).toHaveText('Body result.');
+  const more=results.getByRole('button',{name:'More results',exact:true});await more.focus();await more.press('Enter');await started;await source.focus();releaseMore();
   await expect(more).toBeHidden();await expect(source).toBeFocused();
 });
 
