@@ -4,7 +4,7 @@
 .markdown-editor .markdown-tools { flex-wrap: wrap; max-width: 100%; }
 .markdown-editor .markdown-tools > button { flex: none; }
 .markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
-.markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
+.markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; font-size: var(--font-markdown-body); }
 .markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
 .journal-formatted:not([hidden]), .journal-formatted > div, .journal-formatted .milkdown { display: flex; flex-direction: column; }
 .journal-formatted :is(.ProseMirror,.milkdown), .journal-formatted > div { flex: 1; min-width: 0; }

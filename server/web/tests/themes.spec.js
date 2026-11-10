@@ -55,6 +55,67 @@ test('themes cover tracking, records, editors and account settings with accessib
   }
 });
 
+test('Dagsverk style guide keeps local fonts, journal typography and Bootstrap controls usable in both modes',async({page,request})=>{
+  test.setTimeout(90000);
+  const headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},path='/api/v1/day-notes/2026-11-10/content';
+  const original=await request.get(path,{headers}),body=await original.json();
+  const markdown='# Tanker fra dagen\n\nDet som ble gjort i dag, er mer enn timer og oppgaver. ÆØÅ æøå. **Et godt dagsverk.**\n\n`07:30`';
+  expect((await request.put(path,{headers:{...headers,'If-Match':original.headers().etag},data:{body:markdown}})).ok()).toBe(true);
+  const external=[];page.on('request',request=>{if(new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)external.push(request.url());});
+  try {
+    await signIn(page);await page.locator('#today-date').fill('2026-11-10');
+    const rich=page.locator('#today-note-editor .ProseMirror'),source=page.locator('#today-journal-body');
+    for(const id of ['timekeeper','timekeeper-dark']) {
+      await setTheme(page,id);await page.locator('[data-tab=today]').click();
+      await page.locator('#today-note-editor').getByRole('button',{name:'Formatted',exact:true}).click();
+      await expect(rich).toContainText('ÆØÅ æøå');
+      const fonts=await page.evaluate(async()=>{
+        const inter=await document.fonts.load('400 14px "Inter Variable"','ÆØÅ æøå');
+        const serif=await document.fonts.load('600 18px "Source Serif 4 Variable"','ÆØÅ æøå');
+        return [...inter,...serif].map(font=>font.status);
+      });
+      expect(fonts.length).toBeGreaterThanOrEqual(2);expect(fonts.every(status=>status==='loaded')).toBe(true);
+      await expect(page.locator('body')).toHaveCSS('font-family',/Inter Variable/);
+      await expect(page.locator('#workspace-navigation')).toHaveCSS('background-color',id==='timekeeper'?'rgb(255, 255, 255)':'rgb(28, 48, 41)');
+      await expect(rich).toHaveCSS('font-family',/Source Serif 4 Variable/);
+      expect(parseFloat(await rich.evaluate(node=>getComputedStyle(node).fontSize))).toBeCloseTo(18,2);
+      expect(parseFloat(await rich.evaluate(node=>getComputedStyle(node).lineHeight))).toBeCloseTo(29,1);
+      await expect(rich.locator('strong')).toHaveCSS('font-weight','600');
+      await expect(rich.locator('code')).toHaveCSS('font-family',/monospace/);
+      await expect(page.locator('link[rel=icon]')).toHaveAttribute('href',new RegExp(`dagsverk-symbol${id.endsWith('dark')?'-dark':''}\\.svg$`));
+      const symbol=page.locator('.brand-symbol:visible');await expect(symbol).toHaveAccessibleName('Dagsverk');
+      expect(parseFloat(await symbol.evaluate(node=>getComputedStyle(node).height))).toBeCloseTo(32,2);
+      expect(parseFloat(await symbol.evaluate(node=>getComputedStyle(node).paddingTop))).toBeCloseTo(8,2);
+      await expect(page.locator('.brand-logo:visible')).toHaveCount(0);
+      for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1000});await audit(page);
+        expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+        await captureScreenshot(page,{path:`test-results/style-guide-${id}-${width}.png`});
+      }
+      await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
+      await expect(source).toHaveValue(markdown);await expect(source).toHaveCSS('font-family',/monospace/);
+      await page.getByRole('button',{name:'Record work session',exact:true}).click();
+      const save=page.locator('#save'),field=page.getByLabel('Summary',{exact:true});
+      expect(Math.abs((await save.boundingBox()).height-34)).toBeLessThanOrEqual(1);
+      await expect(field).toHaveCSS('border-top-color','rgb(123, 145, 135)');
+      await field.focus();await expect(field).toHaveCSS('border-top-color',id==='timekeeper'?'rgb(23, 102, 83)':'rgb(121, 208, 173)');
+      expect(await field.evaluate(node=>getComputedStyle(node).boxShadow)).not.toBe('none');
+      await page.locator('#cancel').click();
+    }
+    // Account overrides still take precedence over theme defaults and scale the symbol.
+    await page.evaluate(()=>window.timekeeperTypography.receive({data:{ownerId:window.timekeeperTypography.profile().data.ownerId,version:window.timekeeperTypography.profile().data.version+1,typographyCss:':root { --font-base: 18px; --font-markdown-body: 1.5rem; }'}}));
+    await expect(rich).toHaveCSS('font-size','27px');
+    await page.reload();await expect(page.locator('html')).toHaveCSS('font-size','14px');
+    await setTheme(page,'nord');await expect(page.locator('body')).not.toHaveCSS('font-family',/Inter Variable/);
+    await expect(page.locator('.brand-logo-dark')).toBeVisible();await expect(page.locator('.brand-symbol:visible')).toHaveCount(0);
+    await expect(page.locator('link[rel=icon]')).toHaveAttribute('href',/favicon\.svg$/);
+    expect(external).toEqual([]);
+  } finally {
+    const current=await request.get(path,{headers});
+    expect((await request.put(path,{headers:{...headers,'If-Match':current.headers().etag},data:{body:body.body}})).ok()).toBe(true);
+  }
+});
+
 test('theme choice persists before rendering, follows other tabs and tolerates unavailable browser storage',async({page,context})=>{
   await signIn(page);await setTheme(page,'solarized-dark');
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','solarized-dark');

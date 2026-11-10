@@ -7,10 +7,27 @@
   --holiday-bg: color-mix(in srgb, var(--bs-danger) 14%, var(--bs-body-bg));
   --holiday-color: color-mix(in srgb, var(--bs-danger-text-emphasis) 70%, var(--bs-body-color));
 }
+:root[data-theme=timekeeper] {
+  --theme-page: #f3f6f5; --bs-body-bg: #fff; --bs-body-color: #233b38;
+  --bs-body-bg-rgb: 255,255,255; --bs-body-color-rgb: 35,59,56;
+  --bs-secondary-color: #52655d; --bs-primary: #176653; --bs-primary-rgb: 23,102,83;
+  --theme-on-accent: #fff; --theme-scheme: light;
+  --theme-field-border: #7b9187; --bs-border-color: #d8e2dc;
+  --bs-danger: #9b3b36; --bs-danger-rgb: 155,59,54; --bs-danger-text-emphasis: #9b3b36;
+  --bs-danger-bg-subtle: #f8eceb; --bs-danger-border-subtle: #d5a7a4;
+  --bs-warning: #8a5b16; --bs-warning-rgb: 138,91,22; --bs-warning-text-emphasis: #8a5b16;
+  --bs-warning-bg-subtle: #fbf3e5; --bs-warning-border-subtle: #d0b689;
+}
 :root[data-theme=timekeeper-dark] {
   --theme-page: #14231e; --bs-body-bg: #1c3029; --bs-body-color: #edf5f0;
+  --bs-body-bg-rgb: 28,48,41; --bs-body-color-rgb: 237,245,240;
   --bs-secondary-color: #b8d0c2; --bs-primary: #79d0ad; --bs-primary-rgb: 121,208,173;
   --theme-on-accent: #14231e; --theme-scheme: dark;
+  --theme-field-border: #7b9187;
+  --bs-danger: #f0aaa4; --bs-danger-rgb: 240,170,164; --bs-danger-text-emphasis: #f0aaa4;
+  --bs-danger-bg-subtle: #402a29; --bs-danger-border-subtle: #b57873;
+  --bs-warning: #ebc17e; --bs-warning-rgb: 235,193,126; --bs-warning-text-emphasis: #ebc17e;
+  --bs-warning-bg-subtle: #3b3222; --bs-warning-border-subtle: #aa8d5c;
 }
 :root[data-theme=solarized-light] {
   --theme-page: #eee8d5; --bs-body-bg: #fdf6e3; --bs-body-color: #073642;
@@ -33,12 +50,10 @@
   --theme-on-accent: #282a36; --theme-scheme: dark;
 }
 
-/* The original Timekeeper palette remains unchanged. Shared tokens cover every
-   view, native form controls, account pages and the separate administration app. */
-:root[data-theme]:not([data-theme=timekeeper]) {
+/* Shared tokens cover every view, native forms, account pages and administration. */
+:root[data-theme] {
   color-scheme: var(--theme-scheme);
   --accent: var(--bs-primary); --muted: var(--bs-secondary-color);
-  --bs-border-color: color-mix(in srgb, var(--bs-body-color) 30%, var(--bs-body-bg));
   --line: var(--bs-border-color);
   --theme-soft: color-mix(in srgb, var(--bs-primary) 8%, var(--bs-body-bg));
   --theme-group: color-mix(in srgb, var(--bs-primary) 14%, var(--bs-body-bg));
@@ -94,6 +109,68 @@
   & .calendar-create-preview { background: var(--theme-selected); color: var(--bs-body-color); }
   & .calendar-session-select:focus-visible { outline-color: var(--bs-body-color); }
 }
+:root[data-theme]:not([data-theme=timekeeper]) {
+  --bs-border-color: color-mix(in srgb, var(--bs-body-color) 30%, var(--bs-body-bg));
+}
+
+/* Dagsverk style guide v0.2. Theme defaults remain overridable by account font
+   preferences. Bootstrap owns control padding, radii and interaction states. */
+:root:is([data-theme=timekeeper],[data-theme=timekeeper-dark]) {
+  --bs-body-font-family: 'Inter Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --bs-font-sans-serif: var(--bs-body-font-family);
+  --font-page-title: 2.285714rem; --font-section-heading: 1.714286rem; --font-subsection-heading: 1.428571rem;
+  --font-form-label: 1rem; --font-table: 1rem; --font-table-heading: 1rem; --font-workweek-table: 1rem;
+  --font-markdown-body: 1.285714rem;
+  --font-markdown-h1: 2.285714rem; --font-markdown-h2: 1.714286rem; --font-markdown-h3: 1.428571rem;
+  --bs-primary-text-emphasis: var(--accent); --bs-primary-bg-subtle: var(--theme-group);
+  --bs-primary-border-subtle: var(--theme-field-border);
+  --bs-form-invalid-color: var(--bs-danger); --bs-form-invalid-border-color: var(--bs-danger);
+
+  & h1 { font-weight: 600; line-height: 1.1875; }
+  & h2 { font-weight: 600; line-height: 1.25; }
+  & h3 { font-weight: 600; line-height: 1.3; }
+  & .form-label, & .theme-choice { font-weight: 500; }
+  & :is(.form-control,.form-select) { min-height: 0; --bs-border-color: var(--theme-field-border); }
+  & :is(.form-control-sm,.form-select-sm) { font-size: .875rem; }
+  & .form-check-input { --bs-border-color: var(--theme-field-border); }
+  & .btn-outline-secondary { --bs-btn-border-color: var(--theme-field-border); }
+  & .today-month-day.selected { color: var(--theme-on-accent); }
+  & .table { font-variant-numeric: tabular-nums; }
+  & .brand-logo { display: none; }
+  & .brand-symbol { display: block; box-sizing: content-box; width: auto; height: 1.632653em; padding: .408163em; }
+  & .brand-symbol-dark { display: none; }
+  & .brand small { margin-inline-start: 0; }
+  & .markdown-editor .ProseMirror {
+    font-family: 'Source Serif 4 Variable', Georgia, serif; line-height: 1.611111;
+    & :is(h1,h2,h3,h4,h5,h6) { font-weight: 600; letter-spacing: normal; }
+    & strong { font-weight: 600; }
+    & :is(button,input,select,.markdown-source-fragment) { font-family: var(--bs-body-font-family); }
+    & :is(pre,code,textarea) { font-family: var(--bs-font-monospace); }
+  }
+  & .btn-danger {
+    --bs-btn-color: var(--theme-page); --bs-btn-bg: var(--bs-danger); --bs-btn-border-color: var(--bs-danger);
+    --bs-btn-hover-color: var(--theme-page); --bs-btn-hover-bg: color-mix(in srgb, var(--bs-danger) 85%, var(--bs-body-color));
+    --bs-btn-hover-border-color: var(--bs-btn-hover-bg); --bs-btn-active-color: var(--theme-page);
+    --bs-btn-active-bg: var(--bs-btn-hover-bg); --bs-btn-active-border-color: var(--bs-btn-hover-bg);
+    --bs-btn-disabled-color: var(--theme-page); --bs-btn-disabled-bg: var(--bs-danger); --bs-btn-disabled-border-color: var(--bs-danger);
+    --bs-btn-focus-shadow-rgb: var(--bs-danger-rgb);
+  }
+  & .btn-outline-danger {
+    --bs-btn-hover-color: var(--theme-page); --bs-btn-hover-bg: var(--bs-danger); --bs-btn-hover-border-color: var(--bs-danger);
+    --bs-btn-active-color: var(--theme-page); --bs-btn-active-bg: var(--bs-danger); --bs-btn-active-border-color: var(--bs-danger);
+    --bs-btn-disabled-color: var(--bs-danger); --bs-btn-disabled-border-color: var(--bs-danger);
+    --bs-btn-focus-shadow-rgb: var(--bs-danger-rgb);
+  }
+  & :is(.alert-danger,.alert-warning):not(:empty)::before {
+    content: ''; display: inline-block; width: 1em; height: 1em; margin-inline-end: .5em;
+    vertical-align: -.1em; background: currentColor;
+    mask: url('./assets/bootstrap-icons/exclamation-circle.svg') center / contain no-repeat;
+  }
+  & .alert-warning:not(:empty)::before { mask-image: url('./assets/bootstrap-icons/exclamation-triangle.svg'); }
+}
+.brand-symbol { display: none; }
+:root[data-theme=timekeeper-dark] .brand-symbol-light { display: none; }
+:root[data-theme=timekeeper-dark] .brand-symbol-dark { display: block; }
 :root[data-bs-theme=dark] .form-check-input[type=checkbox]:checked { background-image: url('./assets/check-dark.svg'); }
 :root[data-bs-theme=dark] .form-check-input[type=radio]:checked { background-image: url('./assets/radio-dark.svg'); }
 .theme-choice { display: block; padding: .5rem .75rem; margin: 0; font-size: var(--font-theme-choice); font-weight: 600; }

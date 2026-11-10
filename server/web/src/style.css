@@ -240,7 +240,7 @@ td.actions .btn + .btn { margin-left: .3rem; }
 .week-session-table tr[data-week-project] > :first-child, .week-session-table tr[data-week-project] > :last-child { padding-top: .7rem; }
 .week-session-table td[data-session-date] > .text-body-secondary { display: grid; align-items: center; min-height: 2rem; margin-block: .15rem; }
 .week-session-interval { display: grid; grid-template-columns: 4.75ch .4rem 6.5ch max(32px,2rem); justify-content: center; align-items: center; gap: .1rem; margin-block: .15rem; }
-.week-session-time.form-control { min-width: 0; min-height: 1.9rem; height: 1.9rem; margin: 0; padding: .2rem 0; font-size: inherit; text-align: center; font-variant-numeric: tabular-nums; border-color: var(--line); border-radius: .25rem; }
+.week-session-time.form-control { min-width: 0; min-height: 1.9rem; height: 1.9rem; margin: 0; padding: .2rem 0; font-size: inherit; text-align: center; font-variant-numeric: tabular-nums; border-color: var(--theme-field-border,var(--line)); border-radius: .25rem; }
 .week-session-time[readonly] { border-color: transparent; color: var(--muted); background: var(--bs-tertiary-bg); }
 .week-session-more.btn { width: max(32px,2rem); min-height: max(32px,2rem); height: max(32px,2rem); border-color: transparent; }
 .week-session-more .icon { font-size: var(--font-workweek-action-icon); }
