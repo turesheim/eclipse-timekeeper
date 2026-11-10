@@ -546,7 +546,7 @@ test('event search finds calendar details without creating a note and keeps the 
     await result.click();await choiceStarted;await panel.getByRole('button',{name:/Later choice/}).click();const later=page.locator('#note-popup-editor');await expect(later.locator('.ProseMirror')).toContainText('Observatory follow-up.');
     const delivered=page.waitForResponse(response=>new URL(response.url()).pathname.startsWith('/api/v1/notes/search/calendar/'));releaseChoice();await delivered;
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-    await expect(popup).toBeHidden();await expect(later).toBeVisible();await expect(later.locator('h2')).toHaveText('Later choice');await later.getByRole('button',{name:'Close',exact:true}).click();
+    await expect(popup).toBeHidden();await expect(later).toBeVisible();await expect(later.locator('#note-popup-title')).toHaveText('Later choice');await later.getByRole('button',{name:'Close',exact:true}).click();
   }finally{releaseChoice();await page.unrouteAll({behavior:'wait'});}
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?q=event:observatory');return reply.status();},{timeout:30000}).toBe(200);await searchNotes(page,'event:observatory');
   let release,arrive,completed=false;const held=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{arrive=resolve;});
