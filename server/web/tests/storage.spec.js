@@ -34,7 +34,7 @@ test('Storage shows retained categories and administrator quota changes apply wi
   try{
     await page.getByRole('link',{name:'Manage limits',exact:true}).click();await expect(page.getByRole('heading',{name:'Notes storage limits',exact:true})).toBeVisible();
     await expect(page.getByLabel('Maximum attachment or file size (MB)',{exact:true})).toHaveValue('160');await expect(page.getByLabel('Maximum Markdown file size (MB)',{exact:true})).toHaveValue('10');
-    await page.getByLabel('Files and folders per account',{exact:true}).fill('4');await page.getByLabel('Current administrator password',{exact:true}).fill(admin.password);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByText('Storage limits saved and active.',{exact:true})).toBeVisible();await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');
+    await page.getByLabel('Files and folders per account',{exact:true}).fill('4');await page.getByLabel('Your password',{exact:true}).fill(admin.password);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByText('Storage limits saved and active.',{exact:true})).toBeVisible();await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');
     expect((await api.get('/api/v1/auth/session')).status()).toBe(200);
     for(const width of [1440,320]){
       await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
