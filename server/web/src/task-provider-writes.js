@@ -59,9 +59,12 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
       const text=node('pre',valueText(field,values[field]),'text-break small');text.style.whiteSpace='pre-wrap';parent.append(text);
     }
   }
+  function identityValue(parent,id){
+    parent.append(node('h4',t('task_writes.google_id'),'h6 mt-3'));const value=node('pre',id,'text-break small');value.style.whiteSpace='pre-wrap';parent.append(value);
+  }
   function show(reply){
     if(!valid())return;const review=++reviewGeneration,row=reply.data,path=base()+'/'+row.id;comparison.replaceChildren();comparison.hidden=false;
-    const title=node('h3',t('task_writes.review_title',{title:row.title}),'h5 text-break');title.tabIndex=-1;comparison.append(title,node('p',t('task_writes.state_'+row.state),'hint'));
+    const title=node('h3',t('task_writes.review_title',{title:row.title}),'h5 text-break');title.tabIndex=-1;comparison.append(title,node('p',t('task_writes.state_'+row.state),'hint'));if(row.externalId)identityValue(comparison,row.externalId);
     if(row.action==='CREATE')comparison.append(node('p',t('task_writes.create_help'),'hint'));
     if(row.action==='DELETE')comparison.append(node('p',t('task_writes.delete_help'),'alert alert-warning'));
     else changeValues(comparison,row.writeFields,t('task_writes.proposed'));
@@ -95,7 +98,7 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
         if(!choose.value)return;await view.session.request(path+'/identity',{method:'POST',etag:reply.etag,body:{externalId:choose.value,scanEtag:snapshot.scanEtag,taskEtag:reply.data.currentTaskEtag}});
         if(!valid()||review!==reviewGeneration)return;++reviewGeneration;comparison.hidden=true;await reload();
       },bind));bind.dataset.writeAction='identity';bind.dataset.allowed='false';
-      choose.addEventListener('change',()=>{values.replaceChildren();const chosen=snapshot.items.find(item=>item.externalId===choose.value);if(chosen){changeValues(values,reply.data.localFields,t('task_writes.local'));changeValues(values,chosen.fields,t('task_writes.google'));}bind.dataset.allowed=String(Boolean(chosen));controls();});
+      choose.addEventListener('change',()=>{values.replaceChildren();const chosen=snapshot.items.find(item=>item.externalId===choose.value);if(chosen){identityValue(values,chosen.externalId);changeValues(values,reply.data.localFields,t('task_writes.local'));changeValues(values,chosen.fields,t('task_writes.google'));}bind.dataset.allowed=String(Boolean(chosen));controls();});
       results.append(chooseLabel,values,bind);controls();
     },search,false);});
   }

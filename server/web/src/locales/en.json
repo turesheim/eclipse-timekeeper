@@ -1614,5 +1614,6 @@
   "notes.search_title": "Search notes",
   "notes.search_help": "Search notes and event details. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
   "notes.search_event_series": "Recurring series details",
-  "notes.search_event_no_note": "This event has no saved note."
+  "notes.search_event_no_note": "This event has no saved note.",
+  "task_writes.google_id": "Google task ID"
 }

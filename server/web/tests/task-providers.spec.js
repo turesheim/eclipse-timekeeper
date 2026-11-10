@@ -219,8 +219,19 @@ test('uncertain creation identity remains an explicit choice and a stale scan pr
   const model=await providerFixture(page,owner,{rows:[row],jobs:[job],candidates});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();
   const choice=panel.getByRole('combobox',{name:'Google identity to link',exact:true}),bind=panel.getByRole('button',{name:'Link this identity; keep Dagsverk fields',exact:true});await expect(choice).toHaveValue('');await expect(bind).toBeDisabled();
   await choice.selectOption('second-id');await expect(panel.getByText('Second Google task',{exact:true})).toBeVisible();model.candidateVersion++;await bind.click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(choice).toHaveValue('second-id');await expect(panel.getByText('Second Google task',{exact:true})).toBeVisible();expect(job.state).toBe('UNKNOWN');expect(model.providerWrites).toBe(0);
-  await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();await choice.selectOption('second-id');await bind.click();await expect(panel.getByText('Imported Google task · Observed values reconciled',{exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();await expect(choice).toHaveValue('');await choice.selectOption('second-id');await bind.click();await expect(panel.getByText('Imported Google task · Observed values reconciled',{exact:true})).toBeVisible();
   expect(model.writes.filter(write=>write.path.endsWith('/identity')).at(-1).input).toEqual({externalId:'second-id',scanEtag:'"scan-2"',taskEtag:'"task-current"'});expect(model.providerWrites).toBe(0);
+});
+
+for(const language of ['en-GB','nb-NO'])test('creation identity review fits every theme and remains accessible in '+language,async({page,request})=>{
+  test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false}),remoteId='google-identity-'.repeat(60);
+  await providerFixture(page,owner,{rows:[row],jobs:[job],candidates:[{externalId:remoteId,fields:{summary:'A very long task title '.repeat(30),body:{format:'TEXT',content:'Google source notes '.repeat(10)}}}]});await open(page);
+  const nb=language==='nb-NO',nav=nb?'Oppgavekoblinger':'Task connections',review=nb?'Gjennomgå resultat':'Review result',find=nb?'Finn Google-oppgaver uten kobling':'Find unlinked Google tasks',label=nb?'Google-identitet som skal kobles':'Google identity to link';
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nav,exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:review,exact:true}).click();await panel.getByRole('button',{name:find,exact:true}).click();await panel.getByRole('combobox',{name:label,exact:true}).selectOption(remoteId);await expect(panel.getByText(remoteId,{exact:true})).toBeVisible();
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1100});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
+  }
+  await captureScreenshot(page,{path:'test-results/task-create-320-'+language+'.png',fullPage:true});
 });
 
 test('authorization responses cannot navigate to an unrelated host',async({page,request})=>{

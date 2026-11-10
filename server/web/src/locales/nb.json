@@ -1614,5 +1614,6 @@
   "notes.search_title": "Søk i notater",
   "notes.search_help": "Søk i notater og hendelsesdetaljer. Bruk tag:#navn, file:navn, event:ord, journal:ord eller note:ord for å avgrense treffene. Sett fraser i doble anførselstegn.",
   "notes.search_event_series": "Detaljer for en gjentakende serie",
-  "notes.search_event_no_note": "Denne hendelsen har ikke noe lagret notat."
+  "notes.search_event_no_note": "Denne hendelsen har ikke noe lagret notat.",
+  "task_writes.google_id": "Google-oppgave-ID"
 }
