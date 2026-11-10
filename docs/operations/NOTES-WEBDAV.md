@@ -133,12 +133,19 @@ a file does not rewrite links in other files. Review relative links after moves.
 
 ## Searching note contents
 
-The Notes navigator has explicit **Names and paths** and **Note contents** modes.
-Names and paths keeps substring matching for files and folders, including
-attachments. An empty query returns ordinary folder navigation. Content search
-covers active ordinary Markdown, daily, weekly and event notes; it excludes
-attachments, deleted notes, old revisions and independent day labels. Hidden
-journal paths and disabled `.obsidian` configuration remain excluded.
+The title-bar **Search notes** field searches active ordinary Markdown, daily,
+weekly and event notes. Results appear in a panel on the right with a search
+field for refinements. Opening a note shows a popup and retains the results;
+maximizing the popup opens its workspace and closes the search panel.
+
+Use `file:name` for literal filename/path substring matches, including folders
+and attachments. Quote names containing spaces, such as `file:"Meeting notes"`.
+Use `event:words`, `journal:words` or `note:words` to limit content results to
+events, daily/weekly journals or ordinary Markdown; a bare type qualifier such
+as `event:` lists that type. Filters combine with words, phrases and tags.
+Content results exclude attachments, folders, deleted notes, old revisions and
+independent day labels. Hidden journals and disabled `.obsidian` paths remain
+excluded. Search does not replace the folder navigator or the current draft.
 
 Use words (all required) or double quotes for a phrase. Search is case-insensitive,
 Unicode-aware and does not stem or fold accents. English and Norwegian text,
@@ -147,8 +154,8 @@ Queries allow at most 512 UTF-16 code units and 32 analyzed terms. Punctuation
 acts as text separators; arbitrary Lucene query syntax is not available.
 
 Hashtags such as `#OpenShift` use the accent colour in Formatted mode. Click a
-tag, or focus it and press Enter, to list matching notes in the navigator. The
-search entry becomes `tag:#openshift` and uses Note contents mode. Editing the
+tag, or focus it and press Enter, to open matching notes in the search panel. The
+search entry becomes `tag:#openshift`. Editing the
 query can combine tags with ordinary words or quoted phrases. Tag matching is
 exact and case-insensitive, so an untagged word or `#OpenShiftTools` does not
 match `tag:#openshift`. The current Notes draft is retained.

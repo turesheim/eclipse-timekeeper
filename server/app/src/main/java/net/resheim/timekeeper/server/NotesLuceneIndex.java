@@ -14,14 +14,15 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.BytesRef;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** One replica's private owner index. Inputs must come from committed SQL snapshots. */
 final class NotesLuceneIndex implements AutoCloseable {
-    static final String FORMAT="notes-search-2";
+    static final String FORMAT="notes-search-3";
     static final int CHUNK=65_536,EXCERPT=320;
     private static final Sort ORDER=new Sort(SortField.FIELD_SCORE,new SortField("path_key",SortField.Type.STRING),new SortField("id",SortField.Type.STRING));
     private static final FieldType BODY;
-    private static final Set<String> METADATA=Set.of("id","path","kind","title","source_type","source_id","source_version","source_tag","source_hash","body_size","path_key");
+    private static final Set<String> METADATA=Set.of("id","path","kind","title","source_type","source_id","source_version","source_tag","source_hash","body_size","path_key","calendar");
     static{BODY=new FieldType(TextField.TYPE_NOT_STORED);BODY.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);BODY.freeze();}
     record Identity(String owner,UUID collection,UUID epoch,String restoreGeneration){
         Identity{Objects.requireNonNull(owner);Objects.requireNonNull(collection);Objects.requireNonNull(epoch);restoreGeneration=restoreGeneration==null?"initial":restoreGeneration;}
@@ -29,7 +30,9 @@ final class NotesLuceneIndex implements AutoCloseable {
     record Watermark(long generation,boolean ready,UUID afterEntry){
         Watermark{if(generation<0||generation>9007199254740991L)throw new IllegalArgumentException("Invalid search watermark");}
     }
-    record Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text){
+    record Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text,ObjectNode calendar){
+        Source(UUID id,String path,String kind,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,long byteLength,String title,NotesSearchText.Projection text){this(id,path,kind,sourceType,sourceId,sourceVersion,sourceTag,sourceHash,byteLength,title,text,null);}
+        Source{if(calendar!=null)calendar=calendar.deepCopy();}
         @Override public String toString(){return "NotesLuceneIndex.Source[id="+id+"]";}
     }
     record Position(float score,String pathKey,UUID id){
@@ -41,7 +44,8 @@ final class NotesLuceneIndex implements AutoCloseable {
         Excerpt{highlights=List.copyOf(highlights);}
         @Override public String toString(){return "NotesLuceneIndex.Excerpt[length="+text.length()+"]";}
     }
-    record Hit(UUID id,String path,String kind,String title,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,Excerpt excerpt,Position position){
+    record Hit(UUID id,String path,String kind,String title,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,Excerpt excerpt,Position position,ObjectNode calendar){
+        Hit(UUID id,String path,String kind,String title,String sourceType,UUID sourceId,long sourceVersion,String sourceTag,String sourceHash,Excerpt excerpt,Position position){this(id,path,kind,title,sourceType,sourceId,sourceVersion,sourceTag,sourceHash,excerpt,position,null);}
         @Override public String toString(){return "NotesLuceneIndex.Hit[id="+id+"]";}
     }
     record Page(List<Hit> items,Position next){Page{items=List.copyOf(items);}}
@@ -54,6 +58,7 @@ final class NotesLuceneIndex implements AutoCloseable {
     private final SearcherManager readers;
     private final ReentrantReadWriteLock lock=new ReentrantReadWriteLock();
     private volatile Watermark watermark;
+    private final Map<String,Set<String>> sourceValues=new java.util.concurrent.ConcurrentHashMap<>();
     private boolean closed;
 
     NotesLuceneIndex(Path path,Identity identity)throws IOException{this(path,identity,new Watermark(0,false,null));}
@@ -94,8 +99,12 @@ final class NotesLuceneIndex implements AutoCloseable {
         String leaf=new VaultPath(source.path()).name();if(leaf.toLowerCase(Locale.ROOT).endsWith(".md"))leaf=leaf.substring(0,leaf.length()-3);
         document.add(new TextField("path",NotesSearchText.normalized(leaf),Field.Store.NO));
         document.add(new TextField("title",NotesSearchText.normalized(source.title()),Field.Store.YES));
-        document.add(new StoredField("source_type",source.sourceType()));document.add(new StoredField("source_id",source.sourceId().toString()));
+        document.add(new StringField("source_type",source.sourceType(),Field.Store.YES));document.add(new StoredField("source_id",source.sourceId().toString()));
+        if(source.calendar()!=null){String value=source.calendar().toString();if(value.length()>262144)throw new IllegalArgumentException("Calendar search metadata exceeds its bound");document.add(new StoredField("calendar",value));}
         document.add(new StoredField("source_version",source.sourceVersion()));document.add(new StoredField("source_tag",source.sourceTag()));document.add(new StoredField("source_hash",source.sourceHash()));
+        String fence=source.calendar()!=null&&source.calendar().hasNonNull("noteFence")?source.calendar().path("noteFence").asText():fence(source);
+        document.add(new StringField("source_fence",fence,Field.Store.YES));
+        document.add(new SortedDocValuesField("source_fence",new BytesRef(fence)));
         for(String block:source.text().blocks())document.add(new Field("body",block,BODY));
         for(String prose:source.text().tags())document.add(new TextField("tag",prose,Field.Store.NO));
         String body=source.text().body();document.add(new StoredField("body_size",body.length()));
@@ -112,11 +121,14 @@ final class NotesLuceneIndex implements AutoCloseable {
     void remove(UUID id)throws IOException{lock.writeLock().lock();try{open();writer.deleteDocuments(new Term("id",id.toString()));}finally{lock.writeLock().unlock();}}
     void commit(Watermark state)throws IOException{
         lock.writeLock().lock();try{
-            open();writer.setLiveCommitData(metadata(state).entrySet());writer.commit();if(state.ready())readers.maybeRefreshBlocking();watermark=state;
+            open();writer.setLiveCommitData(metadata(state).entrySet());writer.commit();if(state.ready())readers.maybeRefreshBlocking();watermark=state;sourceValues.clear();
             for(String name:directory.listAll())privateFile(((FSDirectory)directory).getDirectory().resolve(name));
         }finally{lock.writeLock().unlock();}
     }
     Page search(NotesSearchQuery.Parsed parsed,long expectedGeneration,int limit,Position after,boolean configuration,String hiddenJournal,long milliseconds)throws IOException{
+        return search(parsed,expectedGeneration,limit,after,configuration,hiddenJournal,milliseconds,Set.of());
+    }
+    Page search(NotesSearchQuery.Parsed parsed,long expectedGeneration,int limit,Position after,boolean configuration,String hiddenJournal,long milliseconds,Set<String> excluded)throws IOException{
         if(limit<1||limit>200||milliseconds<1||milliseconds>5000)throw new IllegalArgumentException("Invalid search budget");
         long started=System.nanoTime(),budget=TimeUnit.MILLISECONDS.toNanos(milliseconds);boolean acquired;
         try{acquired=lock.readLock().tryLock(milliseconds,TimeUnit.MILLISECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new Unavailable();}
@@ -125,6 +137,7 @@ final class NotesLuceneIndex implements AutoCloseable {
             open();if(!watermark.ready()||watermark.generation()!=expectedGeneration)throw new Unavailable();
             held=readers.acquire();var searcher=new IndexSearcher(held.getIndexReader());searcher.setTimeout(()->System.nanoTime()-started>budget);
             Query query=NotesSearchQuery.scoped(parsed,identity.owner(),configuration,hiddenJournal);
+            if(!excluded.isEmpty())query=new BooleanQuery.Builder().add(query,BooleanClause.Occur.MUST).add(new TermInSetQuery("source_fence",excluded.stream().map(BytesRef::new).toList()),BooleanClause.Occur.MUST_NOT).build();
             if(searcher.getIndexReader().maxDoc()==0)return new Page(List.of(),null);
             // The public position is score/path/UUID. The local maximum doc ID
             // only excludes the exact unique tuple and is never serialized.
@@ -139,11 +152,50 @@ final class NotesLuceneIndex implements AutoCloseable {
                 int leaf=ReaderUtil.subIndex(hit.doc,searcher.getIndexReader().leaves());var context=searcher.getIndexReader().leaves().get(leaf);
                 var matched=weight.matches(context,hit.doc-context.docBase);var matches=matched==null?null:matched.getMatches("body");
                 var excerpt=excerpt(searcher,hit.doc,values.getField("body_size").numericValue().intValue(),matches);
-                result.add(new Hit(id,values.get("path"),values.get("kind"),values.get("title"),values.get("source_type"),UUID.fromString(values.get("source_id")),values.getField("source_version").numericValue().longValue(),values.get("source_tag"),values.get("source_hash"),excerpt,position));
+                result.add(hit(values,excerpt,position));
             }
             if(System.nanoTime()-started>budget)throw new Unavailable();
             return new Page(result,hits.scoreDocs.length>limit?result.getLast().position():null);
         }finally{if(held!=null)readers.release(held);lock.readLock().unlock();}
+    }
+    private static Hit hit(Document values,Excerpt excerpt,Position position)throws IOException{
+        ObjectNode calendar=null;String encoded=values.get("calendar");
+        if(encoded!=null){if(encoded.length()>262144)throw new RebuildRequired();var parsed=JsonValues.parse(encoded);if(!parsed.isObject())throw new RebuildRequired();calendar=(ObjectNode)parsed;}
+        return new Hit(UUID.fromString(values.get("id")),values.get("path"),values.get("kind"),values.get("title"),values.get("source_type"),UUID.fromString(values.get("source_id")),values.getField("source_version").numericValue().longValue(),values.get("source_tag"),values.get("source_hash"),excerpt,position,calendar);
+    }
+    static String fence(Source source){
+        return JsonValues.etag(JsonValues.array().add(source.id().toString()).add(source.path()).add(source.kind()).add(source.sourceType()).add(source.sourceId().toString()).add(source.sourceVersion()).add(source.sourceTag()).add(source.sourceHash()).add(source.title()));
+    }
+    Set<String> sourceFences(String type,long expectedGeneration)throws IOException{return sourceValues(type,"source_fence",expectedGeneration);}
+    Set<UUID> sourceIds(String type,long expectedGeneration)throws IOException{return sourceValues(type,"id",expectedGeneration).stream().map(UUID::fromString).collect(java.util.stream.Collectors.toUnmodifiableSet());}
+    private Set<String> sourceValues(String type,String field,long expectedGeneration)throws IOException{
+        readLock();IndexSearcher searcher=null;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(1);
+        try{
+            open();if(!watermark.ready()||watermark.generation()!=expectedGeneration)throw new Unavailable();String key=type+":"+field;var cached=sourceValues.get(key);if(cached!=null)return cached;
+            searcher=readers.acquire();var result=new HashSet<String>();var reader=searcher.getIndexReader();
+            for(var leaf:reader.leaves()){
+                var postings=leaf.reader().postings(new Term("source_type",type));if(postings==null)continue;var live=leaf.reader().getLiveDocs();var values=DocValues.getSorted(leaf.reader(),field);
+                for(int doc=postings.nextDoc();doc!=org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;doc=postings.nextDoc())if(live==null||live.get(doc)){
+                    if(System.nanoTime()>deadline||Thread.currentThread().isInterrupted())throw new Unavailable();
+                    if(!values.advanceExact(doc))throw new RebuildRequired();result.add(values.lookupOrd(values.ordValue()).utf8ToString());
+                }
+            }
+            var values=Set.copyOf(result);sourceValues.put(key,values);return values;
+        }finally{if(searcher!=null)readers.release(searcher);lock.readLock().unlock();}
+    }
+    Hit lookup(UUID id,long expectedGeneration,boolean configuration,String hiddenJournal)throws IOException{
+        readLock();IndexSearcher searcher=null;
+        try{
+            open();if(!watermark.ready()||watermark.generation()!=expectedGeneration)throw new Unavailable();searcher=readers.acquire();
+            var query=NotesSearchQuery.scoped(new NotesSearchQuery.Parsed("",new TermQuery(new Term("id",id.toString()))),identity.owner(),configuration,hiddenJournal);
+            var hits=searcher.search(query,1);if(hits.scoreDocs.length==0)return null;
+            int doc=hits.scoreDocs[0].doc;var values=searcher.storedFields().document(doc,METADATA);
+            return hit(values,excerpt(searcher,doc,values.getField("body_size").numericValue().intValue(),null),new Position(0,values.get("path_key"),id));
+        }finally{if(searcher!=null)readers.release(searcher);lock.readLock().unlock();}
+    }
+    private void readLock()throws IOException{
+        try{if(!lock.readLock().tryLock(1,TimeUnit.SECONDS))throw new Unavailable();}
+        catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new Unavailable();}
     }
     private static Excerpt excerpt(IndexSearcher searcher,int document,int size,MatchesIterator matches)throws IOException{
         if(size==0)return new Excerpt("",List.of());

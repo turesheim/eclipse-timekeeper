@@ -1454,7 +1454,7 @@
   "notes.search_results": "Treff sortert etter relevans.",
   "notes.search_none": "Ingen samsvarende notater.",
   "notes.search_changed": "Søketreffene er endret eller utløpt. Søk på nytt for oppdaterte treff.",
-  "notes.search_invalid": "Bruk opptil 32 ord, fraser i anførselstegn eller tag:#navn-filtre (opptil 512 tegn).",
+  "notes.search_invalid": "Bruk opptil 32 ord, fraser i anførselstegn eller filtrene tag:, file:, event:, journal: og note: (opptil 512 tegn).",
   "notes.search_unavailable": "Innholdssøket klargjøres eller er utilgjengelig. Prøv igjen om litt. Du kan fortsatt bla i filene.",
   "notes.search_preparing": "Klargjør innholdssøk …",
   "notes.added": "Lagt til:",
@@ -1477,7 +1477,11 @@
   "notes.bookmarks": "Bokmerker",
   "notes.maximize": "Åpne i arbeidsområdet",
   "notes.create_linked_confirm": "Notatet «{{path}}» finnes ikke. Vil du opprette det og åpne redigeringsvinduet?",
+  "notes.search_title": "Søk i notater",
+  "notes.search_help": "Søk i notater og hendelsesdetaljer. Bruk tag:#navn, file:navn, event:ord, journal:ord eller note:ord for å avgrense treffene. Sett fraser i doble anførselstegn.",
   "notes.client": "Knytt til kunde",
   "notes.no_client": "Ingen kunde",
-  "notes.client_associations": "Notater knyttet til kunder"
+  "notes.client_associations": "Notater knyttet til kunder",
+  "notes.search_event_series": "Detaljer for en gjentakende serie",
+  "notes.search_event_no_note": "Denne hendelsen har ikke noe lagret notat."
 }

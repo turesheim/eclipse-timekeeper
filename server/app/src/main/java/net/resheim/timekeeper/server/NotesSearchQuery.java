@@ -36,7 +36,11 @@ final class NotesSearchQuery {
         try(var analyzer=analyzer()){
             for(int offset=0;offset<text.length();){
                 if(Character.isWhitespace(text.charAt(offset))){offset++;continue;}
-                boolean phrase=text.charAt(offset)=='"';var part=new StringBuilder();
+                String field="";
+                for(String candidate:List.of("tag","file","event","journal","note")){
+                    if(text.regionMatches(true,offset,candidate+":",0,candidate.length()+1)){field=candidate;offset+=candidate.length()+1;break;}
+                }
+                boolean phrase=offset<text.length()&&text.charAt(offset)=='"';var part=new StringBuilder();
                 if(phrase){
                     offset++;boolean closed=false;
                     while(offset<text.length()){
@@ -47,13 +51,26 @@ final class NotesSearchQuery {
                     }
                     if(!closed)throw ApiFailure.validation();
                 }else while(offset<text.length()&&!Character.isWhitespace(text.charAt(offset))&&text.charAt(offset)!='"')part.append(text.charAt(offset++));
-                if(!phrase&&part.toString().regionMatches(true,0,"tag:",0,4)){
-                    String value=part.substring(4),key=NotesHashtags.key(value);if(key==null||++count>MAX_TERMS)throw ApiFailure.validation();
+                if(field.equals("tag")){
+                    String value=part.toString(),key=NotesHashtags.key(value);if(key==null||++count>MAX_TERMS)throw ApiFailure.validation();
                     var tagged=new BooleanQuery.Builder().add(new ConstantScoreQuery(new TermQuery(new Term("tag",key))),BooleanClause.Occur.MUST);
                     // Optional zero-weight body terms supply useful excerpt offsets;
                     // only the exact tag field determines membership and ranking.
                     var words=tokens(analyzer,value);if(!words.isEmpty())tagged.add(new BoostQuery(across(words),0),BooleanClause.Occur.SHOULD);
                     required.add(tagged.build(),BooleanClause.Occur.MUST);continue;
+                }
+                if(field.equals("file")){
+                    String value=VaultPath.searchKey(part.toString());if(value.isBlank()||++count>MAX_TERMS)throw ApiFailure.validation();
+                    // The qualifier is a literal path substring, never user-supplied
+                    // wildcard syntax. The existing search deadline still applies.
+                    String literal=value.replace("\\","\\\\").replace("*","\\*").replace("?","\\?");
+                    required.add(new WildcardQuery(new Term("path_key","*"+literal+"*")),BooleanClause.Occur.FILTER);
+                    required.add(new TermQuery(new Term("source_type","CALENDAR_EVENT")),BooleanClause.Occur.MUST_NOT);continue;
+                }
+                if(Set.of("event","journal","note").contains(field)){
+                    if(++count>MAX_TERMS)throw ApiFailure.validation();
+                    List<BytesRef> kinds=switch(field){case "event"->List.of(new BytesRef("EVENT"));case "journal"->List.of(new BytesRef("DAY"),new BytesRef("WEEK"));default->List.of(new BytesRef("MARKDOWN"));};
+                    required.add(new TermInSetQuery("kind",kinds),BooleanClause.Occur.FILTER);
                 }
                 var terms=tokens(analyzer,part.toString());count+=terms.size();if(count>MAX_TERMS)throw ApiFailure.validation();
                 if(phrase&&!terms.isEmpty())required.add(across(terms),BooleanClause.Occur.MUST);

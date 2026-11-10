@@ -1253,8 +1253,8 @@ leave independent day labels untouched. This endpoint requires write permission;
 normal content edits retain their existing timestamp semantics.
 
 `GET /notes/search?q=…&limit=…&cursor=…` searches active Markdown and native
-journal/event notes independently from filename substring navigation. Its
-`NotesSearchPage` contains current entry metadata and bounded plain-text excerpts
+journal/event notes and published calendar event details independently from filename substring navigation. Its
+`NotesSearchPage` contains current entry metadata and/or `calendarEvent` details and bounded plain-text excerpts
 with UTF-16 highlight ranges, plus an opaque snapshot and optional continuation.
 All words are required across boosted title/path/body fields; double quotes form
 phrases. An unquoted `tag:#name` requires an exact prose hashtag and can be
@@ -1263,7 +1263,22 @@ each tag is at most 128 UTF-16 code units including `#`. Unicode letters,
 numbers, underscores, hyphens and slash-separated segments are supported.
 Code, link destinations/labels, image labels, YAML frontmatter and wikilink
 targets do not define tags. Query length is 512 UTF-16 code units and at most
-32 analyzed terms or tag filters.
+32 analyzed terms or filters. `file:value` restricts results to a literal,
+case-insensitive path substring (quote values containing spaces). `event:`,
+`journal:` and `note:` constrain results to events, daily/weekly journals and
+ordinary Markdown respectively. Each can precede a word or quoted phrase; an
+empty type qualifier matches the whole type. Filters combine with ordinary words
+and tags. The browser uses the existing filename catalog endpoint for a pure
+`file:` query so folders and attachments also appear.
+Visible event-enabled subscriptions contribute event titles, descriptions and locations,
+including events without saved notes. Saved event-note text and live details share
+one result. Recurring series use finite published definitions, never unbounded
+occurrence expansion. `file:` excludes unsaved calendar definitions.
+`GET /notes/search/calendar/{id}` rechecks the owned live result and returns
+`NotesSearchHit` without creating a note. Optional `entry` identifies its real
+saved note; `calendarEvent` carries display details without exposing feed URLs.
+A series definition is distinguished from a concrete occurrence, and inherited
+saved-occurrence metadata does not invent start/end times.
 Default/capped page sizes are 50/200, and excerpts are at most 320 code units.
 Owner, deletion, configuration and hidden-journal filters precede pagination.
 
@@ -1271,7 +1286,7 @@ Search captures committed SQL search state under authorization, releases the
 owner transaction for index work, and reacquires authorization to validate the
 generation and every canonical source binding/version before publishing results.
 Signed cursors last ten minutes and bind account/query/visibility, collection,
-restore epoch and committed search generation. Stale tokens return 412; a replica
+restore epoch and committed note/calendar search generations. Stale tokens return 412; a replica
 that cannot catch up within the bounded wait returns 503 without stale snippets.
 `GET /notes/search/status` reports replica-local readiness; write-protected
 `POST /notes/search/rebuild` schedules a private rebuild. All responses are

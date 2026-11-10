@@ -35,7 +35,7 @@ final class CalendarSubscriptions {
     ObjectNode create(JsonNode input,CalendarDownload policy){
         if(store.list(SUB).size()>=20)throw new ApiFailure(422,"CALENDAR_SUBSCRIPTION_LIMIT");
         var value=object().put("createdAt",store.now().toString()).putNull("lastAttempt").putNull("lastSuccess").putNull("lastError").put("nextRefresh",store.now().toString());
-        configuration(value,input,policy,true);UUID id=UUID.randomUUID();value=insert(SUB,id,value);clientRelation(id,uuid(value.get("clientId")));return value;
+        configuration(value,input,policy,true);UUID id=UUID.randomUUID();value=insert(SUB,id,value);clientRelation(id,uuid(value.get("clientId")));new CalendarSearchState(store).changed();return value;
     }
     private void configuration(ObjectNode value,JsonNode input,CalendarDownload policy,boolean create){
         store.find("CLIENT",uuid(input.get("clientId"))).orElseThrow(ApiFailure::notFound);
@@ -58,11 +58,12 @@ final class CalendarSubscriptions {
             value.put("nextRefresh",store.now().toString());
         }
         store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=?",store.owner(),SUB,id);clientRelation(id,uuid(value.get("clientId")));
-        return save(SUB,value);
+        value=save(SUB,value);new CalendarSearchState(store).changed();return value;
     }
     void remove(UUID id,String match){
         var value=required(id);ApiReplies.match(visible(value),match);store.delete(SUB,id);
         store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),FEED,id);
+        new CalendarSearchState(store).changed();
         // Conversion tombstones deliberately outlive subscriptions and activities.
     }
     private static String configuration(JsonNode value){return hash(value.path("url").asText());}
@@ -85,11 +86,12 @@ final class CalendarSubscriptions {
         var value=((ObjectNode)metadata.get()).deepCopy();var feed=((ObjectNode)cached.get()).deepCopy();
         if(!configuration(value).equals(claim.configuration())||!claim.lease().equals(feed.path("lease").asText()))return;
         feed.remove(List.of("lease","leaseUntil"));
+        boolean contentChanged=error==null&&!result.unchanged()&&!Objects.equals(feed.hasNonNull("body")?feed.get("body").asText():null,result.body());
         if(error==null){
             if(!result.unchanged())feed.put("body",result.body()).put("etag",result.etag()).put("modified",result.modified());
             value.put("lastSuccess",store.now().toString()).putNull("lastError");
         }else value.put("lastError",error);
-        save(FEED,feed);save(SUB,value);
+        save(FEED,feed);save(SUB,value);if(contentChanged)new CalendarSearchState(store).changed();
     }
     private static LocalDate[] window(String first,String last){
         try{var from=LocalDate.parse(first);var to=LocalDate.parse(last);if(!to.isAfter(from)||ChronoUnit.DAYS.between(from,to)>31)throw new IllegalArgumentException();return new LocalDate[]{from,to};}
