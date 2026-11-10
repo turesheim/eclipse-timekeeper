@@ -31,6 +31,7 @@ const row=(page,title)=>page.locator('#tasks-list').getByRole('button',{name:'Op
 
 test('Tasks browses all sources by client/category, today and urgency and creates and edits local tasks',async({page,request})=>{
   const {api,native}=await setup(page,request);await expect(page.locator('#tasks-list > li')).toHaveCount(10);await expect(row(page,'M-42: Imported review')).toBeVisible();await expect(row(page,'Calendar future')).toBeVisible();
+  await page.locator('#tasks-hide-completed').check();await expect(page.locator('#tasks-list > li')).toHaveCount(7);await expect(row(page,'Calendar completed')).toHaveCount(0);await expect(row(page,'Calendar cancelled')).toHaveCount(0);await page.locator('#tasks-hide-completed').uncheck();await expect(page.locator('#tasks-list > li')).toHaveCount(10);
   await filter(page,'Today').click();await expect(page.locator('#tasks-list > li')).toHaveCount(2);await expect(row(page,'Local task')).toBeVisible();await expect(row(page,'Calendar today')).toBeVisible();
   await filter(page,'Time critical').click();await expect(page.locator('#tasks-list > li')).toHaveCount(4);await expect(row(page,'Urgent task')).toBeVisible();await expect(row(page,'Finished task')).toHaveCount(0);await expect(row(page,'Calendar completed')).toHaveCount(0);
   await filter(page,'Client A').click();await expect(page.locator('#tasks-list > li')).toHaveCount(1);await expect(row(page,'M-42: Imported review')).toBeVisible();

@@ -22,11 +22,11 @@ export function taskEditorFields(field,value,data,id){
   client.addEventListener('change',()=>{const selected=data().projects.find(item=>item.id===project.value);if(selected&&selected.clientId!==client.value)project.value='';refresh();});
   field(t('tasks.priority'),'priority',value.priority||'UNSPECIFIED',{choices:['UNSPECIFIED','LOW','NORMAL','HIGH'].map(key=>[key,t('tasks.priority_'+key.toLowerCase())])});
   const kind=field(t('tasks.deadline_type'),'dueKind',value.due?.kind||'',{choices:[['',t('tasks.no_deadline')],['DATE',t('tasks.deadline_date')],['DATE_TIME',t('tasks.deadline_time')]]});
-  const date=field(t('tasks.due_label'),'dueDate',value.due?.date||'',{type:'date'}),time=field(t('tasks.deadline_clock'),'dueTime',value.due?.time||'',{type:'time'}),zone=field(t('tasks.deadline_zone'),'dueZone',value.due?.timeZone||data().profile.data.zoneId,{max:255});time.step='any';
+  const date=field(t('tasks.due_label'),'dueDate',value.due?.date||'',{type:'date'}),time=field(t('tasks.deadline_clock'),'dueTime',(value.due?.time||'').split('.')[0],{type:'time'}),zone=field(t('tasks.deadline_zone'),'dueZone',value.due?.timeZone||data().profile.data.zoneId,{max:255});time.step='any';
   const visibility=()=>{date.closest('label').hidden=!kind.value;date.required=!!kind.value;for(const input of [time,zone]){input.closest('label').hidden=kind.value!=='DATE_TIME';input.required=kind.value==='DATE_TIME';}};
   kind.addEventListener('change',visibility);visibility();const original=[kind.value,date.value,time.value,zone.value];
   return {refresh,due:()=>{
     if([kind.value,date.value,time.value,zone.value].every((part,index)=>part===original[index]))return value.due||null;
-    return !kind.value?null:{kind:kind.value,date:date.value,...(kind.value==='DATE_TIME'?{time:time.value,timeZone:zone.value}:{})};
+    return !kind.value?null:{kind:kind.value,date:date.value,...(kind.value==='DATE_TIME'?{time:time.value===original[2]&&value.due?.kind==='DATE_TIME'?value.due.time:time.value,timeZone:zone.value}:{})};
   }};
 }
