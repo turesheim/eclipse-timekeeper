@@ -71,6 +71,7 @@ final class TaskProviderConnections {
         value.putNull("lastError").putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().toString());
         value.put("roundActive",false).put("roundIndex",0).put("blocked",false).put("requested",!value.path("selected").isEmpty()).put("pendingCount",0);value.putArray("pending");value.putObject("listErrors");
         value=previous.isEmpty()?insert(AUTH,id,value):save(AUTH,value);
+        TaskProviderWrites.retire(store,id,value.path("generation").asText());
         return visible(value);
     }
     ObjectNode list(){var result=object();var items=result.putArray("items");for(var value:store.list(AUTH))if(store.find("TASK_CONNECTION",uuid(value.get("id"))).isPresent())items.add(visible(value));return result;}
@@ -79,11 +80,14 @@ final class TaskProviderConnections {
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
         result.set("version",value.path("version"));result.put("configurationVersion",value.path("configurationVersion").asLong()).put("direction",value.path("direction").asText("IMPORT")).put("paused",value.path("paused").asBoolean());
-        result.put("syncing",!value.path("paused").asBoolean()&&(value.hasNonNull("lease")||value.path("roundActive").asBoolean()||value.path("requested").asBoolean())).put("pendingCount",value.path("pendingCount").asInt());
+        boolean waiting=value.hasNonNull("retryUntil")&&Instant.parse(value.path("retryUntil").asText()).isAfter(store.now());
+        result.put("syncing",!value.path("paused").asBoolean()&&!waiting&&(value.hasNonNull("lease")||value.path("roundActive").asBoolean()||value.path("requested").asBoolean())).put("pendingCount",value.path("pendingCount").asInt());
         result.set("listErrors",value.has("listErrors")?value.get("listErrors").deepCopy():object());
         for(String field:List.of("lastAttempt","lastSuccess","lastError","nextRefresh"))result.set(field,value.has(field)?value.get(field):com.fasterxml.jackson.databind.node.NullNode.instance);
+        if(value.hasNonNull("nextRefresh")&&value.hasNonNull("retryUntil")&&Instant.parse(value.path("retryUntil").asText()).isAfter(Instant.parse(value.path("nextRefresh").asText())))result.set("nextRefresh",value.get("retryUntil"));
         result.set("selectedLists",value.path("selected").deepCopy());var catalog=result.putArray("availableLists");
         result.set("projectMappings",value.path("projects").isObject()?value.path("projects").deepCopy():object());result.set("imports",TaskProviderScans.previews(store,value));
+        result.put("pendingWrites",TaskProviderWrites.pending(store,uuid(value.get("id"))));
         for(var list:value.path("catalog")){var item=object();for(String field:List.of("id","name","kind","shared","owner"))item.set(field,list.path(field));catalog.add(item);}
         return result;
     }
@@ -117,8 +121,8 @@ final class TaskProviderConnections {
         TaskProviderScans.retain(store,id,chosen);
         var ids=value.putArray("selected");selected.forEach(ids::add);value.put("configurationVersion",value.path("configurationVersion").asLong()+1).put("generation",UUID.randomUUID().toString()).put("nextRefresh",store.now().toString()).putNull("lease").putNull("leaseUntil");
         value.put("roundActive",false).put("roundIndex",0).put("requested",!selected.isEmpty()&&!value.path("blocked").asBoolean()).put("pendingCount",0).putNull("lastSuccess");
-        if(!value.path("blocked").asBoolean())value.putNull("lastError");value.putArray("pending");value.putObject("listErrors");
-        return visible(save(AUTH,value));
+        if(!value.path("blocked").asBoolean()&&(!value.hasNonNull("retryUntil")||!Instant.parse(value.path("retryUntil").asText()).isAfter(store.now())))value.putNull("lastError");value.putArray("pending");value.putObject("listErrors");
+        var saved=save(AUTH,value);TaskProviderWrites.retire(store,id,saved.path("generation").asText());return visible(saved);
     }
     /** One list per lease bounds work and lets other accounts make progress between large lists. */
     Claim claim(UUID id,boolean force){
@@ -128,6 +132,7 @@ final class TaskProviderConnections {
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
         boolean catalogOnly=value.path("selected").isEmpty();if(catalogOnly&&!force&&!value.path("requested").asBoolean())return null;
         Instant now=store.now();
+        if(value.hasNonNull("retryUntil")&&Instant.parse(value.path("retryUntil").asText()).isAfter(now)){if(force)throw new ApiFailure(429,"TASK_PROVIDER_RATE_LIMITED");return null;}
         if(value.hasNonNull("leaseUntil")&&Instant.parse(value.path("leaseUntil").asText()).isAfter(now))return null;
         if(value.path("blocked").asBoolean()){if(force)throw new ApiFailure(409,value.path("lastError").asText("TASK_PROVIDER_RECONNECT_REQUIRED"));return null;}
         if(force){
@@ -135,7 +140,7 @@ final class TaskProviderConnections {
             value.put("roundActive",false).put("requested",true);
         }else if(value.hasNonNull("nextRefresh")&&Instant.parse(value.path("nextRefresh").asText()).isAfter(now))return null;
         if(!value.path("roundActive").asBoolean()){
-            value.put("roundActive",true).put("forceRound",force).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
+            value.put("roundActive",true).put("forceRound",force||value.path("forceRequested").asBoolean()).put("forceRequested",false).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         }
         int index=value.path("roundIndex").asInt();if(index<0||!catalogOnly&&index>=value.path("selected").size())throw ApiFailure.conflict();
         String remote=catalogOnly?null:value.path("selected").get(index).asText();UUID listId=null;
@@ -187,12 +192,13 @@ final class TaskProviderConnections {
         boolean blocked=error!=null&&Set.of("TASK_PROVIDER_RECONNECT_REQUIRED","TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED","TASK_PROVIDER_PERMISSION_REQUIRED","TASK_PROVIDER_ACCOUNT_CHANGED","TASK_PROVIDER_CONFIGURATION_CHANGED").contains(error);
         int next=value.path("roundIndex").asInt()+1;boolean more=!blocked&&next<value.path("selected").size();
         value.put("roundIndex",more?next:0).put("roundActive",more).put("blocked",blocked).putNull("lease").putNull("leaseUntil");
-        if(!more)value.put("requested",false);
+        boolean queued=TaskProviderWrites.queued(store,claim.id());if(!more)value.put("requested",!blocked&&queued);
         if(outcome!=null&&outcome.path("awaitingImport").asBoolean())value.put("roundPreview",true);
         if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean())value.put("lastSuccess",store.now().toString());
         String first=errors.isEmpty()?null:errors.elements().next().asText();if(first==null)value.putNull("lastError");else value.put("lastError",first);
+        if(retryAfter>0)value.put("retryUntil",store.now().plusSeconds(retryAfter).toString());else if(errors.isEmpty())value.remove("retryUntil");
         if(blocked)value.putNull("nextRefresh");
-        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,Math.min(900,retryAfter)),more?0:errors.isEmpty()?900:60)).toString());
+        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,retryAfter),more?0:!errors.isEmpty()?60:queued?0:900)).toString());
         save(AUTH,value);return more;
     }
     private boolean enabled(){

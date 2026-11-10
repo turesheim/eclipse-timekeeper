@@ -41,6 +41,11 @@ class TaskProviderResourceHttpTest {
         var value=json(call("POST","/complete",object().put("state",begin(provider)).put("code","fixture-code-"+UUID.randomUUID()),null),200);
         inputs.validate("TaskProviderConnection",value);created.add(value.path("id").asText());return value;
     }
+    private ObjectNode connectWritable(){
+        var attempt=json(call("POST","/google/authorize",object().put("direction","TWO_WAY"),null),200);
+        String state=Arrays.stream(URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(item->item.startsWith("state=")).map(item->URLDecoder.decode(item.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
+        var value=json(call("POST","/complete",object().put("state",state).put("code","write-fixture-"+UUID.randomUUID()),null),200);created.add(value.path("id").asText());assertEquals("TWO_WAY",value.path("direction").asText());return value;
+    }
     private ObjectNode current(String id){return json(call("GET","/"+id,null,null),200);}
     private ObjectNode selectAndImport(ObjectNode value,String...lists)throws InterruptedException{
         var input=object();var selected=input.putArray("selectedLists");Arrays.stream(lists).forEach(selected::add);String id=value.path("id").asText();
@@ -141,5 +146,22 @@ class TaskProviderResourceHttpTest {
         store.transaction(owner,()->{var c=new TaskProviderConnections(store);c.claim(UUID.fromString(id),true);var value=c.required(UUID.fromString(id));value.put("leaseUntil",store.now().minusSeconds(1).toString()).put("nextRefresh",store.now().toString());c.save(TaskProviderConnections.AUTH,value);return null;});
         TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).listName="Recovered catalog";
         refresh.sweep();var result=idle(id);assertEquals("Recovered catalog",result.path("availableLists").get(0).path("name").asText());assertTrue(result.path("lastError").isNull());
+    }
+    @Test void reviewedGoogleWritesUseRealHttpOwnershipScopesAndConditionalApprovals()throws Exception{
+        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+        var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
+        var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
+        store.transaction(owner,()->{var current=(net.resheim.eclipse.timekeeper.domain.Task)decode("TASK",store.find("TASK",uuid(task.get("id"))).orElseThrow());store.service().updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(current.id(),current.version(),current.projectId(),current.parentTaskId(),"Reviewed title",current.url()));return null;});
+        var input=object().put("taskId",task.path("id").asText()).put("listId",list.path("id").asText()).put("action","UPDATE");
+        assertEquals(403,call("read",BROWSER,"POST","/"+id+"/writes",input,null).statusCode());assertEquals(404,call("b",BROWSER,"POST","/"+id+"/writes",input,null).statusCode());
+        var response=call("POST","/"+id+"/writes",input,null);var preview=json(response,201);inputs.validate("TaskProviderWrite",preview);String path="/"+id+"/writes/"+preview.path("id").asText();
+        var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());assertEquals(0,provider.writes.get());assertEquals("Reviewed title",preview.path("writeFields").path("summary").asText());
+        assertEquals(428,call("POST",path+"/confirm",null,null).statusCode());assertEquals(412,call("POST",path+"/confirm",null,"\"stale\"").statusCode());assertEquals(403,call("read",BROWSER,"POST",path+"/confirm",null,response.header("ETag")).statusCode());
+        json(call("POST",path+"/confirm",null,response.header("ETag")),202);idle(id);var completed=json(call("GET",path,null,null),200);inputs.validate("TaskProviderWrite",completed);assertEquals("DONE",completed.path("state").asText());assertEquals(1,provider.writes.get());
+        store.transaction(owner,()->{var updated=store.find("TASK",uuid(task.get("id"))).orElseThrow();assertEquals("Reviewed title",updated.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());return null;});
+        var deletion=call("POST","/"+id+"/writes",input.put("action","DELETE"),null);var deletePreview=json(deletion,201);String deletePath="/"+id+"/writes/"+deletePreview.path("id").asText();assertEquals(1,provider.writes.get());
+        json(call("POST",deletePath+"/confirm",null,deletion.header("ETag")),202);idle(id);assertEquals("DONE",json(call("GET",deletePath,null,null),200).path("state").asText());assertEquals(2,provider.writes.get());
+        assertTrue(store.transaction(owner,()->store.find("TASK",uuid(task.get("id"))).isPresent()));assertEquals(412,call("POST",deletePath+"/confirm",null,deletion.header("ETag")).statusCode());assertEquals(2,provider.writes.get());
+        var archive=given().header("Authorization","Bearer test-a").get("/api/v1/data/export");assertEquals(200,archive.statusCode());assertFalse(archive.asString().contains("TASK_WRITE"));
     }
 }

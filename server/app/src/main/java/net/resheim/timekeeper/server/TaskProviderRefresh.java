@@ -81,6 +81,7 @@ class TaskProviderRefresh {
                 }
                 if(scan==null)return;
                 outcome=store.transaction(claim.owner(),()->scans.reconcile(claim));
+                if(claim.provider()==TaskCloudProvider.Provider.GOOGLE)new TaskProviderWrites(store,receipts,inputs).drain(claim,tokens.access(),clients.googleWriter());
             }
         }catch(TaskProviderHttp.Failure failure){error=failure.getMessage();retry=failure.retryAfterSeconds;}
         catch(ApiFailure failure){error=failure.code;}

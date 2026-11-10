@@ -7,4 +7,5 @@ import jakarta.enterprise.context.ApplicationScoped;
 class TaskProviderClients {
     TaskCloudProvider cloud(TaskCloudProvider.Provider provider){return new TaskCloudProvider(provider);}
     TaskProviderOAuth oauth(TaskCloudProvider.Provider provider){return new TaskProviderOAuth(provider);}
+    GoogleTasksWriter googleWriter(){return new GoogleTasksWriter();}
 }

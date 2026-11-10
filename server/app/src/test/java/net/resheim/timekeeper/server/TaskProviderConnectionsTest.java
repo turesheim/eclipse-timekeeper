@@ -197,4 +197,13 @@ class TaskProviderConnectionsTest {
         var paused=tx(owner,()->connections().pause(id,true,etag(selected)));var resumed=tx(owner,()->connections().pause(id,false,etag(paused)));
         assertFalse(resumed.path("syncing").asBoolean());assertTrue(resumed.path("nextRefresh").isNull());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",resumed.path("lastError").asText());
     }
+    @Test void providerRetryAfterAlsoFencesManualRefreshAndNewlyQueuedSelections(){
+        String owner=owner();var connection=connect(owner,grant(owner));UUID id=uuid(connection.get("id"));
+        tx(owner,()->connections().select(id,List.of("remote-list"),etag(connection)));var claim=tx(owner,()->connections().claim(id,false));
+        tx(owner,()->connections().finish(claim,null,"TASK_PROVIDER_RATE_LIMITED",3600));
+        var before=tx(owner,()->connections().visible(connections().required(id)));String retry=before.path("nextRefresh").asText();
+        var changed=tx(owner,()->connections().select(id,List.of("remote-list"),etag(before)));assertEquals(retry,changed.path("nextRefresh").asText());
+        assertNull(tx(owner,()->connections().claim(id,false)));assertEquals(429,assertThrows(ApiFailure.class,()->tx(owner,()->connections().claim(id,true))).status);
+        tx(owner,()->{var value=connections().required(id);value.put("retryUntil",store.now().minusSeconds(1).toString());connections().save(TaskProviderConnections.AUTH,value);return null;});assertNotNull(tx(owner,()->connections().claim(id,false)));
+    }
 }

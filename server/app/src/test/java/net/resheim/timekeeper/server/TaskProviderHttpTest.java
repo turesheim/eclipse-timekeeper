@@ -47,7 +47,13 @@ class TaskProviderHttpTest {
     @Test void throttledCallsAreNotRetriedAndRetainBoundedBackoff(){
         var calls=new AtomicInteger();var transport=http(request->{calls.incrementAndGet();return new TaskProviderHttp.Reply(429,Map.of("retry-after","3600"),new byte[0]);});
         var failure=assertThrows(TaskProviderHttp.Failure.class,()->transport.json("GET",ADDRESS,"private-token",null,null));
-        assertEquals(1,calls.get());assertEquals("TASK_PROVIDER_RATE_LIMITED",failure.getMessage());assertEquals(900,failure.retryAfterSeconds);
+        assertEquals(1,calls.get());assertEquals("TASK_PROVIDER_RATE_LIMITED",failure.getMessage());assertEquals(3600,failure.retryAfterSeconds);
+    }
+    @Test void retryAfterDatesAndLongDelaysAreNotShortenedToTheOrdinaryPollingInterval(){
+        var now=java.time.Instant.parse("2026-11-10T00:00:00.500Z");
+        assertEquals(3600,TaskProviderHttp.retryAfter("Tue, 10 Nov 2026 01:00:00 GMT",now));
+        assertEquals(86400,TaskProviderHttp.retryAfter("86400",now));assertEquals(0,TaskProviderHttp.retryAfter("Tue, 10 Nov 2026 00:00:00 GMT",now));
+        assertEquals(0,TaskProviderHttp.retryAfter("invalid",now));assertEquals(0,TaskProviderHttp.retryAfter("-1",now));assertEquals(Integer.MAX_VALUE,TaskProviderHttp.retryAfter("99999999999999999999",now));
     }
     @Test void conditionalWritesUseProviderEtagAndNeverRetryAnUncertainOutcome(){
         var calls=new AtomicInteger();var transport=http(request->{

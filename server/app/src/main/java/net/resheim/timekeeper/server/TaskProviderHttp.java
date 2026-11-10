@@ -8,6 +8,9 @@ import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Set;
 import java.util.List;
@@ -105,7 +108,7 @@ final class TaskProviderHttp {
         try{
             var reply=transport.send(request);int status=reply.status();
             if(status<200||status>=300){
-                int after=0;try{after=Math.max(0,Math.min(900,Integer.parseInt(reply.headers().getOrDefault("retry-after","0"))));}catch(NumberFormatException ignored){}
+                int after=retryAfter(reply.headers().getOrDefault("retry-after","0"),Instant.now());
                 String code=switch(status){case 401,403->"TASK_PROVIDER_RECONNECT_REQUIRED";case 404->"TASK_PROVIDER_NOT_FOUND";case 409,412->"TASK_PROVIDER_CHANGED";case 429->"TASK_PROVIDER_RATE_LIMITED";default->"TASK_PROVIDER_UNAVAILABLE";};
                 throw new Failure(code,status,after,write&&status>=500);
             }
@@ -120,5 +123,13 @@ final class TaskProviderHttp {
             throw failure;
         }catch(InterruptedException failure){Thread.currentThread().interrupt();throw new Failure("TASK_PROVIDER_CANCELLED",0,0,write);}
         catch(IOException|IllegalArgumentException failure){throw new Failure("TASK_PROVIDER_UNAVAILABLE",0,0,write);}
+    }
+    static int retryAfter(String value,Instant now){
+        try{
+            if(value==null||value.isBlank())return 0;value=value.trim();
+            if(value.matches("[0-9]+"))return value.length()>10?Integer.MAX_VALUE:(int)Math.min(Integer.MAX_VALUE,Long.parseLong(value));
+            var delay=Duration.between(now,ZonedDateTime.parse(value,DateTimeFormatter.RFC_1123_DATE_TIME).toInstant());
+            if(delay.isNegative())return 0;return (int)Math.min(Integer.MAX_VALUE,delay.getSeconds()+(delay.getNano()>0?1:0));
+        }catch(RuntimeException invalid){return 0;}
     }
 }

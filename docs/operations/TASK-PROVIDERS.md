@@ -13,12 +13,41 @@ and new children inherit their parent's project even if the list mapping has
 changed. Status polling and pause/resume retain unsaved list/project choices;
 a competing configuration change requires reviewing the draft before saving.
 
-The current cloud connectors import tasks and subsequent provider changes.
-Local edits stay in Dagsverk; completing a task here does not complete it at the
-provider. Concurrent changes are retained for reconciliation. Disconnecting or
+Connections default to import-only: local edits stay in Dagsverk. Google also
+offers **Two-way · review outgoing changes**. Select that access before Connect
+or Reconnect and grant the Google Tasks write scope. Existing broad grants never
+silently enable two-way mode. Microsoft remains import-only.
+
+For an imported Google task, **Prepare a Google change** previews edits or a
+deletion without sending it. Review the proposed values and restrictions, then
+explicitly send the reviewed change. Supported edits are title, plain text notes,
+completion/reopening and the scheduled civil day. Other values remain local;
+Google's title and note limits are checked before writing. Assigned tasks cannot
+be deleted here, and their notes must be edited at the original source. A Google
+deletion keeps the ordinary Dagsverk task for separate review.
+
+Concurrent changes are retained for reconciliation. Disconnecting or
 deselecting a list keeps imported tasks. Missing tasks are not automatically
 deleted; provider-reported deletions require review. Connection status reports
 errors and the number of tasks needing review.
+
+Google changes use conditional PATCH/DELETE with the observed provider ETag.
+The server records a durable intent before the request and its acknowledgement
+before changing a common baseline. A lost response or interrupted in-flight
+request is **Outcome unknown** and is never resent automatically. **Check Google
+result** reads current values, including with a subsequently read-only grant.
+An absent item or HTTP 404 alone does not prove a deletion; a fresh explicit
+deletion record is required.
+
+When a result needs reconciliation, compare current Dagsverk and observed Google
+values. Choosing either side for conflicts retains unrelated local edits and
+accepts independent Google changes. Both the displayed proposal and the current
+task have their own preconditions; stale decisions require a fresh review.
+Reconciliation of an uncertain operation accepts observed values without
+claiming the original request succeeded. The account page shows active operations
+and the latest 20 completed results; credentials and private observations remain
+outside portable account data. User-requested refreshes and queued writes honor
+the provider's stored Retry-After delay.
 
 Selected lists refresh in the background, normally every 15 minutes. **Refresh
 from provider** requests an earlier scan and discovers newly created lists.
@@ -67,8 +96,9 @@ and reconnecting.
 For Google, enable the Google Tasks API in a Google Cloud project, configure
 the OAuth consent audience, and create a **Web application** OAuth client.
 Register the redirect above and retain its client ID and secret. Dagsverk
-requests `openid` and `https://www.googleapis.com/auth/tasks.readonly`, with
-offline access for background refresh. In Testing, add intended accounts as
+requests `openid` and `https://www.googleapis.com/auth/tasks.readonly` for
+import-only access, or `https://www.googleapis.com/auth/tasks` after an explicit
+two-way choice, with offline access for background refresh. In Testing, add intended accounts as
 test users; Google's testing and verification policies apply. See Google's
 [web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server)
 and [Tasks scopes](https://developers.google.com/workspace/tasks/auth).

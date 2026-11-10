@@ -41,7 +41,7 @@ final class GoogleTasksWriter {
         return ROOT+TaskCloudProvider.segment(list)+"/tasks"+(task==null?"":"/"+TaskCloudProvider.segment(task));
     }
     private static void identifier(String value){if(value==null||value.isBlank()||value.length()>1024||Set.of(".","..").contains(value)||value.codePoints().anyMatch(Character::isISOControl))throw new TaskProviderHttp.Failure("TASK_PROVIDER_INVALID_REQUEST",0,0,false);}
-    private static String revision(String value){
+    static String revision(String value){
         if(value==null||value.isBlank()||value.length()>4096||value.chars().anyMatch(ch->ch<32||ch>126))throw new TaskProviderHttp.Failure("TASK_PROVIDER_REVISION_REQUIRED",0,0,false);
         boolean quoted=value.length()>=2&&value.startsWith("\"")&&value.endsWith("\"")&&value.substring(1,value.length()-1).indexOf('"')<0;
         if(!quoted&&!value.matches("[A-Za-z0-9._:/+=-]+"))throw new TaskProviderHttp.Failure("TASK_PROVIDER_REVISION_REQUIRED",0,0,false);return value;

@@ -22,6 +22,19 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_reviewed_google_writes_bind_an_owned_task_and_exact_proposal(self):
+        command={'taskId':ID,'listId':ID,'action':'UPDATE'}
+        validator('TaskProviderWriteInput').validate(command)
+        for value in [{**command,'action':'CREATE'},{**command,'accessToken':'private'},{**command,'ownerId':'foreign'},{'taskId':ID,'action':'DELETE'}]:
+            self.assertFalse(validator('TaskProviderWriteInput').is_valid(value))
+        base='/task-providers/{connection}/writes'
+        self.assertEqual('write',CONTRACT['paths'][base]['post']['x-required-permission'])
+        self.assertEqual('read',CONTRACT['paths'][base]['get']['x-required-permission'])
+        for path,method in [(base+'/{id}/confirm','post'),(base+'/{id}','delete')]:
+            self.assertIn({'$ref':'#/components/parameters/IfMatch'},CONTRACT['paths'][path][method]['parameters'])
+        self.assertIn('202',CONTRACT['paths'][base+'/{id}/confirm']['post']['responses'])
+        self.assertFalse(validator('TaskProviderWriteInput').is_valid({**command,'writeFields':{'summary':'unreviewed'}}))
+
     def test_document_title_rename_is_private_conditional_and_strict(self):
         operation=CONTRACT['paths']['/notes/entries/{id}/title']['put']
         self.assertEqual('write',operation['x-required-permission'])
@@ -754,7 +767,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider',
+            'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'updateTaskListProviderData', 'deleteTaskList', 'getTaskList', 'listTaskLists',

@@ -20065,6 +20065,629 @@
           }
         }
       }
+    },
+    "/task-providers/{connection}/writes": {
+      "get": {
+        "operationId": "listTaskProviderWrites",
+        "summary": "List reviewed Google write operations",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrites"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "prepareTaskProviderWrite",
+        "summary": "Preview a Google task edit or deletion without making a provider write",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrite"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskProviderWriteInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-providers/{connection}/writes/{id}": {
+      "get": {
+        "operationId": "getTaskProviderWrite",
+        "summary": "Get the current outcome of a reviewed Google write",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrite"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelTaskProviderWrite",
+        "summary": "Cancel a Google write before its mutation starts",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        }
+      }
+    },
+    "/task-providers/{connection}/writes/{id}/confirm": {
+      "post": {
+        "operationId": "confirmTaskProviderWrite",
+        "summary": "Queue the exact reviewed proposal using current task and provider revisions",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "202": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrite"
+                }
+              }
+            }
+          }
+        },
+        "description": "One selected list is fetched per cross-replica lease, with at most four workers per server. Source identity and the connection generation are checked before applying observations. Manual attempts within 30 seconds return 429; an already-running refresh returns 202. Missing or failed source reads do not delete tasks."
+      }
+    },
+    "/task-providers/{connection}/writes/{id}/check": {
+      "post": {
+        "operationId": "checkTaskProviderWrite",
+        "summary": "Read current Google values for an uncertain write without resending it",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "202": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrite"
+                }
+              }
+            }
+          }
+        },
+        "description": "One selected list is fetched per cross-replica lease, with at most four workers per server. Source identity and the connection generation are checked before applying observations. Manual attempts within 30 seconds return 429; an already-running refresh returns 202. Missing or failed source reads do not delete tasks."
+      }
+    },
+    "/task-providers/{connection}/writes/{id}/resolve": {
+      "post": {
+        "operationId": "resolveTaskProviderWrite",
+        "summary": "Accept the displayed local or provider values with a separate task precondition",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "connection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderWrite"
+                }
+              }
+            }
+          }
+        },
+        "description": "One selected list is fetched per cross-replica lease, with at most four workers per server. Source identity and the connection generation are checked before applying observations. Manual attempts within 30 seconds return 429; an already-running refresh returns 202. Missing or failed source reads do not delete tasks.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskProviderWriteResolutionInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -35976,6 +36599,10 @@
             "type": "integer",
             "minimum": 0,
             "description": "Changes only when consent or list/project selection changes. Polling, credential refresh and pause state do not replace a settings draft."
+          },
+          "pendingWrites": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -36165,6 +36792,324 @@
         },
         "required": [
           "paused"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderWriteInput": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "UPDATE",
+              "DELETE"
+            ]
+          }
+        },
+        "required": [
+          "listId",
+          "taskId",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderWrite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "UPDATE",
+              "DELETE"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PREVIEW",
+              "QUEUED",
+              "CHECKING",
+              "SENDING",
+              "ACK",
+              "ACK_REVIEW",
+              "UNKNOWN",
+              "CONFLICT",
+              "DONE",
+              "CANCELLED",
+              "FAILED",
+              "STALE",
+              "RECONCILED"
+            ]
+          },
+          "taskEtag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "providerEtag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "maxLength": 100
+          },
+          "writeFields": {
+            "$ref": "#/components/schemas/TaskSyncFields"
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "reason": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]*$",
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "field",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "canConfirm": {
+            "type": "boolean"
+          },
+          "localFields": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSyncFields"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remoteFields": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSyncFields"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currentTaskEtag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4096
+          },
+          "remoteObservedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resolution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "LOCAL",
+              "REMOTE",
+              null
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "conflictFields": {
+            "type": "array",
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "summary",
+                "body",
+                "status",
+                "completedAt",
+                "scheduledDate"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "connectionId",
+          "listId",
+          "taskId",
+          "version",
+          "title",
+          "externalId",
+          "action",
+          "state",
+          "taskEtag",
+          "providerEtag",
+          "createdAt",
+          "expiresAt",
+          "lastError",
+          "writeFields",
+          "warnings",
+          "canConfirm",
+          "localFields",
+          "remoteFields",
+          "currentTaskEtag",
+          "remoteObservedAt",
+          "resolution",
+          "canResolve",
+          "conflictFields"
+        ]
+      },
+      "TaskProviderWrites": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskProviderWriteSummary"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderWriteResolutionInput": {
+        "type": "object",
+        "properties": {
+          "taskEtag": {
+            "type": "string",
+            "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "LOCAL",
+              "REMOTE"
+            ]
+          }
+        },
+        "required": [
+          "taskEtag",
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "TaskProviderWriteSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "UPDATE",
+              "DELETE"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PREVIEW",
+              "QUEUED",
+              "CHECKING",
+              "SENDING",
+              "ACK",
+              "ACK_REVIEW",
+              "UNKNOWN",
+              "CONFLICT",
+              "DONE",
+              "CANCELLED",
+              "FAILED",
+              "STALE",
+              "RECONCILED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "action",
+          "state",
+          "createdAt",
+          "lastError"
         ],
         "additionalProperties": false
       }

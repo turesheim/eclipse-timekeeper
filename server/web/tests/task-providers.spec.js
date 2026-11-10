@@ -22,9 +22,10 @@ function connection(owner,overrides={}){
   return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[]}={}){
-  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3};
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[]}={}){
+  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,providerWrites:0};
   if(projects.length)await page.route('**/api/v1/projects?*',route=>route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({items:projects,revision:1,nextCursor:null})}));
+  for(const [path,items]of [['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',route=>route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({items,revision:1,nextCursor:null})}));
   await page.route('**/api/v1/task-providers**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname.slice('/api/v1/task-providers'.length),method=request.method(),input=JSON.parse(request.postData()||'{}');
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')};
@@ -35,6 +36,19 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     if(path==='/complete'){model.completed++;expect(input).toEqual({state,code});expect(new URL(page.url()).search).toBe('');expect(request.headers().referer).not.toContain(code);expect(request.headers().referer).not.toContain(state);return reply(model.rows[0]);}
     if(path==='/cancel'){model.cancelled++;expect(input).toEqual({state});return reply(null,204);}
     const row=model.rows.find(value=>path.startsWith('/'+value.id));if(!row)return reply({type:'about:blank',title:'Not found',status:404,code:'NOT_FOUND'},404);
+    if(path.includes('/writes')){
+      if(path.endsWith('/writes')){
+        if(method==='GET')return reply({items:model.jobs.map(({id,title,action,state,createdAt,lastError})=>({id,title,action,state,createdAt,lastError}))});
+        if(method==='POST'){const value=writeJob({connectionId:row.id,taskId:input.taskId,listId:input.listId,action:input.action,title:tasks.find(task=>task.id===input.taskId)?.summary||'Imported Google task'});model.jobs.push(value);row.pendingWrites=model.jobs.length;return reply(value,201);}
+      }
+      const job=model.jobs.find(job=>path.includes('/writes/'+job.id));if(!job)return reply({type:'about:blank',title:'Not found',status:404,code:'NOT_FOUND'},404);
+      if(method==='GET')return reply(job);
+      if(request.headers()['if-match']!==`"provider-${job.version}"`)return reply({type:'about:blank',title:'Stale version',status:412,code:'STALE_VERSION'},412);
+      if(path.endsWith('/confirm')){model.providerWrites++;job.version++;job.state='DONE';job.canConfirm=false;return reply(job,202);}
+      if(path.endsWith('/check')){job.version++;job.remoteFields={summary:'Changed at Google'};job.conflictFields=['summary'];job.canResolve=true;return reply(job,202);}
+      if(path.endsWith('/resolve')){expect(input.taskEtag).toBe(job.currentTaskEtag);job.version++;job.state='RECONCILED';job.canResolve=false;return reply(job);}
+      if(method==='DELETE'){job.version++;job.state='CANCELLED';return reply(null,204);}
+    }
     if(path.includes('/imports/')){
       if(method==='GET')return reply({id:path.split('/').at(-1),version:model.previewVersion,remoteListId:'work',projectId:row.projectMappings.work||null,observedAt:'2026-11-09T12:00:00Z',count:3,createCount:2,existingCount:1,deletedCount:0,revision:'a'.repeat(64),samples:[{title:'Source <img src=x onerror=alert(1)>',deleted:false},{title:'Undated task',deleted:false}]});
       if(method==='POST'){
@@ -49,6 +63,9 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     if(method==='POST'&&path.endsWith('/refresh')){row.version++;row.lastSuccess='2026-11-09T12:01:00Z';return reply(row,202);}
     throw new Error('Unexpected task provider fixture request');
   });return model;
+}
+function writeJob(overrides={}){
+  return {id:randomUUID(),version:1,connectionId:randomUUID(),listId:randomUUID(),taskId:randomUUID(),title:'Imported Google task',action:'UPDATE',state:'PREVIEW',createdAt:'2026-11-10T00:00:00Z',expiresAt:'2026-11-10T00:15:00Z',lastError:null,writeFields:{summary:'Changed locally'},warnings:[{field:'body',reason:'TEXT_ONLY'}],canConfirm:true,currentTaskEtag:'"task-current"',localFields:{summary:'Changed locally',body:{format:'HTML',content:'<strong>Local notes</strong>'}},remoteFields:null,remoteObservedAt:null,resolution:null,canResolve:false,conflictFields:[],...overrides};
 }
 async function open(page){await page.goto('/web/#account/task-providers');await expect(page.locator('#account-content [data-task-provider-connect="google"]')).toBeVisible();}
 const card=(page,id)=>page.locator(`[data-task-provider-id="${id}"]`);
@@ -125,6 +142,52 @@ test('read-only sessions can inspect but cannot approve imports',async({page,req
 test('task connections and failure states are localized in Norwegian',async({page,request})=>{
   const owner=await signIn(page,request,{language:'nb-NO'}),row=connection(owner,{lastError:'TASK_PROVIDER_CONFLICTS',pendingCount:2});await providerFixture(page,owner,{rows:[row]});await open(page);
   await expect(page.getByRole('heading',{name:'Oppgavekoblinger',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Koble til Google Tasks',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes. Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
+});
+
+test('Google access defaults to import-only and write consent is an explicit choice',async({page,request})=>{
+  const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
+  const access=page.getByRole('combobox',{name:'Google access',exact:true});await expect(access).toHaveValue('IMPORT');
+  await access.selectOption('TWO_WAY');await page.getByRole('button',{name:'Connect Google Tasks',exact:true}).click();
+  await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY'});
+});
+
+test('preparing a change selects a real owned task and retains the selection during status polling',async({page,request})=>{
+  const owner=await signIn(page,request),api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json();
+  const headers={'X-CSRF-Token':identity.csrf,'Idempotency-Key':randomUUID()};
+  const source=await api.post('/api/v1/task-connections',{headers,data:{providerId:'google',remoteAccountId:'fixture-account',name:'Browser Google',readable:true,writable:true,enabled:true}});expect(source.status()).toBe(201);const sourceValue=await source.json();
+  const listReply=await api.post('/api/v1/task-lists',{headers:{...headers,'Idempotency-Key':randomUUID()},data:{connectionId:sourceValue.id,remoteListId:'work',name:'Work',kind:'STANDARD',readable:true,writable:true,shared:false,owner:true,present:true,position:0}});expect(listReply.status()).toBe(201);const list=await listReply.json();
+  const created=await api.post('/api/v1/tasks',{headers:{...headers,'Idempotency-Key':randomUUID()},data:{summary:'Changed locally',projectId:null,parentTaskId:null,url:null}});expect(created.status()).toBe(201);const task=await created.json();
+  const linked=await api.put('/api/v1/tasks/'+task.id+'/external-references',{headers:{...headers,'If-Match':created.headers().etag},data:{providerId:'google',repositoryId:'fixture-account/work',externalId:'task-id',externalUrl:null,taskListId:list.id}});expect(linked.status()).toBe(200);
+  const row=connection(owner,{id:sourceValue.id,direction:'TWO_WAY'}),model=await providerFixture(page,owner,{rows:[row],tasks:[await linked.json()],lists:[list]});await open(page);const panel=card(page,row.id);
+  await panel.getByText('Prepare a Google change',{exact:true}).click();const taskChoice=panel.getByRole('combobox',{name:'Imported Google task',exact:true});await taskChoice.selectOption({label:'Work / Changed locally'});const captured=await taskChoice.inputValue();
+  await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(taskChoice).toHaveValue(captured);await panel.getByRole('button',{name:'Review change',exact:true}).click();
+  await expect(panel.getByRole('heading',{name:'Review Google change · Changed locally',exact:true})).toBeVisible();expect(model.writes.find(write=>write.path.endsWith('/writes')).input).toEqual({taskId:task.id,listId:list.id,action:'UPDATE'});expect(model.providerWrites).toBe(0);
+});
+
+test('reviewed Google changes retain their comparison during polling and reject stale approval',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('heading',{name:'Review Google change · Imported Google task',exact:true})).toBeFocused();
+  await expect(panel.getByText('Changed locally',{exact:true})).toBeVisible();await expect(panel.getByText('Notes: Only plain text notes can be sent. These notes stay in Dagsverk.',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
+  job.version++;job.writeFields={summary:'A newer proposal'};await page.getByRole('button',{name:'Refresh status',exact:true}).click();
+  await expect(panel.getByText('Changed locally',{exact:true})).toBeVisible();await expect(panel.getByText('A newer proposal',{exact:true})).toHaveCount(0);
+  await panel.getByRole('button',{name:'Send to Google',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText('A newer proposal',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'Send to Google',exact:true}).click();
+  await expect(panel.getByText('Imported Google task · Confirmed',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(1);
+});
+
+test('read-only Google grants can check and reconcile an uncertain result without resending it',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,state:'UNKNOWN',canConfirm:false}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
+  await expect(panel.getByText('Prepare a Google change',{exact:true})).toBeHidden();await panel.getByRole('button',{name:'Review result',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Send to Google',exact:true})).toHaveCount(0);await panel.getByRole('button',{name:'Check Google result',exact:true}).click();
+  await expect.poll(()=>model.writes.filter(write=>write.path.endsWith('/check')).length).toBe(1);expect(model.providerWrites).toBe(0);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText('Changed at Google',{exact:true})).toBeVisible();await expect(panel.getByText('<strong>Local notes</strong>',{exact:true})).toBeVisible();await expect(panel.locator('strong')).toHaveCount(0);
+  await panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true}).click();await expect(panel.getByText('Imported Google task · Observed values reconciled',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
+  const writes=model.writes.filter(write=>write.path.includes('/writes/'));expect(writes.map(write=>write.path.split('/').at(-1))).toEqual(['check','resolve']);
+});
+
+test('read-only Dagsverk sessions can review Google results without confirming or reconciling them',async({page,request})=>{
+  const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('button',{name:'Send to Google',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);expect(model.providerWrites).toBe(0);
 });
 
 test('authorization responses cannot navigate to an unrelated host',async({page,request})=>{
