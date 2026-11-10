@@ -502,7 +502,15 @@ public abstract class NativeProjectTaskScenario {
 		service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
 				start.plusSeconds(3600), Optional.of(start.plusSeconds(7200)), "Other activity", java.util.Set.of()));
 		Tree tree = bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree").widget;
+		var reference = bot.viewByTitle("Workweek").getViewReference();
+		int[] previousState = { org.eclipse.ui.IWorkbenchPage.STATE_RESTORED };
 		try {
+			onUi(() -> {
+				previousState[0] = reference.getPage().getPartState(reference);
+				// The initial perspective can leave only one activity row visible.
+				// Give both test rows room before sending pointer gestures.
+				reference.getPage().setPartState(reference, org.eclipse.ui.IWorkbenchPage.STATE_MAXIMIZED);
+			});
 			var parent = parentRow(bot, project.name(), task.summary()).expand();
 			var row = parent.getNode(activity.summary());
 			onUi(tree::deselectAll);
@@ -580,7 +588,10 @@ public abstract class NativeProjectTaskScenario {
 				assertNull("Enter with multiple rows selected must not edit", cellEditor(tree));
 			});
 		} finally {
-			onUi(() -> { Text editor = cellEditor(tree); if (editor != null) key(editor, SWT.ESC); });
+			onUi(() -> {
+				Text editor = cellEditor(tree); if (editor != null) key(editor, SWT.ESC);
+				reference.getPage().setPartState(reference, previousState[0]);
+			});
 			cleanup(service, project, java.util.List.of(task.id()));
 			bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
 		}
@@ -602,25 +613,30 @@ public abstract class NativeProjectTaskScenario {
 		});
 		// GTK applies scrolling while dispatching native events, after showItem returns.
 		new SWTWorkbenchBot().waitUntil(new DefaultCondition() {
+			private String geometry = "";
+
 			@Override
 			public boolean test() throws Exception {
 				boolean[] visible = { false };
 				onUi(() -> {
 					var bounds = item.getBounds(column).intersection(item.getParent().getClientArea());
 					visible[0] = bounds.width > 0 && bounds.height > 0;
+					geometry = "cell=" + item.getBounds(column) + ", client=" + item.getParent().getClientArea();
 				});
 				return visible[0];
 			}
 
 			@Override
 			public String getFailureMessage() {
-				return "The activity cell did not scroll into view";
+				return "The activity cell did not scroll into view: " + geometry;
 			}
 		});
 		onUi(() -> {
 			Tree tree = item.getParent();
 			var bounds = item.getBounds(column).intersection(tree.getClientArea());
 			assertTrue("The clicked cell must be visible", bounds.width > 0 && bounds.height > 0);
+			assertSame("The pointer must hit the intended activity", item,
+					tree.getItem(new org.eclipse.swt.graphics.Point(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)));
 			for (int count = 1; count <= (doubleClick ? 2 : 1); count++) {
 				Event mouse = new Event();
 				mouse.x = bounds.x + bounds.width / 2;
