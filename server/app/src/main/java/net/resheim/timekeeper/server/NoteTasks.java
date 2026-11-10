@@ -13,7 +13,8 @@ final class NoteTasks {
     static final String DOCUMENT="NOTE_TASK_DOC",LINK="NOTE_TASK_LINK";
     private final ServerStore store;
     NoteTasks(ServerStore store){this.store=store;}
-    private static UUID id(VaultSources.Ref ref){return UUID.nameUUIDFromBytes(("timekeeper-note-tasks:"+ref.type()+":"+ref.id()).getBytes(StandardCharsets.UTF_8));}
+    private static UUID id(String type,UUID source){return UUID.nameUUIDFromBytes(("timekeeper-note-tasks:"+type+":"+source).getBytes(StandardCharsets.UTF_8));}
+    private static UUID id(VaultSources.Ref ref){return id(ref.type(),ref.id());}
     private static VaultSources.Ref reference(JsonNode value){return NoteReferences.key(value.path("sourceType").asText(),value.path("sourceKey").asText());}
     private static NoteTaskMarkup.Item item(JsonNode value){return new NoteTaskMarkup.Item(value.path("marker").asInt(),value.path("summary").asText(),value.path("checked").asBoolean(),value.path("depth").asInt());}
     private static boolean completed(Task task){return task.planning().status()==TaskStatus.COMPLETED;}
@@ -79,19 +80,23 @@ final class NoteTasks {
         // A task may have changed while its source was in Trash. Restore its
         // current completion without reformatting the restored document.
         if(!normalized.equals(source))write(ref,normalized);
-        result.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag());save(DOCUMENT,id(ref),result);
+        result.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag()).put("sourceVersion",store.resourceVersion(ref.type(),ref.id()));save(DOCUMENT,id(ref),result);
     }
     /** Bounded maintenance enrolls older files without needing a browser read or edit. */
     void existing(String type,UUID sourceId){
-        var stored=store.find(type,sourceId).orElse(null);if(stored==null)return;
+        long version=store.resourceVersion(type,sourceId);if(version==0)return;
+        var checkpoint=store.find(DOCUMENT,id(type,sourceId)).orElse(null);
+        if(checkpoint!=null&&checkpoint.path("sourceVersion").asLong(-1)==version)return;
         VaultSources.Ref ref;
         if(type.equals(VaultContent.TYPE)){
             var entry=new VaultIndex(store).referenced(type,sourceId);
             if(entry==null||entry.path("deleted").asBoolean()||!entry.path("kind").asText().equals("MARKDOWN")||!new VaultSettings(store).allowed(VaultCollection.path(entry)))return;
             ref=VaultSources.fromEntry(entry);
-        }else ref=VaultSources.fromStored(type,stored);
+        }else {var stored=store.find(type,sourceId).orElse(null);if(stored==null)return;ref=VaultSources.fromStored(type,stored);}
         var source=new VaultSources(store,store.vaultLimits(),ref);var state=source.snapshot();
-        if(!state.deleted()&&!record(ref).path("contentTag").asText().equals(state.tag()))source(ref,source.read());
+        if(state.deleted())return;
+        if(checkpoint!=null&&checkpoint.path("contentTag").asText().equals(state.tag()))save(DOCUMENT,id(ref),((ObjectNode)checkpoint).deepCopy().put("sourceVersion",version));
+        else source(ref,source.read());
     }
     ObjectNode origin(UUID task){
         var link=store.find(LINK,task).orElseThrow(ApiFailure::notFound);var document=store.find(DOCUMENT,uuid(link.path("documentId"))).orElseThrow(ApiFailure::notFound);var ref=reference(document);
@@ -119,7 +124,7 @@ final class NoteTasks {
     }
     void install(VaultSources.Ref ref,JsonNode items){
         var previous=record(ref);if(!previous.path("items").isEmpty())throw ApiFailure.conflict();
-        var value=previous.deepCopy();value.set("items",items.deepCopy());value.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag());save(DOCUMENT,id(ref),value);
+        var value=previous.deepCopy();value.set("items",items.deepCopy());value.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag()).put("sourceVersion",store.resourceVersion(ref.type(),ref.id()));save(DOCUMENT,id(ref),value);
         for(var item:items){UUID taskId=uuid(item.path("taskId"));if(store.find(LINK,taskId).isPresent())throw ApiFailure.conflict();save(LINK,taskId,object().put("documentId",id(ref).toString()));}
     }
 }
