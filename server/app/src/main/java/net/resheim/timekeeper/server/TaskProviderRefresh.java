@@ -138,7 +138,7 @@ class TaskProviderRefresh {
                     boolean selected=TaskProviderConnections.services(value).path("tasks").asBoolean()&&!value.path("selected").isEmpty()||TaskProviderConnections.services(value).path("calendars").asBoolean()&&!value.path("calendarSelected").isEmpty();
                     if(!metadata.path("enabled").asBoolean()||!metadata.path("readable").asBoolean()||value.path("paused").asBoolean()||value.path("blocked").asBoolean()||!selected&&!value.path("requested").asBoolean()
                             ||!automatic&&!value.path("requested").asBoolean()||!value.hasNonNull("nextRefresh"))continue;
-                    var provider=TaskProviderConfiguration.provider(metadata.path("providerId").asText());if(!configuration.available(provider))continue;
+                    var provider=TaskProviderConfiguration.provider(metadata.path("providerId").asText());if(!value.hasNonNull("brokerEndpoint")&&!configuration.available(provider))continue;
                     Instant next=Instant.parse(value.path("nextRefresh").asText());if(!next.isAfter(now))due.add(new Due(rows.getString(1),rows.getObject(2,UUID.class),next));
                 }
             }
