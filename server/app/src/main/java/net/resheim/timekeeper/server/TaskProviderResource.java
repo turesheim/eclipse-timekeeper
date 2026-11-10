@@ -29,7 +29,7 @@ public class TaskProviderResource {
     private String browser(){return BrowserCookies.read(headers.getRequestHeader("Cookie")).requireBrowser();}
     @GET public Response list(){
         queries();return tx(()->{
-            var result=connections().list().put("refreshMinutes",15);var providers=result.putObject("providers");
+            var result=connections().list().put("refreshMinutes",15).put("calendarSynchronization",shared.enabled());var providers=result.putObject("providers");
             providers.put("google",configuration.available(TaskCloudProvider.Provider.GOOGLE)).put("microsoft",configuration.available(TaskCloudProvider.Provider.MICROSOFT));
             return new ApiReplies(200,result,null,null);
         });
@@ -47,6 +47,7 @@ public class TaskProviderResource {
             try{return new ApiReplies(200,clients.shared(endpoint).begin(provider,shared.callback(),pending.state(),pending.challenge(),services,input.path("language").asText("en")),null,null).response();}
             catch(RuntimeException failure){try{store.authenticated(identity,()->connections().consume(pending.state(),browser));}catch(RuntimeException ignored){}throw failure;}
         }
+        if(input.has("services")&&(!input.path("services").path("tasks").asBoolean()||input.path("services").path("calendars").asBoolean()))throw new ApiFailure(422,"TASK_PROVIDER_CALENDAR_UNSUPPORTED");
         var settings=configuration.settings(kind);
         return tx(()->new ApiReplies(200,connections().begin(kind,settings,browser,writable),null,null));
     }

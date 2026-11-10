@@ -82,6 +82,11 @@ class TaskProviderResourceHttpTest {
         assertEquals(404,call("b",BROWSER,"GET","/"+connection.path("id").asText(),null,null).statusCode());
         assertEquals(403,call("read",BROWSER,"POST","/google/authorize",object(),null).statusCode());
     }
+    @Test void directSignInNeverSubstitutesTaskAccessForARequestedCalendarOnlyGrant(){
+        var catalog=json(call("GET","",null,null),200);inputs.validate("TaskProviderConnections",catalog);assertFalse(catalog.path("calendarSynchronization").asBoolean());
+        var input=object();input.set("services",object().put("tasks",false).put("calendars",true));var denied=call("POST","/google/authorize",input,null);assertEquals(422,denied.statusCode());assertEquals("TASK_PROVIDER_CALENDAR_UNSUPPORTED",denied.jsonPath().getString("code"));
+        input.set("services",object().put("tasks",true).put("calendars",false));assertEquals(200,call("POST","/google/authorize",input,null).statusCode());
+    }
     @Test void revokedProviderAuthorizationDoesNotLogOutTheDagsverkAccount(){
         var failure=call("POST","/complete",object().put("state",begin("google")).put("code","denied-fixture"),null);
         assertEquals(409,failure.statusCode(),failure.asString());assertEquals("TASK_PROVIDER_RECONNECT_REQUIRED",failure.jsonPath().getString("code"));assertFalse(failure.asString().contains("private-provider-detail"));

@@ -1735,5 +1735,7 @@
   "internet_admin.service_override": "Overstyr adresse til felles innlogging (tomt bruker prosjektets tjenesteoppdagelse)",
   "internet_admin.restart_required": "Innstillingene er lagret. Start alle Dagsverk-serverinstanser på nytt for å aktivere dem. Oppsettkontrollen viser gjeldende aktive innstillinger.",
   "internet_admin.active": "Lagrede innstillinger er aktive.",
-  "internet_admin.direct_callback": "Google-omdirigeringsadresse for direkte registrering"
+  "internet_admin.direct_callback": "Google-omdirigeringsadresse for direkte registrering",
+  "internet_accounts.tasks_only_help": "Logg på for å synkronisere oppgavelister. Legg til et kalenderabonnement for kalenderhendelser.",
+  "task_providers.calendars_unsupported": "Denne påloggingsmåten støtter bare oppgaver. Legg til et kalenderabonnement for hendelser."
 }

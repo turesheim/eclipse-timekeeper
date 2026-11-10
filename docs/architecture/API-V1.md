@@ -229,7 +229,10 @@ establish successful live provider consent.
 
 Internet account sign-in and synchronization use `/task-providers`, separate from portable connection
 metadata. `GET` returns configured-provider availability and owned status with
-discovered/selected lists. `POST /task-providers/{provider}/authorize` starts a
+discovered/selected lists. Its `calendarSynchronization` flag describes whether
+new sign-ins support calendars; direct registration is task-only. A direct
+calendar request is rejected without requesting task access in its place.
+`POST /task-providers/{provider}/authorize` starts a
 browser-bound PKCE flow for `google` or `microsoft`; `POST
 /task-providers/complete` consumes its one-use state and code. `POST
 /task-providers/cancel` cancels an attempt. Credentials remain private and are

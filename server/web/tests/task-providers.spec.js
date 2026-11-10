@@ -22,7 +22,7 @@ function connection(owner,overrides={}){
   return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],identityReviews:[],reviewAdditions:true,projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},calendarSynchronization=true,authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
   const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
   for(const [path,items]of [['clients',clients],['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
@@ -36,7 +36,7 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')};
     const reply=(body,status=200)=>route.fulfill({status,headers:{...headers,ETag:`"provider-${body?.version??0}"`},...(status===204?{}:{body:JSON.stringify(body)})});
     if(method!=='GET')model.writes.push({path,method,input,headers:request.headers()});else model.reads++;
-    if(path==='')return reply({items:model.rows,providers:model.providers,refreshMinutes:15});
+    if(path==='')return reply({items:model.rows,providers:model.providers,refreshMinutes:15,calendarSynchronization});
     if(path.endsWith('/authorize'))return reply({authorizationUrl:authorization||`https://${path.startsWith('/google')?'accounts.google.com/o/oauth2/v2/auth':'login.microsoftonline.com/common/oauth2/v2.0/authorize'}?state=${state}`,expiresAt:'2026-11-09T12:10:00Z',...(authorizationOrigin?{authorizationOrigin}:{})});
     if(path==='/complete'){model.completed++;expect(input).toEqual({state,code});expect(new URL(page.url()).search).toBe('');expect(request.headers().referer).not.toContain(code);expect(request.headers().referer).not.toContain(state);return reply(model.rows[0]);}
     if(path==='/cancel'){model.cancelled++;expect(input).toEqual({state});return reply(null,204);}
@@ -105,6 +105,11 @@ test('calendar-only sign-in uses the shared service and does not request task wr
   await page.route(origin+'/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Dagsverk shared sign-in</title><h1>Shared sign-in</h1>'}));await open(page);
   const google=page.locator('[data-internet-provider=google]');await google.getByRole('checkbox',{name:'Tasks',exact:true}).uncheck();await expect(google.getByRole('combobox',{name:'Task synchronization',exact:true})).toBeDisabled();
   await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(target);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:false,calendars:true},language:'en',direction:'IMPORT'});
+});
+
+test('direct task connections offer supported services and keep calendar subscriptions available',async({page,request})=>{
+  const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],calendarSynchronization:false});await page.route('https://accounts.google.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Google task consent fixture</title>'}));await open(page);
+  const google=page.locator('[data-internet-provider=google]');await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeHidden();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('link',{name:'Add a calendar subscription',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:false},language:'en',direction:'IMPORT'});
 });
 
 test('calendar and task drafts save independently on one connected account',async({page,request})=>{

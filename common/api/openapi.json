@@ -38052,6 +38052,10 @@
             "enum": [
               15
             ]
+          },
+          "calendarSynchronization": {
+            "type": "boolean",
+            "description": "Whether new sign-ins can request calendar synchronization; false for task-only direct registration."
           }
         },
         "required": [

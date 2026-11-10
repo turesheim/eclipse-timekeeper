@@ -28,16 +28,17 @@ export async function renderTaskProviders(view){
   overview.append(setup,refresh,feedback);const cards=new Map(),connectButtons=new Map(),providerPanels=new Map(),providerServices=new Map(),providerFeedback=new Map();
   const accessLabel=node('label',t('task_providers.google_access'),'form-label'),access=node('select',undefined,'form-select');
   for(const direction of ['IMPORT','TWO_WAY'])access.append(new Option(t('task_providers.access_'+direction),direction));accessLabel.append(access);
-  let generation=0,timer=null,controller=null,zone='UTC',configured={},projects=[],clients=[];
+  let generation=0,timer=null,controller=null,zone='UTC',configured={},projects=[],clients=[],calendarSynchronization=true;
   function serviceChoices(initial={tasks:true,calendars:true}){
     const fieldset=node('fieldset',undefined,'mb-3');fieldset.append(node('legend',t('internet_accounts.choose_services'),'h6'));const choices={};
     for(const key of ['calendars','tasks']){const label=node('label',undefined,'form-check'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.checked=!!initial[key];label.append(input,node('span',t('internet_accounts.'+key),'form-check-label'));fieldset.append(label);choices[key]=input;}
-    return {fieldset,choices,read:()=>Object.fromEntries(Object.entries(choices).map(([key,input])=>[key,input.checked])),controls:()=>{for(const input of Object.values(choices))input.disabled=!view.canWrite||view.busy||view.uncertain;}};
+    return {fieldset,choices,read:()=>Object.fromEntries(Object.entries(choices).map(([key,input])=>[key,input.checked])),controls:()=>{for(const [key,input]of Object.entries(choices)){const available=key!=='calendars'||calendarSynchronization;input.closest('label').hidden=!available;if(!available)input.checked=false;input.disabled=!view.canWrite||view.busy||view.uncertain||!available;}}};
   }
   const controls=()=>{
     for(const [provider,pick]of connectButtons){const services=providerServices.get(provider);services.controls();pick.disabled=!view.canWrite||view.busy||view.uncertain||!Object.values(services.read()).some(Boolean);}
     access.disabled=!view.canWrite||view.busy||view.uncertain||!providerServices.get('google')?.choices.tasks.checked;
     for(const card of cards.values()){
+      card.services.controls();
       for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
       card.save.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       card.refresh.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused||card.data.syncing||!card.data.enabled;
@@ -45,7 +46,7 @@ export async function renderTaskProviders(view){
       card.pause.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       for(const input of card.imports.querySelectorAll('button'))input.disabled=view.busy||view.uncertain||card.data.paused;
       if(card.approve)card.approve.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused;
-      card.services.controls();if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!card.services.choices.tasks.checked;card.calendars.controls();card.writes.controls();card.incoming.controls();card.identities.controls();
+      if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!card.services.choices.tasks.checked;card.calendars.controls();card.writes.controls();card.incoming.controls();card.identities.controls();
     }
   };
   const run=(work,submit,target=feedback)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true}).finally(()=>{if(view.valid())controls();});
@@ -134,6 +135,8 @@ export async function renderTaskProviders(view){
     }
   }
   function paint(data){
+    calendarSynchronization=data.calendarSynchronization!==false;
+    for(const panel of providerPanels.values())panel.querySelector('p.hint').textContent=t(calendarSynchronization?'internet_accounts.provider_help':'internet_accounts.tasks_only_help');
     const present=new Set();for(const value of data.items){
       if(value.ownerId!==view.session.owner)throw new ApiError('OWNER_CHANGED',401);present.add(value.id);const card=cards.get(value.id)||cardFor(value);card.data=value;
       card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('task_providers.last_success',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});

@@ -4,6 +4,7 @@ import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(ge
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
   TASK_PROVIDER_NOT_CONFIGURED:'task_providers.not_configured',
+  TASK_PROVIDER_CALENDAR_UNSUPPORTED:'task_providers.calendars_unsupported',
   TASK_PROVIDER_RECONNECT_REQUIRED:'task_providers.reconnect_required',
   TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED:'task_providers.reconnect_required',
   TASK_PROVIDER_PERMISSION_REQUIRED:'task_providers.reconnect_required',

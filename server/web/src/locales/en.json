@@ -1735,5 +1735,7 @@
   "internet_admin.service_override": "Shared sign-in address override (blank uses project discovery)",
   "internet_admin.restart_required": "Settings saved. Restart every Dagsverk server instance to activate them. The setup check shows the currently active settings.",
   "internet_admin.active": "Saved settings are active.",
-  "internet_admin.direct_callback": "Google redirect URI for direct registration"
+  "internet_admin.direct_callback": "Google redirect URI for direct registration",
+  "internet_accounts.tasks_only_help": "Sign in to synchronize task lists. Add a calendar subscription for calendar events.",
+  "task_providers.calendars_unsupported": "This sign-in method supports tasks only. Add a calendar subscription for events."
 }
