@@ -29791,6 +29791,10 @@
             "type": "boolean",
             "description": "This occurrence has a nonempty account-private note."
           },
+          "noteBookmarked": {
+            "type": "boolean",
+            "description": "The account-private note for this occurrence is bookmarked, including an empty bookmarked note."
+          },
           "componentType": {
             "type": "string",
             "enum": [

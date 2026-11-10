@@ -4,15 +4,13 @@ import java.nio.ByteBuffer;
 import java.nio.charset.*;
 import java.text.Normalizer;
 import java.util.*;
-import org.commonmark.ext.front.matter.*;
-import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
+import org.commonmark.ext.front.matter.YamlFrontMatterBlock;
 import org.commonmark.node.*;
 import org.commonmark.parser.Parser;
 
 /** A derived text projection. Source bytes, dates, versions and ETags stay owned by SQL. */
 final class NotesSearchText {
-    private static final Parser MARKDOWN=Parser.builder().extensions(List.of(
-            YamlFrontMatterExtension.create(),StrikethroughExtension.create())).build();
+    private static final Parser MARKDOWN=NotesMarkdown.parser();
     record Projection(String title,List<String> blocks,List<String> tags){
         Projection{blocks=List.copyOf(blocks);tags=List.copyOf(tags);}
         String body(){return String.join("\n\n",blocks);}

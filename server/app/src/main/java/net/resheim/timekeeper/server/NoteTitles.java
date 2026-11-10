@@ -2,19 +2,15 @@ package net.resheim.timekeeper.server;
 
 import static net.resheim.timekeeper.server.JsonValues.uuid;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.commonmark.ext.front.matter.YamlFrontMatterExtension;
-import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
 import org.commonmark.node.*;
 import org.commonmark.parser.Parser;
 
 /** Display metadata only: titles never rename a document or change its canonical bytes. */
 final class NoteTitles {
     static final int MAXIMUM=4096;
-    private static final Parser MARKDOWN=Parser.builder()
-            .extensions(List.of(YamlFrontMatterExtension.create(),StrikethroughExtension.create())).build();
+    private static final Parser MARKDOWN=NotesMarkdown.parser();
     private final ServerStore store;
     NoteTitles(ServerStore store){this.store=store;}
     static String filenameTitle(String filename){int dot=filename.lastIndexOf('.');return dot>0?filename.substring(0,dot):filename;}

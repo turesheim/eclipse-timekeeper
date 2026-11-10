@@ -187,3 +187,5 @@
 .note-client-label > span:last-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .note-client-swatch {flex:none;width:.75rem;height:.75rem;border:1px solid var(--bs-border-color);border-radius:50%;}
 .note-client-dialog {width:min(26rem,calc(100vw - 2rem));}
+
+.journal-formatted mark { color:var(--bs-emphasis-color); background:var(--bs-warning-bg-subtle); padding:.05em .15em; }

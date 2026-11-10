@@ -73,6 +73,14 @@ can also be followed with Enter.
 Unsafe schemes and paths leaving the vault are rejected. Obsidian plugins,
 transclusions of entire Markdown notes and executable HTML are not supported.
 
+## Highlight, subscript and superscript
+
+Use `==highlighted words==`, `H~2~O` and `X^2^`, or select text and use
+**Highlight**, **Subscript** and **Superscript** in the formatting toolbar.
+Highlighted text can contain other inline formatting. Subscript and superscript
+use a single delimiter; strikethrough continues to use `~~two tildes~~`.
+Code and escaped delimiters remain literal, and source mode retains the Markdown.
+
 ## Internal-link assistance
 
 In Formatted mode and Markdown source, typing `[` inserts its matching `]` with

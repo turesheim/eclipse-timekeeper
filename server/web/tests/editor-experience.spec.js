@@ -16,6 +16,33 @@ async function engine(page,value,options={}){
 }
 const source=page=>page.evaluate(()=>globalThis.experience.markdown());
 
+test('extended inline styles render and retain exact source, nested formatting and literal code',async({page})=>{
+  const value='# ==**Focus**==\r\n\r\n==Very **important** words==: H~2~O, X^2^ and ~~obsolete~~. **==Reverse==**\r\n\r\n`==literal== H~2~O X^2^`\r\n';
+  await field(page,value);const rich=page.locator('#experience-formatted .ProseMirror');
+  await expect(rich.locator('mark')).toHaveText(['Focus','Very important words','Reverse']);await expect(rich.locator('mark strong')).toHaveText(['Focus','important','Reverse']);
+  await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');await expect(rich.locator('del')).toHaveText('obsolete');
+  await expect(rich.locator('code')).toHaveText('==literal== H~2~O X^2^');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+  await appendEditorText(rich.locator('p').first(),' Edited.');
+  const changed=await page.evaluate(()=>globalThis.field.value());expect(changed).toContain('==Very **important** words==');expect(changed).toContain('H~2~O');expect(changed).toContain('X^2^');
+  const host=page.locator('#experience-field');await host.getByRole('button',{name:'Markdown source',exact:true}).click();await host.getByRole('button',{name:'Formatted',exact:true}).click();
+  await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    const mark=rich.locator('mark').first();await expect(mark).toBeVisible();
+    expect(await mark.evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  }
+});
+
+test('typed inline styles and their toolbar controls stay editable with undo and read-only guards',async({page})=>{
+  await field(page,'');const rich=page.locator('#experience-formatted .ProseMirror');await rich.click();await page.keyboard.type('H~2~O X^2^ ==Øving== ~~old~~');
+  await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');await expect(rich.locator('mark')).toHaveText('Øving');await expect(rich.locator('del')).toHaveText('old');
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('H~2~O X^2^ ==Øving== ~~old~~');
+  await field(page,'water');const host=page.locator('#experience-field');await page.locator('#experience-formatted .ProseMirror').focus();await page.keyboard.press('ControlOrMeta+a');
+  await host.getByRole('button',{name:'Highlight',exact:true}).click();await expect(host.locator('mark')).toHaveText('water');
+  await page.keyboard.press('ControlOrMeta+z');await expect(host.locator('mark')).toHaveCount(0);await page.keyboard.press('ControlOrMeta+Shift+z');await expect(host.locator('mark')).toHaveText('water');
+  await page.evaluate(()=>globalThis.field.setReadOnly(true));await expect(host.locator('[data-command=highlight]')).toBeDisabled();
+});
+
 test('prose hashtags use accent links without changing Markdown or literal code and link content',async({page})=>{
   const value='# Tag examples\n\nA #Open**Shift** deployment, #Cafe\u0301 and #work/cloud.\n\n`#literal` [#linked](https://example.org/#destination) [[#heading]]\n\n~~~text\n#code\n~~~\n';
   await engine(page,value,{tags:true});const tags=page.locator('#experience-editor [data-hashtag]');await expect(tags).toHaveCount(4);expect(await tags.evaluateAll(nodes=>[...new Set(nodes.map(node=>node.dataset.hashtag))])).toEqual(['#openshift','#café','#work/cloud']);expect(await source(page)).toBe(value);
@@ -59,12 +86,12 @@ test('new checkbox items retain a visible caret and Backspace removes the empty 
 });
 
 test('unknown constructs are inert editable fragments while surrounding Markdown remains formatted',async({page})=>{
-  const value='Before.\r\n\r\n<script>window.bad=true</script>\r\n\r\n==unknown highlight==\r\n\r\nAfter.\r\n';
+  const value='Before.\r\n\r\n<script>window.bad=true</script>\r\n\r\n%%unknown comment%%\r\n\r\nAfter.\r\n';
   await engine(page,value);expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.bad)).toBeUndefined();
   await expect(page.locator('.markdown-source-fragment textarea')).toHaveCount(2);
   await page.locator('#experience-editor p').filter({hasText:'After.'}).click();await page.keyboard.press('End');await page.keyboard.type(' Edited.');
   expect(await source(page)).toBe(value.replace('After.','After. Edited.'));
-  await page.locator('.markdown-source-fragment textarea').last().fill('==changed highlight==');expect(await source(page)).toContain('==changed highlight==');
+  await page.locator('.markdown-source-fragment textarea').last().fill('%%changed comment%%');expect(await source(page)).toContain('%%changed comment%%');
 });
 test('wiki aliases, headings and sized embeds preserve their portable source',async({page})=>{
   const value='Read [[Notes/Design#Decisions|the design]] and [[2026-11-02]].\n\n![[journal/assets/image.png|320x200]]\n';

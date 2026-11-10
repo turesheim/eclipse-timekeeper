@@ -22,7 +22,7 @@ const withoutAutolinks=value=>value.replace(/<([^<>\s]+)>/g,(match,target)=>{
   try{return ['https:','http:','mailto:'].includes(new URL(email?'mailto:'+target:target).protocol)?'':match;}catch{return match;}
 }).replace(/\b(?:https?:\/\/|mailto:)[^\s<>()\[\]]+/gi,'');
 const journalImage=path=>/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(path);
-export const hasUnsupportedSyntax=(value,imageAllowed=journalImage)=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
+export const hasUnsupportedSyntax=(value,imageAllowed=journalImage)=>/\[\[|\]\]|\[![^\]]+\]|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
   withoutDailyWikilinks(withoutAutolinks(value)).replace(/!\[[^\]\n]*\]\(([^\s)]+)\)/g,(source,path)=>imageAllowed(path)?'':source));
 export function needsSource(body,imageAllowed=journalImage) {
   let fence=null,text='',previous='';

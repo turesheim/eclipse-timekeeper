@@ -1,7 +1,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {noteIcon} from '../src/note-presentation.js';
 import {isProjectIcon,projectIconCategories,projectIconLabel,searchProjectIcons} from '../src/icons.js';
 import {readFile} from 'node:fs/promises';
+
+test('all note presentations use a bookmark icon while preserving folders and unmarked note kinds',()=>{
+  for(const kind of ['MARKDOWN','DAY','WEEK','EVENT'])assert.equal(noteIcon({kind,bookmarked:true}),'journal-bookmark');
+  assert.equal(noteIcon({kind:'FOLDER',bookmarked:true}),'folder');assert.equal(noteIcon({kind:'MARKDOWN'}),'file-earmark-text');
+  assert.equal(noteIcon({kind:'DAY'}),'journal-text');assert.equal(noteIcon({kind:'EVENT'}),'calendar-event');
+  assert.equal(noteIcon({},'journal-plus'),'journal-plus');assert.equal(noteIcon({bookmarked:true},'journal-plus'),'journal-bookmark');
+});
 
 test('project icon searches cover the entire catalog, including names and keywords beyond the first page',()=>{
   const all=searchProjectIcons();assert.ok(all.length>2000);

@@ -108,11 +108,18 @@ test('a conflicting document drop cannot replace either file',async({page,reques
   const source=await(await put(api,'Notes/Review.md','Source stays intact.')).json(),target=await(await put(api,'Notes/Archive/Review.md','Destination stays intact.')).json();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();
   await expect(page.locator('#notes-document-title')).toHaveText('Notes');await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
-  await expect(noteEntry(navigation,source.path)).toHaveAttribute('draggable','true');await noteEntry(navigation,source.path).dragTo(noteEntry(navigation,'Notes/Archive'));
-  await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
-  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
-  expect((await(await api('GET','/notes/entries/'+source.id)).json()).path).toBe(source.path);
-  for(const [entry,text] of [[source,'Source stays intact.'],[target,'Destination stays intact.']])expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(text);
+  let release,started;const held=new Promise(resolve=>release=resolve),pending=new Promise(resolve=>started=resolve);
+  await page.route('**/api/v1/notes/entries?*',async route=>{const response=await route.fetch();started();await held;await route.fulfill({response});});
+  try{
+    // An unrelated catalog refresh must not disable an already visible drag source.
+    await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await pending;
+    await expect(noteEntry(navigation,source.path)).toHaveAttribute('draggable','true');await noteEntry(navigation,source.path).dragTo(noteEntry(navigation,'Notes/Archive'));
+    await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
+    release();await page.unrouteAll({behavior:'wait'});
+    await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-panel > .alert-danger')).toBeVisible();
+    expect((await(await api('GET','/notes/entries/'+source.id)).json()).path).toBe(source.path);
+    for(const [entry,text] of [[source,'Source stays intact.'],[target,'Destination stays intact.']])expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(text);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
 
 test('native journal documents retain their folder associations when organizing notes',async({page,request})=>{

@@ -16,7 +16,7 @@ test('frontmatter is kept byte-for-byte outside the body, including BOM and CRLF
   assert.deepEqual(splitMarkdown('---\ntags: [unfinished]'),{frontmatter:'',body:'---\ntags: [unfinished]',unterminated:true});
 });
 test('Obsidian extensions and unsupported constructs use exact source mode',()=>{
-  for(const value of ['[[Project|alias]]','![[diagram.png]]','> [!note] Callout','==highlight==','%%private%%','$a+b$','text ^block-id','<div>HTML</div>','![image](https://example.org/pixel)','Footnote[^one]','[reference]: /somewhere',':::custom\ncontent'])assert.equal(needsSource(value),true,value);
+  for(const value of ['[[Project|alias]]','![[diagram.png]]','> [!note] Callout','%%private%%','$a+b$','text ^block-id','<div>HTML</div>','![image](https://example.org/pixel)','Footnote[^one]','[reference]: /somewhere',':::custom\ncontent'])assert.equal(needsSource(value),true,value);
   for(const value of ['# Heading\n\n**bold** and *emphasis*','- [ ] Task\n- [x] Done','[link](https://example.org)','> Quotation','| Name | Value |\n| --- | --- |\n| a | b |','```md\n[[literal]]\n```','~~~\n<div>Literal HTML</div>\n~~~','Example `[[literal]]`'])assert.equal(needsSource(value),false,value);
 });
 test('journal attachment images can render while external and unsafe images stay in source mode',()=>{
@@ -41,9 +41,9 @@ test('empty rich paragraphs serialize as Markdown blank lines without changing c
   assert.equal(normalizeEditorMarkdown('Before <br /> after\n'),'Before <br /> after\n');
 });
 
-test('setext headings remain eligible for rich editing without admitting unsupported highlights',()=>{
+test('setext headings and supported inline styles remain eligible for rich editing',()=>{
   assert.equal(needsSource('Heading\n=======\n\nText.\n'),false);
-  assert.equal(needsSource('==highlight==\n'),true);
+  assert.equal(needsSource('==highlight==\n'),false);
 });
 
 test('completion ranges consume generated closers while source code and escapes remain literal',async()=>{

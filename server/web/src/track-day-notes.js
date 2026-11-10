@@ -1,3 +1,4 @@
+import {noteIcon} from './note-presentation.js';
 import {DocumentAutosave,bindDocumentAutosave} from './document-autosave.js';
 import {noteRevisionResources} from './note-revisions.js';
 import {vaultEditorResources} from './vault-editor-resources.js';
@@ -182,7 +183,7 @@ export class TrackDayNotes {
       if(interactive){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded||!this.writable&&!text&&!hasBody&&!bookmarked;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
       value.title=text||(hasBody?t('day_notes.body_present'):t('day_notes.add',{date:this.dateLabel(date)}));value.setAttribute('aria-label',t(text||hasBody||bookmarked?(this.writable?'day_notes.edit':'day_notes.view'):'day_notes.add',{date:this.dateLabel(date),text:text||(hasBody?t('day_notes.body_present'):'')}));
       if(text&&!this.compact)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));
-      value.append(icon(bookmarked?'journal-bookmark':hasBody?'journal-text':'journal-plus'));value.classList.toggle('has-body',hasBody);
+      value.append(icon(noteIcon({bookmarked},hasBody?'journal-text':'journal-plus')));value.classList.toggle('has-body',hasBody);
       if(previous)previous.replaceWith(value);else heading.append(value);
     }
     if(focused&&!this.root.hidden)this.grid.querySelector(`button[${this.noteAttr}="${focused}"]`)?.focus({preventScroll:true});

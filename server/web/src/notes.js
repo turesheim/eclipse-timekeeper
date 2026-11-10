@@ -1,3 +1,4 @@
+import {noteIcon} from './note-presentation.js';
 import {DocumentAutosave,bindDocumentAutosave} from './document-autosave.js';
 import {noteRevisionResources} from './note-revisions.js';
 import {t,getLocale} from './i18n.js';
@@ -203,7 +204,9 @@ export class NotesView {
     this.fit();
   }
   fit(){if(!this.visible||!this.root.offsetParent)return;const viewport=window.visualViewport,bottom=viewport?viewport.offsetTop+viewport.height:innerHeight;document.documentElement.style.setProperty('--notes-viewport-height',bottom+'px');}
-  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&(!this.loading||this.treePointerPending||this.dragged)&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
+  // Catalog reads must not disable a visible source between pointer-down and
+  // drag-start. The gesture defers repainting; the move still checks its ETag.
+  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
     for(const pick of this.tree.querySelectorAll('.notes-tree-pick'))pick.draggable=this.canDrag(this.entries.get(pick.parentElement.dataset.id));
@@ -297,7 +300,7 @@ export class NotesView {
     const append=(parent,host)=>{for(const entry of sortedNotes(this.children.get(parent)||[],this.sortOrder,getLocale())){
       const folder=entry.kind==='FOLDER',row=node('div',undefined,'notes-tree-row');row.setAttribute('role','treeitem');row.setAttribute('aria-selected',String(this.note?.id===entry.id));row.dataset.id=entry.id;row.tabIndex=-1;
       const title=noteTitle(entry,parent==='search'?entry.path:entry.path.split('/').at(-1));
-      const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.kind==='EVENT'?title:entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.title?title+' · '+entry.path:entry.path);pick.append(icon(folder?'folder':entry.bookmarked?'bookmark':'file-earmark-text'),node('span',title));row.append(pick);
+      const pick=action(entry.path,()=>{if(folder&&!this.showTrash){this.expandAllRequested=false;this.folder=entry;this.expanded.has(entry.id)?this.expanded.delete(entry.id):this.expanded.add(entry.id);void this.reload();}void this.select(entry.id);});pick.className='notes-tree-pick';pick.tabIndex=-1;pick.title=entry.kind==='EVENT'?title:entry.path;pick.textContent='';pick.setAttribute('aria-label',entry.title?title+' · '+entry.path:entry.path);pick.append(icon(noteIcon(entry)),node('span',title));row.append(pick);
       pick.draggable=this.canDrag(entry);
       row.addEventListener('focus',()=>{for(const item of this.tree.querySelectorAll('[role=treeitem]'))item.tabIndex=item===row?0:-1;});
       if(folder&&!this.showTrash){row.setAttribute('aria-expanded',String(this.expanded.has(entry.id)));if(this.expanded.has(entry.id)){const group=node('div');group.setAttribute('role','group');append(entry.id,group);row.append(group);}}host.append(row);

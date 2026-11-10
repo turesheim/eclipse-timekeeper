@@ -1,6 +1,7 @@
 import {t} from './i18n.js';
 import {icon,iconButton} from './icons.js';
 import {noteTitle} from './note-title.js';
+import {noteIcon} from './note-presentation.js';
 import {notesEntryVisible} from './notes-links.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {calendarSearchNavigation} from './calendar-search-editor.js';
@@ -21,7 +22,7 @@ export class NotesSearch {
     const root=this.root=node('aside',undefined,'notes-search-panel');root.id='notes-search-panel';root.hidden=true;root.setAttribute('aria-labelledby','notes-search-heading');
     const heading=node('div',undefined,'notes-search-heading'),title=node('h2',t('notes.search_title'));title.id='notes-search-heading';
     this.close=button('',()=>this.hide());iconButton(this.close,'close',t('ui.close'));heading.append(title,this.close);
-    const refine=node('form'),label=node('label',t('notes.search_title'),'form-label');this.input=node('input',undefined,'form-control');this.input.id='notes-search-query';this.input.type='search';this.input.maxLength=512;label.htmlFor=this.input.id;
+    const refine=node('form'),label=node('label',t('notes.search_terms'),'form-label');this.input=node('input',undefined,'form-control');this.input.id='notes-search-query';this.input.type='search';this.input.maxLength=512;label.htmlFor=this.input.id;
     const help=node('p',t('notes.search_help'),'hint');help.id='notes-search-help';this.input.setAttribute('aria-describedby',help.id);refine.append(label,this.input,help);
     this.message=node('p','','hint');this.message.setAttribute('role','status');this.results=node('ul',undefined,'notes-search-results');this.results.id='notes-search-results';
     this.more=button(t('notes.search_more'),()=>void this.search(true));this.retry=button(t('notes.search_retry'),()=>void this.search());this.rebuild=button(t('notes.search_rebuild'),()=>void this.rebuildIndex());
@@ -32,7 +33,14 @@ export class NotesSearch {
     root.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();this.hide();}else if(event.key==='ArrowDown'&&event.target===this.input){event.preventDefault();this.results.querySelector('button')?.focus();}});
     this.reset();
   }
-  update(session,writable){if(session!==this.session)this.reset();this.session=session;this.writable=writable;this.form.hidden=!session;this.controls();}
+  update(session,writable,revision){
+    const changed=session!==this.session;if(changed)this.reset();this.session=session;this.writable=writable;this.form.hidden=!session;this.controls();
+    // Prepare private indexes on sign-in and committed changes, before a query.
+    if(session&&(changed||revision!==this.preparedRevision)){
+      this.preparedRevision=revision;
+      void session.request('/notes/search/status').catch(error=>{if(session===this.session&&error.status===401)this.callbacks.onUnauthorized(error);});
+    }
+  }
   reset(){clearTimeout(this.timer);this.hide(false);++this.generation;this.session=null;this.items=[];this.cursor=null;this.catalog=null;this.offset=undefined;this.busy=false;this.failed=null;this.input.value=this.titleInput.value='';this.form.hidden=true;this.paint();}
   show(query){
     if(!this.session)return;this.origin=document.activeElement;this.input.value=this.titleInput.value=query;this.root.hidden=false;this.input.focus({preventScroll:true});void this.search();
@@ -54,7 +62,21 @@ export class NotesSearch {
         this.offset=reply.data.nextOffset;incoming=reply.data.items.filter(entry=>notesEntryVisible(entry,this.catalog.settings)).map(entry=>({entry}));
       }else{
         const params=new URLSearchParams({q:query,limit:50});if(more)params.set('cursor',this.cursor);
-        const reply=await session.request('/notes/search?'+params);if(!current())return;this.cursor=reply.data.nextCursor;incoming=reply.data.items;
+        let reply;const deadline=Date.now()+15000;
+        for(;;){
+          try{reply=await session.request('/notes/search?'+params);break;}
+          catch(error){
+            if(error.status!==503||error.code!=='NOTES_SEARCH_INDEXING'||more||Date.now()>=deadline)throw error;
+            do{
+              await new Promise(resolve=>setTimeout(resolve,250));if(!current())return;
+              const status=(await session.request('/notes/search/status')).data;
+              if(status.state==='UNAVAILABLE'||Date.now()>=deadline)throw error;
+              if(status.state==='READY')break;
+            }while(current());
+            if(!current())return;
+          }
+        }
+        if(!current())return;this.cursor=reply.data.nextCursor;incoming=reply.data.items;
       }
       this.items=more?[...this.items,...incoming]:incoming;this.message.textContent=t(this.items.length||this.cursor||this.offset!==undefined?'notes.search_results':'notes.search_none');this.paint();
       if(focusedMore&&(document.activeElement===this.more||document.activeElement===document.body))this.results.querySelectorAll('button')[previous]?.focus();
@@ -77,7 +99,7 @@ export class NotesSearch {
         const finished=()=>{if(current()){pick.disabled=false;pick.removeAttribute('aria-busy');this.message.textContent=t('notes.search_results');}};
         if(pick.dispatchEvent(new CustomEvent(calendarEvent?calendarSearchNavigation:vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{id,entry,popup:calendarEvent||['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind),searchFolder:entry?.kind==='FOLDER',originSelector:`#notes-search-results [data-search-note="${id}"]`,originElement:pick,guards:[current],leave:[],pending:()=>{if(current())this.message.textContent=t('notes.search_preparing');},finished}})))finished();
       });
-      pick.dataset.searchNote=id;pick.className='btn btn-outline-secondary notes-search-result';const title=node('span',undefined,'notes-search-result-title');title.append(icon(calendarEvent?'calendar-event':entry.kind==='FOLDER'?'folder':entry.kind==='EVENT'?'calendar-event':['DAY','WEEK'].includes(entry.kind)?'journal-text':'file-earmark-text'),node('span',calendarEvent?(calendarEvent.title||t('calendar.untitled')):noteTitle(entry,entry.path)));pick.append(title,node('small',calendarEvent?calendarEvent.clientName+' · '+calendarEvent.calendarName:entry.path,'notes-search-path'));
+      pick.dataset.searchNote=id;pick.className='btn btn-outline-secondary notes-search-result';const title=node('span',undefined,'notes-search-result-title');title.append(icon(noteIcon(entry,calendarEvent?'calendar-event':undefined)),node('span',calendarEvent?(calendarEvent.title||t('calendar.untitled')):noteTitle(entry,entry.path)));pick.append(title,node('small',calendarEvent?calendarEvent.clientName+' · '+calendarEvent.calendarName:entry.path,'notes-search-path'));
       if(excerpt){const text=node('span',undefined,'notes-search-excerpt');let offset=0;for(const range of excerpt.highlights){text.append(document.createTextNode(excerpt.text.slice(offset,range.start)),node('mark',excerpt.text.slice(range.start,range.end)));offset=range.end;}text.append(document.createTextNode(excerpt.text.slice(offset)));pick.append(text);}
       item.append(pick);this.results.append(item);
     }

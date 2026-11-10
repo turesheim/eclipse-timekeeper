@@ -1,4 +1,6 @@
 import {emojiPlugin} from './emoji.js';
+import {inlineStyles,inlineStyleCommands} from './inline-styles.js';
+import {markRule} from '@milkdown/kit/prose';
 import {emojiFor} from '../src/emoji.js';
 import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
@@ -13,7 +15,7 @@ import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,docSchema,paragraphSchema,linkSchema,codeBlockSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
-import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
+import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand,remarkGFMPlugin,strikethroughInputRule,strikethroughSchema} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection,NodeSelection} from '@milkdown/kit/prose/state';
@@ -32,7 +34,8 @@ import {t} from '../src/i18n.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
-const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const commands={...inlineStyleCommands,bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const doubleStrike=$inputRule(ctx=>markRule(/(?<![\w:/])~~([^~]+)~~(?![\w/])$/,strikethroughSchema.type(ctx)));
 const dailyWikilink=$node('daily_wikilink',()=>({
   inline:true,group:'inline',atom:true,selectable:true,leafText:node=>'[['+node.attrs.date+']]',
   attrs:{date:{default:'',validate:'string'}},
@@ -61,8 +64,16 @@ const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
 const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type==='code'&&!!node.meta||!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value.replace(/\[![A-Za-z]+\][+-]?/g,''))||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
+const inlineFormatting=new Set(['strong','emphasis','delete','highlight','subscript','superscript']);
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
+  // Inline format order does not change the text's meaning. ProseMirror keeps
+  // one mark order, while authored Markdown may nest these marks either way.
+  if(value&&inlineFormatting.has(value.type)){
+    const marks=[value.type];let leaf=value;
+    while(leaf.children?.length===1&&inlineFormatting.has(leaf.children[0].type)){leaf=leaf.children[0];marks.push(leaf.type);}
+    if(marks.length>1&&marks.some(name=>['highlight','subscript','superscript'].includes(name)))return {type:'inlineFormatting',marks:marks.sort(),children:semantic(leaf.children)};
+  }
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).sort(([left],[right])=>left<right?-1:left>right?1:0).map(([key,entry])=>[key,semantic(entry)]));
   return typeof value==='string'?value.replace(/\r\n?/g,'\n'):value;
 };
@@ -149,6 +160,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   }})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
+    ctx.set(remarkGFMPlugin.options.key,{singleTilde:false});
     ctx.update(paragraphSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toMarkdown:{...schema.toMarkdown,runner:(state,node)=>{if(node.content.size)schema.toMarkdown.runner(state,node);else state.openNode('paragraph').addNode('html',undefined,emptyMarker).closeNode();}}};});
     ctx.update(linkSchema.key,previous=>schemaContext=>autolinkSchema(previous(schemaContext)));
     ctx.update(codeBlockSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,parseMarkdown:{...schema.parseMarkdown,match:node=>node.type==='code'&&String(node.lang).toLowerCase()!=='mermaid'&&!isPlantUml(node.lang)}};});
@@ -236,7 +248,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
+  }).use(dialect.guard).use(inlineStyles).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema,strikethroughInputRule].includes(plugin))).use(history).use(doubleStrike).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;

@@ -181,6 +181,13 @@ being prepared or unavailable. File browsing and canonical saves remain usable.
 The next successful search validates that its indexed source versions are current.
 Do not treat an indexing response as a complete empty result.
 
+The browser starts preparing the signed-in account's note and calendar indexes
+before the first query and after committed account changes. Empty accounts need
+no index; checking readiness does not create folders or consume storage. A first search waits briefly for preparation and retries
+automatically. Bookmarked notes receive a small relevance bonus; stronger title
+and path matches still take priority. Changing a bookmark refreshes ranking and
+expires existing result cursors without changing note content or timestamps.
+
 ### Search cache and recovery
 
 `TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY` defaults to `AUTO`: a private

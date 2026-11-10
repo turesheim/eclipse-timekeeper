@@ -43,6 +43,12 @@ final class NotesSearchChanges {
         append(active?"UPSERT":"DELETE",uuid((after==null?before:after).path("id")));
     }
     void scopeChanged(){append("SCOPE",null);}
+    void bookmarkChanged(VaultSources.Ref ref){
+        var entry=new VaultIndex(store).referenced(ref.type(),ref.id());
+        if(!searchable(entry)||entry.path("deleted").asBoolean())return;
+        append("UPSERT",uuid(entry.path("id")));
+        if(ref.type().equals(EventNotes.TYPE))new CalendarSearchState(store).changed();
+    }
     /** Imports can replace IDs/versions; a new durable epoch fences old caches. */
     void reset(){
         var previous=ensure();long generation=next(previous);

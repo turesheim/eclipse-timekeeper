@@ -15,6 +15,22 @@ class NoteBookmarksTest {
     @Inject ServerStore store;
     @Inject VaultLimits limits;
     @Inject ContractInputs inputs;
+    @Test void calendarOccurrencesExposePrivateBookmarksEvenBeforeAnEventNoteHasContent(){
+        store.transaction("bookmark-events",()->{
+            UUID client=UUID.randomUUID();var value=object().put("id",client.toString()).put("ownerId",store.owner()).put("version",1).put("name","Calendar client").put("color","#305070");
+            store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,'CLIENT',?,1,?)",store.owner(),client,value.toString());
+            var calendars=new CalendarSubscriptions(store);var sub=calendars.create(object().put("name","Bookmarked events").put("clientId",client.toString()).put("visible",true).put("url","http://fixture.invalid/calendar"),new CalendarDownload("http://fixture.invalid"));UUID id=uuid(sub.path("id"));
+            String body="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dagsverk//Bookmarks//EN\r\nBEGIN:VEVENT\r\nUID:bookmark-event\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:20260504T100000Z\r\nDURATION:PT1H\r\nSUMMARY:Private event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+            var feed=object().put("id",id.toString()).put("ownerId",store.owner()).put("version",1).put("body",body);
+            store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),CalendarSubscriptions.FEED,id,1,feed.toString());
+            var event=calendars.events("2026-05-04","2026-05-05").path("items").get(0);var key=new EventNotes.Key(id,event.path("key").asText());
+            var notes=new EventNotes(store);var before=notes.save(key,etag(notes.get(key)),object().put("body","").put("fromDate","2026-05-04").put("toDate","2026-05-05"));
+            var marks=new NoteBookmarks(store);var ref=marks.reference(EventNotes.TYPE,key.filename());marks.save(ref,marks.tag(ref),true);
+            var marked=calendars.events("2026-05-04","2026-05-05").path("items").get(0);assertTrue(marked.path("noteBookmarked").asBoolean());assertFalse(marked.path("hasNote").asBoolean());inputs.validate("CalendarEvent",marked);
+            assertEquals(before,notes.get(key));marks.save(ref,marks.tag(ref),false);assertFalse(calendars.events("2026-05-04","2026-05-05").path("items").get(0).path("noteBookmarked").asBoolean());return null;
+        });
+        assertTrue(store.transaction("bookmark-events-other",()->new NoteBookmarks(store).events()).isEmpty());
+    }
     private io.restassured.response.Response read(String token,String type,String key){return given().header("Authorization","Bearer "+token).queryParam("sourceType",type).queryParam("sourceKey",key).get("/api/v1/notes/bookmark");}
     private io.restassured.response.Response save(String token,String type,String key,String tag,Object body){
         var request=given().header("Authorization","Bearer "+token).queryParam("sourceType",type).queryParam("sourceKey",key).contentType("application/json");if(tag!=null)request.header("If-Match",tag);return request.body(body).put("/api/v1/notes/bookmark");

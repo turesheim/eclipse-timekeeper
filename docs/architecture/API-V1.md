@@ -1302,7 +1302,9 @@ normal content edits retain their existing timestamp semantics.
 journal/event notes and published calendar event details independently from filename substring navigation. Its
 `NotesSearchPage` contains current entry metadata and/or `calendarEvent` details and bounded plain-text excerpts
 with UTF-16 highlight ranges, plus an opaque snapshot and optional continuation.
-All words are required across boosted title/path/body fields; double quotes form
+Bookmarked notes receive a small, deterministic relevance bonus. Bookmark changes
+advance the search generation and invalidate existing cursors without changing
+source bytes or content validators. All words are required across boosted title/path/body fields; double quotes form
 phrases. An unquoted `tag:#name` requires an exact prose hashtag and can be
 combined with words, phrases or other tags. Tag keys use NFC and case folding;
 each tag is at most 128 UTF-16 code units including `#`. Unicode letters,
@@ -1334,7 +1336,10 @@ generation and every canonical source binding/version before publishing results.
 Signed cursors last ten minutes and bind account/query/visibility, collection,
 restore epoch and committed note/calendar search generations. Stale tokens return 412; a replica
 that cannot catch up within the bounded wait returns 503 without stale snippets.
-`GET /notes/search/status` reports replica-local readiness; write-protected
+`GET /notes/search/status` reports replica-local readiness. An unused account
+returns `READY` with zero generations without creating a collection or search
+state; probing readiness does not consume note storage or affect restore eligibility.
+Write-protected
 `POST /notes/search/rebuild` schedules a private rebuild. All responses are
 `private, no-store`. See [Notes search operations](../operations/NOTES-WEBDAV.md#searching-note-contents).
 

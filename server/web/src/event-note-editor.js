@@ -2,15 +2,16 @@ import {addDays,dateInZone} from './model.js';
 import {t} from './i18n.js';
 import {icon,iconButton} from './icons.js';
 import {JournalNoteEditor} from './journal-note-editor.js';
+import {noteIcon} from './note-presentation.js';
 
 export function eventNoteIndicator(event){
-  if(!event.hasNote)return null;
-  const marker=icon('journal-text');marker.classList.add('calendar-event-note-indicator');marker.title=t('event_notes.open');return marker;
+  if(!event.hasNote&&!event.noteBookmarked)return null;
+  const marker=icon(noteIcon({bookmarked:event.noteBookmarked},'journal-text'));marker.classList.add('calendar-event-note-indicator');marker.title=t('event_notes.open');return marker;
 }
 /** The same note affordance in Week and Today event details. */
 export function eventNoteButton(event,action){
   const button=document.createElement('button');button.type='button';button.dataset.eventNote=event.key;
-  iconButton(button,event.hasNote?'journal-text':'journal-plus',t(event.hasNote?'event_notes.open':'event_notes.add'));
+  iconButton(button,noteIcon({bookmarked:event.noteBookmarked},event.hasNote?'journal-text':'journal-plus'),t(event.hasNote||event.noteBookmarked?'event_notes.open':'event_notes.add'));
   button.addEventListener('click',action);return button;
 }
 export class EventNoteEditor extends JournalNoteEditor {
