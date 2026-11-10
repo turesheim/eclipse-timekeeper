@@ -48,6 +48,25 @@ class AccountHttpTest {
         var body=JsonValues.object();body.put("code",code);body.put("username","admin");body.put("password",PASSWORD);body.put("displayName","Administrator");body.put("email","admin@example.org");
         Browser result=browser(call(null,"POST","/auth/setup",body,false));assertEquals(401,call(null,"POST","/auth/setup",body,false).statusCode());return result;
     }
+    @Test void searchPreparationKeepsAnEmptyAccountEmptyAndIndexesItsFirstNoteWithoutAQuery()throws Exception{
+        var admin=setup();
+        store.transaction("foreign-readiness",()->{
+            var notes=new DayNotes(store);var day=DayNotes.date("2026-11-10");notes.saveContent(day,JsonValues.etag(notes.getContent(day)),JsonValues.object().put("body","Foreign private text"));return null;
+        });
+        var empty=call(admin,"GET","/notes/search/status",null,false);assertEquals(200,empty.statusCode());assertEquals("READY",node(empty.asString()).path("state").asText());
+        assertEquals(0,node(call(admin,"GET","/notes/storage",null,false).asString()).path("usage").path("entries").asInt());
+        store.transaction(admin.owner(),()->{
+            assertFalse(store.hasResources(VaultState.TYPE,VaultIndex.ENTRY,NotesSearchChanges.STATE,CalendarSearchState.TYPE));return null;
+        });
+        String path="/day-notes/2026-11-10/content";var before=call(admin,"GET",path,null,false);
+        var saved=given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-Match",before.header("ETag"))
+                .contentType("application/json").body("{\"body\":\"preparedwithoutquery\"}").put("/api/v1"+path);assertEquals(200,saved.statusCode());
+        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(10);JsonNode status;
+        do{var reply=call(admin,"GET","/notes/search/status",null,false);assertEquals(200,reply.statusCode());status=node(reply.asString());if(status.path("state").asText().equals("READY"))break;Thread.sleep(20);}while(System.nanoTime()<deadline);
+        assertEquals("READY",status.path("state").asText());assertTrue(status.path("generation").asLong()>0);
+        var results=call(admin,"GET","/notes/search?q=preparedwithoutquery",null,false);assertEquals(200,results.statusCode());assertEquals(1,node(results.asString()).path("items").size());
+        assertEquals(saved.header("ETag"),call(admin,"GET",path,null,false).header("ETag"));
+    }
     @Test void administrationHasASeparateNamespaceAndSettingsNeverExposeDeploymentSecrets() throws Exception {
         var admin=setup();
         assertEquals(401,call(null,"GET","/admin/settings",null,false).statusCode());

@@ -204,7 +204,9 @@ export class NotesView {
     this.fit();
   }
   fit(){if(!this.visible||!this.root.offsetParent)return;const viewport=window.visualViewport,bottom=viewport?viewport.offsetTop+viewport.height:innerHeight;document.documentElement.style.setProperty('--notes-viewport-height',bottom+'px');}
-  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&(!this.loading||this.treePointerPending||this.dragged)&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
+  // Catalog reads must not disable a visible source between pointer-down and
+  // drag-start. The gesture defers repainting; the move still checks its ETag.
+  canDrag(entry){return !!(entry&&this.writable&&!this.stale&&!this.busy&&!this.showTrash&&!entry.deleted&&entry.sourceType==='VAULT_CONTENT');}
   controls(){
     this.tree.setAttribute('aria-busy',String(!!this.loading));
     for(const pick of this.tree.querySelectorAll('.notes-tree-pick'))pick.draggable=this.canDrag(this.entries.get(pick.parentElement.dataset.id));

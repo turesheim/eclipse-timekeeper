@@ -32,12 +32,13 @@ test('shared search prepares indexes before a query and presents normal-weight b
     queries++;if(failures-->0)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'NOTES_SEARCH_INDEXING',message:'Indexing'})});
     return route.continue();
   });
-  const api=await setup(page,request);await expect.poll(()=>prepared).toBeGreaterThan(0);expect(queries).toBe(0);
+  const api=await setup(page,request);await expect.poll(()=>prepared).toBeGreaterThan(0);expect(queries).toBe(0);const initialPreparation=prepared;
   const entries=[];
   for(const name of ['A presentation','Z bookmarked'])entries.push(await(await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/'+name+'.md'}),Buffer.from('# '+name+'\n\nsharedpresentationneedle'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json());
   const entry=entries[1],bookmark='/notes/bookmark?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey});
   const metadata=await api('GET',bookmark);await api('PUT',bookmark,{bookmarked:true},{'If-Match':metadata.headers().etag});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();
+  await expect.poll(()=>prepared).toBeGreaterThan(initialPreparation);
   await expect(noteEntry(page.locator('#notes-navigation'),entry.path).locator('.bi-journal-bookmark')).toBeVisible();
   await expect(page.locator('#notes-recent-notes [data-recent-note="'+entry.id+'"] .bi-journal-bookmark')).toBeVisible();
   const panel=await searchNotes(page,'sharedpresentationneedle');await expect(panel.getByRole('heading',{name:'Search results',exact:true})).toBeVisible();await expect(panel.getByRole('searchbox',{name:'Search terms',exact:true})).toBeVisible();

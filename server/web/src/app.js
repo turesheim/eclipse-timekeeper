@@ -445,7 +445,7 @@ function render() {
   calendar.update(s, connected, api);
   track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
   today.update(s, connected, api);
-  notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite);
+  notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite,s.revision);
   recentNotes.update(api,s.profile.data.zoneId,s.revision);
   tasks.update(s,connected,api,canWrite);
 }

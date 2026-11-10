@@ -21,10 +21,11 @@ public class NotesSearchResource {
     private record Access(NotesSearchSources.State state,NotesSearchSources.State calendar,NotesSearchCursor cursor){
         @Override public String toString(){return "NotesSearchResource.Access[]";}
     }
-    private Access access(){return store.authenticated(identity,()->{
+    private Access capture(){
         new VaultCollection(store,limits).initialize();new NotesSearchChanges(store).snapshot();
         return new Access(new NotesSearchSources(store).state(),new CalendarSearchSources(store).state(),new NotesSearchCursor(store.cursorSecret(),store.owner(),store.now()));
-    });}
+    }
+    private Access access(){return store.authenticated(identity,this::capture);}
     private static Response response(int status,Object entity){return Response.status(status).entity(entity).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();}
     private static ApiFailure indexing(){return new ApiFailure(503,"NOTES_SEARCH_INDEXING");}
     @GET public Response results(@QueryParam("q")String text,@QueryParam("limit")String requested,@QueryParam("cursor")String cursor){
@@ -79,7 +80,15 @@ public class NotesSearchResource {
         return new NotesSearchService.Status(state,notes.generation(),notes.target(),notes.rebuilding()||calendar.rebuilding(),notes.error()!=null?notes.error():calendar.error());
     }
     @GET @Path("/status") public Response status(){
-        ContractInputs.queries(uri.getQueryParameters());var access=access();var status=combined(access);
+        ContractInputs.queries(uri.getQueryParameters());
+        var access=store.authenticated(identity,()->{
+            // An empty account has nothing to index. Probing readiness must not
+            // create folders, consume its quota or change restore eligibility.
+            if(!new VaultState(store,limits).get().path("initialized").asBoolean()
+                    &&!store.hasResources(DayNotes.TYPE,WeekNotes.TYPE,EventNotes.TYPE,CalendarSubscriptions.FEED))return null;
+            return capture();
+        });
+        var status=access==null?new NotesSearchService.Status("READY",0,0,false,null):combined(access);
         return store.authenticated(identity,()->response(200,status));
     }
     @POST @Path("/rebuild") public Response rebuild(){

@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -323,6 +324,15 @@ public class ServerStore {
     long resourceVersion(String type,UUID id){
         try(var query=statement("SELECT version FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",owner(),type,id);var rows=query.executeQuery()){
             return rows.next()?rows.getLong(1):0;
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    /** Owner-scoped existence check without loading document-sized payloads. */
+    boolean hasResources(String...types){
+        if(types.length==0)return false;
+        var parameters=new Object[types.length+1];parameters[0]=owner();System.arraycopy(types,0,parameters,1,types.length);
+        String placeholders=String.join(",",Collections.nCopies(types.length,"?"));
+        try(var query=statement("SELECT 1 FROM tk_resource WHERE owner_id=? AND entity_type IN ("+placeholders+") FETCH FIRST 1 ROWS ONLY",parameters);var rows=query.executeQuery()){
+            return rows.next();
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
     List<JsonNode> resourcePage(String type,UUID after,int limit){

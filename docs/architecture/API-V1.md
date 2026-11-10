@@ -1336,7 +1336,10 @@ generation and every canonical source binding/version before publishing results.
 Signed cursors last ten minutes and bind account/query/visibility, collection,
 restore epoch and committed note/calendar search generations. Stale tokens return 412; a replica
 that cannot catch up within the bounded wait returns 503 without stale snippets.
-`GET /notes/search/status` reports replica-local readiness; write-protected
+`GET /notes/search/status` reports replica-local readiness. An unused account
+returns `READY` with zero generations without creating a collection or search
+state; probing readiness does not consume note storage or affect restore eligibility.
+Write-protected
 `POST /notes/search/rebuild` schedules a private rebuild. All responses are
 `private, no-store`. See [Notes search operations](../operations/NOTES-WEBDAV.md#searching-note-contents).
 

@@ -33,10 +33,13 @@ export class NotesSearch {
     root.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();this.hide();}else if(event.key==='ArrowDown'&&event.target===this.input){event.preventDefault();this.results.querySelector('button')?.focus();}});
     this.reset();
   }
-  update(session,writable){
+  update(session,writable,revision){
     const changed=session!==this.session;if(changed)this.reset();this.session=session;this.writable=writable;this.form.hidden=!session;this.controls();
-    // Prepare both private source indexes when the account opens, before a query.
-    if(changed&&session)void session.request('/notes/search/status').catch(error=>{if(session===this.session&&error.status===401)this.callbacks.onUnauthorized(error);});
+    // Prepare private indexes on sign-in and committed changes, before a query.
+    if(session&&(changed||revision!==this.preparedRevision)){
+      this.preparedRevision=revision;
+      void session.request('/notes/search/status').catch(error=>{if(session===this.session&&error.status===401)this.callbacks.onUnauthorized(error);});
+    }
   }
   reset(){clearTimeout(this.timer);this.hide(false);++this.generation;this.session=null;this.items=[];this.cursor=null;this.catalog=null;this.offset=undefined;this.busy=false;this.failed=null;this.input.value=this.titleInput.value='';this.form.hidden=true;this.paint();}
   show(query){
