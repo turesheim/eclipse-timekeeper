@@ -43,6 +43,7 @@ test('shared search prepares indexes before a query and presents normal-weight b
   const panel=await searchNotes(page,'sharedpresentationneedle');await expect(panel.getByRole('heading',{name:'Search results',exact:true})).toBeVisible();await expect(panel.getByRole('searchbox',{name:'Search terms',exact:true})).toBeVisible();
   const results=panel.locator('[data-search-note]');await expect(results).toHaveCount(2);await expect(results.first()).toHaveAttribute('data-search-note',entry.id);await expect(results.first().locator('.bi-journal-bookmark')).toBeVisible();
   await expect(results.first().locator('.notes-search-result-title')).toHaveCSS('font-weight','400');await expect(panel.getByRole('button',{name:'Retry search',exact:true})).toBeHidden();
+  await expect(results.first().locator('.notes-search-excerpt')).toHaveCSS('font-weight','400');await expect(results.first().locator('mark')).toHaveCSS('font-weight','400');
   const field=await page.locator('#titlebar-notes-query').boundingBox(),button=await page.locator('#titlebar-notes-search button').boundingBox(),account=await page.locator('#session').boundingBox();
   expect(Math.abs(field.height-button.height)).toBeLessThanOrEqual(1);expect(account.x-button.x-button.width).toBeLessThanOrEqual(18);
   for(const width of [1280,390]){

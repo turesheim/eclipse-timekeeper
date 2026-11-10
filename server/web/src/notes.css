@@ -91,7 +91,7 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
 .notes-search-panel form,.notes-search-panel p { margin:0; }
 .notes-search-results { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; list-style:none; padding:0; margin:0; }
 .notes-search-results li + li { margin-top:.5rem; }
-.notes-search-result { display:flex; flex-direction:column; align-items:stretch; gap:.25rem; width:100%; text-align:start; overflow-wrap:anywhere; }
+.notes-search-result { display:flex; flex-direction:column; align-items:stretch; gap:.25rem; width:100%; text-align:start; overflow-wrap:anywhere; font-weight:400; }
 .notes-search-result-title { display:flex; align-items:baseline; gap:.5rem; font-weight:400; }
 .notes-search-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
 @media (max-width:767px) {
