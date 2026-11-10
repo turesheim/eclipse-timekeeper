@@ -32,7 +32,7 @@ export function taskProviderIdentities(view,root,{reload,controls:parentControls
       const replace=button(t('task_identities.replace'),()=>run(()=>decide({decision:'REPLACE',externalId:row.externalId,taskId:selection.data.id,taskEtag:selection.etag,previous:selection.previous},row,path),replace,true),'btn btn-primary');replace.dataset.identityWrite='true';replace.dataset.allowed='false';
       const allowed=()=>{replace.dataset.allowed=String(Boolean(row.canReplace&&selection&&ack.checked));controls();};ack.addEventListener('change',allowed);
       choose.addEventListener('change',()=>{
-        const current=++pickGeneration;selection=null;native.replaceChildren();allowed();const chosen=options.find(option=>option.value===choose.value);if(!chosen)return;
+        const current=++pickGeneration;selection=null;ack.checked=false;native.replaceChildren();allowed();const chosen=options.find(option=>option.value===choose.value);if(!chosen)return;
         void view.session.request('/tasks/'+chosen.option.taskId).then(reply=>{
           if(!valid()||review!==generation||current!==pickGeneration)return;const previous=chosen.option.previous;if(!(reply.data.externalReferences||[]).some(ref=>ref.providerId===previous.providerId&&ref.repositoryId===previous.repositoryId&&ref.externalId===previous.externalId)){feedback.textContent=t('task_identities.previous_changed');return;}
           selection={data:reply.data,etag:reply.etag,previous};values(native,reply.data,t('task_writes.local'));const project=projects.find(project=>project.id===reply.data.projectId);native.append(node('p',t('task_identities.project',{name:project?.label||t('task_providers.no_project')}),'hint'));allowed();
