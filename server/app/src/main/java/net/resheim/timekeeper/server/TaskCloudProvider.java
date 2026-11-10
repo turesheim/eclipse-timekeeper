@@ -27,9 +27,10 @@ final class TaskCloudProvider {
     TaskCloudProvider(Provider provider,TaskProviderHttp http){this.provider=provider;this.http=http;}
     String id(){return provider==Provider.GOOGLE?"google":"microsoft";}
     Account account(String token){
-        var value=get(provider==Provider.GOOGLE?"https://openidconnect.googleapis.com/v1/userinfo":GRAPH.substring(0,GRAPH.length()-1)+"?$select=id,displayName",token);
+        var value=get(provider==Provider.GOOGLE?"https://openidconnect.googleapis.com/v1/userinfo":GRAPH.substring(0,GRAPH.length()-1)+"?$select=id,displayName,mail,userPrincipalName",token);
         String key=required(value,provider==Provider.GOOGLE?"sub":"id",1024);
-        return new Account(key,text(value,provider==Provider.GOOGLE?"name":"displayName",1024).orElse(key));
+        var address=text(value,provider==Provider.GOOGLE?"email":"mail",1024);if(address.isEmpty()&&provider==Provider.MICROSOFT)address=text(value,"userPrincipalName",1024);
+        return new Account(key,address.orElseGet(()->text(value,provider==Provider.GOOGLE?"name":"displayName",1024).orElse(key)));
     }
     Page<RemoteList> lists(String token,String next){
         String collection=provider==Provider.GOOGLE?GOOGLE+"users/@me/lists":GRAPH+"todo/lists";

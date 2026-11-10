@@ -22,9 +22,9 @@ function connection(owner,overrides={}){
   return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],identityReviews:[],reviewAdditions:true,projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
   const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
-  for(const [path,items]of [['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
+  for(const [path,items]of [['clients',clients],['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
     const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
   });
@@ -37,7 +37,7 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     const reply=(body,status=200)=>route.fulfill({status,headers:{...headers,ETag:`"provider-${body?.version??0}"`},...(status===204?{}:{body:JSON.stringify(body)})});
     if(method!=='GET')model.writes.push({path,method,input,headers:request.headers()});else model.reads++;
     if(path==='')return reply({items:model.rows,providers:model.providers,refreshMinutes:15});
-    if(path.endsWith('/authorize'))return reply({authorizationUrl:authorization||`https://${path.startsWith('/google')?'accounts.google.com/o/oauth2/v2/auth':'login.microsoftonline.com/common/oauth2/v2.0/authorize'}?state=${state}`,expiresAt:'2026-11-09T12:10:00Z'});
+    if(path.endsWith('/authorize'))return reply({authorizationUrl:authorization||`https://${path.startsWith('/google')?'accounts.google.com/o/oauth2/v2/auth':'login.microsoftonline.com/common/oauth2/v2.0/authorize'}?state=${state}`,expiresAt:'2026-11-09T12:10:00Z',...(authorizationOrigin?{authorizationOrigin}:{})});
     if(path==='/complete'){model.completed++;expect(input).toEqual({state,code});expect(new URL(page.url()).search).toBe('');expect(request.headers().referer).not.toContain(code);expect(request.headers().referer).not.toContain(state);return reply(model.rows[0]);}
     if(path==='/cancel'){model.cancelled++;expect(input).toEqual({state});return reply(null,204);}
     const row=model.rows.find(value=>path.startsWith('/'+value.id));if(!row)return reply({type:'about:blank',title:'Not found',status:404,code:'NOT_FOUND'},404);
@@ -76,6 +76,7 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
       }
     }
     if(method==='GET')return reply(row);
+    if(method==='PUT'&&path.endsWith('/calendars')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedCalendars=input.selectedCalendars;row.calendarMappings=input.calendarMappings;row.version++;row.calendarConfigurationVersion=(row.calendarConfigurationVersion??0)+1;return reply(row);}
     if(method==='PUT'&&path.endsWith('/lists')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedLists=input.selectedLists;row.projectMappings=input.projectMappings;if(Object.hasOwn(input,'reviewAdditions'))row.reviewAdditions=input.reviewAdditions;row.version++;row.configurationVersion++;row.syncing=true;return reply(row);}
     if(method==='PUT'&&path.endsWith('/state')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.paused=input.paused;row.version++;return reply(row);}
     if(method==='DELETE'){model.rows=model.rows.filter(value=>value!==row);return reply(null,204);}
@@ -90,12 +91,46 @@ async function open(page){await page.goto('/web/#account/task-providers');await 
 const card=(page,id)=>page.locator(`[data-task-provider-id="${id}"]`);
 test.afterEach(async({page,request})=>{await page.unrouteAll({behavior:'wait'});await locale(request,'en-GB');});
 
+test('provider accounts and unauthenticated subscriptions remain separate choices without administrator setup',async({page,request})=>{
+  const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],providers:{google:false,microsoft:false}});await open(page);
+  const google=page.locator('[data-internet-provider=google]'),microsoft=page.locator('[data-internet-provider=microsoft]');
+  await expect(google.getByRole('heading',{name:'Google',exact:true})).toBeVisible();await expect(microsoft.getByRole('heading',{name:'Microsoft',exact:true})).toBeVisible();
+  await expect(google.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();await expect(microsoft.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeEnabled();
+  await expect(page.getByText(/enabled by the server administrator/)).toHaveCount(0);
+  await page.getByRole('link',{name:'Add a calendar subscription',exact:true}).click();await expect(page).toHaveURL(/#account\/calendars$/);await expect(page.locator('#calendar-subscription-add')).toBeVisible();expect(model.writes).toEqual([]);
+});
+
+test('calendar-only sign-in uses the shared service and does not request task writes',async({page,request})=>{
+  const owner=await signIn(page,request),origin='https://connect.example.test',target=origin+'/connect/'+'c'.repeat(43),model=await providerFixture(page,owner,{rows:[],authorization:target,authorizationOrigin:origin});
+  await page.route(origin+'/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Dagsverk shared sign-in</title><h1>Shared sign-in</h1>'}));await open(page);
+  const google=page.locator('[data-internet-provider=google]');await google.getByRole('checkbox',{name:'Tasks',exact:true}).uncheck();await expect(google.getByRole('combobox',{name:'Task synchronization',exact:true})).toBeDisabled();
+  await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(target);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:false,calendars:true},language:'en',direction:'IMPORT'});
+});
+
+test('calendar and task drafts save independently on one connected account',async({page,request})=>{
+  const owner=await signIn(page,request),client={id:randomUUID(),name:'Client'},row=connection(owner,{services:{tasks:true,calendars:true,writableTasks:false},availableCalendars:[{id:'team',name:'Team calendar',readable:true},{id:'personal',name:'Personal calendar',readable:true}],selectedCalendars:['team'],calendarMappings:{team:client.id},calendarConfigurationVersion:1});
+  const model=await providerFixture(page,owner,{rows:[row],clients:[client]});await open(page);const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true}),personal=panel.getByRole('checkbox',{name:'Personal calendar',exact:true});
+  await home.check();await personal.check();await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(home).toBeChecked();await expect(personal).toBeChecked();
+  await panel.getByRole('button',{name:'Save calendars',exact:true}).click();await expect(panel.getByText('Calendar selection saved. Synchronization will start shortly.',{exact:true})).toBeVisible();await expect(home).toBeChecked();expect(row.selectedLists).toEqual(['work']);expect(row.selectedCalendars).toEqual(['team','personal']);
+  await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();await expect(personal).toBeChecked();expect(row.selectedLists).toEqual(['work','home']);
+  expect(model.writes.find(item=>item.path.endsWith('/calendars')).input).toEqual({selectedCalendars:['team','personal'],calendarMappings:{team:client.id,personal:client.id}});expect(model.writes.find(item=>item.path.endsWith('/lists')).input).not.toHaveProperty('selectedCalendars');
+});
+
+for(const language of ['en-GB','nb-NO'])test('Internet accounts and both synchronization controls fit every theme in '+language,async({page,request})=>{
+  test.setTimeout(120000);const owner=await signIn(page,request,{language}),client={id:randomUUID(),name:'Client'},row=connection(owner,{services:{tasks:true,calendars:true,writableTasks:false},availableCalendars:[{id:'team',name:'Team calendar',readable:true}],selectedCalendars:['team'],calendarMappings:{team:client.id},calendarConfigurationVersion:1});await providerFixture(page,owner,{rows:[row],clients:[client]});await open(page);const nb=language==='nb-NO';
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Internettkontoer':'Internet accounts',exact:true}).click();
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(card(page,row.id).getByRole('button',{name:nb?'Lagre kalendere':'Save calendars',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  }
+  const accessibility=await new AxeBuilder({page}).include('#account-content').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/internet-accounts-'+language+'-320.png',fullPage:true});
+});
+
 test('provider setup availability and read-only sessions do not acquire write controls',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],providers:{google:true,microsoft:false}});await open(page);
-  await expect(page.getByRole('heading',{name:'Task connections',exact:true})).toBeVisible();
-  for(const name of ['Connect Google Tasks','Connect Microsoft To Do','Save','Refresh from provider','Pause synchronization','Reconnect','Disconnect'])await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();
+  await expect(page.getByRole('heading',{name:'Internet accounts',exact:true})).toBeVisible();
+  for(const name of ['Connect Google','Connect Microsoft','Save','Refresh from provider','Pause synchronization','Reconnect','Disconnect'])await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();
   await expect(card(page,row.id).getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Refresh status',exact:true})).toBeEnabled();
-  await expect(page.getByText('Unavailable task providers must be enabled by the server administrator.',{exact:true})).toBeVisible();expect(model.writes).toEqual([]);
+  await expect(page.getByText('Shared sign-in is temporarily unavailable. Try again later, or add a calendar subscription.',{exact:true})).toBeVisible();expect(model.writes).toEqual([]);
 });
 
 test('list drafts survive status updates and stale saves keep the captured selection',async({page,request})=>{
@@ -118,7 +153,7 @@ test('provider status errors are actionable and remain text in all themes and na
   test.setTimeout(120000);const owner=await signIn(page,request),row=connection(owner,{name:'Account <img src=x onerror=alert(1)> '+ 'LongName'.repeat(24),lastError:'TASK_PROVIDER_RECONNECT_REQUIRED'});await providerFixture(page,owner,{rows:[row]});await open(page);
   await expect(card(page,row.id).getByText('Reconnect this account and grant task access to resume synchronization.',{exact:true})).toBeVisible();await expect(card(page,row.id).locator('img')).toHaveCount(0);
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:'Task connections',exact:true}).click();await expect(card(page,row.id)).toBeVisible();
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(card(page,row.id)).toBeVisible();
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   }
   await captureScreenshot(page,{path:'test-results/task-providers-320.png',fullPage:true});
@@ -160,14 +195,14 @@ test('read-only sessions can inspect but cannot approve imports',async({page,req
 
 test('task connections and failure states are localized in Norwegian',async({page,request})=>{
   const owner=await signIn(page,request,{language:'nb-NO'}),row=connection(owner,{lastError:'TASK_PROVIDER_CONFLICTS',pendingCount:2});await providerFixture(page,owner,{rows:[row]});await open(page);
-  await expect(page.getByRole('heading',{name:'Oppgavekoblinger',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Koble til Google Tasks',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes. Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Internettkontoer',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Koble til Google',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes. Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
 });
 
 test('Google access defaults to import-only and write consent is an explicit choice',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
-  const access=page.getByRole('combobox',{name:'Google access',exact:true});await expect(access).toHaveValue('IMPORT');
-  await access.selectOption('TWO_WAY');await page.getByRole('button',{name:'Connect Google Tasks',exact:true}).click();
-  await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY'});
+  const access=page.getByRole('combobox',{name:'Task synchronization',exact:true});await expect(access).toHaveValue('IMPORT');
+  await access.selectOption('TWO_WAY');await page.getByRole('button',{name:'Connect Google',exact:true}).click();
+  await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY',services:{tasks:true,calendars:true},language:'en'});
 });
 
 test('preparing a change selects a real owned task and retains the selection during status polling',async({page,request})=>{
@@ -213,7 +248,7 @@ for(const language of ['en-GB','nb-NO'])test('Google write comparisons stay read
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id,state:'ACK_REVIEW',canConfirm:false,canResolve:true,conflictFields:['summary'],title:'Imported '+ 'Long task title '.repeat(15),remoteFields:{summary:'Changed at Google',body:{format:'TEXT',content:'Provider notes\n'+ 'LongUnbrokenProviderText'.repeat(40)}},localFields:{summary:'Changed locally',body:{format:'HTML',content:'<img src=x onerror=alert(1)>\nLocal notes stay here'}}});
   const model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:language==='nb-NO'?'Oppgavekoblinger':'Task connections',exact:true}).click();
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:language==='nb-NO'?'Internettkontoer':'Internet accounts',exact:true}).click();
     const panel=card(page,row.id);await panel.getByRole('button',{name:language==='nb-NO'?'Gjennomgå resultat':'Review result',exact:true}).click();await expect(panel.locator('img')).toHaveCount(0);
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   }
@@ -241,7 +276,7 @@ test('uncertain creation identity remains an explicit choice and a stale scan pr
 for(const language of ['en-GB','nb-NO'])test('creation identity review fits every theme and remains accessible in '+language,async({page,request})=>{
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true}),remoteId='google-identity-'.repeat(60);
   await providerFixture(page,owner,{rows:[row],jobs:[job],candidates:[{externalId:remoteId,fields:{summary:'A very long task title '.repeat(30),body:{format:'TEXT',content:'Google source notes '.repeat(10)}}}]});await open(page);
-  const nb=language==='nb-NO',nav=nb?'Oppgavekoblinger':'Task connections',review=nb?'Gjennomgå resultat':'Review result',find=nb?'Finn Google-oppgaver uten kobling':'Find unlinked Google tasks',label=nb?'Google-identitet som skal kobles':'Google identity to link';
+  const nb=language==='nb-NO',nav=nb?'Internettkontoer':'Internet accounts',review=nb?'Gjennomgå resultat':'Review result',find=nb?'Finn Google-oppgaver uten kobling':'Find unlinked Google tasks',label=nb?'Google-identitet som skal kobles':'Google identity to link';
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
     await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nav,exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:review,exact:true}).click();await panel.getByRole('button',{name:find,exact:true}).click();await panel.getByRole('combobox',{name:label,exact:true}).selectOption(remoteId);await expect(panel.getByText(remoteId,{exact:true})).toBeVisible();
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1100});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
@@ -251,14 +286,14 @@ for(const language of ['en-GB','nb-NO'])test('creation identity review fits ever
 
 test('authorization responses cannot navigate to an unrelated host',async({page,request})=>{
   const owner=await signIn(page,request);await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
-  await page.getByRole('button',{name:'Connect Google Tasks',exact:true}).click();await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(new URL(page.url()).pathname).toBe('/web/');
+  await page.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(new URL(page.url()).pathname).toBe('/web/');
 });
 
 test('callback removes provider codes from history and referrers before completing the owned connection',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner);
   const callback=new URL('/web/task-provider-callback.html?'+new URLSearchParams({state,code}),process.env.TIMEKEEPER_WEB_URL).href;
   await page.route('https://accounts.google.com/o/oauth2/v2/auth*',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><html lang="en"><head><title>Provider fixture</title></head><body><a href="'+callback.replaceAll('&','&amp;').replaceAll('"','&quot;')+'">Continue</a></body></html>'}));
-  await page.goto('https://accounts.google.com/o/oauth2/v2/auth?fixture=1');await page.getByRole('link',{name:'Continue',exact:true}).click();await expect(page).toHaveURL(/\/web\/#account\/task-providers$/);await expect(page.getByRole('heading',{name:'Task connections',exact:true})).toBeVisible();expect(model.completed).toBe(1);
+  await page.goto('https://accounts.google.com/o/oauth2/v2/auth?fixture=1');await page.getByRole('link',{name:'Continue',exact:true}).click();await expect(page).toHaveURL(/\/web\/#account\/task-providers$/);await expect(page.getByRole('heading',{name:'Internet accounts',exact:true})).toBeVisible();expect(model.completed).toBe(1);
   expect(await page.evaluate(({state,code})=>[...Object.values(localStorage),...Object.values(sessionStorage)].some(value=>value.includes(state)||value.includes(code)),{state,code})).toBe(false);
 });
 
@@ -296,7 +331,7 @@ test('read-only Dagsverk sessions can inspect incoming conflicts without resolvi
 for(const language of ['en-GB','nb-NO'])test('incoming review remains readable in every theme and narrow layout in '+language,async({page,request})=>{
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),listId=randomUUID(),row=connection(owner,{reviews:[{listId,remoteListId:'work'}]}),review=incomingReview({externalId:'google-id-'.repeat(90),localFields:{summary:'Local '+ 'Task title '.repeat(20),body:{format:'HTML',content:'<b>Local draft</b>'+ 'unbroken'.repeat(80)}},remoteFields:{summary:'Google '+ 'Task title '.repeat(20),body:{format:'TEXT',content:'Google notes '+ 'unbroken'.repeat(80)}}});await providerFixture(page,owner,{rows:[row],reviews:[review]});await open(page);
   const nb=language==='nb-NO';for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
-    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Oppgavekoblinger':'Task connections',exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:nb?'Gjennomgå innkommende endringer: Work':'Review incoming changes: Work',exact:true}).click();
+    await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Internettkontoer':'Internet accounts',exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:nb?'Gjennomgå innkommende endringer: Work':'Review incoming changes: Work',exact:true}).click();
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(panel.getByRole('button',{name:nb?'Behold Dagsverk ved konflikter':'Keep Dagsverk for conflicts',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   }
   const accessibility=await new AxeBuilder({page}).include('[data-task-provider-id="'+row.id+'"]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/task-incoming-review-'+language+'.png',fullPage:true});
@@ -332,6 +367,6 @@ test('read-only native sessions can inspect new identities but cannot import or 
 });
 for(const language of ['en-GB','nb-NO'])test('identity reconciliation fits all themes and narrow layouts in '+language,async({page,request})=>{
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{selectedLists:['work','home']}),fixture=identityTasks(row.id);fixture.task.summary='Native '+ 'Long task title '.repeat(12);row.identityReviews=[{listId:fixture.newList,remoteListId:'home',version:1}];await providerFixture(page,owner,{rows:[row],tasks:[fixture.task],lists:fixture.lists,identities:[identityReview({externalId:'observed-long-id-'.repeat(50),fields:{summary:'Google '+ 'Long task title '.repeat(12),body:{format:'TEXT',content:'Source notes '+ 'unbroken'.repeat(80)}}})]});await open(page);const nb=language==='nb-NO';
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Oppgavekoblinger':'Task connections',exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:nb?'Gjennomgå nye identiteter: Home':'Review new identities: Home',exact:true}).click();await panel.getByRole('combobox',{name:nb?'Eksisterende Dagsverk-oppgave og kildekobling':'Existing Dagsverk task and source link',exact:true}).selectOption(JSON.stringify({taskId:fixture.task.id,previous:{providerId:'google',repositoryId:'fixture-account/work',externalId:'old-source-id'}}));await expect(panel.getByText('<p>Native notes stay</p>',{exact:true})).toBeVisible();await expect(panel.getByText(nb?'Ikke startet':'Not started',{exact:true})).toBeVisible();for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}}
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Internettkontoer':'Internet accounts',exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:nb?'Gjennomgå nye identiteter: Home':'Review new identities: Home',exact:true}).click();await panel.getByRole('combobox',{name:nb?'Eksisterende Dagsverk-oppgave og kildekobling':'Existing Dagsverk task and source link',exact:true}).selectOption(JSON.stringify({taskId:fixture.task.id,previous:{providerId:'google',repositoryId:'fixture-account/work',externalId:'old-source-id'}}));await expect(panel.getByText('<p>Native notes stay</p>',{exact:true})).toBeVisible();await expect(panel.getByText(nb?'Ikke startet':'Not started',{exact:true})).toBeVisible();for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}}
   const accessibility=await new AxeBuilder({page}).include('[data-task-provider-id="'+row.id+'"]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/task-identities-'+language+'.png',fullPage:true});
 });

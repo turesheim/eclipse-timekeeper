@@ -1,9 +1,9 @@
-# Google Tasks and Microsoft To Do
+# Internet accounts, calendars and tasks
 
 Ordinary calendar subscriptions import calendar events and any `VTODO` records
 actually included in the feed. They do not grant access to a separate task
-service. Connect Google Tasks or Microsoft To Do under **Account → Task
-connections**, then select the lists to import. Choose an optional Dagsverk
+service. Google Calendar and Microsoft calendar subscriptions do not contain
+Google Tasks or Microsoft To Do records. Connect Google or Microsoft under **Account → Internet accounts**, then select the lists to import. Choose an optional Dagsverk
 project for each selected list. **Review import** shows counts and sample titles;
 **Import this list** accepts the complete first import. Selecting a list alone
 does not create tasks. The connection belongs to the signed-in Dagsverk account.
@@ -107,11 +107,45 @@ iCloud Reminders is not connected by these cloud adapters. Calendar subscription
 feeds that supply tasks remain supported; direct Reminders access requires a
 separate Apple-authorized connector.
 
-## Register the server
+## Choose sign-in or a subscription
 
-An operator configures a confidential web application before its Connect button
-becomes available. Each user then grants their own read access. No provider
-password is entered into Dagsverk.
+**Account → Internet accounts** offers separate Google and Microsoft sections.
+Choose Calendars, Tasks or both before connecting. One sign-in supports two
+independent synchronizers: save selected calendars with optional client mappings,
+and select task lists with optional project mappings separately. Calendar-only
+access does not request task access. Read-only calendar events appear alongside
+subscription events in Today and Week; they do not create tasks or worked time.
+Each managed calendar can be refreshed or removed from **Account → Calendars**.
+Saving calendar choices preserves unsaved task-list choices, and vice versa.
+
+The same page offers **Add a calendar subscription**. This opens the ordinary
+HTTPS/webcal feed setup without provider login. Specialized feeds that actually
+include VTODO remain supported under Advanced feed options. Google and Microsoft
+calendar feeds should use the normal Calendar events choice.
+
+Shared sign-in is the default. Its one central OAuth registration serves all
+installations; each user still authorizes their own account and selected
+services. No local administrator provider enablement or per-NAS registration is
+required. If shared sign-in is temporarily unavailable, existing imported data
+and ordinary subscriptions remain usable. The service must first be hosted and
+registered by the project; see [shared sign-in operations](SHARED-SIGN-IN.md).
+
+Google calendar synchronization keeps incremental checkpoints, resetting expired
+sync tokens with a complete scan. Microsoft reads complete calendar definitions,
+recurring masters and exceptions. Incomplete or invalid pages keep the last
+complete calendar cache. Calendar catalogs and event errors are reported
+separately from task import errors. Sources above 5,000 event definitions or
+32 MiB are rejected without replacing existing events; generated iCalendar also
+has the existing 2 MiB bound. Windows time zones use the vendored Unicode CLDR 48
+mapping and its bundled Unicode license.
+
+## Advanced: direct server registration
+
+Existing self-managed registrations remain supported for task-only connections.
+Opt out of shared sign-in with `timekeeper.connect.shared=false` (or
+`TIMEKEEPER_CONNECT_SHARED=false`) before using these settings. Direct legacy
+registration does not add the new calendar API synchronizer. No provider password
+is entered into Dagsverk.
 
 Configure Dagsverk's public HTTPS origin first, including its port. For example,
 `https://dagsverk.example.ts.net:8443` requires this exact redirect:
@@ -197,8 +231,9 @@ origin unless central service settings already provide it.
 Access and refresh tokens reside in private, owner-scoped server records. Public
 connection resources, portable exports and account archives exclude them.
 Reconnect after importing an account archive. Whole-instance/database backups
-contain those records and need matching operator app registrations. Native
-application backups include both.
+contain those records. Shared grants also depend on the central service retaining
+its matching encrypted records; direct grants need matching operator app
+registrations. Native application backups include local settings and records.
 
 `TIMEKEEPER_TASK_AUTOMATIC=false` disables scheduled task imports for standalone
 servers; in an operator properties file use `timekeeper.tasks.automatic=false`.
@@ -212,7 +247,7 @@ deployment.
 
 ### Incoming conflicts and confirmed deletions
 
-Open **Account → Task connections → Review incoming changes** for the affected
+Open **Account → Internet accounts → Review incoming changes** for the affected
 list. The comparison uses the saved complete provider scan and shows its time,
 source identity, local values and observed remote values. Filter by title or
 exact source identity when a list has more than 100 decisions. Polling retains

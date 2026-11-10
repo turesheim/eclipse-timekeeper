@@ -230,7 +230,8 @@ the explicit [operator recovery](ACCOUNTS.md#change-the-public-hostname) workflo
 See [email recovery and hostname changes](ACCOUNTS.md#recovery-email-addresses)
 before enabling delivery or changing a VPN/public hostname.
 
-Google Tasks and Microsoft To Do app registrations are optional. Their retained
+Internet accounts use shared sign-in without per-NAS OAuth setup. Optional
+legacy direct task app registrations retain their
 `secrets/task_providers.properties` stays outside generated runtime settings and
 is included in native and Hyper Backup application archives. See
 [task-provider setup](TASK-PROVIDERS.md) for registration and account sign-in.

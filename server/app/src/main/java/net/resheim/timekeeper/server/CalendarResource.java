@@ -35,7 +35,7 @@ public class CalendarResource {
         var response=tx(()->ApiReplies.resource(200,calendars().visible(calendars().edit(key,match,input,refresh.policy())),null));refresh.wake();return response;
     }
     @DELETE @Path("/calendar-subscriptions/{id}") public Response remove(@PathParam("id")String id,@HeaderParam("If-Match")String match){
-        UUID key=ContractInputs.pathId(id);noQueries();return tx(()->{calendars().remove(key,match);return new ApiReplies(204,null,null,null);});
+        UUID key=ContractInputs.pathId(id);noQueries();return tx(()->{if(calendars().required(key).hasNonNull("managedConnectionId"))new InternetCalendars(store).removeSubscription(key,match);else calendars().remove(key,match);return new ApiReplies(204,null,null,null);});
     }
     @POST @Path("/calendar-subscriptions/{id}/refresh") @Consumes("*/*") public Response refresh(@PathParam("id")String id){
         UUID key=ContractInputs.pathId(id);noQueries();return refresh.refresh(identity,key).response();

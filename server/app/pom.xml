@@ -19,6 +19,7 @@
     </dependencies>
   </dependencyManagement>
   <dependencies>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-provider-http</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.google.crypto.tink</groupId><artifactId>tink</artifactId><version>1.23.0</version></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-http-client</artifactId><version>${project.version}</version><scope>test</scope></dependency>
     <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>1.5.9</version></dependency>

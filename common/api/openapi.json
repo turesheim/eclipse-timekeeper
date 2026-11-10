@@ -21492,6 +21492,100 @@
           }
         }
       }
+    },
+    "/task-providers/{id}/calendars": {
+      "put": {
+        "operationId": "selectInternetAccountCalendars",
+        "summary": "Choose calendars for the connected provider account, independently of task lists",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderConnection"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternetCalendarSelectionInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -29293,7 +29387,10 @@
             "minimum": 0
           },
           "name": {
-            "$ref": "#/components/schemas/Name"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
@@ -29337,6 +29434,12 @@
           "includeTodos": {
             "type": "boolean",
             "description": "Include VTODO items. Defaults to false on creation; omission preserves an existing selection. At least one item type must be enabled."
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
           }
         },
         "required": [
@@ -37292,6 +37395,46 @@
             ],
             "default": "IMPORT",
             "description": "Import-only by default. TWO_WAY explicitly requests write consent; currently supported for Google Tasks only."
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "tasks": {
+                "type": "boolean"
+              },
+              "calendars": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "tasks",
+              "calendars"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "properties": {
+                  "tasks": {
+                    "const": true
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "calendars": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "nb"
+            ],
+            "default": "en"
           }
         },
         "required": [],
@@ -37308,6 +37451,12 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "authorizationOrigin": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 8192,
+            "description": "Origin of the shared Dagsverk sign-in service; absent for legacy direct authorization."
           }
         },
         "required": [
@@ -37613,6 +37762,76 @@
               ],
               "additionalProperties": false
             }
+          },
+          "services": {
+            "$ref": "#/components/schemas/InternetAccountServices"
+          },
+          "availableCalendars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InternetCalendar"
+            },
+            "maxItems": 1000
+          },
+          "selectedCalendars": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "calendarMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "maxProperties": 20
+          },
+          "calendarConfigurationVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calendarLastAttempt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calendarLastSuccess": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calendarRetryUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calendarLastError": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -38642,6 +38861,77 @@
             "maximum": 2147483647
           }
         }
+      },
+      "InternetAccountServices": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "boolean"
+          },
+          "calendars": {
+            "type": "boolean"
+          },
+          "writableTasks": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tasks",
+          "calendars",
+          "writableTasks"
+        ],
+        "additionalProperties": false
+      },
+      "InternetCalendar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "readable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "readable"
+        ],
+        "additionalProperties": false
+      },
+      "InternetCalendarSelectionInput": {
+        "type": "object",
+        "properties": {
+          "selectedCalendars": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "calendarMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "maxProperties": 20
+          }
+        },
+        "required": [
+          "selectedCalendars",
+          "calendarMappings"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

@@ -22,6 +22,19 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_internet_account_services_and_calendar_choices_have_separate_owned_commands(self):
+        for tasks,calendars in [(True,False),(False,True),(True,True)]:
+            validator('TaskProviderAuthorizeInput').validate({'services':{'tasks':tasks,'calendars':calendars},'direction':'IMPORT'})
+        for value in [{'services':{'tasks':False,'calendars':False}}, {'services':{'tasks':True,'calendars':True,'clientSecret':'private'}}, {'clientId':'operator-registration'}, {'services':{'tasks':True,'calendars':True,'writableTasks':True}}]:
+            self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid(value))
+        command={'selectedCalendars':['work'],'calendarMappings':{'work':ID}}
+        validator('InternetCalendarSelectionInput').validate(command)
+        for extra in ({'selectedLists':['tasks']},{'ownerId':'another-owner'},{'accessToken':'private'}):
+            self.assertFalse(validator('InternetCalendarSelectionInput').is_valid({**command,**extra}))
+        operation=CONTRACT['paths']['/task-providers/{id}/calendars']['put']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+
     def test_identity_decisions_cannot_inject_remote_fields_or_replace_without_a_native_revision(self):
         create={'externalId':'observed-id','decision':'IMPORT'}
         validator('TaskProviderIdentityDecisionInput').validate(create)
@@ -821,6 +834,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
+            'selectInternetAccountCalendars',
             'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'leaveTaskProviderCreationUnresolved', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview', 'listTaskProviderIdentityReviews', 'decideTaskProviderIdentity',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',

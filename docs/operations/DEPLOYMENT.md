@@ -124,9 +124,9 @@ containers leaves these directories in place. Keep them outside the Container
 Manager project directory, and preserve them during project cleanup.
 The application uses a separate, non-superuser database role.
 
-Optional Google Tasks and Microsoft To Do app registrations use a retained
-private properties file. See [task-provider setup](TASK-PROVIDERS.md) before
-enabling account connections or restoring their credentials.
+Internet accounts use shared sign-in without per-server OAuth setup. Optional
+legacy direct task registrations use a retained private properties file. See
+[Internet accounts](TASK-PROVIDERS.md) for both modes and recovery.
 
 The server database is separate from Eclipse's embedded H2 database. Existing
 H2 files cannot be mounted as PostgreSQL storage. Move user data through the

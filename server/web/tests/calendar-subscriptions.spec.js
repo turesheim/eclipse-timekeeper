@@ -62,7 +62,7 @@ test('calendar sharing guidance explains provider links and task limits with key
   const {page,context}=await setup(browser,request);
   try{
     await page.goto('/web/#account/calendars');await ready(page);await manage(page);
-    const guide=page.getByRole('region',{name:'How to share calendars and tasks',exact:true});await expect(guide).toBeVisible();
+    const guide=page.getByRole('region',{name:'Calendar subscriptions without sign-in',exact:true});await expect(guide).toBeVisible();
     await expect(page.locator('#calendar-subscriptions-content')).toContainText('HTTPS or webcal');
     await expect(guide).toContainText('Removing a subscription here does not revoke its link');
     for(const [name,step,host,key]of [
@@ -74,8 +74,8 @@ test('calendar sharing guidance explains provider links and task limits with key
       await summary.focus();await page.keyboard.press(key);await expect(details).toHaveAttribute('open','');await expect(details).toContainText(step);
       const help=details.getByRole('link');expect(new URL(await help.getAttribute('href')).hostname).toBe(host);await expect(help).toHaveAttribute('rel','noopener noreferrer');
     }
-    const tasks=guide.locator('summary').filter({hasText:'Tasks and reminders'});await tasks.focus();await page.keyboard.press('Enter');
-    await expect(tasks.locator('..')).toContainText('VTODO');await expect(tasks.locator('..')).toContainText('Microsoft To Do, Google Tasks and Apple Reminders');await expect(tasks.locator('..')).toContainText('enable To-do items');
+    const tasks=guide.locator('summary').filter({hasText:'Specialized task feeds'});await tasks.focus();await page.keyboard.press('Enter');
+    await expect(tasks.locator('..')).toContainText('VTODO');await expect(tasks.locator('..')).toContainText('Google Tasks and Microsoft To Do are not included');await expect(tasks.locator('..')).toContainText('ordinary Google or Microsoft calendar subscription supplies calendar events');
     await captureScreenshot(page,{path:'test-results/account-calendar-sharing-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await captureScreenshot(page,{path:'test-results/account-calendar-sharing-mobile.png',fullPage:true});
@@ -318,11 +318,11 @@ test('subscribed calendar to-dos show due dates and completion in Week and Today
     await events.getByRole('button').filter({hasText:'Submit report'}).click();await expect(page.locator('#today-event-details')).toContainText('Read-only calendar task');await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
     expect((await(await api('GET',reportPath)).json()).total).toBe(before);
     await manage(page);await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();
-    const edit=page.locator('#calendar-subscription-editor');await expect(edit.getByLabel('Calendar events',{exact:true})).not.toBeChecked();await expect(edit.getByLabel('To-do items',{exact:true})).toBeChecked();
-    await edit.getByLabel('To-do items',{exact:true}).uncheck();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit.getByRole('alert')).toContainText('Select calendar events');
+    const edit=page.locator('#calendar-subscription-editor');await expect(edit.getByLabel('Calendar events',{exact:true})).not.toBeChecked();await expect(edit.getByLabel('Tasks supplied by a specialized task feed',{exact:true})).toBeChecked();
+    await edit.getByLabel('Tasks supplied by a specialized task feed',{exact:true}).uncheck();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit.getByRole('alert')).toContainText('Select calendar events');
     await edit.getByLabel('Calendar events',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);
     await expect(events.locator('[data-today-event]')).toHaveCount(1);await expect(events).toContainText('Selected meeting');
-    await manage(page);await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();await edit.getByLabel('To-do items',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);await expect(events.locator('[data-today-event]')).toHaveCount(4);
+    await manage(page);await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();await edit.getByText('Advanced feed options',{exact:true}).click();await edit.getByLabel('Tasks supplied by a specialized task feed',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);await expect(events.locator('[data-today-event]')).toHaveCount(4);
   }finally{await context.close();}
 });
 

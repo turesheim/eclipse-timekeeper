@@ -175,11 +175,12 @@ therefore requires pausing writes until every replica supports Work Sessions.
 Keep compatible server builds for subsequent image rollback; a downgrade to the
 previous domain model requires a matching pre-upgrade backup.
 
-## Cloud task connections
+## Internet accounts
 
-Google Tasks and Microsoft To Do use separate account connections rather than
-ordinary calendar subscription URLs. Configure an operator app registration,
-then select lists under **Account → Task connections**. See
+Sign in to Google or Microsoft under **Account → Internet accounts** for separate
+calendar and task synchronization through shared sign-in. No per-server provider
+registration is required. Ordinary calendar subscriptions remain available
+without provider login. See
 [task-provider setup and recovery](TASK-PROVIDERS.md) for configuration,
 supported import behavior and verification limits.
 

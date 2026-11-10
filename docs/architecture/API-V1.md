@@ -215,7 +215,7 @@ Providers may expose only the flags, leaving participant details empty.
 `PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
 list updates preserve it. Portable JSON/CSV and account archives retain it.
 
-Cloud sign-in and import use `/task-providers`, separate from portable connection
+Internet account sign-in and synchronization use `/task-providers`, separate from portable connection
 metadata. `GET` returns configured-provider availability and owned status with
 discovered/selected lists. `POST /task-providers/{provider}/authorize` starts a
 browser-bound PKCE flow for `google` or `microsoft`; `POST
@@ -224,6 +224,20 @@ browser-bound PKCE flow for `google` or `microsoft`; `POST
 excluded from these responses and account archives. The callback is
 `/web/task-provider-callback.html` at the public origin; see
 [operator setup](../operations/TASK-PROVIDERS.md).
+
+Shared sign-in is the default: authorize accepts the selected `services`
+(`tasks`, `calendars`) and `language` (`en`, `nb`), and returns a validated
+`authorizationOrigin` with its authorization URL. The NAS retains owner/browser
+state and PKCE; the shared service holds provider registrations and refresh
+tokens. A one-use handoff returns only to the initiating installation. Legacy
+direct task registration remains an explicit operator opt-out.
+
+`PUT /task-providers/{id}/calendars` saves selected calendar IDs and optional
+owned-client mappings with `If-Match`. Its `calendarConfigurationVersion` is
+independent of task-list configuration. Managed calendar subscriptions are
+read-only API sources refreshed by the account worker, never by the URL feed
+fetcher. Calendar-only accounts do not create task lists. Plain calendar
+subscriptions remain independent and require no provider sign-in.
 
 `GET /task-providers/{id}` reads owned status. `PUT /task-providers/{id}/lists`
 replaces selected remote list IDs with `If-Match`; `DELETE /task-providers/{id}`

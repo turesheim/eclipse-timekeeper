@@ -14,7 +14,7 @@ import jakarta.enterprise.inject.Alternative;
 /** Test-only transport replacement; production keeps its fixed HTTPS provider hosts. */
 @Alternative @ApplicationScoped
 public class TaskProviderHttpTestFixture extends TaskProviderClients {
-    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;volatile boolean writable;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();final AtomicInteger writes=new AtomicInteger();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> patches=new ConcurrentHashMap<>();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> created=new ConcurrentHashMap<>();volatile boolean loseCreationReply;final Map<String,AtomicInteger> revisions=new ConcurrentHashMap<>();}
+    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;volatile boolean writable,catalogFailure;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();final AtomicInteger writes=new AtomicInteger();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> patches=new ConcurrentHashMap<>();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> created=new ConcurrentHashMap<>();volatile boolean loseCreationReply;final Map<String,AtomicInteger> revisions=new ConcurrentHashMap<>();}
     static final Map<String,State> STATES=new ConcurrentHashMap<>();
     @Override TaskProviderOAuth oauth(TaskCloudProvider.Provider provider){
         return new TaskProviderOAuth(provider,new TaskProviderHttp(Set.of("oauth2.googleapis.com","login.microsoftonline.com"),request->{
@@ -42,6 +42,7 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
                 var result=JsonValues.object();var items=result.putArray(google?"items":"value");items.add(task);if(google)state.created.forEach((key,value)->{if(key.startsWith(list+"/"))items.add(value.deepCopy());});return reply(200,result.toString());
             }
             if(path.endsWith("/lists")){
+                if(state.catalogFailure)return reply(503,"{}");
                 var result=JsonValues.object();var items=result.putArray(google?"items":"value");
                 for(int i=1;i<=2;i++)items.add(JsonValues.object().put("id","list-"+i).put(google?"title":"displayName",i==1?state.listName:"Home").put("isOwner",true).put("isShared",false));
                 return reply(200,result.toString());
@@ -80,8 +81,8 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
         var task=JsonValues.object().put("id","task-"+list).put("title",state.title+" "+list).put("status","needsAction").put("position","001");
         var patch=state.patches.get(list);if(patch!=null)task.setAll(patch);task.put("etag","\"fixture-"+state.revisions.computeIfAbsent(list,key->new AtomicInteger(1)).get()+"\"");return task;
     }
-    private static TaskProviderHttp.Reply reply(int status,String value){return new TaskProviderHttp.Reply(status,Map.of(),value.getBytes(StandardCharsets.UTF_8));}
-    private static String bytes(HttpRequest request){
+    static TaskProviderHttp.Reply reply(int status,String value){return new TaskProviderHttp.Reply(status,Map.of(),value.getBytes(StandardCharsets.UTF_8));}
+    static String bytes(HttpRequest request){
         var bytes=new java.io.ByteArrayOutputStream();var finished=new CompletableFuture<Void>();
         request.bodyPublisher().orElseThrow().subscribe(new Flow.Subscriber<ByteBuffer>(){
             public void onSubscribe(Flow.Subscription subscription){subscription.request(Long.MAX_VALUE);}

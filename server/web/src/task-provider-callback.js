@@ -13,7 +13,7 @@ try{
   const anonymous=new Api();let restored;
   try{restored=await anonymous.request('/auth/session');}finally{anonymous.close();}
   session=new Api(null,undefined,restored.data);const profile=await session.request('/me');setLocale(profile.data.locale);translate();
-  if(cancelled){await session.request('/task-providers/cancel',{method:'POST',body:{state}});result.textContent=t('task_providers.cancelled');}
+  if(cancelled){await session.request('/task-providers/cancel',{method:'POST',body:{state}});result.textContent=t(parameters.get('error')==='access_denied'?'task_providers.cancelled':'task_providers.sign_in_failed');}
   else{await session.request('/task-providers/complete',{method:'POST',body:{state,code},timeout:240000});result.textContent=t('task_providers.connected');location.replace('/web/#account/task-providers');}
 }catch{result.textContent=t('task_providers.not_confirmed');result.setAttribute('role','alert');}
 finally{parameters.delete('code');parameters.delete('state');session?.close();}
