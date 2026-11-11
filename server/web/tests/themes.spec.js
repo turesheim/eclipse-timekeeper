@@ -135,6 +135,13 @@ test('Dagsverk-reinvented is opt-in and can be compared with the original Dagsve
     await expect(other.locator('html')).toHaveAttribute('data-theme','timekeeper-reinvented-dark');
     await expect(other.locator('body')).toHaveCSS('font-family',/Inter Variable/);
     await expect(other.locator('.brand-symbol-dark')).toBeVisible();
+    for(const path of ['/web/project-report.html','/web/task-provider-callback.html']) {
+      await other.goto(path);await expect(other.locator('html')).toHaveAttribute('data-theme','timekeeper-reinvented-dark');
+      await expect(other.locator('body')).toHaveCSS('font-family',/Inter Variable/);
+      const faces=await other.evaluate(async()=>(await document.fonts.load('400 14px "Inter Variable"')).length);
+      expect(faces,path+' must load the bundled preview font').toBeGreaterThan(0);
+    }
+    await other.goto('/admin/');await expect(other.locator('.brand-symbol-dark')).toBeVisible();
     for(const [id,logo] of [['timekeeper-dark','dark'],['timekeeper','light']]) {
       await setTheme(page,id);
       await expect(other.locator('html')).toHaveAttribute('data-theme',id);
