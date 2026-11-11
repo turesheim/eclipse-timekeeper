@@ -2,17 +2,20 @@ import {expect} from '@playwright/test';
 
 export async function navigateView(page,name){
   if(['clients','projects'].includes(name)){
-    if(!await page.locator('#account-page').isVisible()){
+    if(!new URL(page.url()).hash.startsWith('#account')){
+      await expect(page.locator('#workspace')).toBeVisible();
       if(await page.locator('#account-menu').getAttribute('open')===null)await page.locator('#account-menu > summary').click();
       await page.locator('#account').click();
     }
+    await expect(page.locator('#account-page')).toBeVisible();
     await page.locator(`#account-navigation a[href="#account/${name}"]`).click();
     await expect(page.locator(`#${name}-panel`)).toBeVisible();
     await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');return;
   }
-  if(await page.locator('#account-page').isVisible())await page.locator('#account-page a[href="#tracking"]').click();
-  await page.locator(`[data-tab=${name}]`).click();
+  if(new URL(page.url()).hash.startsWith('#account'))await page.locator('#account-page a[href="#tracking"]').click();
   await expect(page.locator('#workspace')).toBeVisible();
+  await expect(page.locator('#account-page')).toBeHidden();
+  await page.locator(`[data-tab=${name}]`).click();
   await expect(page.locator(`[data-tab=${name}]`)).toHaveAttribute('aria-current','page');
   await expect(page.locator(`#${name}-panel`)).toHaveJSProperty('hidden',false);
 }
