@@ -36,6 +36,11 @@ existing rows and focused actions during unrelated synchronization. Notes retain
 revisions; note changes, local invalidation and the Notes Refresh action reload it.
 Notifications arriving during a catalog read or another busy operation remain
 pending for one follow-up reload when the view is ready.
+Today retains its calendar cards during background reads and only replaces them
+when event content, subscription warnings, focus, client presentation or the
+selected date/time zone changes. Unchanged feed polls also retain Week's timed
+and all-day cards. Synchronization leaves the journal draft and keyboard focus
+available while requests are pending.
 See [Synology synchronization diagnostics](../operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
 for request and database timings in the container logs.
 

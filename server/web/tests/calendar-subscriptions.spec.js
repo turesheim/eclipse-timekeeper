@@ -1,4 +1,4 @@
-import {clickNoteAction} from './editor-interactions.js';
+import {appendEditorText,clickNoteAction} from './editor-interactions.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
@@ -324,6 +324,71 @@ test('subscribed calendar to-dos show due dates and completion in Week and Today
     await edit.getByLabel('Calendar events',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);
     await expect(events.locator('[data-today-event]')).toHaveCount(1);await expect(events).toContainText('Selected meeting');
     await manage(page);await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();await edit.getByText('Advanced feed options',{exact:true}).click();await edit.getByLabel('Tasks supplied by a specialized task feed',{exact:true}).check();await edit.getByRole('button',{name:'Save',exact:true}).click();await expect(edit).toBeHidden();await tracking(page);await expect(events.locator('[data-today-event]')).toHaveCount(4);
+  }finally{await context.close();}
+});
+
+test('Today keeps unchanged calendar cards and typing responsive during background synchronization',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request);
+  let release;
+  try{
+    const date='2026-05-04',reply=await api('GET','/calendar-events?fromDate='+date+'&toDate=2026-05-05'),snapshot=await reply.json();
+    const event={key:'stable-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Stable meeting',description:'Original details',allDay:false,start:date+'T08:00:00Z',end:date+'T09:00:00Z',firstDate:date,endDate:'2026-05-05',clientId:client.id,clientName:client.name,calendarName:'Team planning',activityIds:[]};
+    snapshot.items=[event];let reads=0,gate,held=false;
+    await page.route('**/api/v1/calendar-events?*',async route=>{
+      if(gate){held=true;await gate;}
+      await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;
+    });
+    await page.clock.install();await page.locator('#today-date').fill(date);
+    const events=page.locator('#today-events'),card=events.locator('[data-today-event]');await expect(card).toHaveText(/Stable meeting/);
+    await card.focus();
+    await events.evaluate(root=>{window.calendarCard=root.querySelector('button');window.calendarMutations=0;new MutationObserver(records=>window.calendarMutations+=records.length).observe(root,{subtree:true,childList:true,characterData:true});});
+    let before=reads;await page.clock.fastForward(30000);await expect.poll(()=>reads).toBeGreaterThan(before);
+    expect(await events.evaluate(root=>root.querySelector('button')===window.calendarCard)).toBe(true);await expect(card).toBeFocused();
+    expect(await page.evaluate(()=>window.calendarMutations)).toBe(0);
+
+    // A snapshot and its calendar read must leave the existing cards and editor usable.
+    await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
+    const draft=page.locator('#today-journal-body');await draft.fill('Typing before sync');
+    gate=new Promise(resolve=>release=resolve);before=reads;await page.clock.fastForward(30000);await expect.poll(()=>held).toBe(true);
+    await page.locator('#refresh').click();await expect(page.locator('#refresh')).toBeEnabled();
+    await expect(card).toBeVisible();await draft.focus();await page.keyboard.press('End');await page.keyboard.type(' and during sync');
+    await expect(draft).toHaveValue('Typing before sync and during sync');await expect(draft).toBeFocused();
+    expect(await events.evaluate(root=>root.querySelector('button')===window.calendarCard)).toBe(true);
+    gate=null;release();release=null;await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(draft).toBeFocused();expect(await page.evaluate(()=>window.calendarMutations)).toBe(0);
+
+    event.title='Changed meeting';event.description='Updated details';event.hasNote=true;snapshot.errors[event.subscriptionId]='CALENDAR_INVALID_FEED';
+    before=reads;await page.clock.fastForward(30000);await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(card).toContainText('Changed meeting');await expect(card.locator('.bi-journal-text')).toHaveCount(1);await expect(events.locator('.alert-warning')).toBeVisible();
+    await expect(draft).toBeFocused();await expect(draft).toHaveValue('Typing before sync and during sync');
+    await card.click();await expect(page.locator('#today-event-details')).toContainText('Updated details');await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('#today-note-editor').getByRole('button',{name:'Formatted',exact:true}).click();
+    const formatted=page.locator('#today-journal-formatted .ProseMirror');await expect(formatted).toBeVisible();
+    let snapshotHeld=false;const snapshotGate=new Promise(resolve=>release=resolve);
+    await page.route('**/api/v1/projects?*',async route=>{snapshotHeld=true;await snapshotGate;await route.continue();});
+    await page.locator('#refresh').click();await expect.poll(()=>snapshotHeld).toBe(true);await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','true');
+    await appendEditorText(formatted.locator('p'),' and formatted typing');await expect(formatted).toBeFocused();
+    release();release=null;await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(formatted).toBeFocused();await expect(formatted).toContainText('and formatted typing');
+    snapshot.items=[];snapshot.errors={};before=reads;await page.clock.fastForward(30000);await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(card).toHaveCount(0);await expect(events).toContainText('No calendar events');await expect(events.locator('.alert-warning')).toHaveCount(0);
+    await expect(formatted).toBeFocused();await expect(formatted).toContainText('and formatted typing');
+  }finally{release?.();await context.close();}
+});
+
+test('Week retains unchanged timed and all-day calendar cards across feed polls',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request);
+  try{
+    const reply=await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-11'),snapshot=await reply.json();
+    const event={key:'stable-week-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Stable week meeting',allDay:false,start:'2026-05-04T08:00:00Z',end:'2026-05-04T09:00:00Z',firstDate:'2026-05-04',endDate:'2026-05-05',clientId:client.id,clientName:client.name,calendarName:'Team planning',color:client.color,activityIds:[]};
+    snapshot.items=[event,{...event,key:'stable-all-day',title:'Stable all-day plan',allDay:true}];let reads=0;
+    await page.route('**/api/v1/calendar-events?*',async route=>{await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;});
+    await calendar(page);const timed=page.locator('.calendar-planned[data-calendar-event-key="stable-week-meeting"]'),allDay=page.locator('.calendar-all-day-event');await expect(timed).toBeVisible();await expect(allDay).toContainText('Stable all-day plan');
+    await page.clock.install();await allDay.focus();
+    await page.evaluate(()=>{window.weekTimed=document.querySelector('.calendar-planned');window.weekAllDay=document.querySelector('.calendar-all-day-event');});
+    let before=reads;await page.clock.fastForward(30000);await expect.poll(()=>reads).toBeGreaterThan(before);
+    expect(await page.evaluate(()=>document.querySelector('.calendar-planned')===window.weekTimed&&document.querySelector('.calendar-all-day-event')===window.weekAllDay)).toBe(true);await expect(allDay).toBeFocused();
+    event.title='Updated week meeting';snapshot.items[1].title='Updated all-day plan';before=reads;await page.clock.fastForward(30000);await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(timed).toContainText('Updated week meeting');await expect(allDay).toContainText('Updated all-day plan');await expect(allDay).toBeFocused();
   }finally{await context.close();}
 });
 
