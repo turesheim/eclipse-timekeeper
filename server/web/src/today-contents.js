@@ -22,13 +22,16 @@ export class TodayContents {
       const key=JSON.stringify([!!editor,headings]);if(key===this.key)return;this.key=key;
       const focused=this.list.contains(document.activeElement)?[...this.list.querySelectorAll('button')].indexOf(document.activeElement):-1;
       this.list.replaceChildren();const base=Math.min(6,...headings.map(heading=>heading.level));
-      for(const heading of headings){
+      for(const [index,heading] of headings.entries()){
         const item=document.createElement('li'),pick=document.createElement('button');pick.type='button';pick.className='btn btn-link';pick.textContent=heading.text||t('markdown.heading_level',{level:heading.level});
         item.style.setProperty('--contents-depth',String(heading.level-base));
-        pick.addEventListener('click',()=>{
-          if(editor!==this.field.editor)return;
-          this.field.jumpToHeading(heading);
-          for(const button of this.list.querySelectorAll('button'))button.removeAttribute('aria-current');pick.setAttribute('aria-current','location');
+        pick.addEventListener('click',async()=>{
+          try{
+            const generation=this.field.generation,current=(await this.field.outline())[index];
+            if(!this.active||generation!==this.field.generation||current?.text!==heading.text||current?.level!==heading.level)return;
+            this.field.jumpToHeading(current);
+            for(const button of this.list.querySelectorAll('button'))button.removeAttribute('aria-current');pick.setAttribute('aria-current','location');
+          }catch{this.update();}
         });item.append(pick);this.list.append(item);
       }
       this.empty.textContent=t('today.no_headings');this.empty.hidden=!!headings.length;

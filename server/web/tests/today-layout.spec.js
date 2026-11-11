@@ -50,7 +50,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     expect(await field.locator('.ProseMirror h2').last().evaluate(node=>node.contains(getSelection().anchorNode))).toBe(true);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await field.getByRole('button',{name:locale==='nb-NO'?'Markdown-kilde':'Markdown source',exact:true}).click();
-    const source=page.locator('#today-journal-body');await choices.first().click();await expect(source).toBeFocused();await choices.last().click();
+    const source=page.locator('#today-journal-body');await choices.first().click();await expect(source).toBeFocused();await expect.poll(()=>source.evaluate(node=>node.selectionStart)).toBe(0);await choices.last().click();
     expect(await source.evaluate(node=>node.selectionStart)).toBe((await source.inputValue()).lastIndexOf('## Next steps'));
     expect(await source.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
