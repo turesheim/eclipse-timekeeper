@@ -17,6 +17,8 @@ export class TodayContents {
   }
   async paint(generation){
     try{
+      if(generation!==this.generation||!this.active)return;
+      if(this.field.loading){this.key=null;this.list.replaceChildren();this.empty.textContent=t('markdown.loading');this.empty.hidden=false;return;}
       const editor=this.field.editor,headings=await this.field.outline();
       if(generation!==this.generation||!this.active)return;
       const key=JSON.stringify([!!editor,headings]);if(key===this.key)return;this.key=key;
@@ -28,7 +30,7 @@ export class TodayContents {
         pick.addEventListener('click',async()=>{
           try{
             const generation=this.field.generation,current=(await this.field.outline())[index];
-            if(!this.active||generation!==this.field.generation||current?.text!==heading.text||current?.level!==heading.level)return;
+            if(!this.active||this.field.loading||generation!==this.field.generation||current?.text!==heading.text||current?.level!==heading.level)return;
             this.field.jumpToHeading(current);
             for(const button of this.list.querySelectorAll('button'))button.removeAttribute('aria-current');pick.setAttribute('aria-current','location');
           }catch{this.update();}

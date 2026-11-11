@@ -53,8 +53,8 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     const readerContext=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale,viewport:{width:1440,height:1000}});
     try{
       const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await reader.locator('#today-date').fill(date);
-      await expect(reader.locator('#today-contents-list button')).toHaveCount(4);await reader.locator('#today-contents-list button').last().click();
       await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
+      await expect(reader.locator('#today-contents-list button')).toHaveCount(4);await reader.locator('#today-contents-list button').last().click();
       await expect(reader.locator('#today-note-editor .ProseMirror h2').last()).toBeInViewport();
     }finally{await readerContext.close();}
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);

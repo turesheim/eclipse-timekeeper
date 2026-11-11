@@ -204,8 +204,13 @@ export class MarkdownField {
   position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}
   async outline(){return this.editor?this.editor.outline():(await loadEngine()).markdownOutline(this.text.value);}
   jumpToHeading(heading){
-    // Selection scrolling needs the DOM selection inside the editor first.
-    if(this.editor){this.editor.focus();this.editor.scrollTo(heading.pos);return;}
+    if(this.editor){
+      this.editor.focus();this.editor.scrollTo(heading.pos);
+      // Read-only editors do not own the DOM selection used by selection scrolling.
+      const host=this.rich.querySelector('.ProseMirror'),rect=this.editor.selectionRect();
+      if(host&&rect)host.scrollTop+=rect.top-host.getBoundingClientRect().top-8;
+      return;
+    }
     this.text.focus({preventScroll:true});this.text.setSelectionRange(heading.offset,heading.offset);
     const rect=this.caret.sourceRect(this.text);if(rect)this.text.scrollTop+=rect.top-rect.box.top-8;
   }
