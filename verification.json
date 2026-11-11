@@ -1,0 +1,66 @@
+{
+  "sourceCommit": "e63a453b4eb2dc04b47f3c1c6e49aa4ee0d84b88",
+  "screenshots": 111,
+  "browserChecks": [
+    {
+      "group": "chromium-editor",
+      "distributionSha256": "074a02a185ccdc407dc8187feecc3cf76af56fde7046b1c3bb4f33f449f2e345",
+      "sourceCommit": "e63a453b4eb2dc04b47f3c1c6e49aa4ee0d84b88",
+      "serverPid": 88781,
+      "browser": "chromium",
+      "https": false,
+      "loopbackSmtp": false,
+      "virtualPasskeys": false,
+      "passed": true,
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "chromium-navigation",
+      "distributionSha256": "074a02a185ccdc407dc8187feecc3cf76af56fde7046b1c3bb4f33f449f2e345",
+      "sourceCommit": "e63a453b4eb2dc04b47f3c1c6e49aa4ee0d84b88",
+      "serverPid": 87915,
+      "browser": "chromium",
+      "https": false,
+      "loopbackSmtp": false,
+      "virtualPasskeys": false,
+      "passed": true,
+      "tests": 75,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "webkit-editor",
+      "distributionSha256": "074a02a185ccdc407dc8187feecc3cf76af56fde7046b1c3bb4f33f449f2e345",
+      "sourceCommit": "e63a453b4eb2dc04b47f3c1c6e49aa4ee0d84b88",
+      "serverPid": 89278,
+      "browser": "webkit",
+      "https": true,
+      "loopbackSmtp": false,
+      "virtualPasskeys": false,
+      "passed": true,
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "webkit-navigation",
+      "distributionSha256": "074a02a185ccdc407dc8187feecc3cf76af56fde7046b1c3bb4f33f449f2e345",
+      "sourceCommit": "e63a453b4eb2dc04b47f3c1c6e49aa4ee0d84b88",
+      "serverPid": 89837,
+      "browser": "webkit",
+      "https": true,
+      "loopbackSmtp": false,
+      "virtualPasskeys": false,
+      "passed": true,
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}
