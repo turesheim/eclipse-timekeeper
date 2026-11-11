@@ -45,7 +45,8 @@ export class NoteClient {
     if(this.line.hidden!==hidden)this.line.hidden=hidden;
     if(client){if(this.name.textContent!==client.name)this.name.textContent=client.name;if(this.label.title!==client.name)this.label.title=client.name;const color=/^#[a-f0-9]{6}$/i.test(client.color||'')?client.color:'';if(this.color!==color){this.color=color;this.swatch.style.backgroundColor=color||'var(--bs-secondary)';}}
     if(this.group.hidden!==!context)this.group.hidden=!context;
-    const disabled=!context?.writable||this.busy;if(this.action.disabled!==disabled)this.action.disabled=disabled;
+    // A relocated opener keeps focus through background reads; dialog fields still wait.
+    const disabled=!context?.writable||this.busy&&this.field.actionsMenu.contains(this.action);if(this.action.disabled!==disabled)this.action.disabled=disabled;
     this.select.disabled=this.busy||!context?.writable;this.save.disabled=this.busy||!context?.writable;this.cancel.disabled=!!this.saving;this.field.syncActions();
   }
   choices(){

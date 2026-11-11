@@ -95,7 +95,17 @@ test('Today main actions reuse revisions, client association and confirmed delet
     await expect(actions.getByRole('button')).toHaveCount(3);
     for(const name of ['Note revisions','Associate with client','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
     const history=actions.getByRole('button',{name:'Note revisions',exact:true});await history.focus();await history.press('Enter');await expect(page.getByRole('dialog',{name:'Note revisions',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(history).toBeFocused();
-    const associate=actions.getByRole('button',{name:'Associate with client',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await dialog.locator('select').selectOption(client.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();await expect(associate).toBeFocused();await expect(page.locator('#today-note-editor .note-client-label')).toHaveText(client.name);
+    const associate=actions.getByRole('button',{name:'Associate with client',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await dialog.locator('select').selectOption(client.id);
+    let held=false,release;const pending=new Promise(resolve=>{release=resolve;});
+    await page.route('**/api/v1/notes/client?**',async route=>{
+      const url=new URL(route.request().url());if(route.request().method()==='GET'&&url.searchParams.get('sourceType')==='DAY_NOTE'&&url.searchParams.get('sourceKey')===date&&!held){held=true;await pending;}await route.continue();
+    });
+    try{
+      await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();await expect.poll(()=>held).toBe(true);
+      await expect(associate).toBeEnabled();await expect(associate).toBeFocused();
+      const refreshed=page.waitForResponse(reply=>{const url=new URL(reply.url());return reply.request().method()==='GET'&&url.pathname==='/api/v1/notes/client'&&url.searchParams.get('sourceType')==='DAY_NOTE'&&url.searchParams.get('sourceKey')===date;});release();await refreshed;
+      await expect(associate).toBeFocused();await expect(page.locator('#today-note-editor .note-client-label')).toHaveText(client.name);
+    }finally{release();await page.unrouteAll({behavior:'wait'});}
     await appendEditorText(page.locator('#today-note-editor .ProseMirror p').first(),' Saved from main actions.');
     await history.focus();await history.press('ControlOrMeta+s');
     await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toContain('Saved from main actions.');
