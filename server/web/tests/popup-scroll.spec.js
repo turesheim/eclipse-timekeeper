@@ -73,7 +73,8 @@ test('account popup and ordinary dialogs scroll to their last action and follow 
       await captureScreenshot(page,{path:`test-results/popup-account-${theme}-${viewport.width}.png`,fullPage:false});
     }
     await page.setViewportSize({width:390,height:320});await expect.poll(()=>menu.evaluate(node=>node.scrollHeight-node.clientHeight)).toBeLessThanOrEqual(1);
-    await page.locator('.app-header').evaluate(node=>{node.style.paddingBlock='3rem';});await fits(page,menu);
+    await page.locator('.app-header').evaluate(node=>{node.style.paddingBlock='6rem';});await fits(page,menu);
+    await expect.poll(()=>menu.evaluate(node=>node.scrollHeight-node.clientHeight)).toBeGreaterThan(1);
     await menu.getByRole('button',{name:'Sign out',exact:true}).focus();await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');const about=menu.getByRole('button',{name:'About',exact:true});await expect(about).toBeFocused();await expect(about).toBeInViewport();
     await about.press('Enter');const dialog=page.locator('#server-info');await expect(dialog).toBeVisible();await fits(page,dialog);await wheel(page,dialog,10000);await expect(page.locator('#about-close')).toBeInViewport();
     await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(toggle).toBeFocused();await page.locator('.app-header').evaluate(node=>{node.style.paddingBlock='';});
