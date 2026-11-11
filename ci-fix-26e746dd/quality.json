@@ -1,0 +1,31 @@
+{
+  "fingerprint": "8aed11aae6b4020572ebd2f8b34edbe76b621a34bfdd7b7812555bd20276f25e",
+  "base": "e63a453b4eb2dc04b47f3c1c6e49aa4ee0d84b88",
+  "mode": "affected",
+  "checks": [
+    "quick",
+    "contract",
+    "web",
+    "server"
+  ],
+  "passed": true,
+  "results": [
+    {
+      "check": "quick",
+      "exit_code": 0
+    },
+    {
+      "check": "contract",
+      "exit_code": 0
+    },
+    {
+      "check": "web",
+      "exit_code": 0
+    },
+    {
+      "check": "server",
+      "exit_code": 0
+    }
+  ],
+  "created_at": 1794394682.076342
+}

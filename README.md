@@ -139,3 +139,7 @@ HTML iframes remain inert source fragments; PDF wiki embeds open owned attachmen
 - [recent-note-types-1440.png](webkit-navigation/recent-note-types-1440.png)
 - [recent-note-types-320.png](webkit-navigation/recent-note-types-320.png)
 
+
+## CI follow-up
+
+[Current CI correction evidence and screenshots](ci-fix-26e746dd/README.md) records the updated fixtures, main integration, PostgreSQL 17/18 replica checks and fresh browser results on `26e746dd`.

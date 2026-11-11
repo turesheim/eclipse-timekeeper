@@ -1,0 +1,10 @@
+{
+  "distributionSha256": "c71eb97842cc99c4c57b60a6d16699cf01f5c87fc666d80de2de4b21b5eef025",
+  "sourceCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4",
+  "serverPid": 18105,
+  "browser": "chromium",
+  "https": false,
+  "loopbackSmtp": false,
+  "virtualPasskeys": false,
+  "passed": true
+}

@@ -1,0 +1,33 @@
+{
+  "sourceCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4",
+  "packageSha256": "c71eb97842cc99c4c57b60a6d16699cf01f5c87fc666d80de2de4b21b5eef025",
+  "browserChecks": [
+    {
+      "group": "chromium-clients",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "webkit-clients",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "chromium-obsidian",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "qualityPassed": true,
+  "postgresVersions": [
+    "17.11",
+    "18.6"
+  ],
+  "twoActualJVMs": true
+}

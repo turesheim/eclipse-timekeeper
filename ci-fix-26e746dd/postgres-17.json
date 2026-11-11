@@ -1,0 +1,14 @@
+{
+  "serverCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4",
+  "postgresImage": "postgres:17.11-bookworm",
+  "twoActualJVMs": true,
+  "privatePersistentCaches": true,
+  "trustedProxyOriginFixture": true,
+  "checks": [
+    "ranked body/Unicode/phrase results page across independent caches without duplicates or account leakage",
+    "committed edits, subtree moves and delete/recovery invalidate stale pages on both replicas",
+    "a body match near the end of a nearly 10 MB supported note is indexed and highlighted on both replicas",
+    "a restarted JVM rebuilds an expired persistent cache; read-only credentials cannot request rebuilds"
+  ],
+  "passed": true
+}
