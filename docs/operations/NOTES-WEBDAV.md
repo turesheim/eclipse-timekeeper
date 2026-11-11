@@ -13,6 +13,11 @@ icons before their titles, with their type also announced to screen readers.
 All open in Notes when selected. Selecting a historical date in Today does not change
 this recent-edit window. Unsaved drafts still require confirmation before leaving.
 
+Ordinary Markdown notes use the filename without `.md` as their title in navigation,
+Recent notes and search, including previously imported Obsidian notes. Headings
+inside the document stay unchanged. Existing bare wikilinks can still match a
+unique first document heading when no filename matches.
+
 Under **Import notes**, choose the local vault root with **Choose vault folder**.
 Timekeeper reviews the relative paths before uploading. Hidden configuration
 folders and nonportable paths are skipped; existing files are listed as conflicts.

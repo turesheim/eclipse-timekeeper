@@ -1204,13 +1204,19 @@ corresponding private staging capacity.
 
 ## Notes collection API (schema 10)
 
-Notes entry metadata includes an optional read-only `title`: an explicitly named
-ordinary document, the associated event title for event notes, or the first nonempty document-level Markdown heading
-(ATX or Setext) for ordinary notes. Heading formatting is reduced to plain text;
-frontmatter, code examples and quoted headings do not supply a document title.
-Titles are bounded to 4,096 characters. The browser falls back to the filename
-without its `.md` suffix when no title is available. Title reads do not modify canonical Markdown bytes,
-filenames, note versions or write validators.
+Notes entry metadata includes an optional read-only `title`: the filename without
+its extension for ordinary Markdown notes, including previously imported notes,
+or the associated event title for event notes. Frontmatter and document headings
+do not override the filename. Titles are bounded to 4,096 characters. The browser
+uses the filename when no title is available. Title reads do not modify canonical
+Markdown bytes, filenames, source dates, note versions or write validators.
+
+Ordinary notes without an explicitly chosen title may also expose a read-only
+`heading` alias from the first nonempty document-level ATX or Setext heading.
+Formatting is reduced to plain text; frontmatter, code and quoted headings are
+excluded. This derived alias preserves existing bare wikilinks after the display
+title policy change. It is omitted when empty or identical to the filename title,
+and is not persisted or exported in account archives.
 
 `PUT /notes/entries/{id}/title` accepts a plain `title` for an ordinary Markdown
 document and requires the current metadata `If-Match`. In one owner transaction

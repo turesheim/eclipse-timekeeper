@@ -16,16 +16,19 @@ final class NoteTitles {
     static String filenameTitle(String filename){int dot=filename.lastIndexOf('.');return dot>0?filename.substring(0,dot):filename;}
     String get(JsonNode entry){
         String source=entry.path("sourceType").asText(),kind=entry.path("kind").asText();
-        if(kind.equals("MARKDOWN")&&source.equals(VaultContent.TYPE)&&entry.hasNonNull("title"))return entry.path("title").asText();
+        if(kind.equals("MARKDOWN")&&source.equals(VaultContent.TYPE))return filenameTitle(new VaultPath(entry.path("path").asText()).name());
         if(kind.equals("EVENT")&&source.equals(EventNotes.TYPE))
             return store.find(source,uuid(entry.path("sourceId"))).map(value->value.path("event").path("title").asText().strip()).orElse("");
-        if(kind.equals("MARKDOWN")&&source.equals(VaultContent.TYPE))
-            return store.find(source,uuid(entry.path("sourceId"))).map(value->heading(new String(VaultContent.bytes((ObjectNode)value),StandardCharsets.UTF_8))).orElse("");
         return "";
+    }
+    String alias(JsonNode entry){
+        if(!entry.path("kind").asText().equals("MARKDOWN")||!entry.path("sourceType").asText().equals(VaultContent.TYPE)||entry.hasNonNull("title"))return "";
+        String value=store.find(VaultContent.TYPE,uuid(entry.path("sourceId"))).map(source->heading(new String(VaultContent.bytes((ObjectNode)source),StandardCharsets.UTF_8))).orElse("");
+        return value.equals(get(entry))?"":value;
     }
     static String heading(String markdown){
         if(markdown.startsWith("\ufeff"))markdown=markdown.substring(1);
-        // Only document headings supply a title; quoted or code examples do not.
+        // Legacy heading aliases exclude quoted headings and code examples.
         return heading(MARKDOWN.parse(markdown));
     }
     static String heading(Node document){

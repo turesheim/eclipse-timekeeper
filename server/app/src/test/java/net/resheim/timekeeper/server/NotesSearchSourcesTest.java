@@ -46,7 +46,7 @@ class NotesSearchSourcesTest {
             var source=sources.load(owner,id);titles.add(source.title());assertFalse(source.text().body().contains("excludedmetadata"));assertFalse(source.text().body().contains("canonical-search"));
             store.transaction(owner,()->{var counted=new MetadataStore(store);var current=new NotesSearchSources(counted).current(hit(source));assertEquals(0,counted.canonicalPayloads);assertEquals(id.toString(),current.path("id").asText());assertFalse(current.has("body"));assertFalse(current.has("data"));return null;});
         }
-        assertEquals(List.of("Ordinary title","","","Event title"),titles);
+        assertEquals(List.of("ordinary","","","Event title"),titles);
         assertFalse(sources.state(owner).toString().contains(owner));assertNull(store.currentConnection());
     }
     @Test void finalValidationDetectsCanonicalWritersThatMissedTheDerivedCatalogHook(){

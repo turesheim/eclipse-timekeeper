@@ -27,7 +27,7 @@ final class VaultCollection {
     ObjectNode metadata(ObjectNode entry){return metadata(entry,folder(entry)?generation():null);}
     private ObjectNode metadata(ObjectNode entry,String snapshot){
         String tag=tag(entry,snapshot);var result=new NoteBookmarks(store).annotate(entry);String metadata=folder(entry)?tag:etag(result);result.put("etag",tag).put("entryEtag",metadata);
-        String title=new NoteTitles(store).get(entry);if(!title.isBlank())result.put("title",title);return result;
+        var titles=new NoteTitles(store);String title=titles.get(entry),heading=titles.alias(entry);if(!title.isBlank())result.put("title",title);if(!heading.isBlank())result.put("heading",heading);return result;
     }
     ObjectNode page(UUID parent,String query,boolean trash,int offset,int count,String snapshot){
         if(offset<0||count<1||count>limits.pageSize())throw ApiFailure.validation();

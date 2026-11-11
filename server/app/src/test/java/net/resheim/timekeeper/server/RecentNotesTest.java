@@ -133,7 +133,7 @@ class RecentNotesTest {
     @Test void httpReadsAreOwnerPrivateAndAllowReadOnlyTokens(){
         var path="Recent-"+UUID.randomUUID()+".md";
         assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path",path).body(bytes("# Owner only title\n\nsecret body")).put("/api/v1/notes/files").statusCode());
-        var reader=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=1");assertEquals(200,reader.statusCode());assertTrue(reader.header("Cache-Control").contains("no-store"));assertEquals(path,reader.jsonPath().getString("items[0].path"));assertEquals("Owner only title",reader.jsonPath().getString("items[0].title"));assertFalse(reader.asString().contains("secret body"));inputs.validate("RecentNotesPage",parse(reader.asString()));
+        var reader=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=1");assertEquals(200,reader.statusCode());assertTrue(reader.header("Cache-Control").contains("no-store"));assertEquals(path,reader.jsonPath().getString("items[0].path"));assertEquals(path.substring(0,path.length()-3),reader.jsonPath().getString("items[0].title"));assertEquals("Owner only title",reader.jsonPath().getString("items[0].heading"));assertFalse(reader.asString().contains("secret body"));inputs.validate("RecentNotesPage",parse(reader.asString()));
         assertEquals(201,given().header("Authorization","Bearer test-a").header("If-None-Match","*").contentType("application/octet-stream").queryParam("path","journal/2020-01-02.md").body(bytes("secret journal body")).put("/api/v1/notes/files").statusCode());
         var journals=given().header("Authorization","Bearer test-read").get("/api/v1/notes/recent?limit=2");assertEquals(200,journals.statusCode());assertTrue(journals.jsonPath().getList("items.kind").contains("DAY"));assertFalse(journals.asString().contains("secret journal body"));inputs.validate("RecentNotesPage",parse(journals.asString()));
         assertEquals(0,given().header("Authorization","Bearer test-b").get("/api/v1/notes/recent").jsonPath().getList("items").size());
@@ -147,15 +147,15 @@ class RecentNotesTest {
             String text="---\ntitle: Ignored metadata title\n---\n\n## Project **review**\n\nPrivate body\n";
             var entry=vault.put(new VaultPath("document.md"),null,true,bytes(text));
             String contentTag=vault.tag(entry),metadataTag=vault.metadataTag(entry),snapshot=vault.generation();long revision=store.revision();
-            var metadata=vault.metadata(entry);inputs.validate("VaultEntry",metadata);assertEquals("Project review",metadata.path("title").asText());
+            var metadata=vault.metadata(entry);inputs.validate("VaultEntry",metadata);assertEquals("document",metadata.path("title").asText());assertEquals("Project review",metadata.path("heading").asText());
             assertArrayEquals(bytes(text),vault.read(entry));assertEquals(contentTag,vault.tag(entry));assertEquals(metadataTag,vault.metadataTag(entry));assertEquals(snapshot,vault.generation());assertEquals(revision,store.revision());
             assertFalse(metadata.has("body"));assertFalse(metadata.toString().contains("Private body"));
-            var recent=new RecentNotes(store,limits).page(0,2,null);assertEquals("Project review",recent.path("items").get(0).path("title").asText());
+            var recent=new RecentNotes(store,limits).page(0,2,null);assertEquals("document",recent.path("items").get(0).path("title").asText());
             var saved=vault.put(VaultCollection.path(entry),contentTag,false,bytes("First replacement\n=================\n\nBody\n"));
-            assertEquals("First replacement",vault.metadata(saved).path("title").asText());
-            vault.delete(saved,vault.tag(saved));var trash=vault.get(VaultCollection.id(saved));assertEquals("First replacement",vault.metadata(trash).path("title").asText());
-            var restored=vault.restore(trash,vault.tag(trash));assertEquals("First replacement",vault.metadata(restored).path("title").asText());
-            assertFalse(vault.metadata(vault.put(new VaultPath("plain.md"),null,true,bytes("No heading"))).has("title"));
+            assertEquals("document",vault.metadata(saved).path("title").asText());assertEquals("First replacement",vault.metadata(saved).path("heading").asText());
+            vault.delete(saved,vault.tag(saved));var trash=vault.get(VaultCollection.id(saved));assertEquals("document",vault.metadata(trash).path("title").asText());
+            var restored=vault.restore(trash,vault.tag(trash));assertEquals("document",vault.metadata(restored).path("title").asText());
+            var plain=vault.metadata(vault.put(new VaultPath("plain.md"),null,true,bytes("No heading")));assertEquals("plain",plain.path("title").asText());assertFalse(plain.has("heading"));
             assertFalse(vault.metadata(vault.put(new VaultPath("journal/2026-11-05.md"),null,true,bytes("# Journal heading"))).has("title"));
             return null;
         });

@@ -93,7 +93,7 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
     },
     vault_wikilink:node=>{
       const ref=wikiReference(node.attrs.value,node.attrs.embed),label=ref?.label||node.attrs.value;
-      if(node.attrs.embed&&resources?.wikiImage){const result=resources.wikiImage(node.attrs.value,label);if(ref?.width)result.dom.style.width=ref.width+'px';if(ref?.height)result.dom.style.height=ref.height+'px';result.dom.dataset.wikiEmbed=node.attrs.value;return result;}
+      if(node.attrs.embed&&/\.(png|jpe?g|gif|webp)$/i.test(ref?.path||'')&&resources?.wikiImage){const result=resources.wikiImage(node.attrs.value,label);if(ref?.width)result.dom.style.width=ref.width+'px';if(ref?.height)result.dom.style.height=ref.height+'px';result.dom.dataset.wikiEmbed=node.attrs.value;return result;}
       const dom=document.createElement('button');dom.type='button';dom.className='markdown-wikilink';dom.contentEditable='false';dom.textContent=label;dom.dataset.wikiReference=node.attrs.value;dom.title=node.attrs.value;
       let disposed=false,timer;
       const preview=()=>{if(!resources?.previewWiki)return;clearTimeout(timer);timer=setTimeout(()=>{void resources.previewWiki(node.attrs.value).then(text=>{if(!disposed)dom.title=text;}).catch(()=>{});},300);};dom.addEventListener('mouseenter',preview);dom.addEventListener('focus',preview);dom.addEventListener('mouseleave',()=>clearTimeout(timer));dom.addEventListener('blur',()=>clearTimeout(timer));

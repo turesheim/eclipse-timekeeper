@@ -100,7 +100,7 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   const subscription=randomUUID(),eventKey='ab'.repeat(32),eventPath=`events/event-${subscription}-${eventKey}.md`;
   const event=await upload(eventPath,'---\ntimekeeper-event: '+JSON.stringify({subscriptionId:subscription,eventKey,event:{uid:'recent-types',recurrenceId:'',title:'Team planning'}})+'\n---\n\nEvent body\n');
   await page.reload();const recent=page.locator('#today-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(4);
-  const cases=[[ordinary,'file-earmark-text','Ordinary note','Vanlig notat','Project review'],[event,'calendar-event','Event note','Hendelsesnotat','Team planning'],[day,'journal-text','Journal note','Dagboknotat','2020-01-02'],[week,'journal-text','Journal note','Dagboknotat','2020-W01']];
+  const cases=[[ordinary,'file-earmark-text','Ordinary note','Vanlig notat','document'],[event,'calendar-event','Event note','Hendelsesnotat','Team planning'],[day,'journal-text','Journal note','Dagboknotat','2020-01-02'],[week,'journal-text','Journal note','Dagboknotat','2020-W01']];
   for(const [entry,glyph,label,,title] of cases){
     const button=recent.locator(`[data-recent-note="${entry.id}"]`);await expect(button).toHaveAccessibleName(new RegExp('^'+label+': '));await expect(button.locator(`.icon.bi-${glyph}`)).toHaveAttribute('aria-hidden','true');
     await expect(button.locator('.today-recent-note-label')).toHaveText(title.split('/').at(-1));await button.click();await expect(page.locator('#note-popup-title')).toHaveText(title);await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();if(entry.kind==='DAY'){await expect(page.locator('#today-date')).toHaveValue(entry.sourceKey);await expect(page.locator('#today-journal-formatted')).toContainText('Daily journal body');}else await expect(page.locator('#notes-document-title')).toHaveText(title);await page.locator('[data-tab=today]').click();
@@ -127,7 +127,7 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   for(const [entry,,,label] of cases)await expect(recent.locator(`[data-recent-note="${entry.id}"]`)).toHaveAccessibleName(new RegExp('^'+label+': '));
 });
 
-test('note views use event titles and document headings while paths and Markdown stay intact',async({page,request})=>{
+test('note views use filename and event titles while headings and Markdown stay intact',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const upload=async(path,text)=>(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   const ordinaryText='---\ntitle: Metadata is not the headline\n---\n\n```markdown\n# Example only\n```\n\n## Project **review**\n\nPrivate body\n';
@@ -137,15 +137,15 @@ test('note views use event titles and document headings while paths and Markdown
   const eventPath='events/event-'+subscription+'-'+eventKey+'.md',eventText='---\ntimekeeper-event: '+JSON.stringify({subscriptionId:subscription,eventKey,event:{uid:'private-title-test',recurrenceId:'',title}})+'\n---\n# Different note heading\n\nDecisions\n';
   const event=await upload(eventPath,eventText);await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
   const recent=page.locator('#today-recent-notes');
-  await expect(recent.locator(`[data-recent-note="${ordinary.id}"] .today-recent-note-label`)).toHaveText('Project review');await expect(recent.locator(`[data-recent-note="${plain.id}"] .today-recent-note-label`)).toHaveText('plain');await expect(recent.locator(`[data-recent-note="${event.id}"] .today-recent-note-label`)).toHaveText(title);
+  await expect(recent.locator(`[data-recent-note="${ordinary.id}"] .today-recent-note-label`)).toHaveText('document');await expect(recent.locator(`[data-recent-note="${plain.id}"] .today-recent-note-label`)).toHaveText('plain');await expect(recent.locator(`[data-recent-note="${event.id}"] .today-recent-note-label`)).toHaveText(title);
   const eventTooltip=await tooltipFor(recent.locator(`[data-recent-note="${event.id}"]`));await expect(eventTooltip).toContainText(title);await expect(eventTooltip).not.toContainText(eventKey);await expect(eventTooltip.locator('img')).toHaveCount(0);await page.keyboard.press('Escape');
   await expect(recent.locator('img')).toHaveCount(0);expect(await page.evaluate(()=>window.noteTitleExecuted)).toBeUndefined();
   await recent.locator(`[data-recent-note="${event.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText(title);await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText(title);const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'events',exact:true}).click();await expect(noteEntry(navigation,eventPath)).toHaveText(title);const navigationTooltip=await tooltipFor(noteEntry(navigation,eventPath));await expect(navigationTooltip).toHaveText(title);await expect(navigationTooltip).not.toContainText(eventKey);await page.keyboard.press('Escape');
-  await navigation.getByRole('button',{name:'Notes',exact:true}).click();await expect(noteEntry(navigation,ordinary.path)).toHaveText('Project review');await noteEntry(navigation,ordinary.path).click();await expect(page.locator('#notes-document-title')).toHaveText('Project review');
+  await navigation.getByRole('button',{name:'Notes',exact:true}).click();await expect(noteEntry(navigation,ordinary.path)).toHaveText('document');await noteEntry(navigation,ordinary.path).click();await expect(page.locator('#notes-document-title')).toHaveText('document');
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveValue(ordinaryText.slice(prefix.length));
-  const updated='# Updated review\n\nThe filename stays document.md.\n';await page.locator('#notes-body').fill(updated);await saveMarkdown(page.locator('#notes-panel'));await expect(page.locator('#notes-document-title')).toHaveText('Updated review');await expect(noteEntry(navigation,ordinary.path)).toHaveText('Updated review');
+  const updated='# Updated review\n\nThe filename stays document.md.\n';await page.locator('#notes-body').fill(updated);await saveMarkdown(page.locator('#notes-panel'));await expect(page.locator('#notes-document-title')).toHaveText('document');await expect(noteEntry(navigation,ordinary.path)).toHaveText('document');
   await noteEntry(navigation,plain.path).click();await expect(page.locator('#notes-document-title')).toHaveText('plain');
-  await page.locator('[data-tab=today]').click();await expect(recent.locator(`[data-recent-note="${ordinary.id}"] .today-recent-note-label`)).toHaveText('Updated review');
+  await page.locator('[data-tab=today]').click();await expect(recent.locator(`[data-recent-note="${ordinary.id}"] .today-recent-note-label`)).toHaveText('document');
   expect(await(await api('GET','/notes/entries/'+ordinary.id+'/content')).text()).toBe(prefix+updated);expect(await(await api('GET','/notes/entries/'+event.id+'/content')).text()).toBe(eventText);
   expect((await new AxeBuilder({page}).include('.today-sidebar').analyze()).violations).toEqual([]);
   await page.setViewportSize({width:1440,height:900});await captureScreenshot(page,{path:'test-results/note-display-titles.png',fullPage:false});
@@ -190,7 +190,7 @@ test('Recent note popup saves before maximizing and retains drafts after a rejec
 
 test('Recent note popup remains accessible in all themes and narrow screens',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
-  const entry=await(await api('PUT','/notes/files?path=Notes%2FAccessible.md',Buffer.from('# A note with a long title that must wrap beside the window buttons\n\nEditable body.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const entry=await(await api('PUT','/notes/files?path=Notes%2FA%20note%20with%20a%20long%20title%20that%20must%20wrap%20beside%20the%20window%20buttons.md',Buffer.from('# A note with a long title that must wrap beside the window buttons\n\nEditable body.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();const popup=page.locator('#note-popup-editor');await expect(page.locator('#note-popup-formatted .ProseMirror')).toBeVisible();
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:900});await expect(popup.getByRole('button',{name:'Open in workspace',exact:true})).toBeInViewport();await expect(popup.getByRole('button',{name:'Close',exact:true})).toBeInViewport();
@@ -223,6 +223,6 @@ test('note popup clears the previous account title and body when authentication 
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const title='Private account headline 607',marker='Private account body marker 607';
   const entry=await(await api('PUT','/notes/files?path=Notes%2FPrivate.md',Buffer.from('# '+title+'\n\n'+marker+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
-  await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText(title);await expect(page.locator('#note-popup-formatted')).toContainText(marker);
+  await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText('Private');await expect(page.locator('#note-popup-formatted')).toContainText(marker);
   await api('POST','/auth/logout');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#note-popup-editor')).not.toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('');await expect(page.locator('#note-popup-body')).toHaveValue('');expect(await page.locator('#note-popup-editor').textContent()).not.toContain(title);expect(await page.locator('#note-popup-editor').textContent()).not.toContain(marker);
 });

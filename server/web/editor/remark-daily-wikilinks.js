@@ -8,7 +8,7 @@ function tokenizer(embed){return function(effects,ok,nok){
   function second(code){if(code!==91)return nok(code);effects.consume(code);return body;}
   function body(code){
     if(code===93){effects.consume(code);brackets++;return end;}
-    if(code===null||code===10||code===13||code===91||value.length>=1024)return nok(code);
+    if(code===null||code<0||code===91||value.length>=1024)return nok(code);
     value+=String.fromCharCode(code);effects.consume(code);return body;
   }
   function end(code){if(code!==93||!brackets||!wikiReference(value,embed))return nok(code);effects.consume(code);effects.exit('vaultWikilink');return ok;}

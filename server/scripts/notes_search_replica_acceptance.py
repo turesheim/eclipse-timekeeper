@@ -74,11 +74,12 @@ def exercise(system):
             time.sleep(.1)
     entries=[]
     for index in range(215):
-        body=('# Replicaneedle priority' if index==214 else '# Record '+str(index))+'\n\nreplicaneedle Café blåbær service.cluster.local.\n\ncommitted replicas preserve canonical bytes.\n'
-        entries.append(put(1,alice,'Corpus/Record-'+str(index).zfill(3)+'.md',body))
+        body=('# Imported priority heading' if index==214 else '# Record '+str(index))+'\n\nreplicaneedle Café blåbær service.cluster.local.\n\ncommitted replicas preserve canonical bytes.\n'
+        path='Corpus/Replicaneedle priority.md' if index==214 else 'Corpus/Record-'+str(index).zfill(3)+'.md'
+        entries.append(put(1,alice,path,body))
         if index==4:ready(2,alice,'replicaneedle')  # Different physical indexing history.
     foreign=put(2,bob,'Corpus/Foreign.md','replicaneedle foreignsecret')
-    first=ready(1,alice,'replicaneedle');assert first['items'][0]['entry']['id']==entries[-1]['id'];seen=set();result=first;replica=1
+    first=ready(1,alice,'replicaneedle');priority=first['items'][0]['entry'];assert priority['id']==entries[-1]['id'];assert priority['title']=='Replicaneedle priority';seen=set();result=first;replica=1
     while True:
         for hit in result['items']:
             identifier=hit['entry']['id'];assert identifier not in seen and identifier!=foreign['id'];seen.add(identifier)

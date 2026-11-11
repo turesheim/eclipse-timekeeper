@@ -3,6 +3,7 @@ import {imagePreview} from './image-preview.js';
 import {relativeNotePath} from './notes-links.js';
 import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
+import {emojiText} from './emoji.js';
 import {hashtagKey,tagNavigation} from './hashtags.js';
 
 export const vaultNoteNavigation='timekeeper:vault-note-navigation';
@@ -94,7 +95,7 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     canonicalAsset:async reference=>(await resolveRelative(reference)).path,
     assetReference:async entry=>{const value=origin(),collection=typeof value==='string'?null:await collectionInfo();let path=originPath([],value,collection?.settings);if(!path)path=originPath(await catalog(),value,collection?.settings);return relativeReference(path,entry.path);},
     previewWiki:async reference=>{const current=session(),entry=await resolveWiki(reference);if(!['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind))return entry.path;const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});if(current!==session())throw new Error(t('notes.invalid_link'));return noteTitle(entry,entry.path)+(entry.title&&entry.kind!=='EVENT'?'\n'+entry.path:'')+'\n'+(await reply.data.slice(0,1500).text()).slice(0,600);},
-    complete:async(query,options={})=>(await catalog()).filter(entry=>!entry.deleted&&entry.kind!=='FOLDER'&&(options.assetsOnly?['ASSET','BINARY'].includes(entry.kind):!!wikiReference(entry.path))&&[entry.path,noteTitle(entry)].some(value=>fold(value).includes(fold(query)))).slice(0,30),
+    complete:async(query,options={})=>(await catalog()).filter(entry=>!entry.deleted&&entry.kind!=='FOLDER'&&(options.assetsOnly?['ASSET','BINARY'].includes(entry.kind):!!wikiReference(entry.path))&&[entry.path,noteTitle(entry),emojiText(entry.heading||'')].some(value=>fold(value).includes(fold(query)))).slice(0,30),
     openWiki:async(reference,source)=>{
       if(opening)return;opening=true;const current=session(),active=()=>!!current&&current===session()&&(!source||source.isConnected);let entry,popup=false;
       try{

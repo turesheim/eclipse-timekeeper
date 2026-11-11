@@ -1,4 +1,4 @@
-import {noteTitle} from './note-title.js';
+import {emojiText} from './emoji.js';
 
 /** Obsidian references remain vault-local; schemes and traversal are never URLs. */
 export function wikiReference(value,embed=false){
@@ -19,7 +19,7 @@ export function wikiCandidates(entries,reference,origin='',{titles=true}={}){
   const names=files.filter(entry=>stem(entry.path.split('/').at(-1))===target);if(names.length)return names;
   if(!titles||ref.path.includes('/'))return [];
   const titleKey=value=>value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
-  return files.filter(entry=>typeof entry.title==='string'&&entry.title.trim()&&titleKey(noteTitle(entry))===titleKey(ref.path));
+  return files.filter(entry=>[entry.title,entry.heading].some(value=>typeof value==='string'&&value.trim()&&titleKey(emojiText(value))===titleKey(ref.path)));
 }
 export const headingAnchor=text=>text.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu,'').replace(/\s+/g,'-');
 

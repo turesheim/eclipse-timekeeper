@@ -347,7 +347,7 @@ test('editing the title above a document renames its file and preserves the body
   const api=await setup(page,request),path='Notes/Imported title.md',body='# Original heading\r\n\r\nExact body.\r\n';
   const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),path).click();
-  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await expect(title).toHaveValue('Original heading');await title.fill('CVE-2026-111943');await title.press('Enter');
+  const title=page.locator('#notes-panel').getByRole('textbox',{name:'Document title',exact:true});await expect(title).toHaveValue('Imported title');await title.fill('CVE-2026-111943');await title.press('Enter');
   await expect(page.locator('.notes-document-path')).toHaveText('Notes/CVE-2026-111943.md');await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');
   const saved=await(await api('GET','/notes/entries/'+entry.id)).json();for(const field of ['id','sourceId','etag','createdAt','modifiedAt','contentVersion'])expect(saved[field]).toEqual(entry[field]);
   expect(saved.title).toBe('CVE-2026-111943');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);
@@ -432,14 +432,14 @@ test('journal wikilinks resolve CVE filenames and show the target document path'
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('.notes-footer .notes-document-path')).toBeEmpty();
 });
 
-test('journal wikilinks open unique document titles and keep duplicate titles ambiguous',async({page,request})=>{
+test('journal wikilinks retain legacy heading aliases while displaying filename titles',async({page,request})=>{
   const api=await setup(page,request),day='2026-11-09',path='Notes/Imported investigation.md';
   await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from('# CVE-2026-111943\n\n## Analysis\n\nMatched by title.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await api('PUT','/notes/files?'+new URLSearchParams({path:'journal/'+day+'.md'}),Buffer.from('[[CVE-2026-111943#Analysis|Investigation]]\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');
   const link=page.locator('#today-journal-formatted [data-wiki-reference="CVE-2026-111943#Analysis|Investigation"]');
   await expect(link).toHaveAttribute('data-resolved','true');await link.click();
-  await expect(page.locator('#notes-document-title')).toHaveText('CVE-2026-111943');await expect(page.locator('.notes-document-path')).toHaveText(path);await expect(page.locator('#notes-formatted h2')).toHaveText('Analysis');
+  await expect(page.locator('#notes-document-title')).toHaveText('Imported investigation');await expect(page.locator('.notes-document-path')).toHaveText(path);await expect(page.locator('#notes-formatted h2')).toHaveText('Analysis');
   await api('PUT','/notes/files?path=Notes%2FDuplicate.md',Buffer.from('# CVE-2026-111943\n\nDifferent investigation.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.goto('/web/?day='+day);await expect(page.locator('#status')).toHaveText('Up to date');await expect(link).toHaveAttribute('data-resolved','false');
   const dialogs=[];page.on('dialog',dialog=>{dialogs.push(dialog.message());void dialog.dismiss();});await link.click();
@@ -609,7 +609,7 @@ test('a delayed search cannot display the signed-out account in a new session',a
 
 test('Notes content search finds body text, keeps relevance order and pages on demand without replacing a draft',async({page,request})=>{
   test.setTimeout(150000);const api=await setup(page,request),word='sparrow';
-  for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:index===54?'Notes/Sparrow priority.md':'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await api('PUT','/notes/files?path=Notes%2Fbinary.txt',Buffer.from(word),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:word}));return reply.status();},{timeout:30000}).toBe(200);
   const navigation=await searchNotes(page,word),rows=navigation.locator('[data-search-note]');
@@ -809,7 +809,7 @@ test('missing wikilinks confirm creation and open a popup without overwriting ex
   const source=await(await api('GET','/notes/resolve?path=Notes%2FSource.md')).json();expect(await(await api('GET','/notes/entries/'+source.id+'/content')).text()).toBe(body);
   // Another client can create a target after the unresolved link was displayed.
   await api('POST','/notes/folders',{path:'Other'});await api('PUT','/notes/files?path=Other%2FNew%20note.md',Buffer.from('# Heading\n\nConcurrent content.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
-  await page.locator('#notes-formatted [data-wiki-reference="Other/New note#Heading|Nested"]').click();await expect(page.locator('#notes-document-title')).toHaveText('Heading');
+  await page.locator('#notes-formatted [data-wiki-reference="Other/New note#Heading|Nested"]').click();await expect(page.locator('#notes-document-title')).toHaveText('New note');
   await noteEntry(page.locator('#notes-navigation'),'Notes/Source.md').click();const nested=page.locator('#notes-formatted [data-wiki-reference="New folder/Sub/New page"]');
   const creation=page.waitForEvent('dialog').then(async dialog=>{expect(dialog.message()).toContain('New folder/Sub/New page.md');await dialog.accept();});await nested.click();await creation;await expect(popup).toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('New page');
   expect((await(await api('GET','/notes/resolve?path=New%20folder%2FSub%2FNew%20page.md')).json()).kind).toBe('MARKDOWN');
@@ -823,7 +823,7 @@ test('read-only clients can open and maximize note popups without creating missi
     const reader=await context.newPage(),dialogs=[],writes=[];reader.on('dialog',dialog=>{dialogs.push(dialog.message());void dialog.dismiss();});reader.on('request',request=>{if(request.method()!=='GET'&&new URL(request.url()).pathname.startsWith('/api/v1/notes/'))writes.push(request.method());});
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();
     await reader.locator(`[data-recent-note="${entry.id}"]`).click();const popup=reader.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(reader.locator('#note-popup-formatted .ProseMirror')).toHaveAttribute('aria-readonly','true');
-    await reader.locator('#note-popup-formatted [data-wiki-reference="Never create this"]').click();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#notes-document-title')).toHaveText('Read only');
+    await reader.locator('#note-popup-formatted [data-wiki-reference="Never create this"]').click();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#notes-document-title')).toHaveText('Readonly');
     expect(dialogs).toEqual([]);expect(writes).toEqual([]);expect((await(await api('GET','/notes/entries?query=Never+create+this')).json()).items).toEqual([]);
   }finally{await context.close();}
 });

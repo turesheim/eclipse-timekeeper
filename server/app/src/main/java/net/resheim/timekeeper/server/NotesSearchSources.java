@@ -32,7 +32,7 @@ class NotesSearchSources {
         var entry=raw.entry();
         if(raw.bytes().length!=entry.path("byteLength").asLong()||!ArchiveJournalFiles.digest(raw.bytes()).equals(entry.path("sha256").asText()))throw unavailable();
         var projection=NotesSearchText.extract(raw.bytes());String title=switch(entry.path("kind").asText()){
-            case "MARKDOWN"->entry.hasNonNull("title")?entry.path("title").asText():projection.title();case "EVENT"->raw.eventTitle();default->"";
+            case "MARKDOWN"->NoteTitles.filenameTitle(new VaultPath(entry.path("path").asText()).name());case "EVENT"->raw.eventTitle();default->"";
         };
         return new NotesLuceneIndex.Source(id,entry.path("path").asText(),entry.path("kind").asText(),entry.path("sourceType").asText(),uuid(entry.path("sourceId")),
                 raw.sourceVersion(),entry.path("contentTag").asText(),entry.path("sha256").asText(),raw.bytes().length,title,projection,null,raw.bookmarked());

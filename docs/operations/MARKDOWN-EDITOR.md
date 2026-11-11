@@ -79,6 +79,7 @@ Vault extensions include:
 | `[[Notes/Design]]` | Opens a vault note |
 | `[[Notes/Design#Decisions\|design]]` | Uses an alias and jumps to a heading |
 | `![[journal/assets/image.png]]` | Authenticated raster preview |
+| `![[datasheet.pdf]]` | Opens the attachment in Notes, where it can be downloaded |
 | `![[image.png\|320]]`, `![[image.png\|320x200]]` | Obsidian image sizing, up to 2000 pixels per dimension |
 | `> [!NOTE] Title` followed by quoted content | Editable callout; `+`/`-` controls initial folding |
 | `Text[^one]` and `[^one]: Footnote.` | Footnote reference and editable definition |

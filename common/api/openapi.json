@@ -36244,7 +36244,7 @@
             "minLength": 1,
             "maxLength": 4096,
             "readOnly": true,
-            "description": "Display title: an explicitly chosen filename title for MARKDOWN notes, otherwise the first nonempty document-level heading; the associated event title for EVENT notes. Omitted when unavailable. Editing a Markdown document title through /title renames its file without rewriting canonical bytes."
+            "description": "Display title: the filename without its extension for ordinary MARKDOWN notes; the associated event title for EVENT notes. Omitted when unavailable. Editing a Markdown document title through /title renames its file without rewriting canonical bytes."
           },
           "createdAtSource": {
             "type": "string",
@@ -36262,6 +36262,13 @@
           "bookmarkEtag": {
             "type": "string",
             "description": "Validator for the separate bookmark state."
+          },
+          "heading": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "readOnly": true,
+            "description": "Legacy wikilink alias derived from the first nonempty document-level heading of an ordinary Markdown note without an explicitly chosen title. Omitted when empty or identical to the filename title; never used as its display title. Derived metadata, not persisted or exported."
           }
         },
         "dependentRequired": {

@@ -1,3 +1,4 @@
+import {appendEditorText} from './editor-interactions.js';
 import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
@@ -9,6 +10,24 @@ async function open(page,source){
   await expect(page.locator('#markdown-formatted [role=textbox]')).toBeVisible();
 }
 async function download(page){const pending=page.waitForEvent('download');await page.locator('#markdown-download').click();return readFile(await(await pending).path(),'utf8');}
+
+test('Obsidian callouts, media source and PDF references retain a formatted document',async({page})=>{
+  const callout='>[!IMPORTANT] Viktig!\n> Dette er et opprinnelig arbeidsdokument.\n';
+  const html='<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/example" title="Example video" frameborder="0" allowfullscreen></iframe>\n[https://www.youtube.com/watch?v=example](https://www.youtube.com/watch?v=example)\n';
+  const attachment='![[security-datasheet.pdf]]\n';
+  const source=callout+'\nhttps://example.invalid/security\n\nKort oppsummert:\nSe også [gjennomgangen](https://example.invalid/wiki/Sikkerhetsgjennomgang+2023) som er relatert.\n\nPakken inneholder _Platform Plus_.\n\n- Container Platform\n- Security\n\n## Må avklares\n- [ ] Hvordan henger dette sammen med *Pipelines* (*tasks*, *triggers*)?\n- [ ] Hva med *Builds* (security gates)\n\nBruk `ServiceAccount` til tilgangsstyring.\n\nAnbefalt video:\n'+html+'\n'+attachment;
+  await open(page,source);
+  await expect(page.locator('#markdown-formatted .markdown-callout')).toContainText('Dette er et opprinnelig arbeidsdokument.');
+  await expect(page.locator('#markdown-formatted h2')).toHaveText('Må avklares');
+  await expect(page.locator('#markdown-formatted').getByRole('checkbox')).toHaveCount(2);
+  await expect(page.locator('#markdown-formatted iframe')).toHaveCount(0);
+  await expect(page.locator('#markdown-formatted .markdown-callout input')).toHaveValue('Viktig!');
+  await expect(page.locator('#markdown-formatted button[data-wiki-reference]')).toHaveText('security-datasheet.pdf');
+  expect(await download(page)).toBe(source);
+  const paragraph=page.locator('#markdown-formatted p').filter({hasText:'Bruk ServiceAccount til tilgangsstyring.'});await appendEditorText(paragraph,' Endret.');
+  const changed=source.replace('til tilgangsstyring.','til tilgangsstyring. Endret.');expect(await download(page)).toBe(changed);
+  await page.locator('#markdown-source').click();await page.locator('#markdown-rich').click();expect(await download(page)).toBe(changed);
+});
 
 test('short table rows render without changing authored Markdown or unrelated blocks',async({page})=>{
   const source='Opening paragraph.\r\n\r\n| Pool | Nodes | vCPU |\r\n| :--- | ---: | ---: |\r\n| Test | 7 | 56 |\r\n| Production | 18 |\r\nCalculation: 244 / 4 = 61.\r\n\r\nTail paragraph.\r\n';
@@ -107,4 +126,9 @@ test('long-note input reaches the next animation frame within the typing budget'
   });
   await page.locator('#typing-performance p').nth(175).click();await page.keyboard.type(' measured typing responsiveness');await expect.poll(()=>page.evaluate(()=>globalThis.typingSamples.length)).toBeGreaterThan(20);
   const samples=await page.evaluate(()=>[...globalThis.typingSamples].sort((a,b)=>a-b)),p95=samples[Math.ceil(samples.length*.95)-1];console.log('Editor input timing '+JSON.stringify({browser:browser.version(),platform:process.platform,architecture:process.arch,samples:samples.length,p95}));expect(p95).toBeLessThan(150);
+});
+
+for(const ending of ['\n','\r\n','\r','\t'])test('incomplete wikilinks preserve their source across '+JSON.stringify(ending),async({page})=>{
+  const source='Before.\n\n[[unfinished'+ending+'reference]]\n\nAfter.\n';await open(page,source);
+  await expect(page.locator('#markdown-formatted p').first()).toHaveText('Before.');await expect(page.locator('#markdown-formatted p').last()).toHaveText('After.');await expect(page.locator('#markdown-formatted [data-wiki-reference]')).toHaveCount(0);expect(await download(page)).toBe(source);
 });
