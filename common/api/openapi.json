@@ -16971,6 +16971,21 @@
               "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
             },
             "description": "Requires createdAt. Defaults to ORIGINAL when a creation date is supplied. Metadata from older exports can explicitly use UNKNOWN."
+          },
+          {
+            "name": "taskPolicy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CHECKBOX",
+                "COMPLETED",
+                "IGNORE"
+              ],
+              "default": "CHECKBOX"
+            },
+            "description": "Markdown checklist enrollment for this reviewed import. CHECKBOX follows source checkboxes; COMPLETED checks all items and uses modifiedAt (or the import time) as their completion instant; IGNORE creates no tasks and durably suppresses automatic enrollment until an item is deliberately edited. Existing linked tasks retain their identities. Binary files are unaffected."
           }
         ],
         "responses": {
@@ -18591,6 +18606,21 @@
               "description": "Whether createdAt is an original source date, the date added to Dagsverk, or of unknown provenance. Older records may omit it; absence is unknown."
             },
             "description": "Requires createdAt. Defaults to ORIGINAL when a creation date is supplied. Metadata from older exports can explicitly use UNKNOWN."
+          },
+          {
+            "name": "taskPolicy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CHECKBOX",
+                "COMPLETED",
+                "IGNORE"
+              ],
+              "default": "CHECKBOX"
+            },
+            "description": "Markdown checklist enrollment for this reviewed import. CHECKBOX follows source checkboxes; COMPLETED checks all items and uses modifiedAt (or the import time) as their completion instant; IGNORE creates no tasks and durably suppresses automatic enrollment until an item is deliberately edited. Existing linked tasks retain their identities. Binary files are unaffected."
           }
         ],
         "responses": {

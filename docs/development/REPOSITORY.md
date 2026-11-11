@@ -62,6 +62,13 @@ The Node commands above run unit/asset checks; browser acceptance additionally
 requires Playwright browser installation and a packaged server, as described
 in the [web acceptance guide](WEB-CLIENT.md#automated-verification).
 
+Ubuntu CI uses `scripts/ci_ubuntu_mirror.py` before installing browser or X11
+dependencies. It selects the kernel.org Ubuntu mirror through the hosted
+runner's existing APT mirror lists, avoiding Canonical DNS outages. Ubuntu's
+suites, components, signing keys and package verification remain unchanged.
+The installer still installs every Playwright dependency and runs all selected
+browser and installed-client scenarios.
+
 See [remote Eclipse acceptance](REMOTE-ECLIPSE.md),
 [remote Mylyn acceptance](REMOTE-MYLYN.md),
 [web acceptance](WEB-CLIENT.md) and [release packaging](RELEASING.md)
