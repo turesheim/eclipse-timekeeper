@@ -31,7 +31,7 @@ export class TrackDayNotes {
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
     this.content=node('div',undefined,'journal-content');const heading=node('div',undefined,'week-note-heading');heading.append(this.title);if(!this.inline){const windowTools=node('div',undefined,'btn-group');this.maximize=iconButton(button('','btn btn-outline-secondary'),'maximize',t('notes.maximize'));this.maximize.addEventListener('click',()=>{if(this.editor)this.dialog.dispatchEvent(new CustomEvent(dayNoteNavigation,{bubbles:true,cancelable:true,detail:{date:this.editor.date,guards:[],leave:[]}}));});windowTools.append(this.maximize,this.cancel);heading.append(windowTools);}this.content.append(heading);
     if(this.labelRoot){this.text.setAttribute('form',this.form.id);this.text.disabled=true;label.classList.add('visually-hidden');const marker=icon('tag');marker.title=t('day_notes.text');this.labelRoot.append(label,this.text,marker);}else this.content.append(label,this.text);
-    this.content.append(this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);this.form.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
+    this.content.append(this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);for(const target of [this.form,this.mainActions].filter(Boolean))target.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor
@@ -39,7 +39,7 @@ export class TrackDayNotes {
     if(!this.inline){this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.requestClose();});this.dialog.addEventListener('close',()=>this.finishEditor());}
     if(!this.inline)guardDayNoteNavigation(this.dialog,()=>this.canLeaveInline(),()=>this.closeEditor());
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.autosave.flush();});
-    this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>{const e=this.editor;return !!e&&e.etag&&!e.busy&&!e.loading&&!e.failedRead&&!e.uncertain&&!e.stale&&this.writable&&!this.markdown.loading;},save:options=>this.commit(options)});bindDocumentAutosave(this.form,this.autosave);
+    this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>{const e=this.editor;return !!e&&e.etag&&!e.busy&&!e.loading&&!e.failedRead&&!e.uncertain&&!e.stale&&this.writable&&!this.markdown.loading;},save:options=>this.commit(options)});bindDocumentAutosave(this.form,this.autosave,[this.mainActions]);
     window.addEventListener('beforeunload',event=>{if(this.editor&&(this.dirty()||this.editor.busy||this.editor.uncertain)){event.preventDefault();event.returnValue='';}});
     if(this.mainActions){
       const field=this.markdown;
@@ -47,7 +47,8 @@ export class TrackDayNotes {
         action.className='btn btn-outline-secondary icon-button';action.removeAttribute('role');action.tabIndex=0;iconButton(action,glyph,label);
       }
       this.delete.classList.replace('btn-outline-secondary','btn-outline-danger');field.client.group.className='today-client-action';
-      this.mainActions.append(field.historyButton,field.client.group,this.delete);field.syncActions();
+      const deleteGroup=this.delete.parentElement;
+      this.mainActions.append(field.historyButton,field.client.group,this.delete);deleteGroup.remove();field.syncActions();
     }
     if(!this.inline)this.buildMenu();
   }

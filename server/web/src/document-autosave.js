@@ -21,9 +21,12 @@ export class DocumentAutosave {
   }
   reset(){this.cancelTimers();++this.generation;this.pending=null;}
 }
-export function bindDocumentAutosave(root,autosave){
-  root.addEventListener('keydown',event=>{if(!event.isComposing&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();void autosave.flush();}});
-  root.addEventListener('focusout',event=>{if(event.relatedTarget&&!root.contains(event.relatedTarget))void autosave.flush();});
+export function bindDocumentAutosave(root,autosave,controls=[]){
+  const roots=[root,...controls.filter(Boolean)];
+  for(const target of roots){
+    target.addEventListener('keydown',event=>{if(!event.isComposing&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();void autosave.flush();}});
+    target.addEventListener('focusout',event=>{if(event.relatedTarget&&!roots.some(value=>value.contains(event.relatedTarget)))void autosave.flush();});
+  }
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')void autosave.flush();});
   window.addEventListener('beforeunload',()=>void autosave.flush({keepalive:true}));
 }
