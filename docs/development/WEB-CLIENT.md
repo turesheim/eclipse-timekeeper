@@ -114,13 +114,13 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The nine views appear in this order: Today, Calendar, Week, Workweek, Activities,
-Tasks, Clients and Projects, followed by Notes. Labels are configured under **My Account → Labels**.
+`nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
+Tasks, Clients and Projects, followed by Notes. Clients, Projects and Labels are configured on separate pages under **My Account**.
 
 Configure **My Account → Focus areas** with a name and a set of clients, then
 select an area in the account menu. **No focus** shows all clients and unassigned
 work; an empty area shows no client-related records. Today, Calendar, Week,
-Workweek, Activities, Clients and Projects use the same client filter, including
+Workweek, Activities and Tasks use the same client filter, including
 totals and subscribed calendar events/to-dos. Journal notes, day labels and the
 notes vault are independent of clients and remain available. Focus changes only
 presentation, never stored work or API permissions. Editors retain all client
@@ -198,23 +198,24 @@ groups work sessions by client and lists all-day and timed calendar events plus
 tasks scheduled for the selected date. Selecting a work session opens its editor.
 The inline journal uses the same saved day note and conflict handling as
 Calendar and Week. Pending changes are autosaved before selecting
-another date. On narrow screens the sidebar follows the journal.
+another date. On narrow screens the day overview follows the journal.
 
-The Today sidebar starts alongside the date navigator, directly below the work
-session card. Its height and the editor's height are measured independently to
-the fixed bottom menu; font changes and wrapping headings update both measures.
-Drag the separator between the journal and sidebar to resize it on desktop.
-When focused, Left/Right changes the width and Home/End selects its limits.
-The selected width survives day and tab changes in the current page. At narrow
-widths the sidebar stacks below the journal and the separator is hidden.
-The date field has an accessible, visually hidden label. Previous, today and
-next-day controls form a grouped toolbar, and the date heading is centered in
-the remaining main-column space. On narrow screens the heading moves above
-the controls. There is no separate timezone caption.
+Today uses three desktop columns: the existing day overview on the left, the
+journal in the main area and a generated **Table of contents** on the right.
+The date navigator, day title and **Main actions** span the left/main area;
+**Note revisions**, **Associate with client** and **Delete note** are available
+there. Other note editors retain these actions in **Note tools**.
 
-The mini calendar uses compact rows and navigation buttons. Dots beneath day and
-week numbers indicate saved notes. The weekly editor has a top-right close button
-and no download action; weekly Markdown remains available through export and sync.
+Drag the separator between the left overview and journal to resize the overview,
+or use Left/Right, Home and End while the separator has keyboard focus. Both
+sidebars scroll independently and the journal stays above the fixed view selector.
+On narrow screens the contents list collapses above the journal and the overview
+follows it. Opening the contents list keeps the journal available below it.
+
+The contents list follows actual Markdown headings, including Setext headings
+and repeated titles, and updates during formatted or source editing. Selecting a
+heading moves the editor caret without navigating, rewriting the note or adding a
+revision. Code examples and opaque frontmatter do not become contents entries.
 
 Today’s work-session cards use Calendar’s font sizes. Calendar event cards show
 the title, time, and client name with a client-coloured edge. Select an event to
@@ -292,7 +293,7 @@ Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
 Documents autosave after a one-second pause and at least every five seconds
 while typing. Navigation and closing wait for the newest draft; there are no
-document Save or Cancel buttons. Delete note is below Note revisions in Note tools. Each note belongs to its calendar date
+document Save or Cancel buttons. Today places Delete note beside the main title; other editors keep it below Note revisions in Note tools. Each note belongs to its calendar date
 and account, including days without work. It follows the account across web
 sessions and devices, and remains on the same date after time-zone changes.
 Narrow screens wrap the label when needed. Day notes never affect timed work,
@@ -682,7 +683,7 @@ the authenticated owner and reject live token owner reassignment.
 
 ## Personal settings and independent user accounts
 
-**My Account** is a dedicated page with Profile, Password, API tokens, Labels and Import sections.
+**My Account** includes separate Clients and Projects pages alongside Profile, Password, API tokens, Labels and Import. Client and project settings show the complete owned catalog independently of the workspace focus filter.
 Open it from the header’s **Account menu**, which also contains **Sign out** and,
 for administrators with write access, **Users**. Time-zone settings are in Profile.
 The menu keeps the header on one row at phone widths and supports normal Tab
@@ -1019,7 +1020,7 @@ per calendar. The API accepts windows of at most 31 civil days.
 
 ## Clients, projects and work sessions
 
-The **Projects** view groups projects beneath their client, with its color and
+**My Account → Projects** groups projects beneath their client, with its color and
 project count. Client groups start collapsed. Use the client chevron to expand
 or collapse its projects. Choices survive refreshes and tab changes within the
 current session; reloading the page starts collapsed again. The session-report
@@ -1051,7 +1052,7 @@ current selection; **None** removes an icon. Icons work offline.
 
 ![Project work-session report in a separate browser tab](../assets/screenshots/project-report-desktop.png)
 
-Use **Clients** to create, rename, recolor or delete a client. A client has a
+Use **My Account → Clients** to create, rename, recolor or delete a client. A client has a
 required name and hex color. Each project belongs to exactly one client; choose
 it in the project editor. A client may have many projects. Each work session also
 belongs to exactly one client and has an optional summary, with no separate

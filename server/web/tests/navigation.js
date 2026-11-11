@@ -1,5 +1,18 @@
 import {expect} from '@playwright/test';
 
+export async function navigateView(page,name){
+  if(['clients','projects'].includes(name)){
+    if(!await page.locator('#account-page').isVisible()){
+      if(await page.locator('#account-menu').getAttribute('open')===null)await page.locator('#account-menu > summary').click();
+      await page.locator('#account').click();
+    }
+    await page.locator(`#account-navigation a[href="#account/${name}"]`).click();
+    await expect(page.locator(`#${name}-panel`)).toBeVisible();return;
+  }
+  if(await page.locator('#account-page').isVisible())await page.locator('#account-page a[href="#tracking"]').click();
+  await page.locator(`[data-tab=${name}]`).click();
+}
+
 export async function openAccountMenu(page) {
   const menu = page.locator('#account-menu');
   const toggle = page.getByRole('button', {name: 'Account menu', exact: true});

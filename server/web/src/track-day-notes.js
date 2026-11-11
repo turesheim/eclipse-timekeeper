@@ -41,6 +41,14 @@ export class TrackDayNotes {
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.autosave.flush();});
     this.autosave=new DocumentAutosave({dirty:()=>this.dirty(),ready:()=>{const e=this.editor;return !!e&&e.etag&&!e.busy&&!e.loading&&!e.failedRead&&!e.uncertain&&!e.stale&&this.writable&&!this.markdown.loading;},save:options=>this.commit(options)});bindDocumentAutosave(this.form,this.autosave);
     window.addEventListener('beforeunload',event=>{if(this.editor&&(this.dirty()||this.editor.busy||this.editor.uncertain)){event.preventDefault();event.returnValue='';}});
+    if(this.mainActions){
+      const field=this.markdown;
+      for(const [action,glyph,label] of [[field.historyButton,'clock-history',t('markdown.revisions')],[field.client.action,'briefcase',t('notes.client')],[this.delete,'trash',t('journal.delete_note')]]){
+        action.className='btn btn-outline-secondary icon-button';action.removeAttribute('role');action.tabIndex=0;iconButton(action,glyph,label);
+      }
+      this.delete.classList.replace('btn-outline-secondary','btn-outline-danger');field.client.group.className='today-client-action';
+      this.mainActions.append(field.historyButton,field.client.group,this.delete);field.syncActions();
+    }
     if(!this.inline)this.buildMenu();
   }
   dirty(){return !!this.editor?.etag&&(this.text.value.trim()!==this.editor.originalText||!this.markdown.matches(this.editor.originalBody));}
@@ -136,6 +144,7 @@ export class TrackDayNotes {
   }
   setWritable(value){this.writable=value;if(!value){this.cancelHold();this.closeMenu();}this.controls();this.paint();}
   controls(){
+    this.callbacks.onContentState?.();
     const editor=this.editor;this.markdown?.bookmark?.sync();if(!editor)return;
     this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.writable;
     const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;

@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu,expandProjectClient} from './navigation.js';
@@ -67,7 +68,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         await page.locator('#auth-mode').selectOption(mode); await accessible(page);
       }
       await captureScreenshot(page,{path:`test-results/design-sign-in-${name}.png`,fullPage:true});
-      await signIn(page);await page.locator('[data-tab=week]').click(); await page.locator('#week-date').fill('2025-10-20');await page.locator('#week-date').blur();
+      await signIn(page);await navigateView(page,'week'); await page.locator('#week-date').fill('2025-10-20');await page.locator('#week-date').blur();
       await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
       await expect(page.locator('#work-session-history')).toHaveCount(0);
       await expect(page.locator('#work-session-title')).toHaveText('Website planning');
@@ -79,7 +80,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await page.mouse.move(0,0);
       await captureScreenshot(page,{path:`test-results/design-work-session-${name}.png`,fullPage:false});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});
-      for(const tab of ['week','calendar','activities','clients','projects']) {
+      for(const tab of ['week','calendar','activities']) {
         await page.locator(`[data-tab=${tab}]`).click();
         await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
         await expect(page.locator('#work-session')).toBeVisible();
@@ -114,7 +115,8 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
 
 test('narrow-screen editors support keyboard focus, validation and visible errors',async({page,browserName})=>{
   await page.setViewportSize({width:390,height:844}); await signIn(page);
-  const clients=page.locator('[data-tab=clients]');await clients.focus();await page.keyboard.press('Enter');
+  await openAccountMenu(page);await page.locator('#account').focus();await page.keyboard.press('Enter');
+  const clients=page.locator('#account-navigation a[href="#account/clients"]');await clients.focus();await page.keyboard.press('Enter');
   const create=page.getByRole('button',{name:'New client',exact:true});await create.focus();await page.keyboard.press('Enter');
   const name=page.getByLabel('Name',{exact:true});await expect(name).toBeFocused();
   await page.locator('#save').click();await expect(name).toBeFocused();

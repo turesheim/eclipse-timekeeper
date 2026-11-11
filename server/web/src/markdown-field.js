@@ -202,6 +202,12 @@ export class MarkdownField {
     this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;
   }
   position(){return {formatted:!!this.editor,...(this.editor?this.editor.position():{anchor:this.text.selectionStart,head:this.text.selectionEnd,scrollTop:this.text.scrollTop})};}
+  async outline(){return this.editor?this.editor.outline():(await loadEngine()).markdownOutline(this.text.value);}
+  jumpToHeading(heading){
+    if(this.editor){this.editor.scrollTo(heading.pos);return;}
+    this.text.focus({preventScroll:true});this.text.setSelectionRange(heading.offset,heading.offset);
+    const rect=this.caret.sourceRect(this.text);if(rect)this.text.scrollTop+=rect.top-rect.box.top-8;
+  }
   async restorePosition(position){if(!position)return;const generation=this.restoreGeneration;if(position.formatted)await this.showFormatted(false);if(generation!==this.restoreGeneration)return;if(this.editor)this.editor.restorePosition(position);else{this.text.setSelectionRange(Math.min(position.anchor,this.text.value.length),Math.min(position.head??position.anchor,this.text.value.length));this.text.scrollTop=position.scrollTop||0;}}
   async showSource(){
     if(this.loading||!this.editor)return;

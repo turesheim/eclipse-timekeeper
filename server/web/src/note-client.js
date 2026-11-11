@@ -22,7 +22,7 @@ export class NoteClient {
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.save=button(t('ui.save'),()=>void this.commit());this.save.className='btn btn-primary';this.cancel=button(t('ui.cancel'),()=>this.dialog.close());const actions=node('div',undefined,'dialog-actions');actions.append(this.cancel,this.save);this.dialog.append(heading,label,this.select,this.error,actions);field.root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{if(this.saving)event.preventDefault();});
-    this.dialog.addEventListener('close',()=>{if(same(this.openContext,this.current())&&this.field.root.getClientRects().length)this.field.actionsTrigger.focus({preventScroll:true});if(this.refreshPending){this.refreshPending=false;this.revision=null;this.sync();}});
+    this.dialog.addEventListener('close',()=>{if(same(this.openContext,this.current())&&this.field.root.getClientRects().length)(this.field.actionsMenu.contains(this.action)?this.field.actionsTrigger:this.action).focus({preventScroll:true});if(this.refreshPending){this.refreshPending=false;this.revision=null;this.sync();}});
   }
   current(){const value=this.options.current?.();return value?.session===directory.session&&value?.sourceType&&value?.sourceKey?value:null;}
   path(context){return '/notes/client?'+new URLSearchParams({sourceType:context.sourceType,sourceKey:context.sourceKey});}

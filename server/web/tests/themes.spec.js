@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme,openThemeSettings} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -27,13 +28,13 @@ test('themes cover tracking, records, editors and account settings with accessib
     await create('work-sessions',{clientId:client.id,projectId:project.id,summary:'Palette review',start:'2025-10-20T06:00:00Z',end:'2025-10-20T14:00:00Z'});
     await create('activities',{taskId:task.id,summary:'Review contrast',start:'2025-10-20T06:00:00Z',end:'2025-10-20T07:00:00Z',labelIds:[]});
     await signIn(page);await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
-    await page.locator('[data-tab=week]').click();await page.locator('#week-date').fill('2025-10-20');await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
-    await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');
+    await navigateView(page,'week');await page.locator('#week-date').fill('2025-10-20');await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
+    await navigateView(page,'track');await page.locator('#track-month').fill('2025-10');
     for(const id of ['timekeeper','timekeeper-dark']) {
       await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
-      await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
-      for(const view of ['track','week','calendar','activities','clients','projects']) {
+      await navigateView(page,'track');await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
+      for(const view of ['today','track','week','calendar','activities','tasks','notes']) {
         await page.locator(`[data-tab=${view}]`).click();
         if(view==='activities') {
           const activity=page.locator('#activities tr[data-kind=activity]').first();
@@ -42,9 +43,10 @@ test('themes cover tracking, records, editors and account settings with accessib
         await audit(page);
       }
       await page.getByRole('button',{name:'Record work session',exact:true}).click();await expect(page.locator('#editor-labels')).toHaveCount(0);await audit(page);await page.locator('#cancel').click();
-      await page.locator('[data-tab=projects]').click();await page.getByRole('button',{name:'New project',exact:true}).click();await page.getByRole('radio',{name:'Code',exact:true}).check();await audit(page);await page.locator('#cancel').click();
+      await navigateView(page,'projects');await page.getByRole('button',{name:'New project',exact:true}).click();await page.getByRole('radio',{name:'Code',exact:true}).check();await audit(page);await page.locator('#cancel').click();
+      await navigateView(page,'clients');await audit(page);
       await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await audit(page);await page.locator('#account-navigation').getByRole('link',{name:'Labels',exact:true}).click();await expect(page.locator('#labels-panel')).toBeVisible();await audit(page);
-      await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();
+      await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await navigateView(page,'track');
       await page.setViewportSize({width:390,height:844});await audit(page);await captureScreenshot(page,{path:`test-results/theme-${id}-mobile.png`,fullPage:false});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }

@@ -1752,5 +1752,9 @@
   "tasks.deadline_time": "Dato og klokkeslett",
   "tasks.deadline_clock": "Klokkeslett for tidsfrist",
   "tasks.deadline_zone": "Tidssone for tidsfrist",
-  "password.passkey_help": "Velg Eksisterende passnøkkel for å angi et nytt passord uten å kjenne det nåværende passordet. Nettleseren ber deg bekrefte med en registrert passnøkkel."
+  "password.passkey_help": "Velg Eksisterende passnøkkel for å angi et nytt passord uten å kjenne det nåværende passordet. Nettleseren ber deg bekrefte med en registrert passnøkkel.",
+  "today.main_actions": "Hovedhandlinger",
+  "today.contents": "Innholdsfortegnelse",
+  "today.no_headings": "Dette notatet har ingen overskrifter ennå.",
+  "today.contents_unavailable": "Innholdsfortegnelsen er utilgjengelig. Du kan fortsatt redigere notatet."
 }

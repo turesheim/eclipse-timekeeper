@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -42,10 +43,10 @@ test('one rich tooltip covers each composite, preserves literal data and support
       await captureScreenshot(page,{path:`test-results/tooltip-${theme}.png`,fullPage:false});
     }
     for(const width of [320,390]){await page.setViewportSize({width,height:844});const tip=await tooltipFor(card),box=await tip.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.height).toBeLessThan(844);}
-    await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');
+    await navigateView(page,'track');await page.locator('#track-month').fill('2025-10');
     const monthly=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`);
     await expect((await tooltipFor(monthly)).locator('.tooltip-session')).toHaveCount(2);await expect(monthly.locator('[title],[data-tk-tooltip]')).toHaveCount(0);
-    await page.locator('[data-tab=clients]').click();await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await navigateView(page,'clients');await expect(page.getByRole('tooltip')).toHaveCount(0);
     expect(errors).toEqual([]);
   } finally {
     for(const [collection,id] of records)await api(request,'DELETE','/'+collection+'/'+id,undefined,{'If-Match':(await api(request,'GET','/'+collection+'/'+id)).headers().etag});

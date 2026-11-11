@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -57,12 +58,12 @@ test('account language persists across devices and can return to browser default
   const user=await fresh(request),first=await context(browser,'nb-NO'),second=await context(browser,'nb-NO');
   try {
     const page=await first.newPage();await login(page,user);await expect(page.locator('#status')).toHaveText('Oppdatert');
-    await page.locator('[data-tab=clients]').click();await page.getByRole('button',{name:'Ny kunde',exact:true}).click();
+    await navigateView(page,'clients');await page.getByRole('button',{name:'Ny kunde',exact:true}).click();
     await expect(page.locator('#editor-title')).toHaveText('Ny kunde');
     const name='<b>Profile</b>';await page.getByLabel('Navn',{exact:true}).fill(name);await page.getByRole('button',{name:'Lagre',exact:true}).click();
     await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#clients')).toContainText(name);await expect(page.locator('#clients b')).toHaveCount(0);
-    await page.locator('[data-tab=projects]').click();await page.getByRole('button',{name:'Nytt prosjekt',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Nytt prosjekt');await page.getByRole('button',{name:'Avbryt',exact:true}).click();
-    await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');await expect(page.locator('#track-title')).toHaveText('Oktober 2025');
+    await navigateView(page,'projects');await page.getByRole('button',{name:'Nytt prosjekt',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Nytt prosjekt');await page.getByRole('button',{name:'Avbryt',exact:true}).click();
+    await navigateView(page,'track');await page.locator('#track-month').fill('2025-10');await expect(page.locator('#track-title')).toHaveText('Oktober 2025');
     await account(page);
     const zone=page.getByLabel('Tidssone',{exact:true});await zone.fill('America/Los_Angeles');
     const zoneForm=page.locator('form').filter({has:zone});await zoneForm.getByRole('button',{name:'Lagre tidssone',exact:true}).click();
@@ -81,7 +82,7 @@ test('account language persists across devices and can return to browser default
     expect((await(await browserRequest(page).get('/api/v1/me')).json()).locale).toBe('en-GB');
     expect((await(await browserRequest(page).get('/api/v1/me')).json()).zoneId).toBe('America/Los_Angeles');
     const other=await second.newPage();await login(other,user);await expect(other.locator('html')).toHaveAttribute('lang','en-GB');
-    await other.locator('[data-tab=clients]').click();await expect(other.locator('#clients')).toContainText(name);await expect(other.locator('#clients b')).toHaveCount(0);
+    await navigateView(other,'clients');await expect(other.locator('#clients')).toContainText(name);await expect(other.locator('#clients b')).toHaveCount(0);
     await account(other);await saveLanguage(other,'Language and region','Save language','','nb-NO');
     expect((await(await browserRequest(other).get('/api/v1/me')).json()).locale).toBeNull();
     await page.reload();await expect(page.locator('html')).toHaveAttribute('lang','nb-NO');await expect(page.locator('#account-heading')).toHaveText('Min konto');

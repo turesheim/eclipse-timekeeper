@@ -5,7 +5,13 @@ export async function noteActions(page,scope){
   if(await trigger.getAttribute('aria-expanded')!=='true')await trigger.click();
   const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu).toBeVisible();return menu;
 }
-export async function clickNoteAction(page,scope,name){await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();}
+export async function clickNoteAction(page,scope,name){
+  if(await scope.getAttribute('id')==='today-note-editor'){
+    const action=page.locator('#today-main-actions').getByRole('button',{name,exact:true});
+    if(await action.count()){await action.click();return;}
+  }
+  await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();
+}
 export async function notesSource(page){
   await page.locator('#notes-panel button[aria-controls="notes-body"]').click();
   const body=page.locator('#notes-body');await expect(body).toBeVisible();return body;
