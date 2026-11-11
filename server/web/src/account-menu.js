@@ -9,7 +9,7 @@ export function accountMenu(menu) {
     if (menu.open) { panel.scrollTop = 0;fit(); }
   });
   window.addEventListener('resize', fit);
-  new ResizeObserver(fit).observe(menu.closest('header') || menu);
+  new ResizeObserver(fit).observe(menu.closest('header') || menu, {box:'border-box'});
   document.addEventListener('click', event => {
     if (!menu.contains(event.target) || event.target.closest('.account-menu-items a, .account-menu-items button')) menu.open = false;
   });
