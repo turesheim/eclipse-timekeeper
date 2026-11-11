@@ -177,7 +177,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-contents li { padding-inline-start: calc(var(--contents-depth) * .65rem); }
 .today-contents .btn-link { width: 100%; min-height: 2.5rem; padding: .35rem .25rem; text-align: start; color: var(--bs-body-color); text-decoration: none; overflow-wrap: anywhere; }
 .today-contents .btn-link:hover, .today-contents [aria-current] { color: var(--accent); background: var(--bs-tertiary-bg); }
-@media(min-width: 1051px) { .today-contents { max-height: calc(var(--today-contents-height,100dvh) - var(--workspace-content-gap)); overflow-y: auto; } }
+@media(min-width: 1051px) { .today-contents { height: calc(var(--today-contents-height,100dvh) - var(--workspace-content-gap)); overflow-y: auto; } }
 .today-calendar { min-width: 0; align-content: start; }
 .today-day-label { display: flex; align-items: center; gap: .5rem; min-width: 0; }
 .today-day-label .journal-note-label { min-width: 0; margin: 0; }

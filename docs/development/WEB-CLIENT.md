@@ -115,7 +115,7 @@ project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
 `nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
-Tasks, Clients and Projects, followed by Notes. Clients, Projects and Labels are configured on separate pages under **My Account**.
+Tasks and Notes. Clients, Projects and Labels are configured on separate pages under **My Account**.
 
 Configure **My Account → Focus areas** with a name and a set of clients, then
 select an area in the account menu. **No focus** shows all clients and unassigned

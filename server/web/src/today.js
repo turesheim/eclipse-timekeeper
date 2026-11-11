@@ -60,7 +60,7 @@ export class TodayView {
     // Fonts, translated headings and session details can resize without a
     // viewport event. Both columns keep their own distance to the fixed dock.
     this.layoutObserver=new ResizeObserver(()=>this.sizeEditor());
-    for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents').querySelector('summary')])if(target)this.layoutObserver.observe(target);
+    for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
   reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
@@ -68,7 +68,7 @@ export class TodayView {
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
   update(data,connected,scope){
-    if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;}
+    if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;if(visible)this.contents.show();}
     this.data=data;this.connected=connected;
     if(!this.date)this.initialize(dateInZone(data.report.generatedAt,data.profile.data.zoneId));
     if(this.visible){this.pollEvents();this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}

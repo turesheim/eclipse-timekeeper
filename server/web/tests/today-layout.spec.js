@@ -62,7 +62,12 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
         if(width===1440){
           const left=await page.locator('.today-sidebar').boundingBox(),main=await page.locator('.today-main').boundingBox(),right=await contents.boundingBox(),toolbar=await page.locator('.today-toolbar').boundingBox();
           expect(left.x+left.width).toBeLessThan(main.x);expect(right.x).toBeGreaterThanOrEqual(main.x+main.width);expect(Math.abs(left.y-main.y)).toBeLessThan(1);expect(Math.abs(right.y-toolbar.y)).toBeLessThan(1);
-        }else await expect(contents.locator('details')).not.toHaveAttribute('open','');
+        }else{
+          await expect(contents.locator('details')).not.toHaveAttribute('open','');
+          await contents.locator('summary').click();await expect(choices.last()).toBeVisible();
+          await expect.poll(async()=>{const editor=await field.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();return editor.y+editor.height<=nav.y+1;}).toBe(true);
+          await contents.locator('summary').click();
+        }
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
         expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
         await captureScreenshot(page,{path:`test-results/today-three-columns-${locale}-${theme}-${width}.png`});
