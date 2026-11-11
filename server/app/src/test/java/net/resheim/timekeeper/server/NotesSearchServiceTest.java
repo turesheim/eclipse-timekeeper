@@ -57,7 +57,7 @@ class NotesSearchServiceTest {
         }
     }
     @Test void exactTagsFollowCanonicalSavesAcrossPrivatePersistentReplicas()throws Exception{
-        String owner="search-tag-owner";UUID id=create(owner,"A #OpenShift deployment.");create("search-tag-other","A #OpenShift foreign note.");var initial=sources().state(owner);
+        String owner="search-tag-owner";UUID id=create(owner,"# Imported heading\n\nA #OpenShift deployment.");create("search-tag-other","A #OpenShift foreign note.");var initial=sources().state(owner);
         Path first=temporary.resolve("tag-a"),second=temporary.resolve("tag-b");
         try(var a=new NotesSearchService(store,first);var b=new NotesSearchService(store,second)){
             assertEquals(List.of(id),waitFor(a,initial,"tag:#openshift").items().stream().map(NotesLuceneIndex.Hit::id).toList());assertEquals(List.of(id),waitFor(b,initial,"tag:#openshift").items().stream().map(NotesLuceneIndex.Hit::id).toList());
@@ -75,16 +75,16 @@ class NotesSearchServiceTest {
         try(var files=Files.walk(cache)){for(var path:files.filter(path->path.getFileName().toString().startsWith("index-")).toList())try(var contents=Files.walk(path)){for(var file:contents.sorted(Comparator.reverseOrder()).toList())Files.delete(file);}}
         try(var service=new NotesSearchService(store,cache)){assertEquals(1,waitFor(service,state,"needle").items().size());}
     }
-    @Test void legacyCacheWithoutTagsIsRebuiltFromCanonicalData()throws Exception{
-        String owner="search-tag-upgrade";UUID id=create(owner,"A #OpenShift deployment.");var state=sources().state(owner);Path cache=temporary.resolve("legacy-tags");
-        try(var service=new NotesSearchService(store,cache)){assertEquals(id,waitFor(service,state,"tag:#openshift").items().getFirst().id());}
+    @Test void previousTitlePolicyCacheIsRebuiltFromCanonicalData()throws Exception{
+        String owner="search-tag-upgrade";UUID id=create(owner,"# Imported heading\n\nA #OpenShift deployment.");var state=sources().state(owner);Path cache=temporary.resolve("legacy-tags");
+        try(var service=new NotesSearchService(store,cache)){var hit=waitFor(service,state,"tag:#openshift").items().getFirst();assertEquals(id,hit.id());assertEquals("note",hit.title());}
         Path path;try(var files=Files.walk(cache)){path=files.filter(file->file.getFileName().toString().startsWith("segments_")).findFirst().orElseThrow().getParent();}
         try(var directory=org.apache.lucene.store.FSDirectory.open(path);var analyzer=NotesSearchQuery.analyzer()){
             Map<String,String> metadata;try(var reader=org.apache.lucene.index.DirectoryReader.open(directory)){metadata=new HashMap<>(reader.getIndexCommit().getUserData());}
-            metadata.put("format","notes-search-1");
+            metadata.put("format","notes-search-4");
             try(var writer=new org.apache.lucene.index.IndexWriter(directory,new org.apache.lucene.index.IndexWriterConfig(analyzer))){writer.deleteAll();writer.setLiveCommitData(metadata.entrySet());writer.commit();}
         }
-        try(var service=new NotesSearchService(store,cache)){assertEquals(id,waitFor(service,state,"tag:#openshift").items().getFirst().id());}
+        try(var service=new NotesSearchService(store,cache)){var hit=waitFor(service,state,"tag:#openshift").items().getFirst();assertEquals(id,hit.id());assertEquals("note",hit.title());}
     }
     @Test void sharedWritableDirectoriesAreRefusedWithoutDisruptingTheirOwner()throws Exception{
         String owner="search-runtime-lock";create(owner,"needle locked");var state=sources().state(owner);Path cache=temporary.resolve("locked");

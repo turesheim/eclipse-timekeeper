@@ -1155,8 +1155,8 @@ widths; other engines check their naturally reported inset.
 ## Notes collections
 
 Notes navigation, editor headings and Today’s Recent notes use the API’s display
-title: event titles for event notes and the first document heading for ordinary
-notes, with the filename minus its `.md` suffix as the fallback. Folder names and
+title: event titles for event notes and the filename minus its `.md` suffix for
+ordinary notes, including existing Obsidian imports. Headings stay in the body. Folder names and
 other file extensions retain their literal names. Name sorting follows the displayed title.
 Collection paths remain available for identification and keep their existing
 synchronization and link semantics.
@@ -1220,7 +1220,7 @@ beside its save state, using the account's time zone and locale. The document's
 full collection-relative path follows the last-change timestamp, updates after
 renaming or moving, and wraps on narrow screens. Wikilinks first match paths and
 filenames. A bare link such as `[[CVE-2026-111943]]` also matches a unique display
-title when no filename matches. Duplicate titles require an explicit path, such
+title or legacy document-heading alias when no filename matches. Duplicate aliases require an explicit path, such
 as `[[Notes/Imported investigation]]`; headings still do not rename files.
 Unsaved edits
 and rejected saves retain the saved timestamps; a successful save updates the

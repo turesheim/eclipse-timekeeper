@@ -37,7 +37,7 @@ class VaultDavHttpTest {
         assertEquals(412,api("test-a").header("If-Match","\"stale\"").contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
         assertEquals(403,api("test-read").header("If-Match",guard).contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
         assertEquals(404,api("test-b").header("If-Match",guard).contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
-        var after=api("test-a").get(endpoint.replace("/title",""));assertEquals(guard,after.header("ETag"));assertEquals(path,after.jsonPath().getString("path"));assertEquals("Before",after.jsonPath().getString("title"));
+        var after=api("test-a").get(endpoint.replace("/title",""));assertEquals(guard,after.header("ETag"));assertEquals(path,after.jsonPath().getString("path"));assertEquals(prefix,after.jsonPath().getString("title"));assertEquals("Before",after.jsonPath().getString("heading"));
     }
     @Test void revisionsCoverDavWritesAndStayOwnerPrivateWithReadOnlyComparison(){
         String path="revision-http.md",first="First\r\n",second="Second\n";

@@ -10,7 +10,7 @@ export function remarkEmoji(){
     function start(code){effects.enter('emojiShortcode');effects.consume(code);return body;}
     function body(code){
       if(code===58){if(!emojiFor(name))return nok(code);effects.consume(code);effects.exit('emojiShortcode');return ok;}
-      if(code===null||name.length>=80||!/[a-z0-9_+-]/.test(String.fromCodePoint(code)))return nok(code);
+      if(code===null||code<0||name.length>=80||!/[a-z0-9_+-]/.test(String.fromCodePoint(code)))return nok(code);
       name+=String.fromCodePoint(code);effects.consume(code);return body;
     }
   };

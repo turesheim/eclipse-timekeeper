@@ -1,3 +1,5 @@
+import {noteEntry} from './note-entry.js';
+import {searchNotes} from './notes-search.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {mkdtemp,mkdir,writeFile,truncate,rm} from 'node:fs/promises';
@@ -88,5 +90,28 @@ test('files named by export metadata but absent from the folder selection are id
     await choose(page,card,root);await expect(card).toContainText('1 new file ready to import');
     const missing=card.locator('.notes-import-row').filter({hasText:'.private.md'});await expect(missing).toContainText('not provided by the folder picker');await expect(missing.getByRole('checkbox')).toBeDisabled();
     await card.getByRole('button',{name:'Import new files',exact:true}).click();await expect(card).toContainText('Imported 1 file.');expect((await resolve(client,'Real.md')).ok()).toBe(true);expect((await resolve(client,'.private.md')).status()).toBe(404);
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+
+test('Obsidian imports use filenames across navigation, recent notes and search while formatting callouts and opening PDF attachments',async({page,request})=>{
+  const {api,client,card}=await setup(page,request),root=await mkdtemp(join(tmpdir(),'notes-obsidian-'));
+  const path='Notes/Security review.md',source='>[!IMPORTANT] Viktig!\r\n> Dette er et arbeidsdokument.\r\n\r\nKort oppsummert:\r\nPakken inneholder _Security_.\r\n\r\n## Må avklares\r\n- [ ] Sjekk `ServiceAccount`\r\n\r\nAnbefalt video:\r\n<iframe src="https://www.youtube-nocookie.com/embed/example" title="Video"></iframe>\r\n\r\n![[security-datasheet.pdf]]\r\n';
+  try{
+    await mkdir(join(root,'Notes'));await writeFile(join(root,path),source);await writeFile(join(root,'Notes/security-datasheet.pdf'),'%PDF-1.4\nSynthetic attachment\n');
+    const external=[];page.on('request',request=>{if(!request.url().startsWith(new URL(process.env.TIMEKEEPER_WEB_URL).origin)&&!request.url().startsWith('blob:'))external.push(request.url());});
+    await choose(page,card,root);await expect(card).toContainText('2 new files ready to import');await card.getByRole('button',{name:'Import new files',exact:true}).click();await expect(card).toContainText('Imported 2 files.');
+    const entry=await(await resolve(client,path)).json();expect(entry.title).toBe('Security review');expect(entry.heading).toBe('Må avklares');
+    expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
+    await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();
+    const item=noteEntry(page.locator('#notes-navigation'),path);await expect(item).toHaveText('Security review');await item.click();
+    await expect(page.locator('#notes-document-title')).toHaveText('Security review');await expect(page.locator('#notes-formatted .markdown-callout input')).toHaveValue('Viktig!');await expect(page.locator('#notes-formatted h2')).toHaveText('Må avklares');await expect(page.locator('#notes-formatted input[type=checkbox]')).toHaveCount(1);await expect(page.locator('#notes-formatted iframe')).toHaveCount(0);
+    await expect(page.locator('#notes-recent-notes [data-recent-note="'+entry.id+'"]')).toContainText('Security review');
+    const panel=await searchNotes(page,'Security review');await expect(panel.locator('[data-search-note="'+entry.id+'"] .notes-search-result-title')).toHaveText('Security review');await panel.getByRole('button',{name:'Close',exact:true}).click();
+    await captureScreenshot(page,{path:'test-results/obsidian-formatted-import.png',fullPage:true});
+    const attachment=page.locator('#notes-formatted [data-wiki-reference="security-datasheet.pdf"]');await expect(attachment).toHaveAttribute('data-resolved','true');await expect(page.locator('#notes-formatted img')).toHaveCount(0);await attachment.click();
+    await expect(page.locator('.notes-document-path')).toHaveText('Notes/security-datasheet.pdf');const pending=page.waitForEvent('download');await page.locator('#notes-panel').getByRole('button',{name:'Download',exact:true}).click();expect((await pending).suggestedFilename()).toBe('security-datasheet.pdf');
+    await item.click();await expect(page.locator('#notes-formatted')).toBeVisible();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
+    const after=await(await resolve(client,path)).json();for(const key of ['createdAt','modifiedAt','version','contentVersion','etag','entryEtag'])expect(after[key]).toEqual(entry[key]);expect(external).toEqual([]);
   }finally{await rm(root,{recursive:true,force:true});}
 });

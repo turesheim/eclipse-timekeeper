@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** One replica's private owner index. Inputs must come from committed SQL snapshots. */
 final class NotesLuceneIndex implements AutoCloseable {
-    static final String FORMAT="notes-search-4";
+    static final String FORMAT="notes-search-5";
     static final int CHUNK=65_536,EXCERPT=320;
     private static final Sort ORDER=new Sort(SortField.FIELD_SCORE,new SortField("path_key",SortField.Type.STRING),new SortField("id",SortField.Type.STRING));
     private static final FieldType BODY;

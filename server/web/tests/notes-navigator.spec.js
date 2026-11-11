@@ -28,7 +28,7 @@ test('a late heading-link completion preserves a pressed navigator action',async
   await page.evaluate(async()=>{
     const {MarkdownField}=await import('/web/markdown-field.js'),show=MarkdownField.prototype.showFormatted;
     const pending=new Promise(resolve=>{window.releaseHeadingRender=resolve;});window.restoreHeadingRender=()=>{MarkdownField.prototype.showFormatted=show;window.releaseHeadingRender();};
-    MarkdownField.prototype.showFormatted=async function(...args){const result=await show.apply(this,args);if(this.root.closest('#notes-panel')&&document.querySelector('#notes-document-title').textContent==='Heading'){window.headingRenderPending=true;await pending;}return result;};
+    MarkdownField.prototype.showFormatted=async function(...args){const result=await show.apply(this,args);if(this.root.closest('#notes-panel')&&document.querySelector('#notes-document-title').textContent==='Target'){window.headingRenderPending=true;await pending;}return result;};
   });
   try{
     await link.click();await expect.poll(()=>page.evaluate(()=>!!window.headingRenderPending)).toBe(true);await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
@@ -231,7 +231,7 @@ test('navigation toggle stays left of Notes while collapse preserves the draft a
   };
   const originalOffset=await toggleOffset();
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Review.md').click();
-  await expect(title).toHaveText('Project review');await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await expect(title).toHaveText('Review');await expect(toggle).toHaveAttribute('aria-expanded','true');
   for(const property of ['font-family','font-size','font-weight'])await expect(title).toHaveCSS(property,await page.locator('#notes-title').evaluate((node,property)=>getComputedStyle(node).getPropertyValue(property),property));
   expect((await title.boundingBox()).y+(await title.boundingBox()).height).toBeLessThan((await editor.boundingBox()).y);
   await expect.poll(()=>navigation.locator('.notes-tree-pick').first().evaluate(node=>parseFloat(getComputedStyle(document.documentElement).fontSize)-parseFloat(getComputedStyle(node).fontSize))).toBeCloseTo(2,1);

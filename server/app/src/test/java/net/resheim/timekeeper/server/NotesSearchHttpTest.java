@@ -84,7 +84,7 @@ class NotesSearchHttpTest {
     }
     @Test void anExplicitTitleWithAnUnchangedPathRefreshesSearchMetadata()throws Exception{
         String title="chosenfilename";create("a","search-http/"+title+".md","# Different imported heading\n");
-        assertEquals("Different imported heading",page(title,200,null).path("items").get(0).path("entry").path("title").asText());
+        assertEquals(title,page(title,200,null).path("items").get(0).path("entry").path("title").asText());
         store.transaction("a",()->{var vault=new VaultCollection(store,limits);var entry=vault.get(new VaultPath("search-http/"+title+".md"));vault.renameTitle(entry,title,vault.metadataTag(entry));return null;});
         assertEquals(title,page(title,200,null).path("items").get(0).path("entry").path("title").asText());
     }
