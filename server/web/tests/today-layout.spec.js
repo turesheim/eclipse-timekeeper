@@ -47,7 +47,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     await expect(choices).toHaveText(['Plan','Next steps','Decisions','Next steps']);
     const saved=await api(request,'GET',path);
     await choices.last().click();
-    await expect(field.locator('.ProseMirror h2').last()).toBeVisible();
+    await expect(field.locator('.ProseMirror h2').last()).toBeInViewport();
     expect(await field.locator('.ProseMirror h2').last().evaluate(node=>node.contains(getSelection().anchorNode))).toBe(true);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await field.getByRole('button',{name:locale==='nb-NO'?'Markdown-kilde':'Markdown source',exact:true}).click();
@@ -56,7 +56,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     expect(await source.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await source.fill(markdown+'\n## Live update\n');await expect(choices.last()).toHaveText('Live update');
-    await field.getByRole('button',{name:locale==='nb-NO'?'Formatert':'Formatted',exact:true}).click();await choices.first().click();
+    await field.getByRole('button',{name:locale==='nb-NO'?'Formatert':'Formatted',exact:true}).click();await choices.first().click();await expect(field.locator('.ProseMirror h1').first()).toBeInViewport();
     for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
       for(const width of [1440,390,320]){

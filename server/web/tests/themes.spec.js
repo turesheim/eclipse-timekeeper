@@ -15,7 +15,7 @@ async function audit(page) {
   expect(result.violations.map(({id,nodes})=>({id,nodes:nodes.map(({target,any})=>({target,checks:any.map(({message,data})=>({message,data}))}))}))).toEqual([]);
 }
 test('themes cover tracking, records, editors and account settings with accessible contrast',async({page,request,browserName})=>{
-  test.setTimeout(150000);
+  test.setTimeout(150000);page.setDefaultTimeout(10000);
   const records=[],headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
   async function api(method,path,data,extra={}) {const response=await request.fetch('/api/v1'+path,{method,data,headers:{...headers,...extra}});expect(response.ok(),method+' '+path+': '+response.status()).toBe(true);return response;}
   async function create(collection,data) {const value=await (await api('POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}
@@ -35,7 +35,7 @@ test('themes cover tracking, records, editors and account settings with accessib
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
       await navigateView(page,'track');await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
       for(const view of ['today','track','week','calendar','activities','tasks','notes']) {
-        await page.locator(`[data-tab=${view}]`).click();
+        await navigateView(page,view);
         if(view==='activities') {
           const activity=page.locator('#activities tr[data-kind=activity]').first();
           if(await activity.getAttribute('aria-selected')!=='true')await activity.locator('.activity-title').click();

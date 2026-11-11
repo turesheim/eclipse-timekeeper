@@ -137,6 +137,7 @@ test('server build and deployment details describe the actual packaged server af
   await expect(page.locator('#server-info')).not.toBeVisible();
 });
 test('core browser workflow manages records, tracks time, and preserves exact reports', async ({page, request}) => {
+  page.setDefaultTimeout(10000);
   const suffix = randomUUID().slice(0,8), project = 'Project ' + suffix, task = 'Task ' + suffix, label = 'Label ' + suffix;
   await signIn(page); await newNamed(page, 'Projects', 'project', project); await newNamed(page, 'Labels', 'label', label);
   const projectRecord=(await (await api(request,'GET','/projects')).json()).items.find(value=>value.name===project);
