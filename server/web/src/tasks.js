@@ -4,7 +4,8 @@ import {iconButton,icon} from './icons.js';
 import {noteIcon} from './note-presentation.js';
 import {noteTitle} from './note-title.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
-import {calendarDescription,linkedText} from './tooltip-description.js';
+import {calendarDescription} from './tooltip-description.js';
+import {renderMarkdown} from './assets/milkdown/markdown-preview.js';
 import {taskRows,taskMatches} from './tasks-model.js';
 import {calendarTasks} from './tasks-api.js';
 
@@ -22,12 +23,12 @@ const contextLink=(label,value,mail=false)=>{
 /** All sources remain in their original collections. Filters only change presentation. */
 export class TasksView {
   constructor(root,callbacks){
-    Object.assign(this,{root,callbacks,generation:0,sourceTasks:[],visibleLimit:50,filterButtons:new Map(),rowElements:new Map(),selection:{kind:'smart',value:'all'}});
+    Object.assign(this,{root,callbacks,generation:0,sourceTasks:[],visibleLimit:50,filterButtons:new Map(),rowElements:new Map(),pending:new Set(),selection:{kind:'smart',value:'all'}});
     this.narrow=matchMedia('(max-width:760px)');
     const heading=node('div',undefined,'tasks-heading');this.title=node('h2',t('ui.tasks'));this.title.id='tasks-title';
     this.toggle=button(t('tasks.browse'),()=>this.navigationState(!root.classList.contains('tasks-navigation-open')),'layout-sidebar');this.toggle.setAttribute('aria-controls','tasks-navigation');
     this.create=button(t('tasks.new'),()=>{if(!this.writable)return;this.selection={kind:'smart',value:'all'};this.paint();callbacks.onNew();},'add');
-    this.refresh=button(t('tasks.refresh'),()=>{callbacks.onRefresh?.();void this.load();},'refresh');const actions=node('div',undefined,'btn-group');actions.append(this.create,this.refresh);heading.append(this.toggle,this.title,actions);
+    this.refresh=button(t('tasks.refresh'),()=>{callbacks.onRefresh?.();void this.load();},'refresh');const actions=node('div',undefined,'btn-group');actions.append(this.create,this.refresh);heading.append(this.toggle,this.title);
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.warning=node('p',t('tasks.source_warning'),'alert alert-warning');this.warning.hidden=true;this.warning.setAttribute('role','status');
     const layout=node('div',undefined,'tasks-layout');this.navigation=node('nav',undefined,'tasks-navigation card');this.navigation.id='tasks-navigation';this.navigation.setAttribute('aria-label',t('tasks.browse'));
@@ -36,17 +37,32 @@ export class TasksView {
     }
     this.navigation.addEventListener('keydown',event=>{if(event.key==='Escape'&&this.narrow.matches){event.preventDefault();this.navigationState(false);this.toggle.focus();}});
     const content=node('section',undefined,'tasks-results card');this.listTitle=node('h3',t('tasks.all'));this.listTitle.id='tasks-list-title';this.listTitle.tabIndex=-1;content.setAttribute('aria-labelledby',this.listTitle.id);
-    const completedLabel=node('label',undefined,'form-check my-2');this.hideCompleted=node('input',undefined,'form-check-input');this.hideCompleted.type='checkbox';this.hideCompleted.id='tasks-hide-completed';completedLabel.htmlFor=this.hideCompleted.id;completedLabel.append(this.hideCompleted,node('span',t('tasks.hide_completed'),'form-check-label'));this.hideCompleted.addEventListener('change',()=>{this.visibleLimit=50;this.paint();});
-    this.count=node('p','','hint');this.count.setAttribute('role','status');this.list=node('ul',undefined,'tasks-list');this.list.id='tasks-list';this.empty=node('p',t('tasks.empty'),'hint');this.more=button(t('tasks.more'),()=>{this.visibleLimit+=50;this.paint();});this.more.hidden=true;content.append(this.listTitle,completedLabel,this.count,this.list,this.empty,this.more);layout.append(this.navigation,content);root.append(heading,this.error,this.warning,layout);
+    const completedLabel=node('label',undefined,'form-check m-0');this.hideCompleted=node('input',undefined,'form-check-input');this.hideCompleted.type='checkbox';this.hideCompleted.checked=true;this.hideCompleted.id='tasks-hide-completed';completedLabel.htmlFor=this.hideCompleted.id;completedLabel.append(this.hideCompleted,node('span',t('tasks.hide_completed'),'form-check-label'));this.hideCompleted.addEventListener('change',()=>{this.visibleLimit=50;this.paint();});
+    const toolbar=node('div',undefined,'btn-toolbar tasks-toolbar align-items-center gap-3');toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label',t('tasks.tools'));toolbar.append(actions,completedLabel);
+    this.resize=node('div',undefined,'tasks-resize');this.resize.tabIndex=0;
+    for(const [name,value]of Object.entries({role:'separator','aria-orientation':'vertical','aria-label':t('tasks.resize'),'aria-controls':'tasks-navigation','aria-valuemin':'180','aria-valuemax':'480','aria-valuenow':'256'}))this.resize.setAttribute(name,value);
+    const width=value=>{this.navWidth=Math.max(180,Math.min(480,value));root.style.setProperty('--tasks-nav-width',this.navWidth+'px');this.resize.setAttribute('aria-valuenow',String(Math.round(this.navWidth)));};
+    this.resize.addEventListener('pointerdown',event=>{event.preventDefault();this.resize.setPointerCapture(event.pointerId);});
+    this.resize.addEventListener('pointermove',event=>{if(this.resize.hasPointerCapture(event.pointerId))width(event.clientX-layout.getBoundingClientRect().left);});
+    this.resize.addEventListener('pointerup',event=>this.resize.releasePointerCapture(event.pointerId));
+    this.resize.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();width(event.key==='Home'?180:event.key==='End'?480:(this.navWidth||256)+(event.key==='ArrowLeft'?-20:20));}});
+    this.count=node('p','','hint');this.count.setAttribute('role','status');this.list=node('ul',undefined,'tasks-list');this.list.id='tasks-list';this.empty=node('p',t('tasks.empty'),'hint');this.more=button(t('tasks.more'),()=>{this.visibleLimit+=50;this.paint();});this.more.hidden=true;content.append(this.listTitle,toolbar,this.count,this.list,this.empty,this.more);layout.append(this.navigation,this.resize,content);root.append(heading,this.error,this.warning,layout);
     this.detail=node('dialog',undefined,'app-dialog task-details');this.detail.id='task-details';this.detailTitle=node('h2');this.detailTitle.id='task-details-title';this.detail.setAttribute('aria-labelledby',this.detailTitle.id);
     const close=button(t('ui.close'),()=>this.detail.close(),'close');close.classList.add('task-details-close');this.detailBody=node('div');
     this.edit=button(t('ui.edit_task'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onEdit(row.id);}});
-    this.remove=button(t('tasks.delete'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onDelete(row.id);}},'delete');this.remove.className='btn btn-outline-danger';const detailActions=node('div',undefined,'dialog-actions');detailActions.append(this.remove,this.edit);
+    this.track=button(t('ui.start_tracking'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onTrack(row.id);}},'start');
+    this.remove=button(t('tasks.delete'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onDelete(row.id);}},'delete');this.remove.className='btn btn-outline-danger';const detailActions=node('div',undefined,'dialog-actions');detailActions.append(this.track,this.remove,this.edit);
     this.detail.append(close,this.detailTitle,this.detailBody,detailActions);root.append(this.detail);
     this.detail.addEventListener('close',()=>{++this.detailGeneration;if(this.visible&&!document.querySelector('dialog[open]'))this.rowElements.get(this.detailKey)?.button.focus();});this.detailGeneration=0;
-    this.narrow.addEventListener('change',()=>{const focused=this.navigation.contains(document.activeElement);this.navigationState(false);if(focused&&this.narrow.matches)this.toggle.focus();});this.navigationState(false);this.controls();
+    this.narrow.addEventListener('change',()=>{const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize;this.navigationState(false);if(focused&&this.narrow.matches)this.toggle.focus();});this.navigationState(false);this.controls();
   }
-  controls(){this.create.disabled=!this.writable;this.refresh.disabled=!this.session||this.loading;this.edit.disabled=this.remove.disabled=!this.writable;this.list.setAttribute('aria-busy',String(!!this.loading));if(this.loading){this.count.textContent=t('tasks.loading');this.empty.hidden=true;}}
+  controls(){
+    this.create.disabled=!this.writable;this.refresh.disabled=!this.session||this.loading;this.edit.disabled=this.remove.disabled=this.track.disabled=!this.writable;
+    const row=this.rows?.find(row=>row.key===this.detailKey),active=row?.source==='task'&&this.data?.active?.data?.taskId===row.id,label=t(active?'ui.stop_tracking':'ui.start_tracking');this.track.hidden=row?.source!=='task';
+    if(this.track.getAttribute('aria-label')!==label)iconButton(this.track,active?'stop':'start',label);
+    for(const [key,entry]of this.rowElements){const row=this.rows.find(row=>row.key===key);entry.checkbox.disabled=!this.writable||row?.source!=='task'||this.pending.has(key);}
+    this.list.setAttribute('aria-busy',String(!!this.loading));if(this.loading){this.count.textContent=t('tasks.loading');this.empty.hidden=true;}
+  }
   navigationState(open){this.root.classList.toggle('tasks-navigation-open',open);this.toggle.setAttribute('aria-expanded',String(!this.narrow.matches||open));}
   update(data,connected,session,writable){
     if(this.session&&session!==this.session)this.reset();const changed=this.data?.revision!==data.revision||this.data?.profile.data.zoneId!==data.profile.data.zoneId;
@@ -54,7 +70,7 @@ export class TasksView {
   }
   show(){this.visible=true;this.paint();void this.load();this.timer??=setInterval(()=>{this.paint();void this.load();},30000);}
   hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detail.close();this.navigationState(false);this.controls();}
-  reset(){this.hide();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.catalogZone=null;this.rows=[];this.selection={kind:'smart',value:'all'};this.hideCompleted.checked=false;this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
+  reset(){this.hide();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.catalogZone=null;this.rows=[];this.selection={kind:'smart',value:'all'};this.hideCompleted.checked=true;this.pending.clear();this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
   async load(){
     if(!this.visible||!this.session||!this.root.offsetParent)return;if(this.loading){this.reloadRequested=true;return;}const session=this.session,current=++this.generation,zone=this.data.profile.data.zoneId;this.controller=new AbortController();const signal=this.controller.signal;this.loading=true;this.controls();
     try{
@@ -86,16 +102,29 @@ export class TasksView {
     this.count.textContent=t('tasks.count',{count:visible.length});this.empty.hidden=!!visible.length;this.more.hidden=visible.length<=this.visibleLimit;const visibleKeys=new Set();
     visible.slice(0,this.visibleLimit).forEach((row,index)=>{
       visibleKeys.add(row.key);let entry=this.rowElements.get(row.key);
-      if(!entry){const item=node('li'),open=button('',()=>this.open(row.key)),title=node('strong'),context=node('span',undefined,'tasks-context'),timing=node('span',undefined,'tasks-timing'),status=node('span',undefined,'tasks-status');open.className='tasks-open';open.append(title,context,timing,status);item.append(open);item.dataset.taskKey=row.key;entry={item,button:open,title,context,timing,status};this.rowElements.set(row.key,entry);}
-      entry.button.setAttribute('aria-label',t('tasks.open',{title:row.title}));entry.title.textContent=row.title;
+      if(!entry){const item=node('li'),open=button('',()=>this.open(row.key)),title=node('span',undefined,'tasks-task-title'),context=node('span',undefined,'tasks-context'),timing=node('span',undefined,'tasks-timing'),status=node('span',undefined,'tasks-status'),checkbox=node('input',undefined,'form-check-input');checkbox.type='checkbox';checkbox.addEventListener('change',()=>void this.complete(row.key,checkbox.checked));open.className='tasks-open';open.append(title,context,timing,status);item.append(checkbox,open);item.dataset.taskKey=row.key;entry={item,button:open,title,context,timing,status,checkbox};this.rowElements.set(row.key,entry);}
+      entry.button.setAttribute('aria-label',t('tasks.open',{title:row.title}));if(entry.renderedTitle!==row.title){entry.title.replaceChildren(renderMarkdown(row.title,{inline:true,links:false}));entry.renderedTitle=row.title;}
+      entry.checkbox.setAttribute('aria-label',t('tasks.completion',{title:row.title}));entry.checkbox.checked=['COMPLETED','CANCELLED'].includes(row.status);
       const client=this.data.clients.find(client=>client.id===row.clientId)?.name||t('ui.unassigned');entry.context.textContent=[client,row.projectName,row.source==='calendar'?row.record.calendarName:t('tasks.native')].filter(Boolean).join(' · ');
       entry.timing.textContent=[row.dueDate?t('tasks.due',{date:row.dueDate}):'',row.urgent?t('tasks.urgent'):'',row.recurring?t('tasks.recurring'):'',row.unresolvedTiming?t('tasks.unresolved'):''].filter(Boolean).join(' · ');entry.status.textContent=t('tasks.status.'+row.status);
       if(this.list.children[index]!==entry.item)this.list.insertBefore(entry.item,this.list.children[index]||null);
     });
     for(const [key,entry]of this.rowElements)if(!visibleKeys.has(key)){entry.item.remove();this.rowElements.delete(key);}
+    this.controls();
+  }
+  async complete(key,checked){
+    const row=this.rows.find(row=>row.key===key),session=this.session;if(!this.writable||row?.source!=='task'||this.pending.has(key))return;
+    this.pending.add(key);this.controls();this.error.hidden=true;
+    try{
+      const current=await session.request('/tasks/'+row.id);if(session!==this.session||!this.writable)return;
+      if(current.data.version!==row.record.version)throw new Error(t('tasks.completion_stale'));
+      await session.request('/tasks/'+row.id+'/planning',{method:'PUT',etag:current.etag,body:{status:checked?'COMPLETED':'NOT_STARTED',scheduledDate:current.data.scheduledDate||null,completedAt:checked?new Date().toISOString():null}});
+      if(session===this.session)await this.callbacks.onChanged();
+    }catch(error){if(session===this.session){this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);else await this.callbacks.onChanged();}}
+    finally{if(session===this.session){this.pending.delete(key);this.paint();}}
   }
   async open(key){
-    const row=this.rows.find(value=>value.key===key);if(!row)return;this.detailKey=key;this.detailTitle.textContent=row.title;this.detailBody.replaceChildren();
+    const row=this.rows.find(value=>value.key===key);if(!row)return;this.detailKey=key;this.detailTitle.replaceChildren(renderMarkdown(row.title,{inline:true,links:false}));this.detailBody.replaceChildren();
     const fields=node('dl',undefined,'task-metadata'),add=(label,text)=>{if(text){fields.append(node('dt',t(label)),node('dd',text));}};
     add('tasks.source',row.source==='calendar'?row.record.calendarName:(row.record.externalReferences||[]).map(value=>value.providerId).join(', ')||t('tasks.native'));
     add('ui.client',this.data.clients.find(client=>client.id===row.clientId)?.name||t('ui.unassigned'));add('ui.project',row.projectName);add('tasks.status_label',t('tasks.status.'+row.status));add('tasks.project_categories',row.categories.join(', '));
@@ -111,8 +140,8 @@ export class TasksView {
     else if(row.url){const link=node('a',t('tasks.open_source'));link.href=row.url;link.target='_blank';link.rel='noopener noreferrer';this.detailBody.append(link);}
     if(row.source==='task')this.providerContext(row.record);
     const body=row.source==='calendar'?row.record.description:row.record.body?.content||'';
-    if(body){if(row.source==='calendar'||row.record.body?.format==='HTML')this.detailBody.append(calendarDescription(body));else{const text=node('p',undefined,'task-plain-body');text.append(linkedText(body));this.detailBody.append(text);}}
-    this.edit.hidden=this.remove.hidden=row.source!=='task';this.edit.disabled=this.remove.disabled=!this.writable;this.detail.showModal();
+    if(body){if(row.source==='calendar'||row.record.body?.format==='HTML')this.detailBody.append(calendarDescription(body));else{const text=node('div',undefined,'task-markdown-body');text.append(renderMarkdown(body));this.detailBody.append(text);}}
+    this.edit.hidden=this.remove.hidden=row.source!=='task';this.controls();this.detail.showModal();
     if(row.source==='task'){
       const session=this.session,current=++this.detailGeneration;
       try{

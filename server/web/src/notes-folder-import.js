@@ -34,6 +34,11 @@ export class NotesFolderImport {
     const overwriteLabel=node('label',t('notes.import_overwrite'));overwriteLabel.className='form-check-label';overwriteLabel.htmlFor=this.overwrite.id;
     const overwriteControl=node('div');overwriteControl.className='form-check';overwriteControl.append(this.overwrite,overwriteLabel);
     const overwriteHelp=node('p',t('notes.import_overwrite_help'));overwriteHelp.className='hint';
+    const taskLabel=node('label',t('notes.import_tasks'));taskLabel.className='form-label';taskLabel.htmlFor='notes-import-tasks';
+    this.taskPolicy=node('select');this.taskPolicy.id=taskLabel.htmlFor;this.taskPolicy.className='form-select mb-2';
+    for(const value of ['CHECKBOX','COMPLETED','IGNORE'])this.taskPolicy.append(new Option(t('notes.import_tasks_'+value.toLowerCase()),value));
+    this.taskPolicy.addEventListener('change',()=>this.owner.changed());
+    const taskHelp=node('p',t('notes.import_tasks_help'));taskHelp.className='hint';
     this.overwrite.addEventListener('change',()=>{for(const row of this.rows)if(row.existing&&!row.blocked&&!row.stale&&row.status!=='imported'){row.status=this.overwrite.checked?'ready':'conflict';row.selected=this.overwrite.checked&&!row.excluded;}this.owner.changed();this.reviewStatus();this.render();});
     this.button=button(t('notes.choose_folder'),()=>this.input.click());this.button.id='notes-import-folder';
     this.reviewPanel=node('div');this.reviewPanel.className='notes-import-review';this.reviewPanel.hidden=true;
@@ -45,7 +50,7 @@ export class NotesFolderImport {
     const actions=node('div');actions.className='dialog-actions';actions.append(this.close,this.apply);
     const help=node('p',t('notes.import_limits',{markdown:number(owner.info.limits.markdownBytes),file:number(owner.info.limits.fileBytes)}));help.className='hint';
     const dates=node('p',t('notes.import_dates_help'));dates.className='hint';
-    this.reviewPanel.append(this.status,this.progress,this.list,actions);owner.root.append(node('p',t('notes.import_help')),help,dates,overwriteControl,overwriteHelp,this.button,this.input,this.reviewPanel);
+    this.reviewPanel.append(this.status,this.progress,this.list,actions);owner.root.append(node('p',t('notes.import_help')),help,dates,taskLabel,this.taskPolicy,taskHelp,overwriteControl,overwriteHelp,this.button,this.input,this.reviewPanel);
     this.input.addEventListener('change',()=>{const files=[...this.input.files];this.input.value='';if(files.length)void this.review(files);});
   }
   entries(){return [...this.rows,...this.folders.values()].filter(row=>!row.folder||row.explicit);}
@@ -55,7 +60,7 @@ export class NotesFolderImport {
     const selected=this.rows.filter(row=>row.selected&&eligible(row)),replacements=selected.filter(row=>row.existing).length;
     this.status.textContent=t(replacements?'notes.import_reviewed_overwrite':'notes.import_reviewed',{count:selected.length,replacements});
   }
-  reset(){this.overwrite.checked=false;++this.generation;this.abort?.abort();this.rows=[];this.folders.clear();this.metadata=null;this.tree=[];this.processed=undefined;this.list.replaceChildren();this.reviewPanel.hidden=true;this.owner.clean();this.input.value='';this.working=this.applying=this.reviewFailed=false;this.status.textContent='';this.progress.hidden=true;this.render();}
+  reset(){this.overwrite.checked=false;this.taskPolicy.value='CHECKBOX';++this.generation;this.abort?.abort();this.rows=[];this.folders.clear();this.metadata=null;this.tree=[];this.processed=undefined;this.list.replaceChildren();this.reviewPanel.hidden=true;this.owner.clean();this.input.value='';this.working=this.applying=this.reviewFailed=false;this.status.textContent='';this.progress.hidden=true;this.render();}
   buildTree(){
     this.folders=new Map();const roots=[];
     const folder=path=>{
@@ -92,6 +97,7 @@ export class NotesFolderImport {
     };
     if(changed)paint(changed);else for(const row of this.tree||[])paint(row);
     this.button.disabled=this.input.disabled=!!this.working||!this.owner.writable||this.owner.busy;this.close.disabled=!!this.applying;this.overwrite.disabled=!!this.working||!this.owner.writable||this.owner.busy;
+    this.taskPolicy.disabled=!!this.working||!this.owner.writable||this.owner.busy;
     const selected=this.entries().filter(row=>row.selected&&eligible(row));this.apply.textContent=t(selected.length&&selected.every(row=>row.status==='failed')?'ui.retry':selected.some(row=>row.existing)?'notes.import_apply_selected':'notes.import_apply');this.apply.disabled=!!this.working||this.reviewFailed||!this.owner.writable||!selected.length;
     if(!this.working&&!this.reviewFailed&&this.rows.length&&!this.progress.hidden)this.progress.setAttribute('aria-valuenow','100');
     if(this.processed!==undefined){const percent=this.total?Math.round(this.processed/this.total*100):0;this.progress.setAttribute('aria-valuenow',String(percent));this.progress.setAttribute('aria-valuetext',t('notes.import_progress_count',{count:this.processed,total:this.total}));this.bar.style.width=percent+'%';this.bar.textContent=percent+'%';}
@@ -130,7 +136,7 @@ export class NotesFolderImport {
   }
   async importFiles(){
     const owner=this.owner;if(this.reviewFailed||this.working||!owner.writable||!owner.session||owner.busy||!this.pending())return;
-    const session=owner.session,generation=this.generation,active=()=>generation===this.generation&&session===owner.session&&owner.valid()&&owner.writable;
+    const session=owner.session,generation=this.generation,taskPolicy=this.taskPolicy.value,active=()=>generation===this.generation&&session===owner.session&&owner.valid()&&owner.writable;
     const pending=this.entries().filter(row=>row.selected&&eligible(row)).sort((a,b)=>Number(!!b.folder)-Number(!!a.folder)||a.path.split('/').length-b.path.split('/').length||a.path.localeCompare(b.path));
     this.total=pending.length;this.processed=0;this.progress.hidden=false;this.applying=this.working=owner.busy=true;owner.controls();this.render();const folders=new Set();
     const ensure=async path=>{
@@ -145,8 +151,8 @@ export class NotesFolderImport {
         try{
           await ensure(row.folder?row.path:row.path.split('/').slice(0,-1).join('/'));if(!active())return;
           if(!row.folder){
-            if(row.existing)await session.request('/notes/entries/'+row.existing.id+'/import?'+new URLSearchParams(row.dates),{method:'PUT',etag:row.existing.entryEtag,rawBody:row.file});
-            else await session.request('/notes/files?'+new URLSearchParams({path:row.path,...row.dates}),{method:'PUT',noneMatch:'*',rawBody:row.file});
+            if(row.existing)await session.request('/notes/entries/'+row.existing.id+'/import?'+new URLSearchParams({...row.dates,taskPolicy}),{method:'PUT',etag:row.existing.entryEtag,rawBody:row.file});
+            else await session.request('/notes/files?'+new URLSearchParams({path:row.path,...row.dates,taskPolicy}),{method:'PUT',noneMatch:'*',rawBody:row.file});
           }
           if(!active())return;row.status='imported';
         }catch(error){if(!active())return;row.status=[404,409,412].includes(error.status)?'conflict':'failed';if(row.status==='conflict')row.stale=true;row.reason=error.message;if(error.status===401){owner.fail(error);return;}}

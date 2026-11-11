@@ -29,8 +29,56 @@ async function setup(page,request,{locale='en-GB',remoteCount=6}={}){
 const filter=(page,name)=>page.locator('#tasks-navigation').getByRole('button',{name,exact:true});
 const row=(page,title)=>page.locator('#tasks-list').getByRole('button',{name:'Open task '+title,exact:true});
 
+test('task tools default to unfinished work and navigation resizes with pointer and keyboard',async({page,request})=>{
+  await setup(page,request);const panel=page.locator('#tasks-panel'),tools=panel.getByRole('toolbar',{name:'Task tools',exact:true}),separator=panel.getByRole('separator',{name:'Resize task navigation',exact:true});
+  await expect(tools.getByRole('button',{name:'New task',exact:true})).toBeVisible();await expect(tools.getByRole('button',{name:'Refresh tasks',exact:true})).toBeVisible();await expect(tools.getByRole('checkbox',{name:'Hide completed tasks',exact:true})).toBeChecked();await expect(row(page,'Finished task')).toHaveCount(0);
+  await separator.focus();await separator.press('End');await expect(separator).toHaveAttribute('aria-valuenow','480');await separator.press('ArrowLeft');await expect(separator).toHaveAttribute('aria-valuenow','460');await separator.press('Home');await expect(separator).toHaveAttribute('aria-valuenow','180');
+  const box=await separator.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+30);await page.mouse.down();await page.mouse.move(box.x+104,box.y+30);await page.mouse.up();const width=await separator.getAttribute('aria-valuenow');expect(Number(width)).toBeGreaterThan(250);
+  await filter(page,'Today').click();await page.locator('[data-tab=today]').click();await page.locator('[data-tab=tasks]').click();await expect(separator).toHaveAttribute('aria-valuenow',width);
+  for(const theme of ['timekeeper','timekeeper-dark','newspaper']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper-dark'?'dark':'light';},theme);
+    for(const viewport of [{width:1440,height:900},{width:320,height:720}]){await page.setViewportSize(viewport);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/task-tools-${theme}-${viewport.width}.png`});}
+  }
+  await expect(separator).toBeHidden();await expect(tools).toBeVisible();
+});
+
+test('task checkboxes synchronize source Markdown and popup controls start and stop real tracking',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0}),source='- [ ] ==Important== @Client_A #work\n',entry=await(await api('PUT','/notes/files?path=Tracking.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();const title='==Important== @Client_A #work',open=row(page,title),item=page.locator('#tasks-list > li').filter({has:open}),checkbox=item.getByRole('checkbox');
+  await expect(open.locator('mark')).toHaveText('Important');await expect(open.locator('.markdown-client-mention')).toHaveText('@Client_A');await checkbox.check();await expect(open).toHaveCount(0);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source.replace('[ ]','[x]'));
+  await page.locator('#tasks-hide-completed').uncheck();await expect(checkbox).toBeChecked();await checkbox.uncheck();await expect(checkbox).not.toBeChecked();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
+  await open.click();const detail=page.locator('#task-details');await expect(detail.locator('h2 mark')).toHaveText('Important');await detail.getByRole('button',{name:'Start tracking',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Start tracking');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();
+  const active=await(await api('GET','/activities/active')).json();expect(active.taskId).toBe((await(await api('GET','/tasks?limit=500')).json()).items.find(value=>value.summary===title).id);
+  await open.click();await detail.getByRole('button',{name:'Stop tracking',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Stop tracking');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();expect((await api('GET','/activities/active')).status()).toBe(204);
+  await open.click();await expect(detail.getByRole('button',{name:'Start tracking',exact:true})).toBeVisible();
+});
+
+test('task Markdown renders safe formatting without executing HTML, fetching images or changing stored text',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0}),summary='==**Review**== H~2~O X^2^ ~~old~~ `==literal==`',body='==Very **important**==\n\n- Item\n\n[Safe](https://example.invalid/task) [Unsafe](javascript:alert(1))\n\n<img src="https://example.invalid/private-image" onerror="alert(1)">\n\n![private](https://example.invalid/image)';
+  const task=await(await api('POST','/tasks',{summary,projectId:null,parentTaskId:null,url:null})).json(),current=await api('GET','/tasks/'+task.id);await api('PUT','/tasks/'+task.id+'/body',{format:'TEXT',content:body},{'If-Match':current.headers().etag});
+  let requests=0;page.on('request',request=>{if(request.url().startsWith('https://example.invalid/'))requests++;});await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();await row(page,summary).click();const detail=page.locator('#task-details');await expect(detail.locator('h2 mark strong')).toHaveText('Review');await expect(detail.locator('h2 sub')).toHaveText('2');await expect(detail.locator('h2 sup')).toHaveText('2');await expect(detail.locator('h2 code')).toHaveText('==literal==');await expect(detail.locator('.task-markdown-body mark')).toHaveText('Very important');await expect(detail.getByRole('link',{name:'Safe',exact:true})).toHaveAttribute('rel','noopener noreferrer');await expect(detail.locator('img,script,a[href^="javascript:"]')).toHaveCount(0);expect(requests).toBe(0);
+  const saved=await(await api('GET','/tasks/'+task.id)).json();expect(saved.summary).toBe(summary);expect(saved.body).toEqual({format:'TEXT',content:body});
+});
+
+test('a lost completion response is reconciled without replaying the task write',async({page,request})=>{
+  const {api,native,today}=await setup(page,request,{remoteCount:0});let writes=0;
+  await page.route('**/api/v1/tasks/'+native.local.id+'/planning',async route=>{if(route.request().method()==='PUT'){writes++;await route.fetch();return route.abort('internetdisconnected');}return route.continue();});
+  await page.locator('#tasks-list > li').filter({has:row(page,'Local task')}).getByRole('checkbox').check();await expect(row(page,'Local task')).toHaveCount(0);expect(writes).toBe(1);const task=await(await api('GET','/tasks/'+native.local.id)).json();expect(task.status).toBe('COMPLETED');expect(task.scheduledDate).toBe(today);
+});
+
+test('a completion click cannot overwrite a task changed after the displayed snapshot',async({page,request})=>{
+  const {api,native}=await setup(page,request,{remoteCount:0});let release,reading=false,writes=0;const held=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/tasks/'+native.local.id,async route=>{if(route.request().method()==='GET'){reading=true;await held;}await route.continue();});
+  page.on('request',request=>{if(request.method()==='PUT'&&request.url().endsWith('/tasks/'+native.local.id+'/planning'))writes++;});
+  try{
+    await page.locator('#tasks-list > li').filter({has:row(page,'Local task')}).getByRole('checkbox').check();await expect.poll(()=>reading).toBe(true);
+    const current=await api('GET','/tasks/'+native.local.id);await api('PUT','/tasks/'+native.local.id+'/planning',{status:'WAITING',scheduledDate:'2026-12-01',completedAt:null},{'If-Match':current.headers().etag});writes=0;release();
+    await expect(page.locator('#tasks-list > li').filter({has:row(page,'Local task')})).toContainText('Waiting');expect(writes).toBe(0);const saved=await(await api('GET','/tasks/'+native.local.id)).json();expect(saved.status).toBe('WAITING');expect(saved.scheduledDate).toBe('2026-12-01');
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('Tasks browses all sources by client/category, today and urgency and creates and edits local tasks',async({page,request})=>{
-  const {api,native}=await setup(page,request);await expect(page.locator('#tasks-list > li')).toHaveCount(10);await expect(row(page,'M-42: Imported review')).toBeVisible();await expect(row(page,'Calendar future')).toBeVisible();
+  const {api,native}=await setup(page,request);await expect(page.locator('#tasks-hide-completed')).toBeChecked();await expect(page.locator('#tasks-list > li')).toHaveCount(7);await page.locator('#tasks-hide-completed').uncheck();await expect(page.locator('#tasks-list > li')).toHaveCount(10);await expect(row(page,'M-42: Imported review')).toBeVisible();await expect(row(page,'Calendar future')).toBeVisible();
   await page.locator('#tasks-hide-completed').check();await expect(page.locator('#tasks-list > li')).toHaveCount(7);await expect(row(page,'Calendar completed')).toHaveCount(0);await expect(row(page,'Calendar cancelled')).toHaveCount(0);await page.locator('#tasks-hide-completed').uncheck();await expect(page.locator('#tasks-list > li')).toHaveCount(10);
   await filter(page,'Today').click();await expect(page.locator('#tasks-list > li')).toHaveCount(2);await expect(row(page,'Local task')).toBeVisible();await expect(row(page,'Calendar today')).toBeVisible();
   await filter(page,'Time critical').click();await expect(page.locator('#tasks-list > li')).toHaveCount(4);await expect(row(page,'Urgent task')).toBeVisible();await expect(row(page,'Finished task')).toHaveCount(0);await expect(row(page,'Calendar completed')).toHaveCount(0);
@@ -61,7 +109,7 @@ test('changing account zone cannot reinterpret cached floating calendar deadline
 });
 
 test('all calendar pages remain available and the task list renders additional rows on demand',async({page,request})=>{
-  const {api}=await setup(page,request,{remoteCount:221});await expect(page.locator('.tasks-results > [role=status]')).toHaveText('225 tasks');await expect(page.locator('#tasks-list > li')).toHaveCount(50);
+  const {api}=await setup(page,request,{remoteCount:221});await page.locator('#tasks-hide-completed').uncheck();await expect(page.locator('.tasks-results > [role=status]')).toHaveText('225 tasks');await expect(page.locator('#tasks-list > li')).toHaveCount(50);
   for(let count=100;count<=200;count+=50){await page.locator('#tasks-panel').getByRole('button',{name:'Show more tasks',exact:true}).click();await expect(page.locator('#tasks-list > li')).toHaveCount(count);}
   await page.locator('#tasks-panel').getByRole('button',{name:'Show more tasks',exact:true}).click();await expect(page.locator('#tasks-list > li')).toHaveCount(225);await expect(row(page,'Remote task 220')).toBeVisible();await expect(page.locator('#tasks-panel').getByRole('button',{name:'Show more tasks',exact:true})).toBeHidden();
   expect((await(await api('GET','/tasks?limit=500')).json()).items).toHaveLength(4);
@@ -74,8 +122,8 @@ test('read-only tasks remain browsable and sign-out clears every source before a
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale:'en-GB'});
   try{
     const reader=await context.newPage();let writes=0;reader.on('request',request=>{if(!['GET','HEAD'].includes(request.method())&&/^\/api\/v1\/(tasks|calendar-tasks)(\/|$)/.test(new URL(request.url()).pathname))writes++;});
-    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=tasks]').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(10);
-    await expect(reader.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeDisabled();await row(reader,'Local task').click();await expect(reader.locator('#task-details').getByRole('button',{name:'Edit task',exact:true})).toBeDisabled();await expect(reader.locator('#task-details').getByRole('button',{name:'Delete task',exact:true})).toBeDisabled();await reader.keyboard.press('Escape');await filter(reader,'Time critical').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(4);expect(writes).toBe(0);
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=tasks]').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(7);await reader.locator('#tasks-hide-completed').uncheck();await expect(reader.locator('#tasks-list > li')).toHaveCount(10);await expect(reader.locator('#tasks-list input[type=checkbox]:enabled')).toHaveCount(0);
+    await expect(reader.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeDisabled();await row(reader,'Local task').click();await expect(reader.locator('#task-details').getByRole('button',{name:'Edit task',exact:true})).toBeDisabled();await expect(reader.locator('#task-details').getByRole('button',{name:'Delete task',exact:true})).toBeDisabled();await expect(reader.locator('#task-details').getByRole('button',{name:'Start tracking',exact:true})).toBeDisabled();await reader.keyboard.press('Escape');await filter(reader,'Time critical').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(4);expect(writes).toBe(0);
     await reader.getByRole('button',{name:'Account menu',exact:true}).click();await reader.getByRole('button',{name:'Sign out',exact:true}).click();await expect(reader.locator('#login')).toBeVisible();await expect(reader.locator('#tasks-panel')).not.toContainText(/Local task|Imported review|Client A|Task calendar/);
     await login(reader,user);await reader.locator('[data-tab=tasks]').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(0);await expect(reader.locator('#tasks-panel')).not.toContainText(/Local task|Imported review|Client A|Task calendar/);
   }finally{await context.close();}

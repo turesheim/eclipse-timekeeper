@@ -77,7 +77,7 @@ const calendarSearchPopup=new CalendarSearchEditor($('workspace'),searchEditorCa
 const calendarSearchWorkspace=new CalendarSearchEditor(calendarSearchPanel,searchEditorCallbacks,{inline:true});
 let calendarNavigation=0;
 async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave()&&await calendarSearchWorkspace.canLeave();}
-const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error))),onDelete:id=>void openDelete('tasks',id).catch(error=>setStatus(errorText(error)))});
+const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onChanged:()=>refresh().catch(()=>{}),onTrack:id=>snapshot.active.data?.taskId===id?openStop():openStart(id),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error))),onDelete:id=>void openDelete('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,tag=hashtagKey(event.detail.tag);
@@ -720,11 +720,12 @@ async function openStart(id) {
   field(i18nText("ui.summary"), 'summary', '', { max: 2000 });labelFields();$('save').textContent = i18nText("ui.start");
   if (snapshot.active.data) $('editor-notice').textContent = i18nText("ui.starting_this_task_stops_the_current_activity");showEditor();
 }
-$('stop').addEventListener('click', () => {
+function openStop() {
   const active = snapshot.active;
   if (!active.data || !begin(i18nText("ui.stop_tracking"), { command: 'stop', id: active.data.id, etag: active.etag, key: crypto.randomUUID() })) return;
   $('fields').append(element('p', i18nText("ui.stop_tracking_1e5b16", { value0: name(snapshot.tasks, active.data.taskId, 'summary') })));$('save').textContent = i18nText("ui.stop");showEditor();
-});
+}
+$('stop').addEventListener('click',openStop);
 for (const [id, collection] of [['add-client', 'clients'], ['add-project', 'projects'], ['add-label', 'labels'], ['add-activity', 'activities']]) $(id).addEventListener('click', () => {void openRecord(collection).catch((error) => setStatus(errorText(error)));});
 function values() {
   const get = (key) => $('fields').querySelector(`[name="${key}"]`)?.value;
