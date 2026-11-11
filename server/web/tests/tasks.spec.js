@@ -28,6 +28,7 @@ async function setup(page,request,{locale='en-GB',remoteCount=6}={}){
 }
 const filter=(page,name)=>page.locator('#tasks-navigation').getByRole('button',{name,exact:true});
 const row=(page,title)=>page.locator('#tasks-list').getByRole('button',{name:'Open task '+title,exact:true});
+const taskItem=(page,title)=>page.locator('#tasks-list > li').filter({has:page.getByRole('button',{name:'Open task '+title,exact:true})});
 
 test('task tools default to unfinished work and navigation resizes with pointer and keyboard',async({page,request})=>{
   await setup(page,request);const panel=page.locator('#tasks-panel'),tools=panel.getByRole('toolbar',{name:'Task tools',exact:true}),separator=panel.getByRole('separator',{name:'Resize task navigation',exact:true});
@@ -44,7 +45,7 @@ test('task tools default to unfinished work and navigation resizes with pointer 
 
 test('task checkboxes synchronize source Markdown and popup controls start and stop real tracking',async({page,request})=>{
   const {api}=await setup(page,request,{remoteCount:0}),source='- [ ] ==Important== @Client_A #work\n',entry=await(await api('PUT','/notes/files?path=Tracking.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
-  await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();const title='==Important== @Client_A #work',open=row(page,title),item=page.locator('#tasks-list > li').filter({has:open}),checkbox=item.getByRole('checkbox');
+  await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();const title='==Important== @Client_A #work',open=row(page,title),item=taskItem(page,title),checkbox=item.getByRole('checkbox');
   await expect(open.locator('mark')).toHaveText('Important');await expect(open.locator('.markdown-client-mention')).toHaveText('@Client_A');await checkbox.check();await expect(open).toHaveCount(0);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source.replace('[ ]','[x]'));
   await page.locator('#tasks-hide-completed').uncheck();await expect(checkbox).toBeChecked();await checkbox.uncheck();await expect(checkbox).not.toBeChecked();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
   await open.click();const detail=page.locator('#task-details');await expect(detail.locator('h2 mark')).toHaveText('Important');await detail.getByRole('button',{name:'Start tracking',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Start tracking');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();
@@ -63,7 +64,7 @@ test('task Markdown renders safe formatting without executing HTML, fetching ima
 test('a lost completion response is reconciled without replaying the task write',async({page,request})=>{
   const {api,native,today}=await setup(page,request,{remoteCount:0});let writes=0;
   await page.route('**/api/v1/tasks/'+native.local.id+'/planning',async route=>{if(route.request().method()==='PUT'){writes++;await route.fetch();return route.abort('internetdisconnected');}return route.continue();});
-  await page.locator('#tasks-list > li').filter({has:row(page,'Local task')}).getByRole('checkbox').check();await expect(row(page,'Local task')).toHaveCount(0);expect(writes).toBe(1);const task=await(await api('GET','/tasks/'+native.local.id)).json();expect(task.status).toBe('COMPLETED');expect(task.scheduledDate).toBe(today);
+  await taskItem(page,'Local task').getByRole('checkbox').check();await expect(row(page,'Local task')).toHaveCount(0);expect(writes).toBe(1);const task=await(await api('GET','/tasks/'+native.local.id)).json();expect(task.status).toBe('COMPLETED');expect(task.scheduledDate).toBe(today);
 });
 
 test('a completion click cannot overwrite a task changed after the displayed snapshot',async({page,request})=>{
@@ -71,9 +72,9 @@ test('a completion click cannot overwrite a task changed after the displayed sna
   await page.route('**/api/v1/tasks/'+native.local.id,async route=>{if(route.request().method()==='GET'){reading=true;await held;}await route.continue();});
   page.on('request',request=>{if(request.method()==='PUT'&&request.url().endsWith('/tasks/'+native.local.id+'/planning'))writes++;});
   try{
-    await page.locator('#tasks-list > li').filter({has:row(page,'Local task')}).getByRole('checkbox').check();await expect.poll(()=>reading).toBe(true);
+    await taskItem(page,'Local task').getByRole('checkbox').check();await expect.poll(()=>reading).toBe(true);
     const current=await api('GET','/tasks/'+native.local.id);await api('PUT','/tasks/'+native.local.id+'/planning',{status:'WAITING',scheduledDate:'2026-12-01',completedAt:null},{'If-Match':current.headers().etag});writes=0;release();
-    await expect(page.locator('#tasks-list > li').filter({has:row(page,'Local task')})).toContainText('Waiting');expect(writes).toBe(0);const saved=await(await api('GET','/tasks/'+native.local.id)).json();expect(saved.status).toBe('WAITING');expect(saved.scheduledDate).toBe('2026-12-01');
+    await expect(taskItem(page,'Local task')).toContainText('Waiting');expect(writes).toBe(0);const saved=await(await api('GET','/tasks/'+native.local.id)).json();expect(saved.status).toBe('WAITING');expect(saved.scheduledDate).toBe('2026-12-01');
   }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
 

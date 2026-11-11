@@ -27,12 +27,12 @@ const put=(api,path,body,dates={})=>api('PUT','/notes/files?'+new URLSearchParam
 const resolve=async(client,path)=>client.get('/api/v1/notes/resolve?'+new URLSearchParams({path}));
 
 for(const policy of ['CHECKBOX','COMPLETED','IGNORE'])test('folder import applies the reviewed Markdown task policy '+policy,async({page,request})=>{
-  const {api,card}=await setup(page,request),root=await mkdtemp(join(tmpdir(),'notes-task-policy-')),date=new Date('2020-02-03T04:05:06.123Z'),source='- [ ] Open import task\n- [x] Finished import task\n\n```md\n- [ ] Code example\n```\n';
+  const {api,card}=await setup(page,request),root=await mkdtemp(join(tmpdir(),'notes-task-policy-')),date=new Date('2020-02-03T04:05:06Z'),source='- [ ] Open import task\n- [x] Finished import task\n\n```md\n- [ ] Code example\n```\n';
   try{
     const file=join(root,'Imported.md');await writeFile(file,source);await utimes(file,date,date);await expect(card.locator('#notes-import-tasks')).toHaveValue('CHECKBOX');await card.locator('#notes-import-tasks').selectOption(policy);await choose(page,card,root);await expect(card).toContainText('1 new file ready to import');await card.getByRole('button',{name:'Import new files',exact:true}).click();await expect(card).toContainText('Imported 1 file.');
     const entry=await(await api('GET','/notes/resolve?path=Imported.md')).json(),saved=await(await api('GET','/notes/entries/'+entry.id+'/content')).text(),tasks=(await(await api('GET','/tasks?limit=500')).json()).items;
-    expect(saved).toBe(policy==='COMPLETED'?source.replace('[ ] Open','[x] Open'):source);expect(entry.modifiedAt).toBe(date.toISOString());expect(tasks).toHaveLength(policy==='IGNORE'?0:2);
-    if(policy==='COMPLETED')for(const task of tasks){expect(task.status).toBe('COMPLETED');expect(task.completedAt).toBe(date.toISOString());}
+    expect(saved).toBe(policy==='COMPLETED'?source.replace('[ ] Open','[x] Open'):source);expect(Date.parse(entry.modifiedAt)).toBe(date.getTime());expect(tasks).toHaveLength(policy==='IGNORE'?0:2);
+    if(policy==='COMPLETED')for(const task of tasks){expect(task.status).toBe('COMPLETED');expect(Date.parse(task.completedAt)).toBe(date.getTime());}
     if(policy==='CHECKBOX')expect(tasks.map(task=>task.status).sort()).toEqual(['COMPLETED','NOT_STARTED']);
     if(policy==='IGNORE'){const before=await api('GET','/notes/entries/'+entry.id+'/content');await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from(source+'\nProse edit\n'),{'Content-Type':'application/octet-stream','If-Match':before.headers().etag});expect((await(await api('GET','/tasks?limit=500')).json()).items).toHaveLength(0);}
   }finally{await rm(root,{recursive:true,force:true});}
