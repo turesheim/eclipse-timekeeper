@@ -1,3 +1,4 @@
+import {clickNoteAction} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {searchNotes} from './notes-search.js';
 import {test,expect} from '@playwright/test';
@@ -110,7 +111,7 @@ test('Obsidian imports use filenames across navigation, recent notes and search 
     const panel=await searchNotes(page,'Security review');await expect(panel.locator('[data-search-note="'+entry.id+'"] .notes-search-result-title')).toHaveText('Security review');await panel.getByRole('button',{name:'Close',exact:true}).click();
     await captureScreenshot(page,{path:'test-results/obsidian-formatted-import.png',fullPage:true});
     const attachment=page.locator('#notes-formatted [data-wiki-reference="security-datasheet.pdf"]');await expect(attachment).toHaveAttribute('data-resolved','true');await expect(page.locator('#notes-formatted img')).toHaveCount(0);await attachment.click();
-    await expect(page.locator('.notes-document-path')).toHaveText('Notes/security-datasheet.pdf');const pending=page.waitForEvent('download');await page.locator('#notes-panel').getByRole('button',{name:'Download',exact:true}).click();expect((await pending).suggestedFilename()).toBe('security-datasheet.pdf');
+    await expect(page.locator('.notes-document-path')).toHaveText('Notes/security-datasheet.pdf');const pending=page.waitForEvent('download');await clickNoteAction(page,page.locator('#notes-panel'),'Download attachment');expect((await pending).suggestedFilename()).toBe('security-datasheet.pdf');
     await item.click();await expect(page.locator('#notes-formatted')).toBeVisible();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
     const after=await(await resolve(client,path)).json();for(const key of ['createdAt','modifiedAt','version','contentVersion','etag','entryEtag'])expect(after[key]).toEqual(entry[key]);expect(external).toEqual([]);
   }finally{await rm(root,{recursive:true,force:true});}

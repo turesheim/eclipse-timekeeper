@@ -57,7 +57,7 @@ class NotesSearchServiceTest {
         }
     }
     @Test void exactTagsFollowCanonicalSavesAcrossPrivatePersistentReplicas()throws Exception{
-        String owner="search-tag-owner";UUID id=create(owner,"# Imported heading\n\nA #OpenShift deployment.");create("search-tag-other","A #OpenShift foreign note.");var initial=sources().state(owner);
+        String owner="search-tag-owner";UUID id=create(owner,"A #OpenShift deployment.");create("search-tag-other","A #OpenShift foreign note.");var initial=sources().state(owner);
         Path first=temporary.resolve("tag-a"),second=temporary.resolve("tag-b");
         try(var a=new NotesSearchService(store,first);var b=new NotesSearchService(store,second)){
             assertEquals(List.of(id),waitFor(a,initial,"tag:#openshift").items().stream().map(NotesLuceneIndex.Hit::id).toList());assertEquals(List.of(id),waitFor(b,initial,"tag:#openshift").items().stream().map(NotesLuceneIndex.Hit::id).toList());

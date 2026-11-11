@@ -1,3 +1,4 @@
+import {appendEditorText} from './editor-interactions.js';
 import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
@@ -23,7 +24,7 @@ test('Obsidian callouts, media source and PDF references retain a formatted docu
   await expect(page.locator('#markdown-formatted .markdown-callout input')).toHaveValue('Viktig!');
   await expect(page.locator('#markdown-formatted button[data-wiki-reference]')).toHaveText('security-datasheet.pdf');
   expect(await download(page)).toBe(source);
-  const paragraph=page.locator('#markdown-formatted p').filter({hasText:'Bruk ServiceAccount til tilgangsstyring.'});await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' Endret.');
+  const paragraph=page.locator('#markdown-formatted p').filter({hasText:'Bruk ServiceAccount til tilgangsstyring.'});await appendEditorText(paragraph,' Endret.');
   const changed=source.replace('til tilgangsstyring.','til tilgangsstyring. Endret.');expect(await download(page)).toBe(changed);
   await page.locator('#markdown-source').click();await page.locator('#markdown-rich').click();expect(await download(page)).toBe(changed);
 });
