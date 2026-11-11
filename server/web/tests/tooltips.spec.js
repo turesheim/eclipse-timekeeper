@@ -16,9 +16,11 @@ async function signIn(page){
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
 test('one rich tooltip covers each composite, preserves literal data and supports hover, keyboard and every theme',async({page,request,browserName})=>{
-  const records=[],original=await(await api(request,'GET','/me')).json(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const records=[],profile=await api(request,'GET','/me'),original=await profile.json(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   const create=async(collection,data)=>{const value=await(await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;};
   try {
+    // Both UTC intervals must belong to the selected civil day in this fixture.
+    await api(request,'PUT','/me',{zoneId:'UTC'},{'If-Match':profile.headers().etag});
     const client=await create('clients',{name:'Tooltip '+randomUUID().slice(0,8)+' <img src=x onerror=alert(1)>',color:'#176653'});
     const project=await create('projects',{clientId:client.id,name:'Review <b>literal project</b>',icon:'code'});
     for(const [summary,start,end] of [['First <script>unsafe()</script>','08:00','09:00'],['Second session','10:00','11:30']])await create('work-sessions',{clientId:client.id,projectId:project.id,summary,start:`2025-10-20T${start}:00Z`,end:`2025-10-20T${end}:00Z`});

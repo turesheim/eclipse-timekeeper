@@ -42,6 +42,7 @@
 .markdown-block-menu [aria-checked="true"] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); font-weight: 700; }
 
 .journal-dialog { --journal-padding: clamp(.75rem, 2vw, 1.5rem); width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }
+dialog.journal-dialog { overflow: auto; }
 .journal-dialog form { display: flex; flex-direction: column; gap: .25rem; height: min(calc(94dvh - var(--journal-padding) - var(--journal-padding) - 2px), 54rem); }
 .journal-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: .25rem; }
 .journal-dialog h2 { font-size: var(--font-journal-dialog-heading); margin-bottom: .5rem; }
@@ -176,6 +177,8 @@
 .calendar-search-details { flex:none; max-height:35dvh; overflow:auto; overflow-wrap:anywhere; }
 .journal-document-dialog.calendar-search-no-note[open] { height:fit-content; }
 .journal-document-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+/* A long heading must not collapse the note to an unreachable zero-height box. */
+dialog.journal-document-dialog > .journal-document-content { min-height: min(12rem,50dvh); overscroll-behavior: auto; }
 .journal-document-dialog > .dialog-actions { flex: none; margin: 0; padding-top: .5rem; border-top: 1px solid var(--bs-border-color); }
 .journal-document-dialog > .dialog-actions [role="status"] { margin-inline-end: auto; }
 .week-note-heading > .btn-group { flex: none; }

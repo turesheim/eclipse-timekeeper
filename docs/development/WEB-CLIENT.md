@@ -168,6 +168,12 @@ in-flight reads. The sidebar becomes a keyboard-accessible drawer on phones.
 
 ## Shared Markdown component
 
+Popups stay within the viewport and scroll overflowing content. The account menu
+uses the space below its trigger and recalculates it after viewport or header
+resizing. Note dialogs retain a usable content area beneath wrapping headings;
+when the full layout cannot fit, the dialog itself also scrolls. Account and note
+popup scrolling stays within the popup; keyboard users can reach its content and actions.
+
 Today, Notes and the daily, weekly and event dialogs use `MarkdownField` with
 one Milkdown schema and the same toolbar. Markdown source is a plain textarea.
 Code blocks lazy-load syntax highlighting; the retired enhanced-source and split
