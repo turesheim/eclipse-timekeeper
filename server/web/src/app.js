@@ -241,7 +241,7 @@ const auth = authentication({
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderCatalog(view,part) {
     const panel=$(part+'-panel');view.root.append(panel);panel.hidden=false;
-    if(snapshot)renderLegacyViews(snapshot,snapshot.profile.data.zoneId);
+    if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
     view.cleanup.add(()=>{panel.hidden=true;$('account-'+part+'-home').append(panel);});
   },
   renderLabels(view) {

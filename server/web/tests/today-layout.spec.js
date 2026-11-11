@@ -55,6 +55,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     expect(await source.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await source.fill(markdown+'\n## Live update\n');await expect(choices.last()).toHaveText('Live update');
+    await field.getByRole('button',{name:locale==='nb-NO'?'Formatert':'Formatted',exact:true}).click();await choices.first().click();
     for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
       for(const width of [1440,390,320]){
@@ -76,7 +77,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
   }finally{await context.close();const current=await api(request,'GET',path);await api(request,'PUT',path,{body},{'If-Match':current.headers().etag});}
 });
 
-test('Today main actions reuse revisions, client association and confirmed deletion while other editors keep Note tools',async({page,request})=>{
+test('Today main actions reuse revisions, client association and confirmed deletion while other editors keep Note tools',async({page,request,browser})=>{
   const date='2026-07-10',path='/day-notes/'+date+'/content',original=await api(request,'GET',path),body=(await original.json()).body;
   await api(request,'PUT',path,{body:'# Action note\n\nKeep this content.'},{'If-Match':original.headers().etag});
   const client=await(await api(request,'POST','/clients',{name:'Main actions '+randomUUID().slice(0,6),color:'#176653'})).json();
@@ -86,6 +87,13 @@ test('Today main actions reuse revisions, client association and confirmed delet
     for(const name of ['Note revisions','Associate with client','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
     const history=actions.getByRole('button',{name:'Note revisions',exact:true});await history.focus();await history.press('Enter');await expect(page.getByRole('dialog',{name:'Note revisions',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(history).toBeFocused();
     const associate=actions.getByRole('button',{name:'Associate with client',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await dialog.locator('select').selectOption(client.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();await expect(associate).toBeFocused();await expect(page.locator('#today-note-editor .note-client-label')).toHaveText(client.name);
+    const readerContext=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
+    try{
+      const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await reader.locator('#today-date').fill(date);
+      await reader.locator('#today-contents-list button').click();await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
+      for(const name of ['Associate with client','Delete note'])await expect(reader.locator('#today-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
+      await expect(reader.locator('#today-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeEnabled();
+    }finally{await readerContext.close();}
     await navigateView(page,'track');await page.locator('#track-month').fill('2026-07');await page.locator('[data-track-note-date="'+date+'"]').click();
     await page.locator('#track-note-editor').getByRole('button',{name:'Note tools',exact:true}).click();
     for(const name of ['Note revisions','Associate with client','Delete note'])await expect(page.getByRole('menuitem',{name,exact:true})).toBeVisible();
