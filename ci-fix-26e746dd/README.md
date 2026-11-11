@@ -16,3 +16,7 @@ The client-note test resolves the note by ID and checks its filename title. The 
 [Client metadata, desktop](chromium-clients/note-client-label-1440.png) · [Client metadata, mobile](chromium-clients/note-client-label-320.png)
 
 [WebKit metadata, desktop](webkit-clients/note-client-label-1440.png) · [WebKit metadata, mobile](webkit-clients/note-client-label-320.png)
+
+## Calendar timing investigation
+
+A separate native-touch calendar scenario, unchanged by this PR, once selected 16:15 instead of the expected 16:30 in CI. The same scenario passed in the previous CI run, [12 consecutive isolated local repetitions](calendar-repeat.json), and the [complete local CI browser shard: 176 cases, zero failures/errors/skips](browser-shard3.json). The original exact-time assertions remain unchanged. [Build #1252](https://github.com/turesheim/eclipse-timekeeper/actions/runs/43007187590) records the CI rerun.

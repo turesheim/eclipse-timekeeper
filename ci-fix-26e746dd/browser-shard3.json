@@ -1,0 +1,74 @@
+{
+  "acceptance": {
+    "distributionSha256": "c71eb97842cc99c4c57b60a6d16699cf01f5c87fc666d80de2de4b21b5eef025",
+    "browser": "chromium",
+    "https": false,
+    "loopbackSmtp": false,
+    "virtualPasskeys": false,
+    "passed": true,
+    "batches": [
+      {
+        "specs": [
+          "administration.spec.js",
+          "calendar.spec.js",
+          "day-notes.spec.js",
+          "editor-polish.spec.js",
+          "focus.spec.js",
+          "markdown-editor.spec.js"
+        ],
+        "distributionSha256": "c71eb97842cc99c4c57b60a6d16699cf01f5c87fc666d80de2de4b21b5eef025",
+        "sourceCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4",
+        "serverPid": 23994,
+        "browser": "chromium",
+        "https": false,
+        "loopbackSmtp": false,
+        "virtualPasskeys": false,
+        "passed": true
+      },
+      {
+        "specs": [
+          "note-clients.spec.js",
+          "notes-navigator.spec.js",
+          "plantuml.spec.js",
+          "recent-notes.spec.js",
+          "startup.spec.js",
+          "task-providers.spec.js"
+        ],
+        "distributionSha256": "c71eb97842cc99c4c57b60a6d16699cf01f5c87fc666d80de2de4b21b5eef025",
+        "sourceCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4",
+        "serverPid": 24388,
+        "browser": "chromium",
+        "https": false,
+        "loopbackSmtp": false,
+        "virtualPasskeys": false,
+        "passed": true
+      },
+      {
+        "specs": [
+          "tooltip-details.spec.js",
+          "undo.spec.js",
+          "workweek-sessions.spec.js"
+        ],
+        "distributionSha256": "c71eb97842cc99c4c57b60a6d16699cf01f5c87fc666d80de2de4b21b5eef025",
+        "sourceCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4",
+        "serverPid": 25501,
+        "browser": "chromium",
+        "https": false,
+        "loopbackSmtp": false,
+        "virtualPasskeys": false,
+        "passed": true
+      }
+    ],
+    "shard": [
+      3,
+      4
+    ],
+    "sourceCommit": "26e746ddc7b6d3e6bf458651e467fd8470b7fbd4"
+  },
+  "summary": {
+    "tests": 176,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}
