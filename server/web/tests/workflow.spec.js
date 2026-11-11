@@ -38,8 +38,8 @@ async function save(page) {
   await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
 }
 async function newNamed(page, tab, singular, name) {
-  if(tab==='Labels')await openLabelSettings(page);else await page.getByRole('button', {name:tab, exact:true}).click(); await page.getByRole('button', {name:`New ${singular}`, exact:true}).click();
-  await page.getByLabel('Name', {exact:true}).fill(name);if(singular==='project') await page.getByLabel('Client',{exact:true}).selectOption({index:1});await save(page);if(tab==='Labels')await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
+  if(tab==='Labels')await openLabelSettings(page);else await navigateView(page,tab.toLowerCase()); await page.getByRole('button', {name:`New ${singular}`, exact:true}).click();
+  await page.getByLabel('Name', {exact:true}).fill(name);if(singular==='project') await page.getByLabel('Client',{exact:true}).selectOption({index:1});await save(page);await navigateView(page,'activities');
 }
 test('account time zone controls local editors and build dates across DST and browser zones', async ({browser, request}) => {
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB'}), page=await context.newPage();
@@ -172,7 +172,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   for (const value of activities.items) { const read = await api(request,'GET',`/activities/${value.id}`); await api(request,'DELETE',`/activities/${value.id}`,undefined,{'If-Match':read.headers().etag}); }
   await clearTaskHistory(request);
   const taskRead=await api(request,'GET',`/tasks/${id}`);await api(request,'DELETE',`/tasks/${id}`,undefined,{'If-Match':taskRead.headers().etag});
-  for (const [tabName, container, value] of [['Projects','projects',project], ['Labels','labels',label]]) { if(tabName==='Labels')await openLabelSettings(page);else await page.getByRole('button', {name:tabName, exact:true}).click(); await page.locator(`#${container} tr`).filter({hasText:value}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible(); }
+  for (const [tabName, container, value] of [['Projects','projects',project], ['Labels','labels',label]]) { if(tabName==='Labels')await openLabelSettings(page);else await navigateView(page,container); await page.locator(`#${container} tr`).filter({hasText:value}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible(); }
 });
 test('manual intervals spanning midnight create editable daily records with exact DST time and labels', async ({page, request}) => {
   const task = await createTask(request, 'Daily browser task ' + randomUUID());

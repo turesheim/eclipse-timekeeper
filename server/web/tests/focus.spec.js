@@ -54,10 +54,13 @@ test('focus areas filter every client view, totals and separately loaded calenda
   await expect(page.locator('#today-sessions')).toContainText(clients[0].name);await expect(page.locator('#today-sessions')).not.toContainText(clients[1].name);
   await expect(page.locator('#today-events')).toContainText(clients[0].name+' meeting');await expect(page.locator('#today-events')).not.toContainText(clients[1].name);
   for(const [tab,root] of [['clients','#clients'],['projects','#projects']]){await navigateView(page,tab);await expect(page.locator(root)).toContainText(clients[0].name);await expect(page.locator(root)).toContainText(clients[1].name);}
-  await navigateView(page,'activities');await expect(page.locator('#activities')).not.toContainText(projects[1].name);
-  await navigateView(page,'clients');await page.locator('#account-page a[href="#tracking"]').click();await expect(page.locator('#activities')).not.toContainText(projects[1].name);
-  await navigateView(page,'activities');await page.locator('#week-date').fill('2025-05-17');
-  await expect(page.locator('#week-total')).toHaveText('1h 0m');await expect(page.locator('#activities')).toContainText(clients[0].name+' task');await expect(page.locator('#activities')).not.toContainText(clients[1].name);
+  await test.step('Opening catalog settings preserves the focused activity report',async()=>{
+    await navigateView(page,'activities');await page.getByLabel('Week containing',{exact:true}).fill('2025-05-17');
+    await expect(page.locator('#week-total')).toHaveText('1h 0m');await expect(page.locator('#activities')).toContainText(tasks[0].summary);await expect(page.locator('#activities')).not.toContainText(tasks[1].summary);
+    await navigateView(page,'clients');await page.locator('#account-page a[href="#tracking"]').click();
+    await expect(page.locator('#activities-panel')).toBeVisible();await expect(page.locator('#week-total')).toHaveText('1h 0m');
+    await expect(page.locator('#activities')).toContainText(tasks[0].summary);await expect(page.locator('#activities')).not.toContainText(tasks[1].summary);
+  });
   await navigateView(page,'week');await expect(page.locator('#week-sessions-section')).toContainText(clients[0].name);await expect(page.locator('#week-sessions-section')).not.toContainText(clients[1].name);
   await navigateView(page,'calendar');await page.locator('#calendar-date').fill('2025-05-17');
   await expect(page.locator(`[data-session-id="${sessions[0].id}"]`).first()).toBeVisible();await expect(page.locator(`[data-session-id="${sessions[1].id}"]`)).toHaveCount(0);

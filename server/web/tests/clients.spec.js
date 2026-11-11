@@ -19,8 +19,8 @@ test('client and project lists and choices sort names after create, rename and r
     for(const suffix of names) projects.push(await (await api(request,'POST','/projects',{name:prefix+' '+suffix,clientId:clients[0].id})).json());
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     const expected=['alpha 2','alpha 10','Beta','Zulu'].map(value=>prefix+' '+value);
-    for(const [tab,id] of [['Clients','clients'],['Projects','projects']]) {
-      await page.getByRole('button',{name:tab,exact:true}).click();
+    for(const id of ['clients','projects']) {
+      await navigateView(page,id);
       await expect(page.locator(`#${id} tbody tr`).filter({hasText:prefix}).locator('td:first-child')).toHaveText(expected);
     }
     await page.getByRole('button',{name:'New project',exact:true}).click();
@@ -32,8 +32,8 @@ test('client and project lists and choices sort names after create, rename and r
       await api(request,'PUT',`/${collection}/${record.id}`,{name:prefix+' Aardvark',...(collection==='clients' ? {color:record.color} : {clientId:record.clientId})},{'If-Match':loaded.headers().etag});
     }
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
-    for(const [tab,id] of [['Clients','clients'],['Projects','projects']]) {
-      await page.getByRole('button',{name:tab,exact:true}).click();
+    for(const id of ['clients','projects']) {
+      await navigateView(page,id);
       await expect(page.locator(`#${id} tbody tr`).filter({hasText:prefix}).locator('td:first-child')).toHaveText(['Aardvark','alpha 2','alpha 10','Beta'].map(value=>prefix+' '+value));
     }
   } finally {
@@ -55,7 +55,7 @@ test('clients maintain names and colors, own projects and color work-session sum
     }
     projects.push(...(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items);expect(projects).toHaveLength(2);
     for(const project of projects) await expect(page.locator(`#projects tbody[data-client-id="${client.id}"] [data-project-id="${project.id}"]`)).toHaveText(new RegExp(project.name));
-    await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
+    await navigateView(page,'today');await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveAttribute('type','datetime-local');await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveAttribute('type','datetime-local');
     await expect(page.getByLabel('Enter exact times',{exact:true})).toHaveCount(0);
     await captureScreenshot(page,{path:'test-results/work-session-date-picker.png',fullPage:true});

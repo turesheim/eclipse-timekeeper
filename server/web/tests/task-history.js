@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {expect} from '@playwright/test';
 import {dateInZone} from '../src/model.js';
 
@@ -19,7 +20,7 @@ export async function openTaskHistory(page,task,request) {
     fixtures.add(activity.id);
   }
   const profile=await (await api(request,'GET','/me')).json();
-  await page.locator('[data-tab=activities]').click();
+  await navigateView(page,'activities');
   await page.getByLabel('Week containing',{exact:true}).fill(dateInZone(Date.parse(activity.start),profile.zoneId));
   const row=taskHistoryRow(page,task.id);await expect(row).toBeVisible();return row;
 }

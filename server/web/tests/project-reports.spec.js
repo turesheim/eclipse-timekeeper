@@ -52,7 +52,7 @@ test('project session reports open a separate tab, include every page and date, 
     await report.setViewportSize({width:1440,height:1000});await report.screenshot({path:'test-results/project-report-desktop.png',fullPage:true});
     await report.setViewportSize({width:390,height:844});expect(await report.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await report.screenshot({path:'test-results/project-report-mobile.png',fullPage:true});
-    await expect(page.locator('#workspace')).toHaveAttribute('data-view','projects');await expect(page.locator('#editor')).not.toBeVisible();
+    await expect(page).toHaveURL(/#account\/projects$/);await expect(page.locator('#account-content #projects-panel')).toBeVisible();await expect(page.locator('#editor')).not.toBeVisible();
   } finally {await report?.close();await f.close();}
 });
 test('project reports support read-only sessions, running entries and retry without partial results',async({page,request})=>{

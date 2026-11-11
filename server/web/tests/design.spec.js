@@ -1,7 +1,7 @@
 import {navigateView} from './navigation.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
-import {openAccountMenu,expandProjectClient} from './navigation.js';
+import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -86,7 +86,6 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         await expect(page.locator('#work-session')).toBeVisible();
         await expect(page.locator('#work-session-choice')).not.toBeVisible();
         await expect(page.locator('#work-session')).not.toContainText('No associated activities');
-        if(tab==='projects')for(const group of await page.locator('#projects tbody[data-client-id]').all())await expandProjectClient(page,await group.getAttribute('data-client-id'));
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
         await accessible(page);
         await iconTargets(page);
