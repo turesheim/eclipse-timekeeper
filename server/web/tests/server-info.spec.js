@@ -56,7 +56,7 @@ test('About follows the saved Norwegian language and remains accessible in every
   await signIn(page,request);const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),profile=await api.get('/api/v1/me');
   expect((await api.put('/api/v1/me',{data:{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf}})).status()).toBe(200);
   await page.reload();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.setViewportSize({width:390,height:844});
-  for(const theme of ['timekeeper','timekeeper-dark','timekeeper-reinvented','timekeeper-reinvented-dark','solarized-light','solarized-dark','nord','dracula','newspaper']) {
+  for(const theme of ['timekeeper','timekeeper-dark']) {
     await setTheme(page,theme);await page.locator('#account-menu > summary').click();
     await page.locator('#about-open').click();const dialog=page.locator('#server-info');
     await expect(dialog.getByRole('heading',{name:'Om Dagsverk',exact:true})).toBeVisible();

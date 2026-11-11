@@ -100,8 +100,6 @@ p { margin-block: .5rem; }
 .brand-logo-dark { display: none; }
 :root[data-bs-theme=dark] .brand-logo-light { display: none; }
 :root[data-bs-theme=dark] .brand-logo-dark { display: block; }
-.brand small { flex-shrink: 0; }
-.brand small { font-size: var(--font-brand-version); color: var(--muted); margin-left: .5rem; }
 #session { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; min-width: 0; }
 #owner { min-width: 0; max-width: 18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .account-menu { position: relative; flex-shrink: 0; }

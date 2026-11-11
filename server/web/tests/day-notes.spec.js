@@ -250,7 +250,7 @@ test('day notes fit all themes and narrow screens, and failed reads leave work a
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page);await put(api,'2026-05-17','<Ferie> '+ 'Avspasering '.repeat(6));await month(page);await expect(note(page)).toContainText('<Ferie>');expect(await note(page).locator('ferie').count()).toBe(0);
     await page.setViewportSize({width:390,height:844});
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
       const audit=await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await note(page).click();await expect(page.locator('#track-note-text')).toBeEnabled();const edit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(edit.violations.map(value=>value.id)).toEqual([]);await page.keyboard.press('Escape');
@@ -392,11 +392,11 @@ test('journal formatted editing fits narrow screens and all themes with accessib
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'# Journal entry\n\n**Bold** and *italic*, ~~done~~ and `inline code`.\n\n[Reference](https://example.com).\n\n> A quotation\n\n1. Numbered item\n\n- [ ] Touch task\n\n```text\nconst value = 1;\n```\n\n| Topic | Status |\n| --- | --- |\n| Writing | Ready |\n'},{'If-Match':initial.headers().etag});await month(page);await note(page).tap();
     const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('h1')).toBeInViewport();await rich.getByRole('checkbox').tap();await expect(rich.getByRole('checkbox')).toBeChecked();await save(page,'Touch label');
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);await note(page).tap();await expect(rich).toBeVisible();
       expect(await rich.locator('li[data-task="true"]').evaluate(row=>{const checkbox=row.querySelector('input').getBoundingClientRect(),range=document.createRange();range.selectNodeContents(row.querySelector('p'));const text=range.getClientRects()[0];return Math.abs(checkbox.y+checkbox.height/2-text.y-text.height/2);})).toBeLessThan(4);
       const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({theme,id:value.id,nodes:value.nodes.map(node=>({target:node.target,reason:node.failureSummary}))}))).toEqual([]);
-      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='dracula')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Close',exact:true}).click();
+      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='timekeeper-dark')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Close',exact:true}).click();
     }
     await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.setViewportSize({width:844,height:390});await expect(dialog(page).getByRole('button',{name:'Close',exact:true})).toBeInViewport({ratio:.9});await page.setViewportSize({width:320,height:740});await expect(dialog(page).getByRole('button',{name:'Close',exact:true})).toBeInViewport({ratio:.9});
@@ -472,8 +472,8 @@ test('journal text-style menu supports keyboard selection and Escape without clo
     await choices.nth(1).press('Escape');await expect(dialog(page)).toBeVisible();await expect(styles).toBeFocused();await expect(styles).toHaveAttribute('aria-expanded','false');
     await styles.press('ArrowUp');await expect(choices.last()).toBeFocused();await choices.last().press('Enter');await expect(rich.locator('h6')).toHaveCount(1);await expect(rich).toBeFocused();
     await page.setViewportSize({width:320,height:740});await styles.click();await expect(choices.last()).toBeInViewport();
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#track-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
     }
     await captureScreenshot(page,{path:'test-results/journal-heading-menu-mobile.png'});await choices.first().click();await expect(rich.locator('p')).toHaveCount(1);

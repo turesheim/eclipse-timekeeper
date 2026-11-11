@@ -39,7 +39,7 @@ test('Notes shows WebDAV connection and links to API token management',async({br
     const response=await page.request.get(await client.getAttribute('href'));
     expect(response.status()).toBe(200);
     expect(await response.body()).toEqual(await readFile(process.env.TIMEKEEPER_WEB_DAV_CLIENT));
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
       await page.evaluate(()=>location.hash='#account/notes');
       await expect(page.getByRole('heading',{name:'Notes settings',exact:true})).toBeVisible();

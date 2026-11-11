@@ -35,8 +35,8 @@ for(const locale of ['en-GB','nb-NO'])test(`date controls share selection, navig
     }
     for(const width of [1440,320]){
       await page.setViewportSize({width,height:900});
-      for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      for(const theme of ['timekeeper','timekeeper-dark']){
+        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${tab}, ${theme}, ${width}px`).toBe(true);
         expect((await new AxeBuilder({page}).include(selector+' .date-navigation').analyze()).violations,`${tab}, ${theme}, ${width}px`).toEqual([]);
       }

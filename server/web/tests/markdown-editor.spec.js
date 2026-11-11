@@ -30,8 +30,8 @@ test('Markdown tables stay compact, themed and readable on desktop and mobile',a
   await importNote(page,source);await page.locator('#markdown-rich').click();
   const table=page.locator('#markdown-formatted table').first();await expect(table).toBeVisible();
   const backgrounds=new Set();
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
     backgrounds.add(await table.locator('th').first().evaluate(cell=>getComputedStyle(cell).backgroundColor));
     for(const width of [1200,390]){
       await page.setViewportSize({width,height:900});
@@ -43,7 +43,7 @@ test('Markdown tables stay compact, themed and readable on desktop and mobile',a
         return false;
       })).toBe(true);
       expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
-      if(['timekeeper','nord'].includes(theme))await captureScreenshot(page,{path:`test-results/markdown-table-${theme}-${width}.png`,fullPage:true});
+      if(['timekeeper','timekeeper-dark'].includes(theme))await captureScreenshot(page,{path:`test-results/markdown-table-${theme}-${width}.png`,fullPage:true});
     }
   }
   expect(backgrounds.size).toBe(6);expect(await downloaded(page)).toBe(source);
@@ -94,8 +94,8 @@ test('Markdown controls are localized, keyboard accessible and fit mobile in all
   await page.setViewportSize({width:390,height:844});await page.route('**/api/v1/auth/session',route=>route.fulfill({json:{locale:'nb-NO'}}));
   await open(page);await page.getByRole('button',{name:'Formatert',exact:true}).click();const rich=page.getByRole('textbox',{name:'Notattekst',exact:true});await expect(rich).toBeFocused();
   await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Markdown-kilde',exact:true})).toBeFocused();
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
     expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }

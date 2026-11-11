@@ -129,7 +129,7 @@ test('meeting links render with provider icons in event dialogs and tooltips wit
       await expect(host.locator('img,script,iframe')).toHaveCount(0);await expect(host.getByText('Unsafe',{exact:true})).not.toHaveAttribute('href');
     };
     await assertLinks(await tooltipFor(item));await page.keyboard.press('Escape');await item.click();const details=page.locator('#calendar-event-details');await assertLinks(details);await expect(details.locator('strong')).toHaveText('Join remotely');
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    for(const theme of ['timekeeper','timekeeper-dark']){
       await details.getByRole('button',{name:'Close',exact:true}).click();await setTheme(page,theme);await page.setViewportSize({width:320,height:844});await item.click();await assertLinks(details);expect(await details.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
       expect((await new AxeBuilder({page}).include('#calendar-event-details').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     }
@@ -234,7 +234,7 @@ test('calendar subscriptions and event dialogs fit narrow screens and remain acc
   try{
     await calendar(page);const feed=await provider(request,[meeting,'UID:all-day-layout\nDTSTART;VALUE=DATE:20260504\nDTEND;VALUE=DATE:20260506\nSUMMARY:Conference']),subscription=await subscribe(page,client,feed);await expect(planned(page,subscription)).toHaveCount(1);
     const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo',locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await ready(page);await calendar(page);await expect(planned(page,subscription)).toContainText('Planlagt');await page.setViewportSize({width:390,height:844});
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
       await page.mouse.move(0,0);await expectClientIndicator(page,planned(page,subscription));await expectClientIndicator(page,page.locator('.calendar-all-day-event'));
       const month=await new AxeBuilder({page}).include('#calendar-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(month.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

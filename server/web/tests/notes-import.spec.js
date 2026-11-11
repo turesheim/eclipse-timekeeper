@@ -45,8 +45,8 @@ test('selecting files and folders limits uploads, explains oversized files and r
     await expect(card.getByRole('checkbox',{name:'Notes/Included.md',exact:true})).toBeDisabled();release();await expect(card).toContainText('Imported 1 file.');await expect(progress).toHaveAttribute('aria-valuenow','100');expect(uploads).toEqual(['Notes/Included.md']);
     expect((await resolve(client,'Notes/Included.md')).ok()).toBe(true);for(const path of ['Notes/Skip.md','SkipFolder/Nested.md','Notes/Oversized.md'])expect((await resolve(client,path)).status()).toBe(404);
     for(const width of [1440,320]){
-      await page.setViewportSize({width,height:900});for(const theme of width===320?['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']:['timekeeper']){
-        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      await page.setViewportSize({width,height:900});for(const theme of width===320?['timekeeper','timekeeper-dark']:['timekeeper']){
+        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
         expect((await new AxeBuilder({page}).include('.notes-import-review').analyze()).violations).toEqual([]);
       }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-import-selection-${width}.png`,fullPage:true});

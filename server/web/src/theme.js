@@ -1,24 +1,17 @@
 // Applied before styles load so a saved dark theme does not flash a light page.
 (() => {
   const key='timekeeper.theme';
-  const themes=[['timekeeper','Dagsverk','light'],['timekeeper-dark','Dagsverk Dark','dark'],
-    ['timekeeper-reinvented','Dagsverk-reinvented','light'],['timekeeper-reinvented-dark','Dagsverk-reinvented Dark','dark'],
-    ['solarized-light','Solarized Light','light'],['solarized-dark','Solarized Dark','dark'],
-    ['nord','Nord','dark'],['dracula','Dracula','dark'],['newspaper','Newspaper','light']];
+  const themes=[['timekeeper','Dagsverk','light'],['timekeeper-dark','Nattverk','dark']];
   const normalize=value=>themes.some(([id])=>id===value) ? value:'timekeeper';
-  const branding=new URL('./assets/branding/',document.currentScript.src);
-  let selected='timekeeper',picker,favicon,originalIcon;
+  let selected='timekeeper',picker;
   const apply=value=>{
     selected=normalize(value);document.documentElement.dataset.theme=selected;
     document.documentElement.dataset.bsTheme=themes.find(([id])=>id===selected)[2];
     if(picker)picker.value=selected;
-    if(favicon)favicon.href=selected==='timekeeper-reinvented' ? new URL('dagsverk-symbol.svg',branding) :
-      selected==='timekeeper-reinvented-dark' ? new URL('dagsverk-symbol-dark.svg',branding) : originalIcon;
   };
   try {selected=normalize(localStorage.getItem(key));} catch { /* Browser storage is optional. */ }
   apply(selected);
   document.addEventListener('DOMContentLoaded',()=>{
-    favicon=document.querySelector('link[rel=icon]');originalIcon=favicon?.href;apply(selected);
     picker=document.getElementById('theme');if(!picker)return;
     for(const [id,label] of themes) {const option=document.createElement('option');option.value=id;option.textContent=label;option.dataset.i18n='theme.'+id;picker.append(option);}
     window.dispatchEvent(new Event('timekeeper-theme-options'));

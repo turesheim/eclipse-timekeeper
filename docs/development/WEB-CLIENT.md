@@ -398,59 +398,25 @@ data license; loading failures and Retry remain available in the monthly view.
 
 ## Themes
 
-Choose **Theme** under **My Account → Profile** to switch between Dagsverk (the default),
-Dagsverk Dark, Dagsverk-reinvented, Dagsverk-reinvented Dark, Solarized Light,
-Solarized Dark, Nord, Dracula and Newspaper. The selection
-is saved on this browser and shared with other open Dagsverk tabs, including
-Administration. A saved theme also applies to sign-in and loads before the
-stylesheets to avoid flashing a light page. If browser storage is unavailable,
+Choose **Theme** under **My Account → Profile** to switch between **Dagsverk**
+(the default) and **Nattverk** (dark). Their saved IDs remain `timekeeper` and
+`timekeeper-dark`, and the storage key remains `timekeeper.theme`. Saved choices
+for removed themes fall back to Dagsverk.
+
+The selection is saved on this browser and shared with other open Dagsverk tabs,
+including Administration. A saved theme also applies to sign-in and loads before
+the stylesheets to avoid flashing a light page. If browser storage is unavailable,
 theme selection still works for the current page.
 
 Theme tokens cover forms, tables, calendar surfaces, dialogs and account pages.
-Client colors remain the colors chosen for those clients, except in Newspaper.
-Newspaper uses black ink and almost-white paper, serif typography, square edges
-and double rules. Hard-edged pixel dithering replaces tinted surfaces, including
-weekends, holidays and selected table rows. Client/label swatches and calendar
-edges display in monochrome without changing saved colors. Code and Markdown
-source retain monospace fonts. The theme uses local assets and system fonts.
-The other palettes use
-[Solarized](https://ethanschoonover.com/solarized/),
-[Nord](https://www.nordtheme.com/docs/colors-and-palettes/) and
-[Dracula](https://draculatheme.com/spec), with text/accent contrast adjusted for
-web controls. All styles and checkbox/radio assets are bundled locally.
-`tests/themes.spec.js` checks WCAG A/AA contrast in every view, editors and account
-settings, persistence, cross-tab updates and unavailable storage. It captures
-desktop and mobile previews for every theme under `server/web/test-results/`.
-
-Dagsverk-reinvented and Dagsverk-reinvented Dark are opt-in previews of the
-Dagsverk style guide v0.2 (10 November 2026). The original Dagsverk choices
-retain their appearance and saved selections; Dagsverk remains the default.
-The light palette uses green `#176653`, text `#233b38`, muted text
-`#52655d`, page `#f3f6f5`, white surfaces and decorative dividers `#d8e2dc`.
-Fields have a stronger `#7b9187` border. Dark uses mint `#79d0ad`, text
-`#edf5f0`, muted text `#b8d0c2`, page `#14231e` and surfaces `#1c3029`.
-Errors use `#9b3b36` and warnings `#8a5b16` in light mode, with lighter
-contrast adaptations in dark mode. Error and warning alerts pair an icon with
-their existing text. The supplied book/clock/checkmark symbol appears at 32px
-with 8px clear space in the header and supplies the favicon in both modes.
-The preview uses the new `timekeeper-reinvented` and
-`timekeeper-reinvented-dark` IDs. Existing theme IDs and the `timekeeper.theme`
-storage key remain compatible. Choose an original theme at any time to compare.
-
-Inter supplies the interface; Source Serif 4 supplies formatted Markdown notes
-at 18px/29px. Source and code keep the monospace font. The interface retains a
-14px base, 32/38, 24/30 and 20/26 heading sizes, 500-weight labels and
-600-weight buttons/headings. Table numerals are tabular; existing time-column
-alignment is retained. Bootstrap 5.3.8 owns control sizes, spacing and states,
-including small controls. Account font-size preferences override theme defaults.
-Other themes retain their existing fonts and artwork.
-
-The exact Fontsource packages are pinned in `package-lock.json`. Upright and
-italic variable WOFF2 files for Latin/extended Latin (including ÆØÅ/æøå) and
-their OFL 1.1 licenses are bundled locally; no font service is contacted at
-runtime. Run `npm run vendor:fonts --prefix server/web` after an intentional
-font update, then `npm run vendor:notices --prefix server/web` to refresh About.
-`npm run check:assets --prefix server/web` verifies both fonts and licenses.
+Client colors remain the colors chosen for those clients. All styles and
+checkbox/radio assets are bundled locally. `tests/themes.spec.js` checks WCAG
+A/AA contrast in every view, editors and account settings, the two theme choices
+in English and Norwegian, persistence, cross-tab updates, removed-theme fallback
+and unavailable storage. It captures desktop and mobile previews under
+`server/web/test-results/`, including the logo on the main, administration and
+project-report headers. Headers display the logo without a version number;
+build details remain available in About.
 
 ## Font sizes
 
@@ -508,7 +474,7 @@ Security Policy. Stored CSS is bounded inert text, never an HTML or stylesheet
 injection. `tests/typography.spec.js` checks persistence across browser contexts,
 account isolation, reset, rem scaling, failed/stale writes, read-only sessions,
 Norwegian labels, keyboard navigation and accessible desktop/mobile layouts
-across all six themes.
+across both themes.
 
 ## Design baseline
 

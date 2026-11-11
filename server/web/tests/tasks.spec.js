@@ -85,8 +85,8 @@ for(const locale of ['en-GB','nb-NO'])test(`Tasks supports keyboard/mobile brows
   await setup(page,request,{locale});
   for(const width of [1440,320]){
     await page.setViewportSize({width,height:900});
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       if(width===320)await page.locator('#tasks-panel > .tasks-heading > button').click();
       await expect(filter(page,locale==='nb-NO'?'Tidskritiske':'Time critical')).toBeVisible();
@@ -103,8 +103,8 @@ for(const locale of ['en-GB','nb-NO'])test('provider source links and assignment
   await page.reload();await page.locator('[data-tab=tasks]').click();await page.locator('#tasks-list button').filter({hasText:'Google context'}).click();const detail=page.locator('#task-details'),nb=locale==='nb-NO';
   await expect(detail.getByRole('link',{name:nb?'Åpne oppgavens nettadresse':'Open task URL',exact:true})).toHaveAttribute('href',own);await expect(detail.getByRole('link',{name:nb?'Åpne i Google Tasks':'Open in Google Tasks',exact:true})).toHaveAttribute('href',google);await expect(detail.getByRole('link',{name:nb?'Åpne tildelingskilden':'Open assignment source',exact:true})).toHaveAttribute('href',assignment);
   await expect(detail.getByRole('link',{name:'Email <source>',exact:true})).toHaveAttribute('rel','noopener noreferrer');await expect(detail.getByRole('link',{name:'My local resource',exact:true})).toBeVisible();await expect(detail.locator('a[href^="javascript:"]')).toHaveCount(0);await expect(detail.locator('source')).toHaveCount(0);
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light','newspaper'].includes(theme)?'light':'dark';},theme);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#task-details').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   }
   expect((await(await api('GET','/tasks/'+task.id)).json()).url).toBe(own);await captureScreenshot(page,{path:'test-results/task-context-'+locale+'-320.png'});

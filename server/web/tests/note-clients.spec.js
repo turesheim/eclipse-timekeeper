@@ -66,11 +66,10 @@ test('an uncertain client save reads its outcome without repeating the command',
 test('client labels and the keyboard selector fit all themes at desktop and phone sizes',async({page,request})=>{
   const {beta}=await setup(page,request);await openNote(page);const scope=page.locator('#notes-panel');await choose(page,scope,beta.id);
   for(const width of [1440,320]){
-    await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light','newspaper'].includes(theme)?'light':'dark';},theme);
+    await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       await expect(scope.locator('.note-client-label')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-      const swatch=scope.locator('.note-client-swatch');await expect(swatch).toHaveCSS('background-color',theme==='newspaper'?'rgb(250, 249, 246)':'rgb(176, 48, 96)');
-      if(theme==='newspaper'){await expect(swatch).toHaveCSS('background-image',/conic-gradient/);await expect(swatch).toHaveCSS('border-radius','0px');}
+      const swatch=scope.locator('.note-client-swatch');await expect(swatch).toHaveCSS('background-color','rgb(176, 48, 96)');
       const label=await scope.locator('.note-client-label').boundingBox(),card=await scope.locator('.notes-editor').boundingBox(),toolbar=await scope.locator('.markdown-toolbar').boundingBox();expect(label.y+label.height).toBeLessThanOrEqual(toolbar.y+1);expect(label.x+label.width).toBeGreaterThan(card.x+card.width/2);expect(label.y-card.y).toBeLessThan(40);
       await clickNoteAction(page,scope,'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeFocused();expect((await new AxeBuilder({page}).include('.note-client-dialog[open]').analyze()).violations).toEqual([]);await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(scope.getByRole('button',{name:'Note tools',exact:true})).toBeFocused();
     }

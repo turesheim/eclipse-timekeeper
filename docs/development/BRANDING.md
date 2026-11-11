@@ -20,9 +20,9 @@ Compatibility identifiers remain unchanged:
 - Browser storage keys, event names, theme IDs and translation keys.
 - Existing database and synchronization configuration.
 
-There is no data migration or new archive format in this phase. Existing themes
-and saved preferences continue to work. User-facing theme labels are Dagsverk
-and Dagsverk Dark, while their stored IDs remain `timekeeper` and `timekeeper-dark`.
+There is no data migration or new archive format in this phase. The supported
+themes are Dagsverk and Nattverk (dark), with stored IDs `timekeeper` and
+`timekeeper-dark`. Saved preferences for removed themes fall back to Dagsverk.
 
 ## Later phases
 
@@ -38,21 +38,20 @@ historical verification records as evidence of what was tested under the old nam
 
 ## Logo and app icons
 
-The integrated wordmark replaces the initial D in Dagsverk with the D/clock
-symbol. The approved SVG/PNG package lives in
-[`server/web/src/assets/branding/`](../../server/web/src/assets/branding/).
-The logo uses Avenir Next Demi Bold outlines: no font installation or external
-requests are required. Use `logo.svg` on light backgrounds, `logo-dark.svg` on
-dark backgrounds, and `logo-mono.svg` for a single-color treatment. The
-`logo-*-header.svg` files crop only the transparent margins for application
-headers; they preserve the approved artwork.
+The web header uses the supplied `dagsverk-logo-checkmark-lys.svg`: a
+book/clock/checkmark symbol with the underlined Dagsverk wordmark. The local
+assets live in [`server/web/src/assets/branding/`](../../server/web/src/assets/branding/).
+`logo.svg` preserves its light artwork, with the Fira Code wordmark converted
+to paths so it needs no installed font or external request. `logo-dark.svg`
+adapts the black wordmark to `#edf5f0` and the green artwork to `#79d0ad` for
+Nattverk. The `logo-*-header.svg` files crop transparent margins for headers.
 
-The original theme colors remain #176653 (green), #233B38 (wordmark), #79D0AD
-(dark accent), #14231E (dark icon surface) and #EDF5F0 (light wordmark).
-The web client, administration and project-report headers select the light or
-dark wordmark using the existing Bootstrap theme attribute. Both image variants
-have the accessible name Dagsverk; the hidden variant is not announced.
-The repository README also supplies both variants.
+The main, administration and project-report headers select the light or dark
+wordmark using the existing Bootstrap theme attribute. Both variants have the
+accessible name Dagsverk; the hidden variant is not announced. Headers omit the
+version number; About retains server version and build details. The repository
+README also supplies both SVG variants. Existing PNG exports and package/app
+icons retain their previous artwork.
 
 `favicon.svg` uses the package's app icon, while `apple-touch-icon.png` uses its
 256 px PNG. The Synology package retains its existing technical icon filenames

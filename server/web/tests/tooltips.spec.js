@@ -36,7 +36,7 @@ test('one rich tooltip covers each composite, preserves literal data and support
     await card.focus();await page.keyboard.press(option+'Tab');await page.keyboard.press(option+'Shift+Tab');await expect(card).toBeFocused();
     await expect(page.getByRole('tooltip')).toBeVisible();await expect(card).toHaveAttribute('aria-describedby',await page.getByRole('tooltip').getAttribute('id'));
     await page.keyboard.press('Escape');await expect(card).not.toHaveAttribute('aria-describedby');
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);await tooltipFor(card);
       const audit=await new AxeBuilder({page}).include('.timekeeper-tooltip').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
       await captureScreenshot(page,{path:`test-results/tooltip-${theme}.png`,fullPage:false});

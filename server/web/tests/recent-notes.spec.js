@@ -48,8 +48,8 @@ test('Notes Recent notes scrolls independently and fits the drawer in every them
   await page.locator('[data-tab=notes]').click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);expect(requests).toEqual([]);
   for(const width of [1280,390]){
     await page.setViewportSize({width,height:844});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);await expect(recent).toBeVisible();expect(await recent.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);expect(await navigation.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);await expect(recent).toBeVisible();expect(await recent.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);expect(await navigation.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
       expect((await new AxeBuilder({page}).include('#notes-navigation').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/notes-recent-${theme}-${width}.png`,fullPage:false});
     }
   }
@@ -107,8 +107,8 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   }
   for(const [width,height] of [[1440,1000],[320,900]]){
     await page.setViewportSize({width,height});await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       for(const [entry] of cases){
         const button=recent.locator(`[data-recent-note="${entry.id}"]`);await button.scrollIntoViewIfNeeded();
         const bounds=await button.evaluate(node=>{const icon=node.querySelector('.icon'),title=node.querySelector('.today-recent-note-label'),a=icon.getBoundingClientRect(),b=title.getBoundingClientRect(),style=getComputedStyle(icon,'::before'),button=getComputedStyle(node);return {before:a.right<=b.left,visible:a.width>0&&a.height>0,font:style.fontFamily,glyph:style.content,borders:[button.borderTopWidth,button.borderRightWidth,button.borderBottomWidth,button.borderLeftWidth],fontSize:parseFloat(button.fontSize),rem:parseFloat(getComputedStyle(document.documentElement).fontSize)};});
@@ -195,8 +195,8 @@ test('Recent note popup remains accessible in all themes and narrow screens',asy
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:900});await expect(popup.getByRole('button',{name:'Open in workspace',exact:true})).toBeInViewport();await expect(popup.getByRole('button',{name:'Close',exact:true})).toBeInViewport();
     expect(await popup.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#note-popup-editor').analyze()).violations,theme+', '+width).toEqual([]);
     }
     await popup.screenshot({path:`test-results/note-popup-${width}.png`});
