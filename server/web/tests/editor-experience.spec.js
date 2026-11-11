@@ -62,6 +62,13 @@ test('hashtag presentation follows typing and undo while source remains portable
   expect(await source(page)).toContain('#NewTag');await page.keyboard.press('ControlOrMeta+z');await expect(page.locator('[data-hashtag]')).toHaveCount(0);
 });
 
+test('client annotations share hashtag presentation while code, links and saved Markdown stay literal',async({page})=>{
+  const value='A #work item for @Client_Name and @client:Øving.\n\n`@Code` [@Link](https://example.invalid/) email@example.invalid\n\n```md\n@Example\n```\n';await engine(page,value,{tags:true});
+  const mentions=page.locator('#experience-editor .markdown-client-mention');await expect(mentions).toHaveText(['@Client_Name','@client:Øving.']);expect(await source(page)).toBe(value);
+  for(const theme of ['timekeeper','timekeeper-dark','newspaper']){await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper-dark'?'dark':'light';},theme);expect(await mentions.first().evaluate(node=>{const tag=document.querySelector('[data-hashtag]');return getComputedStyle(node).color===getComputedStyle(tag).color&&getComputedStyle(node).textDecorationLine===getComputedStyle(tag).textDecorationLine;})).toBe(true);}
+  await page.evaluate(()=>globalThis.experience.setReadOnly(true));await expect(mentions).toHaveCount(2);expect(await source(page)).toBe(value);
+});
+
 test('Backspace deletes rich text and joins paragraphs at the caret',async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await field(page,'First.\n\nSecond.\n');const paragraph=page.locator('#experience-formatted p').last();

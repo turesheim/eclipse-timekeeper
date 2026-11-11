@@ -1761,5 +1761,14 @@
   "layout.collapse_left_sidebar": "Skjul venstre sidepanel",
   "layout.expand_left_sidebar": "Vis venstre sidepanel",
   "layout.collapse_right_sidebar": "Skjul høyre sidepanel",
-  "layout.expand_right_sidebar": "Vis høyre sidepanel"
+  "layout.expand_right_sidebar": "Vis høyre sidepanel",
+  "tasks.tools": "Oppgaveverktøy",
+  "tasks.resize": "Endre bredden på oppgavenavigasjonen",
+  "tasks.completion": "Fullført: {{title}}",
+  "tasks.completion_stale": "Denne oppgaven er endret. Se gjennom gjeldende tilstand før du endrer fullføring.",
+  "notes.import_tasks": "Markdown-oppgaver",
+  "notes.import_tasks_checkbox": "Opprett oppgaver med tilstanden fra avkrysningsboksene",
+  "notes.import_tasks_completed": "Opprett oppgaver og merk alle som fullført",
+  "notes.import_tasks_ignore": "Ignorer oppgaver; ikke opprett noen",
+  "notes.import_tasks_help": "Fullførte oppgaver bruker filens siste endringsdato og krysser av i kilden. Ignorerte elementer blir ikke oppgaver før avkrysningsboksen eller tittelen endres. Eksisterende tilknyttede oppgaver beholder identiteten."
 }

@@ -1761,5 +1761,14 @@
   "layout.collapse_left_sidebar": "Collapse left sidebar",
   "layout.expand_left_sidebar": "Expand left sidebar",
   "layout.collapse_right_sidebar": "Collapse right sidebar",
-  "layout.expand_right_sidebar": "Expand right sidebar"
+  "layout.expand_right_sidebar": "Expand right sidebar",
+  "tasks.tools": "Task tools",
+  "tasks.resize": "Resize task navigation",
+  "tasks.completion": "Completed: {{title}}",
+  "tasks.completion_stale": "This task changed. Review its current state before changing completion.",
+  "notes.import_tasks": "Markdown tasks",
+  "notes.import_tasks_checkbox": "Create tasks from their checkbox state",
+  "notes.import_tasks_completed": "Create tasks and mark all completed",
+  "notes.import_tasks_ignore": "Ignore tasks; do not create any",
+  "notes.import_tasks_help": "Completed tasks use the file’s last modified date and check the source boxes. Ignored items stay unenrolled until their checkbox or title is edited. Existing linked tasks keep their identities."
 }

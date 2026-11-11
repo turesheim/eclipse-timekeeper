@@ -35,7 +35,7 @@ test('saving and checking note items creates ordinary tasks with separate stable
   await(await notesSource(page)).fill('- [ ] Follow up\n- [x] Already finished\n\n```md\n- [ ] Example only\n```\n');await saveMarkdown(page.locator('#notes-panel'));
   let values=await tasks(api);expect(values).toHaveLength(2);const first=values.find(task=>task.summary==='Follow up');expect(first.status).toBe('NOT_STARTED');expect(values.find(task=>task.summary==='Already finished').status).toBe('COMPLETED');
   await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await checkbox(page,'Follow up').check();await saveMarkdown(page.locator('#notes-panel'));values=await tasks(api);expect(values).toHaveLength(2);expect(values.find(task=>task.id===first.id).status).toBe('COMPLETED');await expect(page.locator('#notes-panel .note-client-label')).toHaveText(client.name);expect((await(await api('GET',link)).json()).clientId).toBe(client.id);
-  await page.locator('[data-tab=tasks]').click();const row=page.locator('#tasks-list').getByRole('button',{name:'Open task Follow up',exact:true});await expect(row).toBeVisible();await expect(row).toContainText('Completed');await row.click();await expect(page.locator('#task-details')).toContainText('Dagsverk');
+  await page.locator('[data-tab=tasks]').click();await page.locator('#tasks-hide-completed').uncheck();const row=page.locator('#tasks-list').getByRole('button',{name:'Open task Follow up',exact:true});await expect(row).toBeVisible();await expect(row).toContainText('Completed');await row.click();await expect(page.locator('#task-details')).toContainText('Dagsverk');
 });
 
 test('normal task planning preserves exact source bytes and reload shows its linked checkbox',async({page,request})=>{
