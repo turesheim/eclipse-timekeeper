@@ -3,9 +3,7 @@ import {t} from './i18n.js';
 /** A live outline of Today's journal. Selecting an entry only moves the caret. */
 export class TodayContents {
   constructor(root,field){
-    this.root=root;this.field=field;this.list=root.querySelector('ol');this.empty=root.querySelector('p');this.details=root.querySelector('details');this.generation=0;
-    this.narrow=matchMedia('(max-width:1050px)');this.details.open=!this.narrow.matches;
-    this.narrow.addEventListener('change',event=>{this.details.open=!event.matches;});
+    this.root=root;this.field=field;this.list=root.querySelector('ol');this.empty=root.querySelector('p');this.generation=0;
   }
   show(){this.active=true;this.update();}
   hide(){this.active=false;++this.generation;}

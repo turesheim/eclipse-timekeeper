@@ -1,4 +1,5 @@
 import {TodayContents} from './today-contents.js';
+import {SidebarActions} from './sidebar-actions.js';
 import {dateNavigation} from './date-navigation.js';
 import {calendarDescription,calendarLocation} from './tooltip-description.js';
 import {richTooltip} from './tooltips.js';
@@ -37,6 +38,7 @@ export class TodayView {
     matchMedia('(max-width:1050px)').addEventListener('change',event=>{if(event.matches&&root.offsetParent&&(document.activeElement===this.sidebarResize||this.sidebarResizeFocused&&document.activeElement===document.body))this.dateInput.focus({preventScroll:true});});
     this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions:byId('today-main-actions'),inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
     this.contents=new TodayContents(byId('today-contents'),this.journal.markdown);
+    this.sidebarActions=new SidebarActions(byId('today-main-actions'),root.querySelector('.today-layout'),{left:{panel:this.sidebar,separator:this.sidebarResize},right:{panel:byId('today-contents'),collapseOnNarrow:true}},()=>this.sizeEditor());
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
@@ -63,7 +65,7 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}

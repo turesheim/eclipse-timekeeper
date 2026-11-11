@@ -1756,5 +1756,10 @@
   "today.main_actions": "Hovedhandlinger",
   "today.contents": "Innholdsfortegnelse",
   "today.no_headings": "Dette notatet har ingen overskrifter ennå.",
-  "today.contents_unavailable": "Innholdsfortegnelsen er utilgjengelig. Du kan fortsatt redigere notatet."
+  "today.contents_unavailable": "Innholdsfortegnelsen er utilgjengelig. Du kan fortsatt redigere notatet.",
+  "layout.sidebar_actions": "Sidepaneler",
+  "layout.collapse_left_sidebar": "Skjul venstre sidepanel",
+  "layout.expand_left_sidebar": "Vis venstre sidepanel",
+  "layout.collapse_right_sidebar": "Skjul høyre sidepanel",
+  "layout.expand_right_sidebar": "Vis høyre sidepanel"
 }

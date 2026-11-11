@@ -204,13 +204,18 @@ Today uses three desktop columns: the existing day overview on the left, the
 journal in the main area and a generated **Table of contents** on the right.
 The date navigator, day title and **Main actions** span the left/main area;
 **Note revisions**, **Associate with client** and **Delete note** are available
-there. Other note editors retain these actions in **Note tools**.
+there. Left/right sidebar buttons appear in Main actions for the sidebars present.
+Each toggles its sidebar independently and gives the journal the freed space.
+Other note editors retain note actions in **Note tools**.
 
 Drag the separator between the left overview and journal to resize the overview,
 or use Left/Right, Home and End while the separator has keyboard focus. Both
 sidebars scroll independently and the journal stays above the fixed view selector.
-On narrow screens the contents list collapses above the journal and the overview
-follows it. Opening the contents list keeps the journal available below it.
+On narrow screens the contents sidebar starts hidden and can be expanded from
+Main actions above the journal; the overview follows the journal. Sidebar choices
+are retained separately for wide/narrow layouts while signed in, including when
+switching views or dates. Collapsing the overview also hides its resize handle;
+expanding it restores its width.
 
 The contents list follows actual Markdown headings, including Setext headings
 and repeated titles, and updates during formatted or source editing. Selecting a

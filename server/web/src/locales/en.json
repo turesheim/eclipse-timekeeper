@@ -1756,5 +1756,10 @@
   "today.main_actions": "Main actions",
   "today.contents": "Table of contents",
   "today.no_headings": "No headings in this note yet.",
-  "today.contents_unavailable": "The table of contents is unavailable. Your note is still editable."
+  "today.contents_unavailable": "The table of contents is unavailable. Your note is still editable.",
+  "layout.sidebar_actions": "Sidebar controls",
+  "layout.collapse_left_sidebar": "Collapse left sidebar",
+  "layout.expand_left_sidebar": "Expand left sidebar",
+  "layout.collapse_right_sidebar": "Collapse right sidebar",
+  "layout.expand_right_sidebar": "Expand right sidebar"
 }

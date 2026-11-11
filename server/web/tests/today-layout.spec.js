@@ -73,10 +73,10 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
           const left=await page.locator('.today-sidebar').boundingBox(),main=await page.locator('.today-main').boundingBox(),right=await contents.boundingBox(),toolbar=await page.locator('.today-toolbar').boundingBox();
           expect(left.x+left.width).toBeLessThan(main.x);expect(right.x).toBeGreaterThanOrEqual(main.x+main.width);expect(Math.abs(left.y-main.y)).toBeLessThan(1);expect(Math.abs(right.y-toolbar.y)).toBeLessThan(1);
         }else{
-          await expect(contents.locator('details')).not.toHaveAttribute('open','');
-          await contents.locator('summary').click();await expect(choices.last()).toBeVisible();
+          const toggle=page.locator('#today-main-actions-toggle-right-sidebar');await expect(toggle).toHaveAttribute('aria-expanded','false');
+          await toggle.click();await expect(choices.last()).toBeVisible();
           await expect.poll(async()=>{const editor=await field.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();return editor.y+editor.height<=nav.y+1;}).toBe(true);
-          await contents.locator('summary').click();
+          await toggle.click();
         }
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
         expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
@@ -92,7 +92,7 @@ test('Today main actions reuse revisions, client association and confirmed delet
   const client=await(await api(request,'POST','/clients',{name:'Main actions '+randomUUID().slice(0,6),color:'#176653'})).json();
   try{
     await signIn(page);await page.locator('#today-date').fill(date);const actions=page.getByRole('group',{name:'Main actions',exact:true});
-    await expect(actions.getByRole('button')).toHaveCount(3);
+    await expect(actions.getByRole('button')).toHaveCount(5);
     for(const name of ['Note revisions','Associate with client','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
     const history=actions.getByRole('button',{name:'Note revisions',exact:true});await history.focus();await history.press('Enter');await expect(page.getByRole('dialog',{name:'Note revisions',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(history).toBeFocused();
     const associate=actions.getByRole('button',{name:'Associate with client',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await dialog.locator('select').selectOption(client.id);
@@ -115,6 +115,8 @@ test('Today main actions reuse revisions, client association and confirmed delet
       await reader.locator('#today-contents-list button').click();await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
       for(const name of ['Associate with client','Delete note'])await expect(reader.locator('#today-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
       await expect(reader.locator('#today-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeEnabled();
+      for(const side of ['left','right']){const toggle=reader.locator('#today-main-actions-toggle-'+side+'-sidebar');await expect(toggle).toBeEnabled();await toggle.click();}
+      await expect(reader.locator('#today-sidebar')).toBeHidden();await expect(reader.locator('#today-contents')).toBeHidden();
     }finally{await readerContext.close();}
     await navigateView(page,'track');await page.locator('#track-month').fill('2026-07');await page.locator('[data-track-note-date="'+date+'"]').click();
     await page.locator('#track-note-editor').getByRole('button',{name:'Note tools',exact:true}).click();
