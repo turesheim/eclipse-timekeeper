@@ -198,7 +198,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-month-day { position: relative; min-width: 0; min-height: var(--today-calendar-cell-height); padding: .1rem 0; border: 1px solid transparent; font-size: var(--today-calendar-font-size); white-space: nowrap; }
 .today-month-day.outside { color: var(--muted); }
 .today-month-day.current { border-color: var(--accent); }
-.today-month-day.selected { background: var(--accent); color: #fff; }
+.today-month-day.selected { background: var(--accent); color: var(--theme-on-accent,#fff); }
 .today-month-dot { position: absolute; inset: auto calc(50% - .1rem) .08rem; width: .2rem; height: .2rem; border-radius: 50%; background: currentColor; }
 @media (any-pointer: coarse) {
   .today-month { --today-calendar-cell-height: 2rem; }

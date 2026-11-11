@@ -50,6 +50,14 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     await expect(field.locator('.ProseMirror h2').last()).toBeInViewport();
     expect(await field.locator('.ProseMirror h2').last().evaluate(node=>node.contains(getSelection().anchorNode))).toBe(true);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
+    const readerContext=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale,viewport:{width:1440,height:1000}});
+    try{
+      const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await reader.locator('#today-date').fill(date);
+      await expect(reader.locator('#today-contents-list button')).toHaveCount(4);await reader.locator('#today-contents-list button').last().click();
+      await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
+      await expect(reader.locator('#today-note-editor .ProseMirror h2').last()).toBeInViewport();
+    }finally{await readerContext.close();}
+    expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await field.getByRole('button',{name:locale==='nb-NO'?'Markdown-kilde':'Markdown source',exact:true}).click();
     const source=page.locator('#today-journal-body');await choices.first().click();await expect(source).toBeFocused();await expect.poll(()=>source.evaluate(node=>node.selectionStart)).toBe(0);await choices.last().click();
     expect(await source.evaluate(node=>node.selectionStart)).toBe((await source.inputValue()).lastIndexOf('## Next steps'));
