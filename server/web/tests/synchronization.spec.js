@@ -43,7 +43,7 @@ test('unchanged visible lists retain their focused actions across unrelated sync
   const {api}=await setup(page,request),client=await(await api('POST','/clients',{name:'Stable client',color:'#305070'})).json();
   await api('POST','/projects',{name:'Stable project',clientId:client.id});await api('POST','/labels',{name:'Stable label',color:'#507030'});
   for(const [tab,list,title] of [['clients','clients','Stable client'],['projects','projects','Stable project'],['labels','labels','Stable label']]){
-    if(tab==='labels')await page.goto('/web/#account/labels');else await page.locator('[data-tab='+tab+']').click();
+    if(tab==='labels')await page.goto('/web/#account/labels');else await navigateView(page,tab);
     const row=page.locator('#'+list+' tr').filter({hasText:title}),action=row.getByRole('button',{name:'Edit',exact:true});
     if(tab==='projects')await expandProjectClient(page,client.id);
     await expect(action).toBeVisible();await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await action.focus();await expect(action).toBeFocused();
