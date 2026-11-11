@@ -82,6 +82,36 @@ class PasskeyStoreTest {
         var options=passkeys.managementOptions(browser.principal(),browser.browser(),browser.session().secret(),"fixture",action);
         return passkeys.managementProof(browser.principal(),browser.browser(),browser.session().secret(),"fixture",assertion(options,key,browser.owner(),false)).path("proof").asText();
     }
+    private void password(Browser browser,String proof) {
+        passkeys.changePassword(browser.principal(),browser.browser(),browser.session().secret(),"fixture",object().put("proof",proof).put("newPassword","A replacement password from passkey proof"));
+    }
+    @Test void passwordProofIsBoundToItsActionOwnerSessionAndAccountVersion() throws Exception {
+        var alice=browser("pk-alice");var peer=browser("pk-alice");var bob=browser("pk-bob");
+        var key=new WebAuthnProtocolTest.Authenticator("password proof boundaries");register(alice,key,object().put("currentPassword",PASSWORD));
+        String wrongAction=proof(alice,object().put("action","ADD"),key);
+        assertEquals(403,assertThrows(ApiFailure.class,()->password(alice,wrongAction)).status);
+        // A wrong-action attempt consumes the proof, including for its original purpose.
+        assertEquals(403,assertThrows(ApiFailure.class,()->register(alice,key,object().put("proof",wrongAction))).status);
+        String scoped=proof(alice,object().put("action","PASSWORD"),key);
+        assertEquals(403,assertThrows(ApiFailure.class,()->password(bob,scoped)).status);
+        assertEquals(403,assertThrows(ApiFailure.class,()->password(peer,scoped)).status);
+        accounts.tx(c->{execute(c,"UPDATE tk_account SET version=version+1 WHERE owner_id=?",alice.owner());return null;});
+        assertEquals(403,assertThrows(ApiFailure.class,()->password(alice,scoped)).status);
+        assertTrue(accounts.<Boolean>tx(c->currentPassword(c,alice.owner(),PASSWORD)));
+        assertEquals(alice.owner(),accounts.session(alice.session().secret()).owner());
+        assertEquals(bob.owner(),accounts.session(bob.session().secret()).owner());
+    }
+    @Test void expiredPasswordProofAndRemovedCredentialCannotChangeThePassword() throws Exception {
+        var alice=browser("pk-alice");var key=new WebAuthnProtocolTest.Authenticator("expired password proof");
+        var registered=register(alice,key,object().put("currentPassword",PASSWORD));
+        String expired=proof(alice,object().put("action","PASSWORD"),key);
+        accounts.tx(c->{execute(c,"UPDATE tk_passkey_ceremony SET expires_at=? WHERE digest=?",Instant.now().minusSeconds(1).toString(),hash(expired));return null;});
+        assertEquals(403,assertThrows(ApiFailure.class,()->password(alice,expired)).status);
+        String removed=proof(alice,object().put("action","PASSWORD"),key);
+        assertFalse(passkeys.remove(alice.principal(),ContractInputs.pathId(registered.path("id").asText()),etag(registered),alice.browser(),alice.session().secret(),"fixture",object().put("currentPassword",PASSWORD)));
+        assertEquals(403,assertThrows(ApiFailure.class,()->password(alice,removed)).status);
+        assertTrue(accounts.<Boolean>tx(c->currentPassword(c,alice.owner(),PASSWORD)));
+    }
     @Test void passwordProofEnrollmentDiscoverableRememberedSignInAndRemovalUseExistingSessions() throws Exception {
         var alice=browser("pk-alice");var key=new WebAuthnProtocolTest.Authenticator("stored login key");var first=register(alice,key,object().put("currentPassword",PASSWORD));
         assertEquals(1,passkeys.list(alice.principal()).path("items").size());

@@ -79,6 +79,12 @@ server has a configured HTTPS hostname. Password sign-in remains available;
 canceling a native credential prompt leaves the form usable. **Remember me**
 applies to either method. No credential is requested automatically on page load.
 
+**My Account → Password** accepts a current password or fresh registered-passkey
+verification. **Confirm with → Existing passkey** lets an administrator or ordinary
+account holder replace a forgotten password. Canceling leaves the password draft
+and session usable. Success signs out existing sessions and API tokens and retains
+registered passkeys. Token-derived sessions cannot use passkey proof.
+
 **My Account → Passkeys** lists user-named keys and creation/last-used times in
 the account time zone. Adding or removing a key requires fresh password or
 passkey proof. Removing the key used for the current session signs the user out.

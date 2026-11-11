@@ -101,15 +101,15 @@ test('administration saves shared settings for restart and keeps SMTP credential
     const host='mail-'+randomUUID().slice(0,8)+'.example.invalid';
     await expect(page.getByLabel('SMTP username',{exact:true})).toHaveAttribute('autocomplete','section-smtp username');
     await expect(page.getByLabel('New SMTP password',{exact:true})).toHaveAttribute('autocomplete','section-smtp new-password');
-    await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveAttribute('autocomplete','section-administrator current-password');
-    await page.getByLabel('SMTP host',{exact:true}).fill(host);await page.getByLabel('New SMTP password',{exact:true}).fill(secret);await page.getByLabel('Current administrator password',{exact:true}).fill('wrong password');
-    await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('.form-feedback')).toContainText('Confirm your current administrator password');
+    await expect(page.getByLabel('Your password',{exact:true})).toHaveAttribute('autocomplete','section-administrator current-password');
+    await page.getByLabel('SMTP host',{exact:true}).fill(host);await page.getByLabel('New SMTP password',{exact:true}).fill(secret);await page.getByLabel('Your password',{exact:true}).fill('wrong password');
+    await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('.form-feedback')).toContainText('Confirm your password');
     await expect(page.getByLabel('SMTP host',{exact:true})).toHaveValue(host);await expect(page.getByLabel('New SMTP password',{exact:true})).toHaveValue(secret);
-    await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
-    await expect(page.locator('.form-feedback')).toContainText('Settings saved. Restart');await expect(page.getByLabel('New SMTP password',{exact:true})).toHaveValue('');await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');
+    await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
+    await expect(page.locator('.form-feedback')).toContainText('Settings saved. Restart');await expect(page.getByLabel('New SMTP password',{exact:true})).toHaveValue('');await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');
     const after=await browserRequest(page).get('/api/v1/admin/settings'),saved=await after.json();expect(saved.saved.smtpHost).toBe(host);expect(saved.effective).toEqual(initial.effective);expect(saved.restartRequired).toBe(true);expect(saved.smtpPasswordConfigured).toBe(true);expect(JSON.stringify(saved)).not.toContain(secret);
     await page.getByText('Saved and effective settings',{exact:true}).click();await expect(page.getByRole('row').filter({hasText:'SMTP host'})).toContainText(host);await expect(page.getByRole('row').filter({hasText:'SMTP host'})).toContainText(initial.effective.smtpHost);
-    await page.getByLabel('Clear saved SMTP password',{exact:true}).check();await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');
+    await page.getByLabel('Clear saved SMTP password',{exact:true}).check();await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');
     const cleared=await browserRequest(page).get('/api/v1/admin/settings');expect((await cleared.json()).smtpPasswordConfigured).toBe(false);
     await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/administration-editable-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -120,11 +120,11 @@ test('administration preserves service-setting drafts after a peer save and relo
   const admin=await settingsAdministrator(page,request);
   try {
     const current=await browserRequest(page).get('/api/v1/admin/settings'),data=await current.json();
-    await page.getByLabel('SMTP host',{exact:true}).fill('unsaved-draft.example.invalid');await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);
+    await page.getByLabel('SMTP host',{exact:true}).fill('unsaved-draft.example.invalid');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);
     page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('link',{name:'Users',exact:true}).click();await expect(page.getByLabel('SMTP host',{exact:true})).toHaveValue('unsaved-draft.example.invalid');
     const peer=await settingsWrite(page,current,configurationInput(data,admin.secret,{smtpHost:'peer-change.example.invalid'}));expect(peer.status()).toBe(200);
     await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('.form-feedback')).toContainText('Your draft is kept');await expect(page.getByLabel('SMTP host',{exact:true})).toHaveValue('unsaved-draft.example.invalid');
-    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Reload current values',exact:true}).click();await expect(page.getByLabel('SMTP host',{exact:true})).toHaveValue('peer-change.example.invalid');await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');
+    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Reload current values',exact:true}).click();await expect(page.getByLabel('SMTP host',{exact:true})).toHaveValue('peer-change.example.invalid');await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');
   } finally {await admin.close();}
 });
 test('administration never repeats a service-setting write after a lost reply',async({page,request})=>{
@@ -133,7 +133,7 @@ test('administration never repeats a service-setting write after a lost reply',a
     await page.route('**/api/v1/admin/settings',async route=>{
       if(route.request().method()==='PUT') {writes++;await route.fetch();await route.abort('connectionfailed');}else await route.continue();
     });
-    await page.getByLabel('SMTP host',{exact:true}).fill('committed-once.example.invalid');await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
+    await page.getByLabel('SMTP host',{exact:true}).fill('committed-once.example.invalid');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
     await expect(page.locator('.form-feedback')).toContainText('outcome is unknown');await expect(page.getByRole('button',{name:'Save settings',exact:true})).toBeDisabled();expect(writes).toBe(1);
     const actual=await browserRequest(page).get('/api/v1/admin/settings');expect((await actual.json()).saved.smtpHost).toBe('committed-once.example.invalid');expect(writes).toBe(1);
   } finally {await admin.close();}
@@ -174,11 +174,11 @@ test('Google application settings preserve, replace and clear a write-only secre
   const initial=await client.get(path),before=await initial.json();const secret='Private synthetic Google client secret';
   try{
     await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'Google application settings',exact:true})).toBeVisible();
-    await page.getByLabel('Sign-in mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('synthetic-google-client');await page.getByLabel('New Google client secret',{exact:true}).fill(secret);await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
-    await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('Restart every Dagsverk server instance');
+    await page.getByLabel('Sign-in mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('synthetic-google-client');await page.getByLabel('New Google client secret',{exact:true}).fill(secret);await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
+    await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('Restart every Dagsverk server instance');
     let response=await client.get(path),saved=await response.json();expect(saved.saved.googleClientId).toBe('synthetic-google-client');expect(saved.saved.googleClientSecretConfigured).toBe(true);expect(saved.effective).toEqual(before.effective);expect(JSON.stringify(saved)).not.toContain(secret);expect(await(await client.get('/api/v1/admin/settings')).text()).not.toContain(secret);
-    await page.getByLabel('Google client ID',{exact:true}).fill('updated-synthetic-google-client');await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(true);
-    await page.getByLabel('Clear saved Google client secret',{exact:true}).check();await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Clear saved Google client secret',{exact:true})).not.toBeChecked();saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(false);await captureScreenshot(page,{path:'test-results/admin-google-edit.png',fullPage:true});
+    await page.getByLabel('Google client ID',{exact:true}).fill('updated-synthetic-google-client');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(true);
+    await page.getByLabel('Clear saved Google client secret',{exact:true}).check();await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Clear saved Google client secret',{exact:true})).not.toBeChecked();saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(false);await captureScreenshot(page,{path:'test-results/admin-google-edit.png',fullPage:true});
   }finally{
     const response=await client.get(path),identity=await(await client.get('/api/v1/auth/session')).json();const restored=await client.put(path,{headers:{'If-Match':response.headers().etag,'X-CSRF-Token':identity.csrf},data:{mode:before.saved.mode,serviceUrl:before.saved.serviceUrl,googleClientId:before.saved.googleClientId,googleSecretAction:'CLEAR',currentPassword:admin.secret}});expect(restored.status()).toBe(200);await admin.close();
   }
@@ -195,7 +195,7 @@ test('checking Google setup cannot authorize overwriting a concurrently changed 
     const checked=new URL(route.request().url()).searchParams.has('check');return route.fulfill({headers:{...headers,ETag:checked?'"service-settings-999999"':tag},json:{...data,status:checked?'READY':data.status,version:checked?999999:data.version,saved:{...data.saved,googleClientId:checked?'peer-registration':data.saved.googleClientId}}});
   });
   try{
-    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await page.getByLabel('Google client ID',{exact:true}).fill('my-registration-draft');await page.getByLabel('New Google client secret',{exact:true}).fill('Private replacement draft');await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);
+    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await page.getByLabel('Google client ID',{exact:true}).fill('my-registration-draft');await page.getByLabel('New Google client secret',{exact:true}).fill('Private replacement draft');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);
     await page.getByRole('button',{name:'Check setup',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Setup checked.');await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Your draft is kept');expect(writes).toBe(1);await expect(page.getByLabel('Google client ID',{exact:true})).toHaveValue('my-registration-draft');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('Private replacement draft');
   }finally{await admin.close();}
 });

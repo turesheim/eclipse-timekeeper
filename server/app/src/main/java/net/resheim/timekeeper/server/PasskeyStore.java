@@ -57,7 +57,7 @@ class PasskeyStore {
         if(action.equals("REMOVE")) {
             var id=ContractInputs.pathId(text(input,"id",36,false));var target=credentials.owned(owner,id);String tag=text(input,"etag",100,false);ApiReplies.match(target.management(),tag);
             value.put("id",id.toString()).put("etag",tag);
-        } else if(!action.equals("ADD") || input.has("id") || input.has("etag")) throw ApiFailure.validation();
+        } else if(!Set.of("ADD","PASSWORD").contains(action) || input.has("id") || input.has("etag")) throw ApiFailure.validation();
         return value;
     }
     private boolean proof(Connection c,TokenRegistry.Principal principal,ObjectNode account,PasskeyCeremonies.Scope scope,
@@ -174,6 +174,15 @@ class PasskeyStore {
             }catch(java.sql.SQLException failure) {throw databaseFailure(failure);}
             credentials.revoke(principal.owner(),id,match);
             if(signedOut) new PasskeyCeremonies(c).cancelBrowser(scope);return accepted(signedOut);
+        });
+    }
+    void changePassword(TokenRegistry.Principal principal,String browser,String cookie,String peer,JsonNode input) {
+        String encoded=AccountPasswords.hash(text(input,"newPassword",1024,false));
+        tx(c->{var account=manager(c,principal);var scope=scope(c,principal,browser,cookie);var now=Instant.now();
+            if(!rate(c,"management",scope.browser(),peer,now)) return rejected(429,"RATE_LIMITED");
+            if(!proof(c,principal,account,scope,object().put("action","PASSWORD"),input,object(),now)) return rejected(403,"PASSKEY_PROOF_REQUIRED");
+            // Consume the scoped proof and revoke prior access in the same transaction.
+            replacePassword(c,principal.owner(),encoded);return accepted(null);
         });
     }
     void cancel(String browser,String cookie) {tx(c->{new PasskeyCeremonies(c).cancelBrowser(realm.scope(c,browser,cookie));return accepted(null);});}

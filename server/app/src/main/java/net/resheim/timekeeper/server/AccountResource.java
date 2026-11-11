@@ -19,6 +19,7 @@ public class AccountResource {
     @Inject BrowserOrigins origins;
     @Inject BrowserSignIns signIns;
     @Inject PasskeyRealm realm;
+    @Inject PasskeyStore passkeys;
     @Inject BrowserSessions sessions;
     @Inject ServerInfo serverInfo;
     @Inject RecoveryMail recoveryMail;
@@ -83,7 +84,13 @@ public class AccountResource {
         return ApiReplies.resource(200,accounts.updateSelf(identity.principal(),match,text(value,"username",200),text(value,"displayName",400)),null).response();
     }
     @POST @Path("/password") public Response password(JsonNode body) {
-        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("PasswordInput",body);accounts.changePassword(identity.principal(),text(value,"currentPassword",1024),text(value,"newPassword",1024));
+        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("PasswordInput",body);
+        try {
+            if(value.has("proof")) {
+                browserOrigin();var cookies=cookies();var peer=request.connection().remoteAddress();
+                passkeys.changePassword(identity.principal(),cookies.requireBrowser(),cookies.session(),peer==null ? "local" : peer.hostAddress(),value);
+            } else accounts.changePassword(identity.principal(),text(value,"currentPassword",1024),text(value,"newPassword",1024));
+        } finally {((com.fasterxml.jackson.databind.node.ObjectNode)value).remove(List.of("currentPassword","newPassword","proof"));}
         return Response.noContent().header("Cache-Control","no-store").header("Set-Cookie",AuthenticationFilter.COOKIE+"=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0").build();
     }
     @GET @Path("/tokens") public JsonNode tokens() {ContractInputs.queries(uri.getQueryParameters());return accounts.tokens(identity.principal());}

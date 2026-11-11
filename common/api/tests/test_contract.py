@@ -22,6 +22,19 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_password_change_accepts_exactly_one_scoped_proof_without_owner_injection(self):
+        password='a sufficiently long new password'
+        proof='p'*43
+        for evidence in [{'currentPassword':'old password'},{'proof':proof}]:
+            validator('PasswordInput').validate({'newPassword':password,**evidence})
+        for invalid in [{'newPassword':password},{'newPassword':password,'proof':proof,'currentPassword':'old'},
+                        {'newPassword':password,'proof':proof,'ownerId':'another-owner'},
+                        {'newPassword':password,'proof':'not-a-proof'}, {'newPassword':'short','proof':proof}]:
+            self.assertFalse(validator('PasswordInput').is_valid(invalid))
+        validator('PasskeyActionInput').validate({'action':'PASSWORD'})
+        for invalid in [{'action':'PASSWORD','id':ID}, {'action':'PASSWORD','newPassword':password}]:
+            self.assertFalse(validator('PasskeyActionInput').is_valid(invalid))
+
     def test_internet_account_setup_redacts_credentials_and_guards_secret_updates(self):
         value={'mode':'SHARED','status':'NOT_CHECKED','publicOrigin':'https://dagsverk.example.test',
                'callbackUrl':'https://dagsverk.example.test/web/task-provider-callback.html',
