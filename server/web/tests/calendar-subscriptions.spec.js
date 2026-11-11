@@ -30,8 +30,8 @@ async function apiFor(page){
   return async(method,path,data,extra={})=>{const reply=await request.fetch('/api/v1'+path,{method,data,headers:{'X-CSRF-Token':identity.csrf,...extra}});expect(reply.ok(),`${method} ${path}: ${reply.status()}`).toBe(true);return reply;};
 }
 async function provider(request,events=[meeting],options={}){const reply=await request.post(fixture()+'/feeds',{data:{body:ics(events),...options}});expect(reply.status()).toBe(201);return reply.json();}
-async function setup(browser,request){
-  const user=await fresh(request),context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB',timezoneId:'America/Los_Angeles'}),page=await context.newPage();await login(page,user);let api=await apiFor(page);
+async function setup(browser,request,{clock=false}={}){
+  const user=await fresh(request),context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB',timezoneId:'America/Los_Angeles'}),page=await context.newPage();if(clock)await page.clock.install();await login(page,user);let api=await apiFor(page);
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
   const client=await(await api('POST','/clients',{name:'Meeting client',color:'#176653'})).json();await page.reload();await ready(page);api=await apiFor(page);
   return {user,context,page,api,client};
@@ -328,7 +328,7 @@ test('subscribed calendar to-dos show due dates and completion in Week and Today
 });
 
 test('Today keeps unchanged calendar cards and typing responsive during background synchronization',async({browser,request})=>{
-  const {page,api,context,client}=await setup(browser,request);
+  const {page,api,context,client}=await setup(browser,request,{clock:true});
   let release;
   try{
     const date='2026-05-04',reply=await api('GET','/calendar-events?fromDate='+date+'&toDate=2026-05-05'),snapshot=await reply.json();
@@ -338,7 +338,7 @@ test('Today keeps unchanged calendar cards and typing responsive during backgrou
       if(gate){held=true;await gate;}
       await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;
     });
-    await page.clock.install();await page.locator('#today-date').fill(date);
+    await page.locator('#today-date').fill(date);
     const events=page.locator('#today-events'),card=events.locator('[data-today-event]');await expect(card).toHaveText(/Stable meeting/);
     await card.focus();
     await events.evaluate(root=>{window.calendarCard=root.querySelector('button');window.calendarMutations=0;new MutationObserver(records=>window.calendarMutations+=records.length).observe(root,{subtree:true,childList:true,characterData:true});});
@@ -376,14 +376,14 @@ test('Today keeps unchanged calendar cards and typing responsive during backgrou
 });
 
 test('Week retains unchanged timed and all-day calendar cards across feed polls',async({browser,request})=>{
-  const {page,api,context,client}=await setup(browser,request);
+  const {page,api,context,client}=await setup(browser,request,{clock:true});
   try{
     const reply=await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-11'),snapshot=await reply.json();
     const event={key:'stable-week-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Stable week meeting',allDay:false,start:'2026-05-04T08:00:00Z',end:'2026-05-04T09:00:00Z',firstDate:'2026-05-04',endDate:'2026-05-05',clientId:client.id,clientName:client.name,calendarName:'Team planning',color:client.color,activityIds:[]};
     snapshot.items=[event,{...event,key:'stable-all-day',title:'Stable all-day plan',allDay:true}];let reads=0;
     await page.route('**/api/v1/calendar-events?*',async route=>{await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;});
     await calendar(page);const timed=page.locator('.calendar-planned[data-calendar-event-key="stable-week-meeting"]'),allDay=page.locator('.calendar-all-day-event');await expect(timed).toBeVisible();await expect(allDay).toContainText('Stable all-day plan');
-    await page.clock.install();await allDay.focus();
+    await allDay.focus();
     await page.evaluate(()=>{window.weekTimed=document.querySelector('.calendar-planned');window.weekAllDay=document.querySelector('.calendar-all-day-event');});
     let before=reads;await page.clock.fastForward(30000);await expect.poll(()=>reads).toBeGreaterThan(before);
     expect(await page.evaluate(()=>document.querySelector('.calendar-planned')===window.weekTimed&&document.querySelector('.calendar-all-day-event')===window.weekAllDay)).toBe(true);await expect(allDay).toBeFocused();
