@@ -28,8 +28,19 @@ show a mixed state when only some descendants are selected. Choose **Import new
 files** after reviewing the list. A Bootstrap progress bar counts the selected
 items as they complete, including failed attempts; retry starts a fresh progress
 count and does not upload files that already completed.
-Markdown and attachment bytes are uploaded unchanged, and recognized journal
-dates/weeks retain their associations. Day labels are independent and are kept.
+Choose how **Markdown tasks** should be handled before importing:
+
+- **Create tasks from their checkbox state** keeps the source as written and
+  creates open or completed tasks to match each checkbox. This is the default.
+- **Create tasks and mark all completed** checks every real Markdown task and
+  records the file's last modified date as its completion time.
+- **Ignore tasks; do not create any** keeps the checkboxes without enrolling
+  tasks. Background maintenance and prose-only edits keep them ignored; editing
+  an item's title or checkbox deliberately creates its task later.
+
+Existing linked tasks keep their identities and recorded work. Attachments stay
+unchanged, and recognized journal dates/weeks retain their associations. Day
+labels are independent and are kept.
 
 Files import individually with create-only guards. Files created by another
 client after review are also treated as conflicts. Interrupted imports retain

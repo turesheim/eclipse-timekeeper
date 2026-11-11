@@ -156,9 +156,20 @@ and show a date-review hint. No UTC instant is invented.
 Native tasks can be created or edited through the existing conditional editor,
 including direct client assignment without a project, priority and civil or timed
 deadlines. The editor retains unedited start values, flags and deadline precision.
-**Hide completed tasks** applies to all sidebar filters and sources. Details
+The task toolbar groups **New task**, **Refresh tasks**, and **Hide completed
+tasks**, which starts enabled and applies to all sidebar filters and sources.
+Each row has a completion checkbox; native tasks use conditional planning writes
+and update linked note checkboxes, while calendar tasks remain read-only.
+Uncertain replies are reconciled by refreshing rather than replaying a write.
+The navigator resizes by dragging its separator or using Left/Right and Home/End;
+its width survives tab and filter changes during the session. Details
 include guarded deletion and a type-specific link to the current source note
-for Markdown checklist tasks. Title labels render the shared emoji shortcodes.
+for Markdown checklist tasks, plus **Start tracking** / **Stop tracking** through
+the existing reviewed activity commands. Titles and native task text render the
+shared Markdown inline styles, including `==highlight==`, and emoji shortcodes.
+Authored HTML stays literal in Markdown, image references never fetch resources,
+and only safe web/mail links become active. Prose `@Client_Name` annotations use
+the same accent and underline as hashtags without rewriting source text.
 Calendar tasks remain in their source collection and cannot be edited or
 converted to worked time from Tasks. Read-only sessions retain browsing and
 details. Catalog paging restarts if a source snapshot changes, and the list

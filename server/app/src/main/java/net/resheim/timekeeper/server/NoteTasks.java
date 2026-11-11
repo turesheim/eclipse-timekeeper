@@ -30,16 +30,19 @@ final class NoteTasks {
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),type,id,version)!=1)throw new ApiFailure(412,"STALE_VERSION");
     }
     private static String summary(String text){return text.codePointCount(0,text.length())<=1024?text:text.substring(0,text.offsetByCodePoints(0,1023))+"…";}
-    private Task planning(Task task,boolean checked){
-        if(completed(task)==checked)return task;
-        return store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),new TaskPlanning(checked?TaskStatus.COMPLETED:TaskStatus.NOT_STARTED,task.planning().scheduledDate(),checked?Optional.of(store.now()):Optional.empty())));
+    private Task planning(Task task,boolean checked,java.time.Instant importedAt){
+        if(completed(task)==checked&&(importedAt==null||!checked||task.planning().completedAt().equals(Optional.of(importedAt))))return task;
+        return store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),new TaskPlanning(checked?TaskStatus.COMPLETED:TaskStatus.NOT_STARTED,task.planning().scheduledDate(),checked?Optional.of(importedAt==null?store.now():importedAt):Optional.empty())));
     }
     /** Invoked after a successful canonical Markdown write, including DAV/import writers. */
     void source(VaultSources.Ref ref,byte[] bytes){
         if(store.noteTaskSync()||bytes==null)return;
-        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8));return null;});
+        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8),null,null);return null;});
     }
-    private void reconcile(VaultSources.Ref ref,String source){
+    void imported(VaultSources.Ref ref,byte[] bytes,NoteTaskImport policy,java.time.Instant completedAt){
+        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8),policy,completedAt);return null;});
+    }
+    private void reconcile(VaultSources.Ref ref,String source,NoteTaskImport policy,java.time.Instant importedAt){
         var previous=record(ref);var old=new ArrayList<NoteTaskMarkup.Item>();previous.path("items").forEach(value->old.add(item(value)));
         var next=NoteTaskMarkup.items(source);if(next.size()>1000)throw ApiFailure.validation();
         int[] matches=NoteTaskMatches.previous(old,next);var result=previous.deepCopy();var items=result.putArray("items");var retained=new HashSet<UUID>();String normalized=source;
@@ -50,13 +53,16 @@ final class NoteTasks {
             boolean edited=before==null||!current.summary().equals(before.path("summary").asText())||current.checked()!=before.path("checked").asBoolean();
             // Deleting a normal task is deliberate. Unrelated prose edits must
             // not resurrect it; editing its checkbox/title can create a new task.
-            if(task==null&&edited){task=store.service().createTask(new CreateTask(Optional.empty(),summary(current.summary()),Optional.empty()));task=planning(task,current.checked());taskId=task.id().value();}
+            if(task==null&&(edited||policy!=null)&&policy!=NoteTaskImport.IGNORE){task=store.service().createTask(new CreateTask(Optional.empty(),summary(current.summary()),Optional.empty()));task=planning(task,policy==NoteTaskImport.COMPLETED||current.checked(),importedAt);taskId=task.id().value();}
             else if(task!=null){
                 if(before!=null&&!current.summary().equals(before.path("summary").asText())&&!task.summary().equals(summary(current.summary())))task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),summary(current.summary()),task.url()));
-                if(before!=null&&current.checked()!=before.path("checked").asBoolean())task=planning(task,current.checked());
-                else if(completed(task)!=current.checked())normalized=NoteTaskMarkup.checked(normalized,current,completed(task));
+                if(policy==NoteTaskImport.COMPLETED)task=planning(task,true,importedAt);
+                else if(before!=null&&current.checked()!=before.path("checked").asBoolean())task=planning(task,current.checked(),importedAt);
             }
-            if(taskId==null)throw new IllegalStateException("Missing checklist identity");
+            if(task!=null&&completed(task)!=current.checked())normalized=NoteTaskMarkup.checked(normalized,current,completed(task));
+            // An ignored item has the same durable suppression as a deliberately
+            // deleted task. Maintenance and prose-only edits cannot enroll it.
+            if(taskId==null)taskId=UUID.randomUUID();
             if(task!=null&&assignments!=null&&(before==null||!previous.has("contentTag")||!current.summary().equals(before.path("summary").asText()))) {
                 var assignment=assignments.resolve(current.assignments()).orElse(null);
                 if(assignment!=null){

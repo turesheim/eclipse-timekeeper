@@ -1324,6 +1324,19 @@ unchanged. Folders/deleted entries cannot be overwritten. Native journal imports
 leave independent day labels untouched. This endpoint requires write permission;
 normal content edits retain their existing timestamp semantics.
 
+Both file creation and reviewed replacement accept optional `taskPolicy`:
+`CHECKBOX` (default) enrolls Markdown tasks with their checkbox state,
+`COMPLETED` enrolls and completes every item, and `IGNORE` creates no tasks.
+Imported completion instants use `modifiedAt` when supplied, otherwise the
+import time. Completion patches only real source checkbox markers; source dates
+are applied after reconciliation. Ignored items retain durable suppressed
+identities, so maintenance and prose-only edits cannot create them later;
+editing their title or checkbox deliberately enrolls them. Existing linked tasks
+retain their identities and normal synchronization, including work history.
+Binary and asset files are unaffected. Policy validation, source bytes, dates,
+task enrollment and checkbox changes commit together under the owner lock and
+the same create-only or reviewed-entry preconditions.
+
 `GET /notes/search?q=…&limit=…&cursor=…` searches active Markdown and native
 journal/event notes and published calendar event details independently from filename substring navigation. Its
 `NotesSearchPage` contains current entry metadata and/or `calendarEvent` details and bounded plain-text excerpts

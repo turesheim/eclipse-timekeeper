@@ -1752,5 +1752,14 @@
   "tasks.deadline_time": "Date and time",
   "tasks.deadline_clock": "Deadline time",
   "tasks.deadline_zone": "Deadline time zone",
-  "password.passkey_help": "Choose Existing passkey to set a new password without knowing your current password. Your browser will ask you to verify with a registered passkey."
+  "password.passkey_help": "Choose Existing passkey to set a new password without knowing your current password. Your browser will ask you to verify with a registered passkey.",
+  "tasks.tools": "Task tools",
+  "tasks.resize": "Resize task navigation",
+  "tasks.completion": "Completed: {{title}}",
+  "tasks.completion_stale": "This task changed. Review its current state before changing completion.",
+  "notes.import_tasks": "Markdown tasks",
+  "notes.import_tasks_checkbox": "Create tasks from their checkbox state",
+  "notes.import_tasks_completed": "Create tasks and mark all completed",
+  "notes.import_tasks_ignore": "Ignore tasks; do not create any",
+  "notes.import_tasks_help": "Completed tasks use the file’s last modified date and check the source boxes. Ignored items stay unenrolled until their checkbox or title is edited. Existing linked tasks keep their identities."
 }

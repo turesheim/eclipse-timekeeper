@@ -1752,5 +1752,14 @@
   "tasks.deadline_time": "Dato og klokkeslett",
   "tasks.deadline_clock": "Klokkeslett for tidsfrist",
   "tasks.deadline_zone": "Tidssone for tidsfrist",
-  "password.passkey_help": "Velg Eksisterende passnøkkel for å angi et nytt passord uten å kjenne det nåværende passordet. Nettleseren ber deg bekrefte med en registrert passnøkkel."
+  "password.passkey_help": "Velg Eksisterende passnøkkel for å angi et nytt passord uten å kjenne det nåværende passordet. Nettleseren ber deg bekrefte med en registrert passnøkkel.",
+  "tasks.tools": "Oppgaveverktøy",
+  "tasks.resize": "Endre bredden på oppgavenavigasjonen",
+  "tasks.completion": "Fullført: {{title}}",
+  "tasks.completion_stale": "Denne oppgaven er endret. Se gjennom gjeldende tilstand før du endrer fullføring.",
+  "notes.import_tasks": "Markdown-oppgaver",
+  "notes.import_tasks_checkbox": "Opprett oppgaver med tilstanden fra avkrysningsboksene",
+  "notes.import_tasks_completed": "Opprett oppgaver og merk alle som fullført",
+  "notes.import_tasks_ignore": "Ignorer oppgaver; ikke opprett noen",
+  "notes.import_tasks_help": "Fullførte oppgaver bruker filens siste endringsdato og krysser av i kilden. Ignorerte elementer blir ikke oppgaver før avkrysningsboksen eller tittelen endres. Eksisterende tilknyttede oppgaver beholder identiteten."
 }
