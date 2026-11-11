@@ -8,12 +8,59 @@ async function engine(page,value,options={}){
   await openEditorFixture(page);
   await page.evaluate(async({value,options})=>{
     const {createMarkdownEditor}=await import('/web/assets/milkdown/milkdown.js');
+    if(options.tags){globalThis.searchedTags=[];options.resources={searchTag:tag=>globalThis.searchedTags.push(tag)};delete options.tags;}
     const root=document.createElement('div');root.id='experience-editor';document.body.append(root);
     globalThis.experience=await createMarkdownEditor({root,value,label:'Experience body',taskLabel:text=>text,escape:()=>{},...options});
   },{value,options});
   await expect(page.locator('#experience-editor .ProseMirror')).toBeVisible();
 }
 const source=page=>page.evaluate(()=>globalThis.experience.markdown());
+
+test('extended inline styles render and retain exact source, nested formatting and literal code',async({page})=>{
+  const value='# ==**Focus**==\r\n\r\n==Very **important** words==: H~2~O, X^2^ and ~~obsolete~~. **==Reverse==**\r\n\r\n`==literal== H~2~O X^2^`\r\n';
+  await field(page,value);const rich=page.locator('#experience-formatted .ProseMirror');
+  await expect(rich.locator('mark')).toHaveText(['Focus','Very important words','Reverse']);await expect(rich.locator('mark strong')).toHaveText(['Focus','important','Reverse']);
+  await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');await expect(rich.locator('del')).toHaveText('obsolete');
+  await expect(rich.locator('code')).toHaveText('==literal== H~2~O X^2^');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+  await appendEditorText(rich.locator('p').first(),' Edited.');
+  const changed=await page.evaluate(()=>globalThis.field.value());expect(changed).toContain('==Very **important** words==');expect(changed).toContain('H~2~O');expect(changed).toContain('X^2^');
+  const host=page.locator('#experience-field');await host.getByRole('button',{name:'Markdown source',exact:true}).click();await host.getByRole('button',{name:'Formatted',exact:true}).click();
+  await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    const mark=rich.locator('mark').first();await expect(mark).toBeVisible();
+    expect(await mark.evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  }
+});
+
+test('typed inline styles and their toolbar controls stay editable with undo and read-only guards',async({page})=>{
+  await field(page,'');const rich=page.locator('#experience-formatted .ProseMirror');await rich.click();await page.keyboard.type('H~2~O X^2^ ==Øving== ~~old~~');
+  await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');await expect(rich.locator('mark')).toHaveText('Øving');await expect(rich.locator('del')).toHaveText('old');
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('H~2~O X^2^ ==Øving== ~~old~~');
+  await field(page,'water');const host=page.locator('#experience-field');await page.locator('#experience-formatted .ProseMirror').focus();await page.keyboard.press('ControlOrMeta+a');
+  await host.getByRole('button',{name:'Highlight',exact:true}).click();await expect(host.locator('mark')).toHaveText('water');
+  await page.keyboard.press('ControlOrMeta+z');await expect(host.locator('mark')).toHaveCount(0);await page.keyboard.press('ControlOrMeta+Shift+z');await expect(host.locator('mark')).toHaveText('water');
+  await page.evaluate(()=>globalThis.field.setReadOnly(true));await expect(host.locator('[data-command=highlight]')).toBeDisabled();
+});
+
+test('prose hashtags use accent links without changing Markdown or literal code and link content',async({page})=>{
+  const value='# Tag examples\n\nA #Open**Shift** deployment, #Cafe\u0301 and #work/cloud.\n\n`#literal` [#linked](https://example.org/#destination) [[#heading]]\n\n~~~text\n#code\n~~~\n';
+  await engine(page,value,{tags:true});const tags=page.locator('#experience-editor [data-hashtag]');await expect(tags).toHaveCount(4);expect(await tags.evaluateAll(nodes=>[...new Set(nodes.map(node=>node.dataset.hashtag))])).toEqual(['#openshift','#café','#work/cloud']);expect(await source(page)).toBe(value);
+  await tags.first().click();expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift']);
+  const café=page.locator('[data-hashtag="#café"]');await café.focus();await café.press('Enter');expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift','#café']);expect(await source(page)).toBe(value);
+  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    expect(await café.evaluate(node=>{const probe=document.createElement('span');probe.style.color='var(--accent)';node.after(probe);const expected=getComputedStyle(probe).color;probe.remove();return getComputedStyle(node).color===expected;})).toBe(true);
+    expect((await new AxeBuilder({page}).include('#experience-editor .markdown-hashtag').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+  }
+  await page.setViewportSize({width:390,height:844});await captureScreenshot(page,{path:'test-results/hashtag-accent-phone.png',fullPage:true});
+  await page.evaluate(()=>globalThis.experience.setReadOnly(true));await tags.last().focus();await tags.last().press('Enter');expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.searchedTags.at(-1))).toBe('#work/cloud');
+});
+
+test('hashtag presentation follows typing and undo while source remains portable text',async({page})=>{
+  await engine(page,'An ordinary note.\n',{tags:true});await appendEditorText(page.locator('#experience-editor p'),' #NewTag');await expect(page.locator('[data-hashtag="#newtag"]')).toHaveText('#NewTag');
+  expect(await source(page)).toContain('#NewTag');await page.keyboard.press('ControlOrMeta+z');await expect(page.locator('[data-hashtag]')).toHaveCount(0);
+});
 
 test('Backspace deletes rich text and joins paragraphs at the caret',async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -39,12 +86,12 @@ test('new checkbox items retain a visible caret and Backspace removes the empty 
 });
 
 test('unknown constructs are inert editable fragments while surrounding Markdown remains formatted',async({page})=>{
-  const value='Before.\r\n\r\n<script>window.bad=true</script>\r\n\r\n==unknown highlight==\r\n\r\nAfter.\r\n';
+  const value='Before.\r\n\r\n<script>window.bad=true</script>\r\n\r\n%%unknown comment%%\r\n\r\nAfter.\r\n';
   await engine(page,value);expect(await source(page)).toBe(value);expect(await page.evaluate(()=>globalThis.bad)).toBeUndefined();
   await expect(page.locator('.markdown-source-fragment textarea')).toHaveCount(2);
   await page.locator('#experience-editor p').filter({hasText:'After.'}).click();await page.keyboard.press('End');await page.keyboard.type(' Edited.');
   expect(await source(page)).toBe(value.replace('After.','After. Edited.'));
-  await page.locator('.markdown-source-fragment textarea').last().fill('==changed highlight==');expect(await source(page)).toContain('==changed highlight==');
+  await page.locator('.markdown-source-fragment textarea').last().fill('%%changed comment%%');expect(await source(page)).toContain('%%changed comment%%');
 });
 test('wiki aliases, headings and sized embeds preserve their portable source',async({page})=>{
   const value='Read [[Notes/Design#Decisions|the design]] and [[2026-11-02]].\n\n![[journal/assets/image.png|320x200]]\n';
@@ -65,6 +112,46 @@ async function field(page,value,formatted=true,catalog=[]){
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
   },{value,formatted,catalog});
 }
+async function pasteText(page,text,{html='',plain=false}={}){
+  await page.evaluate(({text,html,plain})=>{
+    const root=document.querySelector('#experience-editor .ProseMirror'),data=new DataTransfer();data.setData('text/plain',text);if(html)data.setData('text/html',html);
+    if(plain)root.dispatchEvent(new KeyboardEvent('keydown',{key:'v',ctrlKey:true,shiftKey:true,bubbles:true,cancelable:true}));
+    root.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));
+  },{text,html,plain});
+}
+test('pasted URLs retain their spelling and remain links through rich edits and source replacement',async({page})=>{
+  const url='https://example.org/a_b/one_(two)?name[0]=value&next=a_b#part_one';
+  await engine(page,'Before.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');await page.keyboard.insertText(' ');
+  await pasteText(page,url,{html:'<a href="'+url+'">'+url+'</a>'});
+  let markdown=await source(page);expect(markdown).toContain(url);
+  await expect(page.locator('#experience-editor a')).toHaveAttribute('href',url);await expect(page.locator('#experience-editor a')).toHaveText(url);
+  expect(markdown).toContain('<'+url+'>');expect(markdown).not.toContain('\\_');
+  await page.keyboard.insertText(' More.');markdown=await source(page);expect(markdown).toContain('<'+url+'>');await expect(page.locator('#experience-editor a')).toHaveText(url);
+  expect(await page.evaluate(value=>globalThis.experience.replaceMarkdown(value),markdown)).toBe(true);await appendEditorText(page.locator('#experience-editor p'),' Again.');expect(await source(page)).toContain('<'+url+'>');
+});
+test('authored autolinks survive edits beside explicit Markdown links',async({page})=>{
+  const url='https://example.org/a_b?key=one&next=two',resource='[Named link]('+url+')';
+  await engine(page,'Before <'+url+'> and '+resource+'.\n');await appendEditorText(page.locator('#experience-editor p'),' More.');
+  const markdown=await source(page);expect(markdown).toContain('<'+url+'>');expect(markdown).toContain('[Named link](');
+  await expect(page.locator('#experience-editor a')).toHaveCount(2);expect(await page.evaluate(value=>globalThis.experience.replaceMarkdown(value),markdown)).toBe(true);
+  await expect(page.getByRole('link',{name:'Named link',exact:true})).toHaveAttribute('href',url);
+  await appendEditorText(page.locator('#experience-editor p'),' Again.');expect(await source(page)).toContain('[Named link](');
+});
+test('plain clipboard URLs become links in table cells without changing table structure',async({page})=>{
+  const url='https://example.org/a_b?name[0]=one&next=two';await engine(page,'| A | B |\n| --- | --- |\n| One | Two |\n');
+  const cell=page.locator('#experience-editor td p').first();await appendEditorText(cell,' ');await pasteText(page,url);
+  await expect(cell.locator('a')).toHaveText(url);const markdown=await source(page);expect(markdown).toContain('<'+url+'>');
+  expect(await page.evaluate(value=>globalThis.experience.replaceMarkdown(value),markdown)).toBe(true);await expect(page.locator('#experience-editor tr')).toHaveCount(2);await expect(page.locator('#experience-editor td')).toHaveCount(2);
+});
+test('code, plain paste, unsafe schemes and read-only notes do not create URL links',async({page})=>{
+  const url='https://example.org/a_b?key=one&next=two';await engine(page,'~~~text\nliteral\n~~~\n');
+  await page.locator('#experience-editor pre code').click();await page.keyboard.press('End');await pasteText(page,url);await expect(page.locator('#experience-editor pre')).toContainText(url);await expect(page.locator('#experience-editor a')).toHaveCount(0);
+  expect(await page.evaluate(()=>globalThis.experience.replaceMarkdown('`literal`\n'))).toBe(true);await page.locator('#experience-editor code').evaluate(node=>{node.closest('.ProseMirror').focus();const range=document.createRange();range.setStart(node.firstChild,3);range.collapse(true);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});await pasteText(page,url);await expect(page.locator('#experience-editor code')).toContainText(url);await expect(page.locator('#experience-editor a')).toHaveCount(0);
+  expect(await page.evaluate(()=>globalThis.experience.replaceMarkdown('Before.\n'))).toBe(true);await appendEditorText(page.locator('#experience-editor p'),' ');await pasteText(page,url,{plain:true});await expect(page.locator('#experience-editor a')).toHaveCount(0);await expect(page.locator('#experience-editor p')).toContainText(url);
+  await pasteText(page,'javascript:alert(1)');await expect(page.locator('#experience-editor a')).toHaveCount(0);
+  const before=await source(page);await page.evaluate(()=>globalThis.experience.setReadOnly(true));await pasteText(page,url);expect(await source(page)).toBe(before);
+});
+
 test('rich paste retains safe structure and URL-over-selection preserves the selected text',async({page})=>{
   await engine(page,'Text to link.\n');await page.locator('#experience-editor p').click();await page.keyboard.press('End');
   await page.evaluate(()=>{const data=new DataTransfer();data.setData('text/plain','Heading\nBold');data.setData('text/html','<h2 onclick="bad()">Heading</h2><p><strong>Bold</strong><img src="https://evil.invalid/track"><script>window.bad=true</script></p>');document.querySelector('#experience-editor .ProseMirror').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));});
@@ -205,4 +292,162 @@ test('table header boundaries remain valid during keyboard operations',async({pa
   const value='| A | B |\n| --- | --- |\n| One | Two |\n';await field(page,value);await page.locator('#experience-formatted th p').first().click();await page.keyboard.press('Escape');
   const button=page.locator('#experience-field [data-command=table]');await button.focus();await button.press('Backspace');await button.press('ArrowUp');await button.press('Shift+ArrowDown');
   await expect(page.locator('#experience-formatted tr')).toHaveCount(2);await expect(page.locator('#experience-formatted th').first()).toHaveText('A');expect(await page.evaluate(()=>globalThis.field.value())).toBe(value);
+});
+
+
+test('completion choices keep readable rows and scroll to keyboard selection on desktop and phones',async({page})=>{
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:900});await field(page,'');const rich=page.locator('#experience-formatted .ProseMirror');await rich.click();await page.keyboard.type(':a');
+    const list=page.locator('#experience-field .markdown-suggestions'),choices=list.getByRole('option');await expect(choices).toHaveCount(12);
+    const sizes=await choices.evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return {height:node.getBoundingClientRect().height,natural:parseFloat(style.lineHeight)+parseFloat(style.paddingTop)+parseFloat(style.paddingBottom)};}));
+    for(const size of sizes)expect(size.height,'A suggestion must show its complete line and padding').toBeGreaterThanOrEqual(size.natural-1);
+    expect(await list.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);await captureScreenshot(page,{path:`test-results/completion-many-${width}.png`,fullPage:true});
+    await page.keyboard.press('ArrowDown');await expect(choices.first()).toBeFocused();for(let index=1;index<12;index++)await page.keyboard.press('ArrowDown');await expect(choices.last()).toBeFocused();
+    const visible=await choices.last().evaluate(node=>{const row=node.getBoundingClientRect(),parent=node.parentElement.getBoundingClientRect();return row.top>=parent.top&&row.bottom<=parent.bottom;});expect(visible).toBe(true);
+    const label=await choices.last().textContent(),shortcode=label.match(/:[a-z0-9_+-]+:/)[0];await page.keyboard.press('Enter');await expect(list).toBeHidden();expect(await page.evaluate(()=>globalThis.field.value())).toContain(shortcode);
+    await appendEditorText(rich.locator('p'),' :a');await expect(list).toBeVisible();await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(rich).toBeFocused();
+    await appendEditorText(rich.locator('p'),' :airplane');await expect(choices).toHaveCount(2);await expect(list).toBeVisible();
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+    }
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/completion-readable-${width}.png`,fullPage:true});
+  }
+});
+
+
+test('internal link assistance pairs brackets and completes a narrowed document in both modes',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',title:'Design decisions',kind:'MARKDOWN'},{path:'Notes/Diary.md',kind:'MARKDOWN'},{path:'Notes/Other.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[]]');
+    const list=page.locator('#experience-field .markdown-suggestions'),options=list.getByRole('option');await expect(options).toHaveCount(3);
+    await page.keyboard.type('Desx');await expect(options).toHaveCount(0);await page.keyboard.press('Backspace');await expect(options).toHaveCount(1);await expect(options.first()).toContainText('Notes/Design.md');
+    await page.keyboard.press('ArrowDown');await expect(options.first()).toBeFocused();await page.keyboard.press('Enter');await expect(list).toBeHidden();
+    const completed=await page.evaluate(()=>globalThis.field.value());expect(completed.trim()).toBe('[[Notes/Design]]');
+    if(formatted)await expect(edit.locator('[data-wiki-reference="Notes/Design"]')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+z');expect((await page.evaluate(()=>globalThis.field.value())).trim()).not.toBe('[[Notes/Design]]');await page.keyboard.press('ControlOrMeta+Shift+z');expect(await page.evaluate(()=>globalThis.field.value())).toBe(completed);
+    await captureScreenshot(page,{path:`test-results/internal-completion-${formatted?'formatted':'source'}.png`,fullPage:true});
+  }
+});
+
+test('generated bracket closers skip typed closers and empty pairs delete together',async({page})=>{
+  for(const formatted of [true,false]){
+    await field(page,'',formatted);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
+    await page.keyboard.press('Backspace');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[]');await page.keyboard.press('Backspace');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('');
+    await page.keyboard.type('[[Notes/Design]]');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]]');await page.keyboard.type(' tail');expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Notes/Design]] tail');
+  }
+});
+
+test('generated wikilink closers can be accepted by moving past them without escaping the link',async({page})=>{
+  await field(page,'',true,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);
+  const rich=page.locator('#experience-formatted .ProseMirror');await rich.click();
+  await page.keyboard.type('[[New document');await expect(rich).toHaveText('[[New document]]');
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[New document]]');
+  await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
+  await expect(rich.locator('[data-wiki-reference="New document"]')).toHaveText('New document');
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[New document]]');
+  await page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true}).click();
+  await expect(page.locator('#experience-body')).toHaveValue('[[New document]]\n');
+});
+
+test('switching modes accepts generated wikilink closers without changing their Markdown',async({page})=>{
+  await field(page,'',true);const host=page.locator('#experience-field'),rich=page.locator('#experience-formatted .ProseMirror');
+  await rich.click();await page.keyboard.type('[[Øving');
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('[[Øving]]');
+  await host.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#experience-body')).toHaveValue('[[Øving]]\n');
+  await host.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich.locator('[data-wiki-reference="Øving"]')).toHaveText('Øving');
+});
+
+
+test('bracket assistance leaves code, escaped links and read-only documents literal',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    for(const code of ['```text\nliteral\n```\n','`literal`\n']){
+      await field(page,code,formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');
+      if(formatted)await edit.locator('code').evaluate(node=>{node.closest('[contenteditable=true]').focus();const text=document.createTreeWalker(node,NodeFilter.SHOW_TEXT).nextNode(),range=document.createRange();range.setStart(text,3);range.collapse(true);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));});
+      else{await edit.focus();await edit.evaluate(node=>{const at=node.value.indexOf('literal')+3;node.setSelectionRange(at,at);});}
+      const literal=formatted?edit.locator('code'):edit;await page.keyboard.type('[');expect(await literal.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toContain('lit[eral');await page.keyboard.type('[');expect(await literal.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toContain('lit[[eral');
+      await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await page.keyboard.type('Design]]');await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toContain('lit[[Design]]eral');
+    }
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('\\[[Design]]');
+    await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();await expect(page.locator('#experience-field [data-wiki-reference]')).toHaveCount(0);
+    if(!formatted)await expect(edit).toHaveValue('\\[[Design]]');
+    await page.evaluate(()=>globalThis.field.setReadOnly(true));const before=await page.evaluate(()=>globalThis.field.value());await edit.focus();await page.keyboard.type('[[');expect(await page.evaluate(()=>globalThis.field.value())).toBe(before);
+  }
+});
+
+test('document assistance rejects delayed old results and clears them when its document changes',async({page})=>{
+  const catalog=[{path:'Notes/Design.md',kind:'MARKDOWN'},{path:'Notes/Diary.md',kind:'MARKDOWN'}];
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);await page.evaluate(catalog=>{globalThis.field.resources.complete=query=>query?Promise.resolve(catalog.filter(entry=>entry.path.includes(query))):new Promise(resolve=>globalThis.finishCompletion=()=>resolve(catalog));},catalog);
+    const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body'),list=page.locator('#experience-field .markdown-suggestions');await edit.click();await page.keyboard.type('[[');await page.waitForFunction(()=>!!globalThis.finishCompletion);
+    await page.keyboard.type('Des');await expect(list.getByRole('option')).toHaveCount(1);await expect(list).toContainText('Notes/Design.md');await page.evaluate(()=>globalThis.finishCompletion());await expect(list.getByRole('option')).toHaveCount(1);
+    await page.evaluate(async formatted=>{globalThis.finishCompletion=null;globalThis.field.setValue('');if(formatted)await globalThis.field.showFormatted();},formatted);await edit.click();await page.keyboard.type('[[');await page.waitForFunction(()=>!!globalThis.finishCompletion);
+    await page.evaluate(()=>{globalThis.field.setValue('A different private document.');globalThis.finishCompletion();});await expect(list).toBeHidden();await expect(list.getByRole('option')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toBe('A different private document.');
+  }
+});
+
+
+test('internal-link choices fit phones and remain accessible in every theme in both modes',async({page})=>{
+  const catalog=Array.from({length:20},(_,index)=>({path:'Notes/Document-'+index+'.md',title:'Document '+index,kind:'MARKDOWN'}));
+  await page.setViewportSize({width:390,height:844});
+  for(const formatted of [true,false]){
+    await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
+    const list=page.locator('#experience-field .markdown-suggestions');await expect(list.getByRole('option')).toHaveCount(20);
+    const fits=await list.evaluate(node=>{const rect=node.getBoundingClientRect();return rect.left>=7&&rect.right<=innerWidth-7&&rect.top>=7&&rect.bottom<=innerHeight-7;});expect(fits).toBe(true);
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+    }
+    await captureScreenshot(page,{path:`test-results/internal-choices-phone-${formatted?'formatted':'source'}.png`,fullPage:true});
+    await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(edit).toBeFocused();
+  }
+});
+
+test('bracket pairing wraps a selection without losing its text and composition stays unpaired',async({page})=>{
+  for(const formatted of [true,false]){
+    await field(page,'Keep selected text.',formatted);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.focus();
+    await edit.evaluate(node=>{if(node instanceof HTMLTextAreaElement)node.setSelectionRange(5,13);else{const text=node.querySelector('p').firstChild,range=document.createRange();range.setStart(text,5);range.setEnd(text,13);getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new Event('selectionchange'));}});
+    await page.keyboard.type('[');expect(await edit.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('Keep [selected] text.');
+    await field(page,'',formatted,[{path:'Notes/Design.md',kind:'MARKDOWN'}]);const composing=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await composing.click();await composing.dispatchEvent('compositionstart',{data:''});await page.keyboard.type('[[');
+    await expect(page.locator('#experience-field .markdown-suggestions')).toBeHidden();expect(await composing.evaluate(node=>node instanceof HTMLTextAreaElement?node.value:node.textContent)).toBe('[[');await composing.dispatchEvent('compositionend',{data:'[['});
+  }
+});
+
+
+test('source bracket tracking cannot skip unrelated text after a formatted edit',async({page})=>{
+  await field(page,'',false);const source=page.locator('#experience-body');await source.click();await page.keyboard.type('[');await expect(source).toHaveValue('[]');
+  const host=page.locator('#experience-field');await host.getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#experience-formatted .ProseMirror');await rich.focus();await page.keyboard.press('ControlOrMeta+a');await page.keyboard.type('AB');
+  await host.getByRole('button',{name:'Markdown source',exact:true}).click();await source.evaluate(node=>node.setSelectionRange(1,1));await page.keyboard.type(']');expect(await page.evaluate(()=>globalThis.field.value())).toContain('A]B');
+});
+
+test('native formatted input preserves active wikilinks without Markdown escapes',async({page})=>{
+  await engine(page,'Before.\n');
+  await page.locator('#experience-editor p').evaluate(node=>{
+    node.textContent='Before. [[Notes/New note|New note]] after native input.';
+    const range=document.createRange();range.selectNodeContents(node);range.collapse(false);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);
+    node.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'[[Notes/New note|New note]]'}));
+  });
+  await expect.poll(()=>source(page)).toContain('[[Notes/New note|New note]]');
+  await expect(page.locator('[data-wiki-reference="Notes/New note|New note"]')).toHaveText('New note');
+  await page.locator('#experience-editor .ProseMirror').focus();await page.keyboard.press('ControlOrMeta+z');expect(await source(page)).toBe('Before.\n');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(page.locator('[data-wiki-reference="Notes/New note|New note"]')).toHaveCount(1);
+});
+
+test('native wikilink conversion preserves authored escapes across edits and source replacement',async({page})=>{
+  const value='Authored \\[[Keep literal]] text.\n\nChange here.\n';await engine(page,value);
+  await appendEditorText(page.locator('#experience-editor p').last(),' More.');await expect(page.locator('[data-wiki-reference]')).toHaveCount(0);expect(await source(page)).toContain('\\[[Keep literal]]');
+  await page.evaluate(()=>globalThis.experience.replaceMarkdown('Replaced \\[[Still literal]].\n\nEditable paragraph.\n'));await expect(page.locator('[data-wiki-reference]')).toHaveCount(0);
+  await appendEditorText(page.locator('#experience-editor p').last(),' More.');expect(await source(page)).toContain('\\[[Still literal]]');
+});
+
+test('native composition creates an active wikilink after composition ends',async({page})=>{
+  await engine(page,'');await page.locator('#experience-editor .ProseMirror').evaluate(node=>{
+    node.focus();node.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));const paragraph=node.querySelector('p');paragraph.textContent='[[Øving]]';
+    const range=document.createRange();range.selectNodeContents(paragraph);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);
+    paragraph.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'[[Øving]]',isComposing:true}));node.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'[[Øving]]'}));
+  });
+  await expect(page.locator('[data-wiki-reference="Øving"]')).toHaveText('Øving');expect(await source(page)).toContain('[[Øving]]');
+  await page.locator('#experience-editor .ProseMirror').focus();await page.keyboard.press('ControlOrMeta+z');expect(await source(page)).toBe('');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(page.locator('[data-wiki-reference="Øving"]')).toHaveCount(1);
 });

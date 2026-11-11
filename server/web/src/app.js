@@ -1,5 +1,8 @@
+import {updateNoteClientDirectory} from './note-client.js';
 import {editorPreferences} from './editor-preferences.js';
+import {RecentNotes} from './recent-notes.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
+import {hashtagKey,tagNavigation} from './hashtags.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale, localeForPreference } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { Api, ApiError } from './api.js';
@@ -11,11 +14,18 @@ import { sameSession } from './calendar-model.js';
 import { MonthTrack } from './track.js';
 import { TodayView } from './today.js';
 import { NotesView } from './notes.js';
+import {NotesSearch} from './notes-search.js';
+import {NotePopup} from './note-popup.js';
+import {CalendarSearchEditor,calendarSearchNavigation} from './calendar-search-editor.js';
+import {calendarSearchHit} from './calendar-search-navigation.js';
+import { TasksView } from './tasks.js';
+import {taskEditorFields} from './task-editor-fields.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
 import { UndoNotice } from './undo.js';
 import { accountMenu } from './account-menu.js';
 import { periodSwipe } from './period-swipe.js';
+import {dateNavigation} from './date-navigation.js';
 import { shiftMonth } from './month-model.js';
 import {focusedSnapshot,focusedCurrentSession,focusIncludesActivity} from './focus-model.js';
 import {renderFocusSettings} from './focus-settings.js';
@@ -34,7 +44,7 @@ let watchSession = null;
 let accountName = '',canWrite = false;
 let serverInfoRequest = 0;
 let snapshotAt = 0,activeAsOf = 0n;
-const collapsed = new Set(),expandedClients = new Set();
+const collapsed = new Set(),expandedClients = new Set(),legacyRenderKeys = new Map();
 let decimalHours = false,activitiesCollapsed = false;
 const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosText(value);
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
@@ -51,24 +61,68 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onChange: changeCalendarSession
 });
 const track = new MonthTrack($('track-panel'), { onUnauthorized:error=>auth.clear(errorText(error)), onChanged:()=>void refresh().catch(()=>{}), onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))) });
+const recentNotes=new RecentNotes($('today-recent-notes'),{onUnauthorized:error=>auth.clear(errorText(error))},{section:$('today-recent-notes').closest('section')});
 const today = new TodayView($('today-panel'), {
   canWrite:()=>canWrite,
   onUnauthorized:error=>auth.clear(errorText(error)),
   onNotesChanged:()=>void refresh().catch(()=>{}),
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
 });
-const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{})});
+const noteSearch=new NotesSearch($('titlebar-notes-search'),{onUnauthorized:error=>auth.clear(errorText(error))});
+const notes = new NotesView($('notes-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onChanged:()=>void refresh().catch(()=>{}),onRefreshRecentNotes:()=>void recentNotes.refresh(true)});
+const notePopup=new NotePopup($('workspace'),{onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))});
+const calendarSearchPanel=element('section');calendarSearchPanel.id='calendar-search-panel';calendarSearchPanel.hidden=true;$('workspace').append(calendarSearchPanel);
+const searchEditorCallbacks={onUnauthorized:error=>auth.clear(errorText(error)),onNotesChanged:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'))};
+const calendarSearchPopup=new CalendarSearchEditor($('workspace'),searchEditorCallbacks);
+const calendarSearchWorkspace=new CalendarSearchEditor(calendarSearchPanel,searchEditorCallbacks,{inline:true});
+let calendarNavigation=0;
+async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave()&&await calendarSearchWorkspace.canLeave();}
+const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error))),onDelete:id=>void openDelete('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
+document.addEventListener(tagNavigation,async event=>{
+  event.preventDefault();++calendarNavigation;const session=api,tag=hashtagKey(event.detail.tag);
+  if(!tag||!session||!await navigationGuards(event.detail.guards,session))return;
+  event.detail.leave.forEach(leave=>leave());noteSearch.show('tag:'+tag);
+});
 document.addEventListener(vaultNoteNavigation,async event=>{
-  event.preventDefault();const session=api;if(!session||!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return;
-  event.detail.leave.forEach(leave=>leave());await tab('notes');await notes.select(event.detail.entry.id);
-  if(event.detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(event.detail.heading);
+  event.preventDefault();++calendarNavigation;const session=api,detail=event.detail;
+  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
+  detail.leave.forEach(leave=>leave());
+  if(detail.popup){calendarSearchPopup.close(true);await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
+  if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}
+  if(detail.maximize&&detail.entry.kind==='DAY'){
+    const date=dailyNoteDate(detail.entry.sourceKey);if(!date)return;
+    if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}return;
+  }
+  if(await tab('notes')===false||session!==api)return;if(detail.searchFolder){await notes.revealFolder(detail.entry);return;}await notes.select(detail.entry.id,!!detail.maximize);
+  if(detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(detail.heading);
+  if(detail.maximize&&notes.note?.id===detail.entry.id)notes.markdown.focus();
+});
+document.addEventListener(calendarSearchNavigation,async event=>{
+  event.preventDefault();const session=api,detail=event.detail,request=++calendarNavigation;
+  const current=()=>session===api&&request===calendarNavigation;
+  try{
+    if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current())return;
+    const reply=await calendarSearchHit(session,detail.id,async()=>current()&&await navigationGuards(detail.guards,session)&&current(),detail.pending);
+    if(!reply||!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
+    detail.leave.forEach(leave=>leave());
+    if(detail.maximize){
+      if(await tab('calendar-search')===false||session!==api)return;
+      noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();
+      await calendarSearchWorkspace.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
+      if(session===api&&calendarSearchWorkspace.opened){calendarSearchWorkspace.title.tabIndex=-1;calendarSearchWorkspace.title.focus({preventScroll:true});}
+    }else{
+      notePopup.close(true);calendarSearchPopup.close(true);
+      await calendarSearchPopup.openHit(reply.data,session,connected&&canWrite,snapshot.profile.data.zoneId,detail);
+    }
+  }catch(error){if(current()&&await navigationGuards(detail.guards,session)){if(error.status===401)auth.clear(errorText(error));else if(calendarSearchPopup.opened){calendarSearchPopup.error.textContent=errorText(error);calendarSearchPopup.error.hidden=false;}else setStatus(errorText(error));}}
+  finally{detail.finished?.();}
 });
 document.addEventListener(dayNoteNavigation,async event=>{
-  event.preventDefault();const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
-  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
+  event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
+  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
-  if(await today.select(date,{confirmed:true})){await tab('today');history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
+  if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),
@@ -151,34 +205,42 @@ function readOnlyWhileDisconnected() {
   track.setWritable(connected && canWrite);
   today.journal.setWritable(connected && canWrite);
   notes.writable=connected && canWrite;notes.controls();
+  notePopup.writable=connected&&canWrite;notePopup.controls();
+  for(const view of [calendarSearchPopup,calendarSearchWorkspace]){view.writable=connected&&canWrite&&!!view.context?.entry;view.controls();}
+  tasks.writable=connected && canWrite;tasks.controls();
   weekSessions.setWritable(connected && canWrite);
   $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
   $('editor-delete-confirm').querySelector('[value=delete]').disabled = $('editor-delete').disabled;
   updateSessionActions();
 }
 async function tab(name) {
-  const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||session!==api)return false;
-  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes']) $(`${item}-panel`).hidden = item !== name;
-  if(name==='notes')notes.show();else notes.hide();
+  ++calendarNavigation;const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return false;
+  notePopup.close(true);calendarSearchPopup.close(true);calendarSearchWorkspace.close(true);
+  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks','calendar-search']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
-  if (name !== 'track') track.hide();
+  if(name==='notes')notes.show();else notes.hide();
+  if(name==='tasks')tasks.show();else tasks.hide();
+  if (name === 'track') track.show();else track.hide();
   if (name === 'today') today.show();else today.hide();
-  if (name !== 'week') weekSessions.hide();
+  if(name==='today')recentNotes.show(today.sidebar,'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
+  if (name === 'week') weekSessions.show();else weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page');else item.removeAttribute('aria-current');
   }
+  if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
 }
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
-  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline(),
-  beforeNavigate:async()=>await notes.canLeave()&&await today.journal.canLeaveInline(),
+  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave()&&await canLeaveSearchEvents(),
+  beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderLabels(view) {
     const panel=$('labels-panel');view.root.append(panel);panel.hidden=false;
+    if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
     view.cleanup.add(()=>{panel.hidden=true;$('account-labels-home').append(panel);});
   },
   async connect(session, account) {
@@ -204,9 +266,9 @@ const auth = authentication({
     editorPreferences.reset();
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshing = null;reloadAgain = false;
-    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
+    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();today.reset();notes.reset();collapsed.clear();expandedClients.clear();canWrite = false;
+    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -262,9 +324,12 @@ async function watch(session) {
       if (!connected || !snapshot) await refresh();
       const changes = await session.changes(snapshot.revision);
       if (session !== api) return;
+      // A local save can already be loading a snapshot containing this batch.
+      // Await that read before deciding whether another consistent read is needed.
+      const reading=refreshing;if(reading)await reading;if(session!==api)return;
       // Full consistent reads include changes made during pagination/report loading.
-      if (changes.items.length || changes.hasMore || snapshot.active.data || snapshot.activeWorkSession.data) await refresh();else
-      void refreshServerInfo(session);
+      if (changes.nextSequence>snapshot.revision || !reading&&(snapshot.active.data || snapshot.activeWorkSession.data)) await refresh();else
+      if(!reading)void refreshServerInfo(session);
       delay = 1000;
     } catch (error) {
       if (session !== api) return;
@@ -365,6 +430,7 @@ $('focus-select').addEventListener('change',()=>{
   focusId=$('focus-select').value;selectedDay=null;render();
 });
 function render() {
+  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision);
   paintFocus();
   const s = focusedSnapshot(snapshot,currentFocus()),zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;
@@ -374,11 +440,29 @@ function render() {
   $('active-title').replaceChildren(active && !focusIncludesActivity(s,active) ? document.createTextNode(i18nText('focus.running_outside')) : active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
   $('active-details').textContent = active && !focusIncludesActivity(s,active) ? '' : active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
   $('stop').hidden = !active;readOnlyWhileDisconnected();
-  table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
-  renderProjects(s);
-  table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))])));
-  for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
+  renderLegacyViews(s,zone);
   refreshLabelFields();refreshClientChoices();renderSession();
+  weekSessions.update(s, activeAsOf, displayNanos, api, connected && canWrite, null);
+  calendar.update(s, connected, api);
+  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
+  today.update(s, connected, api);
+  notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite,s.revision);
+  recentNotes.update(api,s.profile.data.zoneId,s.revision);
+  tasks.update(s,connected,api,canWrite);
+}
+function renderChangedList(id,records,paint){
+  const key=JSON.stringify([getLocale(),records]);
+  if(legacyRenderKeys.get(id)===key)return;
+  paint();legacyRenderKeys.set(id,key);
+}
+function renderLegacyViews(s,zone){
+  if(!$('clients-panel').hidden)renderChangedList('clients',s.clients,()=>table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))]))));
+  if(!$('projects-panel').hidden)renderChangedList('projects',[s.clients,s.projects],()=>renderProjects(s));
+  if(!$('labels-panel').hidden){
+    renderChangedList('labels',s.labels,()=>table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))]))));
+    for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
+  }
+  if($('activities-panel').hidden)return;
   $('week-total').textContent = displayDuration(s.report.total);$('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
     const date = addDays(s.dates.first, index),day = s.report.days.find((v) => v.date === date);
@@ -390,10 +474,6 @@ function render() {
   }
   $('activities-heading').textContent = selectedDay ? i18nText("ui.activities_a05abe", { value0: selectedDay }) : i18nText("ui.activities");
   renderWorkweek(s, zone);
-  calendar.update(s, connected, api);
-  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
-  today.update(s, connected, api);
-  notes.update(s,connected,api,canWrite);
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({ length: 7 }, (_, index) => addDays(s.dates.first, index));
@@ -404,7 +484,6 @@ function renderWorkweek(s, zone) {
     const daily = dates.map((date) => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
     return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
   };
-  weekSessions.update(s, activeAsOf, displayNanos, api, connected && canWrite, null);
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title');node.style.setProperty('--level', level);
     if (key) {
@@ -492,6 +571,7 @@ function clientField(value) {
 }
 function refreshClientChoices() {
   const input = $('field-clientId');if (!input || editor?.busy || editor?.uncertain) return;
+  if(editor?.taskFields){editor.taskFields.refresh();return;}
   const selected = input.value;input.replaceChildren();
   for (const [id, label] of [['', i18nText("ui.choose_a_client")], ...snapshot.clients.map((client) => [client.id, client.name])]) {const option = element('option', label);option.value = id;input.append(option);}
   if (selected && !snapshot.clients.some((client) => client.id === selected)) {const option = element('option', i18nText("ui.removed_client_choose_another"));option.value = selected;input.append(option);}
@@ -517,12 +597,13 @@ function begin(title, state) {
   if (editor || $('editor').open) return false;
   editor = { ...state, session: api, zone: snapshot.profile.data.zoneId, busy: false, uncertain: false };$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
   $('save').className = `btn ${state.remove ? 'btn-danger' : 'btn-primary'}`;
-  $('editor-delete').hidden = state.collection !== 'work-sessions' || !state.id || !!state.remove || !!state.command;
+  $('editor-delete').hidden = !['work-sessions','tasks'].includes(state.collection) || !state.id || !!state.remove || !!state.command;
   $('editor-delete').disabled = !connected || !canWrite;
   $('editor-title').textContent = title;$('save').textContent = i18nText("ui.save");$('save').disabled = false;$('cancel').disabled = false;return true;
 }
 function showEditor() {$('editor').showModal();$('fields').querySelector('input,select,textarea')?.focus();}
 async function openRecord(collection, id = null, initial = {}, caption = null) {
+  ++calendarNavigation;
   const session = api;
   const loaded = id ? await session.request(`/${collection}/${id}`) : { data: initial, etag: null };
   if (session !== api || !connected) return;
@@ -542,8 +623,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   if (collection === 'labels') field(i18nText("ui.color_optional"), 'color', value.color, { hint: i18nText("ui.hex_color_for_example_176653") });
   if (collection === 'tasks') {
     field(i18nText("ui.summary"), 'summary', value.summary, { required: true, max: 1024 });
-    field(i18nText("ui.project"), 'projectId', value.projectId, { choices: [['', i18nText("ui.unassigned")], ...snapshot.projects.map((v) => [v.id, v.name])] });
-    field(i18nText("ui.parent_task"), 'parentTaskId', value.parentTaskId, { choices: [['', i18nText("ui.no_parent")], ...snapshot.tasks.filter((v) => v.id !== id).map((v) => [v.id, taskPresentation(v).title])] });
+    editor.taskFields=taskEditorFields(field,value,()=>snapshot,id);
     field(i18nText('record.url_optional'), 'url', value.url, { type: 'url', max: 4096 });
   }
   if (collection === 'activities') {
@@ -559,6 +639,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   showEditor();
 }
 async function openCalendarActivity(event,range) {
+  ++calendarNavigation;
   const session=api;if(!connected||!canWrite||editor||$('editor').open)return;
   const summary=[event.title,event.description].filter(Boolean).join('\n\n');
   await openRecord('activities',null,{summary:summary.slice(0,2000),start:event.start,end:event.end},i18nText('calendar.create_activity'));
@@ -627,6 +708,7 @@ async function changeCalendarSession(original, proposal, scope) {
   }
 }
 async function openDelete(collection, id) {
+  ++calendarNavigation;
   const session = api,loaded = await session.request(`/${collection}/${id}`);
   if (session !== api || !connected || !begin(i18nText("ui.delete_record"), { collection, id, etag: loaded.etag, remove: true })) return;
   $('fields').append(element('p', i18nText("ui.delete_681b54", { value0: loaded.data.name || loaded.data.summary || (collection === 'work-sessions' ? i18nText("ui.work_session_21aa04") : i18nText("ui.activity")), value1: collection === 'work-sessions' ? i18nText("ui.undo_will_be_available_for_ten_minutes") : i18nText("ui.this_cannot_be_undone_records_with_dependencies_may_be_rejected") })));
@@ -655,7 +737,7 @@ function values() {
     case 'clients':return { name: get('name'), color: get('color') };
     case 'projects':return { name: get('name'), clientId: get('clientId'), icon: $('fields').querySelector('[name=icon]:checked')?.value || null };
     case 'labels':return { name: get('name'), color: get('color') || null };
-    case 'tasks':return { summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null };
+    case 'tasks':return { summary: get('summary'), clientId:get('clientId')||null,projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null,priority:get('priority'),due:editor.taskFields.due() };
     case 'activities':return { ...(editor.id ? {} : { taskId: get('taskId') || null, projectId: get('taskId') ? null : get('projectId') || null }), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels() };
     case 'work-sessions':return { ...(editor.legacyLabelIds?.length ? { labelIds: [...editor.legacyLabelIds] } : {}), clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
   }
@@ -696,10 +778,11 @@ async function saveEditor(event, remove = editor?.remove) {
 }
 $('editor-form').addEventListener('submit', saveEditor);
 $('editor-delete').addEventListener('click', () => {
-  if (!editor || editor.collection !== 'work-sessions' || !editor.id || editor.command || editor.remove || editor.busy || editor.loading || editor.uncertain || editor.reviewRequired || editor.session !== api || !connected || !canWrite) return;
+  if (!editor || !['work-sessions','tasks'].includes(editor.collection) || !editor.id || editor.command || editor.remove || editor.busy || editor.loading || editor.uncertain || editor.reviewRequired || editor.session !== api || !connected || !canWrite) return;
   deleteCandidate = editor;
   $('editor-delete-confirm').querySelector('[value=delete]').disabled = false;
-  $('editor-delete-description').textContent = i18nText('ui.delete_681b54', {value0: editor.deletionLabel || i18nText('ui.work_session_21aa04'), value1: i18nText('ui.undo_will_be_available_for_ten_minutes')});
+  $('editor-delete-title').textContent=i18nText(editor.collection==='tasks'?'tasks.delete':'ui.delete_work_session');
+  $('editor-delete-description').textContent = i18nText('ui.delete_681b54', {value0: editor.deletionLabel || i18nText('ui.work_session_21aa04'), value1: i18nText(editor.collection==='tasks'?'ui.this_cannot_be_undone_records_with_dependencies_may_be_rejected':'ui.undo_will_be_available_for_ten_minutes')});
   $('editor-delete-confirm').returnValue = '';$('editor-delete-confirm').showModal();
 });
 $('editor-delete-confirm').addEventListener('close', () => {
@@ -756,6 +839,7 @@ window.addEventListener('pageshow', (event) => {if (event.persisted) void auth.i
 $('status-icon').append(icon('refresh'));
 iconButton($('collapse-activities'), 'collapse', i18nText("ui.hide_activities"));
 iconButton($('expand-activities'), 'expand', i18nText("ui.show_activities"));
-for (const [id, glyph, label] of [['week-previous', 'left', i18nText("ui.previous_week")], ['week-next', 'right', i18nText("ui.next_week")], ['add-activity', 'add', i18nText("ui.add_time")]]) iconButton($(id), glyph, label);
+dateNavigation($('week-toolbar').querySelector('.calendar-controls'),{input:$('week-date'),previous:$('week-previous'),current:$('week-today'),next:$('week-next'),previousLabel:i18nText('ui.previous_week'),currentLabel:i18nText('ui.today'),nextLabel:i18nText('ui.next_week')});
+iconButton($('add-activity'),'add',i18nText('ui.add_time'));
 $('stop').prepend(icon('stop'));
 void auth.initialize();

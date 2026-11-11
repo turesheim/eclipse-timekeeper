@@ -4,7 +4,7 @@
   const themes=[['timekeeper','Dagsverk','light'],['timekeeper-dark','Dagsverk Dark','dark'],
     ['timekeeper-reinvented','Dagsverk-reinvented','light'],['timekeeper-reinvented-dark','Dagsverk-reinvented Dark','dark'],
     ['solarized-light','Solarized Light','light'],['solarized-dark','Solarized Dark','dark'],
-    ['nord','Nord','dark'],['dracula','Dracula','dark']];
+    ['nord','Nord','dark'],['dracula','Dracula','dark'],['newspaper','Newspaper','light']];
   const normalize=value=>themes.some(([id])=>id===value) ? value:'timekeeper';
   const branding=new URL('./assets/branding/',document.currentScript.src);
   let selected='timekeeper',picker,favicon,originalIcon;

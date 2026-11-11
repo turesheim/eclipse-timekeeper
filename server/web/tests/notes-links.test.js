@@ -5,6 +5,66 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {relativeNotePath,rasterType,notesEntryVisible} from '../src/notes-links.js';
 import {needsSource} from '../src/markdown-document.js';
+import {vaultEditorResources} from '../src/vault-editor-resources.js';
+
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
+const collection=(journalFolder='journal',assetsFolder='journal/assets')=>({settings:{journalFolder,assetsFolder,eventsFolder:'events'},limits:{pageSize:200},snapshot:'snapshot'});
+test('concurrent native image lookups share settings while later lookups see changed folders',async()=>{
+  const first=deferred(),requests=[];let settings=collection(),infos=0;
+  const session={request:async path=>{requests.push(path);if(path==='/notes')return {data:++infos===1?await first.promise:settings};
+    const target=new URLSearchParams(path.split('?')[1]).get('path');if(!target.startsWith(settings.settings.assetsFolder+'/'))throw Object.assign(new Error('missing'),{status:404});return {data:{id:target,path:target,kind:'ASSET'}};}};
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-08'}));
+  const pending=Promise.all(['one','two','three'].map(name=>resources.canonicalAsset('assets/'+name+'.png')));
+  assert.equal(infos,1);first.resolve(settings);assert.deepEqual(await pending,['journal/assets/one.png','journal/assets/two.png','journal/assets/three.png']);
+  assert.equal(requests.length,4);
+  settings=collection('journal','Pictures');assert.equal(await resources.canonicalAsset('assets/four.png'),'Pictures/four.png');assert.equal(infos,2);
+});
+test('ordinary relative assets use their known origin without a collection read',async()=>{
+  const requests=[],session={request:async path=>{requests.push(path);const target=new URLSearchParams(path.split('?')[1]).get('path');return {data:{id:'image',path:target}};}};
+  const resources=vaultEditorResources(()=>session,()=> 'Notes/page.md');
+  assert.equal(await resources.canonicalAsset('../Images/a.png'),'Images/a.png');assert.equal(requests.length,1);assert.ok(requests[0].startsWith('/notes/resolve?'));
+  assert.equal(await resources.assetReference({path:'Images/a.png'}),'../Images/a.png');assert.equal(requests.length,1);
+});
+test('wiki image resolution filters the filename and still reads every ambiguity candidate',async()=>{
+  const requests=[],entries=[{id:'local',path:'Notes/shot.png',kind:'ASSET'},{id:'other',path:'Other/shot.png',kind:'ASSET'}];
+  const session={request:async(path,options)=>{requests.push(path);if(path==='/notes')return {data:collection()};const query=new URLSearchParams(path.split('?')[1]);
+    assert.equal(query.get('query'),'shot.png');assert.equal(options.etag,'snapshot');const offset=Number(query.get('offset'));return {data:{items:[entries[offset]],...(offset===0?{nextOffset:1}:{})}};}};
+  let origin='Notes/page.md';const resources=vaultEditorResources(()=>session,()=>origin);
+  assert.equal((await resources.resolveWiki('shot.png')).id,'local');assert.equal(requests.length,3);
+  origin='page.md';await assert.rejects(resources.resolveWiki('shot.png'));assert.equal(requests.length,3);
+  await assert.rejects(resources.resolveWiki('https://foreign.invalid/image.png'));assert.equal(requests.length,3);
+});
+test('journal title lookup shares a complete paged catalog and does not guess a qualified path',async()=>{
+  const entries=[{id:'first',path:'Notes/Imported.md',kind:'MARKDOWN',title:'CVE-2026-111943'},{id:'second',path:'Notes/Another.md',kind:'MARKDOWN',title:'Other title'}],queries=[];
+  const session={request:async path=>{if(path==='/notes')return {data:collection()};const query=new URLSearchParams(path.split('?')[1]);queries.push(query.get('query'));
+    if(query.get('query'))return {data:{items:[]}};const offset=Number(query.get('offset'));return {data:{items:[entries[offset]],...(offset===0?{nextOffset:1}:{})}};}};
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-09'}));
+  assert.equal((await resources.resolveWiki('CVE-2026-111943')).id,'first');
+  assert.equal((await resources.resolveWiki('Other title')).id,'second');assert.equal(queries.filter(query=>query==='').length,2);
+  await assert.rejects(resources.resolveWiki('Notes/CVE-2026-111943'),error=>error.code==='NOTE_LINK_MISSING');
+  assert.equal(queries.filter(query=>query==='').length,2);
+});
+test('superseded image settings cannot issue lookups or replace another account request',async()=>{
+  const delayed=deferred(),oldRequests=[],newRequests=[];
+  const old={request:async path=>{oldRequests.push(path);return {data:await delayed.promise};}};
+  const current={request:async path=>{newRequests.push(path);if(path==='/notes')return {data:collection('Private','Private/assets')};return {data:{id:'current-image',path:new URLSearchParams(path.split('?')[1]).get('path')}};}};
+  let session=old;const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-08'}));
+  const pending=resources.canonicalAsset('assets/private.png'),rejected=assert.rejects(pending);
+  session=current;assert.equal(await resources.canonicalAsset('assets/own.png'),'Private/assets/own.png');delayed.resolve(collection('Other','Other/assets'));await rejected;
+  assert.deepEqual(oldRequests,['/notes']);assert.equal(newRequests.filter(path=>path==='/notes').length,1);
+});
+test('invalidated settings and failed old catalog reads cannot evict fresh lookups',async()=>{
+  const delayedInfo=deferred(),delayedPage=deferred();let infos=0,pages=0;
+  const session={request:async path=>{if(path==='/notes')return {data:++infos===1?await delayedInfo.promise:collection()};
+    if(path.startsWith('/notes/entries?'))return {data:++pages===1?await delayedPage.promise:{items:[{id:'new',path:'Notes/new.md',kind:'MARKDOWN'}]}};
+    return {data:{id:'asset',path:new URLSearchParams(path.split('?')[1]).get('path')}};}};
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-08'}));
+  const old=resources.canonicalAsset('assets/old.png'),rejected=assert.rejects(old);resources.invalidate();
+  assert.equal(await resources.canonicalAsset('assets/current.png'),'journal/assets/current.png');delayedInfo.resolve(collection());await rejected;
+  const pending=resources.complete(''),failed=assert.rejects(pending);await new Promise(resolve=>setImmediate(resolve));resources.invalidate();
+  assert.deepEqual((await resources.complete('new')).map(entry=>entry.id),['new']);delayedPage.reject(new Error('old page failed'));await failed;
+  assert.deepEqual((await resources.complete('new')).map(entry=>entry.id),['new']);assert.equal(pages,2);
+});
 
 test('collection-relative links decode once and cannot escape or load external images',()=>{
   assert.equal(relativeNotePath('Notes/First.md','../Images/a%20b.png'),'Images/a b.png');
@@ -57,13 +117,13 @@ test('portable folder aliases cannot silently merge different source directories
   assert.ok(rows.every(row=>row.status==='conflict'&&!row.selected));
 });
 const creation='2020-01-02T03:04:05.123456789Z',modification='2021-02-03T04:05:06.987654321Z';
-const manifestEntry=(path,body)=>({path,kind:'FILE',bytes:Buffer.byteLength(body),sha256:createHash('sha256').update(body).digest('hex'),createdAt:creation,modifiedAt:modification});
+const manifestEntry=(path,body)=>({path,kind:'FILE',bytes:Buffer.byteLength(body),sha256:createHash('sha256').update(body).digest('hex'),createdAt:creation,createdAtSource:'ORIGINAL',modifiedAt:modification});
 const chosenFile=(name,body)=>{const value=new File([body],name,{lastModified:Date.parse('2026-01-01T00:00:00Z')});Object.defineProperty(value,'webkitRelativePath',{value:'Vault/'+name});return value;};
 test('import metadata preserves nanosecond dates and uses current modification time after a content edit',async()=>{
   const entry=manifestEntry('Exact.md','Original\r\n'),value={format:'timekeeper-notes-v1',entries:[entry]};
   assert.equal(parseNotesMetadata(value).get('exact.md').createdAt,creation);
-  assert.deepEqual((await importedFileDates(chosenFile('Exact.md','Original\r\n'),entry)).dates,{createdAt:creation,modifiedAt:modification});
-  const edited=await importedFileDates(chosenFile('Exact.md','Edited'),entry);assert.equal(edited.changed,true);assert.deepEqual(edited.dates,{createdAt:creation,modifiedAt:'2026-01-01T00:00:00.000Z'});
+  assert.deepEqual((await importedFileDates(chosenFile('Exact.md','Original\r\n'),entry)).dates,{createdAt:creation,createdAtSource:'ORIGINAL',modifiedAt:modification});
+  const edited=await importedFileDates(chosenFile('Exact.md','Edited'),entry);assert.equal(edited.changed,true);assert.deepEqual(edited.dates,{createdAt:creation,createdAtSource:'ORIGINAL',modifiedAt:'2026-01-01T00:00:00.000Z'});
   for(const bad of ['2021-02-30T00:00:00Z','0000-01-01T00:00:00Z','0001-01-01T00:00:00+14:00','9999-12-31T23:59:59-14:00','not-a-date'])assert.throws(()=>parseNotesMetadata({...value,entries:[{...entry,createdAt:bad}]}));
   assert.throws(()=>parseNotesMetadata({...value,entries:[entry,{...entry,path:'exact.md'}]}));
 });
@@ -74,4 +134,19 @@ test('export metadata cannot hide a source file using the same conventional meta
   assert.equal(metadata.file,transport);assert.equal(rows.length,1);assert.equal(rows[0].file,original);assert.equal(rows[0].status,'ready');
   const independent=chosenFile('timekeeper-notes-metadata-00000000-0000-0000-0000-000000000002.json',JSON.stringify({format:'timekeeper-notes-v1',entries:[]}));
   await assert.rejects(()=>readNotesMetadata([transport,independent]));
+});
+
+test('import date provenance survives exports without guessing from date order',async()=>{
+  const file=chosenFile('Later.md','Body'),entry=manifestEntry('Later.md','Body');
+  for(const source of ['ORIGINAL','ADDED','UNKNOWN'])assert.equal((await importedFileDates(file,{...entry,createdAtSource:source})).dates.createdAtSource,source);
+  const {createdAtSource,...legacy}=entry;assert.equal((await importedFileDates(file,legacy)).dates.createdAtSource,'UNKNOWN');
+  const plain=await importedFileDates(file,null);assert.deepEqual(plain.dates,{modifiedAt:'2026-01-01T00:00:00.000Z'});
+  assert.throws(()=>parseNotesMetadata({format:'timekeeper-notes-v1',entries:[{...entry,createdAtSource:'invented'}]}));
+});
+
+
+test('document completion narrows Unicode-equivalent titles and paths while excluding trash and folders',async()=>{
+  const entries=[{id:'path',path:'Notes/Blåbær.md',kind:'MARKDOWN'},{id:'title',path:'Notes/Design.md',title:'Café decisions',kind:'MARKDOWN'},{id:'deleted',path:'Notes/Café.md',kind:'MARKDOWN',deleted:true},{id:'folder',path:'Café',kind:'FOLDER'}];
+  const session={request:async path=>({data:path==='/notes'?collection():{items:entries}})},resources=vaultEditorResources(()=>session,()=> 'Notes/current.md');
+  assert.deepEqual((await resources.complete('CAFE\u0301')).map(entry=>entry.id),['title']);assert.deepEqual((await resources.complete('BLA\u030aBÆR')).map(entry=>entry.id),['path']);
 });

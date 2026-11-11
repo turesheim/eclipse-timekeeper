@@ -17,6 +17,14 @@ export const thirdPartyNotices=[
     "licenseUrl": "/web/assets/notices/fonts-source-serif-4-LICENSE.txt"
   },
   {
+    "name": "PlantUML",
+    "homepage": "https://plantuml.com/",
+    "license": "MIT",
+    "copyright": "Copyright 2009–2024, Arnaud Roques",
+    "version": "1.2026.9",
+    "licenseUrl": "/web/assets/notices/plantuml-LICENSE.txt"
+  },
+  {
     "name": "gemoji",
     "homepage": "https://github.com/wooorm/gemoji",
     "license": "MIT",

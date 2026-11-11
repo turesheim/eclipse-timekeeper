@@ -1,3 +1,5 @@
+import {NoteBookmark} from './note-bookmark.js';
+import {NoteClient} from './note-client.js';
 import {MarkdownCaret} from './markdown-caret.js';
 import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
@@ -52,6 +54,7 @@ export class MarkdownField {
     this.tools.append(this.blockTrigger);
     for(const [name,glyph] of [
       ['bold','type-bold'],['italic','type-italic'],['strike','type-strikethrough'],
+      ['highlight','highlighter'],['subscript','subscript'],['superscript','superscript'],
       ['inline_code','code'],['code_block','code-square'],['list','list-ul'],['ordered','list-ol'],['tasks','list-check'],
       ['link','link-45deg'],['quote','quote'],['table','table'],['hr','hr']
     ]){
@@ -90,13 +93,18 @@ export class MarkdownField {
     root.append(this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.toolbar.addEventListener('keydown',event=>this.historyShortcut(event));
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
-    this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>this.controls()));
+    this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>{
+      if(!this.rich.contains(document.activeElement)&&!this.suggestions?.contains(document.activeElement))this.editor?.finishWiki();
+      this.controls();
+    }));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('keydown',event=>{if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
-    buildExperience(this);this.caret=new MarkdownCaret(this);
+    if(resources?.bookmark)this.bookmark=new NoteBookmark(root,resources.bookmark);
+    buildExperience(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
+  focus(){if(this.rich.hidden)this.text.focus({preventScroll:true});else this.editor?.focus();}
   historyShortcut(event){
     if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||!this.editor||this.readOnly||this.loading||!event.target.closest?.('button,[role=menuitem]'))return false;
     const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return false;
@@ -163,7 +171,7 @@ export class MarkdownField {
   }
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
   controls(){
-    this.caret?.update();
+    this.caret?.update();this.bookmark?.sync();this.client?.sync();
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));
@@ -173,12 +181,14 @@ export class MarkdownField {
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
+    this.resetCompletions?.();
     if(!formatted)this.closeBlockMenu();
     this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.plain.hidden=formatted;
     this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.resetCompletions?.();
     this.closeActions?.();
     this.caret?.clear();
     this.sourcePosition=null;
@@ -195,6 +205,7 @@ export class MarkdownField {
   async restorePosition(position){if(!position)return;const generation=this.restoreGeneration;if(position.formatted)await this.showFormatted(false);if(generation!==this.restoreGeneration)return;if(this.editor)this.editor.restorePosition(position);else{this.text.setSelectionRange(Math.min(position.anchor,this.text.value.length),Math.min(position.head??position.anchor,this.text.value.length));this.text.scrollTop=position.scrollTop||0;}}
   async showSource(){
     if(this.loading||!this.editor)return;
+    this.editor.finishWiki();
     const previous=this.editor,position=previous.position(),body=previous.markdown();this.setRaw(body);this.suspended={editor:previous,body};this.editor=null;
     this.mode(false);this.controls();const normalized=position.anchor,head=position.head??normalized;this.text.setSelectionRange(Math.min(normalized,head),Math.max(normalized,head),head<normalized?'backward':'forward');this.text.scrollTop=position.scrollTop;this.text.focus();
   }

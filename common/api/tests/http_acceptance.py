@@ -54,6 +54,30 @@ def resolve(value):
 
 
 class HttpAcceptance(unittest.TestCase):
+    def test_task_provider_connections_require_owned_browser_bound_grants(self):
+        catalog,_=self.call('GET','/task-providers')
+        self.assertEqual({'google','microsoft'},set(catalog['providers']))
+        self.call('GET','/task-providers',owner=None,status=401)
+        self.call('GET','/task-providers?owner=foreign',status=400)
+        missing=str(uuid4());cookie={'Cookie':'__Host-timekeeper-browser='+'a'*43}
+        self.call('GET','/task-providers/'+missing,status=404)
+        self.call('PUT','/task-providers/'+missing+'/lists',body={'selectedLists':[]},headers={'If-Match':'"missing"'},status=404)
+        self.call('DELETE','/task-providers/'+missing,headers={'If-Match':'"missing"'},status=404)
+        self.call('POST','/task-providers/'+missing+'/refresh',status=404)
+        self.call('POST','/task-providers/complete',body={'state':'z'*43,'code':'unused-fixture-code'},headers=cookie,status=409,code='TASK_PROVIDER_AUTHORIZATION_EXPIRED')
+        self.call('POST','/task-providers/cancel',body={'state':'z'*43},headers=cookie,status=409,code='TASK_PROVIDER_AUTHORIZATION_EXPIRED')
+        self.call('POST','/task-providers/google/authorize',owner='read',body={},headers=cookie,status=403)
+        self.call('POST','/task-providers/google/authorize',body={'ownerId':'foreign'},headers=cookie,status=400)
+        for provider,available in catalog['providers'].items():
+            if not available:
+                self.call('POST','/task-providers/'+provider+'/authorize',body={},headers=cookie,status=503,code='TASK_PROVIDER_NOT_CONFIGURED')
+                continue
+            authorization,_=self.call('POST','/task-providers/'+provider+'/authorize',body={},headers=cookie)
+            from urllib.parse import parse_qs
+            state=parse_qs(urlsplit(authorization['authorizationUrl']).query)['state'][0]
+            self.call('POST','/task-providers/cancel',body={'state':state},headers=cookie,status=204)
+            self.call('POST','/task-providers/cancel',body={'state':state},headers=cookie,status=409,code='TASK_PROVIDER_AUTHORIZATION_EXPIRED')
+
     def call(self, method, path, *, owner='a', body=None, headers=None, status=200, code=None):
         request_headers = {'Accept': 'application/json, application/problem+json'}
         if owner is not None:

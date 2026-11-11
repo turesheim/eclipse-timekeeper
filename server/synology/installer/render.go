@@ -201,6 +201,9 @@ func publishConfiguration(root, target string, s Settings) error {
 	if err := ensureMailConfiguration(root); err != nil {
 		return err
 	}
+	if err := ensureTaskProviderConfiguration(root); err != nil {
+		return err
+	}
 	_, err := url.Parse(s.PublicOrigin)
 	if err != nil {
 		return err
@@ -217,7 +220,7 @@ func publishConfiguration(root, target string, s Settings) error {
 			return err
 		}
 	}
-	for _, name := range []string{"config/tokens.json", "config/account-setup.json", "config/mail.properties", "secrets/database_password", "secrets/smtp_password"} {
+	for _, name := range []string{"config/tokens.json", "config/account-setup.json", "config/mail.properties", "secrets/database_password", "secrets/smtp_password", taskProviderConfiguration} {
 		content, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {
 			return err

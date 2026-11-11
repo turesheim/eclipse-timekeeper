@@ -14,7 +14,7 @@ async function audit(page) {
   expect(result.violations.map(({id,nodes})=>({id,nodes:nodes.map(({target,any})=>({target,checks:any.map(({message,data})=>({message,data}))}))}))).toEqual([]);
 }
 test('themes cover tracking, records, editors and account settings with accessible contrast',async({page,request,browserName})=>{
-  test.setTimeout(150000);
+  test.setTimeout(210000);
   const records=[],headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
   async function api(method,path,data,extra={}) {const response=await request.fetch('/api/v1'+path,{method,data,headers:{...headers,...extra}});expect(response.ok(),method+' '+path+': '+response.status()).toBe(true);return response;}
   async function create(collection,data) {const value=await (await api('POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}
@@ -29,7 +29,7 @@ test('themes cover tracking, records, editors and account settings with accessib
     await signIn(page);await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
     await page.locator('[data-tab=week]').click();await page.locator('#week-date').fill('2025-10-20');await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
     await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');
-    for(const id of ['timekeeper','timekeeper-dark','timekeeper-reinvented','timekeeper-reinvented-dark','solarized-light','solarized-dark','nord','dracula']) {
+    for(const id of ['timekeeper','timekeeper-dark','timekeeper-reinvented','timekeeper-reinvented-dark','solarized-light','solarized-dark','nord','dracula','newspaper']) {
       await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
       await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
@@ -87,7 +87,7 @@ test('Dagsverk-reinvented style guide keeps local fonts, journal typography and 
       expect(parseFloat(await symbol.evaluate(node=>getComputedStyle(node).height))).toBeCloseTo(32,2);
       expect(parseFloat(await symbol.evaluate(node=>getComputedStyle(node).paddingTop))).toBeCloseTo(8,2);
       await expect(page.locator('.brand-logo:visible')).toHaveCount(0);
-      for(const width of [1440,390]) {
+      for(const width of [1440,390,320]) {
         await page.setViewportSize({width,height:1000});await audit(page);
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
         await captureScreenshot(page,{path:`test-results/style-guide-${id}-${width}.png`});
@@ -154,15 +154,15 @@ test('Dagsverk-reinvented is opt-in and can be compared with the original Dagsve
   } finally {await other.close();}
 });
 
-test('theme choice persists before rendering, follows other tabs and tolerates unavailable browser storage',async({page,context})=>{
-  await signIn(page);await setTheme(page,'solarized-dark');
-  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','solarized-dark');
-  await expect(page.locator('html')).toHaveAttribute('data-bs-theme','dark');await openThemeSettings(page);await expect(page.getByLabel('Theme',{exact:true})).toHaveValue('solarized-dark');
-  const other=await context.newPage();await other.goto('/admin/');await expect(other.locator('html')).toHaveAttribute('data-theme','solarized-dark');
+for(const [initial,mode] of [['solarized-dark','dark'],['newspaper','light']]) test(`theme ${initial} persists before rendering, follows other tabs and tolerates unavailable browser storage`,async({page,context})=>{
+  await signIn(page);await setTheme(page,initial);
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme',initial);
+  await expect(page.locator('html')).toHaveAttribute('data-bs-theme',mode);await openThemeSettings(page);await expect(page.getByLabel('Theme',{exact:true})).toHaveValue(initial);
+  const other=await context.newPage();await other.goto('/admin/');await expect(other.locator('html')).toHaveAttribute('data-theme',initial);
   await page.getByLabel('Theme',{exact:true}).selectOption('nord');await expect(other.locator('html')).toHaveAttribute('data-theme','nord');
   await page.evaluate(()=>localStorage.removeItem('timekeeper.theme'));await expect(other.locator('html')).toHaveAttribute('data-theme','timekeeper');await other.close();
   await page.evaluate(()=>localStorage.setItem('timekeeper.theme','invalid-theme'));await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
   await page.addInitScript(()=>{Storage.prototype.getItem=()=>{throw new DOMException('Storage unavailable','SecurityError');};Storage.prototype.setItem=()=>{throw new DOMException('Storage unavailable','SecurityError');};});
-  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');await setTheme(page,'dracula');
-  await expect(page.locator('html')).toHaveAttribute('data-theme','dracula');await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');await setTheme(page,initial);
+  await expect(page.locator('html')).toHaveAttribute('data-theme',initial);await expect(page.locator('#status')).toHaveText('Up to date');
 });

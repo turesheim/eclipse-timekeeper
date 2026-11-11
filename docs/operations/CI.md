@@ -36,27 +36,45 @@ publishing an Eclipse package without its platform certification.
 Add the **ci:full** label to a PR to request all checks. Adding or removing a label
 re-evaluates selection; later pushes retain the label's effect. The **Build**
 workflow also supports **Run workflow**, and runs full validation nightly at
-02:23 UTC. Scheduled/manual runs validate without publishing containers.
+02:23 UTC. Scheduled/manual runs validate without publishing registry images.
 
 Release tags retain full certification. Routine web-only main pushes skip Java
 tests, Eclipse builds and database/native migration certification. The independent
-main **Server containers** workflow still builds and publishes the current image,
+main **Server containers** workflow builds the current image and Synology SPK,
 after a short Compose smoke check of two actual unprivileged replicas, private
 shared storage, authenticated API identity, exact commit and bundled web assets.
 Its smoke receipt says `mode: smoke`; it does not certify backup, migration or
 rolling-update behavior. Backend/deployment changes retain full container checks.
-Documentation-only main pushes reuse previously tested binaries.
+Documentation-only main pushes also build a current SPK, without selecting the
+unchanged database/native certification matrix. No workflow publishes the retired
+`eclipse-timekeeper-server` container package.
 
 PRs and nightly runs call the container workflow only when full validation is
 selected, after the H2 checks pass; they reuse that result instead of running the
 same H2 suite again. The container workflow remains the source of deployment and
 Synology release provenance. Full certification produces Synology candidates.
-Routine web-only pushes also package an installable **synology-web-preview** SPK
-from the exact smoke-tested immutable image, so frontend fixes reach NAS users.
+Routine main pushes package an installable SPK from the smoke-tested image.
+Both validation paths upload **synology-installer**.
 The preview channel requires the same commit's successful selected Build checks,
 including every browser shard and **PR validation**. Its channel metadata records
 `validation: web-smoke`; full candidates record `validation: full`. Stable NAS
 promotion still requires full database certification and real-NAS acceptance.
+
+The **Synology latest** workflow waits for the same commit's successful main
+Build and Server containers runs. It verifies artifact and SPK digests, source
+identity and Build revision before replacing the `synology-latest` prerelease.
+Out-of-order completions cannot replace a newer revision. Only this rolling
+prerelease loses old assets; all versioned releases remain intact. Older known
+temporary SPK artifacts are removed after publication, preserving newer work and
+artifacts associated with version tags.
+
+Pages retains its three most recent deployment records, the latest successful
+deployment and all in-progress deployments. Old records are made inactive before
+deletion; this does not change the deployed website. The Pages workflow's manual
+**maintenance_only** mode inventories or cleans the retired container registry
+using its repository Actions token. Version-tagged container indexes and their
+referenced platform manifests are retained. Use **apply_cleanup** only after
+reviewing the inventory; normal website deployment does not run registry cleanup.
 
 Publication gates accept both historical **Web** jobs and complete **Web (i/n)**
 matrices. Missing, failed or mixed browser shards prevent publication.

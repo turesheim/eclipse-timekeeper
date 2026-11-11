@@ -22,6 +22,9 @@ export function cursorMap(tree,doc,source){
     node.children?.forEach(visit);
   };visit(tree);
   doc.descendants((node,pos)=>{
+    // Fenced diagrams occupy a block slot even though their preview is atomic.
+    // Retain that slot so prose on either side still matches its source block.
+    if(['mermaid_diagram','plantuml_diagram'].includes(node.type.name)){visible.push({node,pos,characters:[{char:atom,from:pos,to:pos+node.nodeSize}]});return false;}
     if(!node.isTextblock)return;
     const characters=[];node.forEach((child,offset)=>{
       if(child.isText)for(let i=0;i<child.text.length;i++)characters.push({char:child.text[i],from:pos+1+offset+i,to:pos+1+offset+i+1});

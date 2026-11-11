@@ -31,12 +31,22 @@ the separate About prototype and its scratchpad controls have been retired.
   decorations. It lazy-loads only for code content, preserving the block's
   authored source. Pinned highlight.js grammars supply validated decoration
   ranges; unknown languages and fences over 200,000 characters remain plain.
+  `shell` fences use the Bash script grammar without requiring a prompt;
+  `console` and `shellsession` retain the prompt-aware transcript grammar.
+  Arrow Down from the last visual line, Arrow Right at the end, or clicking below
+  a final code block moves to following prose. An empty trailing caret paragraph
+  does not change the authored Markdown until text is entered.
   The top-right badge groups language selection and copying. Theme surfaces stay
   unchanged; token foregrounds blend existing semantic and body-text colors.
 - Emoji shortcodes use a micromark token and an inline atom, preserving the
   authored alias through source switches, undo and serialization. The pinned
   local gemoji data is regenerated with `npm run vendor:emoji`; code, escapes
   and URL destinations remain literal.
+- Pasted HTTP(S) URLs become links with autolink source spelling. The link schema
+  retains this spelling through DOM edits and source replacement; explicitly
+  authored resource links keep their normal Markdown syntax. Plain paste and
+  code remain literal, and URL-over-selection retains the selected label.
+  Link marks end at their boundary, so following prose does not extend the label.
 - Mermaid fences use an atomic presentation node and lazy-load the local
   renderer. Formatted mode shows only an inert SVG image; Markdown source edits
   its complete fenced text. Script and external-resource requests are rejected.
@@ -49,6 +59,11 @@ made during a save and flushes before navigation. Writes are debounced for one
 second with a five-second typing deadline; failures keep the draft and block
 navigation. Unknown replies are reconciled by reads before further writes. Body edits
 and day labels use independent records and validators.
+
+Note dialogs keep their content inert until the note read completes. Close stays
+available while loading; mode and editing actions become available against the
+loaded document. This prevents an early mode selection from being overwritten
+by the initial formatted projection.
 
 ## Assets and licenses
 
@@ -91,3 +106,19 @@ historical measurements from current implementation and platform coverage.
 
 The [#548 presentation verification](../verification/MARKDOWN-EDITOR-548.md)
 records the subsequent code badge, link, diagram and note-action coverage.
+
+The bookmark action attaches to the top edge of Notes and inline journal cards.
+Its ribbon has a straight top in the filled, add and remove states.
+It has no button border: a filled bookmark marks saved metadata, an outlined plus
+adds it, and an outlined dash appears when removing it with pointer or keyboard.
+A visible keyboard focus outline and a touch target of at least 44 pixels remain.
+Popup bookmarks align with their note-content edge below the window controls.
+
+The Note tools menu includes **Associate with client** for an owned note or empty
+daily/weekly page. The dialog lists every owned client, including those outside
+the workspace focus filter, and **No client** removes the association. A small
+name and color marker appear at the top right of the note. Read-only sessions
+can see the label. Selecting a client does not save a body draft or change its
+bytes, dates or content ETag. Stale or uncertain association writes are resolved
+by reading metadata; another write requires an explicit choice. Saved event
+notes, native journal editors and ordinary note popups share this behavior.

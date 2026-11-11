@@ -52,6 +52,8 @@
   --font-today-month-button: .75rem;
   /* Secondary text in Today event and task lists. */
   --font-today-hint: .8rem;
+  /* Titles in the Today sidebar's Recent notes list. */
+  --font-today-recent-note: .875rem;
   /* Text in ordinary data tables. */
   --font-table: .9rem;
   /* Column headings in data tables. */

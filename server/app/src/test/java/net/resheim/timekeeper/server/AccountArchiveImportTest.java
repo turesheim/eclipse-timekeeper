@@ -58,9 +58,12 @@ class AccountArchiveImportTest {
         try(var file=archives.download(tokens.authenticate("Bearer test-a"))) {return AccountArchiveInput.read(file.file(),"application/zip");}
     }
     private UUID stage(ObjectNode archive) throws Exception {
-        byte[] bytes=archive.toString().getBytes(StandardCharsets.UTF_8);String digest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        return stage(archive.toString().getBytes(StandardCharsets.UTF_8),"application/json");
+    }
+    private UUID stage(byte[] bytes,String mime) throws Exception {
+        String digest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         return store.transaction("b",()->{
-            var uploads=new AccountUploads(store);var upload=uploads.create("account.json","application/json",bytes.length,digest);UUID id=uuid(upload.get("id"));
+            var uploads=new AccountUploads(store);var upload=uploads.create(mime.equals("application/zip")?"account.zip":"account.json",mime,bytes.length,digest);UUID id=uuid(upload.get("id"));
             for(int offset=0,index=0;offset<bytes.length;offset+=AccountUploads.CHUNK_BYTES,index++) uploads.chunk(id,index,Base64.getEncoder().encodeToString(Arrays.copyOfRange(bytes,offset,Math.min(bytes.length,offset+AccountUploads.CHUNK_BYTES))));
             return id;
         });
@@ -91,7 +94,7 @@ class AccountArchiveImportTest {
             note.put("text",text);note.put("markdown",new String(JournalMarkdown.render(date+".md",note.path("markdown").asText().getBytes(StandardCharsets.UTF_8),text,note.path("body").asText()),StandardCharsets.UTF_8));
         }
         var inline=archive.putArray("dayNotes");days.values().forEach(inline::add);
-        archive.remove(java.util.List.of("journalFiles","dayLabels","vault"));return archive.put("format",AccountArchive.LEGACY_FORMAT);
+        archive.remove(java.util.List.of("journalFiles","dayLabels","vault","noteTasks"));return archive.put("format",AccountArchive.LEGACY_FORMAT);
     }
     private ObjectNode work() {return store.transaction("b",()->{var value=object();for(var entry:DomainTransfer.TYPES.entrySet()) {var items=value.putArray(entry.getKey());store.list(entry.getValue()).forEach(items::add);}value.set("profile",store.profile());return value;});}
     @Test void focusAreasRestoreWithNewOwnedClientIdentitiesAndPreviewHasNoSideEffects() throws Exception {
@@ -138,6 +141,43 @@ class AccountArchiveImportTest {
             assertEquals("deleted",restored.get(0).path("externalReferences").get(0).path("externalId").asText());
             return null;
         });
+    }
+    @Test void bookmarksRoundTripWithAnAccountArchiveAndPreviewRollsBackMetadata() throws Exception {
+        source();
+        var source=store.transaction("a",()->{
+            var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();var entry=vault.put(new VaultPath("Bookmarked.md"),null,true,"Exact note".getBytes(StandardCharsets.UTF_8));
+            var marks=new NoteBookmarks(store);var file=marks.reference(VaultContent.TYPE,entry.path("sourceKey").asText());marks.save(file,marks.tag(file),true);
+            var day=marks.reference(DayNotes.TYPE,"2026-11-08");marks.save(day,marks.tag(day),true);return file;
+        });
+        ObjectNode archive;byte[] zip;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");zip=java.nio.file.Files.readAllBytes(file.file());}
+        inputs.validate("AccountArchiveSnapshot",archive);assertEquals(2,archive.path("bookmarks").size());assertEquals(2,AccountArchiveInput.counts(archive).path("bookmarks").asInt());
+        UUID upload=stage(zip,"application/zip");var review=store.transaction("b",()->importer().preview(upload,false));assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->{var marks=new NoteBookmarks(store);assertFalse(marks.get(source).path("bookmarked").asBoolean());assertFalse(marks.day(DayNotes.date("2026-11-08")));assertTrue(store.list(NoteBookmarks.TYPES.get(VaultContent.TYPE)).isEmpty());return null;});
+        store.transaction("b",()->importer().apply(upload,false,review.etag()));
+        store.transaction("b",()->{var marks=new NoteBookmarks(store);assertTrue(marks.get(source).path("bookmarked").asBoolean());assertTrue(marks.day(DayNotes.date("2026-11-08")));assertTrue(store.find(DayNotes.TYPE,DayNotes.id(DayNotes.date("2026-11-08"))).isEmpty());return null;});
+        var invalid=archive.deepCopy();invalid.withArray("bookmarks").add(invalid.path("bookmarks").get(0).deepCopy());assertEquals(422,assertThrows(ApiFailure.class,()->NoteBookmarks.validate(invalid.path("bookmarks"),invalid.path("vault"))).status);
+        var missing=archive.deepCopy();missing.withArray("bookmarks").add(object().put("sourceType",VaultContent.TYPE).put("sourceKey",UUID.randomUUID().toString()));assertEquals(422,assertThrows(ApiFailure.class,()->NoteBookmarks.validate(missing.path("bookmarks"),missing.path("vault"))).status);
+    }
+    @Test void noteClientsRoundTripWithRemappedBusinessClientsAndPreviewIsPrivate() throws Exception {
+        source();
+        var source=store.transaction("a",()->{
+            var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();var entry=vault.put(new VaultPath("Client note.md"),null,true,"Exact client note\r\n".getBytes(StandardCharsets.UTF_8));
+            var clients=new NoteClients(store);UUID client=uuid(store.list("CLIENT").get(0).path("id"));var file=clients.reference(VaultContent.TYPE,entry.path("sourceKey").asText());clients.save(file,clients.tag(file),client);
+            var day=clients.reference(DayNotes.TYPE,"2026-11-19");clients.save(day,clients.tag(day),client);return file;
+        });
+        ObjectNode archive;byte[] zip;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");zip=java.nio.file.Files.readAllBytes(file.file());}
+        inputs.validate("AccountArchiveSnapshot",archive);assertEquals(2,archive.path("noteClients").size());assertEquals(2,AccountArchiveInput.counts(archive).path("noteClients").asInt());String originalClient=archive.path("noteClients").get(0).path("clientId").asText();
+        UUID upload=stage(zip,"application/zip");var review=store.transaction("b",()->importer().preview(upload,false));assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->{assertTrue(new NoteClients(store).get(source).path("clientId").isNull());assertTrue(store.list(NoteClients.TYPES.get(DayNotes.TYPE)).isEmpty());return null;});
+        store.transaction("b",()->importer().apply(upload,false,review.etag()));
+        store.transaction("b",()->{
+            var clients=new NoteClients(store);String mapped=clients.get(source).path("clientId").asText();assertNotEquals(originalClient,mapped);assertEquals(store.list("PROJECT").get(0).path("clientId").asText(),mapped);
+            assertEquals(mapped,clients.get(clients.reference(DayNotes.TYPE,"2026-11-19")).path("clientId").asText());assertTrue(store.find(DayNotes.TYPE,DayNotes.id(DayNotes.date("2026-11-19"))).isEmpty());
+            assertArrayEquals("Exact client note\r\n".getBytes(StandardCharsets.UTF_8),new VaultSources(store,store.vaultLimits(),source).read());return null;
+        });
+        var equivalent=archive.deepCopy();((ObjectNode)equivalent.path("noteClients").get(0)).put("clientId",originalClient.toUpperCase(Locale.ROOT));assertDoesNotThrow(()->NoteClients.validate(equivalent));
+        var duplicate=archive.deepCopy();duplicate.withArray("noteClients").add(duplicate.path("noteClients").get(0).deepCopy());assertEquals(422,assertThrows(ApiFailure.class,()->NoteClients.validate(duplicate)).status);
+        var foreign=archive.deepCopy();((ObjectNode)foreign.path("noteClients").get(0)).put("clientId",UUID.randomUUID().toString());assertEquals(422,assertThrows(ApiFailure.class,()->NoteClients.validate(foreign)).status);
     }
     @Test void dayNotesRoundTripWithoutWorkAndNeverOverwriteAnExistingDate() throws Exception {
         source();
@@ -325,7 +365,7 @@ class AccountArchiveImportTest {
         });
     }
     @Test void olderAccountArchiveWithoutProviderCollectionsStillRestores() throws Exception {
-        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove(java.util.List.of("journalFiles","dayLabels","vault"));var work=(ObjectNode)archive.path("work");
+        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove(java.util.List.of("journalFiles","dayLabels","vault","noteTasks"));var work=(ObjectNode)archive.path("work");
         work.remove("taskConnections");work.remove("taskLists");work.remove("taskListSections");work.remove("taskAttachments");
         inputs.validate("AccountArchiveSnapshot",archive);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));

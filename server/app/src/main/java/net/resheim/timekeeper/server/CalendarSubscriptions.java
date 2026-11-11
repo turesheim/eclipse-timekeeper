@@ -29,15 +29,17 @@ final class CalendarSubscriptions {
     ObjectNode visible(JsonNode value){
         var result=object();for(String field:List.of("id","ownerId","version","name","clientId","visible","createdAt","lastAttempt","lastSuccess","lastError","nextRefresh"))result.set(field,value.path(field));
         result.put("includeEvents",value.path("includeEvents").asBoolean(true)).put("includeTodos",value.path("includeTodos").asBoolean(false));
+        if(value.hasNonNull("managedConnectionId")){result.put("managed",true);result.set("connectionId",value.get("managedConnectionId"));}
         try{result.put("origin",new java.net.URI(value.get("url").asText()).getHost());}catch(Exception failure){throw ApiFailure.conflict();}return result;
     }
     ObjectNode list(){var result=object().put("refreshMinutes",REFRESH_MINUTES);var items=result.putArray("items");store.list(SUB).stream().sorted(Comparator.comparing(value->value.path("name").asText(),String.CASE_INSENSITIVE_ORDER)).forEach(value->items.add(visible(value)));return result;}
     ObjectNode create(JsonNode input,CalendarDownload policy){
         if(store.list(SUB).size()>=20)throw new ApiFailure(422,"CALENDAR_SUBSCRIPTION_LIMIT");
         var value=object().put("createdAt",store.now().toString()).putNull("lastAttempt").putNull("lastSuccess").putNull("lastError").put("nextRefresh",store.now().toString());
-        configuration(value,input,policy,true);UUID id=UUID.randomUUID();value=insert(SUB,id,value);clientRelation(id,uuid(value.get("clientId")));return value;
+        configuration(value,input,policy,true);UUID id=UUID.randomUUID();value=insert(SUB,id,value);clientRelation(id,uuid(value.get("clientId")));new CalendarSearchState(store).changed();return value;
     }
     private void configuration(ObjectNode value,JsonNode input,CalendarDownload policy,boolean create){
+        if(value.hasNonNull("managedConnectionId")&&(!input.path("url").asText("").isBlank()||input.has("includeEvents")&&!input.path("includeEvents").asBoolean()||input.path("includeTodos").asBoolean()))throw new ApiFailure(409,"CALENDAR_MANAGED_SOURCE");
         store.find("CLIENT",uuid(input.get("clientId"))).orElseThrow(ApiFailure::notFound);
         String url=input.path("url").asText("");if(create||!url.isBlank()) {
             try{value.put("url",policy.address(url).toString());}catch(CalendarFailure failure){throw new ApiFailure(422,failure.code);}
@@ -58,11 +60,12 @@ final class CalendarSubscriptions {
             value.put("nextRefresh",store.now().toString());
         }
         store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=?",store.owner(),SUB,id);clientRelation(id,uuid(value.get("clientId")));
-        return save(SUB,value);
+        value=save(SUB,value);new CalendarSearchState(store).changed();return value;
     }
     void remove(UUID id,String match){
         var value=required(id);ApiReplies.match(visible(value),match);store.delete(SUB,id);
         store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),FEED,id);
+        new CalendarSearchState(store).changed();
         // Conversion tombstones deliberately outlive subscriptions and activities.
     }
     private static String configuration(JsonNode value){return hash(value.path("url").asText());}
@@ -70,6 +73,7 @@ final class CalendarSubscriptions {
     private boolean enabled(){try(var query=store.statement("SELECT state FROM tk_account WHERE owner_id=?",store.owner());var rows=query.executeQuery()){return rows.next()&&!rows.getString(1).equals("DISABLED");}catch(SQLException failure){throw new ApiFailure(503,"UNAVAILABLE");}}
     Claim claim(UUID id,boolean force){
         var value=required(id);if(!enabled())return null;Instant now=store.now();
+        if(value.hasNonNull("managedConnectionId"))return null;
         var previous=store.find(FEED,id);var feed=previous.map(node->((ObjectNode)node).deepCopy()).orElseGet(JsonValues::object);
         if(feed.hasNonNull("leaseUntil")&&Instant.parse(feed.get("leaseUntil").asText()).isAfter(now))return null;
         if(!force&&value.hasNonNull("nextRefresh")&&Instant.parse(value.get("nextRefresh").asText()).isAfter(now))return null;
@@ -79,17 +83,42 @@ final class CalendarSubscriptions {
         value.put("lastAttempt",now.toString()).put("nextRefresh",now.plusSeconds(REFRESH_MINUTES*60L).toString());value=save(SUB,value);
         return new Claim(store.owner(),id,lease,configuration(value),value.get("url").asText(),optionalText(feed.get("body")).orElse(null),optionalText(feed.get("etag")).orElse(null),optionalText(feed.get("modified")).orElse(null),value.path("includeEvents").asBoolean(true),value.path("includeTodos").asBoolean(false));
     }
+    ObjectNode managed(UUID id,UUID connection,String remote,String name,UUID client,String source){
+        store.find("CLIENT",client).orElseThrow(ApiFailure::notFound);var previous=store.find(SUB,id);
+        if(previous.isEmpty()&&store.list(SUB).size()>=20)throw new ApiFailure(422,"CALENDAR_SUBSCRIPTION_LIMIT");
+        if(previous.isPresent()&&!previous.get().path("managedConnectionId").asText().equals(connection.toString()))throw ApiFailure.conflict();
+        var value=previous.map(node->((ObjectNode)node).deepCopy()).orElseGet(()->object().put("createdAt",store.now().toString()).put("visible",true).putNull("lastAttempt").putNull("lastSuccess").putNull("lastError"));
+        boolean changed=previous.isEmpty()||!value.path("name").asText().equals(name)||!value.path("clientId").asText().equals(client.toString());
+        value.put("name",name).put("clientId",client.toString()).put("url",source).put("includeEvents",true).put("includeTodos",false).put("managedConnectionId",connection.toString()).put("remoteCalendarId",remote).put("nextRefresh",store.now().toString());
+        if(!changed)return value;
+        value=previous.isEmpty()?insert(SUB,id,value):save(SUB,value);store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='CAL_SUB' AND from_id=?",store.owner(),id);clientRelation(id,client);new CalendarSearchState(store).changed();return value;
+    }
+    void managedAttempt(UUID id,UUID connection){
+        var found=store.find(SUB,id);if(found.isEmpty()||!found.get().path("managedConnectionId").asText().equals(connection.toString()))return;
+        var value=((ObjectNode)found.get()).deepCopy();value.put("lastAttempt",store.now().toString()).put("nextRefresh",store.now().plusSeconds(900).toString());save(SUB,value);
+    }
+    void managedFinish(UUID id,UUID connection,String body,String error){
+        var found=store.find(SUB,id);if(found.isEmpty()||!found.get().path("managedConnectionId").asText().equals(connection.toString()))return;
+        var value=((ObjectNode)found.get()).deepCopy();
+        if(error==null){
+            var cached=store.find(FEED,id);var feed=cached.map(node->((ObjectNode)node).deepCopy()).orElseGet(JsonValues::object);boolean changed=!Objects.equals(feed.path("body").asText(null),body);
+            feed.put("body",body).putNull("etag").putNull("modified");if(cached.isEmpty())insert(FEED,id,feed);else save(FEED,feed);
+            value.put("lastSuccess",store.now().toString()).putNull("lastError");if(changed)new CalendarSearchState(store).changed();
+        }else value.put("lastError",error);
+        save(SUB,value);
+    }
     void finish(Claim claim,CalendarDownload.Result result,String error){
         if(!store.owner().equals(claim.owner()))throw ApiFailure.notFound();
         var metadata=store.find(SUB,claim.id());var cached=store.find(FEED,claim.id());if(metadata.isEmpty()||cached.isEmpty()||!enabled())return;
         var value=((ObjectNode)metadata.get()).deepCopy();var feed=((ObjectNode)cached.get()).deepCopy();
         if(!configuration(value).equals(claim.configuration())||!claim.lease().equals(feed.path("lease").asText()))return;
         feed.remove(List.of("lease","leaseUntil"));
+        boolean contentChanged=error==null&&!result.unchanged()&&!Objects.equals(feed.hasNonNull("body")?feed.get("body").asText():null,result.body());
         if(error==null){
             if(!result.unchanged())feed.put("body",result.body()).put("etag",result.etag()).put("modified",result.modified());
             value.put("lastSuccess",store.now().toString()).putNull("lastError");
         }else value.put("lastError",error);
-        save(FEED,feed);save(SUB,value);
+        save(FEED,feed);save(SUB,value);if(contentChanged)new CalendarSearchState(store).changed();
     }
     private static LocalDate[] window(String first,String last){
         try{var from=LocalDate.parse(first);var to=LocalDate.parse(last);if(!to.isAfter(from)||ChronoUnit.DAYS.between(from,to)>31)throw new IllegalArgumentException();return new LocalDate[]{from,to};}
@@ -110,12 +139,13 @@ final class CalendarSubscriptions {
         catch(CalendarFailure failure){throw new ApiFailure(409,"CALENDAR_EVENT_CHANGED");}
     }
     ObjectNode events(String first,String last){
-        var dates=window(first,last);var result=object();var items=result.putArray("items");var errors=result.putObject("errors");var links=links();var notes=new EventNotes(store).presentKeys();
+        var dates=window(first,last);var result=object();var items=result.putArray("items");var errors=result.putObject("errors");var links=links();var notes=new EventNotes(store).presentKeys();var bookmarks=new NoteBookmarks(store).events();
         for(var subscription:store.list(SUB))if(subscription.path("visible").asBoolean())try {
             var values=occurrences(subscription,dates[0],dates[1]);if(items.size()+values.size()>5000)throw CalendarFailure.complex();
             for(var event:values) {
                 var link=links.get(subscription.path("id").asText()+"/"+event.path("key").asText());
-                event.set("activityIds",link==null?array():link.path("activityIds"));event.put("hasNote",notes.contains(subscription.path("id").asText()+"/"+event.path("key").asText()));items.add(event);
+                String noteKey=subscription.path("id").asText()+"/"+event.path("key").asText();
+                event.set("activityIds",link==null?array():link.path("activityIds"));event.put("hasNote",notes.contains(noteKey)).put("noteBookmarked",bookmarks.contains(new EventNotes.Key(uuid(subscription.path("id")),event.path("key").asText()).id()));items.add(event);
             }
         }catch(CalendarFailure failure){errors.put(subscription.path("id").asText(),failure.code);}
         var sources=result.putObject("activitySources");
@@ -125,6 +155,22 @@ final class CalendarSubscriptions {
             var source=object();for(String field:List.of("subscriptionId","calendarName","clientId","clientName","color","eventKey","uid","recurrenceId","title","description","location","start","end","allDay","firstDate","endDate"))source.set(field,link.path(field));sources.set(id.asText(),source);
         }
         return result;
+    }
+    ObjectNode tasks(){
+        var result=object();var items=result.putArray("items");var errors=result.putObject("errors");var state=object().put("owner",store.owner()).put("zone",store.profile().path("zoneId").asText());var sources=state.putArray("sources");
+        var zone=ZoneId.of(store.profile().path("zoneId").asText());
+        for(var subscription:store.list(SUB).stream().sorted(Comparator.comparing(value->value.path("id").asText())).toList())if(subscription.path("visible").asBoolean()&&subscription.path("includeTodos").asBoolean(false)) {
+            String id=subscription.path("id").asText();var feed=store.find(FEED,uuid(subscription.get("id")));var source=object().put("id",id).put("version",subscription.path("version").asLong()).put("feedVersion",feed.map(value->value.path("version").asLong()).orElse(-1L));sources.add(source);
+            if(subscription.hasNonNull("lastError"))errors.put(id,subscription.path("lastError").asText());
+            if(feed.isEmpty()||!feed.get().hasNonNull("body")){errors.put(id,subscription.path("lastError").asText("CALENDAR_UNAVAILABLE"));continue;}
+            var client=store.find("CLIENT",uuid(subscription.get("clientId"))).orElseThrow(ApiFailure::notFound);
+            try{for(var task:new CalendarFeed(feed.get().path("body").asText(),false,true).tasks(zone)) {
+                task.put("subscriptionId",id).put("calendarName",subscription.path("name").asText()).put("clientId",client.path("id").asText()).put("clientName",client.path("name").asText()).put("color",client.path("color").asText());
+                // UIDs are only unique inside their source subscription.
+                task.put("id",hash(array().add(id).add(task.path("id").asText()).toString()));items.add(task);
+            }}catch(CalendarFailure failure){errors.put(id,failure.code);}
+        }
+        result.put("snapshot",etag(state)).put("zoneId",zone.getId());return result;
     }
     ObjectNode convert(UUID id,String key,JsonNode input){
         var subscription=required(id);if(!key.matches("[0-9a-f]{64}"))throw ApiFailure.badRequest();

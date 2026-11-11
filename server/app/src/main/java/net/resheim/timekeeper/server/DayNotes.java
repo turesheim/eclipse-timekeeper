@@ -68,8 +68,9 @@ final class DayNotes {
         long days=ChronoUnit.DAYS.between(first,last);if(days<0||days>=62)throw ApiFailure.validation();
         var dates=new TreeSet<LocalDate>();
         for(String type:List.of(TYPE,DayLabels.TYPE))for(var value:store.list(type,id(first),id(last)))dates.add(date(value.path("date").asText()));
+        var bookmarks=new NoteBookmarks(store);dates.addAll(bookmarks.days(first,last));
         var result=object().put("revision",store.revision());var items=result.putArray("items");
-        for(var day:dates){var value=get(day);if(hasContent(value)){value.remove("body");items.add(value);}}
+        for(var day:dates){var value=get(day);boolean marked=bookmarks.day(day);value.put("bookmarked",marked);if(hasContent(value)||marked){value.remove("body");items.add(value);}}
         return result;
     }
     ObjectNode save(LocalDate date,String match,String text){return save(date,match,object().put("text",text));}
@@ -133,6 +134,7 @@ final class DayNotes {
         // understand profile invalidations; no Eclipse/domain type is added.
         new DayNoteHistory(store).note(date,previous,value);
         VaultCatalog.complete(vault);
+        if(!deleted)new NoteTasks(store).source(new VaultSources.Ref(TYPE,id(date),date.toString()),markdown.getBytes(StandardCharsets.UTF_8));
         store.change("PROFILE","UPDATED",store.owner());return get(date);
     }
     void restoreDocument(LocalDate date,byte[] bytes){

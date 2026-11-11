@@ -36,7 +36,7 @@ export class WorkweekSessions {
       if (this.draft.first !== snapshot.dates.first || this.draft.zone !== snapshot.profile.data.zoneId) {
         this.draft.review = true;this.feedback.textContent = i18nText("ui.the_week_or_time_zone_changed_cancel_or_reload_to_review_your_proposed_times");this.showControls();
       }
-    } else this.paint();
+    } else if(!this.root.closest('#week-panel')?.hidden)this.paint();
     if (this.detailId) this.paintDetails();
   }
   setWritable(value) {
@@ -53,6 +53,7 @@ export class WorkweekSessions {
     this.close();this.draft = null;this.snapshot = null;this.model = null;this.api = null;this.writable = false;this.asOf = 0n;this.grid.replaceChildren();this.feedback.textContent = '';this.controls.hidden = true;this.root.replaceChildren();
   }
   close() {if (this.dialog.open) this.dialog.close();this.detailId = null;this.details.replaceChildren();}
+  show() {this.paint();}
   hide() {this.close();}
   paint() {
     if (!this.snapshot || this.draft) return;

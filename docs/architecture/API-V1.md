@@ -31,6 +31,15 @@ secrets never appear in resource DTOs, URLs, logs, errors or change notification
 Web requests may instead use the HttpOnly Secure cookie; unsafe cookie requests
 require the memory-only CSRF value returned by `/auth/session`.
 
+`POST /auth/password` accepts `newPassword` and exactly one of `currentPassword`
+or `proof`. Obtain a passkey proof through `/auth/passkeys/proof/options` with
+`{"action":"PASSWORD"}` and `/auth/passkeys/proof/finish`. This requires a genuine
+account browser session and fresh user-verified WebAuthn assertion. The two-minute,
+one-use proof is bound to the password action, owner, browser, session, origin, RP
+and account version; it cannot be borrowed from enrollment or removal. Proof
+consumption and password replacement are atomic. Success preserves passkeys and
+revokes all sessions and API tokens for that owner. Other owners are unaffected.
+
 Stateful clients bind their session to the first authenticated owner. Authorized
 responses include `X-Timekeeper-Owner`, the canonical unpadded base64url encoding
 of that owner's UTF-8 ID, including empty pages and 204 responses. Send that
@@ -100,8 +109,16 @@ JSON processing; transfer limits also apply to exported snapshots. Successful
 JSON is `application/json`; errors are `application/problem+json` with matching
 HTTP/body status and stable `code`. Clients branch on status/code, not prose.
 
-Tasks may be unassigned, but a subtask must have the same non-null project as its
-parent. Self-parenting, cycles, and moving a task with children to another project
+Tasks may be unassigned. A task without a project can have an optional, owned
+`clientId`; tasks in a project inherit that project's client. This business-client
+metadata lives in the server adapter, like project and work-session clients.
+Legacy writes that omit `clientId` retain the direct assignment. Supplying null
+clears it. A supplied client must agree with the selected project. Portable JSON,
+CSV and account archives retain direct clients and remap their IDs on import.
+Task section and provider responses retain this metadata and return the same
+canonical task validators as ordinary reads, so their ETags can be reused.
+Subtasks have the same project as their parent, including when both are unassigned.
+Self-parenting, cycles, and moving a task with children to another project
 are conflicts (409). Deleting a project containing tasks, a task with children
 or activities, or a label assigned to activities returns 409; no implicit cascade
 loses recorded time. All referenced projects/tasks/labels must be owned.
@@ -147,6 +164,9 @@ supplies all three fields and changes no other task data. A provider connector
 must retain unsupported flags in Timekeeper without inventing a corresponding
 provider value. Legacy task, planning, checklist, and timing updates preserve
 importance.
+The ordinary task editor can also supply optional `priority` and `due` in
+`PUT /tasks/{id}`. These fields and the legacy fields commit atomically under
+the supplied task ETag, preserving start values, flags, urgency and other sections.
 
 Task notes use a separate conditional `PUT /tasks/{id}/body` with a complete
 `{ "format": "TEXT" | "HTML", "content": "..." }` value. Empty plain text clears
@@ -214,6 +234,52 @@ participants and roles. This context is distinct from the list's `shared`,
 Providers may expose only the flags, leaving participant details empty.
 `PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
 list updates preserve it. Portable JSON/CSV and account archives retain it.
+
+Administrator-only `GET /admin/internet-accounts` returns redacted installation
+setup and callback URLs. It does not contact a provider by default. With
+`?check=true`, it resolves the operator-controlled shared service and reads
+`/v1/providers` to report configured registrations. The response is `no-store`
+and never includes client secrets, account grants or tokens. The administrator
+can inspect the installation client ID and saved/effective sign-in settings.
+`PUT` requires a browser administrator session, CSRF, `If-Match` and the current
+administrator password. Secret updates explicitly preserve, replace or clear
+the private value; changes activate only after a coordinated restart. Shared
+service registrations remain independent. A configured registration does not
+establish successful live provider consent.
+
+Internet account sign-in and synchronization use `/task-providers`, separate from portable connection
+metadata. `GET` returns configured-provider availability and owned status with
+discovered/selected lists. Its `calendarSynchronization` flag describes whether
+new sign-ins support calendars; direct registration is task-only. A direct
+calendar request is rejected without requesting task access in its place.
+`POST /task-providers/{provider}/authorize` starts a
+browser-bound PKCE flow for `google` or `microsoft`; `POST
+/task-providers/complete` consumes its one-use state and code. `POST
+/task-providers/cancel` cancels an attempt. Credentials remain private and are
+excluded from these responses and account archives. The callback is
+`/web/task-provider-callback.html` at the public origin; see
+[operator setup](../operations/TASK-PROVIDERS.md).
+
+Shared sign-in is the default: authorize accepts the selected `services`
+(`tasks`, `calendars`) and `language` (`en`, `nb`), and returns a validated
+`authorizationOrigin` with its authorization URL. The NAS retains owner/browser
+state and PKCE; the shared service holds provider registrations and refresh
+tokens. A one-use handoff returns only to the initiating installation. Legacy
+direct task registration remains an explicit operator opt-out.
+
+`PUT /task-providers/{id}/calendars` saves selected calendar IDs and optional
+owned-client mappings with `If-Match`. Its `calendarConfigurationVersion` is
+independent of task-list configuration. Managed calendar subscriptions are
+read-only API sources refreshed by the account worker, never by the URL feed
+fetcher. Calendar-only accounts do not create task lists. Plain calendar
+subscriptions remain independent and require no provider sign-in.
+
+`GET /task-providers/{id}` reads owned status. `PUT /task-providers/{id}/lists`
+replaces selected remote list IDs with `If-Match`; `DELETE /task-providers/{id}`
+disconnects with `If-Match`, retaining tasks. `POST /task-providers/{id}/refresh`
+queues a bounded background scan and returns 202. Private leases fence results
+after disconnect, reselection, reconnect or account disablement. These adapters
+advertise import-only capabilities and do not perform provider writes.
 
 `/task-list-sections` stores optional, owner-scoped provider groupings inside
 one task list. A section has a stable Timekeeper ID, remote section ID, name,
@@ -691,6 +757,21 @@ ICS feed can be displayed. In particular, the separate task-provider APIs and
 connectors described in [the task protocol](TASK-SYNC-PROTOCOL.md) remain separate.
 
 Today, like Week, reloads subscription results every 30 seconds while visible.
+The Tasks page reads `/calendar-tasks?limit=…&cursor=…` to browse every current
+published to-do definition and detached recurrence instance, independently of
+the calendar window. This includes undated, completed, cancelled and distant
+dates. It does not generate an infinite occurrence list or create native tasks.
+Native and Eclipse/Mylyn tasks retain their existing `/tasks` records.
+Absolute calendar times retain UTC precision, including repeated local hours;
+floating times retain their account-zone wall value without an invented instant.
+The new catalog requires read permission, binds rows/cursors to the owner, and
+never returns the subscription feed URL or fetches an upstream feed during a
+read. Subsequent pages require `If-Match` with the response snapshot/ETag;
+changed source/configuration/zone snapshots return 412 and require a restart.
+Native account revision changes retain the normal `409 CURSOR_EXPIRED` behavior.
+Per-subscription errors preserve unrelated results. Calendar completion remains
+read-only; change it in the source provider.
+
 The server refreshes upstream feeds at its existing 15-minute interval. Today
 shows visible-subscription download/parse failures rather than silently treating
 a partial result as an empty calendar. Source providers can cache published ICS
@@ -1123,13 +1204,47 @@ corresponding private staging capacity.
 
 ## Notes collection API (schema 10)
 
-Notes entry metadata includes an optional read-only `title`: the associated event
-title for event notes, or the first nonempty document-level Markdown heading
+Notes entry metadata includes an optional read-only `title`: an explicitly named
+ordinary document, the associated event title for event notes, or the first nonempty document-level Markdown heading
 (ATX or Setext) for ordinary notes. Heading formatting is reduced to plain text;
 frontmatter, code examples and quoted headings do not supply a document title.
-Titles are bounded to 4,096 characters. Clients fall back to the filename/path
-when no title is available. Title reads do not modify canonical Markdown bytes,
+Titles are bounded to 4,096 characters. The browser falls back to the filename
+without its `.md` suffix when no title is available. Title reads do not modify canonical Markdown bytes,
 filenames, note versions or write validators.
+
+`PUT /notes/entries/{id}/title` accepts a plain `title` for an ordinary Markdown
+document and requires the current metadata `If-Match`. In one owner transaction
+it retains that display title and renames the file in its current folder,
+preserving its extension, ID, canonical bytes, content version and source dates.
+Collisions, stale metadata and invalid portable filenames fail without changing
+either document. Journal, event and attachment associations cannot be renamed
+through this operation. Explicit titles survive account archives and subsequent
+content edits; a later path rename updates the chosen title to its filename stem.
+
+`GET /notes/client?sourceType=...&sourceKey=...` reads an account-private
+note-to-client association with its own strong ETag. `PUT` accepts exactly
+`{clientId: <owned client UUID or null>}` and requires that association's current
+`If-Match` (428 when absent, 412 when stale). Clearing an unchanged association
+is a no-op. Valid sources are ordinary Markdown, saved event notes, and daily or
+weekly pages, including empty daily/weekly pages. Foreign notes/clients return
+404; read-only tokens cannot write. Responses are private, no-store.
+
+Association writes retain canonical note bytes, dates, content validators and
+edit history. A client relation protects the associated client from deletion
+until its notes are detached. Account archives include optional `noteClients`
+metadata and remap client IDs with the imported work graph. Review rolls back
+these associations; an existing different association is an import conflict.
+Note-only ZIPs do not contain business-client records or these associations.
+
+`GET /notes/recent` includes ordinary, event and daily/weekly journal note metadata
+within the configured account-local recent-edit window. It excludes today's
+daily journal note, identified by its canonical date in the account time zone,
+as well as folders, attachments and trash. The exclusion applies before paging,
+independently of the selected Today date or the configured journal folder.
+Results use stable edit-time ordering and guarded snapshot
+pagination; upgrading the selection policy also invalidates an older snapshot.
+An unused account stays uninitialized; existing canonical event/journal notes
+are indexed on the first recent-list read when needed.
 
 `GET /notes/storage` requires read permission and returns owner-private logical
 usage without initializing an unused collection. It includes effective `limits`,
@@ -1174,29 +1289,86 @@ carry entryEtag in the HTTP ETag header; content responses carry the content
 validator. Use entryEtag for PUT `/path`, DELETE entry and POST `/restore`.
 New entries include `createdAt`, the original creation time supplied by import,
 or otherwise the time they were added to the collection. Existing entries with
-no recorded creation date omit it. It is
-preserved by editing, moving, recovery and account archives. `modifiedAt` describes
+no recorded creation date omit it. `createdAtSource` is `ORIGINAL`, `ADDED` or
+`UNKNOWN`; older entries without it have unknown provenance. It is preserved by editing, moving, recovery and account archives. `modifiedAt` describes
 the canonical file content. Clients sort after following every metadata page;
 unknown dates can be placed after known dates without fetching file bytes.
-Conflicting destinations are never overwritten. Stale/missing preconditions
+Create-only imports never overwrite conflicting destinations. Stale/missing preconditions
 return 412/428; account quota growth returns 507. Day labels are independent.
 
-The create-only file endpoint accepts optional `createdAt` and `modifiedAt` query
-parameters; the folder endpoint accepts the same optional fields in
+The create-only file endpoint accepts optional `createdAt`, `modifiedAt` and
+`createdAtSource` query parameters; the folder endpoint accepts the same optional fields in
 `VaultFolderInput`. They are validated RFC 3339 instants, normalized to UTC within
 years 0001–9999, and applied atomically to
 the new namespace entry and its canonical content, with the resulting content
 validator refreshed before replying. They cannot retime an existing file, bypass
 If-None-Match, change a day label, or add an artificial content revision. Normal
 content edits advance modification time and preserve creation time. Account
-archives retain both dates when present; older archives remain accepted.
+archives retain both dates and their creation-date provenance when present;
+older archives remain accepted. Supplying `createdAtSource` requires `createdAt`;
+when a source creation date is supplied without provenance it defaults to `ORIGINAL`.
+
+For an explicitly reviewed replacement, `PUT /notes/entries/{id}/import` accepts
+raw file bytes and the same optional date query parameters. Require the reviewed
+`entryEtag` in `If-Match`; this guards edits, moves, deletion and replacement of the
+reviewed entry. Replacements preserve entry ID and path, enforce the usual quotas
+and native note validation, and update bytes and source dates in one transaction.
+Without a supplied creation date, the existing creation date and provenance remain
+unchanged. Folders/deleted entries cannot be overwritten. Native journal imports
+leave independent day labels untouched. This endpoint requires write permission;
+normal content edits retain their existing timestamp semantics.
+
+`GET /notes/search?q=…&limit=…&cursor=…` searches active Markdown and native
+journal/event notes and published calendar event details independently from filename substring navigation. Its
+`NotesSearchPage` contains current entry metadata and/or `calendarEvent` details and bounded plain-text excerpts
+with UTF-16 highlight ranges, plus an opaque snapshot and optional continuation.
+Bookmarked notes receive a small, deterministic relevance bonus. Bookmark changes
+advance the search generation and invalidate existing cursors without changing
+source bytes or content validators. All words are required across boosted title/path/body fields; double quotes form
+phrases. An unquoted `tag:#name` requires an exact prose hashtag and can be
+combined with words, phrases or other tags. Tag keys use NFC and case folding;
+each tag is at most 128 UTF-16 code units including `#`. Unicode letters,
+numbers, underscores, hyphens and slash-separated segments are supported.
+Code, link destinations/labels, image labels, YAML frontmatter and wikilink
+targets do not define tags. Query length is 512 UTF-16 code units and at most
+32 analyzed terms or filters. `file:value` restricts results to a literal,
+case-insensitive path substring (quote values containing spaces). `event:`,
+`journal:` and `note:` constrain results to events, daily/weekly journals and
+ordinary Markdown respectively. Each can precede a word or quoted phrase; an
+empty type qualifier matches the whole type. Filters combine with ordinary words
+and tags. The browser uses the existing filename catalog endpoint for a pure
+`file:` query so folders and attachments also appear.
+Visible event-enabled subscriptions contribute event titles, descriptions and locations,
+including events without saved notes. Saved event-note text and live details share
+one result. Recurring series use finite published definitions, never unbounded
+occurrence expansion. `file:` excludes unsaved calendar definitions.
+`GET /notes/search/calendar/{id}` rechecks the owned live result and returns
+`NotesSearchHit` without creating a note. Optional `entry` identifies its real
+saved note; `calendarEvent` carries display details without exposing feed URLs.
+A series definition is distinguished from a concrete occurrence, and inherited
+saved-occurrence metadata does not invent start/end times.
+Default/capped page sizes are 50/200, and excerpts are at most 320 code units.
+Owner, deletion, configuration and hidden-journal filters precede pagination.
+
+Search captures committed SQL search state under authorization, releases the
+owner transaction for index work, and reacquires authorization to validate the
+generation and every canonical source binding/version before publishing results.
+Signed cursors last ten minutes and bind account/query/visibility, collection,
+restore epoch and committed note/calendar search generations. Stale tokens return 412; a replica
+that cannot catch up within the bounded wait returns 503 without stale snippets.
+`GET /notes/search/status` reports replica-local readiness. An unused account
+returns `READY` with zero generations without creating a collection or search
+state; probing readiness does not consume note storage or affect restore eligibility.
+Write-protected
+`POST /notes/search/rebuild` schedules a private rebuild. All responses are
+`private, no-store`. See [Notes search operations](../operations/NOTES-WEBDAV.md#searching-note-contents).
 
 `GET /notes/export` requires read permission and prepares a private ZIP using the
 same authorization recheck, restore fence, repeatable-read snapshot, temporary-file
 cleanup and download mechanism as `/data/account/export`. It contains active
 portable paths and exact bytes, including configured journal/event folders and
 assets, but no trash or account authority. Its `timekeeper-notes-v1` auxiliary
-metadata records `path`, `kind` (`FILE`/`FOLDER`), optional `createdAt`/`modifiedAt`,
+metadata records `path`, `kind` (`FILE`/`FOLDER`), optional `createdAt`/`modifiedAt`/`createdAtSource`,
 and file `bytes`/`sha256`. It normally uses `timekeeper-notes-metadata.json`, with a UUID
 suffix on collision. ZIP timestamp fields are also populated; the metadata
 preserves nanosecond precision and empty folder dates across extraction/import.
@@ -1249,3 +1421,31 @@ account are retained; oldest snapshots are evicted atomically. General binary
 assets are excluded. Revision snapshots are server-local recovery data; portable
 Markdown/WebDAV exports contain current files, not a revision database. Full
 instance backups retain the underlying owner-private records.
+
+### Note checklist tasks
+
+Canonical Markdown writes for daily, weekly, saved event and ordinary Notes
+resources reconcile nonempty Markdown checklist items into shared-domain tasks.
+Read-only reads do not enroll existing notes. A bounded background worker enrolls
+older active Markdown independently of browser reads. Source creation and task creation/updates commit
+under the same account transaction; normal task completion patches only the
+checkbox marker in the current source and changes its content ETag. Stale note
+writers receive the existing 412 response and must retain/review their draft.
+Code examples, escapes, YAML frontmatter and binary files are not task sources.
+A document is limited to 1,000 checklist items. Prose annotations `@Client_Name`
+or `@Project_Name` select an unambiguous owned client or project; underscores
+stand for spaces. `@client:Name` and `@project:Name` resolve collisions between
+the two catalogs. Unknown, ambiguous or conflicting names do not assign a task;
+code, escapes, link labels and email addresses are not annotations. Source bytes
+and annotation text are retained. Removing an item deletes its unused task. Tasks
+with recorded work or subtasks are retained and unlinked. A deliberately deleted
+task is not recreated by prose-only edits. Trash retains task identities for restore.
+`GET /tasks/{id}/note` resolves the current active source as `VaultEntry`, following
+file moves and renames, and returns 404 for an unlinked, deleted or foreign source.
+
+Account snapshots may include `noteTasks`, an array of source references and
+ordered checklist identities. Every non-null task ID must reference the owned
+work graph exactly once and is remapped by account restoration. Null IDs retain
+a deliberate task deletion. Preview rolls back both graph and link writes;
+restoration suppresses automatic enrollment while restoring original bytes and
+then validates/installs the remapped links. Older archives omit this optional field.

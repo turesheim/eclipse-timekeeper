@@ -49,11 +49,12 @@ final class VaultSources {
         if(!ref.id().toString().equals(value.path("id").asText())||!store.owner().equals(value.path("ownerId").asText()))throw new IllegalStateException("Invalid stored vault reference");
         return value;
     }
+    private void identity(UUID expected){if(!expected.equals(ref.id()))throw new IllegalStateException("Invalid stored vault reference");}
     private byte[] document(){return switch(ref.type()){
-        case DayNotes.TYPE->new DayNotes(store).document(DayNotes.date(ref.key()));
-        case WeekNotes.TYPE->new WeekNotes(store).document(WeekNotes.week(ref.key()));
-        case EventNotes.TYPE->new EventNotes(store).document(EventNotes.filename(ref.key()));
-        case JournalAssets.TYPE->JournalAssets.bytes(new JournalAssets(store).get(ref.key()));
+        case DayNotes.TYPE->{var date=DayNotes.date(ref.key());identity(DayNotes.id(date));yield new DayNotes(store).document(date);}
+        case WeekNotes.TYPE->{var week=WeekNotes.week(ref.key());identity(WeekNotes.id(week));yield new WeekNotes(store).document(week);}
+        case EventNotes.TYPE->{var key=EventNotes.filename(ref.key());identity(key.id());yield new EventNotes(store).document(key);}
+        case JournalAssets.TYPE->{identity(JournalAssets.id(store.owner(),ref.key()));yield JournalAssets.bytes(new JournalAssets(store).get(ref.key()));}
         case VaultContent.TYPE->new VaultContent(store).read(ref.id());
         default->throw new IllegalStateException("Invalid stored vault reference");
     };}
@@ -68,7 +69,11 @@ final class VaultSources {
         };
         return new Snapshot(etag(value),value.path("version").asLong(),deleted,bytes.length,ArchiveJournalFiles.digest(bytes),modified);
     }
-    byte[] read(){var value=value();if(value.path("version").asLong()==0||value.path("deleted").asBoolean())throw ApiFailure.notFound();return document();}
+    byte[] read(){
+        // Canonical readers already enforce ownership, existence and deletion.
+        // A metadata preflight would copy and parse the same large SQL payload twice.
+        byte[] bytes=document();if(bytes==null)throw ApiFailure.notFound();return bytes;
+    }
     Snapshot write(String expected,byte[] bytes,boolean markdown){
         if(bytes==null||bytes.length>limits.fileBytes())throw new ApiFailure(413,"VAULT_FILE_TOO_LARGE");
         switch(ref.type()){
@@ -76,7 +81,7 @@ final class VaultSources {
             case WeekNotes.TYPE->new WeekNotes(store).saveDocument(WeekNotes.week(ref.key()),expected,bytes);
             case EventNotes.TYPE->new EventNotes(store).saveDocument(EventNotes.filename(ref.key()),expected,bytes);
             case JournalAssets.TYPE->new JournalAssets(store).save(ref.key(),expected,bytes);
-            case VaultContent.TYPE->{if(markdown){VaultContent.markdown(bytes,limits.markdownBytes());new NoteRevisions(store).before(ref,bytes);}new VaultContent(store).save(ref.id(),expected,bytes,limits.fileBytes());}
+            case VaultContent.TYPE->{if(markdown){VaultContent.markdown(bytes,limits.markdownBytes());new NoteRevisions(store).before(ref,bytes);}var saved=new VaultContent(store).save(ref.id(),expected,bytes,limits.fileBytes());if(markdown&&!etag(saved).equals(expected))new NoteTasks(store).source(ref,bytes);}
             default->throw new IllegalStateException("Invalid stored vault reference");
         }
         return snapshot();

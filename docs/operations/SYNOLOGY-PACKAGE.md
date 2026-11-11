@@ -230,6 +230,12 @@ the explicit [operator recovery](ACCOUNTS.md#change-the-public-hostname) workflo
 See [email recovery and hostname changes](ACCOUNTS.md#recovery-email-addresses)
 before enabling delivery or changing a VPN/public hostname.
 
+Internet accounts use shared sign-in without per-NAS OAuth setup. Optional
+legacy direct task app registrations retain their
+`secrets/task_providers.properties` stays outside generated runtime settings and
+is included in native and Hyper Backup application archives. See
+[task-provider setup](TASK-PROVIDERS.md) for registration and account sign-in.
+
 Back up before upgrades. A failed application upgrade leaves native data and
 retained configuration intact; retain the previous `.spk` for recovery. Real DSM
 checks must verify package repair, reinstallation permissions and failure recovery.
@@ -268,12 +274,38 @@ This is separate from the encrypted `.tkbackup` download in Administration.
 the native archive contains plaintext credentials, and its confidentiality and
 retention are managed by Hyper Backup. Keep Hyper Backup's recovery key separately.
 
+The archive covers the whole selected application instance, including every
+account; it is not the current user's account export. The native engine's
+inventory is:
+
+| State | Archive coverage and recovery behavior |
+| --- | --- |
+| Accounts and work | `database.dump` contains the dedicated database, including owners, account credentials, browser sessions, API-token state, clients, projects, tasks, activities and work sessions. |
+| Notes and files | The same dump includes canonical note/file bytes, day/week/event notes, journal assets and task attachments, deleted content in the recycle bin, note revisions, and account preferences. Assets and history are database records, not an additional shared-folder tree. |
+| Authentication and settings | The dump includes central settings, recovery/passkey records and instance control. `config/tokens.json`, `config/account-setup.json`, `config/mail.properties` and `secrets/smtp_password` preserve the retained bootstrap/token/mail configuration. |
+| Recovered security material | Format 2 includes `instance-restore/active.json` and every file in its committed immutable generation, with inventory checksums and database bindings. This includes applicable recovered keys, certificates and source configuration. Format 1 remains readable when there is no active generation. |
+| Destination connection | `settings.json` and `secrets/database_password` describe the source for native recovery, but restore keeps the installed destination's database, role, generated service password, local HTTP port and public origin. PostgreSQL roles, the NAS configuration and administrator passwords are not dumped. |
+
+Temporary uploads, uncommitted restore stages, decrypted workspaces, locks,
+generated runtime configuration, reproducible search indexes, container images,
+logs and earlier native backup files are excluded. Install the compatible SPK
+and dependencies separately; this application archive is not an operating-system
+or PostgreSQL-package backup. Do not select the PostgreSQL data directory to make
+this logical archive complete.
+
 Backup briefly stops the selected package and restarts it if it was running.
 An already stopped package stays stopped. PostgreSQL remains running and all
 other clients of the selected application database must be stopped. Only the
 selected package is controlled; other packages/databases are not stopped. A
 concurrent callback is refused. Failed exports are reported to Hyper Backup and
 do not publish a partial archive.
+
+Allow downtime for the complete dump or restore, not just for uploading the
+result. Duration and free-space requirements depend on database size. Backup
+needs room in private appdata for its temporary dump and native archive, plus
+Hyper Backup's staged copy. Restore additionally needs the private input copy,
+unpacked dump and rendered SQL, as well as PostgreSQL transaction space. Check
+both the appdata and Hyper Backup staging volumes before a large operation.
 
 Restore through Hyper Backup's **Data** restore workflow, choosing the backup
 version and application. The destination package must already be installed and
@@ -286,6 +318,55 @@ restore leaves it stopped; follow native recovery below and retry the same backu
 An interrupted restore retains a private `.hyper-backup-import-*.tar` under
 `server/backups` while its maintenance marker remains. Keep that archive and
 marker until recovery completes.
+
+### Recovery onto a clean destination
+
+1. Keep the original installation and repository intact. Obtain the Hyper Backup
+   recovery key from its separate storage. Install a compatible DSM, Container
+   Manager and SynoCommunity PostgreSQL 17, meeting the minimums above, plus
+   Hyper Backup. Retain the exact tested SPK and its version information.
+2. Install the destination application package. Choose unused dedicated
+   database/role names and the destination's own HTTPS origin and local port.
+   Supply the PostgreSQL administrator credential only to the installation
+   wizard. The installer generates a new service password; recovery must keep it.
+   A newer backup schema requires a compatible application package before restore.
+3. Start the fresh application once so it initializes its canonical schema, then
+   stop it in Package Center. Finish or discard any unrelated pending maintenance
+   using its documented recovery procedure before importing a backup. The
+   destination must be installed and provisioned; Hyper Backup's application
+   import is not an installation wizard.
+4. Relink/open the existing repository in Hyper Backup and choose **Restore →
+   Data**, the desired version, and the matching application identity. Dagsverk
+   and Timekeeper are separate installed packages: use the identity recorded by
+   that repository. No PostgreSQL directory or additional application-data share
+   is required. Restore replaces the destination's disposable application data.
+5. On successful restore, start the package if it was previously stopped.
+   Authenticate using accounts from the backup, open representative notes and
+   assets, inspect note history and work/tasks for more than one account, and
+   create/edit a record. Verify the destination still uses its new database and
+   service credential. Check origin-dependent passkeys, HTTPS/proxy routing and
+   outbound mail using the [account recovery guidance](ACCOUNTS.md).
+6. Keep the source and recovery archive until verification succeeds. A failed
+   restore stays stopped. Retain the maintenance marker and staged native
+   archive, resolve the reported prerequisite or validation problem, and retry
+   the chosen backup. Do not clear the marker simply to bypass startup checks.
+
+This procedure must be demonstrated from a real Hyper Backup repository on the
+supported NAS. A successful direct native restore or Linux fixture alone does
+not establish clean-destination Hyper Backup recovery.
+
+### Failures and acceptance evidence
+
+An unavailable database, unsupported database/schema, another connected client,
+invalid archive or failed staging write makes the callback fail. A failed backup
+attempts to restore a previously running source's availability; a failed restore
+leaves the destination stopped. If restart fails, inspect Package Center and
+resolve that failure before starting the package. Hyper Backup remains
+responsible for reporting task success and retaining repository versions.
+After interruption, inspect both Package Center and the native maintenance
+marker before retrying; do not assume that cancelling the UI restored the prior
+state. The installed Hyper Backup cancellation/lifecycle contract remains part
+of the required real-NAS verification.
 
 The root callback handles only package lifecycle and Hyper Backup staging file
 descriptors. Archive creation and parsing run under the package's own numeric
@@ -484,8 +565,8 @@ The Dagsverk packages used by migration acceptance are uploaded separately as
 An **incomplete** `dsm-acceptance-template.json` binds the real-NAS test record to
 that exact candidate. Automated CI does not fill in the manual test results.
 
-Web-only main builds use **Synology web preview** and upload
-`synology-web-preview` instead. This packages the exact image that passed
+Routine main builds use **Synology web preview** and upload
+`synology-installer` too. This packages the exact image that passed
 deployment startup and bundled-web checks, without repeating the database and
 native backup matrix. When preview publication is enabled, the preview channel
 also requires the matching commit's selected Build checks, every Web shard and
@@ -493,6 +574,13 @@ also requires the matching commit's selected Build checks, every Web shard and
 `validation: web-smoke`; fully certified candidates use `validation: full`.
 Web previews cannot be promoted to stable: stable publication still requires
 the full candidate and real-NAS acceptance.
+
+Every main build produces the installer, including documentation-only changes.
+The newest verified main SPK is also available at the rolling
+[Synology latest prerelease](https://github.com/turesheim/eclipse-timekeeper/releases/tag/synology-latest).
+Its old assets and older temporary SPK artifacts are removed after replacement.
+Versioned release assets are retained. The SPK bundles its image; installation
+does not require the retired GitHub container package.
 
 The installer artifact name describes its contents. Preview status remains in
 the SPK version (`1.99.0-<revision>`), provenance and repository channel. Release
@@ -570,13 +658,40 @@ create an acceptance template locally (CI also supplies one):
 python3 server/scripts/promote_synology.py --package /private/candidate/timekeeper-1.99.0-42-r1000.spk --write-template /private/candidate/dsm-acceptance.json
 ```
 
-Record the full DSM, Container Manager and PostgreSQL package versions from the
-tested NAS and the UTC completion time in `testedAt`. Set a check to `true` only
+Record the full DSM, Container Manager, PostgreSQL and Hyper Backup package
+versions from the tested NAS and the UTC completion time in `testedAt`. The
+format-2 template names its `package` (`timekeeper` or `dagsverk`); complete a
+separate record for each exact package candidate. A Timekeeper record cannot
+certify a Dagsverk package. Older format-1 records lack Hyper Backup acceptance
+and must be replaced by a fresh template and the additional real-NAS checks.
+Set a check to `true` only
 after that scenario passes on the actual NAS. The scenarios include both client
 connections, package/reboot lifecycle and failed-upgrade recovery, migration,
 backup/restore, uninstall retention and repository discovery/update. Local Docker
 tests do not satisfy these checks. Do not put passwords, setup codes, tokens,
 hostnames or user data in the record; additional fields are refused.
+
+The dedicated Hyper Backup checks require these observations from the installed
+version, beyond the generic `backupRestore` scenario:
+
+| Check | Required observation on the actual NAS |
+| --- | --- |
+| `hyperBackupDiscoveryAndSummary` | The selected identity appears in Applications, and its summary explicitly includes database, application data, settings and authentication/security material. |
+| `hyperBackupCallbackContract` | Record the actual request/response protocol, execution UID/GID, staging ownership/modes, lifecycle ownership and cancellation behavior in private test evidence. |
+| `hyperBackupApplicationOnly` | Select only the application, with no data share/PostgreSQL directory, then complete a real repository backup. |
+| `hyperBackupRunningAndStoppedState` | Run manual and scheduled backups with the package initially running and stopped; both preserve its prior state. |
+| `hyperBackupAllDataRecovery` | Change/delete representative data, restore the earlier repository version, and verify all accounts, credentials, work/tasks, notes/history, attachments/assets, settings and active material. Restored users can authenticate and read/write. |
+| `hyperBackupCleanDestination` | Follow the clean-destination procedure above from the same repository, with a newly generated destination service password; source and unrelated databases remain unchanged. |
+| `hyperBackupFailedExport` | Unavailable database, unsupported versions, full staging volume and failed export report failure and publish no partial archive; a running source recovers availability. |
+| `hyperBackupFailedRestore` | Corrupt/incompatible archives are rejected without data replacement; the destination remains stopped and retains any recovery marker/archive. |
+| `hyperBackupCancellationAndRetry` | Interrupt/cancel backup and restore through Hyper Backup, check process/package/maintenance state, then retry successfully without partial publication or unsafe startup. |
+| `hyperBackupFailedRestart` | A failed restart is visible as failure and has a verified Package Center recovery path. |
+| `hyperBackupClientEncryption` | The repository uses client-side encryption and can be recovered with the separately stored key. |
+
+Keep screenshots and redacted task logs in the private acceptance evidence,
+identified by the exact preview SHA-256 and content digest. The public record
+contains only the strict fields above. Neither the record nor a green automated
+build substitutes for recovery demonstrated from that repository.
 
 After all scenarios pass, promote the tested archive:
 

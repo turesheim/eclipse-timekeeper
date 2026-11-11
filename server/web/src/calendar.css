@@ -13,6 +13,8 @@ body:has(#workspace:is([data-view=calendar],[data-view=today]):not([hidden])) {
 }
 .calendar-toolbar{display:grid;grid-template-columns:minmax(11rem,1fr) minmax(0,auto) minmax(11rem,1fr);align-items:center}
 .calendar-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:.75rem}
+.calendar-controls.date-navigation{align-items:center;gap:.5rem}
+.calendar-toolbar .date-navigation-field .form-control{width:1%;min-width:0}
 .calendar-toolbar-heading{text-align:center;overflow-wrap:anywhere}
 .calendar-toolbar .calendar-tools{justify-self:end;justify-content:flex-end;flex-wrap:wrap}
 .calendar-toolbar .calendar-tools .btn,.calendar-toolbar .calendar-navigation .btn{flex:none}

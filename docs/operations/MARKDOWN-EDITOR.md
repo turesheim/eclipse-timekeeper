@@ -18,9 +18,58 @@ exact spelling of edited markup matters.
 The formatted dialect is CommonMark/GFM: paragraphs, H1–H6, emphasis, strong,
 strikethrough, links, quotations, horizontal rules, nested/task lists, tables and
 fenced code. Enter creates a paragraph; Shift+Enter creates a hard line break.
+Tables use compact cells and theme-colored headers; wide tables scroll within
+the editor instead of breaking words. Short rows display their
+omitted trailing cells as empty without changing the saved source. As in GFM,
+separate text following a table with a blank line to start a new paragraph.
 An ordinary newline in Markdown is a soft break. Newly formatted rules use `---`.
 Unknown extensions, HTML other than safe anchors, reference-style links and code
 fences with extra metadata remain inert, editable source fragments. Their HTML is never executed.
+
+Saved checklist items such as `- [ ] Follow up` are also ordinary
+Dagsverk tasks. Checking or unchecking an item updates the task's completion;
+completing or reopening the task updates the linked checkbox. Fenced/indented
+code examples, escaped markers and empty items do not create tasks. Existing
+notes are enrolled in the background, without needing to open or edit them.
+Add `@Client_Name` or `@Project_Name` to assign a task; use underscores for spaces.
+Names must identify one of your own clients or projects unambiguously. When a
+client and project share a name, use `@client:Name` or `@project:Name`. Conflicting
+or unknown names remain as text. Code, escaped annotations and link labels do not
+assign tasks. The note retains its original text and annotation spelling.
+Each document supports up to 1,000 nonempty checklist items. Task titles longer
+than 1,024 characters are shortened with an ellipsis; the note keeps the full text.
+
+Links use private metadata and add no IDs or comments to Markdown. Moving or
+renaming the file retains its links. Distinct titles can be reordered; repeated
+identical titles remain separate in their relative order. Unambiguous title edits
+in the note update their tasks; editing a task title separately leaves the note's
+wording intact. Replacing several unrelated items can create new tasks while
+deleting unused previous tasks. Removing an item deletes its task unless recorded
+work or subtasks require retaining it; in that case, only its note link is removed.
+Trashing a note retains its tasks for restoration. Deleting
+a task does not recreate it during unrelated note edits; editing that item's
+title or checkbox can create a new task. Restoring a trashed note retains its
+links and uses the tasks' current completion states.
+
+Account archives retain checklist links and remap task IDs on restore. A notes-only
+export contains Markdown, so importing those files elsewhere creates new tasks.
+Task completion is a normal note change with a new content validator and history;
+a concurrent unsaved note draft is retained for explicit review. An open Notes
+editor reports a server change; use **Reload from server** to review the updated
+checkbox state.
+
+In **Tasks**, **Hide completed tasks** applies to every category and both native
+and calendar tasks. Emoji shortcodes in titles are displayed as emoji. A native
+task's details offer **Delete task** and an **Open source note** link with the
+note's type icon. The shared note popup preserves normal draft and concurrency
+guards. The task editor supports a client without a project, priority, and either
+a date-only or timed deadline with its original time zone. Editing other fields
+preserves the exact stored deadline, start, flags and urgency.
+
+Canonical saves, including WebDAV and imports, reconcile immediately. The
+background worker processes up to 25 sources of each kind every 30 seconds and
+resumes scanning after restart. `TIMEKEEPER_NOTE_TASKS_AUTOMATIC=false` disables
+only background enrollment; normal Markdown saves continue synchronizing tasks.
 
 Vault extensions include:
 
@@ -44,7 +93,53 @@ can also be followed with Enter.
 Unsafe schemes and paths leaving the vault are rejected. Obsidian plugins,
 transclusions of entire Markdown notes and executable HTML are not supported.
 
+## Highlight, subscript and superscript
+
+Use `==highlighted words==`, `H~2~O` and `X^2^`, or select text and use
+**Highlight**, **Subscript** and **Superscript** in the formatting toolbar.
+Highlighted text can contain other inline formatting. Subscript and superscript
+use a single delimiter; strikethrough continues to use `~~two tildes~~`.
+Code and escaped delimiters remain literal, and source mode retains the Markdown.
+
+## Internal-link assistance
+
+In Formatted mode and Markdown source, typing `[` inserts its matching `]` with
+the caret between them. Typing a second `[` creates `[[…]]` and offers matching
+documents. Continue typing to narrow by title or path, then click a choice or use
+Arrow Down and Enter. Escape dismisses the choices. A wikilink keeps its `[[...]]`
+syntax during autosave, even while the caret is inside the generated brackets.
+Move past the closing brackets, leave the editor or switch modes to activate it.
+Generated closing brackets
+are consumed when completing a link or skipped when typed; Backspace removes an
+empty generated pair. Code, escaped links and read-only documents stay literal.
+Selections and edits remain in the current draft until the host saves it.
+
 ## Writing and source tools
+
+PlantUML fences (`plantuml` or `puml`) render as local diagram previews in
+Formatted mode, including read-only notes. For example:
+
+````markdown
+```plantuml
+@startuml
+Alice -> Bob: Plan
+Bob --> Alice: Done
+@enduml
+```
+````
+
+Switch to Markdown source to edit the diagram. Its authored fence, line endings
+and frontmatter remain unchanged until an edit is saved. Sequence, class and
+activity diagrams use the bundled official PlantUML engine and local Smetana
+layout; no PlantUML service or Graphviz installation is required. Previews
+follow the selected light/dark mode and fit narrow screens.
+
+Previews accept up to 10 KB of source. Files, includes, images, external themes
+and standard-library downloads are unavailable. Syntax errors, unsupported
+features, large output or a rendering timeout leave the source available for
+editing. Rendering runs in a bounded worker; replacing or clearing a document
+cancels its work and releases the preview image. Canonical notes and backups
+contain the source, without generated diagram files.
 
 The heading menu selects plain text or H1–H6. Toolbar tooltips name each action
 and available shortcut; active formatting is indicated. Use the main toolbar to
@@ -108,8 +203,9 @@ explicit. In lists, Tab/Shift+Tab indent/outdent and Enter continues the list.
 
 Formatted paste retains safe headings, lists, links and tables. Scripts, embedded
 media and remote clipboard images are discarded. Command/Ctrl+Shift+V pastes
-literal text. Pasting an HTTP(S) URL over selected text creates a link without
-replacing its label. Code fields accept literal text.
+literal text. Pasting an HTTP(S) URL creates a link with the original URL spelling
+in Markdown. Pasting it over selected text creates a link without replacing its
+label. Code fields accept literal text.
 
 Paste screenshots or drop files to upload them at a tracked insertion point.
 The current upload shows its filename/count; **Retry** retains failed files and
@@ -173,3 +269,12 @@ in Markdown source and downloads. Escaped colons, code, unknown names and link
 destinations remain literal. Emoji also appear in note headings and navigation.
 The bundled gemoji catalog works without an external emoji service; custom Slack
 workspace emoji are not available.
+
+In Formatted mode, typing or native text input preserves active `[[wikilinks]]`.
+If a linked note is missing, an editable note offers to create it and open a
+popup editor. Canceling leaves the collection unchanged. A bare name creates a
+Markdown note beside the current document; a path containing `/` is relative to
+the Notes collection root; required parent folders are created after confirmation.
+Aliases and heading targets do not become part of the
+filename. Ambiguous links require resolution, and read-only sessions cannot
+create notes. Existing files are never overwritten by this action.

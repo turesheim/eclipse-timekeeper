@@ -2,16 +2,19 @@ import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import {countries,selectedHolidayCountry} from './holidays.js';
 import { t as i18nText } from "./i18n.js";import { instantText, localDateTimeToInstant } from './model.js';
-import { node, button, field, passwordField, validatePassword, section, form, table } from './account-ui.js';
+import { node, button, field, section, form, table } from './account-ui.js';
 import { renderRecoveryEmails } from './recovery-emails.js';
 import { renderImports } from './imports.js';
 import { renderPasskeys } from './passkeys.js';
+import { renderPassword } from './account-password.js';
 import { renderAccountData } from './account-data.js';
 import {renderTypography} from './typography-account.js';
 import {renderNotesAccount} from './notes-account.js';
 import {renderStorage} from './storage-account.js';
+import {renderTaskProviders} from './task-providers-account.js';
 
 export async function renderAccount(view, part) {
+  if(part==='task-providers'){await renderTaskProviders(view);return;}
   if(part==='storage'){await renderStorage(view);return;}
   if (part === 'typography') {await renderTypography(view);return;}
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
@@ -26,18 +29,7 @@ export async function renderAccount(view, part) {
     view.root.append(node('p', i18nText("ui.ask_the_server_operator_for_an_account_recovery_code_to_add_a_username_and_password_t"), 'alert alert-info'));
     if (part === 'password') return;
   } else if (part === 'password') {
-    const password = form(view, i18nText("ui.change_password"), i18nText("ui.change_password_and_sign_out"), async () => {
-      validatePassword(next.value, confirm.value);
-      try {await view.session.request('/auth/password', { method: 'POST', body: { currentPassword: old.value, newPassword: next.value } });}
-      catch (error) {
-        if (error.status === 401) {await view.session.request('/auth/session');throw new Error(i18nText("ui.the_current_password_was_not_accepted_your_draft_is_kept"));}
-        throw error;
-      }
-      if (view.valid()) view.signOut(i18nText("ui.password_changed_sign_in_again_your_existing_sessions_and_api_tokens_have_been_revoke"));
-    });
-    password.value.append(node('p', i18nText("ui.use_at_least_15_characters_changing_your_password_signs_out_all_of_your_sessions_and_"), 'alert alert-warning'));
-    const old = passwordField(password.value, i18nText("ui.current_password"), true),next = passwordField(password.value, i18nText("ui.new_password")),confirm = passwordField(password.value, i18nText("ui.confirm_new_password"));
-    password.finish();return;
+    await renderPassword(view);return;
   } else {
     const identity = form(view, i18nText("ui.profile"), i18nText("ui.save_profile"), async () => {
       const reply = await view.session.request('/auth/account', { method: 'PUT', etag: loaded.etag, body: { username: username.value, displayName: display.value.trim() || username.value } });

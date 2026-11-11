@@ -16,6 +16,10 @@ export function markdownSource({source,tree,document,serialize,equivalent}){
     // Clearing the document must clear its old trailing whitespace as well.
     if(!canonical||!valid||!records.length)return remember(canonical);
     const nodes=[];current.forEach(node=>nodes.push(node));
+    // Match trackedDocument's serializer: a final empty paragraph is a caret
+    // destination, not an authored block. Navigating out of code must preserve
+    // the original fence spelling, line endings and trailing whitespace.
+    if(nodes.length>1&&nodes.at(-1).type.name==='paragraph'&&!nodes.at(-1).content.size)nodes.pop();
     const indices=nodes.map(node=>mapped.get(node));
     // Equal-size edited runs between immutable anchors keep their original
     // block slots. Insertions/deletions never borrow another block's source.

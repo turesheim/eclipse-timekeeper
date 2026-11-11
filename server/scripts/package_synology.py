@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VERSION = {'preview': '1.99.0', 'stable': '2.0.0'}
 GUIDES = {'docs/operations/SYNOLOGY-PACKAGE.md': 'README.md',
           'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
+          'docs/operations/TASK-PROVIDERS.md': 'TASK-PROVIDERS.md',
           'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
           'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',

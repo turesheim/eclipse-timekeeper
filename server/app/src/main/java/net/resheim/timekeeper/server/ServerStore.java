@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +42,13 @@ public class ServerStore {
     @Inject ServerInfo serverInfo;
     @Inject VaultLimits vaultLimits;
     VaultLimits vaultLimits(){return vaultLimits;}
+    String restoreGeneration(){return restoreFence.generation();}
+    Set<String> notesSearchOwners(){
+        var owners=new HashSet<String>();
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection);var query=connection.createStatement();var rows=query.executeQuery("SELECT id FROM tk_owner")){
+            while(rows.next())owners.add(rows.getString(1));return Set.copyOf(owners);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     private Connection h2SchemaSession;
@@ -51,7 +59,8 @@ public class ServerStore {
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
-    record Context(String owner, Connection connection, Instant now) { }
+    private final ThreadLocal<Boolean> noteTaskSync = new ThreadLocal<>();
+    record Context(String owner, Connection connection, Instant now, boolean readOnly) { }
     Connection currentConnection(){var current=context.get();return current==null?null:current.connection();}
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
@@ -144,6 +153,7 @@ public class ServerStore {
         Context existing = context.get();
         if (existing != null) {
             if (!existing.owner().equals(owner)) throw new IllegalStateException("Cross-owner nested transaction");
+            if(existing.readOnly())throw new IllegalStateException("Cannot write inside a read snapshot");
             return work.get();
         }
         long started=System.nanoTime(),acquired=0,locked=0,worked=0;String phase="pool",outcome="failed";
@@ -163,7 +173,7 @@ public class ServerStore {
                     lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
                 }
                 locked=System.nanoTime();phase="work";
-                context.set(new Context(owner,connection,clock.now()));
+                context.set(new Context(owner,connection,clock.now(),false));
                 AccountStore.ensureAccount(connection,owner);
                 try(var initialized=statement("SELECT initialized FROM tk_account WHERE owner_id=?",owner);var rows=initialized.executeQuery()) {
                     if(!rows.next()) throw new SQLException("Missing account identity");
@@ -188,6 +198,18 @@ public class ServerStore {
                         locked==0?0:(workEnd-locked)/1_000_000,worked==0?0:(ended-worked)/1_000_000);
             }
         }
+    }
+    /** Committed canonical reads without provisioning, rollover or the owner write lock. */
+    <T> T readSnapshot(String owner,Supplier<T> work){
+        if(context.get()!=null)throw new IllegalStateException("Read snapshots must not nest inside owner transactions");
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)){
+            connection.setReadOnly(true);connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setAutoCommit(false);
+            context.set(new Context(owner,connection,clock.now(),true));
+            try{
+                try(var query=statement("SELECT id FROM tk_owner WHERE id=?",owner);var rows=query.executeQuery()){if(!rows.next())throw ApiFailure.notFound();}
+                return work.get();
+            }finally{context.remove();connection.rollback();}
+        }catch(SQLException failure){throw databaseFailure(failure);}
     }
     public <T> T authenticated(RequestIdentity identity,Supplier<T> work) {
         return transaction(identity.owner(),()->{
@@ -214,6 +236,8 @@ public class ServerStore {
         var previous=journalSource.get();journalSource.set(source);
         try{return work.get();}finally{if(previous==null)journalSource.remove();else journalSource.set(previous);}
     }
+    boolean noteTaskSync(){return Boolean.TRUE.equals(noteTaskSync.get());}
+    <T> T withNoteTaskSync(Supplier<T> work){var previous=noteTaskSync.get();noteTaskSync.set(true);try{return work.get();}finally{if(previous==null)noteTaskSync.remove();else noteTaskSync.set(previous);}}
     DayNoteHistory.Source journalSource(){return Optional.ofNullable(journalSource.get()).orElse(DayNoteHistory.Source.INTERNAL);}
     ObjectNode journalClient(){var value=journalPrincipal.get();return value==null?object().put("authentication","INTERNAL").putNull("tokenId"):safeJournalClient(value);}
     ObjectNode journalBuild(){return serverInfo.journalIdentity();}
@@ -233,10 +257,12 @@ public class ServerStore {
     public Instant now() { return current().now(); }
     PreparedStatement statement(String sql, Object... parameters) throws SQLException {
         var statement = current().connection().prepareStatement(sql);
+        if(current().readOnly())statement.setQueryTimeout(5);
         for (int i=0;i<parameters.length;i++) statement.setObject(i+1,parameters[i]);
         return statement;
     }
     int update(String sql, Object... parameters) {
+        if(current().readOnly())throw new IllegalStateException("Cannot write inside a read snapshot");
         try (var statement = statement(sql,parameters)) { return statement.executeUpdate(); }
         catch (SQLException e) { throw databaseFailure(e); }
     }
@@ -294,6 +320,30 @@ public class ServerStore {
             if (!rows.next()) return Optional.empty(); return Optional.of(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
         } catch (SQLException e) { throw databaseFailure(e); }
     }
+    /** Revalidate a canonical source without copying its document-sized payload. */
+    long resourceVersion(String type,UUID id){
+        try(var query=statement("SELECT version FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",owner(),type,id);var rows=query.executeQuery()){
+            return rows.next()?rows.getLong(1):0;
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    /** Owner-scoped existence check without loading document-sized payloads. */
+    boolean hasResources(String...types){
+        if(types.length==0)return false;
+        var parameters=new Object[types.length+1];parameters[0]=owner();System.arraycopy(types,0,parameters,1,types.length);
+        String placeholders=String.join(",",Collections.nCopies(types.length,"?"));
+        try(var query=statement("SELECT 1 FROM tk_resource WHERE owner_id=? AND entity_type IN ("+placeholders+") FETCH FIRST 1 ROWS ONLY",parameters);var rows=query.executeQuery()){
+            return rows.next();
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    List<JsonNode> resourcePage(String type,UUID after,int limit){
+        if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource page");
+        // H2 needs the constant key prefix in ORDER BY to stop at the page limit.
+        String sql="SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=?"+(after==null?"":" AND id>?")+" ORDER BY owner_id,entity_type,id FETCH FIRST "+limit+" ROWS ONLY";
+        var result=new ArrayList<JsonNode>();
+        try(var query=after==null?statement(sql,owner(),type):statement(sql,owner(),type,after);var rows=query.executeQuery()){
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     public List<JsonNode> list(String type) {
         List<JsonNode> list = new ArrayList<>();
         try (var statement = statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner(),type); var rows = statement.executeQuery()) {
@@ -313,6 +363,14 @@ public class ServerStore {
     List<JsonNode> list(String type,UUID first,UUID last) {
         var result=new ArrayList<JsonNode>();
         try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id",owner(),type,first,last);var rows=statement.executeQuery()) {
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
+    /** Bounded range reads use the existing owner/type/id resource primary key. */
+    List<JsonNode> list(String type,UUID first,UUID last,int limit) {
+        if(limit<1||limit>NotesSearchChanges.MAX_BATCH)throw new IllegalArgumentException("Invalid resource batch");
+        var result=new ArrayList<JsonNode>();
+        try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY owner_id,entity_type,id FETCH FIRST "+limit+" ROWS ONLY",owner(),type,first,last);var rows=statement.executeQuery()){
             while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
@@ -360,6 +418,10 @@ public class ServerStore {
     }
     public <T> T save(String type,T value) {
         var node = snapshot(owner(),value);
+        if(type.equals("TASK")) {
+            var previous=find(type,uuid(node.get("id"))).orElse(null);
+            if(!node.hasNonNull("projectId")&&previous!=null&&previous.hasNonNull("clientId"))node.set("clientId",previous.get("clientId").deepCopy());
+        }
         if (type.equals("PROJECT") || type.equals("WORK_SESSION")) {
             var previous=find(type,uuid(node.get("id"))).orElse(null);
             node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText()
@@ -419,7 +481,14 @@ public class ServerStore {
             node.path("labelIds").forEach(label -> relation(type,id,"label","LABEL",uuid(label)));
             if(node.hasNonNull("projectId")) relation(type,id,"project","PROJECT",uuid(node.get("projectId")));
         }
+        if(value instanceof Task task)new NoteTasks(this).task(task);
         return value;
+    }
+    /** Task HTTP responses include server-owned client metadata and its canonical ETag. */
+    ObjectNode taskSnapshot(Task task){
+        var value=(ObjectNode)find("TASK",task.id().value()).orElseThrow(ApiFailure::notFound);
+        if(value.path("version").asLong()!=task.version())throw new ApiFailure(412,"STALE_VERSION");
+        return value.deepCopy();
     }
     private JsonNode defaultClient() {
         UUID id=UUID.nameUUIDFromBytes(("timekeeper-default-client:"+owner()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -470,7 +539,13 @@ public class ServerStore {
     JsonNode clientDetails(String type,UUID id,JsonNode input) {
         var node=((ObjectNode)find(type,id).orElseThrow(ApiFailure::notFound)).deepCopy();
         if(input.has("clientId")) {
-            UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());
+            if(type.equals("TASK")&&input.get("clientId").isNull())node.remove("clientId");
+            else {UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());}
+        }
+        if(type.equals("TASK")&&node.hasNonNull("projectId")) {
+            var project=find("PROJECT",uuid(node.get("projectId"))).orElseThrow(ApiFailure::notFound);
+            if(input.hasNonNull("clientId")&&!input.get("clientId").equals(project.get("clientId")))throw ApiFailure.conflict();
+            node.remove("clientId");
         }
         if(type.equals("PROJECT") && input.has("icon")) node.set("icon",input.get("icon").deepCopy());
         if(type.equals("PROJECT") && input.has("clientId")) {
@@ -499,7 +574,7 @@ public class ServerStore {
         }
         if(update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),owner(),type,id,node.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=? AND kind='client'",owner(),type,id);
-        relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
+        if(node.hasNonNull("clientId"))relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
     }
     private boolean sessionUsesProject(UUID project) {
         try(var query=statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND kind='project' AND to_type='PROJECT' AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),project);var rows=query.executeQuery()) {return rows.next();}
@@ -509,6 +584,7 @@ public class ServerStore {
         update("INSERT INTO tk_relation(owner_id,from_type,from_id,kind,to_type,to_id) VALUES(?,?,?,?,?,?)",owner(),fromType,fromId,kind,toType,toId);
     }
     public void delete(String type,UUID id) {
+        if(Set.of("TASK_CONNECTION","TASK_LIST").contains(type)&&TaskProviderWrites.references(this,type,id))throw ApiFailure.conflict();
         // Older replicas may have written a legacy link after startup cleanup.
         if(type.equals("WORK_SESSION")) update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='ACTIVITY' AND kind='workSession' AND to_type='WORK_SESSION' AND to_id=?",owner(),id);
         JsonNode existing = find(type,id).orElseThrow(ApiFailure::notFound);
@@ -516,6 +592,7 @@ public class ServerStore {
         if ("TASK".equals(type)) update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
         if ("ACTIVITY".equals(type)) update("DELETE FROM tk_active WHERE owner_id=? AND activity_id=?",owner(),id);
         if (update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=? AND version=?",owner(),type,id,existing.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
+        if(type.equals(VaultIndex.ENTRY))new NotesSearchChanges(this).changed(existing,null);
     }
     boolean related(String kind,String type,UUID id) {
         try (var statement = statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND kind=? AND to_type=? AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),kind,type,id); var rows = statement.executeQuery()) { return rows.next(); }
@@ -599,6 +676,7 @@ public class ServerStore {
             public Task save(Task value) { check(); return ServerStore.this.save("TASK",value); }
             public void delete(TaskId id) {
                 check();var task=get("TASK",id.value(),Task.class).orElseThrow(ApiFailure::notFound);
+                TaskProviderWrites.deleted(ServerStore.this,task);
                 var identities=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());
                 task.externalReferences().forEach(reference -> identities.add(reference.key()));
                 for(var attachment:ServerStore.this.list("TASK_ATTACHMENT")) if(attachment.path("taskId").asText().equals(id.value().toString())) {

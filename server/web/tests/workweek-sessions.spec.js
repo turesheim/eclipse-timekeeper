@@ -67,7 +67,7 @@ test('Workweek groups local session times by client/project with exact DST total
     await expect(sunday.locator('[data-endpoint=start]')).toHaveValue('00:00');await expect(sunday.locator('[data-endpoint=end]')).toHaveValue('24:00');
     await expect(client.locator('td').nth(5)).toHaveText('0h 30m');await expect(client.locator('td').nth(6)).toHaveText('25h 0m');await expect(row.locator('td').last()).toHaveText('25h 30m');
     await expect(page.locator(`#week-sessions [data-work-session-id="${outside.id}"]`)).toHaveCount(0);
-    await expect(page.locator('#week-total')).toHaveText(nanosText(activityTotal));
+    await expect(page.locator('#activities-panel')).toBeHidden();await page.locator('[data-tab=activities]').click();await expect(page.locator('#week-total')).toBeVisible();await expect(page.locator('#week-total')).toHaveText(nanosText(activityTotal));await page.locator('[data-tab=week]').click();await expect(row.locator('td').last()).toHaveText('25h 30m');
     await expect(page.locator('#week-actions')).not.toBeVisible();
     await page.getByLabel('Week containing', {exact: true}).fill('2025-12-31');
     await page.locator('#week-next').click();await expect(page.locator('#zone-caption')).toContainText('2026-01-05');
@@ -80,8 +80,8 @@ test('Workweek groups local session times by client/project with exact DST total
     await page.locator('[data-tab=week]').click();await expect(page.locator('#week-report-title')).toHaveText('Your workweek');
     await expect(page.locator('#week-actions')).not.toBeVisible();
     await page.getByLabel('Week containing',{exact:true}).fill('2025-10-26');await expect(row.locator('td').last()).toHaveText('25h 30m');
-    await setDurationFormat(page,'decimal'); await expect(row.locator('td').last()).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
-    await expect(page.locator('#activities-panel')).not.toBeVisible();await page.locator('[data-tab=activities]').click();
+    await setDurationFormat(page,'decimal'); await expect(row.locator('td').last()).toHaveText('25.50h');
+    await expect(page.locator('#activities-panel')).not.toBeVisible();await page.locator('[data-tab=activities]').click();await expect(page.locator('#week-total')).toBeVisible();await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
     await expect(page.locator('#activities')).toBeVisible();await expect(page.locator('#days')).toBeVisible();await expect(page.locator('#week-sessions-section')).not.toBeVisible();
     await expect(page.getByLabel('Duration format',{exact:true})).toHaveValue('decimal');await expect(page.getByLabel('Week containing',{exact:true})).toHaveValue('2025-10-26');
     await page.locator('.day button').filter({hasText:'2025-10-21'}).click();await expect(page.locator('#week-total')).toBeVisible();

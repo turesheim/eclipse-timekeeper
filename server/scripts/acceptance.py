@@ -72,7 +72,10 @@ def main():
     base = f'http://127.0.0.1:{port}/api/v1'
     contract.BASE_URL, contract.TOKENS = base, tokens
     environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL': 'jdbc:h2:' + str(data / 'database'),
-                   'TIMEKEEPER_SERVER_TOKENS_FILE': str(token_file), 'TIMEKEEPER_SERVER_SETUP_FILE':'NONE', 'TIMEKEEPER_PUBLIC_ORIGIN':'NONE'}
+                   'TIMEKEEPER_SERVER_TOKENS_FILE': str(token_file), 'TIMEKEEPER_SERVER_SETUP_FILE':'NONE', 'TIMEKEEPER_PUBLIC_ORIGIN':'NONE',
+                   # Offline generic HTTP contracts exercise direct OAuth availability;
+                   # shared-service handoffs have their own synthetic HTTP fixtures.
+                   'TIMEKEEPER_CONNECT_SHARED':'false'}
     process = None
     streams = []
     pids = []

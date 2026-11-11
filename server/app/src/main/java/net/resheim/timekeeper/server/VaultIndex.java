@@ -22,12 +22,15 @@ final class VaultIndex {
         var current=store.find(ENTRY,ROOT);
         if(current.isPresent())return copy(current.get());
         var value=object().put("path","").put("kind",Kind.FOLDER.name()).put("parentId",ROOT.toString()).put("deleted",false)
-                .put("createdAt",store.now().toString()).put("modifiedAt",store.now().toString());
+                .put("createdAt",store.now().toString()).put("createdAtSource","ADDED").put("modifiedAt",store.now().toString());
         var saved=write(ENTRY,ROOT,value);point(pathId(VaultPath.root()),PATH,object().put("key","").put("entryId",ROOT.toString()).put("active",true));return saved;
     }
     ObjectNode get(UUID id){return copy(store.find(ENTRY,id).orElseThrow(ApiFailure::notFound));}
     ObjectNode dates(UUID id,java.time.Instant created,java.time.Instant modified){
-        var value=get(id);if(created!=null)value.put("createdAt",created.toString());if(modified!=null)value.put("modifiedAt",modified.toString());
+        return dates(id,created,modified,created==null?null:"ORIGINAL");
+    }
+    ObjectNode dates(UUID id,java.time.Instant created,java.time.Instant modified,String source){
+        var value=get(id);if(created!=null)value.put("createdAt",created.toString()).put("createdAtSource",source);if(modified!=null)value.put("modifiedAt",modified.toString());
         return write(ENTRY,id,value);
     }
     ObjectNode at(VaultPath path,boolean deleted){
@@ -57,7 +60,7 @@ final class VaultIndex {
         UUID entryId=UUID.randomUUID();
         if(sourceType!=null&&sourceId!=null&&referenced(sourceType,sourceId)!=null)throw ApiFailure.conflict();
         var value=object().put("path",target.value()).put("kind",kind.name()).put("parentId",id(parent).toString()).put("deleted",false)
-                .put("createdAt",store.now().toString()).put("modifiedAt",store.now().toString());
+                .put("createdAt",store.now().toString()).put("createdAtSource","ADDED").put("modifiedAt",store.now().toString());
         if(sourceType!=null){value.put("sourceType",sourceType).put("sourceId",Objects.requireNonNull(sourceId).toString()).put("sourceKey",Objects.requireNonNull(sourceKey));}
         var saved=write(ENTRY,entryId,value);link(saved);
         if(sourceType!=null)point(refId(sourceType,sourceId),REFERENCE,object().put("sourceType",sourceType).put("sourceId",sourceId.toString()).put("entryId",entryId.toString()));
@@ -96,11 +99,14 @@ final class VaultIndex {
         if(!original.path("parentId").asText().equals(parent.path("id").asText()))unlinkChild(original);
         ObjectNode moved=null;
         for(var entry:entries){
+            String previousName=path(entry).name(),nextName=targets.get(id(entry)).name();
+            if(entry.has("title")&&!previousName.equals(nextName))entry.put("title",NoteTitles.filenameTitle(nextName));
             entry.put("path",targets.get(id(entry)).value());if(id(entry).equals(source))entry.put("parentId",id(parent).toString());
             var saved=write(ENTRY,id(entry),entry);link(saved);if(id(entry).equals(source))moved=saved;
         }
         return moved;
     }
+    ObjectNode title(UUID entryId,String title){var entry=get(entryId);return title.equals(entry.path("title").asText())?entry:write(ENTRY,entryId,entry.put("title",title));}
     ObjectNode tombstone(UUID entryId,UUID batch){
         var entry=get(entryId);if(entryId.equals(ROOT))throw ApiFailure.conflict();
         if(entry.path("deleted").asBoolean())return entry;
@@ -156,6 +162,7 @@ final class VaultIndex {
         var value=data.deepCopy().put("id",id.toString()).put("ownerId",store.owner()).put("version",version+1);
         if(previous==null)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",store.owner(),type,id,version+1,value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),type,id,version)!=1)throw new ApiFailure(412,"STALE_VERSION");
+        if(type.equals(ENTRY))new NotesSearchChanges(store).changed(previous,value);
         return value;
     }
     private static ObjectNode copy(JsonNode value){return ((ObjectNode)value).deepCopy();}

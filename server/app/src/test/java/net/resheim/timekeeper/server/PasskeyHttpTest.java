@@ -104,7 +104,29 @@ class PasskeyHttpTest {
             assertEquals(204,call(other,"POST","/auth/passkeys/cancel",Map.of("ceremony",newer.path("ceremony").asText())).statusCode());
             assertEquals(204,call(login,"POST","/auth/passkeys/cancel",Map.of("ceremony",canceled.path("ceremony").asText())).statusCode());
             assertEquals(401,call(login,"POST","/auth/passkeys/login/finish",assertion(canceled,secondKey,owner.owner(),false)).statusCode());
-            issued(login,call(login,"POST","/auth/passkeys/login/finish",assertion(newer,secondKey,owner.owner(),false)));
+            var passkeyAdmin=issued(login,call(login,"POST","/auth/passkeys/login/finish",assertion(newer,secondKey,owner.owner(),false)));
+            String passwordProof=proof(passkeyAdmin,secondKey,object().put("action","PASSWORD"));
+            String replacement="A new administrator password without the original";
+            given().header("Origin",ORIGIN).header("Cookie",passkeyAdmin.cookie()).contentType("application/json").body(Map.of("proof",passwordProof,"newPassword",replacement)).post("/api/v1/auth/password").then().statusCode(403);
+            assertEquals(403,call(other,"POST","/auth/password",Map.of("proof",passwordProof,"newPassword",replacement)).statusCode());
+            assertEquals(403,call(tokenBrowser,"POST","/auth/password",Map.of("proof",passwordProof,"newPassword",replacement)).statusCode());
+            assertEquals(400,call(passkeyAdmin,"POST","/auth/password",Map.of("newPassword",replacement)).statusCode());
+            assertEquals(422,call(passkeyAdmin,"POST","/auth/password",Map.of("proof",passwordProof,"currentPassword",PASSWORD,"newPassword",replacement)).statusCode());
+            assertEquals(400,call(passkeyAdmin,"POST","/auth/password",Map.of("proof",passwordProof,"newPassword",replacement,"ownerId",other.owner())).statusCode());
+            var changed=call(passkeyAdmin,"POST","/auth/password",Map.of("proof",passwordProof,"newPassword",replacement));
+            assertEquals(204,changed.statusCode(),changed.asString());assertEquals("no-store",changed.header("Cache-Control"));
+            assertTrue(changed.getHeaders().getValues("Set-Cookie").stream().anyMatch(v->v.startsWith(AuthenticationFilter.COOKIE+"=") && v.contains("Max-Age=0")));
+            assertEquals(401,call(passkeyAdmin,"GET","/auth/session",null).statusCode());
+            assertEquals(401,call(owner,"GET","/auth/session",null).statusCode());
+            given().header("Authorization","Bearer "+token).get("/api/v1/me").then().statusCode(401);
+            assertEquals(200,call(other,"GET","/auth/session",null).statusCode());
+            var nextBrowser=anonymous();assertEquals(401,call(nextBrowser,"POST","/auth/login",Map.of("username","http-passkey","password",PASSWORD,"remember",false)).statusCode());
+            var passwordAdmin=issued(nextBrowser,call(nextBrowser,"POST","/auth/login",Map.of("username","http-passkey","password",replacement,"remember",false)));
+            assertTrue(success(call(passwordAdmin,"GET","/auth/session",null),200).path("administrator").asBoolean());
+            assertEquals(403,call(passwordAdmin,"POST","/auth/password",Map.of("proof",passwordProof,"newPassword",replacement)).statusCode());
+            assertEquals(1,success(call(passwordAdmin,"GET","/auth/passkeys",null),200).path("items").size());
+            var retainedKey=anonymous();var retainedOptions=success(call(retainedKey,"POST","/auth/passkeys/login/options",Map.of("remember",false)),200);
+            issued(retainedKey,call(retainedKey,"POST","/auth/passkeys/login/finish",assertion(retainedOptions,secondKey,owner.owner(),false)));
         } finally {ClientProxy.unwrap(accounts).setupFile="NONE";}
     }
 }

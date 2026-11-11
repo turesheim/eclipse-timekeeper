@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {splitMarkdown,needsSource,normalizeEditorMarkdown} from '../src/markdown-document.js';
+import {hashtagKey,hashtagRanges} from '../src/hashtags.js';
+test('hashtags use exact bounded Unicode keys and ignore word, URL and wikilink fragments',()=>{
+  assert.equal(hashtagKey('#Cafe\u0301'),'#café');assert.equal(hashtagKey('#Straße'),'#strasse');assert.equal(hashtagKey('#work/OpenShift'),'#work/openshift');
+  for(const value of ['#','#a*','#a//b','#'+'a'.repeat(128)])assert.equal(hashtagKey(value),null);
+  const text='🚀 #OpenShift (#Cafe\u0301) #work/Cloud words#no https://example.invalid/#no [[#heading]] ![[file#heading]]';
+  assert.deepEqual(hashtagRanges(text).map(range=>[text.slice(range.from,range.to),range.key]),[['#OpenShift','#openshift'],['#Cafe\u0301','#café'],['#work/Cloud','#work/cloud']]);
+});
 test('frontmatter is kept byte-for-byte outside the body, including BOM and CRLF',()=>{
   for(const value of ['---\ntags: [daily]\n---\n\n# Day\n','\uFEFF---\r\ntitle: Mandag\r\n...\r\n\r\nA note\r\n','---\n---\nBody','---\nkey: value\n---']){
     const parts=splitMarkdown(value);assert.ok(parts.frontmatter);assert.equal(parts.unterminated,false);assert.equal(parts.frontmatter+parts.body,value);
@@ -9,7 +16,7 @@ test('frontmatter is kept byte-for-byte outside the body, including BOM and CRLF
   assert.deepEqual(splitMarkdown('---\ntags: [unfinished]'),{frontmatter:'',body:'---\ntags: [unfinished]',unterminated:true});
 });
 test('Obsidian extensions and unsupported constructs use exact source mode',()=>{
-  for(const value of ['[[Project|alias]]','![[diagram.png]]','> [!note] Callout','==highlight==','%%private%%','$a+b$','text ^block-id','<div>HTML</div>','![image](https://example.org/pixel)','Footnote[^one]','[reference]: /somewhere',':::custom\ncontent'])assert.equal(needsSource(value),true,value);
+  for(const value of ['[[Project|alias]]','![[diagram.png]]','> [!note] Callout','%%private%%','$a+b$','text ^block-id','<div>HTML</div>','![image](https://example.org/pixel)','Footnote[^one]','[reference]: /somewhere',':::custom\ncontent'])assert.equal(needsSource(value),true,value);
   for(const value of ['# Heading\n\n**bold** and *emphasis*','- [ ] Task\n- [x] Done','[link](https://example.org)','> Quotation','| Name | Value |\n| --- | --- |\n| a | b |','```md\n[[literal]]\n```','~~~\n<div>Literal HTML</div>\n~~~','Example `[[literal]]`'])assert.equal(needsSource(value),false,value);
 });
 test('journal attachment images can render while external and unsafe images stay in source mode',()=>{
@@ -34,7 +41,16 @@ test('empty rich paragraphs serialize as Markdown blank lines without changing c
   assert.equal(normalizeEditorMarkdown('Before <br /> after\n'),'Before <br /> after\n');
 });
 
-test('setext headings remain eligible for rich editing without admitting unsupported highlights',()=>{
+test('setext headings and supported inline styles remain eligible for rich editing',()=>{
   assert.equal(needsSource('Heading\n=======\n\nText.\n'),false);
-  assert.equal(needsSource('==highlight==\n'),true);
+  assert.equal(needsSource('==highlight==\n'),false);
+});
+
+test('completion ranges consume generated closers while source code and escapes remain literal',async()=>{
+  const {wikiCompletion,literalBracketContext}=await import('../src/markdown-brackets.js');
+  assert.deepEqual(wikiCompletion('[[Des]]',5),{query:'Des',embed:false,from:0,to:7});
+  assert.deepEqual(wikiCompletion('![[asset]]',8),{query:'asset',embed:true,from:0,to:10});
+  assert.equal(wikiCompletion('\\[[Des]]',6),null);
+  for(const value of ['```text\ncode','~~~text\ncode','    code','`code','`one\ntwo','[label](https://example.invalid/','\\','\\['])assert.equal(literalBracketContext(value,value.length),true,value);
+  for(const value of ['ordinary text','```text\ncode\n```\nprose','`code` then prose','`one\ntwo` prose','`open\n\nprose','* List item','    * Nested item'])assert.equal(literalBracketContext(value,value.length),false,value);
 });

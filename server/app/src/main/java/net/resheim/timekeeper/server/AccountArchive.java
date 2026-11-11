@@ -109,6 +109,9 @@ class AccountArchive {
         if(assetCount[0]>0)counts.put("journalAssets",assetCount[0]);
         final long[] vaultCounts={0,0};records(c,owner,VaultIndex.ENTRY,value->vaultCounts[0]++);VaultArchive.files(c,owner,(path,bytes)->vaultCounts[1]++);
         counts.put("notesEntries",vaultCounts[0]);counts.put("notesFiles",vaultCounts[1]);
+        counts.put("bookmarks",NoteBookmarks.archive(c,owner,value->{}));
+        counts.put("noteClients",NoteClients.archive(c,owner,value->{}));
+        counts.put("noteTasks",NoteTaskArchive.archive(c,owner,value->{}));
         var profile=profile(c,owner);var metadata=metadata(c,owner);
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
@@ -128,6 +131,9 @@ class AccountArchive {
             journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));
             json.writeEndArray();
             VaultArchive.metadata(c,owner,json);
+            NoteBookmarks.archive(c,owner,json);
+            NoteClients.archive(c,owner,json);
+            NoteTaskArchive.archive(c,owner,json);
             json.writeArrayFieldStart("dayLabels");
             records(c,owner,DayLabels.TYPE,value->json.writeTree(object().put("date",value.path("date").asText()).put("text",value.path("text").asText())));
             json.writeEndArray();
@@ -189,10 +195,10 @@ class AccountArchive {
         var result=value.deepCopy();if(name.equals("taskAttachments")){result.remove("data");result.put("archiveFile",ArchiveJournalFiles.taskPath(value.path("id").asText()));}return result;
     }
     private static void entry(ZipOutputStream zip,String name) throws IOException {zip.putNextEntry(new ZipEntry(name));}
-    private static boolean presentNote(ObjectNode value,Map<String,Long> deleted){
+    static boolean presentNote(ObjectNode value,Map<String,Long> deleted){
         return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&DayNotes.emptyForDeletion(value));
     }
-    private static boolean presentWeek(ObjectNode value,Map<String,Long> deleted){
+    static boolean presentWeek(ObjectNode value,Map<String,Long> deleted){
         return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&value.path("body").asText().isEmpty());
     }
     private static Set<String> fieldNames(ObjectNode value) {var names=new HashSet<String>();value.fieldNames().forEachRemaining(names::add);return names;}

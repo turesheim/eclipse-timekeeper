@@ -1,14 +1,21 @@
 import {emojiPlugin} from './emoji.js';
+import {inlineStyles,inlineStyleCommands} from './inline-styles.js';
+import {markRule} from '@milkdown/kit/prose';
 import {emojiFor} from '../src/emoji.js';
 import {cursorMap} from './cursor-map.js';
 import {trackedDocument} from './tracked-document.js';
 import {closeHistory} from '@milkdown/kit/prose/history';
 import {codeTools} from './code-tools.js';
+import {plantumlDiagram,plantumlPresentation,plantumlBlock,isPlantUml} from './plantuml.js';
+import {hashtagPresentation} from './hashtags.js';
+import {bracketPairs} from './bracket-pairs.js';
+import {nativeWikiInput,wikiLiteralInput,wikiCompositionEnd,wikiInputComplete} from './wiki-input.js';
+import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,docSchema,paragraphSchema,linkSchema,codeBlockSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
-import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
+import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand,remarkGFMPlugin,strikethroughInputRule,strikethroughSchema} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Plugin,TextSelection,NodeSelection} from '@milkdown/kit/prose/state';
@@ -21,12 +28,14 @@ import {wikiReference,headingAnchor} from '../src/wiki-links.js';
 import {clipboardSlice,spreadsheetSlice} from './clipboard.js';
 import {vaultDialect} from './vault-dialect.js';
 import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
+import {remarkAutolinks,autolinkSchema} from './autolinks.js';
 import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import {t} from '../src/i18n.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
-const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const commands={...inlineStyleCommands,bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
+const doubleStrike=$inputRule(ctx=>markRule(/(?<![\w:/])~~([^~]+)~~(?![\w/])$/,strikethroughSchema.type(ctx)));
 const dailyWikilink=$node('daily_wikilink',()=>({
   inline:true,group:'inline',atom:true,selectable:true,leafText:node=>'[['+node.attrs.date+']]',
   attrs:{date:{default:'',validate:'string'}},
@@ -34,11 +43,16 @@ const dailyWikilink=$node('daily_wikilink',()=>({
   parseMarkdown:{match:node=>node.type==='dailyWikilink',runner:(state,node,type)=>state.addNode(type,{date:node.value})},
   toMarkdown:{match:node=>node.type.name==='daily_wikilink',runner:(state,node)=>state.addNode('dailyWikilink',undefined,node.attrs.date)}
 }));
+const wikiNode=(state,match,start)=>{
+  if(Number.isInteger(start)){const position=state.doc.resolve(start),before=position.parent.textBetween(0,position.parentOffset,'','\ufffc');if(escapedBracket(before,before.length))return null;}
+  if(!wikiReference(match[2],!!match[1])||state.selection.$from.parent.type.spec.code||state.selection.$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;
+  const date=!match[1]&&dailyNoteDate(match[2]);return (date?state.schema.nodes.daily_wikilink.create({date}):state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]})).mark(state.storedMarks||state.selection.$from.marks());
+};
 const vaultWikilinkInput=$inputRule(()=>new InputRule(/(!?)\[\[([^\[\]\n]{1,1024})\]\]$/,(state,match,start,end)=>{
-  if(!wikiReference(match[2],!!match[1])||state.selection.$from.parent.type.spec.code||state.selection.$from.marks().some(mark=>mark.type.name==='inlineCode'))return null;
-  const date=!match[1]&&dailyNoteDate(match[2]),node=date?state.schema.nodes.daily_wikilink.create({date}):state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]});return state.tr.replaceWith(start,end,node.mark(state.storedMarks||state.selection.$from.marks()));
+  const node=wikiNode(state,match,start);return node?state.tr.replaceWith(start,end,node):null;
 }));
 const dailyWikilinkRemark=$remark('timekeeperDailyWikilinks',()=>remarkDailyWikilinks);
+const autolinkRemark=$remark('timekeeperAutolinks',()=>remarkAutolinks);
 const sourceNodes=new Set(['html','imageReference','linkReference','definition']);
 const safeAsset=url=>typeof url==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(url);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
@@ -50,8 +64,16 @@ const safeDocument=(doc,assetAllowed=safeAsset,linkAllowed=safeLink)=>{
 const unsupported=(node,assetAllowed=safeAsset,linkAllowed=safeLink)=>node.type==='code'&&!!node.meta||!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!assetAllowed(node.url)||node.type==='link'&&!linkAllowed(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value.replace(/\[![A-Za-z]+\][+-]?/g,''))||Boolean(node.children?.some(child=>unsupported(child,assetAllowed,linkAllowed))));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
+const inlineFormatting=new Set(['strong','emphasis','delete','highlight','subscript','superscript']);
 const semantic=value=>{
   if(Array.isArray(value))return value.map(semantic);
+  // Inline format order does not change the text's meaning. ProseMirror keeps
+  // one mark order, while authored Markdown may nest these marks either way.
+  if(value&&inlineFormatting.has(value.type)){
+    const marks=[value.type];let leaf=value;
+    while(leaf.children?.length===1&&inlineFormatting.has(leaf.children[0].type)){leaf=leaf.children[0];marks.push(leaf.type);}
+    if(marks.length>1&&marks.some(name=>['highlight','subscript','superscript'].includes(name)))return {type:'inlineFormatting',marks:marks.sort(),children:semantic(leaf.children)};
+  }
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['position','spread'].includes(key)).sort(([left],[right])=>left<right?-1:left>right?1:0).map(([key,entry])=>[key,semantic(entry)]));
   return typeof value==='string'?value.replace(/\r\n?/g,'\n'):value;
 };
@@ -122,6 +144,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const cleanGenerated=value=>value.replaceAll(emptyMarker,'');
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
   const code=codeTools(()=>readOnly);
+  const hashtags=hashtagPresentation(resources);
+  const brackets=bracketPairs(()=>readOnly,(view,transaction,at)=>{
+    const position=transaction.doc.resolve(at),before=position.parent.textBetween(0,position.parentOffset,'','\ufffc'),match=/(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(before);if(!match)return;
+    const from=at-match[0].length,node=wikiNode(view.state,match,from);if(!node)return;transaction.replaceWith(from,at,node).setSelection(TextSelection.near(transaction.doc.resolve(from+node.nodeSize)));
+  });
+  let composing=false;
+  const wikiInput=nativeWikiInput(()=>readOnly,brackets.pending,()=>composing);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
   const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
@@ -131,17 +160,20 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   }})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
+    ctx.set(remarkGFMPlugin.options.key,{singleTilde:false});
     ctx.update(paragraphSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toMarkdown:{...schema.toMarkdown,runner:(state,node)=>{if(node.content.size)schema.toMarkdown.runner(state,node);else state.openNode('paragraph').addNode('html',undefined,emptyMarker).closeNode();}}};});
-    ctx.update(linkSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,toDOM:mark=>{const [tag,attributes,...content]=schema.toDOM(mark);return [tag,{...attributes,tabindex:'0'},...content];}};});
-    ctx.update(codeBlockSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,parseMarkdown:{...schema.parseMarkdown,match:node=>node.type==='code'&&String(node.lang).toLowerCase()!=='mermaid'}};});
+    ctx.update(linkSchema.key,previous=>schemaContext=>autolinkSchema(previous(schemaContext)));
+    ctx.update(codeBlockSchema.key,previous=>schemaContext=>{const schema=previous(schemaContext);return {...schema,parseMarkdown:{...schema.parseMarkdown,match:node=>node.type==='code'&&String(node.lang).toLowerCase()!=='mermaid'&&!isPlantUml(node.lang)}};});
     ctx.update(remarkStringifyOptionsCtx,options=>({...options,resourceLink:true,rule:'-',ruleRepetition:3,ruleSpaces:false}));
     ctx.set(editorViewOptionsCtx,{
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
+      handleTextInput:(view,from,to,text)=>brackets.input(view,from,to,text),
       handleKeyDown:(_view,event)=>{
         // DOM reconciliation also calls this with an undispatched key event.
         // Its DOM already contains the edit; keep the model's pre-edit selection.
         if(event.target&&!event.isComposing)syncDOMSelection(_view,root);
+        if(brackets.keyDown(_view,event))return true;
         if(event.key.toLowerCase()==='v'&&(event.metaKey||event.ctrlKey))plainPaste=event.shiftKey;
 
         const foot=event.target?.closest?.('[data-footnote-reference]');if(foot&&['Enter',' '].includes(event.key)){event.preventDefault();foot.click();return true;}
@@ -151,7 +183,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
         if(event.key==='Escape'){escape();return true;}return false;
       },
-      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:code.nodeView,mermaid_diagram:mermaidBlock,image:node=>{
+      nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:code.nodeView,mermaid_diagram:mermaidBlock,plantuml_diagram:plantumlBlock,image:node=>{
         if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
@@ -160,7 +192,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       }},
       // Following a link leaves the document unchanged. Local note navigation
       // still delegates to the owner-aware resource adapter and its draft guard.
-      handleDOMEvents:{click:(_view,event)=>{
+      handleDOMEvents:{compositionstart:()=>{composing=true;return false;},compositionend:view=>{composing=false;setTimeout(()=>{if(!view.isDestroyed)view.dispatch(view.state.tr.setMeta(wikiCompositionEnd,true));},0);return false;},click:(_view,event)=>{
+        if(hashtags.click(event))return true;
         const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
         const date=dailyNoteDate(link.dataset.dayNoteDate);
@@ -187,18 +220,21 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const files=[...(event.clipboardData?.files||[])];
         if(files.length&&uploadFiles){event.preventDefault();uploadFiles(files,bookmark());return true;}
         const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();
-        const selection=view.state.selection,code=selection.$from.parent.type.spec.code||selection.$from.marks().some(mark=>mark.type.name==='inlineCode');
-        if(!forcePlain&&!code&&!selection.empty&&/^https?:\/\/[^\s]+$/i.test(text)&&linkAllowed(text)){
-          view.dispatch(view.state.tr.addMark(selection.from,selection.to,view.state.schema.marks.link.create({href:text})));return true;
+        const selection=view.state.selection,code=selection.$from.parent.type.spec.code||(view.state.storedMarks||selection.$from.marks()).some(mark=>mark.type.name==='inlineCode');
+        if(!forcePlain&&!code&&/^https?:\/\/[^\s<>\u0000-\u0020\u007f]+$/i.test(text)&&linkAllowed(text)){
+          const type=view.state.schema.marks.link,transaction=view.state.tr;
+          if(selection.empty)transaction.insertText(text).addMark(selection.from,selection.from+text.length,type.create({href:text,sourceAutolink:true})).removeStoredMark(type);
+          else transaction.addMark(selection.from,selection.to,type.create({href:text}));
+          view.dispatch(transaction.scrollIntoView());return true;
         }
         const html=event.clipboardData?.getData('text/html');
         if(!forcePlain&&!code){
           const slice=html?clipboardSlice(view.state.schema,html,text,linkAllowed):spreadsheetSlice(view.state.schema,text,{insideTable:isInTable(view.state)});
-          if(slice){if(!pasteTable(view,slice))view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());return true;}
+          if(slice){if(!pasteTable(view,slice))view.dispatch(view.state.tr.replaceSelection(slice).setMeta(wikiLiteralInput,!!html).scrollIntoView());return true;}
         }
         const match=/^(!?)\[\[([^\[\]\n]{1,1024})\]\]$/.exec(text);
         if(match&&wikiReference(match[2],!!match[1])&&!code&&!forcePlain){const date=!match[1]&&dailyNoteDate(match[2]);view.dispatch(view.state.tr.replaceSelectionWith(date?view.state.schema.nodes.daily_wikilink.create({date}):view.state.schema.nodes.vault_wikilink.create({value:match[2],embed:!!match[1]}),true));}
-        else view.dispatch(view.state.tr.insertText(text));plainPaste=false;return true;
+        else view.dispatch(view.state.tr.insertText(text).setMeta(wikiLiteralInput,forcePlain));plainPaste=false;return true;
       },
       handleDrop:(view,event,slice,moved)=>{
         const files=[...(event.dataTransfer?.files||[])];if(readOnly)return true;
@@ -212,7 +248,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         view.dispatch(safe?view.state.tr.replaceSelection(safe):view.state.tr.insertText(text));return true;
       }
     });
-  }).use(dialect.guard).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema].includes(plugin))).use(history).use(dailyWikilink).use(dailyWikilinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(code.plugin).use(changePlugin);
+  }).use(dialect.guard).use(inlineStyles).use(commonmark.filter(plugin=>plugin!==docSchema)).use(trackedDocument).use(dialect.plugins).use(gfm.filter(plugin=>![...footnoteReferenceSchema,...footnoteDefinitionSchema,strikethroughInputRule].includes(plugin))).use(history).use(doubleStrike).use(dailyWikilink).use(dailyWikilinkRemark).use(autolinkRemark).use(emojiPlugin).use(vaultWikilinkInput).use(mermaidDiagram).use(diagramPresentation).use(plantumlDiagram).use(plantumlPresentation).use(code.plugin).use(brackets.plugin).use(wikiInput.plugin).use(hashtags.plugin).use(changePlugin);
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
@@ -284,7 +320,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       if(focus)view.focus();return true;
     };
     let snapshot=original,snapshotText=value,comparisonText,comparisonDocument;
-    const markdown=()=>{const current=view.state.doc,result=(origins.get(current.attrs.sourceEpoch)?.render||serialize)(current);snapshot=current;snapshotText=result;return result;};
+    const markdown=()=>{const current=view.state.doc,result=(origins.get(current.attrs.sourceEpoch)?.render||serialize)(wikiInput.project(view.state));snapshot=current;snapshotText=result;return result;};
     const matchesSource=text=>{
       const current=view.state.doc;
       const origin=origins.get(current.attrs.sourceEpoch);
@@ -319,6 +355,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       position:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source);return {anchor:map.source(view.state.selection.anchor),head:map.source(view.state.selection.head,view.state.selection.head>view.state.selection.anchor?-1:1),scrollTop:view.dom.scrollTop};},
       restorePosition:position=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source),anchor=map.rich(position.anchor),head=map.rich(position.head??position.anchor);view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor),view.state.doc.resolve(head))));view.dom.scrollTop=position.scrollTop||0;},
       composing:()=>view.composing,
+      finishWiki:()=>{if(!readOnly&&!view.composing)view.dispatch(view.state.tr.setMeta(wikiInputComplete,true));},
       context:()=>({text:view.state.selection.$from.parent.textContent,table:Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('cell')||Array.from({length:view.state.selection.$from.depth},(_,index)=>view.state.selection.$from.node(index+1).type.spec.tableRole).includes('header_cell'),block:view.state.selection.$from.parent.type.name}),
       selectedText:()=>view.state.doc.textBetween(view.state.selection.from,view.state.selection.to,'\n'),
       selectionRect:()=>{try{return view.coordsAtPos(view.state.selection.to);}catch{return null;}},
@@ -327,7 +364,8 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       scrollTo:(position)=>{view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(position+1,view.state.doc.content.size)))).scrollIntoView());view.focus();},
       slash:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph')return null;const match=/^\/([\w-]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.start(),to:$from.pos}:null;},
       replaceSlash:(name,payload)=>{const {$from}=view.state.selection;view.dispatch(view.state.tr.delete($from.start(),$from.pos));return command(name,payload);},
-      wikiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code)return null;const match=/(!?)\[\[([^\]\n]*)$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[2],embed:!!match[1],from:$from.pos-match[0].length,to:$from.pos}:null;},
+      wikiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code||$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;
+        const range=wikiCompletion($from.parent.textBetween(0,$from.parent.content.size,'','\ufffc'),$from.parentOffset);return range?{...range,from:$from.start()+range.from,to:$from.start()+range.to}:null;},
       emojiQuery:()=>{const {$from,empty}=view.state.selection;if(!empty||$from.parent.type.spec.code||$from.marks().some(mark=>['inlineCode','link'].includes(mark.type.name)))return null;const match=/(?:^|\s):([a-z0-9_+-]{1,40})$/.exec($from.parent.textBetween(0,$from.parentOffset));return match?{query:match[1],from:$from.pos-match[1].length-1,to:$from.pos}:null;},
       insertEmoji:(range,name)=>{if(readOnly||!emojiFor(name))return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.emoji_shortcode.create({name})));view.focus();return true;},
       insertWiki:(range,path)=>{if(readOnly)return false;view.dispatch(view.state.tr.replaceWith(range.from,range.to,view.state.schema.nodes.vault_wikilink.create({value:path,embed:!!range.embed})));view.focus();return true;},

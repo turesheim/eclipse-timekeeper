@@ -27,6 +27,15 @@ in parallel. Profile and revision checks still reject mixed snapshots and retry
 up to three times. A 30-second overall deadline covers all pages and attempts;
 failed or superseded attempts abort their outstanding reads. Browser console
 warnings report refreshes lasting at least five seconds without exposing records.
+Change polling shares any refresh already in flight. It reloads again if that
+completed read is older than the batch; running work keeps its periodic refresh.
+Popup saves use the shared notes-changed event to request a single refresh.
+Inactive client, project, label, activity, month and week views retain their data
+and paint when selected. Unchanged client, project and label lists keep their
+existing rows and focused actions during unrelated synchronization. Notes retains its catalog for unchanged account
+revisions; note changes, local invalidation and the Notes Refresh action reload it.
+Notifications arriving during a catalog read or another busy operation remain
+pending for one follow-up reload when the view is ready.
 See [Synology synchronization diagnostics](../operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
 for request and database timings in the container logs.
 
@@ -70,6 +79,12 @@ server has a configured HTTPS hostname. Password sign-in remains available;
 canceling a native credential prompt leaves the form usable. **Remember me**
 applies to either method. No credential is requested automatically on page load.
 
+**My Account → Password** accepts a current password or fresh registered-passkey
+verification. **Confirm with → Existing passkey** lets an administrator or ordinary
+account holder replace a forgotten password. Canceling leaves the password draft
+and session usable. Success signs out existing sessions and API tokens and retains
+registered passkeys. Token-derived sessions cannot use passkey proof.
+
 **My Account → Passkeys** lists user-named keys and creation/last-used times in
 the account time zone. Adding or removing a key requires fresh password or
 passkey proof. Removing the key used for the current session signs the user out.
@@ -94,8 +109,8 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
-Clients and Projects. Labels are configured under **My Account → Labels**.
+`nav-link` controls. The nine views appear in this order: Today, Calendar, Week, Workweek, Activities,
+Tasks, Clients and Projects, followed by Notes. Labels are configured under **My Account → Labels**.
 
 Configure **My Account → Focus areas** with a name and a set of clients, then
 select an area in the account menu. **No focus** shows all clients and unassigned
@@ -115,6 +130,37 @@ bar and page content clear of each other. Standard action buttons use Bootstrap
 clickable sync indicator sits immediately beside the Timekeeper title in the
 header, remains available in My Account and is hidden when signed out.
 
+## Tasks
+
+Tasks combines native Dagsverk and Eclipse/Mylyn task records with read-only
+to-dos actually published by visible calendar subscriptions with **To-do items**
+enabled. All includes completed, cancelled, undated and distant calendar tasks;
+recurrence definitions and detached instances retain their published identities.
+It does not manufacture an unbounded list of virtual occurrences.
+
+The single-column sidebar provides Today, All and Time critical, followed by
+clients and categories. Categories include task metadata, calendar categories
+and project names, preserving the Eclipse/Mylyn project/category mapping.
+Focus areas apply to native and calendar tasks. Today selects unfinished tasks
+scheduled, starting or due on the current account day. Time critical selects
+unfinished tasks overdue, due today or explicitly urgent. Civil dates retain
+their day; timed dates use the account zone. Unknown zones or ambiguous times
+that cannot be projected across zones retain their original values in details
+and show a date-review hint. No UTC instant is invented.
+
+Native tasks can be created or edited through the existing conditional editor,
+including direct client assignment without a project, priority and civil or timed
+deadlines. The editor retains unedited start values, flags and deadline precision.
+**Hide completed tasks** applies to all sidebar filters and sources. Details
+include guarded deletion and a type-specific link to the current source note
+for Markdown checklist tasks. Title labels render the shared emoji shortcodes.
+Calendar tasks remain in their source collection and cannot be edited or
+converted to worked time from Tasks. Read-only sessions retain browsing and
+details. Catalog paging restarts if a source snapshot changes, and the list
+renders 50 rows at a time with **Show more tasks**. Source refreshes every 30
+seconds while visible; session changes clear records, filters, details and
+in-flight reads. The sidebar becomes a keyboard-accessible drawer on phones.
+
 ## Shared Markdown component
 
 Today, Notes and the daily, weekly and event dialogs use `MarkdownField` with
@@ -125,6 +171,12 @@ component through test-only Playwright routes. No prototype page is shipped or
 linked from About. See the [editor development contract](MARKDOWN-EDITOR.md).
 
 ## Today and Calendar views
+
+The shared date-navigation component reuses each view's date input and period
+handlers. Today, Calendar, Week, Workweek and Activities use the same grouped
+picker and previous/current/next controls; the monthly picker retains its month
+and year popover. Date labels remain available to assistive technology, while
+redundant visible month, work-session and date/time-zone captions are omitted.
 
 **Today** is the default workspace tab. It opens a selected day with its Markdown
 journal in the main column. The date field and adjacent buttons move between
@@ -337,14 +389,20 @@ data license; loading failures and Retry remain available in the monthly view.
 
 Choose **Theme** under **My Account → Profile** to switch between Dagsverk (the default),
 Dagsverk Dark, Dagsverk-reinvented, Dagsverk-reinvented Dark, Solarized Light,
-Solarized Dark, Nord and Dracula. The selection
+Solarized Dark, Nord, Dracula and Newspaper. The selection
 is saved on this browser and shared with other open Dagsverk tabs, including
 Administration. A saved theme also applies to sign-in and loads before the
 stylesheets to avoid flashing a light page. If browser storage is unavailable,
 theme selection still works for the current page.
 
 Theme tokens cover forms, tables, calendar surfaces, dialogs and account pages.
-Client colors remain the colors chosen for those clients. The palettes use
+Client colors remain the colors chosen for those clients, except in Newspaper.
+Newspaper uses black ink and almost-white paper, serif typography, square edges
+and double rules. Hard-edged pixel dithering replaces tinted surfaces, including
+weekends, holidays and selected table rows. Client/label swatches and calendar
+edges display in monochrome without changing saved colors. Code and Markdown
+source retain monospace fonts. The theme uses local assets and system fonts.
+The other palettes use
 [Solarized](https://ethanschoonover.com/solarized/),
 [Nord](https://www.nordtheme.com/docs/colors-and-palettes/) and
 [Dracula](https://draculatheme.com/spec), with text/accent contrast adjusted for
@@ -1129,14 +1187,48 @@ widths; other engines check their naturally reported inset.
 
 Notes navigation, editor headings and Today’s Recent notes use the API’s display
 title: event titles for event notes and the first document heading for ordinary
-notes, with filename/path fallbacks. Name sorting follows the displayed title.
+notes, with the filename minus its `.md` suffix as the fallback. Folder names and
+other file extensions retain their literal names. Name sorting follows the displayed title.
 Collection paths remain available for identification and keep their existing
 synchronization and link semantics.
+
+Recent-note titles use regular font weight. Selecting one opens the shared
+Markdown editor in a dialog while retaining the current workspace. **Open in
+workspace**, beside Close, flushes pending edits before opening a daily journal
+in Today or another document in Notes, with keyboard focus in the destination.
+Failed or conflicting saves retain the
+dialog and draft. Daily, weekly and event-note dialogs expose the same window
+action for saved notes.
+
+Today’s Recent notes includes ordinary, event and daily/weekly journal notes,
+excluding today's daily journal note in the account time zone. Entries use a
+single borderless title row without a path below it. The editable typography
+constant `--font-today-recent-note` controls their text size (default `.875rem`).
+Each title starts with a locally bundled file, calendar-event or journal icon;
+localized type text is available to screen readers and in the tooltip. Selection
+still uses the shared draft guard and opens the canonical document in Notes.
 
 The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
 tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
+
+Recent notes also appears below the Notes folder navigator. Today and Notes
+move the same section between their sidebars, retaining its loaded pages and
+using the same card, heading and guarded popup navigation. The navigator and
+recent list scroll separately, and the list stays inside the navigation drawer
+on phones. Leaving both views stops polling and fences pending replies.
+
+Notes navigation and editor content scroll independently within the available
+viewport. Its flex layout fills the space above navigation after the old view's
+toolbar is hidden and adapts to visual viewport changes; nested scrolling does
+not chain to the page at its boundaries.
+Ordinary writable document rows can be dragged to folders or the navigation background
+(the collection root). Moves flush the current draft and use the existing
+conditional path endpoint, preserving identities and bytes. Read-only, stale,
+deleted and foreign-session drags cannot write. Daily/weekly journal and event
+notes retain their configured folder associations. The Move dialog remains the
+keyboard alternative. A conflicting destination is never overwritten.
 
 The navigation toggle stays to the left of the Notes title at every screen
 size, including when navigation is collapsed or the phone drawer is open.
@@ -1146,6 +1238,27 @@ width without replacing the document, draft or editing mode. On phones it opens
 the folder drawer; selecting a document closes the drawer. The toggle reports
 its current state to assistive technology and retains focus when a viewport
 change hides the focused navigation control.
+
+An ordinary Markdown document has an editable title above its content. Press
+Enter or leave the field to save; Escape cancels a draft. Saving the title
+renames the file in its existing folder, retaining the extension and canonical
+Markdown bytes. The chosen title survives reloads and account archives. A name
+collision or stale save retains the draft; read-only clients cannot change it.
+Journal and event titles retain their existing date/event association.
+
+The footer shows the selected item's saved creation/addition and last-change timestamps
+beside its save state, using the account's time zone and locale. The document's
+full collection-relative path follows the last-change timestamp, updates after
+renaming or moving, and wraps on narrow screens. Wikilinks first match paths and
+filenames. A bare link such as `[[CVE-2026-111943]]` also matches a unique display
+title when no filename matches. Duplicate titles require an explicit path, such
+as `[[Notes/Imported investigation]]`; headings still do not rename files.
+Unsaved edits
+and rejected saves retain the saved timestamps; a successful save updates the
+last-change time. The creation label distinguishes original creation, addition to Dagsverk and unknown legacy provenance. Dates wrap on narrow screens. Formatted web, local, daily and
+wiki links show the hand pointer in both writable and read-only notes.
+In short phone windows the formatting actions scroll horizontally, retaining
+space for the document and keyboard access to every action.
 
 ![Notes workspace with a compact, resizable folder tree](../assets/screenshots/notes-workspace-expanded.png)
 
@@ -1194,3 +1307,44 @@ Formatted mode shows the diagram only; Markdown source edits its text. There is
 no hidden editable code region. Normal links and inertly parsed safe HTML anchors
 follow the owner-aware link adapter; wiki links retain their existing resolution,
 draft checks and private attachment handling.
+
+Notes and Today expose a page bookmark in the editor’s upper-right corner. On
+pointer devices the add icon appears on hover or keyboard focus; a saved
+bookmark remains visible and shows the remove icon on hover/focus. Touch devices
+always expose the control. Read-only clients display saved bookmarks disabled.
+Calendar uses `journal-bookmark` for bookmarked dates and Notes navigation uses
+`bookmark`. Empty dates can be bookmarked without creating a Markdown document.
+
+Bookmarks use the owner-private `/notes/bookmark?sourceType=…&sourceKey=…`
+GET/PUT resource and an independent ETag. They follow canonical note identity
+through edits, moves and trash recovery. A toggle never changes document bytes,
+creation/modification times, body validators or edit history. Failed/stale bookmark
+writes reload metadata and require a new explicit decision; body drafts stay in
+memory. Optional `bookmarks` metadata is included in account ZIP archives and in
+the normal full database backup. A plain folder import/export carries document
+files and dates; it does not carry these application bookmarks.
+
+## Note search panel
+
+The title-bar search and right-side results panel use the owner-bound Notes
+search API. Unqualified queries search all note types and published event details; `event:`, `journal:` and
+`note:` filters narrow them. Pure `file:` queries use the existing filename
+catalog to retain folder and attachment results. Search generations reject late
+queries and account changes, while signed cursors detect stale paging. The panel
+is modeless so users can keep editing or open guarded note popups without losing
+results. Maximizing a popup closes the panel; ordinary Close returns focus to the
+result that opened it.
+
+Calendar results include description and location from visible event-enabled
+subscriptions, even without saved notes. Opening details does not create a note.
+Where a saved event note exists, the same guarded Markdown editor edits its real
+canonical entry alongside current event details. Recurring series are labelled
+as definitions rather than expanded into unlimited occurrences.
+
+Opening or maximizing a calendar result retries `NOTES_SEARCH_INDEXING` within
+one 15-second budget when a recent save is ahead of the derived index. The
+selected action shows preparation status and rejects repeat clicks; other
+results, editing and Close remain available. Closing the source, changing the
+selection/query or ending the session prevents the pending result from opening.
+Other failures return immediately, and an exhausted index wait leaves the draft
+and a recoverable error in place.

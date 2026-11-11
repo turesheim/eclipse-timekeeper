@@ -42,7 +42,7 @@ class SynologyReleaseTest(unittest.TestCase):
         record = template(checked)
         record['checks'] = dict.fromkeys(record['checks'], True)
         record['testedAt'] = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        record['target'].update(dsmVersion='7.4.1-90080', containerManagerVersion='24.0.2-1706', postgresqlVersion='17.11-6')
+        record['target'].update(dsmVersion='7.4.1-90080', containerManagerVersion='24.0.2-1706', postgresqlVersion='17.11-6', hyperBackupVersion='4.2.2-4262')
         self.binaries = {55: json.dumps(record).encode()}
         self.remote = {'id': 20, 'tag_name': 'v2.0.0', 'draft': False, 'prerelease': False,
                        'published_at': '2026-10-14T00:00:00Z',
@@ -165,6 +165,12 @@ class SynologyReleaseTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Web'):release.matrix_run(REPO,'main',COMMIT,web_preview=True)
         self.container_jobs.remove('Deployment startup and bundled web')
         with self.assertRaisesRegex(ValueError,'Deployment startup'):release.candidate_artifact(REPO,123,'main',COMMIT,allow_web_preview=True)
+
+    def test_installer_name_does_not_turn_a_smoke_distribution_into_a_stable_candidate(self):
+        self.container_jobs = set(release.WEB_PREVIEW_JOBS)
+        self.assertEqual(self.artifact, release.candidate_artifact(REPO, 123, 'main', COMMIT, allow_web_preview=True))
+        with self.assertRaises(ValueError):
+            self.prepare()
 
     def test_full_certification_accepts_complete_web_shards_and_rejects_missing_or_mixed_shards(self):
         self.matrix_jobs=(set(release.MATRIX_JOBS)-{'Web'})|{f'Web ({index}/4)' for index in range(1,5)}

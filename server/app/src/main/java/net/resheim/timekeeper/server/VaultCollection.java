@@ -23,10 +23,10 @@ final class VaultCollection {
     String generation(){return etag(state.get());}
     String tag(JsonNode entry){return tag(entry,folder(entry)?generation():null);}
     String tag(JsonNode entry,String snapshot){return folder(entry)?etag(object().put("entry",etag(entry)).put("generation",snapshot)):entry.path("contentTag").asText();}
-    String metadataTag(JsonNode entry){return folder(entry)?tag(entry):etag(entry);}
+    String metadataTag(JsonNode entry){return folder(entry)?tag(entry):etag(new NoteBookmarks(store).annotate((ObjectNode)entry));}
     ObjectNode metadata(ObjectNode entry){return metadata(entry,folder(entry)?generation():null);}
     private ObjectNode metadata(ObjectNode entry,String snapshot){
-        String tag=tag(entry,snapshot);var result=entry.deepCopy().put("etag",tag).put("entryEtag",folder(entry)?tag:etag(entry));
+        String tag=tag(entry,snapshot);var result=new NoteBookmarks(store).annotate(entry);String metadata=folder(entry)?tag:etag(result);result.put("etag",tag).put("entryEtag",metadata);
         String title=new NoteTitles(store).get(entry);if(!title.isBlank())result.put("title",title);return result;
     }
     ObjectNode page(UUID parent,String query,boolean trash,int offset,int count,String snapshot){
@@ -76,7 +76,7 @@ final class VaultCollection {
         UUID content=UUID.randomUUID();var storage=new VaultContent(store);
         storage.save(content,etag(storage.metadata(content)),bytes,limits.fileBytes());
         var entry=index.create(target,markdown?VaultIndex.Kind.MARKDOWN:VaultIndex.Kind.BINARY,VaultContent.TYPE,content,content.toString());
-        var next=source(entry).snapshot();entry=index.content(id(entry),next,bytes.length);state.changed(bytes.length,1,false);changed();return entry;
+        var next=source(entry).snapshot();entry=index.content(id(entry),next,bytes.length);state.changed(bytes.length,1,false);changed();if(markdown)new NoteTasks(store).source(VaultSources.fromEntry(entry),bytes);return index.get(id(entry));
     }
     private ObjectNode update(ObjectNode entry,byte[] bytes){
         var ref=VaultSources.fromEntry(entry);var src=source(entry);String before=tag(entry);
@@ -112,6 +112,18 @@ final class VaultCollection {
         for(var descendant:descendants){var next=path(descendant).rebase(path(entry),target);allowed(next);if(!folder(descendant)&&association(next)!=null)throw new ApiFailure(409,"VAULT_ASSOCIATION_MOVE");}
         var moved=index.move(id(entry),target);if(!path(moved).equals(path(entry))){state.changed(0,0,false);changed();}return moved;
     }
+    ObjectNode renameTitle(ObjectNode entry,String title,String expected){
+        match(metadataTag(entry),expected);
+        if(entry.path("deleted").asBoolean())throw ApiFailure.notFound();
+        if(!entry.path("kind").asText().equals("MARKDOWN")||!entry.path("sourceType").asText().equals(VaultContent.TYPE))throw new ApiFailure(409,"VAULT_ASSOCIATION_MOVE");
+        if(title==null||title.isBlank())throw ApiFailure.validation();
+        title=java.text.Normalizer.normalize(title.strip(),java.text.Normalizer.Form.NFC);
+        var previous=path(entry);String name=previous.name();var target=previous.parent().resolve(title+name.substring(NoteTitles.filenameTitle(name).length()));
+        var moved=move(entry,target,tag(entry));boolean changedTitle=!title.equals(moved.path("title").asText());
+        var result=index.title(id(entry),title);
+        if(changedTitle&&path(moved).value().equals(previous.value())){state.changed(0,0,false);changed();}
+        return result;
+    }
     void delete(ObjectNode entry,String expected){
         match(tag(entry),expected);protectedRoot(entry);if(entry.path("deleted").asBoolean())throw ApiFailure.notFound();
         var entries=new ArrayList<>(index.subtree(id(entry)));Collections.reverse(entries);UUID batch=UUID.randomUUID();
@@ -136,7 +148,7 @@ final class VaultCollection {
             var ref=VaultSources.fromEntry(item);var src=source(item);var current=src.snapshot();
             if(!current.deleted()||current.version()!=item.path("contentVersion").asLong())throw ApiFailure.conflict();
             if(ref.type().equals(VaultContent.TYPE)){
-                new VaultContent(store).restore(ref.id(),current.tag());var next=src.snapshot();index.content(id(item),next,item.path("retainedBytes").asLong());state.changed(0,0,false);
+                new VaultContent(store).restore(ref.id(),current.tag());var next=src.snapshot();index.content(id(item),next,item.path("retainedBytes").asLong());state.changed(0,0,false);if(item.path("kind").asText().equals("MARKDOWN"))new NoteTasks(store).source(ref,src.read());
             }else{
                 byte[] bytes=new VaultRecycle(store).read(id(item),current.version());src.write(current.tag(),bytes,true);
             }

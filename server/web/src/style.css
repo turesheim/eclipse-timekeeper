@@ -154,9 +154,11 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-toolbar .track-heading { grid-column: 2; grid-row: 1; }
 .today-toolbar h2 { margin: 0; }
 .today-toolbar .today-date-navigation { grid-column: 1; grid-row: 1; display: flex; align-items: center; flex-wrap: nowrap; gap: .5rem; min-width: 0; }
-.today-date-field { width: calc(10ch + 4.25rem + 2px); max-width: 100%; }
-.today-date-field .form-control { min-width: 0; margin-top: 0; font-variant-numeric: tabular-nums; }
-.today-date-field input::-webkit-calendar-picker-indicator { display: none; }
+.date-navigation { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; min-width: 0; }
+.date-navigation-field { width: calc(10ch + 4.25rem + 2px); max-width: 100%; flex: none; }
+.date-navigation-month { width: calc(7ch + 4.25rem + 2px); }
+.date-navigation-field .form-control { width: 1%; flex: 1 1 auto; min-width: 0; margin-top: 0; font-variant-numeric: tabular-nums; }
+.date-navigation-field input::-webkit-calendar-picker-indicator { display: none; }
 .today-layout { display: grid; grid-template-columns: minmax(0,1fr) 1rem minmax(180px,var(--today-sidebar-width,14rem)); align-items: start; }
 .today-resize { align-self: stretch; cursor: col-resize; touch-action: none; }
 .today-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -525,5 +527,11 @@ code, pre { font-size: var(--font-code); }
 @media(forced-colors: active) { .css-editor.is-highlighted textarea { color: CanvasText; background: Canvas; caret-color: CanvasText; }.css-editor-highlight { visibility: hidden; } }
 
 .today-recent-list { display: grid; gap: .35rem; }
-.today-recent-note { display: grid; width: 100%; min-width: 0; text-align: start; }
+.recent-notes { --today-sidebar-heading-font-size: var(--font-today-sidebar-heading); display:flex; flex-direction:column; min-height:0; }
+.recent-notes > h3 { flex-shrink:0; }
+.recent-notes > div { min-height:0; overflow:auto; overscroll-behavior:contain; }
+.today-recent-note { display: grid; width: 100%; min-width: 0; border: 0; text-align: start; font-size: var(--font-today-recent-note); }
 .today-recent-note > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-recent-note-title { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+.today-recent-note-title > .icon { flex: none; }
+.today-recent-note-label { font-weight: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

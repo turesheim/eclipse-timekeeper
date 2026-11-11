@@ -115,6 +115,7 @@ def select_jobs(event, event_name, ref, head):
     specs = [] if full or backend else browser_specs(web_paths)
     return {
         'code': code,
+        'synology_distribution': code or ref == 'refs/heads/main',
         'full': full,
         'eclipse': certify_all or any(desktop_path(p) for p in product),
         'remote_eclipse': full,

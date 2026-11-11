@@ -91,19 +91,12 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
    HAProxy accepts the required request line size; any additional HTTPS proxy
    must also allow request lines up to 128 KiB for those extreme lookup URLs.
 
-The server image is published by the **Server containers** workflow after successful
-server/Compose checks. Web-only main changes use the deployment startup/web smoke
-check; backend/deployment changes and releases retain full certification (see
-[CI selection](CI.md)). `edge` tracks tested `main`; semantic release tags use the
-version without the leading `v`, and immutable `sha-<full-commit>` tags are also
-published. Images first become available after that workflow runs on `main` or
-a release tag. Use the source-build instructions below before publication.
-If registry access is denied, make the repository-linked GHCR packages public,
-or authenticate the NAS with `docker login ghcr.io` using an account that can
-read those packages. The updater reuses Docker's registry authentication.
+The **Server containers** workflow builds images for the Synology SPK and the
+`server-compose` image archive. It no longer publishes the
+`eclipse-timekeeper-server` registry package. Main builds produce a Synology
+distribution; see [CI selection](CI.md) for validation levels.
 
-PR CI also supplies tested AMD64 image archives in `server-compose`, so
-the DS923+ can run a candidate before registry publication. Download the artifact,
+CI supplies AMD64 image archives in `server-compose`. Download the artifact,
 verify `checksums.sha256`, extract `timekeeper-compose.tar.gz` into `deploy`, and
 import the images through Container Manager or SSH:
 
@@ -113,9 +106,9 @@ docker load -i timekeeper-images-linux-amd64.tar.gz
 ```
 
 Copy the image values from `images.env` into the deployment `.env` before
-starting the project. These imported immutable candidates do not auto-update;
-after the PR is merged and images are published, switch the API reference to
-the GHCR channel you want to follow. Configure `.env` and run setup as described
+starting the project. Imported immutable images do not auto-update. Download and
+load a newer archive, or build from source, for a newer deployment. Configure
+`.env` and run setup as described
 above; deployment bundles and image archives contain no production credentials.
 
 Keep the official PostgreSQL image on the explicit version tag in `.env`.
@@ -131,6 +124,10 @@ containers leaves these directories in place. Keep them outside the Container
 Manager project directory, and preserve them during project cleanup.
 The application uses a separate, non-superuser database role.
 
+Internet accounts use shared sign-in without per-server OAuth setup. Optional
+legacy direct task registrations use a retained private properties file. See
+[Internet accounts](TASK-PROVIDERS.md) for both modes and recovery.
+
 The server database is separate from Eclipse's embedded H2 database. Existing
 H2 files cannot be mounted as PostgreSQL storage. Move user data through the
 API's supported export/import flow; this deployment never converts or merges
@@ -143,7 +140,8 @@ sh backup.sh
 ```
 
 The resulting directory contains a PostgreSQL custom-format dump, the token
-registry, SMTP settings/password and the deployed image list. Configure a daily DSM task to run this
+registry, SMTP settings/password, optional task-provider app registrations and the
+deployed image list. Configure a daily DSM task to run this
 command, monitor failures, and back up `backups`, `config`, `.env` and `secrets`
 to another host/location using Hyper Backup. Set retention for those backups.
 Copying live PostgreSQL data directories is not a consistent backup.

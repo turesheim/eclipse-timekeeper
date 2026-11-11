@@ -10,6 +10,9 @@ if [ -e "$backup_dir/mail.properties" ] || [ -e "$backup_dir/smtp_password" ]; t
   test -f "$backup_dir/mail.properties"
   test -f "$backup_dir/smtp_password"
 fi
+if [ -e "$backup_dir/task_providers.properties" ]; then
+  test -f "$backup_dir/task_providers.properties"
+fi
 # shellcheck source=/dev/null
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 if [ "${TIMEKEEPER_COMPOSE_LOCK_HELD:-}" != 1 ]; then
@@ -30,6 +33,16 @@ if [ -f "$backup_dir/mail.properties" ]; then
   chmod 444 "$state_dir/secrets/timekeeper_smtp_password.new"
   mv "$state_dir/secrets/timekeeper_smtp_password.new" "$state_dir/secrets/timekeeper_smtp_password"
 fi
+mkdir -p "$state_dir/secrets/task-providers"
+chmod 700 "$state_dir/secrets"
+chmod 755 "$state_dir/secrets/task-providers"
+if [ -f "$backup_dir/task_providers.properties" ]; then
+  cp "$backup_dir/task_providers.properties" "$state_dir/secrets/task-providers/application.properties.new"
+else
+  printf '%s\n' '# No task-provider app registrations in this backup.' > "$state_dir/secrets/task-providers/application.properties.new"
+fi
+chmod 444 "$state_dir/secrets/task-providers/application.properties.new"
+mv "$state_dir/secrets/task-providers/application.properties.new" "$state_dir/secrets/task-providers/application.properties"
 python3 ./instance_material.py finish "$backup_dir"
 # Wait for both members before returning; a single ready load-balanced request
 # does not prove that the other restored replica has completed startup.

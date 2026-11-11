@@ -47,6 +47,7 @@ export class TrackHolidays {
     return i18nText('holidays.country',{country:name});
   }
   applyHolidays(data,focused) {
+    if(this.root.hidden)return;
     const retryFocused=document.activeElement===this.holidayRetry;
     this.holidayRetry.hidden=true;this.holidayRetry.disabled=false;
     this.holidayStatus.hidden=data.state==='ready';
@@ -65,7 +66,7 @@ export class TrackHolidays {
     else if(retryFocused)this.input.focus();
   }
   paintHolidays(focused) {
-    if(!this.active||!this.calendar)return;
+    if(!this.active||!this.calendar||this.root.hidden)return;
     const country=selectedHolidayCountry(this.preference),key=this.calendar.month+'|'+getLocale()+'|'+this.preference+'|'+country;
     if(this.holidayKey===key) {if(this.holidayData)this.applyHolidays(this.holidayData,focused);return;}
     const generation=++this.holidayGeneration;this.holidayKey=key;this.holidayData=null;

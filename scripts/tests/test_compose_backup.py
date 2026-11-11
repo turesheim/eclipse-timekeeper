@@ -22,7 +22,8 @@ class ComposeBackupTest(unittest.TestCase):
         self.state = self.root / 'state with spaces'
         for name, content in {'config/tokens.json': '[]',
                               'config/mail.properties': '# mail fixture\n',
-                              'secrets/timekeeper_smtp_password': 'fixture-password'}.items():
+                              'secrets/timekeeper_smtp_password': 'fixture-password',
+                              'secrets/task-providers/application.properties': 'timekeeper.tasks.google.client-secret=synthetic-registration\n'}.items():
             target = self.state / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
@@ -80,10 +81,17 @@ else:
                          (backup / 'images.txt').read_text())
         for source, destination in [('config/tokens.json', 'tokens.json'),
                                     ('config/mail.properties', 'mail.properties'),
-                                    ('secrets/timekeeper_smtp_password', 'smtp_password')]:
+                                    ('secrets/timekeeper_smtp_password', 'smtp_password'),
+                                    ('secrets/task-providers/application.properties', 'task_providers.properties')]:
             self.assertEqual((self.state / source).read_bytes(), (backup / destination).read_bytes())
         self.assertEqual(0o700, backup.stat().st_mode & 0o777)
         self.assertTrue(all(path.stat().st_mode & 0o777 == 0o600 for path in backup.iterdir()))
+
+    def test_backup_still_accepts_state_from_before_task_providers(self):
+        (self.state / 'secrets/task-providers/application.properties').unlink()
+        result = self.backup()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertFalse((self.root / result.stdout.strip() / 'task_providers.properties').exists())
 
     def test_failed_dump_never_reports_a_completed_backup(self):
         result = self.backup(FAIL_DUMP='1')

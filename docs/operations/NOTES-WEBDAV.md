@@ -8,8 +8,9 @@ Save folder settings before importing a vault whose layout uses those folders.
 
 The **Recent notes: number of days** preference controls the list below Planned
 tasks in Today. The default is seven calendar days including today, using your
-account time zone. Journal notes are excluded; other Markdown and event notes
-open in Notes when selected. Selecting a historical date in Today does not change
+account time zone. Ordinary, event and daily/weekly journal notes have distinct
+icons before their titles, with their type also announced to screen readers.
+All open in Notes when selected. Selecting a historical date in Today does not change
 this recent-edit window. Unsaved drafts still require confirmation before leaving.
 
 Under **Import notes**, choose the local vault root with **Choose vault folder**.
@@ -51,12 +52,19 @@ for folder import. Timekeeper recognizes the auxiliary metadata, excludes it fro
 uploads, and preserves dates and empty folders. A source file with the same name
 is kept as a normal file. Invalid or ambiguous metadata blocks review. Original
 creation dates follow relative paths; a checksum detects content edited after the
-snapshot and uses that file's current modification time instead. Existing server
-files and existing folder dates remain unchanged.
+snapshot and uses that file's current modification time instead. Existing files are kept by default. Select **Overwrite existing files** to
+include them as reviewed replacements. The review identifies each replacement;
+a subsequent edit, move or deletion causes a conflict and preserves the current
+server file. Replacements preserve file identity and path. Existing folder dates
+remain unchanged. Without supplied original creation metadata, a replacement
+keeps its existing creation date. Source modification dates are preserved.
 
 Browsers expose `lastModified` but not filesystem creation dates. A folder import
 without metadata therefore preserves the available modification time and records
-when each new entry joined Timekeeper. To keep creation dates for an existing
+when each new entry joined Dagsverk. The footer calls that date **Added**;
+**Created** identifies a supplied original creation date. Older entries have no
+recorded date provenance and show **Created / added**. Modification time may be
+older than either value; it must not be substituted for an unknown creation date. To keep creation dates for an existing
 local vault, download the manual sync client from the same account page and run:
 
 ```sh
@@ -70,7 +78,9 @@ where the OS provides them (including macOS); POSIX `ctime` is never used as a
 creation date. It refuses symlinks, checks for concurrent source changes, and
 refuses to overwrite an unrelated file occupying the metadata filename. `--include-obsidian` includes configuration when
 also enabled in the target account. Timekeeper exports already include metadata
-and do not need this preparation step. The helper defaults to at most 100,000 entries (adjust with `--max-entries`);
+and do not need this preparation step. To correct dates on files already
+imported without metadata, prepare the metadata in the original local folder,
+choose that folder again, enable overwrite and review the replacements. The helper defaults to at most 100,000 entries (adjust with `--max-entries`);
 `--max-file-bytes` sets its bounded per-file limit. The browser review still
 applies the target server's own limits.
 
@@ -120,6 +130,107 @@ content pane when selected in the navigation tree; other attachments can be down
 Journal image references also resolve companions imported through vault synchronization,
 including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
+
+## Searching note contents
+
+The title-bar **Search notes** field searches active ordinary Markdown, daily,
+weekly and event notes. Results appear in a panel on the right with a search
+field for refinements. Opening a note shows a popup and retains the results;
+maximizing the popup opens its workspace and closes the search panel.
+
+Use `file:name` for literal filename/path substring matches, including folders
+and attachments. Quote names containing spaces, such as `file:"Meeting notes"`.
+Use `event:words`, `journal:words` or `note:words` to limit content results to
+events, daily/weekly journals or ordinary Markdown; a bare type qualifier such
+as `event:` lists that type. Filters combine with words, phrases and tags.
+Content results exclude attachments, folders, deleted notes, old revisions and
+independent day labels. Hidden journals and disabled `.obsidian` paths remain
+excluded. Search does not replace the folder navigator or the current draft.
+
+Use words (all required) or double quotes for a phrase. Search is case-insensitive,
+Unicode-aware and does not stem or fold accents. English and Norwegian text,
+link labels and code are indexed; YAML frontmatter and markup are excluded.
+Queries allow at most 512 UTF-16 code units and 32 analyzed terms. Punctuation
+acts as text separators; arbitrary Lucene query syntax is not available.
+
+Hashtags such as `#OpenShift` use the accent colour in Formatted mode. Click a
+tag, or focus it and press Enter, to open matching notes in the search panel. The
+search entry becomes `tag:#openshift`. Editing the
+query can combine tags with ordinary words or quoted phrases. Tag matching is
+exact and case-insensitive, so an untagged word or `#OpenShiftTools` does not
+match `tag:#openshift`. The current Notes draft is retained.
+
+Tags support Unicode letters and numbers, underscores, hyphens and nested
+segments such as `#work/openshift`, up to 128 UTF-16 code units including `#`.
+Code, link and image labels/destinations, wikilink targets and frontmatter do
+not define tags. Markdown source retains ordinary editable text; no tag
+metadata or rewritten source is required. Existing private search caches
+rebuild automatically for the new tag format.
+
+Matches are ordered by relevance, with title and path matches boosted. Each
+result shows its title, path and a plain-text highlighted excerpt. **More results**
+loads the next page without reordering earlier matches. Changing a query keeps
+an open draft; opening another result uses the usual save/navigation guard.
+Changes during pagination require a fresh search rather than mixing snapshots.
+
+Content search is derived from the canonical SQL records using embedded Lucene.
+Each server replica independently replays the committed, content-free change
+log into its own private index. A search first captures the committed generation;
+if that replica cannot catch up within a short wait, it reports that search is
+being prepared or unavailable. File browsing and canonical saves remain usable.
+The next successful search validates that its indexed source versions are current.
+Do not treat an indexing response as a complete empty result.
+
+The browser starts preparing the signed-in account's note and calendar indexes
+before the first query and after committed account changes. Empty accounts need
+no index; checking readiness does not create folders or consume storage. A first search waits briefly for preparation and retries
+automatically. Bookmarked notes receive a small relevance bonus; stronger title
+and path matches still take priority. Changing a bookmark refreshes ranking and
+expires existing result cursors without changing note content or timestamps.
+
+### Search cache and recovery
+
+`TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY` defaults to `AUTO`: a private
+`timekeeper-notes-search-*` directory in the JVM temporary directory. A clean
+shutdown removes an automatic cache; a restart rebuilds it from SQL. Abruptly
+terminated processes can leave temporary directories for the operator or OS
+temporary-file cleanup to remove. Only remove directories from stopped instances.
+For persistent reuse, choose a dedicated local directory owned by the server
+account. Each replica requires a different writable directory; a shared directory
+is refused. Keep these derived files outside backup/export storage and include
+only the canonical database in the backup plan. Restore works without any index.
+
+The defaults are eight open account caches, two concurrent searches, a 16 GB soft
+aggregate disk limit within the configured cache root and 1 GiB free-space
+headroom. Configure them with `TIMEKEEPER_NOTES_SEARCH_OPEN_OWNERS` (1–32),
+`TIMEKEEPER_NOTES_SEARCH_MAX_CACHE_BYTES` and
+`TIMEKEEPER_NOTES_SEARCH_MIN_FREE_BYTES`. Disk usage is measured every two seconds;
+bounded in-flight work and Lucene merges can exceed the soft limit. Inactive
+account caches are reclaimed when the limit is reached. Idle handles close after
+ten minutes. The worker processes at most 32 records or about 8 MB per replay
+batch, stopping between records after its 100 ms work budget. A single supported
+Markdown file and a commit/merge can extend a batch beyond those soft budgets.
+Backfills checkpoint approximately once per second and publish readers only when
+ready. A crash can repeat uncommitted backfill work; canonical data stays in SQL.
+Incremental updates commit before being considered caught up. Canonical
+transactions never wait for parsing or index commits.
+
+`GET /api/v1/notes/search/status` reports this replica's ready/indexing/unavailable
+state, applied and target generations and any safe failure category.
+`POST /api/v1/notes/search/rebuild` requires write permission and schedules a
+private rebuild for this account on this replica. The content-search UI offers
+**Search again** and **Rebuild search** when unavailable. Missing, incompatible,
+corrupt or expired caches rebuild automatically; collection and instance-restore
+identities fence old contents. Removed SQL owners are purged during maintenance.
+Cache failure, disk pressure or a busy writer produces an unavailable response
+without changing canonical notes. The cache uses private directory/file permissions.
+
+Search pages contain at most 50 results by default, capped at 200. Excerpts contain
+at most 320 UTF-16 code units and 64 highlight ranges. Signed snapshot/cursor tokens
+last ten minutes and bind the account, query, visibility, collection, restore
+identity and content generation. A changed snapshot returns 412; retryable indexing
+or cache failure returns 503. Continuation uses logical relevance/path/entry-ID
+positions, allowing another caught-up replica to continue without local document IDs.
 
 ## Connection and folder choices
 

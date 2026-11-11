@@ -13,5 +13,5 @@ export function withoutDailyWikilinks(value){
 export const dayNoteNavigation='timekeeper:open-day-note';
 /** Dialogs contribute a non-mutating guard and a close action to one navigation. */
 export function guardDayNoteNavigation(root,canLeave,leave){
-  for(const name of [dayNoteNavigation,'timekeeper:vault-note-navigation'])root.addEventListener(name,event=>{event.detail.guards.push(canLeave);event.detail.leave.push(leave);});
+  for(const name of [dayNoteNavigation,'timekeeper:vault-note-navigation','timekeeper:notes-tag-navigation'])root.addEventListener(name,event=>{event.detail.guards.push(canLeave);event.detail.leave.push(leave);});
 }

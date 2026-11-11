@@ -67,7 +67,9 @@ Choose a deployment:
   to configure persistent storage, generate the first-administrator setup code
   and start the PostgreSQL-backed deployment. With the default local settings,
   open **http://127.0.0.1:8080/web/**.
-- **Synology DSM:** download the `synology-installer` artifact from a successful
+- **Synology DSM:** download the current SPK from
+  [Synology latest](https://github.com/turesheim/eclipse-timekeeper/releases/tag/synology-latest),
+  or the `synology-installer` artifact from a successful
   [Server containers workflow](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/server-containers.yml)
   run. Extract it and install the `.spk` through **Package Center → Manual Install**.
   The candidate targets DS923+ (r1000) with Container Manager and SynoCommunity

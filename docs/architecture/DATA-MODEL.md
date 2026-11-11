@@ -396,6 +396,11 @@ are independent task values. Missing values on older payloads read as
 `UNSPECIFIED`/false/false. Ordinary task edits preserve them, and both portable
 exports and account archives retain them. Provider capabilities determine
 which of these fields a connector may write remotely.
+Tasks without a project can also carry a nullable, server-owned `clientId` in
+their JSON resource, protected by an owned client relation. Project tasks inherit
+their project's client. Domain mutations retain direct client metadata; legacy
+tasks read without an assignment. Portable JSON/CSV and account imports remap
+direct client IDs without creating projects. No SQL schema change is required.
 Task notes are an embedded `body` value with an explicit `TEXT` or `HTML`
 format. Missing values on older payloads read as empty plain text. The
 conditional body endpoint can clear notes with empty text; ordinary task edits
@@ -681,7 +686,10 @@ used by all canonical note writers. Metadata queries never fetch attachment data
 
 New entries also record a `createdAt` timestamp, using an original source creation
 time supplied during create-only import, or otherwise their creation in the
-collection. It survives content edits, moves, deletion/recovery and logical
+collection. `createdAtSource` distinguishes `ORIGINAL` source creation from
+`ADDED` collection addition; absent provenance or `UNKNOWN` stays unknown.
+Clients must not infer it from the ordering of creation and modification times.
+It survives content edits, moves, deletion/recovery and logical
 account archives. Entries predating this metadata may omit it; reads and moves do
 not invent a creation date. File `modifiedAt` remains the canonical content's
 modification time. A create-only import can supply this original modification
@@ -690,6 +698,18 @@ refreshed together. Subsequent edits use the normal server modification time.
 Logical account archives and portable Notes ZIP metadata preserve available
 creation and modification dates. Clients can sort complete metadata listings
 without reading document bodies.
+
+`NOTES_SEARCH` stores an owner-scoped search epoch, committed generation and
+retained-history floor. `NOTES_SEARCH_LOG` stores at most 8,192 content-free
+changed-entry/deletion/scope records, written in the same SQL transaction as
+canonical mutations. Each replica independently replays those records into its
+private Lucene cache. Cache commits retain identity and the applied watermark;
+backfill copies canonical data in short repeatable-read snapshots and parses it
+after releasing SQL connections. Final API publication rechecks current SQL
+identity, generation, authorization and canonical source versions. Logical account
+restore resets the search epoch, while instance restore also fences caches by
+its restore generation. Search rows are derived synchronization data, excluded
+from portable account exports; SQL backups include the state needed for recovery.
 
 `VAULT_CONTENT` holds exact general-file bytes, checksum, size and content version.
 DAY_NOTE, WEEK_NOTE, EVENT_NOTE and JOURNAL_ASSET remain the sole live sources for
@@ -718,6 +738,15 @@ journal/event associations. Encrypted instance backups retain raw records and
 history across accounts. See [Notes design](NOTES-VAULT.md) and the
 [manual synchronization guide](../operations/NOTES-WEBDAV.md).
 
+`DAY_CLIENT`, `WEEK_CLIENT`, `EVENT_CLIENT` and `VAULT_CLIENT` store optional
+owned business-client associations by stable canonical note source ID. Their
+versions and ETags are independent of content and bookmark metadata. An assigned
+record has an owner-scoped `client` relation to `CLIENT`; clearing removes that
+relation. These records survive note moves, title edits and recoverable deletion,
+and empty day/week associations do not create Markdown files. Logical account
+archives remap their client IDs with imported work records. Encrypted instance
+backups retain the raw records and relations.
+
 ### Prospective note revisions
 
 `NOTE_REVISION` owner-scoped `tk_resource` records retain prior canonical UTF-8
@@ -744,17 +773,22 @@ archives without the field use 7. The preference is included in full account
 archives, but not notes-only ZIP exports.
 
 `GET /api/v1/notes/recent` returns owner-private index metadata rather than
-document or attachment bodies. It includes active Markdown and event notes edited
-from the first local midnight through the end of today, excluding the configured
-journal subtree, day/week notes, assets, folders and trash. Results sort by edit
+document or attachment bodies. It includes active ordinary, event and daily/weekly
+journal notes edited from the first local midnight through the end of today,
+excluding assets, folders, trash and the daily journal note for the current
+account-local date. Other journal dates use the edit instant for eligibility.
+The exclusion uses the canonical source identity, so a custom journal folder or
+an ordinary document with the same filename does not change it. Results sort by edit
 instant descending, then normalized path and identity. The pagination snapshot
 binds the collection generation, day range, time zone and preference; subsequent
-pages require it in `If-Match`. Midnight and time-zone changes invalidate pages
+pages require it in `If-Match`. The selection policy is versioned in the opaque
+snapshot, so an upgrade of the selection policy invalidates pages.
+Midnight and time-zone changes invalidate pages
 even when no note has changed.
 
 An empty Recent notes read does not initialize the collection or create business
 records. This preserves the strict empty-target restore check after a user opens
-Today on a fresh installation. Existing canonical event notes are indexed on the
+Today on a fresh installation. Existing canonical event and journal notes are indexed on the
 first recent-list read when the collection has not yet been initialized.
 
 `VAULT_SETTINGS.editorCursor` is an optional account preference: `default`, `line`,
@@ -784,3 +818,15 @@ and four byte/count values are updated atomically without changing the outer
 service settings version, active version or authentication epoch. No table or
 schema-version change is needed. Encrypted instance backups retain the object;
 account archives do not carry authority to alter it.
+
+Checklist/task links use owner-private `NOTE_TASK_DOC` and `NOTE_TASK_LINK`
+resources. The document record is keyed by a deterministic UUID containing the
+canonical source type/ID; its ordered items keep task IDs, parsed summaries,
+checkbox states and source offsets. The task-keyed link permits constant-time
+completion lookup without adding metadata to Markdown or duplicating task data.
+Task creation, updates and planning use the canonical shared service. Removed
+items drop the private link while retaining the ordinary task. Deleted tasks
+leave an inert item identity until an explicit checklist edit or item removal.
+These resources are included in instance backups and exported as logical,
+validated `noteTasks` records in account archives; runtime IDs are rebuilt during
+restore. All operations use the existing owner lock and conditional resource writes.

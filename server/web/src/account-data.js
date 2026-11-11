@@ -4,7 +4,7 @@ import { instantText } from './model.js';
 import {archiveDownload} from './archive-download.js';
 
 const MAX_BYTES = 1024 * 1024 * 1024;
-const labels = { notesEntries:i18nText('notes.entry_count'),notesFiles:i18nText('notes.file_count'),eventNotes: i18nText("event_notes.count"), dayNotes: i18nText("day_notes.count"), clients: i18nText("ui.clients"), projects: i18nText("ui.projects"), tasks: i18nText("ui.tasks"), labels: i18nText("ui.labels"), activities: i18nText("ui.activities"), workSessions: i18nText("ui.work_sessions"), importAuditRecords: i18nText("ui.import_audit_records") };
+const labels = { noteTasks:i18nText("notes.task_count"), noteClients:i18nText('notes.client_associations'),bookmarks:i18nText('notes.bookmarks'), notesEntries:i18nText('notes.entry_count'),notesFiles:i18nText('notes.file_count'),eventNotes: i18nText("event_notes.count"), dayNotes: i18nText("day_notes.count"), clients: i18nText("ui.clients"), projects: i18nText("ui.projects"), tasks: i18nText("ui.tasks"), labels: i18nText("ui.labels"), activities: i18nText("ui.activities"), workSessions: i18nText("ui.work_sessions"), importAuditRecords: i18nText("ui.import_audit_records") };
 const relationshipLabels = { projectClients: i18nText("ui.project_clients"), taskProjects: i18nText("ui.task_projects"), parentTasks: i18nText("ui.parent_tasks"), activityTasks: i18nText("ui.activity_tasks"), activityProjects: i18nText("ui.activity_projects"), activityLabels: i18nText("ui.activity_labels"), workSessionClients: i18nText("ui.work_session_clients"), workSessionProjects: i18nText("ui.work_session_projects"), workSessionLabels: i18nText("ui.work_session_labels") };
 const base = '/data/account';
 

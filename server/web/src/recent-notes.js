@@ -2,21 +2,30 @@ import {t} from './i18n.js';
 import {dateInZone,instantText} from './model.js';
 import {vaultNoteNavigation} from './vault-editor-resources.js';
 import {noteTitle} from './note-title.js';
+import {icon} from './icons.js';
+import {noteIcon} from './note-presentation.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 
 /** Metadata only; opening a document uses the shared unsaved-draft navigation guard. */
 export class RecentNotes {
-  constructor(root,callbacks){
-    this.root=root;this.callbacks=callbacks;this.generation=0;this.visible=false;this.items=[];
+  constructor(root,callbacks,{section=root}={}){
+    this.root=root;this.section=section;this.callbacks=callbacks;this.generation=0;this.visible=false;this.items=[];
     document.addEventListener('timekeeper:notes-changed',()=>void this.refresh(true));
   }
   reset(){this.hide();this.scope=null;this.items=[];this.page=null;this.error=null;this.root.replaceChildren();this.root.removeAttribute('aria-busy');}
-  hide(){this.visible=false;this.key=null;this.busy=false;++this.generation;}
-  show(){this.visible=true;void this.refresh();}
+  hide(){this.visible=false;this.key=null;this.busy=false;++this.generation;clearInterval(this.timer);this.timer=null;}
+  show(host,id){
+    if(host&&this.section.parentElement!==host)host.append(this.section);
+    if(id){
+      this.root.id=id;const heading=this.section.querySelector('h3');
+      if(heading){heading.id=id+'-title';this.section.setAttribute('aria-labelledby',heading.id);}
+    }
+    this.visible=true;if(!this.timer)this.timer=setInterval(()=>void this.refresh(),30000);void this.refresh();
+  }
   update(scope,zone,revision){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;}
-    this.zone=zone;this.revision=revision;void this.refresh();
+    this.zone=zone;this.revision=revision;if(this.visible)this.show();
   }
   async refresh(force=false){
     if(!this.visible||!this.scope||!this.zone)return;
@@ -50,9 +59,15 @@ export class RecentNotes {
       const list=node('ul',undefined,'today-list today-recent-list'),scope=this.scope,generation=this.generation;
       for(const entry of this.items){
         const item=node('li'),action=node('button',undefined,'btn btn-outline-secondary today-recent-note');action.type='button';action.dataset.recentNote=entry.id;
-        action.append(node('strong',noteTitle(entry)),node('span',entry.path,'hint'));
-        action.title=(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
-        action.addEventListener('click',()=>action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}})));
+        const key=entry.kind==='EVENT'?'notes.type_event':['DAY','WEEK'].includes(entry.kind)?'notes.type_journal':'notes.type_ordinary';
+        const title=node('span',undefined,'today-recent-note-title');
+        title.append(icon(noteIcon(entry)),node('span',t(key)+': ','visually-hidden'),node('span',noteTitle(entry),'today-recent-note-label'));
+        action.append(title);
+        action.title=t(key)+'\n'+(entry.kind==='EVENT'?noteTitle(entry):entry.path)+'\n'+instantText(entry.modifiedAt,this.zone);
+        action.addEventListener('click',()=>{
+          const originSelector=(this.root.id?'#'+CSS.escape(this.root.id)+' ':'')+`[data-recent-note="${entry.id}"]`;
+          action.dispatchEvent(new CustomEvent(vaultNoteNavigation,{bubbles:true,cancelable:true,detail:{entry,popup:true,originSelector,originElement:action,guards:[()=>this.visible&&scope===this.scope&&generation===this.generation],leave:[]}}));
+        });
         item.append(action);list.append(item);
       }
       this.root.append(list);

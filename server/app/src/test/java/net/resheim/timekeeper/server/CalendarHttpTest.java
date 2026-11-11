@@ -91,6 +91,27 @@ class CalendarHttpTest {
         clock.set(NOW.plusSeconds(31));Feeds.body.set(body.replace("STATUS:NEEDS-ACTION","STATUS:COMPLETED"));refresh(path).then().statusCode(200);
         var changed=events().path("items").get(0);assertEquals(item.path("key"),changed.path("key"));assertNotEquals(item.path("eventVersion"),changed.path("eventVersion"));assertEquals("COMPLETED",changed.path("todoStatus").asText());
     }
+    @Test void allCalendarTasksArePagedReadOnlyOwnedAndSnapshotBoundOutsideTheCalendarWindow(){
+        StringBuilder body=new StringBuilder("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dagsverk//Task catalog//EN\r\n");
+        for(int index=0;index<7;index++)body.append("BEGIN:VTODO\r\nUID:catalog-").append(index).append("\r\nDTSTAMP:20260101T000000Z\r\nSUMMARY:Task ").append(index).append("\r\n").append(index==0?"DUE;VALUE=DATE:19990101\r\n":index==1?"DUE;VALUE=DATE:20990101\r\n":index==2?"STATUS:COMPLETED\r\n":"").append("END:VTODO\r\n");
+        Feeds.body.set(body.append("END:VCALENDAR\r\n").toString());var config=configuration(client("test-a").path("id").asText()).put("includeTodos",true).put("includeEvents",false);
+        String path="/calendar-subscriptions/"+parse(create("test-a",config).then().statusCode(201).extract().asString()).path("id").asText();refresh(path).then().statusCode(200);int requests=Feeds.requests.get();
+        var first=get("test-read","/calendar-tasks?limit=2");first.then().statusCode(200);assertEquals("no-store",first.header("Cache-Control"));assertFalse(first.asString().contains("private-access"));
+        var firstPage=parse(first.asString());String snapshot=firstPage.path("snapshot").asText(),cursor=firstPage.path("nextCursor").asText();assertEquals(snapshot,first.header("ETag"));
+        var ids=new HashSet<String>();var dates=new HashSet<String>();JsonNode page=firstPage;
+        do{for(var item:page.path("items")){assertTrue(ids.add(item.path("id").asText()));if(item.hasNonNull("due"))dates.add(item.path("due").path("date").asText());}
+            if(page.path("nextCursor").isNull())break;
+            page=parse(call("test-read","GET","/calendar-tasks?limit=2&cursor="+page.path("nextCursor").asText(),null,snapshot,null).then().statusCode(200).extract().asString());
+        }while(true);
+        assertEquals(7,ids.size());assertEquals(Set.of("1999-01-01","2099-01-01"),dates);assertEquals(requests,Feeds.requests.get());
+        get("test-b","/calendar-tasks").then().statusCode(200);assertEquals(0,parse(get("test-b","/calendar-tasks").asString()).path("items").size());
+        get("test-read","/calendar-tasks?limit=2&cursor="+cursor).then().statusCode(428);
+        call("test-b","GET","/calendar-tasks?limit=2&cursor="+cursor,null,snapshot,null).then().statusCode(412);
+        clock.set(NOW.plusSeconds(31));Feeds.body.set(Feeds.body.get().replace("Task 0","Updated task"));refresh(path).then().statusCode(200);
+        call("test-read","GET","/calendar-tasks?limit=2&cursor="+cursor,null,snapshot,null).then().statusCode(412);
+        var current=get("test-a",path);call("test-a","PUT",path,config.put("visible",false).put("url",""),current.header("ETag"),null).then().statusCode(200);
+        assertEquals(0,parse(get("test-a","/calendar-tasks").asString()).path("items").size());
+    }
     @Test void configurationHasOwnedConditionalBoundariesAndNeverReturnsTheCredentialUrl(){
         String client=client("test-a").path("id").asText(),foreign=client("test-b").path("id").asText();var input=configuration(client);String key=UUID.randomUUID().toString();
         var created=call("test-a","POST","/calendar-subscriptions",input,null,key);created.then().statusCode(201);assertFalse(created.asString().contains("private-access"));assertFalse(parse(created.asString()).has("url"));

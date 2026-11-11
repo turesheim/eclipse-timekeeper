@@ -22,6 +22,10 @@ class ServiceSettings {
     @Inject PasskeyRealm realm;
     @Inject BrowserOrigins browserOrigins;
     @Inject RecoveryMail mail;
+    @Inject TaskProviderConfiguration taskProviders;
+    @Inject SharedConnectConfiguration sharedConnect;
+    @Inject InstanceAdministrator administrators;
+    static final String INTERNET="internetAccounts";
     @ConfigProperty(name="timekeeper.service-settings.recover",defaultValue="false") boolean recover;
     private volatile long localVersion=-1;
     private static final Set<String> FIELDS=Set.of("publicOrigin","originEpoch","passkeysEnabled","passkeyRpId","emailRecoveryEnabled",
@@ -42,7 +46,20 @@ class ServiceSettings {
         value.put("smtpHost",config("quarkus.mailer.host","localhost"));value.put("smtpPort",Integer.parseInt(config("quarkus.mailer.port","587")));
         value.put("smtpFrom",config("quarkus.mailer.from","timekeeper@localhost"));value.put("smtpUsername",config("quarkus.mailer.username",""));
         value.put("smtpTls",Boolean.parseBoolean(config("quarkus.mailer.tls","false")));value.put("smtpStartTls",config("quarkus.mailer.start-tls","REQUIRED"));
+        value.set(INTERNET,internetDeployment());
         return value;
+    }
+    private static ObjectNode internetDeployment(){
+        return object().put("mode",Boolean.parseBoolean(config("timekeeper.connect.shared","true"))?"SHARED":"DIRECT")
+                .put("serviceUrl",config("timekeeper.connect.service-url","").isBlank()?null:config("timekeeper.connect.service-url",""))
+                .put("googleClientId",config("timekeeper.tasks.google.client-id","")).put("googleClientSecret",config("timekeeper.tasks.google.client-secret",""));
+    }
+    private static ObjectNode internet(JsonNode settings){return settings.has(INTERNET)?((ObjectNode)settings.get(INTERNET)).deepCopy():internetDeployment();}
+    private static void validateInternet(JsonNode value){
+        if(!value.isObject()||value.size()!=4||!Set.of("SHARED","DIRECT").contains(value.path("mode").asText()))throw ApiFailure.validation();
+        text(value,"googleClientId",1024);text(value,"googleClientSecret",16384);
+        if(!value.has("serviceUrl"))throw ApiFailure.validation();
+        if(!value.path("serviceUrl").isNull())try{SharedConnectConfiguration.validate(text(value,"serviceUrl",2048));}catch(RuntimeException invalid){throw ApiFailure.validation();}
     }
     private static String publicOrigin(JsonNode value) {return value.hasNonNull("publicOrigin") ? value.get("publicOrigin").asText() : "NONE";}
     private static String text(JsonNode value,String field,int length) {
@@ -53,6 +70,7 @@ class ServiceSettings {
     private static void validate(ObjectNode value,String password) {
         var fields=new HashSet<String>();value.fieldNames().forEachRemaining(fields::add);
         if(fields.remove(VaultLimits.SETTINGS_KEY))NotesLimitSettings.validateStored(value.get(VaultLimits.SETTINGS_KEY));
+        if(fields.remove(INTERNET))validateInternet(value.get(INTERNET));
         if(!FIELDS.equals(fields)) throw ApiFailure.validation();
         for(String field:List.of("passkeysEnabled","emailRecoveryEnabled","smtpTls")) if(!value.path(field).isBoolean()) throw ApiFailure.validation();
         if(!value.path("originEpoch").canConvertToLong() || value.path("originEpoch").asLong()<0) throw ApiFailure.validation();
@@ -95,6 +113,7 @@ class ServiceSettings {
                 execute(c,"INSERT INTO tk_service_settings(id,version,active_version,saved,effective,saved_smtp_password,effective_smtp_password) VALUES(1,0,0,?,?,?,?)",initial.toString(),initial.toString(),initialPassword,initialPassword);
             } else if(recover) {
                 if(current.effective().has(VaultLimits.SETTINGS_KEY))initial.set(VaultLimits.SETTINGS_KEY,current.effective().get(VaultLimits.SETTINGS_KEY).deepCopy());
+                if(current.effective().has(INTERNET))initial.set(INTERNET,current.effective().get(INTERNET).deepCopy());
                 long configured=Long.parseLong(config("timekeeper.auth.origin-epoch","1"));
                 long required=nextEpoch(c,current.saved().path("originEpoch").asLong());
                 if(configured<required) throw new IllegalStateException("Service settings recovery requires an explicitly newer authentication origin epoch");
@@ -110,6 +129,8 @@ class ServiceSettings {
         origin.configure(publicOrigin(effective),effective.path("originEpoch").asLong());browserOrigins.configure(publicOrigin(effective));
         realm.configure(effective.path("passkeysEnabled").asBoolean(),effective.path("passkeyRpId").asText());
         mail.configure(effective,stored.effectivePassword());localVersion=stored.active();
+        var internet=internet(effective);sharedConnect.configure(internet.path("mode").asText().equals("SHARED"),internet.path("serviceUrl").isNull()?null:internet.path("serviceUrl").asText());
+        taskProviders.configureGoogle(internet.path("googleClientId").asText(),internet.path("googleClientSecret").asText());
     }
     void requireCurrent(Connection c) {
         if(localVersion<0) throw new ApiFailure(503,"UNAVAILABLE");
@@ -157,7 +178,31 @@ class ServiceSettings {
                 .put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",value.version()!=value.active())
                 .put("smtpPasswordConfigured",value.savedPassword()!=null && !value.savedPassword().isEmpty())
                 .put("effectiveSmtpPasswordConfigured",value.effectivePassword()!=null && !value.effectivePassword().isEmpty());
-        var saved=value.saved().deepCopy();var effective=value.effective().deepCopy();saved.remove(VaultLimits.SETTINGS_KEY);effective.remove(VaultLimits.SETTINGS_KEY);
+        var saved=value.saved().deepCopy();var effective=value.effective().deepCopy();saved.remove(List.of(VaultLimits.SETTINGS_KEY,INTERNET));effective.remove(List.of(VaultLimits.SETTINGS_KEY,INTERNET));
         result.set("saved",saved);result.set("effective",effective);return new Reply(result,tag(value.version()));
+    }
+    Reply internetSettings(TokenRegistry.Principal principal){return accounts.tx(c->{manager(c,principal,false);return internetReply(read(c,false),accountSession(c,principal));});}
+    Reply saveInternet(InstanceAdministrator.Proof proof,String match,JsonNode input){
+        administrators.requireFresh(proof);
+        return accounts.tx(c->{
+            lock(c);manager(c,proof.principal(),true);var current=read(c,true);
+            if(match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");if(!tag(current.version()).equals(match))throw new ApiFailure(412,"STALE_VERSION");
+            var value=internet(current.saved());value.put("mode",input.path("mode").asText());value.set("serviceUrl",input.get("serviceUrl"));value.put("googleClientId",input.path("googleClientId").asText());
+            switch(input.path("googleSecretAction").asText()){
+                case "PRESERVE" -> {if(input.has("googleClientSecret"))throw ApiFailure.validation();}
+                case "CLEAR" -> {if(input.has("googleClientSecret"))throw ApiFailure.validation();value.put("googleClientSecret","");}
+                case "REPLACE" -> {String secret=text(input,"googleClientSecret",16384);if(secret.isBlank())throw ApiFailure.validation();value.put("googleClientSecret",secret);}
+                default -> throw ApiFailure.validation();
+            }
+            validateInternet(value);if(value.equals(internet(current.saved())))return internetReply(current,true);
+            long version=current.version()+1;if(version>9007199254740991L)throw ApiFailure.conflict();var saved=current.saved().deepCopy();saved.set(INTERNET,value);
+            if(execute(c,"UPDATE tk_service_settings SET version=?,saved=? WHERE id=1 AND version=?",version,saved.toString(),current.version())!=1)throw new ApiFailure(412,"STALE_VERSION");
+            return internetReply(read(c,false),true);
+        });
+    }
+    private static ObjectNode redactedInternet(JsonNode settings){var value=internet(settings);value.put("googleClientSecretConfigured",!value.path("googleClientSecret").asText().isBlank());value.remove("googleClientSecret");return value;}
+    private static Reply internetReply(Stored value,boolean canEdit){
+        var result=object().put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",value.version()!=value.active()).put("canEdit",canEdit);
+        result.set("saved",redactedInternet(value.saved()));result.set("effective",redactedInternet(value.effective()));return new Reply(result,tag(value.version()));
     }
 }

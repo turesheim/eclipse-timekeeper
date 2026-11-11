@@ -66,6 +66,96 @@ final class CalendarFeed {
         return hash(canonical(content).toString());
     }
     private static boolean todo(CalendarComponent event){return event instanceof VToDo;}
+    /** Published event definitions, not an unbounded expansion of recurring occurrences. */
+    List<ObjectNode> eventDefinitions(ZoneId zone) {
+        var result=new ArrayList<ObjectNode>();var budget=new Budget();
+        try {
+            for(var revisions:series.values()) {
+                var master=revisions.get("");if(master!=null&&(todo(master)||cancelled(master)))continue;
+                boolean recurring=revisions.size()>1||master!=null&&(!master.getProperties("RRULE").isEmpty()||!master.getProperties("RDATE").isEmpty());
+                for(var item:revisions.entrySet()) {
+                    budget.use();var source=item.getValue();if(todo(source)||cancelled(source))continue;
+                    result.add(eventDefinition(source,master,item.getKey(),zone,recurring));
+                }
+            }
+        }catch(CalendarFailure failure){throw failure;}catch(Exception failure){throw CalendarFailure.invalid();}
+        return result.stream().sorted(Comparator.comparing(value->value.path("id").asText())).toList();
+    }
+    /** Details applicable to one retained note identity, without recurrence expansion. */
+    Optional<ObjectNode> eventDefinition(String uid,String rid,ZoneId zone){
+        var revisions=series.get("VEVENT:"+uid);if(revisions==null)return Optional.empty();var master=revisions.get("");
+        if(master!=null&&cancelled(master))return Optional.empty();
+        boolean recurring=revisions.size()>1||master!=null&&(!master.getProperties("RRULE").isEmpty()||!master.getProperties("RDATE").isEmpty());
+        if(rid.equals("single"))return master==null||recurring?Optional.empty():Optional.of(eventDefinition(master,master,"",zone,false));
+        CalendarComponent selected=revisions.get(rid);String selectedRid=rid;
+        if(selected==null){
+            final Temporal original;
+            try{original=rid.startsWith("D:")?LocalDate.parse(rid.substring(2)):rid.startsWith("F:")?LocalDateTime.parse(rid.substring(2)):rid.startsWith("T:")?Instant.parse(rid.substring(2)):null;}
+            catch(java.time.format.DateTimeParseException invalid){return Optional.empty();}
+            if(original==null||master==null||!recurring)return Optional.empty();
+            selected=master;selectedRid="";Instant position=instant(original,zone),latest=Instant.MIN;
+            for(var item:revisions.entrySet())if(!item.getKey().isEmpty()&&range(item.getValue())){
+                Instant start=instant(date(item.getValue(),"RECURRENCE-ID"),zone);
+                if(!start.isAfter(position)&&!start.isBefore(latest)){latest=start;selected=item.getValue();selectedRid=item.getKey();}
+            }
+        }
+        if(cancelled(selected))return Optional.empty();var value=eventDefinition(selected,master,selectedRid,zone,recurring);
+        if(!selectedRid.equals(rid)){value.remove(List.of("start","end","allDay","firstDate","endDate"));value.put("seriesDefinition",true);}
+        value.put("recurrenceId",rid).put("eventKey",hash(array().add(uid).add(rid).toString()));return Optional.of(value);
+    }
+    private static ObjectNode eventDefinition(CalendarComponent source,CalendarComponent master,String rid,ZoneId zone,boolean recurring){
+        String uid=text(source,"UID",null,1024);Temporal start=date(source,"DTSTART");
+        var timing=source.getProperty("DTEND").isPresent()||source.getProperty("DURATION").isPresent()||master==null?source:master;
+        Temporal end=start.plus(duration(timing));boolean allDay=start instanceof LocalDate,definition=rid.isEmpty()&&recurring;
+        var value=object().put("id",hash(array().add("VEVENT").add(uid).add(rid).toString())).put("uid",uid).put("recurrenceId",rid.isEmpty()&&!recurring?"single":rid)
+                .put("title",text(source,"SUMMARY",master==null?"":text(master,"SUMMARY","",4000),4000))
+                .put("description",text(source,"DESCRIPTION",master==null?"":text(master,"DESCRIPTION","",16000),16000))
+                .put("location",text(source,"LOCATION",master==null?"":text(master,"LOCATION","",4000),4000))
+                .put("start",instant(start,zone).toString()).put("end",instant(end,zone).toString())
+                .put("allDay",allDay).put("firstDate",allDay?start.toString():null).put("endDate",allDay?end.toString():null)
+                .put("recurring",recurring||!rid.isEmpty()).put("seriesDefinition",definition);
+        if(definition)value.putNull("eventKey");else value.put("eventKey",hash(array().add(uid).add(rid.isEmpty()?"single":rid).toString()));
+        return value;
+    }
+    /** Published task definitions and detached instances, independent of a calendar window. */
+    List<ObjectNode> tasks(ZoneId zone) {
+        var result=new ArrayList<ObjectNode>();var budget=new Budget();
+        try {
+            for(var revisions:series.values())for(var item:revisions.entrySet()) {
+                budget.use();var source=item.getValue();if(!todo(source))continue;var master=revisions.get("");
+                String uid=text(source,"UID",null,1024),rid=item.getKey();
+                Temporal start=rawDate(source,"DTSTART"),due=rawDate(source,"DUE");
+                if(!rid.isEmpty()&&master!=null) {
+                    Temporal original=rawDate(source,"RECURRENCE-ID");
+                    if(start==null&&rawDate(master,"DTSTART")!=null)start=original;
+                    if(due==null&&rawDate(master,"DUE")!=null)due=start==null?original:start.plus(duration(master));
+                }
+                if(due==null&&start!=null&&source.getProperty("DURATION").isPresent())due=start.plus(duration(source));
+                String status=text(source,"STATUS",master==null?"NEEDS-ACTION":text(master,"STATUS","NEEDS-ACTION",30),30);
+                if(!status.equals("CANCELLED")&&completed(source))status="COMPLETED";
+                var value=object().put("id",hash(array().add("VTODO").add(uid).add(rid).toString())).put("uid",uid).put("recurrenceId",rid)
+                        .put("summary",text(source,"SUMMARY",master==null?"":text(master,"SUMMARY","",4000),4000))
+                        .put("description",text(source,"DESCRIPTION",master==null?"":text(master,"DESCRIPTION","",16000),16000))
+                        .put("location",text(source,"LOCATION",master==null?"":text(master,"LOCATION","",4000),4000))
+                        .put("url",text(source,"URL",master==null?"":text(master,"URL","",4096),4096)).put("status",status)
+                        .put("recurring",!rid.isEmpty()||!source.getProperties("RRULE").isEmpty()||!source.getProperties("RDATE").isEmpty());
+                value.set("start",taskMoment(start,zone));value.set("due",taskMoment(due,zone));
+                var categories=value.putArray("categories");var chosen=source.getProperties("CATEGORIES");if(chosen.isEmpty()&&master!=null)chosen=master.getProperties("CATEGORIES");
+                var names=new TreeSet<String>();for(var property:chosen)names.addAll(((Categories)property).getCategories().getTexts());
+                if(names.size()>1000||names.stream().anyMatch(name->name.length()>4000))throw CalendarFailure.complex();names.forEach(categories::add);result.add(value);
+            }
+        }catch(CalendarFailure failure){throw failure;}catch(Exception failure){throw CalendarFailure.invalid();}
+        return result.stream().sorted(Comparator.comparing(value->value.path("id").asText())).toList();
+    }
+    private static Temporal rawDate(CalendarComponent value,String name){return value.getProperty(name).map(property->((DateProperty<?>)property).getDate()).orElse(null);}
+    private static com.fasterxml.jackson.databind.JsonNode taskMoment(Temporal value,ZoneId zone){
+        if(value==null)return com.fasterxml.jackson.databind.node.NullNode.instance;
+        if(value instanceof LocalDate day)return object().put("kind","DATE").put("date",day.toString());
+        // An absolute deadline must stay distinguishable across a repeated local
+        // hour. Floating values retain their wall clock without inventing an instant.
+        var local=value instanceof LocalDateTime time?time:instant(value,zone).atOffset(ZoneOffset.UTC).toLocalDateTime();
+        return object().put("kind","DATE_TIME").put("date",local.toLocalDate().toString()).put("time",local.toLocalTime().toString()).put("timeZone",value instanceof LocalDateTime?zone.getId():"UTC");
+    }
     private static boolean completed(CalendarComponent event){return "COMPLETED".equals(text(event,"STATUS","",30))||event.getProperty("COMPLETED").isPresent();}
     private static void validateRule(String rule) {
         long combinations=1;

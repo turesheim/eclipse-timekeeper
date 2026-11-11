@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 const phrase='Separate encrypted instance backup passphrase';
 const card=(page,title)=>page.getByRole('heading',{name:title,exact:true}).locator('..');
-async function password(section){await section.getByLabel('Current administrator password',{exact:true}).fill(process.env.TIMEKEEPER_WEB_PASSWORD);}
+async function password(section){await section.getByLabel('Your password',{exact:true}).fill(process.env.TIMEKEEPER_WEB_PASSWORD);}
 test('instance backup Administration supports native encrypted download and upload review over HTTPS',async({page,request},testInfo)=>{
   test.skip(!process.env.TIMEKEEPER_WEB_URL?.startsWith('https:'),'Native grants require HTTPS');test.setTimeout(120000);
   const origin=new URL(process.env.TIMEKEEPER_WEB_URL).origin;
@@ -13,7 +13,7 @@ test('instance backup Administration supports native encrypted download and uplo
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill('browser-admin');await page.locator('#password').fill(process.env.TIMEKEEPER_WEB_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   await page.goto('/admin/#backups');await expect(page.getByRole('heading',{name:'Backup & Restore',exact:true})).toBeVisible();
   const create=card(page,'Create encrypted backup');await password(create);await create.getByLabel('Backup encryption passphrase',{exact:true}).fill(phrase);await create.getByLabel('Confirm encryption passphrase',{exact:true}).fill(phrase);await create.getByRole('button',{name:'Create encrypted backup',exact:true}).click();
-  await expect(create.getByLabel('Current administrator password',{exact:true})).toHaveValue('');
+  await expect(create.getByLabel('Your password',{exact:true})).toHaveValue('');
   const download=card(page,'Download encrypted backup');await expect(download).toBeVisible({timeout:60000});
   await page.reload();await expect(download).toBeVisible();await password(download);
   const pending=page.waitForEvent('download');await download.getByRole('button',{name:'Download encrypted backup',exact:true}).click();const file=await pending;

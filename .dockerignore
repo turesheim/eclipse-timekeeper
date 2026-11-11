@@ -5,6 +5,7 @@
 **/playwright-report
 **/.metadata
 **/.env
+**/service.env
 **/secrets
 **/data
 **/backups

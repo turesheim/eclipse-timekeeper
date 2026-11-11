@@ -14,6 +14,31 @@ class VaultDavHttpTest {
     public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return VaultTestDatabase.configuration("http",Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:vault_dav_http","timekeeper.auth.public-origin","https://timekeeper.example.test"));}}
     private RequestSpecification client(String token){return given().header("Authorization","Basic "+Base64.getEncoder().encodeToString(("vault:"+token).getBytes(StandardCharsets.UTF_8)));}
     private RequestSpecification api(String token){return given().header("Authorization","Bearer "+token);}
+    @Test void editableTitleRenamesTheFileAndPersistsWithoutChangingCanonicalBytes(){
+        String folder="title-"+UUID.randomUUID(),body="# Imported heading\r\n\r\nExact original bytes.\r\n";
+        assertEquals(201,api("test-a").contentType("application/json").body(Map.of("path",folder)).post("/api/v1/notes/folders").statusCode());
+        var original=api("test-a").queryParam("path",folder+"/Imported.MD").header("If-None-Match","*").contentType("application/octet-stream").body(body.getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files");assertEquals(201,original.statusCode());
+        String id=original.jsonPath().getString("id"),source=original.jsonPath().getString("sourceId"),contentTag=original.jsonPath().getString("etag"),endpoint="/api/v1/notes/entries/"+id;
+        var renamed=api("test-a").header("If-Match",original.header("ETag")).contentType("application/json").body(Map.of("title","CVE-2026-111943")).put(endpoint+"/title");assertEquals(200,renamed.statusCode());
+        assertEquals(folder+"/CVE-2026-111943.MD",renamed.jsonPath().getString("path"));assertEquals("CVE-2026-111943",renamed.jsonPath().getString("title"));assertEquals(source,renamed.jsonPath().getString("sourceId"));assertEquals(contentTag,renamed.jsonPath().getString("etag"));
+        for(String field:List.of("createdAt","modifiedAt","contentVersion","sha256","byteLength"))assertEquals(original.jsonPath().getString(field),renamed.jsonPath().getString(field));
+        assertEquals(body,api("test-a").get(endpoint+"/content").asString());assertEquals("CVE-2026-111943",api("test-a").get(endpoint).jsonPath().getString("title"));
+        assertEquals(404,api("test-a").queryParam("path",folder+"/Imported.MD").get("/api/v1/notes/resolve").statusCode());
+        var moved=api("test-a").header("If-Match",renamed.header("ETag")).contentType("application/json").body(Map.of("path",folder+"/Manual.md")).put(endpoint+"/path");assertEquals(200,moved.statusCode());assertEquals("Manual",moved.jsonPath().getString("title"));
+    }
+    @Test void titleRenamesRejectCollisionsStaleGuardsInvalidNamesAndForeignOrReadonlyAccounts(){
+        String prefix="title-guard-"+UUID.randomUUID(),path=prefix+".md";
+        var original=api("test-a").queryParam("path",path).header("If-None-Match","*").contentType("application/octet-stream").body("# Before\n".getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files");assertEquals(201,original.statusCode());
+        assertEquals(201,api("test-a").queryParam("path",prefix+"-taken.md").header("If-None-Match","*").contentType("application/octet-stream").body("Keep existing\n".getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files").statusCode());
+        String endpoint="/api/v1/notes/entries/"+original.jsonPath().getString("id")+"/title",guard=original.header("ETag");
+        assertEquals(409,api("test-a").header("If-Match",guard).contentType("application/json").body(Map.of("title",prefix+"-taken")).put(endpoint).statusCode());
+        for(String title:List.of(""," ","../escape","bad:name","bad\\name"))assertEquals(422,api("test-a").header("If-Match",guard).contentType("application/json").body(Map.of("title",title)).put(endpoint).statusCode());
+        assertEquals(428,api("test-a").contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
+        assertEquals(412,api("test-a").header("If-Match","\"stale\"").contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
+        assertEquals(403,api("test-read").header("If-Match",guard).contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
+        assertEquals(404,api("test-b").header("If-Match",guard).contentType("application/json").body(Map.of("title","Another")).put(endpoint).statusCode());
+        var after=api("test-a").get(endpoint.replace("/title",""));assertEquals(guard,after.header("ETag"));assertEquals(path,after.jsonPath().getString("path"));assertEquals("Before",after.jsonPath().getString("title"));
+    }
     @Test void revisionsCoverDavWritesAndStayOwnerPrivateWithReadOnlyComparison(){
         String path="revision-http.md",first="First\r\n",second="Second\n";
         var created=client("test-a").header("If-None-Match","*").body(first.getBytes(StandardCharsets.UTF_8)).put(ROOT+path);assertEquals(201,created.statusCode());

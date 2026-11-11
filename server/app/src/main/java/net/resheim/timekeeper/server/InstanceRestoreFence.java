@@ -16,6 +16,7 @@ class InstanceRestoreFence {
     private static final ObjectReader READER=MAPPER.reader().with(JsonParser.Feature.STRICT_DUPLICATE_DETECTION).with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private volatile boolean initialized;
     private String generation;
+    String generation(){if(!initialized)throw unavailable("INSTANCE_FENCE_UNAVAILABLE");return generation;}
     private record State(String generation,boolean pending) { }
 
     /** Called after canonical schema bootstrap, before any account/service initialization. */
