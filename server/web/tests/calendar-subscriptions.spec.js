@@ -1,4 +1,4 @@
-import {clickNoteAction} from './editor-interactions.js';
+import {appendEditorText,clickNoteAction} from './editor-interactions.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
@@ -30,8 +30,11 @@ async function apiFor(page){
   return async(method,path,data,extra={})=>{const reply=await request.fetch('/api/v1'+path,{method,data,headers:{'X-CSRF-Token':identity.csrf,...extra}});expect(reply.ok(),`${method} ${path}: ${reply.status()}`).toBe(true);return reply;};
 }
 async function provider(request,events=[meeting],options={}){const reply=await request.post(fixture()+'/feeds',{data:{body:ics(events),...options}});expect(reply.status()).toBe(201);return reply.json();}
-async function setup(browser,request){
-  const user=await fresh(request),context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB',timezoneId:'America/Los_Angeles'}),page=await context.newPage();await login(page,user);let api=await apiFor(page);
+async function setup(browser,request,{fastCalendarPolls=false}={}){
+  const user=await fresh(request),context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB',timezoneId:'America/Los_Angeles'}),page=await context.newPage();
+  // Exercise real interval callbacks without advancing request deadlines or autosave.
+  if(fastCalendarPolls)await page.addInitScript(()=>{const interval=window.setInterval;window.setInterval=(callback,delay,...args)=>interval(callback,delay===30000?1000:delay,...args);});
+  await login(page,user);let api=await apiFor(page);
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
   const client=await(await api('POST','/clients',{name:'Meeting client',color:'#176653'})).json();await page.reload();await ready(page);api=await apiFor(page);
   return {user,context,page,api,client};
@@ -327,10 +330,79 @@ test('subscribed calendar to-dos show due dates and completion in Week and Today
   }finally{await context.close();}
 });
 
+test('Today keeps unchanged calendar cards and typing responsive during background synchronization',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request,{fastCalendarPolls:true});
+  let release;
+  try{
+    const date='2026-05-04',reply=await api('GET','/calendar-events?fromDate='+date+'&toDate=2026-05-05'),snapshot=await reply.json();
+    const event={key:'stable-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Stable meeting',description:'Original details',allDay:false,start:date+'T08:00:00Z',end:date+'T09:00:00Z',firstDate:date,endDate:'2026-05-05',clientId:client.id,clientName:client.name,calendarName:'Team planning',activityIds:[]};
+    snapshot.items=[event];let reads=0,gate,held=false;
+    await page.route('**/api/v1/calendar-events?*',async route=>{
+      if(gate){held=true;await gate;}
+      await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;
+    });
+    await page.locator('#today-date').fill(date);
+    const events=page.locator('#today-events'),card=events.locator('[data-today-event]');await expect(card).toHaveText(/Stable meeting/);
+    await card.focus();
+    await events.evaluate(root=>{window.calendarCard=root.querySelector('button');window.calendarMutations=0;new MutationObserver(records=>window.calendarMutations+=records.length).observe(root,{subtree:true,childList:true,characterData:true});});
+    let before=reads;await expect.poll(()=>reads).toBeGreaterThan(before);
+    expect(await events.evaluate(root=>root.querySelector('button')===window.calendarCard)).toBe(true);await expect(card).toBeFocused();
+    expect(await page.evaluate(()=>window.calendarMutations)).toBe(0);
+
+    // A snapshot and its calendar read must leave the existing cards and editor usable.
+    await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
+    const draft=page.locator('#today-journal-body');await draft.fill('Typing before sync');
+    gate=new Promise(resolve=>release=resolve);before=reads;await expect.poll(()=>held).toBe(true);
+    await page.locator('#refresh').click();await expect(page.locator('#refresh')).toBeEnabled();
+    await expect(card).toBeVisible();await draft.focus();await page.keyboard.press('End');await page.keyboard.type(' and during sync');
+    await expect(draft).toHaveValue('Typing before sync and during sync');await expect(draft).toBeFocused();
+    expect(await events.evaluate(root=>root.querySelector('button')===window.calendarCard)).toBe(true);
+    gate=null;release();release=null;await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(draft).toBeFocused();expect(await page.evaluate(()=>window.calendarMutations)).toBe(0);
+
+    event.title='Changed meeting';event.description='Updated details';event.hasNote=true;snapshot.errors[event.subscriptionId]='CALENDAR_INVALID_FEED';
+    before=reads;await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(card).toContainText('Changed meeting');await expect(card.locator('.bi-journal-text')).toHaveCount(1);await expect(events.locator('.alert-warning')).toBeVisible();
+    await expect(draft).toBeFocused();await expect(draft).toHaveValue('Typing before sync and during sync');
+    await card.click();await expect(page.locator('#today-event-details')).toContainText('Updated details');await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('#today-note-editor').getByRole('button',{name:'Formatted',exact:true}).click();
+    const formatted=page.locator('#today-journal-formatted .ProseMirror');await expect(formatted).toBeVisible();
+    await saveMarkdown(page.locator('#today-note-editor'));await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+    await expect(page.locator('#status')).toHaveText('Up to date');await expect(formatted).toHaveAttribute('contenteditable','true');
+    await expect.poll(()=>formatted.locator('p').evaluate(node=>node.isContentEditable&&!node.closest('[inert]'))).toBe(true);
+    let snapshotHeld=false;const snapshotGate=new Promise(resolve=>release=resolve);
+    await page.route('**/api/v1/projects?*',async route=>{snapshotHeld=true;await snapshotGate;await route.continue();});
+    // Dispatch refresh without an action wait for its deliberately held response.
+    await page.locator('#refresh').dispatchEvent('click');await expect.poll(()=>snapshotHeld).toBe(true);await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','true');
+    await appendEditorText(formatted.locator('p'),' and formatted typing');await expect(formatted).toBeFocused();
+    release();release=null;await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(formatted).toBeFocused();await expect(formatted).toContainText('and formatted typing');
+    snapshot.items=[];snapshot.errors={};before=reads;await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(card).toHaveCount(0);await expect(events).toContainText('No calendar events');await expect(events.locator('.alert-warning')).toHaveCount(0);
+    await expect(formatted).toBeFocused();await expect(formatted).toContainText('and formatted typing');
+  }finally{release?.();await context.close();}
+});
+
+test('Week retains unchanged timed and all-day calendar cards across feed polls',async({browser,request})=>{
+  const {page,api,context,client}=await setup(browser,request,{fastCalendarPolls:true});
+  try{
+    const reply=await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-11'),snapshot=await reply.json();
+    const event={key:'stable-week-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Stable week meeting',allDay:false,start:'2026-05-04T08:00:00Z',end:'2026-05-04T09:00:00Z',firstDate:'2026-05-04',endDate:'2026-05-05',clientId:client.id,clientName:client.name,calendarName:'Team planning',color:client.color,activityIds:[]};
+    snapshot.items=[event,{...event,key:'stable-all-day',title:'Stable all-day plan',allDay:true}];let reads=0;
+    await page.route('**/api/v1/calendar-events?*',async route=>{await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;});
+    await calendar(page);const timed=page.locator('.calendar-planned[data-calendar-event-key="stable-week-meeting"]'),allDay=page.locator('.calendar-all-day-event');await expect(timed).toBeVisible();await expect(allDay).toContainText('Stable all-day plan');
+    await allDay.focus();
+    await page.evaluate(()=>{window.weekTimed=document.querySelector('.calendar-planned');window.weekAllDay=document.querySelector('.calendar-all-day-event');});
+    let before=reads;await expect.poll(()=>reads).toBeGreaterThan(before);
+    expect(await page.evaluate(()=>document.querySelector('.calendar-planned')===window.weekTimed&&document.querySelector('.calendar-all-day-event')===window.weekAllDay)).toBe(true);await expect(allDay).toBeFocused();
+    event.title='Updated week meeting';snapshot.items[1].title='Updated all-day plan';before=reads;await expect.poll(()=>reads).toBeGreaterThan(before);
+    await expect(timed).toContainText('Updated week meeting');await expect(allDay).toContainText('Updated all-day plan');await expect(allDay).toBeFocused();
+  }finally{await context.close();}
+});
+
 test('Today periodically reloads calendar items and shows subscription errors without losing an editor draft',async({browser,request})=>{
   const {page,api,context,client}=await setup(browser,request);
   try{
-    await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);
+    await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);await expect(planned(page,subscription)).toHaveCount(1);
     await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
     await expect(page.locator('#today-events')).toContainText('Planned meeting');
     // Simulate a newly refreshed server snapshot without emitting a domain change.
