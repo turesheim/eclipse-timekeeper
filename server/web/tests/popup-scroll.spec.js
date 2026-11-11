@@ -53,7 +53,7 @@ test('account popup and ordinary dialogs scroll to their last action and follow 
     for(const viewport of [{width:390,height:240},{width:1440,height:180}]){
       await page.setViewportSize(viewport);await fits(page,menu);await menu.evaluate(node=>{node.scrollTop=0;});
       const background=await page.evaluate(()=>scrollY);await wheel(page,menu,10000);await expect.poll(()=>menu.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
-      await expect(menu.getByRole('button',{name:'About',exact:true})).toBeInViewport();await wheel(page,menu,10000);expect(await page.evaluate(()=>scrollY)).toBe(background);
+      const last=menu.getByRole('button',{name:'About',exact:true});await expect(last).toBeInViewport();await last.click({trial:true});await wheel(page,menu,10000);expect(await page.evaluate(()=>scrollY)).toBe(background);
       await captureScreenshot(page,{path:`test-results/popup-account-${theme}-${viewport.width}.png`,fullPage:false});
     }
     await page.setViewportSize({width:390,height:320});await page.locator('.app-header').evaluate(node=>{node.style.paddingBlock='3rem';});await fits(page,menu);
