@@ -372,8 +372,8 @@ test('Today keeps unchanged calendar cards and typing responsive during backgrou
     await expect.poll(()=>formatted.locator('p').evaluate(node=>node.isContentEditable&&!node.closest('[inert]'))).toBe(true);
     let snapshotHeld=false;const snapshotGate=new Promise(resolve=>release=resolve);
     await page.route('**/api/v1/projects?*',async route=>{snapshotHeld=true;await snapshotGate;await route.continue();});
-    // WebKit's action wait must not wait for the deliberately held read.
-    await page.locator('#refresh').click({noWaitAfter:true});await expect.poll(()=>snapshotHeld).toBe(true);await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','true');
+    // Dispatch refresh without an action wait for its deliberately held response.
+    await page.locator('#refresh').dispatchEvent('click');await expect.poll(()=>snapshotHeld).toBe(true);await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','true');
     await appendEditorText(formatted.locator('p'),' and formatted typing');await expect(formatted).toBeFocused();
     release();release=null;await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(formatted).toBeFocused();await expect(formatted).toContainText('and formatted typing');
     snapshot.items=[];snapshot.errors={};before=reads;await expect.poll(()=>reads).toBeGreaterThan(before);
@@ -402,7 +402,7 @@ test('Week retains unchanged timed and all-day calendar cards across feed polls'
 test('Today periodically reloads calendar items and shows subscription errors without losing an editor draft',async({browser,request})=>{
   const {page,api,context,client}=await setup(browser,request);
   try{
-    await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);
+    await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);await expect(planned(page,subscription)).toHaveCount(1);
     await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
     await expect(page.locator('#today-events')).toContainText('Planned meeting');
     // Simulate a newly refreshed server snapshot without emitting a domain change.
