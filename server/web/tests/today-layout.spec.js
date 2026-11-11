@@ -70,6 +70,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
       for(const width of [1440,390,320]){
         await page.setViewportSize({width,height:1000});
         if(width===1440){
+          await expect(page.locator('.today-sidebar')).toBeVisible();await expect(contents).toBeVisible();
           const left=await page.locator('.today-sidebar').boundingBox(),main=await page.locator('.today-main').boundingBox(),right=await contents.boundingBox(),toolbar=await page.locator('.today-toolbar').boundingBox();
           expect(left.x+left.width).toBeLessThan(main.x);expect(right.x).toBeGreaterThanOrEqual(main.x+main.width);expect(Math.abs(left.y-main.y)).toBeLessThan(1);expect(Math.abs(right.y-toolbar.y)).toBeLessThan(1);
         }else{

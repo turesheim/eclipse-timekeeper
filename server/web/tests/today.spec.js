@@ -242,6 +242,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
     const check=async(width,font,heading=null,brand=originalBrand)=>{
       if(page.viewportSize()?.width!==width||page.viewportSize()?.height!==1000)await page.setViewportSize({width,height:1000});
       await page.evaluate(({font,heading,brand})=>{const root=document.documentElement;root.style.setProperty('--font-base',font+'px');heading?root.style.setProperty('--font-section-heading',heading):root.style.removeProperty('--font-section-heading');brand?root.style.setProperty('--font-brand',brand):root.style.removeProperty('--font-brand');scrollTo(0,0);},{font,heading,brand});
+      await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toHaveAttribute('aria-expanded',String(width>1050));
       const gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));
       // Font-only changes must redock both columns without a synthetic resize.
       await expect.poll(()=>page.evaluate(gap=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector('#workspace-navigation').getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},gap)).toBeLessThan(2);
