@@ -46,7 +46,7 @@ test('Markdown tables stay compact, themed and readable on desktop and mobile',a
       if(['timekeeper','timekeeper-dark'].includes(theme))await captureScreenshot(page,{path:`test-results/markdown-table-${theme}-${width}.png`,fullPage:true});
     }
   }
-  expect(backgrounds.size).toBe(6);expect(await downloaded(page)).toBe(source);
+  expect(backgrounds.size,'Dagsverk and Nattverk table headers use distinct theme surfaces').toBe(2);expect(await downloaded(page)).toBe(source);
 });
 test('Markdown rich edits, tasks, undo and source edits keep semantic content and metadata',async({page})=>{
   await open(page);const original=await fixture('standard');await importNote(page,original);await page.locator('#markdown-rich').click();
