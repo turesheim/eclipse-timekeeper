@@ -4,7 +4,7 @@ import {navigateView,setTheme} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
 
 async function signIn(page){
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveAttribute('data-state','ready');
 }
 async function api(request,method,path,data,headers={}){
   const response=await request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`,...headers}});expect(response.ok()).toBe(true);return response;
