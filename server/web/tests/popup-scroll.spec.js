@@ -17,6 +17,18 @@ async function fits(page,popup){
 async function wheel(page,target,delta){
   const box=await target.boundingBox(),viewport=page.viewportSize();
   await page.mouse.move(Math.min(viewport.width-8,Math.max(8,box.x+box.width/2)),Math.min(viewport.height-8,Math.max(8,box.y+box.height/2)));await page.mouse.wheel(0,delta);
+  await settled(target);
+}
+async function settled(target){
+  // Native wheel/PageDown animation continues after the input command returns.
+  await target.evaluate(node=>new Promise(resolve=>{
+    let last='',quiet=0;
+    const frame=()=>{
+      const positions=[scrollX,scrollY];for(let current=node;current;current=current.parentElement)positions.push(current.scrollTop,current.scrollLeft);
+      const next=positions.join(',');quiet=next===last?quiet+1:0;last=next;
+      if(quiet>=4)resolve();else requestAnimationFrame(frame);
+    };requestAnimationFrame(frame);
+  }));
 }
 
 test('note popup content and close controls stay reachable beneath long headings on short screens',async({page,request})=>{
@@ -36,6 +48,7 @@ test('note popup content and close controls stay reachable beneath long headings
       await popup.evaluate(node=>{node.scrollTop=0;});await content.evaluate(node=>{node.scrollTop=0;});
       await wheel(page,popup.locator('.week-note-heading'),10000);await rich.focus();await rich.press('PageDown');
       await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+      await settled(content);
       await wheel(page,content,10000);await expect(rich.getByText('Last paragraph in the popup.',{exact:true})).toBeInViewport();
       await captureScreenshot(page,{path:`test-results/popup-note-${theme}-${viewport.width}.png`,fullPage:false});
       await content.evaluate(node=>{node.scrollTop=0;});await wheel(page,content,-10000);await expect.poll(()=>popup.evaluate(node=>node.scrollTop)).toBe(0);
