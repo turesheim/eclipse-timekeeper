@@ -4,10 +4,10 @@
   "license": "EPL-2.0",
   "type": "module",
   "scripts": {
-    "test": "node scripts/vendor-html.mjs --check && node scripts/vendor-emoji.mjs --check && node scripts/vendor-hashes.mjs --check && node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node scripts/vendor-plantuml.mjs --check && node --test tests/plantuml.test.js tests/document-autosave.test.js tests/code-highlight.test.js tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js tests/calendar-search-navigation.test.js tests/calendar-item.test.js tests/month.test.js tests/workweek-session-model.test.js tests/toggl-csv.test.js tests/import-model.test.js tests/webauthn.test.js tests/icons.test.js tests/i18n.test.js tests/holidays.test.js tests/markdown-document.test.js tests/file-sha256.test.js tests/instance-upload.test.js tests/notes-links.test.js tests/notes-sort.test.js tests/wiki-links.test.js tests/inline-styles.test.js tests/journal-links.test.js tests/focus-model.test.js tests/revision-diff.test.js tests/tasks-model.test.js",
+    "test": "node scripts/vendor-html.mjs --check && node scripts/vendor-emoji.mjs --check && node scripts/vendor-hashes.mjs --check && node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-fonts.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node scripts/vendor-plantuml.mjs --check && node --test tests/plantuml.test.js tests/document-autosave.test.js tests/code-highlight.test.js tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js tests/calendar-search-navigation.test.js tests/calendar-item.test.js tests/month.test.js tests/workweek-session-model.test.js tests/toggl-csv.test.js tests/import-model.test.js tests/webauthn.test.js tests/icons.test.js tests/i18n.test.js tests/holidays.test.js tests/markdown-document.test.js tests/file-sha256.test.js tests/instance-upload.test.js tests/notes-links.test.js tests/notes-sort.test.js tests/wiki-links.test.js tests/inline-styles.test.js tests/journal-links.test.js tests/focus-model.test.js tests/revision-diff.test.js tests/tasks-model.test.js",
     "test:browser": "playwright test",
     "vendor:bootstrap": "node scripts/vendor-bootstrap.mjs",
-    "check:assets": "node scripts/vendor-html.mjs --check && node scripts/vendor-emoji.mjs --check && node scripts/vendor-hashes.mjs --check && node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node scripts/vendor-plantuml.mjs --check",
+    "check:assets": "node scripts/vendor-html.mjs --check && node scripts/vendor-emoji.mjs --check && node scripts/vendor-hashes.mjs --check && node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-fonts.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node scripts/vendor-plantuml.mjs --check",
     "vendor:mermaid": "node scripts/vendor-mermaid.mjs",
     "vendor:icons": "node scripts/vendor-icons.mjs",
     "vendor:i18n": "node scripts/vendor-i18n.mjs",
@@ -17,10 +17,13 @@
     "vendor:hashes": "node scripts/vendor-hashes.mjs",
     "vendor:html": "node scripts/vendor-html.mjs",
     "vendor:emoji": "node scripts/vendor-emoji.mjs",
-    "vendor:plantuml": "node scripts/vendor-plantuml.mjs"
+    "vendor:plantuml": "node scripts/vendor-plantuml.mjs",
+    "vendor:fonts": "node scripts/vendor-fonts.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/source-serif-4": "5.3.1",
     "@milkdown/kit": "7.22.3",
     "@noble/hashes": "2.4.0",
     "@plantuml/core": "1.2026.9",

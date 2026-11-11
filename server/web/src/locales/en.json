@@ -757,6 +757,8 @@
   "duration.less_than_second": "<1s",
   "theme.timekeeper": "Dagsverk",
   "theme.timekeeper-dark": "Dagsverk Dark",
+  "theme.timekeeper-reinvented": "Dagsverk-reinvented",
+  "theme.timekeeper-reinvented-dark": "Dagsverk-reinvented Dark",
   "theme.solarized-light": "Solarized Light",
   "theme.solarized-dark": "Solarized Dark",
   "theme.nord": "Nord",

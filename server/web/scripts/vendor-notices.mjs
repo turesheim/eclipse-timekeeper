@@ -3,6 +3,8 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 const root=new URL('../',import.meta.url),check=process.argv.includes('--check');
 const manifest=JSON.parse(await readFile(new URL('package.json',root)));
 const components=[
+  {id:'@fontsource-variable/inter',name:'Inter',homepage:'https://rsms.me/inter/',license:'OFL-1.1',directory:'fonts',licenseFile:'inter-LICENSE'},
+  {id:'@fontsource-variable/source-serif-4',name:'Source Serif 4',homepage:'https://adobe-fonts.github.io/source-serif/',license:'OFL-1.1',directory:'fonts',licenseFile:'source-serif-4-LICENSE',copyright:'Google Inc.'},
   {id:'@plantuml/core',name:'PlantUML',homepage:'https://plantuml.com/',license:'MIT',directory:'plantuml',copyright:'Copyright 2009–2024, Arnaud Roques'},
   {id:'gemoji',name:'gemoji',homepage:'https://github.com/wooorm/gemoji',license:'MIT',directory:'emoji'},
   {id:'highlight.js',name:'highlight.js',homepage:'https://highlightjs.org/',license:'BSD-3-Clause',directory:'milkdown',licenseFile:'HIGHLIGHT-LICENSE',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},

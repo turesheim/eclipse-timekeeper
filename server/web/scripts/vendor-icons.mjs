@@ -24,6 +24,7 @@ const catalog=ids.map(id=>[id,title(id),keywords[id]||'',categoriesByIcon.get(id
 const files=new Map();
 for(const name of ['bootstrap-icons.min.css','fonts/bootstrap-icons.woff2','fonts/bootstrap-icons.woff'])files.set(new URL(name,target),await readFile(new URL('font/'+name,source)));
 files.set(new URL('LICENSE',target),await readFile(new URL('LICENSE',source)));
+for(const name of ['exclamation-circle','exclamation-triangle'])files.set(new URL(name+'.svg',target),await readFile(new URL('icons/'+name+'.svg',source)));
 const hash=createHash('sha256').update(await readFile(new URL('font/fonts/bootstrap-icons.woff2',source))).digest('hex');
 const readme=new URL('README.md',target);
 files.set(readme,`# Bootstrap Icons\n\nPinned source: \`bootstrap-icons@${version}\` from the official npm package.\n\nThe unmodified CSS, WOFF2/WOFF fonts and MIT license are bundled for offline use.\nSee https://icons.getbootstrap.com/usage/ for upstream usage.\n\nWOFF2 SHA-256: \`${hash}\`.\n\nRun \`npm run vendor:icons\` to regenerate the assets, project catalog and API allow-list.\n`);
