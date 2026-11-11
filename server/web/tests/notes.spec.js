@@ -609,7 +609,7 @@ test('a delayed search cannot display the signed-out account in a new session',a
 
 test('Notes content search finds body text, keeps relevance order and pages on demand without replacing a draft',async({page,request})=>{
   test.setTimeout(150000);const api=await setup(page,request),word='sparrow';
-  for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  for(let index=0;index<55;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:index===54?'Notes/Sparrow priority.md':'Notes/Result-'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===54?'# Sparrow priority\n\nA body match: sparrow.':'# Ordinary '+index+'\n\nA body match: sparrow.'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await api('PUT','/notes/files?path=Notes%2Fbinary.txt',Buffer.from(word),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await expect.poll(async()=>{const reply=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:word}));return reply.status();},{timeout:30000}).toBe(200);
   const navigation=await searchNotes(page,word),rows=navigation.locator('[data-search-note]');
@@ -823,7 +823,7 @@ test('read-only clients can open and maximize note popups without creating missi
     const reader=await context.newPage(),dialogs=[],writes=[];reader.on('dialog',dialog=>{dialogs.push(dialog.message());void dialog.dismiss();});reader.on('request',request=>{if(request.method()!=='GET'&&new URL(request.url()).pathname.startsWith('/api/v1/notes/'))writes.push(request.method());});
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();
     await reader.locator(`[data-recent-note="${entry.id}"]`).click();const popup=reader.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(reader.locator('#note-popup-formatted .ProseMirror')).toHaveAttribute('aria-readonly','true');
-    await reader.locator('#note-popup-formatted [data-wiki-reference="Never create this"]').click();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#notes-document-title')).toHaveText('Read only');
+    await reader.locator('#note-popup-formatted [data-wiki-reference="Never create this"]').click();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#notes-document-title')).toHaveText('Readonly');
     expect(dialogs).toEqual([]);expect(writes).toEqual([]);expect((await(await api('GET','/notes/entries?query=Never+create+this')).json()).items).toEqual([]);
   }finally{await context.close();}
 });
