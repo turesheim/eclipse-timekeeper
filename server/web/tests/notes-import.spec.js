@@ -105,7 +105,7 @@ test('Obsidian imports use filenames across navigation, recent notes and search 
     const entry=await(await resolve(client,path)).json();expect(entry.title).toBe('Security review');expect(entry.heading).toBe('Må avklares');
     expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
     await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();
-    const item=noteEntry(page.locator('#notes-navigation'),path);await expect(item).toHaveText('Security review');await item.click();
+    const item=noteEntry(page.locator('#notes-navigation'),path);await expect(item).toHaveText('Security review');await expect(item).toHaveAccessibleName(path);await item.click();
     await expect(page.locator('#notes-document-title')).toHaveText('Security review');await expect(page.locator('#notes-formatted .markdown-callout input')).toHaveValue('Viktig!');await expect(page.locator('#notes-formatted h2')).toHaveText('Må avklares');await expect(page.locator('#notes-formatted').getByRole('checkbox')).toHaveCount(1);await expect(page.locator('#notes-formatted iframe')).toHaveCount(0);
     await expect(page.locator('#notes-recent-notes [data-recent-note="'+entry.id+'"]')).toContainText('Security review');
     const panel=await searchNotes(page,'Security review');await expect(panel.locator('[data-search-note="'+entry.id+'"] .notes-search-result-title')).toHaveText('Security review');await panel.getByRole('button',{name:'Close',exact:true}).click();

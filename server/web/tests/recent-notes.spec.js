@@ -190,7 +190,7 @@ test('Recent note popup saves before maximizing and retains drafts after a rejec
 
 test('Recent note popup remains accessible in all themes and narrow screens',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
-  const entry=await(await api('PUT','/notes/files?path=Notes%2FAccessible.md',Buffer.from('# A note with a long title that must wrap beside the window buttons\n\nEditable body.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  const entry=await(await api('PUT','/notes/files?path=Notes%2FA%20note%20with%20a%20long%20title%20that%20must%20wrap%20beside%20the%20window%20buttons.md',Buffer.from('# A note with a long title that must wrap beside the window buttons\n\nEditable body.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();const popup=page.locator('#note-popup-editor');await expect(page.locator('#note-popup-formatted .ProseMirror')).toBeVisible();
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:900});await expect(popup.getByRole('button',{name:'Open in workspace',exact:true})).toBeInViewport();await expect(popup.getByRole('button',{name:'Close',exact:true})).toBeInViewport();
@@ -223,6 +223,6 @@ test('note popup clears the previous account title and body when authentication 
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const title='Private account headline 607',marker='Private account body marker 607';
   const entry=await(await api('PUT','/notes/files?path=Notes%2FPrivate.md',Buffer.from('# '+title+'\n\n'+marker+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
-  await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText(title);await expect(page.locator('#note-popup-formatted')).toContainText(marker);
+  await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${entry.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText('Private');await expect(page.locator('#note-popup-formatted')).toContainText(marker);
   await api('POST','/auth/logout');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#note-popup-editor')).not.toBeVisible();await expect(page.locator('#note-popup-title')).toHaveText('');await expect(page.locator('#note-popup-body')).toHaveValue('');expect(await page.locator('#note-popup-editor').textContent()).not.toContain(title);expect(await page.locator('#note-popup-editor').textContent()).not.toContain(marker);
 });
