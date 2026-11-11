@@ -90,7 +90,7 @@ export class CalendarSubscriptions {
   show(){if(!this.scope||!this.data)return;this.poll();void this.load();}
   hide(){if(!this.managementView){clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);}this.details.close();}
   reset(){
-    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.reset();this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
+    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.reset();this.scope=null;this.data=null;this.key=null;this.allDayKey=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
     this.dialog.close();this.details.close();this.fields.replaceChildren();this.details.replaceChildren();this.list.replaceChildren();this.allDay.replaceChildren();this.allDay.hidden=true;this.message.textContent='';
   }
   async load() {
@@ -100,8 +100,9 @@ export class CalendarSubscriptions {
     try {
       const [subscriptions,events]=await Promise.all([session.request('/calendar-subscriptions'),session.request('/calendar-events?'+new URLSearchParams({fromDate:from,toDate:to}))]);
       if(session!==this.scope||generation!==this.generation||key!==this.key)return;
+      const plansChanged=JSON.stringify([this.events,this.sources])!==JSON.stringify([events.data.items,events.data.activitySources]);
       this.rows=subscriptions.data.items;this.events=events.data.items;this.sources=events.data.activitySources;this.errors=events.data.errors;this.message.textContent=this.rows.some(value=>value.lastError||this.errors?.[value.id])?t('calendar.refresh_errors'):'';
-      this.paint();this.paintAllDay();this.callbacks.onEvents({items:this.events,sources:this.sources});this.reviewDetails();
+      this.paint();this.paintAllDay();if(plansChanged)this.callbacks.onEvents({items:this.events,sources:this.sources});this.reviewDetails();
       clearTimeout(this.burst);
       if(this.rows.some(value=>!value.lastError&&(!value.lastSuccess&&Date.now()-Date.parse(value.createdAt)<90000||value.lastAttempt&&(!value.lastSuccess||Date.parse(value.lastAttempt)>Date.parse(value.lastSuccess))&&Date.now()-Date.parse(value.lastAttempt)<90000)))this.burst=setTimeout(()=>void this.load(),2000);
     }catch(error){if(session===this.scope&&generation===this.generation)this.failure(error);}
@@ -188,7 +189,9 @@ export class CalendarSubscriptions {
   }
   eventDate(event) {return calendarItemWhen(event,this.data.profile.data.zoneId);}
   paintAllDay() {
-    const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay&&focusIncludes(this.data,value.clientId));this.allDay.replaceChildren();this.allDay.hidden=!values.length;
+    const values=this.events.filter(value=>value.allDay&&focusIncludes(this.data,value.clientId)),renderKey=JSON.stringify([getLocale(),this.data.profile.data.zoneId,values]);
+    if(renderKey===this.allDayKey)return;this.allDayKey=renderKey;
+    const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null;this.allDay.replaceChildren();this.allDay.hidden=!values.length;
     if(!values.length)return;const title=node('h3',t('calendar.all_day_plans'));title.id='calendar-all-day-title';this.allDay.append(title);
     for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);const title=node('strong',value.title||t('calendar.untitled')),marker=eventNoteIndicator(value);if(marker)title.append(' ',marker);pick.append(title,node('span',this.eventDate(value)));if(calendarTodo(value))pick.append(node('small',calendarItemStatus(value)));pick.append(node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
     if(key&&document.activeElement===document.body)this.allDay.querySelector(`[data-calendar-event-key="${key}"]`)?.focus();

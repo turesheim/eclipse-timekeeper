@@ -33,9 +33,9 @@ test('About identifies the project and bundled libraries with complete local lic
   await expect(page.locator('#server-version')).toHaveText(server.version);
   await page.locator('#about-notices summary').click();
   const manifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
-  for(const [name,pkg,directory=pkg,licenseFile='LICENSE'] of [['highlight.js','highlight.js','milkdown','HIGHLIGHT-LICENSE'],['Milkdown','@milkdown/kit','milkdown'],['Mermaid','mermaid'],['Bootstrap','bootstrap'],['Bootstrap Icons','bootstrap-icons'],['i18next','i18next'],['date-holidays','date-holidays']]) {
+  for(const [name,pkg,directory=pkg,licenseFile='LICENSE',credit='Copyright'] of [['Inter','@fontsource-variable/inter','fonts','inter-LICENSE','The Inter Project Authors'],['Source Serif 4','@fontsource-variable/source-serif-4','fonts','source-serif-4-LICENSE','Google Inc.'],['PlantUML','@plantuml/core','plantuml'],['highlight.js','highlight.js','milkdown','HIGHLIGHT-LICENSE'],['Milkdown','@milkdown/kit','milkdown'],['Mermaid','mermaid'],['Bootstrap','bootstrap'],['Bootstrap Icons','bootstrap-icons'],['i18next','i18next'],['date-holidays','date-holidays']]) {
     const row=page.locator('#about-components li').filter({has:page.getByRole('link',{name,exact:true})});
-    await expect(row).toContainText(manifest.devDependencies[pkg]);await expect(row).toContainText('Copyright');
+    await expect(row).toContainText(manifest.devDependencies[pkg]);await expect(row).toContainText(credit);
     const response=await request.get(await row.getByRole('link',{name:new RegExp('^'+name+' license:','i')}).getAttribute('href'));
     expect(response.status()).toBe(200);expect(response.headers()['content-type']).toMatch(/^text\/plain/);
     expect(await response.text()).toBe(await readFile(new URL('../src/assets/'+directory+'/'+licenseFile,import.meta.url),'utf8'));
@@ -56,7 +56,7 @@ test('About follows the saved Norwegian language and remains accessible in every
   await signIn(page,request);const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),profile=await api.get('/api/v1/me');
   expect((await api.put('/api/v1/me',{data:{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf}})).status()).toBe(200);
   await page.reload();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.setViewportSize({width:390,height:844});
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
+  for(const theme of ['timekeeper','timekeeper-dark','timekeeper-reinvented','timekeeper-reinvented-dark','solarized-light','solarized-dark','nord','dracula','newspaper']) {
     await setTheme(page,theme);await page.locator('#account-menu > summary').click();
     await page.locator('#about-open').click();const dialog=page.locator('#server-info');
     await expect(dialog.getByRole('heading',{name:'Om Dagsverk',exact:true})).toBeVisible();

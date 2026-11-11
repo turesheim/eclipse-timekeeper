@@ -134,6 +134,8 @@
   /* Markdown and journal editors */
   /* Plain Markdown source editor text. */
   --font-markdown-source: .9rem;
+  /* Body text in formatted Markdown notes; Dagsverk-reinvented uses an 18px default. */
+  --font-markdown-body: 1rem;
   /* Level 1 heading in formatted Markdown notes. */
   --font-markdown-h1: 1.7rem;
   /* Level 2 heading in formatted Markdown notes. */
