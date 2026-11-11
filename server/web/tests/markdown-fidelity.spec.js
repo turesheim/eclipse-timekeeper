@@ -19,7 +19,7 @@ test('Obsidian callouts, media source and PDF references retain a formatted docu
   await open(page,source);
   await expect(page.locator('#markdown-formatted .markdown-callout')).toContainText('Dette er et opprinnelig arbeidsdokument.');
   await expect(page.locator('#markdown-formatted h2')).toHaveText('Må avklares');
-  await expect(page.locator('#markdown-formatted input[type=checkbox]')).toHaveCount(2);
+  await expect(page.locator('#markdown-formatted').getByRole('checkbox')).toHaveCount(2);
   await expect(page.locator('#markdown-formatted iframe')).toHaveCount(0);
   await expect(page.locator('#markdown-formatted .markdown-callout input')).toHaveValue('Viktig!');
   await expect(page.locator('#markdown-formatted button[data-wiki-reference]')).toHaveText('security-datasheet.pdf');
@@ -126,4 +126,9 @@ test('long-note input reaches the next animation frame within the typing budget'
   });
   await page.locator('#typing-performance p').nth(175).click();await page.keyboard.type(' measured typing responsiveness');await expect.poll(()=>page.evaluate(()=>globalThis.typingSamples.length)).toBeGreaterThan(20);
   const samples=await page.evaluate(()=>[...globalThis.typingSamples].sort((a,b)=>a-b)),p95=samples[Math.ceil(samples.length*.95)-1];console.log('Editor input timing '+JSON.stringify({browser:browser.version(),platform:process.platform,architecture:process.arch,samples:samples.length,p95}));expect(p95).toBeLessThan(150);
+});
+
+for(const ending of ['\n','\r\n','\r','\t'])test('incomplete wikilinks preserve their source across '+JSON.stringify(ending),async({page})=>{
+  const source='Before.\n\n[[unfinished'+ending+'reference]]\n\nAfter.\n';await open(page,source);
+  await expect(page.locator('#markdown-formatted p').first()).toHaveText('Before.');await expect(page.locator('#markdown-formatted p').last()).toHaveText('After.');await expect(page.locator('#markdown-formatted [data-wiki-reference]')).toHaveCount(0);expect(await download(page)).toBe(source);
 });
