@@ -180,6 +180,8 @@ jobs:
     - name: Test time-zone, precision and HTTP session boundaries
       if: matrix.shard == 1
       run: npm test --prefix server/web
+    - name: Configure Ubuntu package mirror
+      run: sudo python3 scripts/ci_ubuntu_mirror.py
     - name: Install Chromium
       working-directory: server/web
       run: npx playwright install --with-deps chromium
@@ -242,6 +244,8 @@ jobs:
         node-version: 24
         cache: npm
         cache-dependency-path: server/web/package-lock.json
+    - name: Configure Ubuntu package mirror
+      run: sudo python3 scripts/ci_ubuntu_mirror.py
     - name: Install browser peer for installed Eclipse acceptance
       run: |
         npm ci --ignore-scripts --prefix server/web
@@ -366,6 +370,9 @@ jobs:
       shell: bash
       run: ./mvnw --version
 
+    - name: Configure Ubuntu package mirror
+      if: runner.os == 'Linux'
+      run: sudo python3 scripts/ci_ubuntu_mirror.py
     - name: Install Xvfb
       if: runner.os == 'Linux'
       run: sudo apt-get update && sudo apt-get install -y xvfb
