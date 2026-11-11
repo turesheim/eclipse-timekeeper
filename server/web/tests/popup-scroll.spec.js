@@ -45,21 +45,24 @@ test('note popup content and close controls stay reachable beneath long headings
   expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);
 });
 
-test('account popup and ordinary dialogs scroll to their last action and follow viewport and header resizing',async({page,request})=>{
+test('account popup and ordinary dialogs scroll to their last action and follow viewport and header resizing',async({page,request,browserName})=>{
   test.setTimeout(90000);await setup(page,request);
   const menu=page.locator('.account-menu-items'),toggle=page.getByRole('button',{name:'Account menu',exact:true});
   for(const theme of ['timekeeper','timekeeper-dark']){
     await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await openAccountMenu(page);
     for(const viewport of [{width:390,height:240},{width:1440,height:180}]){
       await page.setViewportSize(viewport);await fits(page,menu);await menu.evaluate(node=>{node.scrollTop=0;});
-      const background=await page.evaluate(()=>scrollY);await wheel(page,menu,10000);await expect.poll(()=>menu.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
-      const last=menu.getByRole('button',{name:'About',exact:true});await expect(last).toBeInViewport();await last.click({trial:true});await wheel(page,menu,10000);expect(await page.evaluate(()=>scrollY)).toBe(background);
+      const background=await page.evaluate(()=>scrollY);await wheel(page,menu,250);await expect.poll(()=>menu.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+      const last=menu.getByRole('button',{name:'About',exact:true});await expect(last).toBeInViewport();
+      expect(await last.evaluate(node=>{const box=node.getBoundingClientRect();return node.contains(document.elementFromPoint(box.x+box.width/2,box.y+box.height/2));})).toBe(true);
+      await wheel(page,menu,250);expect(await page.evaluate(()=>scrollY)).toBe(background);
+      await expect.poll(()=>last.evaluate(node=>{const box=node.getBoundingClientRect();return node.contains(document.elementFromPoint(box.x+box.width/2,box.y+box.height/2));})).toBe(true);
       await captureScreenshot(page,{path:`test-results/popup-account-${theme}-${viewport.width}.png`,fullPage:false});
     }
     await page.setViewportSize({width:390,height:320});await page.locator('.app-header').evaluate(node=>{node.style.paddingBlock='3rem';});await fits(page,menu);
-    await menu.getByRole('button',{name:'Sign out',exact:true}).focus();await page.keyboard.press('Tab');const about=menu.getByRole('button',{name:'About',exact:true});await expect(about).toBeFocused();await expect(about).toBeInViewport();
+    await menu.getByRole('button',{name:'Sign out',exact:true}).focus();await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');const about=menu.getByRole('button',{name:'About',exact:true});await expect(about).toBeFocused();await expect(about).toBeInViewport();
     await about.press('Enter');const dialog=page.locator('#server-info');await expect(dialog).toBeVisible();await fits(page,dialog);await wheel(page,dialog,10000);await expect(page.locator('#about-close')).toBeInViewport();
     await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(toggle).toBeFocused();await page.locator('.app-header').evaluate(node=>{node.style.paddingBlock='';});
-    await openAccountMenu(page);expect(await menu.evaluate(node=>node.scrollTop)).toBe(0);await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(toggle).toBeFocused();
+    await openAccountMenu(page);await expect.poll(()=>menu.evaluate(node=>node.scrollTop)).toBe(0);await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(toggle).toBeFocused();
   }
 });
