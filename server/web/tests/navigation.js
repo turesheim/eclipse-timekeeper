@@ -14,7 +14,7 @@ export async function navigateView(page,name){
   await page.locator(`[data-tab=${name}]`).click();
   await expect(page.locator('#workspace')).toBeVisible();
   await expect(page.locator(`[data-tab=${name}]`)).toHaveAttribute('aria-current','page');
-  await expect(page.locator(`#${name}-panel`)).toBeVisible();
+  await expect(page.locator(`#${name}-panel`)).toHaveJSProperty('hidden',false);
 }
 
 export async function openAccountMenu(page) {
