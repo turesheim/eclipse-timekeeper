@@ -5,7 +5,7 @@ export class NoteContents {
   constructor(root,field,{available=()=>true}={}){
     this.available=available;root.classList.add('note-contents');
     if(!root.querySelector('ol')){
-      const title=document.createElement('h3'),navigation=document.createElement('nav'),list=document.createElement('ol'),empty=document.createElement('p');
+      const title=document.createElement('h2'),navigation=document.createElement('nav'),list=document.createElement('ol'),empty=document.createElement('p');
       title.id=root.id+'-title';title.textContent=t('today.contents');root.setAttribute('aria-labelledby',title.id);navigation.setAttribute('aria-labelledby',title.id);empty.className='hint';navigation.append(list);root.append(title,navigation,empty);
     }
     this.root=root;this.field=field;this.list=root.querySelector('ol');this.empty=root.querySelector('p');this.generation=0;

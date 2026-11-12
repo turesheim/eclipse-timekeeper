@@ -49,7 +49,7 @@ test('Notes right sidebar resizes and collapses without replacing the draft, and
   await expect.poll(async()=>(await contents.boundingBox()).width).toBeCloseTo(initial+80,0);await separator.press('ArrowLeft');await expect(separator).toHaveAttribute('aria-valuenow',String(initial+100));await separator.press('Home');await expect(separator).toHaveAttribute('aria-valuenow','180');await separator.press('End');await expect(separator).toHaveAttribute('aria-valuenow','480');
   for(const theme of ['timekeeper','timekeeper-dark']){
     await setTheme(page,theme);await captureScreenshot(page,{path:`test-results/notes-layout-${theme}.png`});
-    expect((await new AxeBuilder({page}).include('#notes-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+    expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);
   }
   const width=(await page.locator('.notes-editor').boundingBox()).width;await toggle.click();await expect(contents).toBeHidden();await expect(separator).toBeHidden();expect((await page.locator('.notes-editor').boundingBox()).width).toBeGreaterThan(width);await toggle.click();await expect(separator).toHaveAttribute('aria-valuenow','480');
   expect(await source.evaluate(node=>({same:node===window.layoutSource,start:node.selectionStart,end:node.selectionEnd,scroll:node.scrollTop}))).toEqual({same:true,start:5,end:12,scroll:100});expect((await api('GET','/notes/entries/'+metadata.id+'/content')).headers().etag).toBe(saved.headers().etag);
@@ -213,7 +213,7 @@ test('Notes keeps navigation and both editor modes anchored while their contents
     if(width<=760)await page.locator('.notes-drawer-toggle').click();
     for(const mode of ['Markdown source','Formatted']){
       await page.locator('#notes-panel').getByRole('button',{name:mode,exact:true}).click();const content=page.locator(mode==='Formatted'?'.notes-markdown .ProseMirror':'#notes-body');
-      expect((await content.boundingBox()).height).toBeGreaterThan(24);
+      expect((await content.boundingBox()).height).toBeGreaterThan(48);
       await content.hover();await page.mouse.wheel(0,5000);await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.mouse.wheel(0,5000);
       expect(await page.evaluate(()=>scrollY)).toBe(0);await expect(page.locator('.notes-footer')).toBeInViewport();
       expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);

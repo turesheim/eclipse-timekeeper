@@ -8,7 +8,7 @@ export async function noteActions(page,scope){
 export async function clickNoteAction(page,scope,name){
   const id=await scope.getAttribute('id');
   if(['today-note-editor','notes-panel'].includes(id)){
-    const action=page.locator(id==='notes-panel'?'#notes-main-actions':'#today-main-actions').getByRole('button',{name,exact:true});
+    const action=page.locator(id==='notes-panel'?'#notes-main-actions':'#today-main-actions').getByRole('button',{name,exact:true,includeHidden:true});
     if(await action.count()){await action.click();return;}
   }
   await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();
