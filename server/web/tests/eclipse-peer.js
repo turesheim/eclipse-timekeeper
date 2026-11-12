@@ -5,7 +5,7 @@ import {chromium, expect, request} from '@playwright/test';
 import {createInterface} from 'node:readline';
 import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
-import {openLabelSettings,setTimeZone,expandProjectClient} from './navigation.js';
+import {navigateView,openLabelSettings,setTimeZone,expandProjectClient} from './navigation.js';
 import {openTaskHistory,clearTaskHistory} from './task-history.js';
 
 const browser = await chromium.launch();
@@ -14,6 +14,7 @@ page.setDefaultTimeout(15000);
 const record = {};
 const apiRequest=await request.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
 async function tab(name) {
+  if(['Clients','Projects'].includes(name)){await navigateView(page,name.toLowerCase());return;}
   if(name==='Labels'){await openLabelSettings(page);return;}
   if(new URL(page.url()).hash.startsWith('#account')){await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#workspace')).toBeVisible();}
   await page.getByRole('button', {name, exact:true}).click();

@@ -1,3 +1,4 @@
+export {markdownOutline} from './markdown-outline.js';
 import {emojiPlugin} from './emoji.js';
 import {inlineStyles,inlineStyleCommands} from './inline-styles.js';
 import {markRule} from '@milkdown/kit/prose';
@@ -12,7 +13,7 @@ import {bracketPairs} from './bracket-pairs.js';
 import {nativeWikiInput,wikiLiteralInput,wikiCompositionEnd,wikiInputComplete} from './wiki-input.js';
 import {wikiCompletion,escapedBracket} from '../src/markdown-brackets.js';
 // This build-time entry is bundled to one local native ES module. The application
-// and source-mode fallback do not import Milkdown until rich mode is requested.
+// loads this module when formatted editing or the Today outline needs its parser.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx,serializerCtx,parserCtx} from '@milkdown/kit/core';
 import {commonmark,docSchema,paragraphSchema,linkSchema,codeBlockSchema,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand,remarkGFMPlugin,strikethroughInputRule,strikethroughSchema} from '@milkdown/kit/preset/gfm';

@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
@@ -19,11 +20,11 @@ async function setup(page,request){
   return {api,folder};
 }
 async function openNote(page){
-  await page.locator('[data-tab=notes]').click();const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Draft.md').click();await expect(page.locator('#notes-formatted .ProseMirror')).toBeVisible();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+  await navigateView(page,'notes');const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Draft.md').click();await expect(page.locator('#notes-formatted .ProseMirror')).toBeVisible();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
 }
 
 test('background synchronization preserves typing and defers inactive work views until they are opened',async({page,request})=>{
-  const {api}=await setup(page,request);await api('POST','/clients',{name:'Seed client',color:'#305070'});await page.locator('[data-tab=clients]').click();await expect(page.locator('#clients')).toContainText('Seed client');await page.locator('[data-tab=track]').click();await expect(page.locator('#track-calendar')).not.toBeEmpty();await openNote(page);
+  const {api}=await setup(page,request);await api('POST','/clients',{name:'Seed client',color:'#305070'});await navigateView(page,'clients');await expect(page.locator('#clients')).toContainText('Seed client');await navigateView(page,'track');await expect(page.locator('#track-calendar')).not.toBeEmpty();await openNote(page);
   await page.evaluate(()=>{
     const ids=['clients','projects','labels','activities','days','track-calendar','week-sessions'];globalThis.syncMutations={};globalThis.syncObservers=ids.map(id=>{globalThis.syncMutations[id]=0;const observer=new MutationObserver(records=>{globalThis.syncMutations[id]+=records.length;});observer.observe(document.getElementById(id),{childList:true,subtree:true});return observer;});
   });
@@ -34,15 +35,15 @@ test('background synchronization preserves typing and defers inactive work views
   }
   await typing;await expect(paragraph).toHaveText('Before. '+text);await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');
   const changes=await page.evaluate(()=>{globalThis.syncObservers.forEach(observer=>observer.disconnect());return globalThis.syncMutations;});expect(changes).toEqual(Object.fromEntries(Object.keys(changes).map(key=>[key,0])));
-  await page.locator('[data-tab=clients]').click();for(let index=0;index<3;index++)await expect(page.locator('#clients')).toContainText('Synchronized client '+index);
-  await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-formatted .ProseMirror p')).toHaveText('Before. '+text);
+  await navigateView(page,'clients');for(let index=0;index<3;index++)await expect(page.locator('#clients')).toContainText('Synchronized client '+index);
+  await navigateView(page,'notes');await expect(page.locator('#notes-formatted .ProseMirror p')).toHaveText('Before. '+text);
 });
 
 test('unchanged visible lists retain their focused actions across unrelated synchronization',async({page,request})=>{
   const {api}=await setup(page,request),client=await(await api('POST','/clients',{name:'Stable client',color:'#305070'})).json();
   await api('POST','/projects',{name:'Stable project',clientId:client.id});await api('POST','/labels',{name:'Stable label',color:'#507030'});
   for(const [tab,list,title] of [['clients','clients','Stable client'],['projects','projects','Stable project'],['labels','labels','Stable label']]){
-    if(tab==='labels')await page.goto('/web/#account/labels');else await page.locator('[data-tab='+tab+']').click();
+    if(tab==='labels')await page.goto('/web/#account/labels');else await navigateView(page,tab);
     const row=page.locator('#'+list+' tr').filter({hasText:title}),action=row.getByRole('button',{name:'Edit',exact:true});
     if(tab==='projects')await expandProjectClient(page,client.id);
     await expect(action).toBeVisible();await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await action.focus();await expect(action).toBeFocused();
@@ -74,7 +75,7 @@ test('a local note save and its change notification share one consistent account
 });
 
 test('a change newer than an in-flight snapshot still triggers the required second refresh',async({page,request})=>{
-  const {api}=await setup(page,request);await page.locator('[data-tab=clients]').click();await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+  const {api}=await setup(page,request);await navigateView(page,'clients');await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
   let reads=0,held=false,revision,release;const pending=new Promise(resolve=>{release=resolve;});
   await page.route('**/api/v1/projects?*',async route=>{const number=++reads,reply=await route.fetch();if(number===2){revision=(await reply.json()).revision;held=true;await pending;}await route.fulfill({response:reply});});
   try{
