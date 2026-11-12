@@ -83,6 +83,19 @@ class ServiceSettingsTest {
         assertEquals(403,call(ordinary,"GET","/admin/internet-accounts?check=true",null,null,false).statusCode());
     }
     private Response noteLimits(Browser browser,Response previous,ObjectNode values){var body=object().put("currentPassword",PASSWORD);body.set("limits",values);return call(browser,"PUT","/admin/notes/limits",body,previous.header("ETag"),true);}
+    @Test void legacyGoogleSettingsDoNotGrowNewFieldsUntilMicrosoftIsChanged()throws Exception{
+        var admin=setup();accounts.tx(c->{
+            try(var statement=query(c,"SELECT saved,effective FROM tk_service_settings WHERE id=1");var rows=statement.executeQuery()){
+                assertTrue(rows.next());var saved=(ObjectNode)parse(rows.getString(1));var effective=(ObjectNode)parse(rows.getString(2));
+                ((ObjectNode)saved.get(ServiceSettings.INTERNET)).remove(List.of("microsoftClientId","microsoftClientSecret"));((ObjectNode)effective.get(ServiceSettings.INTERNET)).remove(List.of("microsoftClientId","microsoftClientSecret"));
+                execute(c,"UPDATE tk_service_settings SET saved=?,effective=? WHERE id=1",saved.toString(),effective.toString());
+            }catch(java.sql.SQLException failure){throw new AssertionError(failure);}return null;
+        });
+        String path="/admin/internet-accounts";var before=call(admin,"GET",path,null,null,false);
+        var input=object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","updated-google").put("googleSecretAction","PRESERVE").put("microsoftClientId","").put("microsoftSecretAction","PRESERVE").put("currentPassword",PASSWORD);
+        success(call(admin,"PUT",path,input,before.header("ETag"),true),200);
+        accounts.tx(c->{try(var statement=query(c,"SELECT saved FROM tk_service_settings WHERE id=1");var rows=statement.executeQuery()){assertTrue(rows.next());var stored=parse(rows.getString(1)).path(ServiceSettings.INTERNET);assertEquals(4,stored.size());assertEquals("updated-google",stored.path("googleClientId").asText());}catch(java.sql.SQLException failure){throw new AssertionError(failure);}return null;});
+    }
     @Test void microsoftRegistrationIsWriteOnlyAndOlderGoogleCommandsPreserveIt()throws Exception{
         var admin=setup();String path="/admin/internet-accounts",secret="private-microsoft-application-secret";
         var before=call(admin,"GET",path,null,null,false);

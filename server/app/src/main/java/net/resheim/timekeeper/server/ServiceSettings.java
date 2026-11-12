@@ -208,6 +208,9 @@ class ServiceSettings {
                 }
             }
             validateInternet(value);if(value.equals(internet(current.saved())))return internetReply(current,true);
+            // Preserve the old payload during rolling upgrades until Microsoft settings are actually changed.
+            var previous=current.saved().path(INTERNET);var defaults=internetDeployment();
+            if(previous.isObject()&&!previous.has("microsoftClientId")&&value.path("microsoftClientId").equals(defaults.path("microsoftClientId"))&&value.path("microsoftClientSecret").equals(defaults.path("microsoftClientSecret")))value.remove(List.of("microsoftClientId","microsoftClientSecret"));
             long version=current.version()+1;if(version>9007199254740991L)throw ApiFailure.conflict();var saved=current.saved().deepCopy();saved.set(INTERNET,value);
             if(execute(c,"UPDATE tk_service_settings SET version=?,saved=? WHERE id=1 AND version=?",version,saved.toString(),current.version())!=1)throw new ApiFailure(412,"STALE_VERSION");
             return internetReply(read(c,false),true);

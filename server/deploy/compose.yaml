@@ -17,32 +17,54 @@ x-api: &api
   security_opt: [no-new-privileges:true]
   networks: [application, database]
   logging: *logging
+  # Identical legacy aliases keep automatic rollback to older 2.x images usable.
   environment:
-    DAGSVERK_SERVER_DB_URL: jdbc:postgresql://postgres:5432/timekeeper
-    DAGSVERK_SERVER_DB_USER: timekeeper
-    DAGSVERK_SERVER_DB_PASSWORD_FILE: /run/secrets/timekeeper_database_password
-    DAGSVERK_SERVER_TOKENS_FILE: /config/tokens.json
-    DAGSVERK_INSTANCE_BACKUP_STORAGE: /instance/backups
-    DAGSVERK_INSTANCE_RESTORE_STORAGE: /instance/restore
-    DAGSVERK_MAINTENANCE_FILE: /instance/maintenance.pending
-    DAGSVERK_ALLOW_SCHEMA_UPGRADE: ${DAGSVERK_ALLOW_SCHEMA_UPGRADE-${TIMEKEEPER_ALLOW_SCHEMA_UPGRADE:-false}}
-    DAGSVERK_SERVER_SETUP_FILE: ${DAGSVERK_SERVER_SETUP_FILE-${TIMEKEEPER_SERVER_SETUP_FILE:-NONE}}
-    DAGSVERK_PACKAGE_ID: ${DAGSVERK_PACKAGE_ID-${TIMEKEEPER_PACKAGE_ID:-timekeeper}}
-    DAGSVERK_CONNECT_SHARED: ${DAGSVERK_CONNECT_SHARED-${TIMEKEEPER_CONNECT_SHARED:-true}}
-    DAGSVERK_CONNECT_SERVICE_URL: ${DAGSVERK_CONNECT_SERVICE_URL-${TIMEKEEPER_CONNECT_SERVICE_URL:-}}
-    DAGSVERK_PUBLIC_ORIGIN: ${DAGSVERK_PUBLIC_ORIGIN-${TIMEKEEPER_PUBLIC_ORIGIN:-NONE}}
-    DAGSVERK_SETTINGS_RECOVERY: ${DAGSVERK_SETTINGS_RECOVERY-${TIMEKEEPER_SETTINGS_RECOVERY:-false}}
-    DAGSVERK_AUTH_ORIGIN_EPOCH: ${DAGSVERK_AUTH_ORIGIN_EPOCH-${TIMEKEEPER_AUTH_ORIGIN_EPOCH:-1}}
-    DAGSVERK_PASSKEYS_ENABLED: ${DAGSVERK_PASSKEYS_ENABLED-${TIMEKEEPER_PASSKEYS_ENABLED:-true}}
-    DAGSVERK_PASSKEY_RP_ID: ${DAGSVERK_PASSKEY_RP_ID-${TIMEKEEPER_PASSKEY_RP_ID:-AUTO}}
-    DAGSVERK_CALENDAR_TRUSTED_ORIGINS: ${DAGSVERK_CALENDAR_TRUSTED_ORIGINS-${TIMEKEEPER_CALENDAR_TRUSTED_ORIGINS:-}}
-    DAGSVERK_CALENDAR_AUTOMATIC: ${DAGSVERK_CALENDAR_AUTOMATIC-${TIMEKEEPER_CALENDAR_AUTOMATIC:-true}}
+    DAGSVERK_SERVER_DB_URL: &dagsverk-server-db-url jdbc:postgresql://postgres:5432/timekeeper
+    TIMEKEEPER_SERVER_DB_URL: *dagsverk-server-db-url
+    DAGSVERK_SERVER_DB_USER: &dagsverk-server-db-user timekeeper
+    TIMEKEEPER_SERVER_DB_USER: *dagsverk-server-db-user
+    DAGSVERK_SERVER_DB_PASSWORD_FILE: &dagsverk-server-db-password-file /run/secrets/timekeeper_database_password
+    TIMEKEEPER_SERVER_DB_PASSWORD_FILE: *dagsverk-server-db-password-file
+    DAGSVERK_SERVER_TOKENS_FILE: &dagsverk-server-tokens-file /config/tokens.json
+    TIMEKEEPER_SERVER_TOKENS_FILE: *dagsverk-server-tokens-file
+    DAGSVERK_INSTANCE_BACKUP_STORAGE: &dagsverk-instance-backup-storage /instance/backups
+    TIMEKEEPER_INSTANCE_BACKUP_STORAGE: *dagsverk-instance-backup-storage
+    DAGSVERK_INSTANCE_RESTORE_STORAGE: &dagsverk-instance-restore-storage /instance/restore
+    TIMEKEEPER_INSTANCE_RESTORE_STORAGE: *dagsverk-instance-restore-storage
+    DAGSVERK_MAINTENANCE_FILE: &dagsverk-maintenance-file /instance/maintenance.pending
+    TIMEKEEPER_MAINTENANCE_FILE: *dagsverk-maintenance-file
+    DAGSVERK_ALLOW_SCHEMA_UPGRADE: &dagsverk-allow-schema-upgrade ${DAGSVERK_ALLOW_SCHEMA_UPGRADE-${TIMEKEEPER_ALLOW_SCHEMA_UPGRADE:-false}}
+    TIMEKEEPER_ALLOW_SCHEMA_UPGRADE: *dagsverk-allow-schema-upgrade
+    DAGSVERK_SERVER_SETUP_FILE: &dagsverk-server-setup-file ${DAGSVERK_SERVER_SETUP_FILE-${TIMEKEEPER_SERVER_SETUP_FILE:-NONE}}
+    TIMEKEEPER_SERVER_SETUP_FILE: *dagsverk-server-setup-file
+    DAGSVERK_PACKAGE_ID: &dagsverk-package-id ${DAGSVERK_PACKAGE_ID-${TIMEKEEPER_PACKAGE_ID:-timekeeper}}
+    TIMEKEEPER_PACKAGE_ID: *dagsverk-package-id
+    DAGSVERK_CONNECT_SHARED: &dagsverk-connect-shared ${DAGSVERK_CONNECT_SHARED-${TIMEKEEPER_CONNECT_SHARED:-true}}
+    TIMEKEEPER_CONNECT_SHARED: *dagsverk-connect-shared
+    DAGSVERK_CONNECT_SERVICE_URL: &dagsverk-connect-service-url ${DAGSVERK_CONNECT_SERVICE_URL-${TIMEKEEPER_CONNECT_SERVICE_URL:-}}
+    TIMEKEEPER_CONNECT_SERVICE_URL: *dagsverk-connect-service-url
+    DAGSVERK_PUBLIC_ORIGIN: &dagsverk-public-origin ${DAGSVERK_PUBLIC_ORIGIN-${TIMEKEEPER_PUBLIC_ORIGIN:-NONE}}
+    TIMEKEEPER_PUBLIC_ORIGIN: *dagsverk-public-origin
+    DAGSVERK_SETTINGS_RECOVERY: &dagsverk-settings-recovery ${DAGSVERK_SETTINGS_RECOVERY-${TIMEKEEPER_SETTINGS_RECOVERY:-false}}
+    TIMEKEEPER_SETTINGS_RECOVERY: *dagsverk-settings-recovery
+    DAGSVERK_AUTH_ORIGIN_EPOCH: &dagsverk-auth-origin-epoch ${DAGSVERK_AUTH_ORIGIN_EPOCH-${TIMEKEEPER_AUTH_ORIGIN_EPOCH:-1}}
+    TIMEKEEPER_AUTH_ORIGIN_EPOCH: *dagsverk-auth-origin-epoch
+    DAGSVERK_PASSKEYS_ENABLED: &dagsverk-passkeys-enabled ${DAGSVERK_PASSKEYS_ENABLED-${TIMEKEEPER_PASSKEYS_ENABLED:-true}}
+    TIMEKEEPER_PASSKEYS_ENABLED: *dagsverk-passkeys-enabled
+    DAGSVERK_PASSKEY_RP_ID: &dagsverk-passkey-rp-id ${DAGSVERK_PASSKEY_RP_ID-${TIMEKEEPER_PASSKEY_RP_ID:-AUTO}}
+    TIMEKEEPER_PASSKEY_RP_ID: *dagsverk-passkey-rp-id
+    DAGSVERK_CALENDAR_TRUSTED_ORIGINS: &dagsverk-calendar-trusted-origins ${DAGSVERK_CALENDAR_TRUSTED_ORIGINS-${TIMEKEEPER_CALENDAR_TRUSTED_ORIGINS:-}}
+    TIMEKEEPER_CALENDAR_TRUSTED_ORIGINS: *dagsverk-calendar-trusted-origins
+    DAGSVERK_CALENDAR_AUTOMATIC: &dagsverk-calendar-automatic ${DAGSVERK_CALENDAR_AUTOMATIC-${TIMEKEEPER_CALENDAR_AUTOMATIC:-true}}
+    TIMEKEEPER_CALENDAR_AUTOMATIC: *dagsverk-calendar-automatic
     QUARKUS_CONFIG_LOCATIONS: file:/config/mail.properties,file:/run/task-providers/application.properties
-    DAGSVERK_SMTP_PASSWORD_FILE: /run/secrets/timekeeper_smtp_password
+    DAGSVERK_SMTP_PASSWORD_FILE: &dagsverk-smtp-password-file /run/secrets/timekeeper_smtp_password
+    TIMEKEEPER_SMTP_PASSWORD_FILE: *dagsverk-smtp-password-file
     QUARKUS_DATASOURCE_JDBC_MAX_SIZE: '16'
     QUARKUS_SHUTDOWN_TIMEOUT: 20s
     JAVA_OPTS: -Xms64m -Xmx384m
-    DAGSVERK_DEPLOYED_AT: ${DAGSVERK_DEPLOYED_AT-${TIMEKEEPER_DEPLOYED_AT:-}}
+    DAGSVERK_DEPLOYED_AT: &dagsverk-deployed-at ${DAGSVERK_DEPLOYED_AT-${TIMEKEEPER_DEPLOYED_AT:-}}
+    TIMEKEEPER_DEPLOYED_AT: *dagsverk-deployed-at
   secrets: [timekeeper_database_password, timekeeper_smtp_password]
   volumes:
     - ${DAGSVERK_STATE_DIR-${TIMEKEEPER_STATE_DIR:-./state}}/config:/config:ro
