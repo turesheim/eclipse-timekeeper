@@ -16,13 +16,13 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     return [...document.fonts].some(font=>font.family.includes('bootstrap-icons') && font.status==='loaded');
   })).toBe(true);
   await expect(page.locator('#refresh')).toHaveClass(/\bbtn\b/);
-  const views=[['today','Today'],['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['tasks','Tasks'],['clients','Clients'],['projects','Projects'],['notes','Notes']];
+  const views=[['today','Today'],['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['tasks','Tasks'],['notes','Notes']];
   await expect(page.locator('[data-tab=labels]')).toHaveCount(0);
   await expect(page.locator('#activity-tasks,#tasks,#add-task')).toHaveCount(0);
   expect(await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:844});
-    await expect(bar.locator('button')).toHaveCount(9);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(9);
+    await expect(bar.locator('button')).toHaveCount(7);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(7);
     const brand=await page.locator('.brand').boundingBox(),status=await page.locator('#sync-status').boundingBox();expect(status.x).toBeGreaterThanOrEqual(brand.x+brand.width);expect(Math.abs(status.y+status.height/2-brand.y-brand.height/2)).toBeLessThan(1);
     const bounds=await bar.boundingBox();expect(bounds.y+bounds.height).toBeCloseTo(844,0);
     for(const [id,label] of views) {
@@ -32,9 +32,9 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
       if(width<1024)await expect(button.locator('.nav-label')).not.toBeVisible();else await expect(button.locator('.nav-label')).toBeVisible();
       await button.click();await expect(button).toHaveAttribute('aria-current','page');await expect(page.locator('#'+id+'-panel')).toHaveJSProperty('hidden',false);
     }
-    await page.locator('[data-tab=projects]').click();
+    await page.locator('[data-tab=notes]').click();
     await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
-    await expect.poll(async()=>{const content=await page.locator('#projects-panel').boundingBox();return content.y+content.height;}).toBeLessThanOrEqual(bounds.y);
+    await expect.poll(async()=>{const content=await page.locator('#notes-panel').boundingBox();return content.y+content.height;}).toBeLessThanOrEqual(bounds.y);
     expect((await bar.boundingBox()).y).toBeCloseTo(bounds.y,0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const audit=await new AxeBuilder({page}).include('#workspace-navigation').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
@@ -73,7 +73,7 @@ test('bottom navigation uses compact desktop spacing while preserving touch safe
       const above=target.y-bounds.y,below=bounds.y+bounds.height-target.y-target.height;
       const borders=await bar.evaluate(value=>{const style=getComputedStyle(value);return parseFloat(style.borderTopWidth)-parseFloat(style.borderBottomWidth);});
       expect(below-above).toBeCloseTo((touch?inset:0)-borders,0);expect(target.height).toBeGreaterThanOrEqual(44);
-      for(const name of ['Today','Calendar','Week','Workweek','Activities','Tasks','Clients','Projects','Notes'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
+      for(const name of ['Today','Calendar','Week','Workweek','Activities','Tasks','Notes'])await expect(bar.getByRole('button',{name,exact:true})).toBeVisible();
       if(width>=1024){
         await bar.getByRole('button',{name:'Today',exact:true}).click();
         await expect.poll(async()=>{const note=await page.locator('#today-note-editor').boundingBox(),nav=await bar.boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-note.y-note.height-gap);}).toBeLessThan(2);

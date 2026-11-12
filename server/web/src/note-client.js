@@ -22,7 +22,7 @@ export class NoteClient {
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.save=button(t('ui.save'),()=>void this.commit());this.save.className='btn btn-primary';this.cancel=button(t('ui.cancel'),()=>this.dialog.close());const actions=node('div',undefined,'dialog-actions');actions.append(this.cancel,this.save);this.dialog.append(heading,label,this.select,this.error,actions);field.root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{if(this.saving)event.preventDefault();});
-    this.dialog.addEventListener('close',()=>{if(same(this.openContext,this.current())&&this.field.root.getClientRects().length)this.field.actionsTrigger.focus({preventScroll:true});if(this.refreshPending){this.refreshPending=false;this.revision=null;this.sync();}});
+    this.dialog.addEventListener('close',()=>{if(same(this.openContext,this.current())&&this.field.root.getClientRects().length)(this.field.actionsMenu.contains(this.action)?this.field.actionsTrigger:this.action).focus({preventScroll:true});if(this.refreshPending){this.refreshPending=false;this.revision=null;this.sync();}});
   }
   current(){const value=this.options.current?.();return value?.session===directory.session&&value?.sourceType&&value?.sourceKey?value:null;}
   path(context){return '/notes/client?'+new URLSearchParams({sourceType:context.sourceType,sourceKey:context.sourceKey});}
@@ -45,7 +45,8 @@ export class NoteClient {
     if(this.line.hidden!==hidden)this.line.hidden=hidden;
     if(client){if(this.name.textContent!==client.name)this.name.textContent=client.name;if(this.label.title!==client.name)this.label.title=client.name;const color=/^#[a-f0-9]{6}$/i.test(client.color||'')?client.color:'';if(this.color!==color){this.color=color;this.swatch.style.backgroundColor=color||'var(--bs-secondary)';}}
     if(this.group.hidden!==!context)this.group.hidden=!context;
-    const disabled=!context?.writable||this.busy;if(this.action.disabled!==disabled)this.action.disabled=disabled;
+    // A relocated opener keeps focus through background reads; dialog fields still wait.
+    const disabled=!context?.writable||this.busy&&this.field.actionsMenu.contains(this.action);if(this.action.disabled!==disabled)this.action.disabled=disabled;
     this.select.disabled=this.busy||!context?.writable;this.save.disabled=this.busy||!context?.writable;this.cancel.disabled=!!this.saving;this.field.syncActions();
   }
   choices(){

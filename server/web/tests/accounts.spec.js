@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
 import {browserRequest} from './browser-request.js';
 import {openAccountMenu,openAbout} from './navigation.js';
@@ -81,7 +82,7 @@ test('account UI creates an isolated user and named Eclipse token shown once',as
   const peer=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL}),other=await peer.newPage();
   try {
     await login(other,username,otherPassword);await expect(other.locator('#owner')).toHaveText(display);
-    await other.getByRole('button',{name:'Clients',exact:true}).click();await other.getByRole('button',{name:'New client',exact:true}).click();await other.getByLabel('Name',{exact:true}).fill('Private client '+suffix);await other.getByLabel('Color',{exact:true}).fill('#112233');await other.locator('#save').click();await expect(other.locator('#editor')).not.toBeVisible();
+    await navigateView(other,'clients');await other.getByRole('button',{name:'New client',exact:true}).click();await other.getByLabel('Name',{exact:true}).fill('Private client '+suffix);await other.getByLabel('Color',{exact:true}).fill('#112233');await other.locator('#save').click();await expect(other.locator('#editor')).not.toBeVisible();
     await openAccountMenu(other);await other.getByRole('link',{name:'My Account',exact:true}).click();await other.getByRole('link',{name:'API tokens',exact:true}).click();await expect(other.getByRole('heading',{name:'User accounts',exact:true})).not.toBeVisible();
     await other.getByLabel('Token name',{exact:true}).fill('Eclipse '+suffix);await other.getByRole('button',{name:'Create token',exact:true}).click();const raw=await other.getByLabel('New API token',{exact:true}).inputValue();expect(raw).toMatch(/^tkp_/);
     const own=await request.get('/api/v1/clients',{headers:{Authorization:`Bearer ${raw}`}});expect(own.status()).toBe(200);const id=(await own.json()).items.find(value=>value.name==='Private client '+suffix).id;
@@ -90,7 +91,7 @@ test('account UI creates an isolated user and named Eclipse token shown once',as
     await other.getByRole('link',{name:'Back to time tracking',exact:true}).click();await openAccountMenu(other);await other.getByRole('link',{name:'My Account',exact:true}).click();await other.getByRole('link',{name:'API tokens',exact:true}).click();await expect(other.getByLabel('New API token',{exact:true})).not.toBeVisible();
     await other.getByRole('button',{name:'Revoke',exact:true}).click();await other.getByRole('button',{name:'Revoke token',exact:true}).click();await expect(other.locator('#account-content')).toContainText('Revoked');expect((await request.get('/api/v1/me',{headers:{Authorization:`Bearer ${raw}`}})).status()).toBe(401);
     await other.getByRole('link',{name:'Back to time tracking',exact:true}).click();await openAccountMenu(other);await other.getByRole('button',{name:'Sign out',exact:true}).click();await expect(other.locator('#login')).toBeVisible();await expect(other.locator('#clients')).toBeEmpty();
-    await login(other);await other.getByRole('button',{name:'Clients',exact:true}).click();await expect(other.locator('#clients')).not.toContainText('Private client '+suffix);
+    await login(other);await navigateView(other,'clients');await expect(other.locator('#clients')).not.toContainText('Private client '+suffix);
   } finally {await peer.close();}
   await captureScreenshot(page,{path:'test-results/account-administration.png',fullPage:true});
 });
