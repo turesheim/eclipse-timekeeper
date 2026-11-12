@@ -28,10 +28,12 @@ test('Notes opens formatted with main document actions and a compact keyboard-ac
  const panel=page.locator('#notes-panel'),toolbar=panel.locator('.markdown-toolbar'),trigger=toolbar.getByRole('button',{name:'Note tools',exact:true});
  await expect(panel.locator('.ProseMirror')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toHaveAttribute('aria-pressed','true');await expect(panel.locator('#notes-body')).toBeHidden();await expect(panel.getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
  await expect(toolbar.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('menuitem')).toHaveCount(0);
- await page.clock.install();
+ await expect(trigger).toBeEnabled();
  for(const width of [1440,320]){
+  await test.step(`Resource menu and toolbar at ${width}px`,async()=>{
   await page.setViewportSize({width,height:900});await trigger.focus();await trigger.press('ArrowDown');const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu.getByRole('menuitem').first()).toBeFocused();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Rename or move',exact:true})).toBeInViewport();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeInViewport();await expect(menu.getByRole('menuitem',{name:'Rename or move',exact:true})).toHaveCount(0);
-  expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);if(width===1440){await noteEntry(page.locator('#notes-navigation'),'Notes/Toolbar.md').hover();await page.clock.runFor(1000);await expect(page.getByRole('tooltip')).toBeVisible();}await menu.getByRole('menuitem').first().press('Escape');await expect(trigger).toBeFocused();await expect(menu).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);if(width===1440){await noteEntry(page.locator('#notes-navigation'),'Notes/Toolbar.md').hover();await expect(page.getByRole('tooltip')).toBeVisible();}await menu.getByRole('menuitem').first().press('Escape');await expect(trigger).toBeFocused();await expect(menu).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  });
  }
  await captureScreenshot(page,{path:'test-results/notes-compact-toolbar.png'});
  await toolbar.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-body')).toHaveAccessibleName('Note body');await expect(page.locator('#notes-body').locator('..').locator('label')).toHaveClass(/visually-hidden/);await page.locator('#notes-body').focus();await expect(page.locator('#notes-body')).toHaveCSS('box-shadow','none');
