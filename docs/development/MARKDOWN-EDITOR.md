@@ -20,8 +20,10 @@ the separate About prototype and its scratchpad controls have been retired.
   unchanged top-level Markdown spans after a rich edit. Unfamiliar blocks remain
   inert editable source fragments rather than being discarded or executed.
 - Markdown source is a native textarea. There is no enhanced-source editor,
-  source-tools toolbar, separate document outline or split-preview renderer.
-  Switching modes retains the rich document/history when it can be reconciled.
+  source-tools toolbar or split-preview renderer. Switching modes retains the
+  rich document/history when it can be reconciled. Notes and Today provide a
+  host-owned `NoteContents` sidebar using the same heading and navigation API in
+  either mode; selecting a heading does not reserialize the document.
 - `src/markdown-experience.js` adds resource-aware completion, existing-asset
   selection, image properties and guarded revision comparison through the same
   component. `src/markdown-actions.js` groups these and host document actions in

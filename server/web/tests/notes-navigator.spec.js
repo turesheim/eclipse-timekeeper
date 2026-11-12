@@ -55,7 +55,7 @@ test('Notes right sidebar resizes and collapses without replacing the draft, and
   expect(await source.evaluate(node=>({same:node===window.layoutSource,start:node.selectionStart,end:node.selectionEnd,scroll:node.scrollTop}))).toEqual({same:true,start:5,end:12,scroll:100});expect((await api('GET','/notes/entries/'+metadata.id+'/content')).headers().etag).toBe(saved.headers().etag);
   await separator.focus();await page.setViewportSize({width:390,height:844});await expect(separator).toBeHidden();await expect(contents).toBeHidden();await expect(toggle).toBeFocused();
   for(const viewportWidth of [390,320]){
-    await page.setViewportSize({width:viewportWidth,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();await expect(contents).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-contents-mobile-${viewportWidth}.png`});await toggle.click();
+    await page.setViewportSize({width:viewportWidth,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();await expect(contents).toBeVisible();expect((await contents.boundingBox()).width).toBeGreaterThan(200);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-contents-mobile-${viewportWidth}.png`});await toggle.click();
     const editor=await page.locator('.notes-editor').boundingBox(),dock=await page.locator('#workspace-navigation').boundingBox();expect(editor.y+editor.height).toBeLessThanOrEqual(dock.y+1);
   }
   await source.fill('Draft survives the sidebar controls.');await toggle.focus();await toggle.press('ControlOrMeta+s');await expect.poll(async()=>(await(await api('GET','/notes/entries/'+metadata.id+'/content')).body()).toString()).toBe('Draft survives the sidebar controls.');
@@ -301,7 +301,7 @@ test('Notes main actions collapse sidebars while preserving the draft and naviga
   await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
   await toggle.press('Enter');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toBeHidden();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
-  await toggle.click();await page.setViewportSize({width:390,height:844});await toggle.click();await expect(navigation).toBeVisible();await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();
+  await toggle.click();await page.setViewportSize({width:390,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();await expect(navigation).toBeVisible();await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
 });
 
