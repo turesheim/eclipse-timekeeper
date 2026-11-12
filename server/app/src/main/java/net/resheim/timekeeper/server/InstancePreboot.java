@@ -31,7 +31,7 @@ public final class InstancePreboot {
             byte[] response;try(var output=helper.getInputStream()){response=output.readNBytes(8_388_609);}if(response.length>8_388_608)throw new IOException();
             if(helper.waitFor()!=0)return false;var updates=new Properties();try(var input=new ByteArrayInputStream(response)){updates.load(input);}finally{Arrays.fill(response,(byte)0);}
             if(!"READY".equals(updates.remove("status")))return false;
-            for(String name:updates.stringPropertyNames())if(!Set.of("quarkus.config.locations","TIMEKEEPER_SERVER_DB_PASSWORD","TIMEKEEPER_SMTP_PASSWORD").contains(name))return false;
+            for(String name:updates.stringPropertyNames())if(!Set.of("quarkus.config.locations","TIMEKEEPER_SERVER_DB_PASSWORD","TIMEKEEPER_SMTP_PASSWORD","DAGSVERK_SERVER_DB_PASSWORD","DAGSVERK_SMTP_PASSWORD").contains(name))return false;
             for(String name:updates.stringPropertyNames())System.setProperty(name,updates.getProperty(name));updates.clear();return true;
         }catch(Exception failure){return false;}
         finally {

@@ -12,7 +12,7 @@ temporary=".env.deployment.$$"
 umask 077
 trap 'rm -f "$temporary"' EXIT
 {
-  if [ -f .env ]; then awk '!/^[[:space:]]*(export[[:space:]]+)?TIMEKEEPER_DEPLOYED_AT=/' .env; fi
-  printf 'TIMEKEEPER_DEPLOYED_AT=%s\n' "$timestamp"
+  if [ -f .env ]; then awk '!/^[[:space:]]*(export[[:space:]]+)?(TIMEKEEPER|DAGSVERK)_DEPLOYED_AT=/' .env; fi
+  printf 'DAGSVERK_DEPLOYED_AT=%s\n' "$timestamp"
 } > "$temporary"
 mv "$temporary" .env

@@ -35,16 +35,16 @@ exists, edit it instead of replacing your existing settings.
 ```sh
 cat > .env <<EOF
 COMPOSE_PROJECT_NAME=timekeeper-local
-TIMEKEEPER_STATE_DIR="$HOME/.local/share/timekeeper-server/state"
-TIMEKEEPER_BIND_ADDRESS=127.0.0.1
-TIMEKEEPER_HTTP_PORT=8080
-TIMEKEEPER_SERVER_IMAGE=timekeeper-server:local
-TIMEKEEPER_POSTGRES_IMAGE=postgres:18.6-bookworm
+DAGSVERK_STATE_DIR="$HOME/.local/share/timekeeper-server/state"
+DAGSVERK_BIND_ADDRESS=127.0.0.1
+DAGSVERK_HTTP_PORT=8080
+DAGSVERK_SERVER_IMAGE=timekeeper-server:local
+DAGSVERK_POSTGRES_IMAGE=postgres:18.6-bookworm
 EOF
 ```
 
 Choose a different HTTP port if 8080 is occupied. Use an absolute, writable
-path for `TIMEKEEPER_STATE_DIR`; keep the same path when restarting or rebuilding.
+path for `DAGSVERK_STATE_DIR`; keep the same path when restarting or rebuilding.
 On Docker Desktop, allow file sharing for that directory if requested.
 
 Create credentials and the initial account:
@@ -64,8 +64,8 @@ token registry. Re-running preserves credentials and data. See the
 Build the server from your checkout, then start the regular Compose deployment:
 
 ```sh
-export TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)"
-export TIMEKEEPER_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
+export DAGSVERK_BUILD_COMMIT="$(git rev-parse HEAD)"
+export DAGSVERK_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
 docker compose -f compose.yaml -f compose.build.yaml build api-1
 sh set-deployment-time.sh
 docker compose up -d --wait --wait-timeout 180
@@ -110,11 +110,11 @@ keep it out of shell history and curl's command-line arguments:
 
 ```sh
 printf 'Bearer token: '
-read -r -s TIMEKEEPER_TOKEN
+read -r -s DAGSVERK_TOKEN
 printf '\n'
-printf 'Authorization: Bearer %s\n' "$TIMEKEEPER_TOKEN" \
+printf 'Authorization: Bearer %s\n' "$DAGSVERK_TOKEN" \
   | curl --fail --silent --show-error --header @- http://127.0.0.1:8080/api/v1/me
-unset TIMEKEEPER_TOKEN
+unset DAGSVERK_TOKEN
 ```
 
 The response's `ownerId` should match the account chosen during setup.
@@ -137,7 +137,7 @@ proxy as described in the [deployment guide](DEPLOYMENT.md).
 
 Use the [shared Tailscale access guide](TAILSCALE.md) to reach the server from
 other devices in your tailnet over HTTPS. The same setup works on Synology.
-Keep `TIMEKEEPER_BIND_ADDRESS=127.0.0.1` in `.env`; Serve runs on the Docker host
+Keep `DAGSVERK_BIND_ADDRESS=127.0.0.1` in `.env`; Serve runs on the Docker host
 and forwards requests to the existing local gateway.
 
 ## 6. Stop, restart and back up
@@ -178,8 +178,8 @@ database upgrades require a planned migration.
 For an image built locally, rebuild after updating your checkout:
 
 ```sh
-export TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)"
-export TIMEKEEPER_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
+export DAGSVERK_BUILD_COMMIT="$(git rev-parse HEAD)"
+export DAGSVERK_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
 docker compose -f compose.yaml -f compose.build.yaml build api-1
 sh backup.sh
 sh set-deployment-time.sh
@@ -188,7 +188,7 @@ docker compose up -d --no-deps --wait --wait-timeout 180 api-1 api-2
 
 This development update can briefly interrupt requests. For rolling updates,
 publish your built image to a registry you manage, set
-`TIMEKEEPER_SERVER_IMAGE` in `.env` to that image, then run:
+`DAGSVERK_SERVER_IMAGE` in `.env` to that image, then run:
 
 ```sh
 sh update.sh

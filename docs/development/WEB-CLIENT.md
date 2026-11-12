@@ -5,7 +5,7 @@ The **About** item at the bottom of the account menu opens a dialog that reads
 recorded deployment time and process-start time. Information refreshes after
 long polls and manual refreshes, including during rolling updates. Missing
 deployment metadata is shown as **Not recorded**. The Docker/Synology deployment
-guide records `TIMEKEEPER_DEPLOYED_AT`; direct JVM deployments may supply the
+guide records `DAGSVERK_DEPLOYED_AT`; direct JVM deployments may supply the
 same UTC timestamp as an environment variable. Maven embeds Git identity and
 build time in the server, and Docker builds receive Git identity as build args.
 

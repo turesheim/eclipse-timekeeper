@@ -19182,6 +19182,15 @@
           },
           {
             "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "check",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Explicitly recheck connection readiness, bypassing the short-lived availability cache. Does not start consent."
           }
         ],
         "responses": {
@@ -37827,7 +37836,7 @@
             "type": "string",
             "format": "uri",
             "maxLength": 8192,
-            "description": "Origin of the shared Dagsverk sign-in service; absent for legacy direct authorization."
+            "description": "Origin of the managed Dagsverk OAuth service; absent for direct authorization."
           }
         },
         "required": [
@@ -38260,7 +38269,38 @@
           },
           "calendarSynchronization": {
             "type": "boolean",
-            "description": "Whether new sign-ins can request calendar synchronization; false for task-only direct registration."
+            "description": "Calendar consent is supported in both managed and direct OAuth modes."
+          },
+          "readiness": {
+            "type": "object",
+            "properties": {
+              "google": {
+                "type": "string",
+                "enum": [
+                  "READY",
+                  "TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED",
+                  "TASK_PROVIDER_CALLBACK_INVALID",
+                  "TASK_PROVIDER_NOT_CONFIGURED",
+                  "TASK_PROVIDER_CONNECTION_UNAVAILABLE"
+                ]
+              },
+              "microsoft": {
+                "type": "string",
+                "enum": [
+                  "READY",
+                  "TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED",
+                  "TASK_PROVIDER_CALLBACK_INVALID",
+                  "TASK_PROVIDER_NOT_CONFIGURED",
+                  "TASK_PROVIDER_CONNECTION_UNAVAILABLE"
+                ]
+              }
+            },
+            "required": [
+              "google",
+              "microsoft"
+            ],
+            "additionalProperties": false,
+            "description": "Current active-mode connection readiness. Contains no OAuth registration details. Existing connected data is returned even while new authorization is unavailable."
           }
         },
         "required": [
@@ -39342,7 +39382,9 @@
               "NOT_CHECKED",
               "READY",
               "PUBLIC_ORIGIN_REQUIRED",
-              "UNAVAILABLE"
+              "UNAVAILABLE",
+              "CALLBACK_INVALID",
+              "REGISTRATION_REQUIRED"
             ]
           },
           "publicOrigin": {
@@ -39439,6 +39481,13 @@
           },
           "googleClientSecretConfigured": {
             "type": "boolean"
+          },
+          "microsoftClientId": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "microsoftClientSecretConfigured": {
+            "type": "boolean"
           }
         }
       },
@@ -39487,6 +39536,23 @@
           "currentPassword": {
             "type": "string",
             "maxLength": 1024
+          },
+          "microsoftClientId": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "microsoftSecretAction": {
+            "type": "string",
+            "enum": [
+              "PRESERVE",
+              "REPLACE",
+              "CLEAR"
+            ]
+          },
+          "microsoftClientSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
           }
         },
         "allOf": [
@@ -39508,8 +39574,38 @@
                 "googleClientSecret": false
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "microsoftSecretAction": {
+                  "const": "REPLACE"
+                }
+              },
+              "required": [
+                "microsoftSecretAction"
+              ]
+            },
+            "then": {
+              "required": [
+                "microsoftClientSecret"
+              ]
+            },
+            "else": {
+              "properties": {
+                "microsoftClientSecret": false
+              }
+            }
           }
-        ]
+        ],
+        "dependentRequired": {
+          "microsoftClientId": [
+            "microsoftSecretAction"
+          ],
+          "microsoftSecretAction": [
+            "microsoftClientId"
+          ]
+        }
       }
     },
     "parameters": {

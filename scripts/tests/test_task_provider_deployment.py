@@ -18,7 +18,7 @@ class TaskProviderDeploymentTest(unittest.TestCase):
         self.state = self.root / 'state with spaces'
         self.deploy = self.root / 'deploy'
         self.deploy.mkdir()
-        for name in ('setup.py', 'restore.sh'):
+        for name in ('setup.py', 'restore.sh', 'environment.sh'):
             shutil.copy(ROOT / 'server/deploy' / name, self.deploy / name)
         shutil.copy(ROOT / 'server/scripts/configure_accounts.py', self.deploy / 'configure_accounts.py')
         self.environment = {key: value for key, value in os.environ.items() if not key.startswith('TIMEKEEPER_')}

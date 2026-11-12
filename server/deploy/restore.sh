@@ -15,10 +15,11 @@ if [ -e "$backup_dir/task_providers.properties" ]; then
 fi
 # shellcheck source=/dev/null
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
-if [ "${TIMEKEEPER_COMPOSE_LOCK_HELD:-}" != 1 ]; then
+. ./environment.sh
+if [ "${DAGSVERK_COMPOSE_LOCK_HELD:-}" != 1 ]; then
   exec python3 ./instance_material.py locked "$0" "$@"
 fi
-state_dir=${TIMEKEEPER_STATE_DIR:-./state}
+state_dir=${DAGSVERK_STATE_DIR:-./state}
 docker compose stop api-1 api-2
 python3 ./instance_material.py prepare "$backup_dir"
 python3 ./restore-database.py "$backup_dir/database.dump"

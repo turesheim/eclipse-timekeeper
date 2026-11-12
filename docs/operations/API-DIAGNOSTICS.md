@@ -60,16 +60,16 @@ certificate-validated HTTPS connection to the same Timekeeper server as the web
 client. The operating system's curl may use its system certificate store when a
 separate Python runtime does not trust the operator's local certificate issuer.
 
-With `TIMEKEEPER_DIAGNOSTICS_CONFIG` naming that file and
-`TIMEKEEPER_DIAGNOSTICS_URL` naming the HTTPS server, the following are read-only:
+With `DAGSVERK_DIAGNOSTICS_CONFIG` naming that file and
+`DAGSVERK_DIAGNOSTICS_URL` naming the HTTPS server, the following are read-only:
 
 ```sh
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/auth/session"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/server"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/day-labels?fromDate=2026-10-01&toDate=2026-10-31"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/day-labels/2026-10-27"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/day-notes/2026-10-27/content"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/day-entries/2026-10-27"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/auth/session"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/server"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/day-labels?fromDate=2026-10-01&toDate=2026-10-31"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/day-labels/2026-10-27"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/day-notes/2026-10-27/content"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/day-entries/2026-10-27"
 ```
 
 Check `/auth/session` for the actual permissions; a token granted write access
@@ -104,7 +104,7 @@ The endpoint covers both independent resources for that date; a history
 sequence is diagnostic ordering, not a shared label/note write version.
 
 ```sh
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/day-notes/2026-10-27/history?limit=50"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/day-notes/2026-10-27/history?limit=50"
 ```
 
 `current` contains the label, independent note/label versions, body-presence and
@@ -181,9 +181,9 @@ not manufacture historical events.
 Read the subscription metadata and the selected civil day's projected items:
 
 ```sh
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/me"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/calendar-subscriptions"
-curl --config "$TIMEKEEPER_DIAGNOSTICS_CONFIG" "$TIMEKEEPER_DIAGNOSTICS_URL/api/v1/calendar-events?fromDate=2026-10-30&toDate=2026-10-31"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/me"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/calendar-subscriptions"
+curl --config "$DAGSVERK_DIAGNOSTICS_CONFIG" "$DAGSVERK_DIAGNOSTICS_URL/api/v1/calendar-events?fromDate=2026-10-30&toDate=2026-10-31"
 ```
 
 Use the account's `zoneId` and an exclusive `toDate`. Check the subscription's

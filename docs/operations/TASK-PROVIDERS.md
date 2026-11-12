@@ -128,7 +128,7 @@ installations; each user still authorizes their own account and selected
 services. No local administrator provider enablement or per-NAS registration is
 required. If shared sign-in is temporarily unavailable, existing imported data
 and ordinary subscriptions remain usable. The service must first be hosted and
-registered by the project; see [shared sign-in operations](SHARED-SIGN-IN.md).
+registered by the project; see [OAuth mode setup](SHARED-SIGN-IN.md).
 
 Google calendar synchronization keeps incremental checkpoints, resetting expired
 sync tokens with a complete scan. Microsoft reads complete calendar definitions,
@@ -155,14 +155,14 @@ uses `https://SHARED_HOST/oauth/google/callback` in Google Cloud; the displayed
 installation return address is a separate handoff and is not Google's redirect.
 
 Shared-service client IDs and secrets stay in the service's private environment.
-For a self-managed Google registration, **Google application settings** lets an
+For self-managed Google and Microsoft registrations, **OAuth application settings** lets an
 administrator edit this installation's client ID and replace or clear its
 write-only secret. Blank preserves the saved secret. Saves require the current
 administrator password and a current version, then a coordinated restart.
 Shared-service registrations remain separate from these installation settings.
 A configured registration is not proof that Google APIs, consent, refresh or reconnect work;
 perform those live checks before making the shared service public. The complete
-operator setup is in [shared sign-in operations](SHARED-SIGN-IN.md).
+operator setup is in [OAuth mode setup](SHARED-SIGN-IN.md).
 
 ## Advanced: direct server registration
 
@@ -172,15 +172,15 @@ archives. The Google secret is never returned by the Admin API. General settings
 and Internet accounts share an optimistic version, preventing either page from
 overwriting newer saved settings. Authentication recovery preserves these values.
 
-Existing self-managed registrations remain supported for task-only connections.
-In **Administration → Internet accounts → Google application settings**, choose
-**Direct registration (tasks only)**. Register the displayed **Google redirect
+Self-managed registrations support calendar-only, tasks-only and combined connections.
+In **Administration → Internet accounts → OAuth application settings**, choose
+**Direct registration (own OAuth application)**. Register the displayed **Google redirect
 URI for direct registration** in Google Cloud, enter the client ID and secret,
 save with the current administrator password and restart every server instance.
 Use **Check setup** after restart, then connect Google under Account → Internet
-accounts with Tasks selected. The optional environment settings below initialize
+accounts with the desired Calendar and/or Tasks services selected. The optional environment settings below initialize
 new installations; settings saved in Administration take precedence. Direct
-registration does not add the calendar API synchronizer. No provider password
+registration uses the same calendar API synchronizer as managed OAuth. No provider password
 is entered into Dagsverk.
 
 Configure Dagsverk's public HTTPS origin first, including its port. For example,
@@ -256,10 +256,10 @@ readable by the container's application user.
 
 For a **standalone Java server**, load the properties file through
 `QUARKUS_CONFIG_LOCATIONS=file:/absolute/path/to/task-providers.properties`, or
-set `TIMEKEEPER_GOOGLE_TASKS_CLIENT_ID`, `TIMEKEEPER_GOOGLE_TASKS_CLIENT_SECRET`,
-`TIMEKEEPER_MICROSOFT_TASKS_CLIENT_ID` and
-`TIMEKEEPER_MICROSOFT_TASKS_CLIENT_SECRET` in its protected service environment.
-Restart after changes. Set `TIMEKEEPER_PUBLIC_ORIGIN` to the external HTTPS
+set `DAGSVERK_GOOGLE_TASKS_CLIENT_ID`, `DAGSVERK_GOOGLE_TASKS_CLIENT_SECRET`,
+`DAGSVERK_MICROSOFT_TASKS_CLIENT_ID` and
+`DAGSVERK_MICROSOFT_TASKS_CLIENT_SECRET` in its protected service environment.
+Restart after changes. Set `DAGSVERK_PUBLIC_ORIGIN` to the external HTTPS
 origin unless central service settings already provide it.
 
 ## Account grants and recovery
@@ -271,7 +271,7 @@ contain those records. Shared grants also depend on the central service retainin
 its matching encrypted records; direct grants need matching operator app
 registrations. Native application backups include local settings and records.
 
-`TIMEKEEPER_TASK_AUTOMATIC=false` disables scheduled task imports for standalone
+`DAGSVERK_TASK_AUTOMATIC=false` disables scheduled task imports for standalone
 servers; in an operator properties file use `timekeeper.tasks.automatic=false`.
 Manual refresh remains available. These settings take effect at startup.
 

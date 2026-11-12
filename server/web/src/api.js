@@ -3,7 +3,10 @@ import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
-  TASK_PROVIDER_NOT_CONFIGURED:'task_providers.not_configured',
+  TASK_PROVIDER_CONNECTION_UNAVAILABLE:'internet_accounts.connection_unavailable',
+  TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED:'internet_accounts.origin_required',
+  TASK_PROVIDER_CALLBACK_INVALID:'internet_accounts.callback_invalid',
+  TASK_PROVIDER_NOT_CONFIGURED:'internet_accounts.registration_required',
   TASK_PROVIDER_CALENDAR_UNSUPPORTED:'task_providers.calendars_unsupported',
   TASK_PROVIDER_RECONNECT_REQUIRED:'task_providers.reconnect_required',
   TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED:'task_providers.reconnect_required',

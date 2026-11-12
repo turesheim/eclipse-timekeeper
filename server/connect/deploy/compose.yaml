@@ -4,9 +4,9 @@ services:
     env_file: service.env
     environment:
       QUARKUS_HTTP_HOST: 0.0.0.0
-      TIMEKEEPER_CONNECT_DB_URL: jdbc:postgresql://database:5432/connect
-      TIMEKEEPER_CONNECT_DB_USER: connect
-      TIMEKEEPER_CONNECT_DB_PASSWORD: ${CONNECT_DATABASE_PASSWORD:?Set CONNECT_DATABASE_PASSWORD in the private Compose environment}
+      DAGSVERK_CONNECT_DB_URL: jdbc:postgresql://database:5432/connect
+      DAGSVERK_CONNECT_DB_USER: connect
+      DAGSVERK_CONNECT_DB_PASSWORD: ${CONNECT_DATABASE_PASSWORD:?Set CONNECT_DATABASE_PASSWORD in the private Compose environment}
     ports:
       - 127.0.0.1:8090:8090
     restart: unless-stopped

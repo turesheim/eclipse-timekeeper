@@ -13,13 +13,13 @@
       "environment": {
         "QUARKUS_CONFIG_LOCATIONS": "file:/config/runtime.properties,file:/config/mail.properties,file:/run/secrets/task_providers.properties",
         "QUARKUS_HTTP_HOST": "127.0.0.1",
-        "TIMEKEEPER_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password",
-        "TIMEKEEPER_SMTP_PASSWORD_FILE": "/run/secrets/smtp_password",
-        "TIMEKEEPER_SERVER_TOKENS_FILE": "/config/tokens.json",
-        "TIMEKEEPER_SERVER_SETUP_FILE": "/config/account-setup.json",
-        "TIMEKEEPER_INSTANCE_BACKUP_STORAGE": "/state/server/instance-backup",
-        "TIMEKEEPER_INSTANCE_RESTORE_STORAGE": "/state/server/instance-restore",
-        "TIMEKEEPER_MAINTENANCE_FILE": "/config/maintenance-pending.json"
+        "DAGSVERK_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password",
+        "DAGSVERK_SMTP_PASSWORD_FILE": "/run/secrets/smtp_password",
+        "DAGSVERK_SERVER_TOKENS_FILE": "/config/tokens.json",
+        "DAGSVERK_SERVER_SETUP_FILE": "/config/account-setup.json",
+        "DAGSVERK_INSTANCE_BACKUP_STORAGE": "/state/server/instance-backup",
+        "DAGSVERK_INSTANCE_RESTORE_STORAGE": "/state/server/instance-restore",
+        "DAGSVERK_MAINTENANCE_FILE": "/config/maintenance-pending.json"
       },
       "volumes": [
         {"type":"bind", "source":"/var/packages/timekeeper/target/private/config", "target":"/config", "read_only":true},

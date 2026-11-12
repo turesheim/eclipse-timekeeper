@@ -25,7 +25,7 @@ public class ConnectResource {
     private static long now(){return Instant.now().getEpochSecond();}
 
     @GET @Path("/v1/providers") @Produces(MediaType.APPLICATION_JSON)
-    public ObjectNode providers(){return object().put("protocol",1).put("google",settings.available("google")).put("microsoft",settings.available("microsoft"));}
+    public ObjectNode providers(){store.ready();return object().put("protocol",1).put("google",settings.available("google")).put("microsoft",settings.available("microsoft"));}
 
     @POST @Path("/v1/requests") @Consumes(MediaType.APPLICATION_JSON) @Produces(MediaType.APPLICATION_JSON)
     public ObjectNode create(JsonNode input){

@@ -23,7 +23,7 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
    Copy this deployment bundle into the `deploy` directory. Keep the state
    directory outside the Container Manager project directory.
 2. Copy `.env.example` to `.env`. Keep
-   `TIMEKEEPER_STATE_DIR=/volume1/docker/timekeeper/state`; adjust it if using a
+   `DAGSVERK_STATE_DIR=/volume1/docker/timekeeper/state`; adjust it if using a
    different NAS volume. The HTTP listener defaults to `127.0.0.1:8080` for DSM's
    HTTPS reverse proxy or Tailscale Serve. Change the port if it is occupied.
 3. Run the one-time setup from SSH or a DSM user-defined task with permission to
@@ -67,7 +67,7 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
    database to initialize and for all health checks to become healthy.
 
    Before the initial Container Manager deployment, run `sh set-deployment-time.sh`
-   over SSH in the deployment directory. It records `TIMEKEEPER_DEPLOYED_AT` in
+   over SSH in the deployment directory. It records `DAGSVERK_DEPLOYED_AT` in
    `.env`, which both servers use. Open **About** in the web client's account menu
    for the running version, commit, deployment time, build time and process-start time.
    Keep this timestamp on ordinary restarts. `update.sh` records a new timestamp
@@ -214,7 +214,7 @@ mounted at the new data path. This migration requires a maintenance window.
    the resulting backup, `.env`, `config` and original `secrets` outside the project.
 2. Pause client access and stop the old project with `docker compose down` from
    its original deployment directory. Keep all old state directories intact.
-3. Install this new bundle and set `TIMEKEEPER_STATE_DIR` to a **new empty** host
+3. Install this new bundle and set `DAGSVERK_STATE_DIR` to a **new empty** host
    directory. Copy the old `secrets` and `config` into it before running `setup.py`.
    Keep the PostgreSQL image set to `postgres:18.6-bookworm`.
 4. Start the new project, then run its `restore.sh` with the absolute path to the
@@ -255,8 +255,8 @@ To run a source build locally, set the images and state path in a deployment
 
 ```sh
 cd server/deploy
-export TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)"
-export TIMEKEEPER_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
+export DAGSVERK_BUILD_COMMIT="$(git rev-parse HEAD)"
+export DAGSVERK_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
 docker compose -f compose.yaml -f compose.build.yaml build
 sh set-deployment-time.sh
 docker compose -f compose.yaml -f compose.build.yaml up -d
@@ -268,7 +268,7 @@ References: [Synology projects](https://kb.synology.com/en-global/DSM/help/Conta
 
 Service settings are seeded from deployment configuration on first schema-5
 startup, then edited centrally in [Administration](ACCOUNTS.md). Saved changes
-require restarting both API instances. Set `TIMEKEEPER_SETTINGS_RECOVERY=true`
+require restarting both API instances. Set `DAGSVERK_SETTINGS_RECOVERY=true`
 only for the documented offline recovery with a strictly newer epoch; remove it
 before starting the other instance. Ordinary `.env` changes do not overwrite
 saved service settings.
@@ -278,9 +278,9 @@ Stop every older replica before upgrade; authorize the supported schema-9 to 10
 transition explicitly. Notes hooks keep the hierarchical namespace and canonical
 journals consistent; older binaries must not write after the transition. Keep a
 verified pre-upgrade backup for rollback. [Notes deployment limits and manual
-sync](NOTES-WEBDAV.md) documents `TIMEKEEPER_NOTES_MAX_FILE_BYTES`,
-`TIMEKEEPER_NOTES_MAX_MARKDOWN_BYTES`, `TIMEKEEPER_NOTES_MAX_TOTAL_BYTES`,
-`TIMEKEEPER_NOTES_MAX_ENTRIES` and `TIMEKEEPER_NOTES_MAX_PAGE_SIZE`.
+sync](NOTES-WEBDAV.md) documents `DAGSVERK_NOTES_MAX_FILE_BYTES`,
+`DAGSVERK_NOTES_MAX_MARKDOWN_BYTES`, `DAGSVERK_NOTES_MAX_TOTAL_BYTES`,
+`DAGSVERK_NOTES_MAX_ENTRIES` and `DAGSVERK_NOTES_MAX_PAGE_SIZE`.
 
 The four Notes storage quotas can also be adjusted live in **Administration →
 Notes**. Their defaults are 160 MB/file, 10 MB/ordinary Markdown file, 5 GB/account

@@ -4,8 +4,10 @@ COPY server server
 COPY common common
 ARG TIMEKEEPER_BUILD_COMMIT=unknown
 ARG TIMEKEEPER_BUILD_DIRTY=unknown
+ARG DAGSVERK_BUILD_COMMIT=${TIMEKEEPER_BUILD_COMMIT}
+ARG DAGSVERK_BUILD_DIRTY=${TIMEKEEPER_BUILD_DIRTY}
 RUN mvn -B -ntp -f server/pom.xml package -DskipTests -Dquarkus.profile=postgresql \
-    -Dgit.commit.id.full="$TIMEKEEPER_BUILD_COMMIT" -Dgit.dirty="$TIMEKEEPER_BUILD_DIRTY"
+    -Dgit.commit.id.full="$DAGSVERK_BUILD_COMMIT" -Dgit.dirty="$DAGSVERK_BUILD_DIRTY"
 
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
@@ -15,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /source/server/app/target/quarkus-app/ /app/
 COPY --chmod=755 server/deploy/server-entrypoint.sh /app/entrypoint.sh
+COPY --chmod=644 server/deploy/environment.sh /app/environment.sh
 USER 10001:10001
 ENV QUARKUS_PROFILE=postgresql QUARKUS_HTTP_HOST=0.0.0.0
 EXPOSE 8080

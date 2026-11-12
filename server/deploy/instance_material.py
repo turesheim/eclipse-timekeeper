@@ -368,7 +368,7 @@ cat > /dev/null
                 if not selector.select(60) or process.stdout.readline(16) != b'LOCKED\n':
                     raise RuntimeError('Another maintenance operation is active or its private lock is unavailable')
             return subprocess.run(['sh', *command], cwd=HERE,
-                env={**os.environ, 'TIMEKEEPER_COMPOSE_LOCK_HELD': '1'}).returncode
+                env={**os.environ, 'DAGSVERK_COMPOSE_LOCK_HELD': '1'}).returncode
         finally:
             process.stdin.close()
             try:

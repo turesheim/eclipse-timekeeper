@@ -27,9 +27,10 @@ class SharedConnectResourceHttpTest {
     public static class Fixture extends TaskProviderHttpTestFixture {
         static final Map<String,Pending> PENDING=new ConcurrentHashMap<>(),GRANTS=new ConcurrentHashMap<>();
         static final AtomicInteger REFRESHES=new AtomicInteger(),CALENDAR_READS=new AtomicInteger(),REVOCATIONS=new AtomicInteger();
-        static volatile boolean badTarget,failRevocation;
+        static volatile boolean badTarget,failRevocation,unavailable,googleConfigured=true;
         @Override SharedConnectClient shared(URI endpoint){return new SharedConnectClient(endpoint,new TaskProviderHttp(Set.of("connect.example.test"),request->{
             String path=request.uri().getPath();
+            if(path.equals("/v1/providers"))return unavailable?reply(503,"{}"):reply(200,object().put("protocol",1).put("google",googleConfigured).put("microsoft",true).toString());
             if(path.equals("/v1/requests")){
                 var input=parse(bytes(request));assertFalse(input.has("clientId"));assertFalse(input.has("clientSecret"));assertEquals("https://localhost/web/task-provider-callback.html",input.path("returnUri").asText());
                 String state=input.path("state").asText(),id=TaskProviderOAuth.challenge(state),credential=TaskProviderOAuth.challenge("grant:"+state),account=hash(state).substring(0,24),code=TaskProviderOAuth.challenge("code:"+state);var services=(ObjectNode)input.path("services").deepCopy();
@@ -43,8 +44,8 @@ class SharedConnectResourceHttpTest {
             if(path.equals("/v1/grants/current")&&request.method().equals("DELETE")){REVOCATIONS.incrementAndGet();if(failRevocation)return reply(503,"{}");GRANTS.remove(credential);return reply(204,"{}");}
             throw new AssertionError("Unexpected shared service endpoint");
         }));}
-        private static ObjectNode bundle(Pending value){var result=object().put("provider",value.provider()).put("accessToken","fixture-access-"+value.account()).put("expiresAt",Instant.now().plusSeconds(3600).toString()).put("remoteAccountId",value.account()).put("name","Google fixture");result.set("services",value.services());result.putArray("scopes").add("openid").add("https://www.googleapis.com/auth/tasks.readonly").add("https://www.googleapis.com/auth/calendar.readonly");return result;}
-        @Override CalendarCloudProvider calendars(TaskCloudProvider.Provider provider){return new CalendarCloudProvider(provider,new TaskProviderHttp(Set.of("www.googleapis.com"),request->{
+        private static ObjectNode bundle(Pending value){var result=object().put("provider",value.provider()).put("accessToken","fixture-access-"+value.account()).put("expiresAt",Instant.now().plusSeconds(3600).toString()).put("remoteAccountId",value.account()).put("name","Google fixture");result.set("services",value.services());var scopes=result.putArray("scopes");Arrays.stream(ProviderScopes.requested(value.provider(),value.services().path("tasks").asBoolean(),value.services().path("calendars").asBoolean(),value.services().path("writableTasks").asBoolean()).split(" ")).forEach(scopes::add);return result;}
+        @Override CalendarCloudProvider calendars(TaskCloudProvider.Provider provider){if(provider==TaskCloudProvider.Provider.MICROSOFT)return super.calendars(provider);return new CalendarCloudProvider(provider,new TaskProviderHttp(Set.of("www.googleapis.com"),request->{
             CALENDAR_READS.incrementAndGet();var page=object();if(request.uri().getPath().endsWith("calendarList"))page.putArray("items").add(object().put("id","calendar").put("summary","Calendar").put("accessRole","reader"));
             else{page.put("nextSyncToken","complete");var event=object().put("id","meeting").put("summary","Meeting");event.set("start",object().put("date","2026-11-10"));event.set("end",object().put("date","2026-11-11"));page.putArray("items").add(event);}return reply(200,page.toString());
         }));}
@@ -58,9 +59,24 @@ class SharedConnectResourceHttpTest {
     private Response call(String owner,String browser,String method,String path,ObjectNode body,String match){var request=given().header("Authorization","Bearer test-"+owner).header("Cookie",BrowserCookies.BROWSER+"="+browser).contentType("application/json");if(body!=null)request.body(body.toString());if(match!=null)request.header("If-Match",match);return request.request(method,"/api/v1/task-providers"+path);}
     private Response call(String method,String path,ObjectNode body,String match){return call("a",BROWSER,method,path,body,match);}
     private ObjectNode json(Response response,int status){assertEquals(status,response.statusCode(),response.asString());return (ObjectNode)parse(response.asString());}
-    private Pending begin(boolean tasks,boolean calendars){var input=object();input.set("services",object().put("tasks",tasks).put("calendars",calendars));var value=json(call("POST","/google/authorize",input,null),200);inputs.validate("TaskProviderAuthorization",value);assertEquals("https://connect.example.test",value.path("authorizationOrigin").asText());return Fixture.PENDING.get(URI.create(value.path("authorizationUrl").asText()).getPath().substring("/connect/".length()));}
+    private Pending begin(boolean tasks,boolean calendars){return begin("google",tasks,calendars);}
+    private Pending begin(String provider,boolean tasks,boolean calendars){var input=object();input.set("services",object().put("tasks",tasks).put("calendars",calendars));var value=json(call("POST","/"+provider+"/authorize",input,null),200);inputs.validate("TaskProviderAuthorization",value);assertEquals("https://connect.example.test",value.path("authorizationOrigin").asText());return Fixture.PENDING.get(URI.create(value.path("authorizationUrl").asText()).getPath().substring("/connect/".length()));}
     private ObjectNode complete(Pending pending){var value=json(call("POST","/complete",object().put("state",pending.state()).put("code",pending.code()),null),200);inputs.validate("TaskProviderConnection",value);return value;}
     private ObjectNode idle(String id)throws InterruptedException{long deadline=System.nanoTime()+java.time.Duration.ofSeconds(15).toNanos();do{var value=json(call("GET","/"+id,null,null),200);if(!value.path("syncing").asBoolean())return value;Thread.sleep(25);}while(System.nanoTime()<deadline);fail("Shared account did not finish refreshing");return null;}
+    @Test void readinessReportsRealProviderRegistrationAndRetriesWithoutCreatingAuthorizationState(){
+        Fixture.unavailable=true;try{
+            var result=json(call("GET","?check=true",null,null),200);assertFalse(result.path("providers").path("google").asBoolean());assertEquals("TASK_PROVIDER_CONNECTION_UNAVAILABLE",result.path("readiness").path("google").asText());
+            int before=Fixture.PENDING.size();var denied=call("POST","/google/authorize",object(),null);assertEquals(503,denied.statusCode());assertEquals("TASK_PROVIDER_CONNECTION_UNAVAILABLE",denied.jsonPath().getString("code"));assertEquals(before,Fixture.PENDING.size());
+        }finally{Fixture.unavailable=false;}
+        Fixture.googleConfigured=false;try{var result=json(call("GET","?check=true",null,null),200);assertEquals("TASK_PROVIDER_NOT_CONFIGURED",result.path("readiness").path("google").asText());assertTrue(result.path("providers").path("microsoft").asBoolean());assertEquals(503,call("POST","/google/authorize",object(),null).statusCode());}finally{Fixture.googleConfigured=true;}
+        assertTrue(json(call("GET","?check=true",null,null),200).path("providers").path("google").asBoolean());
+    }
+    @Test void managedAuthorizationKeepsAllServiceCombinationsAndProviderIdentitiesSeparate(){
+        var identities=new HashSet<String>();for(String provider:List.of("google","microsoft"))for(boolean[] selected:List.of(new boolean[]{true,false},new boolean[]{false,true},new boolean[]{true,true})){
+            var pending=begin(provider,selected[0],selected[1]);var connected=complete(pending);assertTrue(identities.add(connected.path("id").asText()));
+            assertEquals(provider,connected.path("providerId").asText());assertEquals(selected[0]?2:0,connected.path("availableLists").size());assertEquals(selected[1]?1:0,connected.path("availableCalendars").size());assertEquals(pending.services(),connected.path("services"));
+        }
+    }
     @Test void ordinaryAccountsConnectThroughTheSharedServiceWithoutLocalAppRegistration()throws Exception{
         var providers=json(call("GET","",null,null),200);inputs.validate("TaskProviderConnections",providers);assertTrue(providers.path("calendarSynchronization").asBoolean());assertTrue(providers.path("providers").path("google").asBoolean());assertTrue(providers.path("providers").path("microsoft").asBoolean());
         var pending=begin(true,true);var connection=complete(pending);assertEquals(1,connection.path("availableCalendars").size());assertEquals(2,connection.path("availableLists").size());assertFalse(connection.toString().contains(pending.credential()));

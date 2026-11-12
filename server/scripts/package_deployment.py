@@ -9,13 +9,15 @@ from io import BytesIO
 from documentation import render_document
 
 ROOT = Path(__file__).resolve().parents[2]
-FILES = ('compose.yaml', '.env.example', 'haproxy.cfg', 'setup.py', 'backup.sh',
+FILES = ('environment.sh', 'compose.yaml', '.env.example', 'haproxy.cfg', 'setup.py', 'backup.sh',
          'restore.sh', 'restore-database.py', 'instance_material.py', 'export-synology.py', 'update.sh', 'set-deployment-time.sh', 'postgres/bootstrap.sql')
 GUIDES = {'docs/operations/DEPLOYMENT.md': 'README.md',
           'docs/operations/LOCAL-DOCKER.md': 'LOCAL.md',
           'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
           'docs/operations/TASK-PROVIDERS.md': 'TASK-PROVIDERS.md',
+          'docs/operations/SHARED-SIGN-IN.md': 'SHARED-SIGN-IN.md',
+          'docs/operations/CONFIGURATION.md': 'CONFIGURATION.md',
           'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
           'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',

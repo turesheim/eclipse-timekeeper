@@ -22,7 +22,7 @@ reports under `docs/verification/` describe superseded work, not supported proce
 
 Use **Preferences > Timekeeper > Database** to select new, separate storage.
 An empty database is initialized with the current schema and a durable
-`TIMEKEEPER_SCHEMA` marker. Restart reopens only a recognized, versioned,
+`DAGSVERK_SCHEMA` marker. Restart reopens only a recognized, versioned,
 `READY` database. Unknown versions/layouts, unversioned databases and unfinished
 initialization or migration targets are refused without schema changes.
 

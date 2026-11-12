@@ -4,8 +4,10 @@ COPY server server
 COPY common common
 ARG TIMEKEEPER_BUILD_COMMIT=unknown
 ARG TIMEKEEPER_BUILD_DIRTY=unknown
+ARG DAGSVERK_BUILD_COMMIT=${TIMEKEEPER_BUILD_COMMIT}
+ARG DAGSVERK_BUILD_DIRTY=${TIMEKEEPER_BUILD_DIRTY}
 RUN mvn -B -ntp -f server/pom.xml -pl connect -am package -DskipTests -Dquarkus.profile=postgresql \
-    -Dgit.commit.id.full="$TIMEKEEPER_BUILD_COMMIT" -Dgit.dirty="$TIMEKEEPER_BUILD_DIRTY"
+    -Dgit.commit.id.full="$DAGSVERK_BUILD_COMMIT" -Dgit.dirty="$DAGSVERK_BUILD_DIRTY"
 
 FROM eclipse-temurin:21-jre-jammy
 RUN groupadd --gid 10001 dagsverk && useradd --uid 10001 --gid 10001 --no-create-home dagsverk

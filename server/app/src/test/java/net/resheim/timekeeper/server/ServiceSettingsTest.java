@@ -83,6 +83,18 @@ class ServiceSettingsTest {
         assertEquals(403,call(ordinary,"GET","/admin/internet-accounts?check=true",null,null,false).statusCode());
     }
     private Response noteLimits(Browser browser,Response previous,ObjectNode values){var body=object().put("currentPassword",PASSWORD);body.set("limits",values);return call(browser,"PUT","/admin/notes/limits",body,previous.header("ETag"),true);}
+    @Test void microsoftRegistrationIsWriteOnlyAndOlderGoogleCommandsPreserveIt()throws Exception{
+        var admin=setup();String path="/admin/internet-accounts",secret="private-microsoft-application-secret";
+        var before=call(admin,"GET",path,null,null,false);
+        var input=object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","").put("googleSecretAction","PRESERVE").put("microsoftClientId","microsoft-app").put("microsoftSecretAction","REPLACE").put("microsoftClientSecret",secret).put("currentPassword",PASSWORD);
+        var written=call(admin,"PUT",path,input,before.header("ETag"),true);var data=success(written,200);inputs.validate("AdministrationInternetAccounts",data);
+        assertTrue(data.path("saved").path("microsoftClientSecretConfigured").asBoolean());assertFalse(data.path("effective").path("microsoftClientSecretConfigured").asBoolean());assertFalse(written.asString().contains(secret));
+        settings.initialize();assertEquals("microsoft-app",ClientProxy.unwrap(taskProviders).microsoftId.orElseThrow());assertEquals(secret,ClientProxy.unwrap(taskProviders).microsoftSecret.orElseThrow());
+        var legacy=input.deepCopy();legacy.remove(List.of("microsoftClientId","microsoftSecretAction","microsoftClientSecret"));var current=call(admin,"GET",path,null,null,false);
+        var preserved=call(admin,"PUT",path,legacy,current.header("ETag"),true);assertTrue(success(preserved,200).path("saved").path("microsoftClientSecretConfigured").asBoolean());
+        var clear=input.deepCopy().put("microsoftSecretAction","CLEAR");clear.remove("microsoftClientSecret");var cleared=call(admin,"PUT",path,clear,preserved.header("ETag"),true);assertFalse(success(cleared,200).path("saved").path("microsoftClientSecretConfigured").asBoolean());
+        settings.initialize();assertTrue(ClientProxy.unwrap(taskProviders).microsoftSecret.isEmpty());assertFalse(current(admin).asString().contains(secret));
+    }
     @Test void googleCredentialsAreWriteOnlyVersionedAndActivateOnlyOnRestart()throws Exception{
         var admin=setup();String path="/admin/internet-accounts",secret="private-google-application-secret";
         var initial=call(admin,"GET",path,null,null,false);success(initial,200);

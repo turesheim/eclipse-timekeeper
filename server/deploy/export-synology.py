@@ -51,7 +51,7 @@ def export(output, client=compose_client, state=None, db_resources=None):
     output=Path(output).resolve()
     if output.exists():raise ValueError('Choose a new migration archive path')
     db_resources=Path(db_resources or resources())
-    state=Path(state or configuration().get('TIMEKEEPER_STATE_DIR',HERE/'state')).resolve()
+    state=Path(state or configuration().get('DAGSVERK_STATE_DIR',HERE/'state')).resolve()
     def query(sql):return client('psql',['-X','-q','-A','-t','-w','-v','ON_ERROR_STOP=1','-h','postgres','-U','timekeeper','-d','timekeeper'],sql=sql)
     def guard():
         value=query(OFFLINE_DRAIN_SQL+"SELECT current_setting('server_version_num')::int/10000; SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid(); SELECT schema_version||'|'||state FROM public.tk_schema WHERE id=1; SELECT bootstrap_completed FROM public.tk_auth_control WHERE id=1;")

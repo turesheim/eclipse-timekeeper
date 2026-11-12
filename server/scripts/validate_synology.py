@@ -122,7 +122,7 @@ def validate(path):
             if len(state)!=1 or state[0]!={'type':'bind','source':'/var/packages/'+package_id+'/var','target':'/state','read_only':False}:
                 raise ValueError('Native instance state must use retained package appdata')
             environment=service.get('environment',{})
-            if environment.get('TIMEKEEPER_INSTANCE_BACKUP_STORAGE')!='/state/server/instance-backup' or environment.get('TIMEKEEPER_INSTANCE_RESTORE_STORAGE')!='/state/server/instance-restore':
+            if environment.get('DAGSVERK_INSTANCE_BACKUP_STORAGE')!='/state/server/instance-backup' or environment.get('DAGSVERK_INSTANCE_RESTORE_STORAGE')!='/state/server/instance-restore':
                 raise ValueError('Native full instance backup and restore need private persistent storage')
             if service.get('container_name')!=package_id+'-server':
                 raise ValueError('Native container identity must match its package')

@@ -66,7 +66,7 @@ class TaskProviderRefresh {
                 }
             }else{
                 var settings=configuration.settings(claim.provider());if(!TaskProviderConnections.settingsHash(settings).equals(claim.settingsHash()))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
-                if(!tokens.expires().isAfter(clock.now().plusSeconds(60))){tokens=clients.oauth(claim.provider()).refresh(settings,tokens,clock.now(),claim.writable());var renewed=tokens;if(!store.transaction(claim.owner(),()->connections().credentials(claim,renewed)))return;}
+                if(!tokens.expires().isAfter(clock.now().plusSeconds(60))){tokens=clients.oauth(claim.provider()).refresh(settings,tokens,clock.now(),claim.services());var renewed=tokens;if(!store.transaction(claim.owner(),()->connections().credentials(claim,renewed)))return;}
             }
             var provider=clients.cloud(claim.provider());
             RuntimeException taskCatalogFailure=null;

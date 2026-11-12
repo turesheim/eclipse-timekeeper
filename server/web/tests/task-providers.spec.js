@@ -22,8 +22,8 @@ function connection(owner,overrides={}){
   return {id:randomUUID(),ownerId:owner,providerId:'google',remoteAccountId:'fixture-account',name:'Fixture account',enabled:true,version:1,configurationVersion:1,direction:'IMPORT',paused:false,imports:[],identityReviews:[],reviewAdditions:true,projectMappings:{},syncing:false,pendingCount:0,listErrors:{},lastAttempt:null,lastSuccess:null,nextRefresh:'2026-11-09T12:00:00Z',lastError:null,
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
-async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},calendarSynchronization=true,authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
-  const model={rows,providers,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
+async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},calendarSynchronization=true,readiness={},authorizationFailure=null,authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
+  const model={rows,providers,readiness,authorizationFailure,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
   for(const [path,items]of [['clients',clients],['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
     const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
@@ -36,7 +36,8 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')};
     const reply=(body,status=200)=>route.fulfill({status,headers:{...headers,ETag:`"provider-${body?.version??0}"`},...(status===204?{}:{body:JSON.stringify(body)})});
     if(method!=='GET')model.writes.push({path,method,input,headers:request.headers()});else model.reads++;
-    if(path==='')return reply({items:model.rows,providers:model.providers,refreshMinutes:15,calendarSynchronization});
+    if(path==='')return reply({items:model.rows,providers:model.providers,readiness:model.readiness,refreshMinutes:15,calendarSynchronization});
+    if(path.endsWith('/authorize')&&model.authorizationFailure)return reply({code:model.authorizationFailure.code,status:model.authorizationFailure.status},model.authorizationFailure.status);
     if(path.endsWith('/authorize'))return reply({authorizationUrl:authorization||`https://${path.startsWith('/google')?'accounts.google.com/o/oauth2/v2/auth':'login.microsoftonline.com/common/oauth2/v2.0/authorize'}?state=${state}`,expiresAt:'2026-11-09T12:10:00Z',...(authorizationOrigin?{authorizationOrigin}:{})});
     if(path==='/complete'){model.completed++;expect(input).toEqual({state,code});expect(new URL(page.url()).search).toBe('');expect(request.headers().referer).not.toContain(code);expect(request.headers().referer).not.toContain(state);return reply(model.rows[0]);}
     if(path==='/cancel'){model.cancelled++;expect(input).toEqual({state});return reply(null,204);}
@@ -95,7 +96,7 @@ test('provider accounts and unauthenticated subscriptions remain separate choice
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],providers:{google:false,microsoft:false}});await open(page);
   const google=page.locator('[data-internet-provider=google]'),microsoft=page.locator('[data-internet-provider=microsoft]');
   await expect(google.getByRole('heading',{name:'Google',exact:true})).toBeVisible();await expect(microsoft.getByRole('heading',{name:'Microsoft',exact:true})).toBeVisible();
-  await expect(google.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();await expect(microsoft.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeEnabled();
+  await expect(google.getByRole('button',{name:'Connect Google',exact:true})).toBeDisabled();await expect(microsoft.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeDisabled();
   await expect(page.getByText(/enabled by the server administrator/)).toHaveCount(0);
   await page.getByRole('link',{name:'Add a calendar subscription',exact:true}).click();await expect(page).toHaveURL(/#account\/calendars$/);await expect(page.locator('#calendar-subscription-add')).toBeVisible();expect(model.writes).toEqual([]);
 });
@@ -107,9 +108,9 @@ test('calendar-only sign-in uses the shared service and does not request task wr
   await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(target);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:false,calendars:true},language:'en',direction:'IMPORT'});
 });
 
-test('direct task connections offer supported services and keep calendar subscriptions available',async({page,request})=>{
-  const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],calendarSynchronization:false});await page.route('https://accounts.google.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Google task consent fixture</title>'}));await open(page);
-  const google=page.locator('[data-internet-provider=google]');await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeHidden();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('link',{name:'Add a calendar subscription',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:false},language:'en',direction:'IMPORT'});
+test('direct connections offer calendar and task choices without infrastructure controls',async({page,request})=>{
+  const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[]});await page.route('https://accounts.google.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Google consent fixture</title>'}));await open(page);
+  const google=page.locator('[data-internet-provider=google]');await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeChecked();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('link',{name:'Add a calendar subscription',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:true},language:'en',direction:'IMPORT'});
 });
 
 test('calendar and task drafts save independently on one connected account',async({page,request})=>{
@@ -135,7 +136,7 @@ test('provider setup availability and read-only sessions do not acquire write co
   await expect(page.getByRole('heading',{name:'Internet accounts',exact:true})).toBeVisible();
   for(const name of ['Connect Google','Connect Microsoft','Save','Refresh from provider','Pause synchronization','Reconnect','Disconnect'])await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();
   await expect(card(page,row.id).getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Refresh status',exact:true})).toBeEnabled();
-  await expect(page.getByText('Shared sign-in is temporarily unavailable. Try again later, or add a calendar subscription.',{exact:true})).toBeVisible();expect(model.writes).toEqual([]);
+  await expect(page.getByText('Some connections are not ready. Check the status below, or use a calendar subscription. Refresh status to check again.',{exact:true})).toBeVisible();expect(model.writes).toEqual([]);
 });
 
 test('list drafts survive status updates and stale saves keep the captured selection',async({page,request})=>{
@@ -156,7 +157,7 @@ test('saved selections refresh in the background without replacing focused contr
 
 test('provider status errors are actionable and remain text in all themes and narrow screens',async({page,request})=>{
   test.setTimeout(120000);const owner=await signIn(page,request),row=connection(owner,{name:'Account <img src=x onerror=alert(1)> '+ 'LongName'.repeat(24),lastError:'TASK_PROVIDER_RECONNECT_REQUIRED'});await providerFixture(page,owner,{rows:[row]});await open(page);
-  await expect(card(page,row.id).getByText('Reconnect this account and grant task access to resume synchronization.',{exact:true})).toBeVisible();await expect(card(page,row.id).locator('img')).toHaveCount(0);
+  await expect(card(page,row.id).getByText('Reconnect this account and approve its selected calendar and task permissions to resume synchronization.',{exact:true})).toBeVisible();await expect(card(page,row.id).locator('img')).toHaveCount(0);
   for(const theme of ['timekeeper','timekeeper-dark']){
     await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(card(page,row.id)).toBeVisible();
     for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
@@ -207,7 +208,7 @@ test('Google access defaults to import-only and write consent is an explicit cho
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
   const access=page.getByRole('combobox',{name:'Task synchronization',exact:true});await expect(access).toHaveValue('IMPORT');
   await access.selectOption('TWO_WAY');await page.getByRole('button',{name:'Connect Google',exact:true}).click();
-  await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY',services:{tasks:true,calendars:true},language:'en'});
+  await expect(page.getByText('Reload current values',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY',services:{tasks:true,calendars:true},language:'en'});
 });
 
 test('preparing a change selects a real owned task and retains the selection during status polling',async({page,request})=>{
@@ -291,7 +292,7 @@ for(const language of ['en-GB','nb-NO'])test('creation identity review fits ever
 
 test('authorization responses cannot navigate to an unrelated host',async({page,request})=>{
   const owner=await signIn(page,request);await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
-  await page.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page.getByText('Reload current values',{exact:true})).toBeVisible();expect(new URL(page.url()).pathname).toBe('/web/');
+  await page.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page.getByText('Reload current values',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();expect(new URL(page.url()).pathname).toBe('/web/');
 });
 
 test('callback removes provider codes from history and referrers before completing the owned connection',async({page,request})=>{
@@ -374,4 +375,25 @@ for(const language of ['en-GB','nb-NO'])test('identity reconciliation fits all t
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),row=connection(owner,{selectedLists:['work','home']}),fixture=identityTasks(row.id);fixture.task.summary='Native '+ 'Long task title '.repeat(12);row.identityReviews=[{listId:fixture.newList,remoteListId:'home',version:1}];await providerFixture(page,owner,{rows:[row],tasks:[fixture.task],lists:fixture.lists,identities:[identityReview({externalId:'observed-long-id-'.repeat(50),fields:{summary:'Google '+ 'Long task title '.repeat(12),body:{format:'TEXT',content:'Source notes '+ 'unbroken'.repeat(80)}}})]});await open(page);const nb=language==='nb-NO';
   for(const theme of ['timekeeper','timekeeper-dark']){await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Internettkontoer':'Internet accounts',exact:true}).click();const panel=card(page,row.id);await panel.getByRole('button',{name:nb?'Gjennomgå nye identiteter: Home':'Review new identities: Home',exact:true}).click();await panel.getByRole('combobox',{name:nb?'Eksisterende Dagsverk-oppgave og kildekobling':'Existing Dagsverk task and source link',exact:true}).selectOption(JSON.stringify({taskId:fixture.task.id,previous:{providerId:'google',repositoryId:'fixture-account/work',externalId:'old-source-id'}}));await expect(panel.getByText('<p>Native notes stay</p>',{exact:true})).toBeVisible();await expect(panel.getByText(nb?'Ikke startet':'Not started',{exact:true})).toBeVisible();for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}}
   const accessibility=await new AxeBuilder({page}).include('[data-task-provider-id="'+row.id+'"]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/task-identities-'+language+'.png',fullPage:true});
+});
+
+
+test('connection readiness disables only new authorization and explicit recheck recovers',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],providers:{google:false,microsoft:false},readiness:{google:'TASK_PROVIDER_CONNECTION_UNAVAILABLE',microsoft:'TASK_PROVIDER_NOT_CONFIGURED'}});await open(page);
+  await expect(page.getByRole('button',{name:'Connect Google',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeDisabled();
+  await expect(card(page,row.id).getByRole('button',{name:'Save',exact:true})).toBeEnabled();await expect(card(page,row.id).getByRole('button',{name:'Refresh from provider',exact:true})).toBeEnabled();
+  await expect(page.locator('[data-internet-provider=google]')).toContainText('connection service is unavailable');
+  await expect(page.locator('#account-content')).not.toContainText('client ID');await expect(page.locator('#account-content')).not.toContainText('registration (');
+  model.providers.google=true;model.readiness.google='READY';await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(page.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);
+});
+
+test('OAuth initialization failures keep service choices and connected account writes usable',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],authorizationFailure:{status:503,code:'TASK_PROVIDER_CONNECTION_UNAVAILABLE'}});await open(page);
+  const google=page.locator('[data-internet-provider=google]'),connect=page.getByRole('button',{name:'Connect Google',exact:true});
+  for(const code of ['TASK_PROVIDER_CONNECTION_UNAVAILABLE','TASK_PROVIDER_NOT_CONFIGURED','TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED']){
+    model.authorizationFailure.code=code;await connect.click();await expect(connect).toBeEnabled();await expect(google.locator('fieldset').first().getByRole('checkbox',{name:'Calendars',exact:true})).toBeEnabled();
+    await expect(page.getByRole('button',{name:'Reload current values',exact:true})).toHaveCount(0);await expect(page.locator('#account-content')).not.toContainText('The outcome is unknown');await expect(card(page,row.id).getByRole('button',{name:'Save',exact:true})).toBeEnabled();
+  }
+  await card(page,row.id).getByRole('checkbox',{name:'Home',exact:true}).check();await card(page,row.id).getByRole('button',{name:'Save',exact:true}).click();await expect(card(page,row.id)).toContainText('List selection saved.');
 });

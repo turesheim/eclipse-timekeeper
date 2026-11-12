@@ -24,8 +24,9 @@ function authorizationTarget(provider,address,sharedOrigin){
 export async function renderTaskProviders(view){
   const overview=section(view,t('task_providers.title'));overview.append(node('p',t('task_providers.help'),'hint'),node('p',t('task_providers.direction'),'hint'));
   const setup=node('p',t('task_providers.not_configured'),'hint'),feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
-  const refresh=button(t('task_providers.refresh_status'),()=>void view.run(()=>load(),{submit:refresh,feedback}));
-  overview.append(setup,refresh,feedback);const cards=new Map(),connectButtons=new Map(),providerPanels=new Map(),providerServices=new Map(),providerFeedback=new Map();
+  const refresh=button(t('task_providers.refresh_status'),()=>void view.run(()=>load(true),{submit:refresh,feedback}));
+  overview.append(setup,refresh,feedback);
+  const administration=link(t('internet_accounts.administration'),'/admin/#internet-accounts');administration.hidden=true;overview.append(administration);const cards=new Map(),connectButtons=new Map(),providerPanels=new Map(),providerServices=new Map(),providerFeedback=new Map(),providerStatus=new Map();
   const accessLabel=node('label',t('task_providers.google_access'),'form-label'),access=node('select',undefined,'form-select');
   for(const direction of ['IMPORT','TWO_WAY'])access.append(new Option(t('task_providers.access_'+direction),direction));accessLabel.append(access);
   let generation=0,timer=null,controller=null,zone='UTC',configured={},projects=[],clients=[],calendarSynchronization=true;
@@ -35,33 +36,34 @@ export async function renderTaskProviders(view){
     return {fieldset,choices,read:()=>Object.fromEntries(Object.entries(choices).map(([key,input])=>[key,input.checked])),controls:()=>{for(const [key,input]of Object.entries(choices)){const available=key!=='calendars'||calendarSynchronization;input.closest('label').hidden=!available;if(!available)input.checked=false;input.disabled=!view.canWrite||view.busy||view.uncertain||!available;}}};
   }
   const controls=()=>{
-    for(const [provider,pick]of connectButtons){const services=providerServices.get(provider);services.controls();pick.disabled=!view.canWrite||view.busy||view.uncertain||!Object.values(services.read()).some(Boolean);}
+    for(const [provider,pick]of connectButtons){const services=providerServices.get(provider);services.controls();pick.disabled=!configured[provider]||!view.canWrite||view.busy||view.uncertain||!Object.values(services.read()).some(Boolean);}
     access.disabled=!view.canWrite||view.busy||view.uncertain||!providerServices.get('google')?.choices.tasks.checked;
     for(const card of cards.values()){
       card.services.controls();
       for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
       card.save.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       card.refresh.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused||card.data.syncing||!card.data.enabled;
-      card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;card.reconnect.disabled=!view.canWrite||view.busy||view.uncertain||!Object.values(card.services.read()).some(Boolean);
+      card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;card.reconnect.disabled=!configured[card.data.providerId]||!view.canWrite||view.busy||view.uncertain||!Object.values(card.services.read()).some(Boolean);
       card.pause.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       for(const input of card.imports.querySelectorAll('button'))input.disabled=view.busy||view.uncertain||card.data.paused;
       if(card.approve)card.approve.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused;
       if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!card.services.choices.tasks.checked;card.calendars.controls();card.writes.controls();card.incoming.controls();card.identities.controls();
     }
   };
-  const run=(work,submit,target=feedback)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true}).finally(()=>{if(view.valid())controls();});
+  const run=(work,submit,target=feedback,authorization=false)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true,authorization}).finally(()=>{if(view.valid())controls();});
   const connect=(provider,direction=access.value,services=providerServices.get(provider).read(),targetFeedback=providerFeedback.get(provider))=>{
     const pick=connectButtons.get(provider);
     run(async()=>{
       if(view.dirty.size&&!window.confirm(t('ui.discard_unsaved_account_changes')))return;
       targetFeedback.textContent=t('internet_accounts.opening_sign_in');
-      const reply=await view.session.request('/task-providers/'+provider+'/authorize',{method:'POST',timeout:60000,body:{services,language:getLocale().startsWith('nb')?'nb':'en',...(provider==='google'?{direction:services.tasks?direction:'IMPORT'}:{})}});if(!view.valid())return;
+      let reply;try{reply=await view.session.request('/task-providers/'+provider+'/authorize',{method:'POST',timeout:60000,body:{services,language:getLocale().startsWith('nb')?'nb':'en',...(provider==='google'?{direction:services.tasks?direction:'IMPORT'}:{})}});}catch(error){if(!error.status||error.code==='TASK_PROVIDER_UNAVAILABLE'||error.code==='UNAVAILABLE')throw new ApiError('TASK_PROVIDER_CONNECTION_UNAVAILABLE',error.status);throw error;}if(!view.valid())return;
       const target=authorizationTarget(provider,reply.data.authorizationUrl,reply.data.authorizationOrigin);view.dirty.clear();location.assign(target);
-    },pick,targetFeedback);
+    },pick,targetFeedback,true);
   };
   for(const provider of ['google','microsoft']){
     const panel=section(view,t('internet_accounts.'+provider));panel.dataset.internetProvider=provider;providerPanels.set(provider,panel);
-    panel.append(node('p',t('internet_accounts.provider_help'),'hint'));
+    panel.append(node('p',t(provider==='microsoft'?'internet_accounts.microsoft_help':'internet_accounts.provider_help'),'hint'));
+    const readiness=node('p','','hint');readiness.setAttribute('role','status');providerStatus.set(provider,readiness);panel.append(readiness);
     const services=serviceChoices();services.fieldset.addEventListener('change',controls);providerServices.set(provider,services);panel.append(services.fieldset);
     if(provider==='google')panel.append(accessLabel);
     const pick=button(t('task_providers.connect',{provider:providerName(provider)}),()=>connect(provider),'btn btn-primary');pick.dataset.taskProviderConnect=provider;connectButtons.set(provider,pick);panel.append(pick);
@@ -136,7 +138,7 @@ export async function renderTaskProviders(view){
   }
   function paint(data){
     calendarSynchronization=data.calendarSynchronization!==false;
-    for(const panel of providerPanels.values())panel.querySelector('p.hint').textContent=t(calendarSynchronization?'internet_accounts.provider_help':'internet_accounts.tasks_only_help');
+    for(const [provider,status]of providerStatus){const ready=!!data.providers[provider];status.textContent=ready?t('internet_accounts.ready'):providerError(data.readiness?.[provider]||'TASK_PROVIDER_NOT_CONFIGURED');status.className=ready?'hint':'alert alert-warning';}
     const present=new Set();for(const value of data.items){
       if(value.ownerId!==view.session.owner)throw new ApiError('OWNER_CHANGED',401);present.add(value.id);const card=cards.get(value.id)||cardFor(value);card.data=value;
       card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('task_providers.last_success',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});
@@ -163,11 +165,11 @@ export async function renderTaskProviders(view){
       }
     }
     for(const [id,card]of cards)if(!present.has(id)){view.clean(card.form);card.calendars.dispose();card.writes.dispose();card.incoming.dispose();card.identities.dispose();card.panel.remove();cards.delete(id);}
-    configured=data.providers;setup.hidden=Object.values(configured).every(Boolean);controls();
+    configured=data.providers;setup.hidden=Object.values(configured).every(Boolean);administration.hidden=setup.hidden||!view.account?.administrator||!view.canWrite;controls();
   }
-  async function load(){
+  async function load(check=false){
     const current=++generation;controller?.abort();controller=new AbortController();
-    const reply=await view.session.request('/task-providers',{signal:controller.signal});if(!view.valid()||current!==generation)return;
+    const reply=await view.session.request('/task-providers'+(check?'?check=true':''),{signal:controller.signal,timeout:20000});if(!view.valid()||current!==generation)return;
     paint(reply.data);await Promise.all([...cards.values()].map(card=>card.writes.refresh()));if(!view.valid()||current!==generation)return;
     clearTimeout(timer);timer=setTimeout(poll,reply.data.items.some(item=>item.syncing)?2000:30000);
   }

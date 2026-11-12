@@ -4,7 +4,8 @@ set -eu
 cd "$(dirname "$0")"
 # shellcheck source=/dev/null
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
-state_dir=${TIMEKEEPER_STATE_DIR:-./state}
+. ./environment.sh
+state_dir=${DAGSVERK_STATE_DIR:-./state}
 lock_dir="$state_dir/update.lock"
 if ! mkdir "$lock_dir" 2>/dev/null; then echo 'Another update is running.'; exit 0; fi
 drained=
@@ -19,7 +20,7 @@ trap 'exit 130' HUP INT TERM
 
 wait_ready() {
   attempt=0
-  while [ "$attempt" -lt "${TIMEKEEPER_UPDATE_ATTEMPTS:-60}" ]; do
+  while [ "$attempt" -lt "${DAGSVERK_UPDATE_ATTEMPTS:-60}" ]; do
     container=$(docker compose ps -q "$1")
     if [ -n "$container" ] && [ "$(docker inspect --format '{{.State.Health.Status}}' "$container")" = healthy ]; then
       return 0
@@ -36,7 +37,7 @@ gateway_command() {
 
 wait_routed() {
   attempt=0
-  while [ "$attempt" -lt "${TIMEKEEPER_UPDATE_ATTEMPTS:-60}" ]; do
+  while [ "$attempt" -lt "${DAGSVERK_UPDATE_ATTEMPTS:-60}" ]; do
     status=$(gateway_command 'show stat' | awk -F, -v member="$1" '$1 == "api" && $2 == member {print $18}')
     if [ "$status" = UP ]; then return 0; fi
     attempt=$((attempt + 1))
@@ -49,7 +50,7 @@ drain() {
   gateway_command "set server api/$1 state drain" || return 1
   drained=$1
   attempt=0
-  while [ "$attempt" -lt "${TIMEKEEPER_UPDATE_ATTEMPTS:-60}" ]; do
+  while [ "$attempt" -lt "${DAGSVERK_UPDATE_ATTEMPTS:-60}" ]; do
     sessions=$(gateway_command 'show stat' | awk -F, -v member="$1" '$1 == "api" && $2 == member {print $5}')
     if [ "$sessions" = 0 ]; then return 0; fi
     attempt=$((attempt + 1))
@@ -62,7 +63,7 @@ drain() {
 
 replace() {
   drain "$1" || return 1
-  TIMEKEEPER_SERVER_IMAGE="$2" TIMEKEEPER_DEPLOYED_AT="${3-$deployment_time}" docker compose up -d --no-deps --pull never "$1" || return 1
+  DAGSVERK_SERVER_IMAGE="$2" DAGSVERK_DEPLOYED_AT="${3-$deployment_time}" docker compose up -d --no-deps --pull never "$1" || return 1
   wait_ready "$1" || return 1
   gateway_command "set server api/$1 state ready" || return 1
   wait_routed "$1" || return 1
@@ -86,12 +87,12 @@ old_1=$(retain_image "$old_id_1")
 old_2=$(retain_image "$old_id_2")
 deployment_date() {
   docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$(docker compose ps -q "$1")" |
-    awk '/^TIMEKEEPER_DEPLOYED_AT=/ {sub(/^TIMEKEEPER_DEPLOYED_AT=/, ""); print; exit}'
+    awk '/^DAGSVERK_DEPLOYED_AT=/ {sub(/^DAGSVERK_DEPLOYED_AT=/, ""); current=$0; found=1} /^TIMEKEEPER_DEPLOYED_AT=/ {sub(/^TIMEKEEPER_DEPLOYED_AT=/, ""); legacy=$0} END {print found ? current : legacy}'
 }
 old_date_1=$(deployment_date api-1)
 old_date_2=$(deployment_date api-2)
 docker compose pull api-1 api-2
-image_ref=${TIMEKEEPER_SERVER_IMAGE:-ghcr.io/turesheim/eclipse-timekeeper-server:edge}
+image_ref=${DAGSVERK_SERVER_IMAGE:-ghcr.io/turesheim/eclipse-timekeeper-server:edge}
 new_id=$(docker image inspect --format '{{.Id}}' "$image_ref")
 if [ "$old_id_1" = "$new_id" ] && [ "$old_id_2" = "$new_id" ]; then echo 'Server image is current.'; exit 0; fi
 new_image=$(retain_image "$new_id")

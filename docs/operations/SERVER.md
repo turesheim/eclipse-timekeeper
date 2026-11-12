@@ -51,7 +51,7 @@ lifetimes. Configure an explicit JDBC URL before starting the JVM.
 
 The authenticated `GET /api/v1/server` reports this server's build identity and
 timestamps, which the web client displays in its footer. For a direct JVM
-deployment, set `TIMEKEEPER_DEPLOYED_AT` to the actual UTC deployment timestamp
+deployment, set `DAGSVERK_DEPLOYED_AT` to the actual UTC deployment timestamp
 (for example, `2026-10-13T08:30:00Z`) and retain that value in the service's
 environment across restarts. Without a recorded deployment timestamp, the web
 client shows **Not recorded**; process-start time remains available separately.
@@ -78,11 +78,11 @@ readiness and private API requests return 503.
 
 By default the server binds `127.0.0.1:8080`. `QUARKUS_HTTP_PORT` changes the port;
 `QUARKUS_HTTP_HOST` changes the bind address. Use TLS outside loopback and set
-`TIMEKEEPER_PUBLIC_ORIGIN` when terminating HTTPS at a reverse proxy. There is no
+`DAGSVERK_PUBLIC_ORIGIN` when terminating HTTPS at a reverse proxy. There is no
 cross-account sharing or anonymous local-owner fallback.
 
-Optional JDBC credentials use `TIMEKEEPER_SERVER_DB_USER` (default `sa`) and
-`TIMEKEEPER_SERVER_DB_PASSWORD`. The server database account requires schema
+Optional JDBC credentials use `DAGSVERK_SERVER_DB_USER` (default `sa`) and
+`DAGSVERK_SERVER_DB_PASSWORD`. The server database account requires schema
 initialization and H2 database-administration rights. Permitted URL settings are
 `IFEXISTS`, `DB_CLOSE_ON_EXIT`, `AUTO_SERVER`, `AUTO_SERVER_PORT` and
 `LOCK_TIMEOUT`; arbitrary startup SQL, credentials in URLs, read-only mode and
@@ -113,13 +113,13 @@ A request has a bounded lifetime, a 2 MiB body limit, and no automatic HTTP retr
 At most four downloads run per server, with database leases coordinating replicas.
 
 For a trusted internal calendar server, set
-`TIMEKEEPER_CALENDAR_TRUSTED_ORIGINS` to a comma-separated list of exact origins,
+`DAGSVERK_CALENDAR_TRUSTED_ORIGINS` to a comma-separated list of exact origins,
 for example `https://calendar.internal.example:8443`. Only those specific origins
 may resolve to internal addresses. An explicitly listed `http://` origin may use
 HTTP; HTTPS-to-HTTP redirects remain rejected. This is operator configuration,
 not a setting calendar users can override. The supplied Compose file forwards
 this variable. An empty value keeps the public-HTTPS-only policy.
-`TIMEKEEPER_CALENDAR_AUTOMATIC=false` disables scheduled refresh; manual refresh
+`DAGSVERK_CALENDAR_AUTOMATIC=false` disables scheduled refresh; manual refresh
 remains available. No database schema upgrade is required for subscriptions.
 
 ## Data and operational behavior
@@ -231,3 +231,7 @@ PostgreSQL continues using its existing pooled bootstrap path. The regression
 retires every pooled connection repeatedly against a real H2 file with a
 one-slot pool and nondefault database credentials, then verifies authenticated
 reads/writes and rejection of invalid enum values.
+
+External environment names use `DAGSVERK_*`; existing `TIMEKEEPER_*` settings
+remain temporary aliases. See [configuration migration](CONFIGURATION.md) for
+precedence, saved settings and secret preservation.

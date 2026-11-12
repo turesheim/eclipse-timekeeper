@@ -82,10 +82,18 @@ class TaskProviderResourceHttpTest {
         assertEquals(404,call("b",BROWSER,"GET","/"+connection.path("id").asText(),null,null).statusCode());
         assertEquals(403,call("read",BROWSER,"POST","/google/authorize",object(),null).statusCode());
     }
-    @Test void directSignInNeverSubstitutesTaskAccessForARequestedCalendarOnlyGrant(){
-        var catalog=json(call("GET","",null,null),200);inputs.validate("TaskProviderConnections",catalog);assertFalse(catalog.path("calendarSynchronization").asBoolean());
-        var input=object();input.set("services",object().put("tasks",false).put("calendars",true));var denied=call("POST","/google/authorize",input,null);assertEquals(422,denied.statusCode());assertEquals("TASK_PROVIDER_CALENDAR_UNSUPPORTED",denied.jsonPath().getString("code"));
-        input.set("services",object().put("tasks",true).put("calendars",false));assertEquals(200,call("POST","/google/authorize",input,null).statusCode());
+    @Test void directAuthorizationSupportsOnlyTheSelectedServicesForBothProviders()throws Exception{
+        var catalog=json(call("GET","",null,null),200);inputs.validate("TaskProviderConnections",catalog);assertTrue(catalog.path("calendarSynchronization").asBoolean());
+        for(String provider:List.of("google","microsoft"))for(boolean[] selection:List.of(new boolean[]{false,true},new boolean[]{true,false},new boolean[]{true,true})){
+            boolean tasks=selection[0],calendars=selection[1];var input=object();input.set("services",object().put("tasks",tasks).put("calendars",calendars));
+            var attempt=json(call("POST","/"+provider+"/authorize",input,null),200);var params=new HashMap<String,String>();for(String pair:URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")){var parts=pair.split("=",2);params.put(parts[0],URLDecoder.decode(parts[1],StandardCharsets.UTF_8));}
+            assertEquals(ProviderScopes.requested(provider,tasks,calendars,false),params.get("scope"));
+            String code=(tasks?calendars?"combined-fixture-":"fixture-":"calendar-fixture-")+UUID.randomUUID();
+            var connected=json(call("POST","/complete",object().put("state",params.get("state")).put("code",code),null),200);created.add(connected.path("id").asText());
+            assertEquals(tasks,connected.path("services").path("tasks").asBoolean());assertEquals(calendars,connected.path("services").path("calendars").asBoolean());
+            assertEquals(tasks?2:0,connected.path("availableLists").size());assertEquals(calendars?1:0,connected.path("availableCalendars").size());
+            if(calendars){String owner=connected.path("ownerId").asText(),id=connected.path("id").asText();var client=store.transaction(owner,()->store.createClient(object().put("name","Calendar parity")));var selected=object();selected.putArray("selectedCalendars").add("calendar");selected.putObject("calendarMappings").put("calendar",client.path("id").asText());json(call("PUT","/"+id+"/calendars",selected,etag(connected)),200);var synced=idle(id);assertTrue(synced.path("calendarLastError").isNull(),synced.toString());assertTrue(synced.path("calendarLastSuccess").isTextual());}
+        }
     }
     @Test void revokedProviderAuthorizationDoesNotLogOutTheDagsverkAccount(){
         var failure=call("POST","/complete",object().put("state",begin("google")).put("code","denied-fixture"),null);

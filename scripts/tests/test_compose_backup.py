@@ -17,7 +17,7 @@ class ComposeBackupTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         shutil.copy(BACKUP_SCRIPT, self.root / 'backup.sh')
-        for name in ('instance_material.py', 'restore-database.py'):
+        for name in ('instance_material.py', 'restore-database.py', 'environment.sh'):
             shutil.copy(ROOT / 'server/deploy' / name, self.root / name)
         self.state = self.root / 'state with spaces'
         for name, content in {'config/tokens.json': '[]',

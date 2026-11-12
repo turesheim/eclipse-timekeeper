@@ -91,8 +91,8 @@ public final class InstanceRestoreMain {
     }
     private static java.util.Map<String,String> resolvedSecrets() throws java.io.IOException {
         var resolved=new java.util.HashMap<String,String>();
-        for(String name:java.util.List.of("TIMEKEEPER_SERVER_DB_PASSWORD","TIMEKEEPER_SMTP_PASSWORD")) {
-            String path=System.getenv(name+"_FILE");if(path==null||path.isBlank())continue;
+        for(String name:java.util.List.of("DAGSVERK_SERVER_DB_PASSWORD","DAGSVERK_SMTP_PASSWORD")) {
+            String path=EnvironmentAliases.value(System.getenv(),name+"_FILE");if(path==null||path.isBlank())continue;
             if(java.nio.file.Files.size(Path.of(path))>1_048_576)throw new java.io.IOException("INVALID_SECRET_FILE");
             String value=java.nio.file.Files.readString(Path.of(path));while(value.endsWith("\n"))value=value.substring(0,value.length()-1);resolved.put(name,value);
         }

@@ -14,16 +14,16 @@ import jakarta.enterprise.inject.Alternative;
 /** Test-only transport replacement; production keeps its fixed HTTPS provider hosts. */
 @Alternative @ApplicationScoped
 public class TaskProviderHttpTestFixture extends TaskProviderClients {
-    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;volatile boolean writable,catalogFailure;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();final AtomicInteger writes=new AtomicInteger();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> patches=new ConcurrentHashMap<>();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> created=new ConcurrentHashMap<>();volatile boolean loseCreationReply;final Map<String,AtomicInteger> revisions=new ConcurrentHashMap<>();}
+    static final class State {volatile String title="Cloud task",listName="Work";volatile int failure;volatile boolean writable,catalogFailure,tasks=true,calendars;final AtomicInteger reads=new AtomicInteger();final AtomicInteger refreshes=new AtomicInteger();final AtomicInteger requests=new AtomicInteger();final AtomicInteger writes=new AtomicInteger();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> patches=new ConcurrentHashMap<>();final Map<String,com.fasterxml.jackson.databind.node.ObjectNode> created=new ConcurrentHashMap<>();volatile boolean loseCreationReply;final Map<String,AtomicInteger> revisions=new ConcurrentHashMap<>();}
     static final Map<String,State> STATES=new ConcurrentHashMap<>();
     @Override TaskProviderOAuth oauth(TaskCloudProvider.Provider provider){
         return new TaskProviderOAuth(provider,new TaskProviderHttp(Set.of("oauth2.googleapis.com","login.microsoftonline.com"),request->{
             var form=form(request);String grant=form.get("grant_type"),key;
             if(grant.equals("authorization_code")){
                 String code=form.get("code");if(code.startsWith("denied-"))return reply(400,"{\"error\":\"invalid_grant\",\"error_description\":\"private-provider-detail\"}");
-                key=JsonValues.hash(code).substring(0,24);STATES.putIfAbsent(key,new State());STATES.get(key).writable=code.startsWith("write-fixture-");
+                key=JsonValues.hash(code).substring(0,24);STATES.putIfAbsent(key,new State());STATES.get(key).writable=code.startsWith("write-fixture-");STATES.get(key).tasks=!code.startsWith("calendar-fixture-");STATES.get(key).calendars=code.startsWith("calendar-fixture-")||code.startsWith("combined-fixture-");
             }else{key=form.get("refresh_token").substring("fixture-refresh-".length());STATES.get(key).refreshes.incrementAndGet();}
-            String scopes=provider==TaskCloudProvider.Provider.GOOGLE?"openid https://www.googleapis.com/auth/tasks"+(STATES.get(key).writable?"":".readonly"):"Tasks.Read User.Read";
+            var selected=STATES.get(key);String scopes=ProviderScopes.requested(provider.name().toLowerCase(Locale.ROOT),selected.tasks,selected.calendars,selected.writable);
             return reply(200,JsonValues.object().put("access_token","fixture-access-"+key).put("refresh_token","fixture-refresh-"+key).put("token_type","Bearer").put("expires_in",3600).put("scope",scopes).toString());
         }));
     }
@@ -48,6 +48,16 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
                 return reply(200,result.toString());
             }
             throw new AssertionError("Unexpected provider endpoint: "+path);
+        }));
+    }
+    @Override CalendarCloudProvider calendars(TaskCloudProvider.Provider provider){
+        return new CalendarCloudProvider(provider,new TaskProviderHttp(Set.of("www.googleapis.com","graph.microsoft.com"),request->{
+            var page=JsonValues.object();boolean google=provider==TaskCloudProvider.Provider.GOOGLE;
+            var items=page.putArray(google?"items":"value");String path=request.uri().getPath();
+            if(path.endsWith("calendarList")||path.endsWith("/calendars"))items.add(JsonValues.object().put("id","calendar").put(google?"summary":"name","Calendar").put("accessRole","reader"));
+            else if(google){page.put("nextSyncToken","complete");var event=JsonValues.object().put("id","meeting").put("summary","Meeting");event.set("start",JsonValues.object().put("date","2026-11-10"));event.set("end",JsonValues.object().put("date","2026-11-11"));items.add(event);}
+            else{var event=JsonValues.object().put("id","meeting").put("subject","Meeting").put("isAllDay",false).put("type","singleInstance");event.set("start",JsonValues.object().put("dateTime","2026-11-10T10:00:00").put("timeZone","UTC"));event.set("end",JsonValues.object().put("dateTime","2026-11-10T11:00:00").put("timeZone","UTC"));items.add(event);}
+            return reply(200,page.toString());
         }));
     }
     @Override GoogleTasksWriter googleWriter(){

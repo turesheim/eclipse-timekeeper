@@ -16,9 +16,14 @@ Compatibility identifiers remain unchanged:
 
 - Java packages/classes, Eclipse bundle/extension IDs and Maven coordinates.
 - Repository, website/wiki URLs, p2 sites and distribution filenames.
-- `TIMEKEEPER_*` environment variables, API headers and archive/schema fields.
+- API headers and archive/schema fields.
 - Browser storage keys, event names, theme IDs and translation keys.
 - Existing database and synchronization configuration.
+
+External deployment settings now use `DAGSVERK_*`. Legacy `TIMEKEEPER_*` aliases
+remain supported through Dagsverk 2.x, with the new name taking precedence.
+See [configuration migration](../operations/CONFIGURATION.md). Persisted service
+settings, internal `timekeeper.*` properties and secrets remain compatible.
 
 There is no data migration or new archive format in this phase. The supported
 themes are Dagsverk and Nattverk (dark), with stored IDs `timekeeper` and

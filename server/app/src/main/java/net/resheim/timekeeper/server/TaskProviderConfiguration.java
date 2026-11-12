@@ -16,16 +16,17 @@ class TaskProviderConfiguration {
     @ConfigProperty(name="timekeeper.tasks.microsoft.client-id") Optional<String> microsoftId;
     @ConfigProperty(name="timekeeper.tasks.microsoft.client-secret") Optional<String> microsoftSecret;
     void configureGoogle(String id,String secret){googleId=Optional.of(id).filter(value->!value.isBlank());googleSecret=Optional.of(secret).filter(value->!value.isBlank());}
+    void configureMicrosoft(String id,String secret){microsoftId=Optional.of(id).filter(value->!value.isBlank());microsoftSecret=Optional.of(secret).filter(value->!value.isBlank());}
     TaskProviderOAuth.Settings settings(TaskCloudProvider.Provider provider){
         try{
             var id=provider==TaskCloudProvider.Provider.GOOGLE?googleId:microsoftId;
             var secret=provider==TaskCloudProvider.Provider.GOOGLE?googleSecret:microsoftSecret;
             String origin=origins.currentOrigin();var uri=URI.create(origin);
-            if(uri.getRawAuthority()==null||uri.getRawUserInfo()!=null||uri.getRawQuery()!=null||uri.getRawFragment()!=null
+            if(!"https".equals(uri.getScheme())||uri.getHost()==null||uri.getRawAuthority()==null||uri.getRawUserInfo()!=null||uri.getRawQuery()!=null||uri.getRawFragment()!=null
                     ||uri.getRawPath()!=null&&!uri.getRawPath().isEmpty())throw new IllegalArgumentException();
             return new TaskProviderOAuth.Settings(id.orElseThrow(),secret.orElseThrow(),origin+"/web/task-provider-callback.html");
         }catch(RuntimeException invalid){throw new ApiFailure(503,"TASK_PROVIDER_NOT_CONFIGURED");}
     }
-    boolean available(TaskCloudProvider.Provider provider){if(shared!=null&&shared.enabled())return true;try{settings(provider);return true;}catch(ApiFailure unavailable){return false;}}
+    boolean available(TaskCloudProvider.Provider provider){try{settings(provider);return true;}catch(ApiFailure unavailable){return false;}}
     static TaskCloudProvider.Provider provider(String id){return switch(id){case "google"->TaskCloudProvider.Provider.GOOGLE;case "microsoft"->TaskCloudProvider.Provider.MICROSOFT;default->throw ApiFailure.notFound();};}
 }

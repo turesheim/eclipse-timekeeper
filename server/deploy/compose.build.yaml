@@ -5,7 +5,7 @@ services:
       context: ../..
       dockerfile: server/Dockerfile
       args:
-        TIMEKEEPER_BUILD_COMMIT: ${TIMEKEEPER_BUILD_COMMIT:-unknown}
-        TIMEKEEPER_BUILD_DIRTY: ${TIMEKEEPER_BUILD_DIRTY:-unknown}
+        DAGSVERK_BUILD_COMMIT: ${DAGSVERK_BUILD_COMMIT-${TIMEKEEPER_BUILD_COMMIT:-unknown}}
+        DAGSVERK_BUILD_DIRTY: ${DAGSVERK_BUILD_DIRTY-${TIMEKEEPER_BUILD_DIRTY:-unknown}}
   api-2:
     build: *build

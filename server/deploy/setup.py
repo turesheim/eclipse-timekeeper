@@ -24,6 +24,12 @@ def configuration():
                 key, value = line.split('=', 1)
                 values[key.strip()] = value.strip().strip("\"'")
     values.update(os.environ)
+    for key in list(values):
+        if key.startswith('TIMEKEEPER_'):
+            canonical='DAGSVERK_'+key[len('TIMEKEEPER_'):]
+            if canonical in values and values[canonical]!=values[key]:
+                print(f'{canonical} overrides deprecated {key}; values are redacted.',file=sys.stderr)
+            values.setdefault(canonical,values[key])
     return values
 
 
@@ -35,7 +41,7 @@ def main():
     if args.owner is not None and (not args.owner.strip() or args.owner != args.owner.strip()
             or args.owner == 'local' or len(args.owner) > 200):
         parser.error('Choose a stable owner ID of 1–200 characters; local is reserved')
-    state = (args.state_dir or Path(configuration().get('TIMEKEEPER_STATE_DIR', HERE / 'state'))).resolve()
+    state = (args.state_dir or Path(configuration().get('DAGSVERK_STATE_DIR', HERE / 'state'))).resolve()
     credentials = state / 'secrets'
     if any((state / f'postgres-{i}' / 'data' / 'PG_VERSION').exists() for i in (1, 2, 3)):
         parser.error('Existing HA data requires a logical backup and restore into a new state directory; see README.md')
@@ -101,10 +107,10 @@ def main():
         (state / name).mkdir(parents=True, exist_ok=True)
     env_file = HERE / '.env'
     if not env_file.exists():
-        env_file.write_text(f'TIMEKEEPER_STATE_DIR={shlex.quote(str(state))}\nTIMEKEEPER_BIND_ADDRESS=127.0.0.1\nTIMEKEEPER_HTTP_PORT=8080\n')
+        env_file.write_text(f'DAGSVERK_STATE_DIR={shlex.quote(str(state))}\nDAGSVERK_BIND_ADDRESS=127.0.0.1\nDAGSVERK_HTTP_PORT=8080\n')
     if setup_created:
         with env_file.open('a') as output:
-            output.write('\nTIMEKEEPER_SERVER_SETUP_FILE=/config/account-setup.json\n')
+            output.write('\nDAGSVERK_SERVER_SETUP_FILE=/config/account-setup.json\n')
     print(f'Durable state: {state}')
     print('Start with: docker compose up -d')
 
