@@ -57,6 +57,7 @@ class HttpAcceptance(unittest.TestCase):
     def test_task_provider_connections_require_owned_browser_bound_grants(self):
         catalog,_=self.call('GET','/task-providers')
         self.assertEqual({'google','microsoft'},set(catalog['providers']))
+        self.assertEqual({'google','microsoft'},set(catalog['readiness']))
         self.call('GET','/task-providers',owner=None,status=401)
         self.call('GET','/task-providers?owner=foreign',status=400)
         missing=str(uuid4());cookie={'Cookie':'__Host-timekeeper-browser='+'a'*43}
@@ -70,7 +71,9 @@ class HttpAcceptance(unittest.TestCase):
         self.call('POST','/task-providers/google/authorize',body={'ownerId':'foreign'},headers=cookie,status=400)
         for provider,available in catalog['providers'].items():
             if not available:
-                self.call('POST','/task-providers/'+provider+'/authorize',body={},headers=cookie,status=503,code='TASK_PROVIDER_NOT_CONFIGURED')
+                reason=catalog['readiness'][provider]
+                self.assertIn(reason,{'TASK_PROVIDER_NOT_CONFIGURED','TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED','TASK_PROVIDER_CALLBACK_INVALID','TASK_PROVIDER_CONNECTION_UNAVAILABLE'})
+                self.call('POST','/task-providers/'+provider+'/authorize',body={},headers=cookie,status=503,code=reason)
                 continue
             authorization,_=self.call('POST','/task-providers/'+provider+'/authorize',body={},headers=cookie)
             from urllib.parse import parse_qs

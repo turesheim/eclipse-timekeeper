@@ -24,12 +24,13 @@ class SharedConnectConfiguration {
     Optional<URI> configuredEndpoint(){return configured.map(SharedConnectConfiguration::validate);}
     synchronized void configure(boolean shared,String address){enabled=shared;configured=Optional.ofNullable(address);cached=null;expires=Instant.EPOCH;failedUntil=Instant.EPOCH;}
     String callback(){return origins.currentOrigin()+"/web/task-provider-callback.html";}
+    synchronized void recheck(){failedUntil=Instant.EPOCH;expires=Instant.EPOCH;}
     synchronized URI endpoint(){
         if(configured.isPresent())return validate(configured.get());
         if(cached!=null&&expires.isAfter(Instant.now()))return cached;
         if(failedUntil.isAfter(Instant.now()))throw new ApiFailure(503,"TASK_PROVIDER_UNAVAILABLE");
         try{
-            var http=new TaskProviderHttp(Set.of("turesheim.github.io"));var metadata=http.send(HttpRequest.newBuilder(URI.create(DISCOVERY)).timeout(Duration.ofSeconds(25)).header("Accept","application/json").GET().build());
+            var http=new TaskProviderHttp(Set.of("turesheim.github.io"));var metadata=http.send(HttpRequest.newBuilder(URI.create(DISCOVERY)).timeout(Duration.ofSeconds(5)).header("Accept","application/json").GET().build());
             if(metadata.path("protocol").asInt()!=1||!metadata.path("serviceUrl").isTextual())throw new ApiFailure(503,"TASK_PROVIDER_UNAVAILABLE");
             cached=validate(metadata.path("serviceUrl").asText());expires=Instant.now().plusSeconds(600);return cached;
         }catch(RuntimeException unavailable){failedUntil=Instant.now().plusSeconds(30);throw new ApiFailure(503,"TASK_PROVIDER_UNAVAILABLE");}

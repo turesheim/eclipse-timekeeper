@@ -31,7 +31,7 @@ class Installation:
         self.project = 'timekeeper-instance-' + secrets.token_hex(5)
         self.origin = 'https://localhost:' + ('18443' if identity == 'timekeeper' else '19443')
         self.environment = {key: value for key, value in os.environ.items()
-                            if not key.startswith(('TIMEKEEPER_', 'COMPOSE_'))}
+                            if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_', 'COMPOSE_'))}
         self.environment['COMPOSE_PROJECT_NAME'] = self.project
         self.identity = identity
         self.started = False

@@ -11,7 +11,7 @@ never grants access to another account's work records or tokens.
 ## First administrator
 
 For a fresh Docker installation, `python3 setup.py` prints a one-time code and
-sets `TIMEKEEPER_SERVER_SETUP_FILE` in `.env`. Start the deployment, open `/web/`,
+sets `DAGSVERK_SERVER_SETUP_FILE` in `.env`. Start the deployment, open `/web/`,
 choose **First administrator setup**, and enter a username, a password of at least
 15 characters twice, a primary recovery email address, and the one-time code. The username is used as the initial
 display name. The code expires after 15 minutes.
@@ -22,8 +22,8 @@ For a standalone JVM, from the extracted server distribution:
 
 ```sh
 python3 configure_accounts.py --output /secure/timekeeper/account-setup.json
-export TIMEKEEPER_SERVER_SETUP_FILE=/secure/timekeeper/account-setup.json
-export TIMEKEEPER_SERVER_DB_URL=jdbc:h2:/data/timekeeper/server
+export DAGSVERK_SERVER_SETUP_FILE=/secure/timekeeper/account-setup.json
+export DAGSVERK_SERVER_DB_URL=jdbc:h2:/data/timekeeper/server
 java -jar quarkus-run.jar
 ```
 
@@ -48,7 +48,7 @@ The sign-in page and server details show the installed SPK version when availabl
 The container runs as UID 10001. The mounted digest file must be readable by that
 UID; `setup.py` sets mode 0644 within the read-only `/config` mount. For a manually
 generated Docker challenge, place it at `state/config/account-setup.json`, set its
-mode to 0644, set `TIMEKEEPER_SERVER_SETUP_FILE=/config/account-setup.json` in
+mode to 0644, set `DAGSVERK_SERVER_SETUP_FILE=/config/account-setup.json` in
 `.env`, and recreate the replicas. Retain operator-only write access to that file.
 
 ## Language and region
@@ -72,7 +72,7 @@ schema 9. Pre-schema-4 browser sessions are ended because earlier versions did
 not record their origin and browser binding. Schema-4 sessions and passkeys are
 preserved; changing service settings later retires sessions at activation.
 Passwords and Eclipse API tokens remain valid. Upgrading is refused by default. After backing up and stopping both
-older replicas, set `TIMEKEEPER_ALLOW_SCHEMA_UPGRADE=true` in `.env` (or the JVM
+older replicas, set `DAGSVERK_ALLOW_SCHEMA_UPGRADE=true` in `.env` (or the JVM
 environment), select the same new image for both replicas, and start them. Remove
 the flag after successful migration. A fresh database needs no upgrade flag.
 Automatic rolling updates therefore fail safely against an older schema and retain the
@@ -125,7 +125,7 @@ matching browser Origin when present. No new password or bearer token is saved
 in localStorage/sessionStorage. First setup and login attempts are rate limited.
 
 Use HTTPS outside loopback. For Tailscale Serve or another TLS reverse proxy, set
-`TIMEKEEPER_PUBLIC_ORIGIN` to the exact browser origin, for example
+`DAGSVERK_PUBLIC_ORIGIN` to the exact browser origin, for example
 `https://timekeeper.example.ts.net` (no trailing slash or path), on all replicas.
 The server does not implicitly trust forwarded headers. Direct loopback HTTP is
 supported for development by browsers that accept Secure cookies on loopback.
@@ -277,15 +277,15 @@ receipt at both addresses before relying on recovery. SMTP credentials never
 belong in Compose files, issue reports or screenshots. Delivery failure logs
 contain fixed messages without links, addresses or credentials.
 
-A standalone JVM accepts `TIMEKEEPER_MAIL_ENABLED`, `TIMEKEEPER_SMTP_HOST`,
-`TIMEKEEPER_SMTP_PORT`, `TIMEKEEPER_SMTP_FROM`, `TIMEKEEPER_SMTP_USERNAME`,
-`TIMEKEEPER_SMTP_PASSWORD`, `TIMEKEEPER_SMTP_TLS` and `TIMEKEEPER_SMTP_START_TLS`.
-The container also accepts `TIMEKEEPER_SMTP_PASSWORD_FILE`. Mail defaults off;
+A standalone JVM accepts `DAGSVERK_MAIL_ENABLED`, `DAGSVERK_SMTP_HOST`,
+`DAGSVERK_SMTP_PORT`, `DAGSVERK_SMTP_FROM`, `DAGSVERK_SMTP_USERNAME`,
+`DAGSVERK_SMTP_PASSWORD`, `DAGSVERK_SMTP_TLS` and `DAGSVERK_SMTP_START_TLS`.
+The container also accepts `DAGSVERK_SMTP_PASSWORD_FILE`. Mail defaults off;
 the production mailer is never configured in mock mode.
 
 ### Change the public hostname
 
-Recovery links use the configured exact HTTPS `TIMEKEEPER_PUBLIC_ORIGIN`, never
+Recovery links use the configured exact HTTPS `DAGSVERK_PUBLIC_ORIGIN`, never
 the incoming Host header or forwarded headers. Moving from a VPN hostname to a
 public hostname does not change account ownership or verified email addresses.
 Choose the intended long-term hostname when possible, but migration is supported:
@@ -303,7 +303,7 @@ Choose the intended long-term hostname when possible, but migration is supported
 If the old address is already unreachable, use explicit **operator recovery**:
 stop every instance and retain a protected backup; set the desired public origin,
 RP/mail deployment values and an authentication epoch strictly higher than the
-saved/effective epochs. Set `TIMEKEEPER_SETTINGS_RECOVERY=true` for a JVM/Compose,
+saved/effective epochs. Set `DAGSVERK_SETTINGS_RECOVERY=true` for a JVM/Compose,
 or `timekeeper.service-settings.recover=true` in DSM's retained
 `/var/packages/timekeeper/var/server/config/mail.properties`. In DSM, the same
 file can explicitly set `timekeeper.auth.public-origin`,
@@ -367,8 +367,8 @@ Disabling passkeys keeps credential records and password access. Central setting
 survive upgrades and protected backups.
 
 For initial deployment or explicit operator recovery, Compose passes
-`TIMEKEEPER_PUBLIC_ORIGIN`, `TIMEKEEPER_PASSKEYS_ENABLED` (default `true`) and
-`TIMEKEEPER_PASSKEY_RP_ID` (default `AUTO`) to both replicas. DSM accepts the
+`DAGSVERK_PUBLIC_ORIGIN`, `DAGSVERK_PASSKEYS_ENABLED` (default `true`) and
+`DAGSVERK_PASSKEY_RP_ID` (default `AUTO`) to both replicas. DSM accepts the
 corresponding `timekeeper.auth.public-origin`, `timekeeper.auth.passkeys-enabled`
 and `timekeeper.auth.passkey-rp-id` properties in retained `config/mail.properties`.
 These deployment values do not overwrite existing central settings on a normal

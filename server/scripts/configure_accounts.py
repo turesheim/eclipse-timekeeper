@@ -58,7 +58,7 @@ def main():
     print('Account setup/recovery code (shown once; do not place it in a URL or routine logs):')
     print(code)
     print('Expires: ' + value['expiresAt'])
-    print('Set TIMEKEEPER_SERVER_SETUP_FILE to the generated file and restart the server replicas.')
+    print('Set DAGSVERK_SERVER_SETUP_FILE to the generated file and restart the server replicas.')
 
 
 if __name__ == '__main__':

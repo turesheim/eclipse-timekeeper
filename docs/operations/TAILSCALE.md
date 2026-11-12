@@ -18,9 +18,9 @@ rules must allow the client device to reach this host on TCP port **8443**.
 See [HTTPS setup](https://tailscale.com/docs/how-to/set-up-https-certificates).
 
 Run the commands on the host operating system, where `http://127.0.0.1:8080`
-is reachable. Keep `TIMEKEEPER_BIND_ADDRESS=127.0.0.1` in the deployment `.env`.
+is reachable. Keep `DAGSVERK_BIND_ADDRESS=127.0.0.1` in the deployment `.env`.
 Both Compose setups already publish their gateway on this address. If you changed
-`TIMEKEEPER_HTTP_PORT`, replace `8080` in the commands below.
+`DAGSVERK_HTTP_PORT`, replace `8080` in the commands below.
 
 The native **DSM package** automatically selects and remembers its local port.
 Read that non-secret port on the NAS before configuring Serve:
@@ -93,7 +93,7 @@ Use the full HTTPS DNS name printed by Serve. For example:
 Replace the example hostname with your host's printed name. Use that DNS name
 for certificate validation; Eclipse requires HTTPS outside loopback. Browser
 sessions use normal account sign-in; Eclipse uses a personal API token created
-under **My Account**. On first deployment, set `TIMEKEEPER_PUBLIC_ORIGIN` to
+under **My Account**. On first deployment, set `DAGSVERK_PUBLIC_ORIGIN` to
 the exact HTTPS origin (including the port when non-default). After installation,
 change the public address in **Administration → General settings** and restart
 every server instance. If the saved address is unreachable, use the explicit
@@ -134,3 +134,12 @@ After schema-5 initialization, change the public HTTPS address in
 an operator command; changing the application address does not create a Serve
 rule. The account guide also covers recovery when the previous hostname is no
 longer reachable.
+
+## Google and Microsoft connections over the private VPN
+
+The browser can return to a VPN-only Dagsverk HTTPS callback when it remains on
+Tailscale and the provider accepts the exact registered URI, including its port.
+Dagsverk does not need public ingress for this browser return. Managed OAuth
+returns through the central broker before handing back to the private installation;
+direct OAuth returns straight to the installation. See the [OAuth setup and live
+Synology/Tailscale acceptance checks](SHARED-SIGN-IN.md#private-synology-and-tailscale-callbacks).

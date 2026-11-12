@@ -175,7 +175,7 @@ def main():
         backend = f'http://127.0.0.1:{port}'
         fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1',calendars=True)
         base = fixture.base
-        environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
+        environment = {**{key:value for key,value in os.environ.items() if not key.startswith('DAGSVERK_')}, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
                        'TIMEKEEPER_INSTANCE_BACKUP_STORAGE':str(data / 'instance-backups'), 'TIMEKEEPER_INSTANCE_RESTORE_STORAGE':str(data / 'instance-restore') if args.restore else 'NONE', 'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}
         server_log = ROOT / 'server/web/target/server.log'
         server_log.parent.mkdir(parents=True, exist_ok=True)

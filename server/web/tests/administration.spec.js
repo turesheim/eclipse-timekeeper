@@ -144,17 +144,17 @@ test('Internet accounts administration checks registrations, explains Google set
   test.setTimeout(120000);const admin=await settingsAdministrator(page,request),client=browserRequest(page);
   const actual=await client.get('/api/v1/admin/internet-accounts');expect(actual.status()).toBe(200);expect(actual.headers()['cache-control']).toBe('no-store');
   const local=await actual.json();expect(Object.keys(local).sort()).toEqual(['mode','status','publicOrigin','callbackUrl','serviceUrl','discoveryUrl','googleRedirectUrl','googleConfigured','microsoftConfigured','version','effectiveVersion','restartRequired','canEdit','saved','effective'].sort());
-  const sample={...local,mode:'SHARED',status:'NOT_CHECKED',serviceUrl:'https://connect.example.test',googleRedirectUrl:'https://connect.example.test/oauth/google/callback',googleConfigured:null,microsoftConfigured:null};
+  const sample={...local,publicOrigin:'https://nas.example-tailnet.ts.net:8443',callbackUrl:'https://nas.example-tailnet.ts.net:8443/web/task-provider-callback.html',mode:'SHARED',status:'NOT_CHECKED',serviceUrl:'https://connect.example.test',googleRedirectUrl:'https://connect.example.test/oauth/google/callback',googleConfigured:null,microsoftConfigured:null};
   let checks=0,unavailable=false;const external=[];page.on('request',request=>{if(new URL(request.url()).origin!==origin())external.push(request.url());});
   await page.route('**/api/v1/admin/internet-accounts*',route=>{
     const check=new URL(route.request().url()).searchParams.get('check')==='true';if(check)checks++;
     return route.fulfill({headers:{'X-Timekeeper-Owner':actual.headers()['x-timekeeper-owner'],ETag:actual.headers().etag},json:check?{...sample,status:unavailable?'UNAVAILABLE':'READY',googleConfigured:unavailable?null:true,microsoftConfigured:unavailable?null:false}:sample});
   });
   try{
-    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'Set up Google integration',exact:true})).toBeVisible();expect(checks).toBe(0);
-    const check=page.getByRole('button',{name:'Check setup',exact:true});await check.focus();await check.press('Enter');await expect(page.locator('#account-content')).toContainText('Setup checked.');expect(checks).toBe(1);
+    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'OAuth setup guidance',exact:true})).toBeVisible();expect(checks).toBe(0);
+    const check=page.getByRole('button',{name:'Check setup',exact:true});await check.focus();await check.press('Enter');await expect(page.locator('#account-content')).toContainText('Setup checks passed.');expect(checks).toBe(1);
     await expect(page.locator('#account-content tr').filter({hasText:'Google registration'})).toContainText('Configured');await expect(page.locator('#account-content tr').filter({hasText:'Microsoft registration'})).toContainText('Not configured');
-    await expect(page.locator('#account-content')).toContainText('https://connect.example.test/oauth/google/callback');await expect(page.locator('#account-content')).toContainText('TIMEKEEPER_CONNECT_GOOGLE_CLIENT_SECRET');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');
+    await expect(page.locator('#account-content')).toContainText('https://connect.example.test/oauth/google/callback');await expect(page.locator('#account-content')).toContainText('They do not provide SSO');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');
     for(const width of [1440,390]){
       await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark']){
         await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
@@ -162,19 +162,19 @@ test('Internet accounts administration checks registrations, explains Google set
         await captureScreenshot(page,{path:`test-results/admin-internet-${theme}-${width}.png`,fullPage:true});
       }
     }
-    unavailable=true;await check.click();await expect(page.locator('#account-content [role=status]').filter({hasText:'could not be reached'})).toBeVisible();await expect(check).toBeEnabled();
+    unavailable=true;await check.click();await expect(page.locator('#account-content [role=status]').filter({hasText:'Managed OAuth discovery'})).toBeVisible();await expect(check).toBeEnabled();
     const identity=await(await client.get('/api/v1/auth/session')).json(),profile=await client.get('/api/v1/me');const me=await profile.json();expect((await client.put('/api/v1/me',{headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf},data:{zoneId:me.zoneId,locale:'nb-NO'}})).ok()).toBe(true);
-    await page.reload();await expect(page.getByRole('heading',{name:'Sett opp Google-integrasjon',exact:true})).toBeVisible();await page.setViewportSize({width:320,height:900});await expect(page.getByRole('button',{name:'Kontroller oppsett',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/admin-internet-nb-320.png',fullPage:true});expect(external).toEqual([]);
+    await page.reload();await expect(page.getByRole('heading',{name:'Veiledning for OAuth-oppsett',exact:true})).toBeVisible();await page.setViewportSize({width:320,height:900});await expect(page.getByRole('button',{name:'Kontroller oppsett',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/admin-internet-nb-320.png',fullPage:true});expect(external).toEqual([]);
   }finally{await admin.close();}
 });
 
 
-test('Google application settings preserve, replace and clear a write-only secret for restart',async({page,request})=>{
+test('OAuth application settings preserve, replace and clear a write-only secret for restart',async({page,request})=>{
   const admin=await settingsAdministrator(page,request),client=browserRequest(page),path='/api/v1/admin/internet-accounts';
   const initial=await client.get(path),before=await initial.json();const secret='Private synthetic Google client secret';
   try{
-    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'Google application settings',exact:true})).toBeVisible();
-    await page.getByLabel('Sign-in mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('synthetic-google-client');await page.getByLabel('New Google client secret',{exact:true}).fill(secret);await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
+    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'OAuth application settings',exact:true})).toBeVisible();
+    await page.getByLabel('OAuth mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('synthetic-google-client');await page.getByLabel('New Google client secret',{exact:true}).fill(secret);await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
     await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('Restart every Dagsverk server instance');
     let response=await client.get(path),saved=await response.json();expect(saved.saved.googleClientId).toBe('synthetic-google-client');expect(saved.saved.googleClientSecretConfigured).toBe(true);expect(saved.effective).toEqual(before.effective);expect(JSON.stringify(saved)).not.toContain(secret);expect(await(await client.get('/api/v1/admin/settings')).text()).not.toContain(secret);
     await page.getByLabel('Google client ID',{exact:true}).fill('updated-synthetic-google-client');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(true);
@@ -195,7 +195,7 @@ test('checking Google setup cannot authorize overwriting a concurrently changed 
     const checked=new URL(route.request().url()).searchParams.has('check');return route.fulfill({headers:{...headers,ETag:checked?'"service-settings-999999"':tag},json:{...data,status:checked?'READY':data.status,version:checked?999999:data.version,saved:{...data.saved,googleClientId:checked?'peer-registration':data.saved.googleClientId}}});
   });
   try{
-    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await page.getByLabel('Google client ID',{exact:true}).fill('my-registration-draft');await page.getByLabel('New Google client secret',{exact:true}).fill('Private replacement draft');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);
-    await page.getByRole('button',{name:'Check setup',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Setup checked.');await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Your draft is kept');expect(writes).toBe(1);await expect(page.getByLabel('Google client ID',{exact:true})).toHaveValue('my-registration-draft');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('Private replacement draft');
+    await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await page.getByLabel('OAuth mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('my-registration-draft');await page.getByLabel('New Google client secret',{exact:true}).fill('Private replacement draft');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);
+    await page.getByRole('button',{name:'Check setup',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Setup checks passed.');await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Your draft is kept');expect(writes).toBe(1);await expect(page.getByLabel('Google client ID',{exact:true})).toHaveValue('my-registration-draft');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('Private replacement draft');
   }finally{await admin.close();}
 });

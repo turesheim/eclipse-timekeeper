@@ -17,6 +17,7 @@ public class TaskProviderResource {
     @Inject ContractInputs inputs;
     @Inject BackendClock clock;
     @Inject TaskProviderConfiguration configuration;
+    @Inject InternetAccountSetup setup;
     @Inject SharedConnectConfiguration shared;
     @Inject TaskProviderClients clients;
     @Inject TaskProviderRefresh refresh;
@@ -27,12 +28,12 @@ public class TaskProviderResource {
     private Response tx(Supplier<ApiReplies> work){return store.authenticated(identity,()->work.get().response());}
     private void queries(){ContractInputs.queries(uri.getQueryParameters());}
     private String browser(){return BrowserCookies.read(headers.getRequestHeader("Cookie")).requireBrowser();}
-    @GET public Response list(){
-        queries();return tx(()->{
-            var result=connections().list().put("refreshMinutes",15).put("calendarSynchronization",shared.enabled());var providers=result.putObject("providers");
-            providers.put("google",configuration.available(TaskCloudProvider.Provider.GOOGLE)).put("microsoft",configuration.available(TaskCloudProvider.Provider.MICROSOFT));
-            return new ApiReplies(200,result,null,null);
-        });
+    @GET public Response list(@QueryParam("check") @DefaultValue("false") String check){
+        ContractInputs.queries(uri.getQueryParameters(),"check");if(!Set.of("true","false").contains(check))throw ApiFailure.validation();
+        var result=store.authenticated(identity,()->connections().list());
+        var readiness=setup.readiness(check.equals("true"));result.put("refreshMinutes",15).put("calendarSynchronization",true);result.set("readiness",readiness);
+        var providers=result.putObject("providers");for(String provider:List.of("google","microsoft"))providers.put(provider,readiness.path(provider).asText().equals("READY"));
+        return new ApiReplies(200,result,null,null).response();
     }
     @GET @Path("/{id}") public Response get(@PathParam("id")String id){
         UUID key=ContractInputs.pathId(id);queries();return tx(()->ApiReplies.resource(200,connections().view(key),null));
@@ -40,16 +41,16 @@ public class TaskProviderResource {
     @POST @Path("/{provider}/authorize") public Response authorize(@PathParam("provider")String provider,JsonNode body){
         var input=inputs.validate("TaskProviderAuthorizeInput",body);queries();var kind=TaskProviderConfiguration.provider(provider);String browser=browser();
         boolean writable=input.path("direction").asText("IMPORT").equals("TWO_WAY");
+        if(writable&&kind!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
+        var services=input.path("services").isObject()?((com.fasterxml.jackson.databind.node.ObjectNode)input.get("services")).deepCopy():object().put("tasks",true).put("calendars",false);services.put("writableTasks",writable);SharedConnectClient.services(services);
+        store.authenticated(identity,()->null);setup.require(kind);
         if(shared.enabled()){
-            if(writable&&kind!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
-            var services=input.path("services").isObject()?((com.fasterxml.jackson.databind.node.ObjectNode)input.get("services")).deepCopy():object().put("tasks",true).put("calendars",false);services.put("writableTasks",writable);SharedConnectClient.services(services);
             var endpoint=shared.endpoint();var pending=store.authenticated(identity,()->connections().beginShared(kind,endpoint,browser,services));
             try{return new ApiReplies(200,clients.shared(endpoint).begin(provider,shared.callback(),pending.state(),pending.challenge(),services,input.path("language").asText("en")),null,null).response();}
             catch(RuntimeException failure){try{store.authenticated(identity,()->connections().consume(pending.state(),browser));}catch(RuntimeException ignored){}throw failure;}
         }
-        if(input.has("services")&&(!input.path("services").path("tasks").asBoolean()||input.path("services").path("calendars").asBoolean()))throw new ApiFailure(422,"TASK_PROVIDER_CALENDAR_UNSUPPORTED");
         var settings=configuration.settings(kind);
-        return tx(()->new ApiReplies(200,connections().begin(kind,settings,browser,writable),null,null));
+        return tx(()->new ApiReplies(200,connections().begin(kind,settings,browser,services),null,null));
     }
     @POST @Path("/cancel") public Response cancel(JsonNode body){
         var input=inputs.validate("TaskProviderCancelInput",body);queries();String browser=browser();
@@ -59,27 +60,27 @@ public class TaskProviderResource {
         var input=inputs.validate("TaskProviderCompleteInput",body);queries();String browser=browser();
         var grant=store.authenticated(identity,()->connections().consume(input.path("state").asText(),browser));
         try{
+            TaskProviderOAuth.Settings settings=null;TaskProviderOAuth.Tokens tokens;JsonNode reply=null;
             if(grant.broker()!=null){
-                var reply=clients.shared(SharedConnectConfiguration.validate(grant.broker())).redeem(input.path("code").asText(),grant.verifier());
-                var provider=clients.cloud(grant.provider());if(!reply.path("provider").asText().equals(provider.id())||!reply.path("services").equals(grant.services()))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");
-                var tokens=SharedConnectClient.tokens(reply,reply.path("grantCredential").asText());var account=provider.account(tokens.access());
-                if(!account.id().equals(reply.path("remoteAccountId").asText()))throw new ApiFailure(409,"TASK_PROVIDER_ACCOUNT_CHANGED");
-                List<TaskCloudProvider.RemoteList> observed=List.of();RuntimeException taskCatalogFailure=null;
-                if(grant.services().path("tasks").asBoolean())try{observed=provider.catalog(tokens.access());}catch(RuntimeException failure){observed=null;taskCatalogFailure=failure;}
-                var catalog=observed;var connected=store.authenticated(identity,()->connections().connectShared(grant,account,tokens,catalog));
-                if(taskCatalogFailure!=null){String code=InternetCalendars.failure(taskCatalogFailure);store.authenticated(identity,()->{var auth=connections().required(uuid(connected.get("id")));auth.put("lastError",code);auth.withObject("listErrors").put("",code);connections().save(TaskProviderConnections.AUTH,auth);return null;});}
-                if(grant.services().path("calendars").asBoolean()){
-                    try{var calendars=clients.calendars(grant.provider()).catalog(tokens.access());store.authenticated(identity,()->{new InternetCalendars(store).catalog(uuid(connected.get("id")),calendars);return null;});}
-                    catch(RuntimeException failure){store.authenticated(identity,()->{new InternetCalendars(store).error(uuid(connected.get("id")),InternetCalendars.failure(failure));return null;});}
-                }
-                refresh.wake();return tx(()->ApiReplies.resource(200,connections().view(uuid(connected.get("id"))),null));
+                reply=clients.shared(SharedConnectConfiguration.validate(grant.broker())).redeem(input.path("code").asText(),grant.verifier());
+                if(!reply.path("provider").asText().equals(new TaskCloudProvider(grant.provider()).id())||!reply.path("services").equals(grant.services()))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");
+                tokens=SharedConnectClient.tokens(reply,reply.path("grantCredential").asText());
+            }else{
+                settings=configuration.settings(grant.provider());
+                if(!TaskProviderConnections.settingsHash(settings).equals(grant.settingsHash()))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
+                tokens=clients.oauth(grant.provider()).exchange(settings,input.path("code").asText(),grant.verifier(),clock.now(),grant.services());
             }
-            var settings=configuration.settings(grant.provider());
-            if(!TaskProviderConnections.settingsHash(settings).equals(grant.settingsHash()))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
-            var tokens=clients.oauth(grant.provider()).exchange(settings,input.path("code").asText(),grant.verifier(),clock.now(),grant.writable());
             var provider=clients.cloud(grant.provider());var account=provider.account(tokens.access());
-            var catalog=provider.catalog(tokens.access());
-            var response=tx(()->ApiReplies.resource(200,connections().connect(grant,settings,account,tokens,catalog),null));refresh.wake();return response;
+            if(reply!=null&&!account.id().equals(reply.path("remoteAccountId").asText()))throw new ApiFailure(409,"TASK_PROVIDER_ACCOUNT_CHANGED");
+            List<TaskCloudProvider.RemoteList> observed=List.of();RuntimeException taskCatalogFailure=null;
+            if(grant.services().path("tasks").asBoolean())try{observed=provider.catalog(tokens.access());}catch(RuntimeException failure){observed=null;taskCatalogFailure=failure;}
+            var catalog=observed;var direct=settings;var connected=store.authenticated(identity,()->grant.broker()!=null?connections().connectShared(grant,account,tokens,catalog):connections().connect(grant,direct,account,tokens,catalog));
+            if(taskCatalogFailure!=null){String code=InternetCalendars.failure(taskCatalogFailure);store.authenticated(identity,()->{var auth=connections().required(uuid(connected.get("id")));auth.put("lastError",code);auth.withObject("listErrors").put("",code);connections().save(TaskProviderConnections.AUTH,auth);return null;});}
+            if(grant.services().path("calendars").asBoolean()){
+                try{var calendars=clients.calendars(grant.provider()).catalog(tokens.access());store.authenticated(identity,()->{new InternetCalendars(store).catalog(uuid(connected.get("id")),calendars);return null;});}
+                catch(RuntimeException failure){store.authenticated(identity,()->{new InternetCalendars(store).error(uuid(connected.get("id")),InternetCalendars.failure(failure));return null;});}
+            }
+            refresh.wake();return tx(()->ApiReplies.resource(200,connections().view(uuid(connected.get("id"))),null));
         }catch(TaskProviderHttp.Failure failure){throw providerFailure(failure);}
     }
     @PUT @Path("/{id}/lists") public Response select(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){

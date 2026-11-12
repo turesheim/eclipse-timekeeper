@@ -76,7 +76,7 @@ def main():
                     relay(self)
                 for verb in ['GET','POST','PUT','DELETE','OPTIONS','HEAD','PROPFIND','MKCOL','MOVE']:setattr(handler,'do_'+verb,fault_relay)
         certificate=data/'fixture-cert.pem';base=fixture.base;process=None;log=(data/'server.log').open('w')
-        environment={**os.environ,'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:'+str(data/'database'),'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry),'TIMEKEEPER_SERVER_SETUP_FILE':str(data/'setup.json'),'TIMEKEEPER_PUBLIC_ORIGIN':base,**fixture.environment}
+        environment={**{key:value for key,value in os.environ.items() if not key.startswith('DAGSVERK_')},'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:'+str(data/'database'),'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry),'TIMEKEEPER_SERVER_SETUP_FILE':str(data/'setup.json'),'TIMEKEEPER_PUBLIC_ORIGIN':base,**fixture.environment}
         def start():
             nonlocal process
             process=subprocess.Popen([args.java,'-Dquarkus.http.port='+str(port),'-jar',str(data/'timekeeper-server/quarkus-run.jar')],env=environment,stdout=log,stderr=subprocess.STDOUT)

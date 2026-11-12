@@ -17,7 +17,7 @@ class ComposeBackupTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         shutil.copy(BACKUP_SCRIPT, self.root / 'backup.sh')
-        for name in ('instance_material.py', 'restore-database.py'):
+        for name in ('instance_material.py', 'restore-database.py', 'environment.sh'):
             shutil.copy(ROOT / 'server/deploy' / name, self.root / name)
         self.state = self.root / 'state with spaces'
         for name, content in {'config/tokens.json': '[]',
@@ -63,7 +63,7 @@ else:
 ''')
         docker.chmod(0o755)
         self.environment = {key: value for key, value in os.environ.items()
-                            if not key.startswith('TIMEKEEPER_')}
+                            if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_'))}
         self.environment['PATH'] = str(binary) + os.pathsep + os.environ['PATH']
 
     def backup(self, **environment):

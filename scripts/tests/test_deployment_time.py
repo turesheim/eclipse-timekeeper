@@ -22,7 +22,7 @@ class DeploymentTimeTest(unittest.TestCase):
                 subprocess.run(['sh', str(root / 'set-deployment-time.sh'), timestamp], check=True)
                 self.assertEqual('# operator settings\nTIMEKEEPER_STATE_DIR=/srv/timekeeper\n'
                                  'OTHER_SETTING="keep spaces"\n'
-                                 f'TIMEKEEPER_DEPLOYED_AT={timestamp}\n', environment.read_text())
+                                 f'DAGSVERK_DEPLOYED_AT={timestamp}\n', environment.read_text())
                 self.assertEqual(0o600, environment.stat().st_mode & 0o777)
                 self.assertEqual([], list(root.glob('.env.deployment.*')))
 

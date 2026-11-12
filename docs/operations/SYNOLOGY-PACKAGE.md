@@ -542,7 +542,7 @@ checks those properties, compiles the small static installer, bundles the image,
 and writes the `.spk`, SHA-256 checksum and provenance JSON:
 
 ```sh
-docker build --platform linux/amd64 --build-arg TIMEKEEPER_BUILD_COMMIT="$COMMIT" --build-arg TIMEKEEPER_BUILD_DIRTY=false -t "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$COMMIT" -f server/Dockerfile .
+docker build --platform linux/amd64 --build-arg DAGSVERK_BUILD_COMMIT="$COMMIT" --build-arg DAGSVERK_BUILD_DIRTY=false -t "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$COMMIT" -f server/Dockerfile .
 python3 server/scripts/package_synology.py --commit "$COMMIT" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$COMMIT" --revision 1 --output server/target/synology
 ```
 

@@ -1468,3 +1468,21 @@ work graph exactly once and is remapped by account restoration. Null IDs retain
 a deliberate task deletion. Preview rolls back both graph and link writes;
 restoration suppresses automatic enrollment while restoring original bytes and
 then validates/installs the remapped links. Older archives omit this optional field.
+
+
+### Internet-account connection readiness
+
+`GET /task-providers` returns owner-scoped connected data even when new OAuth
+connections are unavailable. `providers` now reflects effective-mode readiness;
+`readiness` supplies stable per-provider codes without infrastructure details.
+`?check=true` explicitly bypasses the short-lived readiness cache. Managed checks
+resolve discovery/override and verify the broker's healthy provider registrations;
+direct checks validate the effective registration and HTTPS callback. Neither
+starts provider consent. Authorization start revalidates before creating state.
+
+Managed and direct grants support Google/Microsoft calendars and tasks separately
+or together. Scopes match selected services; calendars and Microsoft tasks remain
+read-only, and Google task writes require explicit TWO_WAY consent. Existing grants
+retain their original refresh path through mode changes. Initialization failures
+are retryable connection errors, not uncertain business-record writes. Genuine
+persistent-write uncertainty still requires review of current values.

@@ -206,7 +206,7 @@ expires existing result cursors without changing note content or timestamps.
 
 ### Search cache and recovery
 
-`TIMEKEEPER_NOTES_SEARCH_CACHE_DIRECTORY` defaults to `AUTO`: a private
+`DAGSVERK_NOTES_SEARCH_CACHE_DIRECTORY` defaults to `AUTO`: a private
 `timekeeper-notes-search-*` directory in the JVM temporary directory. A clean
 shutdown removes an automatic cache; a restart rebuilds it from SQL. Abruptly
 terminated processes can leave temporary directories for the operator or OS
@@ -218,9 +218,9 @@ only the canonical database in the backup plan. Restore works without any index.
 
 The defaults are eight open account caches, two concurrent searches, a 16 GB soft
 aggregate disk limit within the configured cache root and 1 GiB free-space
-headroom. Configure them with `TIMEKEEPER_NOTES_SEARCH_OPEN_OWNERS` (1–32),
-`TIMEKEEPER_NOTES_SEARCH_MAX_CACHE_BYTES` and
-`TIMEKEEPER_NOTES_SEARCH_MIN_FREE_BYTES`. Disk usage is measured every two seconds;
+headroom. Configure them with `DAGSVERK_NOTES_SEARCH_OPEN_OWNERS` (1–32),
+`DAGSVERK_NOTES_SEARCH_MAX_CACHE_BYTES` and
+`DAGSVERK_NOTES_SEARCH_MIN_FREE_BYTES`. Disk usage is measured every two seconds;
 bounded in-flight work and Lucene merges can exceed the soft limit. Inactive
 account caches are reclaimed when the limit is reached. Idle handles close after
 ten minutes. The worker processes at most 32 records or about 8 MB per replay

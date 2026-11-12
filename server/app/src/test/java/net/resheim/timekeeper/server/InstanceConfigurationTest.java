@@ -7,6 +7,8 @@ import java.nio.file.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class InstanceConfigurationTest {
     @TempDir Path directory;
@@ -14,18 +16,19 @@ class InstanceConfigurationTest {
         return new HashMap<>(Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:private-source","quarkus.datasource.db-kind","h2","quarkus.datasource.username","sa",
             "timekeeper.auth.tokens-file","NONE","timekeeper.auth.setup-file","NONE"));
     }
-    @Test void environmentAliasesAreCapturedThroughTheirCanonicalPropertiesOnly() throws Exception {
+    @ParameterizedTest @ValueSource(strings={"TIMEKEEPER_","DAGSVERK_"}) void environmentAliasesAreCapturedThroughTheirCanonicalPropertiesOnly(String prefix) throws Exception {
         Path token=directory.resolve("tokens.json");Files.writeString(token,"private configured hashes");
-        var properties=base();properties.put("timekeeper.auth.tokens-file","${TIMEKEEPER_SERVER_TOKENS_FILE:NONE}");
-        var environment=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_SERVER_TOKENS_FILE",token.toString()),300);
-        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment).build();
+        var properties=base();properties.put("timekeeper.auth.tokens-file","${DAGSVERK_SERVER_TOKENS_FILE:${TIMEKEEPER_SERVER_TOKENS_FILE:NONE}}");
+        var supplied=Map.of(prefix+"SERVER_TOKENS_FILE",token.toString());
+        var environment=new io.smallrye.config.EnvConfigSource(supplied,300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment,new DagsverkEnvironmentConfigSource(supplied)).build();
         try(var snapshot=InstanceConfiguration.capture(config)) {
             assertEquals(1,snapshot.files().size());assertEquals(token.toString(),snapshot.document().path("properties").path("timekeeper.auth.tokens-file").asText());
             assertFalse(snapshot.document().path("properties").has("timekeeper.server.tokens.file"));
         }
         // Explicitly declared application inputs still require classification.
         properties.put("timekeeper.server.tokens.file",token.toString());
-        var declared=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment).build();
+        var declared=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment,new DagsverkEnvironmentConfigSource(supplied)).build();
         rejects(()->InstanceConfiguration.capture(declared));
     }
     @Test void credentialsAndConfiguredFilesIncludingNamedTlsKeysAreCapturedExactly() throws Exception {
@@ -107,20 +110,22 @@ class InstanceConfigurationTest {
             assertEquals("NONE",snapshot.document().path("properties").path("timekeeper.auth.setup-file").asText());assertTrue(snapshot.files().isEmpty());
         }
     }
-    @Test void entrypointSecretFilesAndTheirResolvedValuesAreBothInventoried() throws Exception {
+    @ParameterizedTest @ValueSource(strings={"TIMEKEEPER_","DAGSVERK_"}) void entrypointSecretFilesAndTheirResolvedValuesAreBothInventoried(String prefix) throws Exception {
         Path database=directory.resolve("database-password"),smtp=directory.resolve("smtp-password");Files.writeString(database,"private DB secret\n");Files.writeString(smtp,"private SMTP secret\n");
         var values=base();values.put("quarkus.datasource.password","private DB secret");values.put("quarkus.mailer.password","private SMTP secret");
-        var env=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_SERVER_DB_PASSWORD_FILE",database.toString(),"TIMEKEEPER_SMTP_PASSWORD_FILE",smtp.toString()),300);
-        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(values,"application",100),env).build();
+        var supplied=Map.of(prefix+"SERVER_DB_PASSWORD_FILE",database.toString(),prefix+"SMTP_PASSWORD_FILE",smtp.toString());
+        var env=new io.smallrye.config.EnvConfigSource(supplied,300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(values,"application",100),env,new DagsverkEnvironmentConfigSource(supplied)).build();
         try(var snapshot=InstanceConfiguration.capture(config)) {
             assertEquals(2,snapshot.files().size());assertEquals("private DB secret",snapshot.document().path("properties").path("quarkus.datasource.password").asText());
             assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"private DB secret\n".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
             assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"private SMTP secret\n".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
         }
     }
-    @Test void nativeMaintenanceMarkerIsRuntimeGuardRatherThanRequiredArchiveInput() throws Exception {
-        var env=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_MAINTENANCE_FILE",directory.resolve("absent-pending.json").toString()),300);
-        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(base(),"application",100),env).build();
+    @ParameterizedTest @ValueSource(strings={"TIMEKEEPER_","DAGSVERK_"}) void nativeMaintenanceMarkerIsRuntimeGuardRatherThanRequiredArchiveInput(String prefix) throws Exception {
+        var supplied=Map.of(prefix+"MAINTENANCE_FILE",directory.resolve("absent-pending.json").toString());
+        var env=new io.smallrye.config.EnvConfigSource(supplied,300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(base(),"application",100),env,new DagsverkEnvironmentConfigSource(supplied)).build();
         try(var snapshot=InstanceConfiguration.capture(config)) {
             assertTrue(snapshot.files().isEmpty());
             assertEquals(directory.resolve("absent-pending.json").toString(),snapshot.document().path("properties").path("timekeeper.maintenance.file").asText());

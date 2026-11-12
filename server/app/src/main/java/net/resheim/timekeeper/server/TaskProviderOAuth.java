@@ -30,35 +30,39 @@ final class TaskProviderOAuth {
         @Override public String toString(){return "Task provider credentials";}
     }
     private static final Base64.Encoder BASE64=Base64.getUrlEncoder().withoutPadding();
-    private static final String GOOGLE_READ="https://www.googleapis.com/auth/tasks.readonly",GOOGLE_WRITE="https://www.googleapis.com/auth/tasks";
+    private static final String GOOGLE_WRITE="https://www.googleapis.com/auth/tasks";
     private final TaskCloudProvider.Provider provider;
     private final TaskProviderHttp http;
     TaskProviderOAuth(TaskCloudProvider.Provider provider){this(provider,new TaskProviderHttp(Set.of("oauth2.googleapis.com","login.microsoftonline.com")));}
     TaskProviderOAuth(TaskCloudProvider.Provider provider,TaskProviderHttp http){this.provider=provider;this.http=http;}
 
     Attempt begin(Settings settings){return begin(settings,false);}
-    Attempt begin(Settings settings,boolean writable){
+    Attempt begin(Settings settings,boolean writable){return begin(settings,services(writable));}
+    Attempt begin(Settings settings,JsonNode services){
         var random=new SecureRandom();byte[] state=new byte[32],verifier=new byte[32];random.nextBytes(state);random.nextBytes(verifier);
         String opaque=BASE64.encodeToString(state),proof=BASE64.encodeToString(verifier);
         var values=new LinkedHashMap<String,String>();values.put("client_id",settings.clientId());values.put("redirect_uri",settings.redirect());
-        values.put("response_type","code");values.put("scope",requestedScopes(writable));values.put("state",opaque);values.put("code_challenge",challenge(proof));values.put("code_challenge_method","S256");
-        if(provider==TaskCloudProvider.Provider.GOOGLE){values.put("access_type","offline");values.put("prompt","consent");}
-        else values.put("response_mode","query");
+        values.put("response_type","code");values.put("scope",requestedScopes(services));values.put("state",opaque);values.put("code_challenge",challenge(proof));values.put("code_challenge_method","S256");
+        if(provider==TaskCloudProvider.Provider.GOOGLE){values.put("access_type","offline");values.put("prompt","consent select_account");}
+        else {values.put("response_mode","query");values.put("prompt","select_account");}
         return new Attempt(opaque,proof,authorize()+"?"+form(values));
     }
     Tokens exchange(Settings settings,String code,String verifier,Instant now){return exchange(settings,code,verifier,now,false);}
-    Tokens exchange(Settings settings,String code,String verifier,Instant now,boolean writable){
+    Tokens exchange(Settings settings,String code,String verifier,Instant now,boolean writable){return exchange(settings,code,verifier,now,services(writable));}
+    Tokens exchange(Settings settings,String code,String verifier,Instant now,JsonNode services){
         if(!bounded(code,8192)||verifier==null||!verifier.matches("[A-Za-z0-9._~-]{43,128}"))throw failure("TASK_PROVIDER_AUTHORIZATION_EXPIRED");
         var values=client(settings);values.put("grant_type","authorization_code");values.put("code",code);values.put("code_verifier",verifier);values.put("redirect_uri",settings.redirect());
-        return tokens(send(values),null,now,writable);
+        return tokens(send(values),null,now,services);
     }
     Tokens refresh(Settings settings,Tokens previous,Instant now){return refresh(settings,previous,now,false);}
-    Tokens refresh(Settings settings,Tokens previous,Instant now,boolean writable){
+    Tokens refresh(Settings settings,Tokens previous,Instant now,boolean writable){return refresh(settings,previous,now,services(writable));}
+    Tokens refresh(Settings settings,Tokens previous,Instant now,JsonNode services){
+        boolean writable=services.path("writableTasks").asBoolean();
         if(previous==null||!secret(previous.refresh()))throw failure("TASK_PROVIDER_RECONNECT_REQUIRED");
         if(writable&&!canWrite(previous.scopes()))throw failure("TASK_PROVIDER_PERMISSION_REQUIRED");
         var values=client(settings);values.put("grant_type","refresh_token");values.put("refresh_token",previous.refresh());
-        if(provider==TaskCloudProvider.Provider.MICROSOFT)values.put("scope",requestedScopes(writable));
-        return tokens(send(values),previous,now,writable);
+        if(provider==TaskCloudProvider.Provider.MICROSOFT)values.put("scope",requestedScopes(services));
+        return tokens(send(values),previous,now,services);
     }
     private LinkedHashMap<String,String> client(Settings settings){
         var values=new LinkedHashMap<String,String>();values.put("client_id",settings.clientId());values.put("client_secret",settings.clientSecret());return values;
@@ -73,7 +77,7 @@ final class TaskProviderOAuth {
             throw failure;
         }
     }
-    private Tokens tokens(JsonNode value,Tokens previous,Instant now,boolean writable){
+    private Tokens tokens(JsonNode value,Tokens previous,Instant now,JsonNode services){
         if(!value.path("access_token").isTextual()||!value.path("token_type").isTextual()
                 ||value.has("refresh_token")&&!value.get("refresh_token").isTextual())throw failure("TASK_PROVIDER_INVALID_RESPONSE");
         String access=value.path("access_token").asText("");
@@ -87,15 +91,13 @@ final class TaskProviderOAuth {
             var supplied=value.get("scope");if(!supplied.isTextual()||supplied.asText().isBlank()||supplied.asText().length()>16384)throw failure("TASK_PROVIDER_INVALID_RESPONSE");
             scopes=new HashSet<>(Arrays.asList(supplied.asText().trim().split(" +")));
         }else if(previous!=null)scopes=previous.scopes();else throw failure("TASK_PROVIDER_PERMISSION_REQUIRED");
-        boolean readable=provider==TaskCloudProvider.Provider.GOOGLE?scopes.contains(GOOGLE_READ)||scopes.contains(GOOGLE_WRITE)
-                :hasGraphScope(scopes,"Tasks.Read")||hasGraphScope(scopes,"Tasks.ReadWrite");
-        boolean identity=provider==TaskCloudProvider.Provider.GOOGLE?scopes.contains("openid"):hasGraphScope(scopes,"User.Read");
-        if(!readable||!identity||writable&&!canWrite(scopes))throw failure("TASK_PROVIDER_PERMISSION_REQUIRED");
+        if(!ProviderScopes.granted(provider.name().toLowerCase(Locale.ROOT),scopes,services.path("tasks").asBoolean(),services.path("calendars").asBoolean(),services.path("writableTasks").asBoolean()))throw failure("TASK_PROVIDER_PERMISSION_REQUIRED");
         return new Tokens(access,refresh,now.plusSeconds(seconds),scopes);
     }
     private static boolean hasGraphScope(Set<String> scopes,String name){return scopes.contains(name)||scopes.contains("https://graph.microsoft.com/"+name);}
     boolean canWrite(Set<String> scopes){return provider==TaskCloudProvider.Provider.GOOGLE?scopes.contains(GOOGLE_WRITE):hasGraphScope(scopes,"Tasks.ReadWrite");}
-    private String requestedScopes(boolean writable){return provider==TaskCloudProvider.Provider.GOOGLE?"openid "+(writable?GOOGLE_WRITE:GOOGLE_READ):"openid offline_access https://graph.microsoft.com/User.Read https://graph.microsoft.com/Tasks."+(writable?"ReadWrite":"Read");}
+    private static JsonNode services(boolean writable){return JsonValues.object().put("tasks",true).put("calendars",false).put("writableTasks",writable);}
+    private String requestedScopes(JsonNode services){return ProviderScopes.requested(provider.name().toLowerCase(Locale.ROOT),services.path("tasks").asBoolean(),services.path("calendars").asBoolean(),services.path("writableTasks").asBoolean());}
     private String authorize(){return provider==TaskCloudProvider.Provider.GOOGLE?"https://accounts.google.com/o/oauth2/v2/auth":"https://login.microsoftonline.com/common/oauth2/v2.0/authorize";}
     private String token(){return provider==TaskCloudProvider.Provider.GOOGLE?"https://oauth2.googleapis.com/token":"https://login.microsoftonline.com/common/oauth2/v2.0/token";}
     static String challenge(String verifier){

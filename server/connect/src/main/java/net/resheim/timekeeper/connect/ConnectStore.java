@@ -24,11 +24,16 @@ class ConnectStore {
     private SecretKeySpec key;
     record Row(String id,String kind,long version,long expires,ObjectNode value){@Override public String toString(){return "Private shared-sign-in record";}}
     @PostConstruct void start(){
+        net.resheim.timekeeper.server.EnvironmentAliases.report();
         try{byte[] bytes=Base64.getDecoder().decode(settings.encryptionKey());if(bytes.length!=32)throw new IllegalArgumentException();key=new SecretKeySpec(bytes,"AES");}
         catch(RuntimeException invalid){throw new IllegalStateException("A 256-bit shared-sign-in encryption key is required");}
         try(var connection=datasource.getConnection();var statement=connection.createStatement()){
             statement.execute("CREATE TABLE IF NOT EXISTS tk_connect_record (record_key VARCHAR(100) PRIMARY KEY, kind VARCHAR(20) NOT NULL, version BIGINT NOT NULL, expires_at BIGINT NOT NULL, payload TEXT NOT NULL)");
         }catch(SQLException failure){throw new ConnectFailure(503,"SERVICE_UNAVAILABLE");}
+    }
+    void ready(){
+        try(var connection=datasource.getConnection();var query=connection.prepareStatement("SELECT 1 FROM tk_connect_record WHERE record_key=?")){query.setString(1,"health");query.setQueryTimeout(3);try(var rows=query.executeQuery()){} }
+        catch(SQLException unavailable){throw new ConnectFailure(503,"SERVICE_UNAVAILABLE");}
     }
     DataSource database(){return datasource;}
     Row insert(String id,String kind,long expires,ObjectNode value){

@@ -47,7 +47,7 @@ class SynologyPackageTest(unittest.TestCase):
         if foreign_mount:
             project=json.loads(payload['project/compose.yaml']);project['services']['server']['volumes'][0]['source']='/var/packages/other/target/private/config';payload['project/compose.yaml']=json.dumps(project).encode()
         if invalid_instance_storage:
-            project=json.loads(payload['project/compose.yaml']);project['services']['server']['environment']['TIMEKEEPER_INSTANCE_RESTORE_STORAGE']='NONE';payload['project/compose.yaml']=json.dumps(project).encode()
+            project=json.loads(payload['project/compose.yaml']);project['services']['server']['environment']['DAGSVERK_INSTANCE_RESTORE_STORAGE']='NONE';payload['project/compose.yaml']=json.dumps(project).encode()
         if empty_project:payload['project/compose.yaml']=b'{"services":{}}'
         payload=archive(payload,True)
         info={'package':'timekeeper','arch':'r1000','os_min_ver':'7.2.2-72806','version':'1.99.0-1',

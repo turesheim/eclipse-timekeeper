@@ -15,8 +15,8 @@ Configure persistent private directories with existing parent directories:
 
 | Setting | Purpose |
 | --- | --- |
-| `TIMEKEEPER_INSTANCE_BACKUP_STORAGE` | Encrypted backups/uploads and private worker files |
-| `TIMEKEEPER_INSTANCE_RESTORE_STORAGE` | Prepared restore image, handoff and recovered configuration/material |
+| `DAGSVERK_INSTANCE_BACKUP_STORAGE` | Encrypted backups/uploads and private worker files |
+| `DAGSVERK_INSTANCE_RESTORE_STORAGE` | Prepared restore image, handoff and recovered configuration/material |
 
 Their canonical properties are `timekeeper.instance-backup.storage` and
 `timekeeper.instance-restore.storage`. Both default to `NONE`. Restore preparation

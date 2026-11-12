@@ -36,8 +36,8 @@ class TaskProviderOAuthTest {
         });done.join();return bytes.toString(StandardCharsets.UTF_8);
     }
     @Test void writeAuthorizationRequiresAnExplicitRequestAndAnActualWriteGrant(){
-        assertEquals("openid "+READ,form(URI.create(oauth().begin(settings()).address()).getRawQuery()).get("scope"));
-        var requested=form(URI.create(oauth().begin(settings(),true).address()).getRawQuery());assertEquals("openid "+WRITE,requested.get("scope"));assertEquals("S256",requested.get("code_challenge_method"));
+        assertEquals("openid email profile "+READ,form(URI.create(oauth().begin(settings()).address()).getRawQuery()).get("scope"));
+        var requested=form(URI.create(oauth().begin(settings(),true).address()).getRawQuery());assertEquals("openid email profile "+WRITE,requested.get("scope"));assertEquals("S256",requested.get("code_challenge_method"));
         var readOnly=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"access\",\"refresh_token\":\"refresh\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\"openid "+READ+"\"}"));
         assertEquals("TASK_PROVIDER_PERMISSION_REQUIRED",assertThrows(TaskProviderHttp.Failure.class,()->readOnly.exchange(settings(),"code",VERIFIER,NOW,true)).getMessage());assertEquals("access",readOnly.exchange(settings(),"code",VERIFIER,NOW).access());
         var granted=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"access\",\"refresh_token\":\"refresh\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\"openid "+WRITE+"\"}"));
@@ -52,11 +52,24 @@ class TaskProviderOAuthTest {
         var retained=oauth(TaskCloudProvider.Provider.GOOGLE,request->reply(200,"{\"access_token\":\"renewed\",\"token_type\":\"Bearer\",\"expires_in\":3600}"));
         var renewed=retained.refresh(settings(),writable,NOW,true);assertTrue(renewed.scopes().contains(WRITE));assertEquals("refresh",renewed.refresh());
     }
+    @Test void calendarOnlyRefreshNeverAddsTaskScopesAndMissingSelectedPermissionsAreRejected(){
+        for(var provider:TaskCloudProvider.Provider.values()){
+            var services=JsonValues.object().put("tasks",false).put("calendars",true).put("writableTasks",false);String id=provider.name().toLowerCase(Locale.ROOT),scopes=ProviderScopes.requested(id,false,true,false);
+            var service=oauth(provider,request->{
+                var sent=form(body(request));if(provider==TaskCloudProvider.Provider.MICROSOFT)assertEquals(scopes,sent.get("scope"));
+                return reply(200,"{\"access_token\":\"renewed\",\"token_type\":\"Bearer\",\"expires_in\":3600}");
+            });
+            var previous=new TaskProviderOAuth.Tokens("old","refresh",NOW,Set.copyOf(Arrays.asList(scopes.split(" "))));
+            assertEquals(previous.scopes(),service.refresh(settings(),previous,NOW,services).scopes());
+            var denied=oauth(provider,request->reply(200,"{\"access_token\":\"access\",\"refresh_token\":\"refresh\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\""+ProviderScopes.requested(id,true,false,false)+"\"}"));
+            assertEquals("TASK_PROVIDER_PERMISSION_REQUIRED",assertThrows(TaskProviderHttp.Failure.class,()->denied.exchange(settings(),"code",VERIFIER,NOW,services)).getMessage());
+        }
+    }
     @Test void pkceMatchesTheRfc7636S256Vector(){assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",TaskProviderOAuth.challenge(VERIFIER));}
     @Test void googleRequestsReadOnlyOfflineAccessWithUniqueStateAndNoClientSecret(){
         var first=oauth().begin(settings());var second=oauth().begin(settings());var values=form(java.net.URI.create(first.address()).getRawQuery());
         assertTrue(first.address().startsWith("https://accounts.google.com/o/oauth2/v2/auth?"));assertFalse(first.address().contains("private-client-secret"));
-        assertEquals("code",values.get("response_type"));assertEquals("openid "+READ,values.get("scope"));assertEquals("offline",values.get("access_type"));assertEquals("consent",values.get("prompt"));
+        assertEquals("code",values.get("response_type"));assertEquals("openid email profile "+READ,values.get("scope"));assertEquals("offline",values.get("access_type"));assertEquals("consent select_account",values.get("prompt"));
         assertEquals(first.state(),values.get("state"));assertTrue(first.state().matches("[A-Za-z0-9_-]{43}"));assertNotEquals(first.state(),second.state());
         assertNotEquals(first.verifier(),second.verifier());assertEquals(TaskProviderOAuth.challenge(first.verifier()),values.get("code_challenge"));assertEquals("S256",values.get("code_challenge_method"));
         assertFalse(first.toString().contains(first.verifier()));assertFalse(settings().toString().contains("private-client-secret"));

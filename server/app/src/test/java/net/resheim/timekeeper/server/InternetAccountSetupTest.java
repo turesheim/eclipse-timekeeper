@@ -41,5 +41,17 @@ class InternetAccountSetupTest {
         setup.origins.configure("https://dagsverk.example.test:8443");setup.shared.enabled=false;var direct=setup.inspect(true);
         assertEquals("DIRECT",direct.path("mode").asText());assertTrue(direct.path("googleConfigured").asBoolean());assertFalse(direct.path("microsoftConfigured").asBoolean());
         assertEquals(direct.path("callbackUrl"),direct.path("googleRedirectUrl"));assertTrue(direct.path("serviceUrl").isNull());assertEquals(0,calls.get());assertFalse(direct.toString().contains("private-google"));
+    }    @Test void readinessCachesBrieflyAndExplicitRetryRechecksWhileInvalidCallbacksStayDisabled(){
+        var calls=new AtomicInteger();var setup=setup("{\"protocol\":1,\"google\":true,\"microsoft\":false}",calls);
+        assertEquals("READY",setup.readiness(false).path("google").asText());setup.readiness(false);assertEquals(1,calls.get());
+        assertEquals("TASK_PROVIDER_NOT_CONFIGURED",setup.readiness(true).path("microsoft").asText());assertEquals(2,calls.get());
+        setup.origins.configure("http://nas.example.test:8443");assertEquals("TASK_PROVIDER_CALLBACK_INVALID",setup.readiness(false).path("google").asText());assertEquals(2,calls.get());
+        setup.origins.configure("NONE");assertEquals("TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED",setup.readiness(false).path("google").asText());assertEquals(2,calls.get());
     }
+    @Test void aHealthyBrokerWithNoRegistrationsIsNotReportedReady(){
+        var setup=setup("{\"protocol\":1,\"google\":false,\"microsoft\":false}",new AtomicInteger());
+        assertEquals("REGISTRATION_REQUIRED",setup.inspect(true).path("status").asText());
+        var readiness=setup.readiness(true);assertEquals("TASK_PROVIDER_NOT_CONFIGURED",readiness.path("google").asText());assertEquals("TASK_PROVIDER_NOT_CONFIGURED",readiness.path("microsoft").asText());
+    }
+
 }

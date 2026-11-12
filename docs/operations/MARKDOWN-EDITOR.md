@@ -68,7 +68,7 @@ preserves the exact stored deadline, start, flags and urgency.
 
 Canonical saves, including WebDAV and imports, reconcile immediately. The
 background worker processes up to 25 sources of each kind every 30 seconds and
-resumes scanning after restart. `TIMEKEEPER_NOTE_TASKS_AUTOMATIC=false` disables
+resumes scanning after restart. `DAGSVERK_NOTE_TASKS_AUTOMATIC=false` disables
 only background enrollment; normal Markdown saves continue synchronizing tasks.
 
 Vault extensions include:

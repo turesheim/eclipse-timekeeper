@@ -51,7 +51,7 @@ class DistributionDocumentationTest(unittest.TestCase):
             package(output, COMMIT)
             with tarfile.open(output) as archive:
                 names = set(archive.getnames())
-                self.assertTrue({'migration/notes-v10.sql','migration/schema-v10-postgresql.shape','NOTES-WEBDAV.md','TASK-PROVIDERS.md','webdav_sync.py'}.issubset(names))
+                self.assertTrue({'migration/notes-v10.sql','migration/schema-v10-postgresql.shape','NOTES-WEBDAV.md','TASK-PROVIDERS.md','SHARED-SIGN-IN.md','CONFIGURATION.md','environment.sh','webdav_sync.py'}.issubset(names))
                 self.assertNotIn('.env', names)
                 self.assertFalse(any(name.startswith(('state/', 'secrets/')) for name in names))
                 local = archive.extractfile('LOCAL.md').read().decode()

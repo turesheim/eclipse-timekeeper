@@ -40,7 +40,7 @@ def main():
         token=secrets.token_urlsafe(32);registry=root/'tokens.json'
         registry.write_text(json.dumps([{'ownerId':'label-upgrade','sha256':hashlib.sha256(token.encode()).hexdigest(),'permissions':['read','write']}]))
         registry.chmod(0o600)
-        environment={**os.environ,'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:'+str(root/'database'),'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry),'TIMEKEEPER_PUBLIC_ORIGIN':'NONE','TIMEKEEPER_SERVER_SETUP_FILE':'NONE'}
+        environment={**{key:value for key,value in os.environ.items() if not key.startswith('DAGSVERK_')},'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:'+str(root/'database'),'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry),'TIMEKEEPER_PUBLIC_ORIGIN':'NONE','TIMEKEEPER_SERVER_SETUP_FILE':'NONE'}
         process=None;log=None;counter=0;base=None
         def stop():
             nonlocal process,log

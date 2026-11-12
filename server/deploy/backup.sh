@@ -5,10 +5,11 @@ umask 077
 cd "$(dirname "$0")"
 # shellcheck source=/dev/null
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
-if [ "${TIMEKEEPER_COMPOSE_LOCK_HELD:-}" != 1 ]; then
+. ./environment.sh
+if [ "${DAGSVERK_COMPOSE_LOCK_HELD:-}" != 1 ]; then
   exec python3 ./instance_material.py locked "$0" "$@"
 fi
-state_dir=${TIMEKEEPER_STATE_DIR:-./state}
+state_dir=${DAGSVERK_STATE_DIR:-./state}
 backup_dir="$state_dir/backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"

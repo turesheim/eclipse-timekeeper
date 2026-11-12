@@ -34,15 +34,17 @@ final class TaskProviderConnections {
     static String sharedHash(String broker){return hash("shared-sign-in\n"+broker);}
 
     ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser){return begin(provider,settings,browser,false);}
-    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,boolean writable){
+    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,boolean writable){return begin(provider,settings,browser,object().put("tasks",true).put("calendars",false).put("writableTasks",writable));}
+    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,JsonNode services){
+        boolean writable=services.path("writableTasks").asBoolean();SharedConnectClient.services(services);
         if(writable&&provider!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
         String binding=binding(browser);Instant now=store.now();
         for(var flow:store.list(FLOW))if(!Instant.parse(flow.path("expires").asText()).isAfter(now))remove(FLOW,flow);
         if(store.list(FLOW).size()>=5)throw new ApiFailure(429,"TASK_PROVIDER_AUTHORIZATION_LIMIT");
-        var attempt=new TaskProviderOAuth(provider).begin(settings,writable);
+        var attempt=new TaskProviderOAuth(provider).begin(settings,services);
         var value=object().put("provider",provider.name()).put("stateHash",hash(attempt.state())).put("browserHash",binding)
                 .put("verifier",attempt.verifier()).put("settingsHash",settingsHash(settings)).put("writable",writable).put("expires",now.plusSeconds(600).toString());
-        insert(FLOW,flowId(attempt.state()),value);
+        value.set("services",services.deepCopy());insert(FLOW,flowId(attempt.state()),value);
         return object().put("authorizationUrl",attempt.address()).put("expiresAt",value.path("expires").asText());
     }
     Grant consume(String state,String browser){

@@ -111,7 +111,7 @@ def main():
         fixture = stage / 'fixture'
         fixture.mkdir(mode=0o700)
         environment = {key: value for key, value in os.environ.items()
-                       if not key.startswith(('TIMEKEEPER_', 'QUARKUS_', 'SMALLRYE_'))
+                       if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_', 'QUARKUS_', 'SMALLRYE_'))
                        and key not in {'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS'}}
         prepared = subprocess.run(['java', '-cp', fixture_classpath,
                                    'net.resheim.timekeeper.server.InstanceRestorePackagedFixture', str(fixture)],
@@ -142,7 +142,7 @@ def main():
         cancelled_fixture.mkdir(mode=0o700)
         prepared = subprocess.run(['java', '-cp', fixture_classpath,
                                    'net.resheim.timekeeper.server.InstanceRestorePackagedFixture', str(cancelled_fixture)],
-                                  cwd=ROOT, env={key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')},
+                                  cwd=ROOT, env={key: value for key, value in environment.items() if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_'))},
                                   capture_output=True, timeout=40)
         if prepared.returncode:
             raise ValueError('Disposable cancellation fixture failed')
@@ -160,10 +160,10 @@ def main():
             raise ValueError('Cancelled recovery retained its plaintext handoff')
         verify_http_recovery(app, cancelled_fixture, environment, restored=False)
         verify_public_restore(ROOT, app, stage / 'public-fixture', fixture_classpath,
-                              {key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')})
+                              {key: value for key, value in environment.items() if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_'))})
         for name, origin in [('same-rp', 'https://source.example'), ('changed-rp', 'https://destination.example')]:
             verify_public_restore(ROOT, app, stage / name, fixture_classpath,
-                                  {key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')},
+                                  {key: value for key, value in environment.items() if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_'))},
                                   deployment_origin=origin)
         evidence = {'sourceCommit': manifest['commit'], 'distributionSha256': digest,
                     'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True, 'offlineCancellation': True, 'cancelledStartup': True, 'publicStageConfirm': True, 'restoredJournalLabelAsset': True, 'sourceArchiveUnchanged': True, 'sameRpSignedPasskeyLogin': True, 'changedRpRejectsOriginalCredential': True, 'changedRpPasswordReenrollment': True}

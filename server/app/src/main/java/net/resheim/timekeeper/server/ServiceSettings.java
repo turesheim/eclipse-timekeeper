@@ -52,12 +52,20 @@ class ServiceSettings {
     private static ObjectNode internetDeployment(){
         return object().put("mode",Boolean.parseBoolean(config("timekeeper.connect.shared","true"))?"SHARED":"DIRECT")
                 .put("serviceUrl",config("timekeeper.connect.service-url","").isBlank()?null:config("timekeeper.connect.service-url",""))
-                .put("googleClientId",config("timekeeper.tasks.google.client-id","")).put("googleClientSecret",config("timekeeper.tasks.google.client-secret",""));
+                .put("googleClientId",config("timekeeper.tasks.google.client-id","")).put("googleClientSecret",config("timekeeper.tasks.google.client-secret",""))
+                .put("microsoftClientId",config("timekeeper.tasks.microsoft.client-id","")).put("microsoftClientSecret",config("timekeeper.tasks.microsoft.client-secret",""));
     }
-    private static ObjectNode internet(JsonNode settings){return settings.has(INTERNET)?((ObjectNode)settings.get(INTERNET)).deepCopy():internetDeployment();}
+    private static ObjectNode internet(JsonNode settings){
+        var value=settings.has(INTERNET)?((ObjectNode)settings.get(INTERNET)).deepCopy():internetDeployment();
+        // Old saved settings predate editable Microsoft registrations; retain their effective deployment values.
+        var fallback=internetDeployment();for(String key:List.of("microsoftClientId","microsoftClientSecret"))if(!value.has(key))value.set(key,fallback.get(key));return value;
+    }
     private static void validateInternet(JsonNode value){
-        if(!value.isObject()||value.size()!=4||!Set.of("SHARED","DIRECT").contains(value.path("mode").asText()))throw ApiFailure.validation();
+        var fields=new HashSet<String>();value.fieldNames().forEachRemaining(fields::add);
+        Set<String> legacy=Set.of("mode","serviceUrl","googleClientId","googleClientSecret"),current=Set.of("mode","serviceUrl","googleClientId","googleClientSecret","microsoftClientId","microsoftClientSecret");
+        if(!value.isObject()||!fields.equals(legacy)&&!fields.equals(current)||!Set.of("SHARED","DIRECT").contains(value.path("mode").asText()))throw ApiFailure.validation();
         text(value,"googleClientId",1024);text(value,"googleClientSecret",16384);
+        if(value.has("microsoftClientId")||value.has("microsoftClientSecret")){text(value,"microsoftClientId",1024);text(value,"microsoftClientSecret",16384);}
         if(!value.has("serviceUrl"))throw ApiFailure.validation();
         if(!value.path("serviceUrl").isNull())try{SharedConnectConfiguration.validate(text(value,"serviceUrl",2048));}catch(RuntimeException invalid){throw ApiFailure.validation();}
     }
@@ -131,6 +139,7 @@ class ServiceSettings {
         mail.configure(effective,stored.effectivePassword());localVersion=stored.active();
         var internet=internet(effective);sharedConnect.configure(internet.path("mode").asText().equals("SHARED"),internet.path("serviceUrl").isNull()?null:internet.path("serviceUrl").asText());
         taskProviders.configureGoogle(internet.path("googleClientId").asText(),internet.path("googleClientSecret").asText());
+        taskProviders.configureMicrosoft(internet.path("microsoftClientId").asText(),internet.path("microsoftClientSecret").asText());
     }
     void requireCurrent(Connection c) {
         if(localVersion<0) throw new ApiFailure(503,"UNAVAILABLE");
@@ -188,19 +197,26 @@ class ServiceSettings {
             lock(c);manager(c,proof.principal(),true);var current=read(c,true);
             if(match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");if(!tag(current.version()).equals(match))throw new ApiFailure(412,"STALE_VERSION");
             var value=internet(current.saved());value.put("mode",input.path("mode").asText());value.set("serviceUrl",input.get("serviceUrl"));value.put("googleClientId",input.path("googleClientId").asText());
-            switch(input.path("googleSecretAction").asText()){
-                case "PRESERVE" -> {if(input.has("googleClientSecret"))throw ApiFailure.validation();}
-                case "CLEAR" -> {if(input.has("googleClientSecret"))throw ApiFailure.validation();value.put("googleClientSecret","");}
-                case "REPLACE" -> {String secret=text(input,"googleClientSecret",16384);if(secret.isBlank())throw ApiFailure.validation();value.put("googleClientSecret",secret);}
-                default -> throw ApiFailure.validation();
+            for(String provider:List.of("google","microsoft")){
+                if(!input.has(provider+"SecretAction"))continue;
+                value.put(provider+"ClientId",text(input,provider+"ClientId",1024));
+                switch(input.path(provider+"SecretAction").asText()){
+                    case "PRESERVE" -> {if(input.has(provider+"ClientSecret"))throw ApiFailure.validation();}
+                    case "CLEAR" -> {if(input.has(provider+"ClientSecret"))throw ApiFailure.validation();value.put(provider+"ClientSecret","");}
+                    case "REPLACE" -> {String secret=text(input,provider+"ClientSecret",16384);if(secret.isBlank())throw ApiFailure.validation();value.put(provider+"ClientSecret",secret);}
+                    default -> throw ApiFailure.validation();
+                }
             }
             validateInternet(value);if(value.equals(internet(current.saved())))return internetReply(current,true);
+            // Preserve the old payload during rolling upgrades until Microsoft settings are actually changed.
+            var previous=current.saved().path(INTERNET);var defaults=internetDeployment();
+            if(previous.isObject()&&!previous.has("microsoftClientId")&&value.path("microsoftClientId").equals(defaults.path("microsoftClientId"))&&value.path("microsoftClientSecret").equals(defaults.path("microsoftClientSecret")))value.remove(List.of("microsoftClientId","microsoftClientSecret"));
             long version=current.version()+1;if(version>9007199254740991L)throw ApiFailure.conflict();var saved=current.saved().deepCopy();saved.set(INTERNET,value);
             if(execute(c,"UPDATE tk_service_settings SET version=?,saved=? WHERE id=1 AND version=?",version,saved.toString(),current.version())!=1)throw new ApiFailure(412,"STALE_VERSION");
             return internetReply(read(c,false),true);
         });
     }
-    private static ObjectNode redactedInternet(JsonNode settings){var value=internet(settings);value.put("googleClientSecretConfigured",!value.path("googleClientSecret").asText().isBlank());value.remove("googleClientSecret");return value;}
+    private static ObjectNode redactedInternet(JsonNode settings){var value=internet(settings);for(String provider:List.of("google","microsoft")){value.put(provider+"ClientSecretConfigured",!value.path(provider+"ClientSecret").asText().isBlank());value.remove(provider+"ClientSecret");}return value;}
     private static Reply internetReply(Stored value,boolean canEdit){
         var result=object().put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",value.version()!=value.active()).put("canEdit",canEdit);
         result.set("saved",redactedInternet(value.saved()));result.set("effective",redactedInternet(value.effective()));return new Reply(result,tag(value.version()));
