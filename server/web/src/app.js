@@ -309,7 +309,7 @@ async function refresh() {
       try {current = await session.snapshot((zone) => weekRange(date, zone),null,{signal:controller.signal});}
       catch (error) {
         // A queued refresh supersedes this read, not the authenticated session.
-        if (controller.signal.aborted && reloadAgain && session === api) continue;
+        if (controller.signal.aborted && error.status === 0 && error.code === 'UNAVAILABLE' && reloadAgain && session === api) continue;
         throw error;
       } finally {if (refreshController === controller) refreshController = null;}
       if (session !== api) return;
