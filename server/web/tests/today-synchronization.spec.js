@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
-import {appendEditorText} from './editor-interactions.js';
+import {appendEditorText,nativeConfirmations} from './editor-interactions.js';
 
 const date='2026-05-04';
 const body='# Working journal\n\n'+Array.from({length:400},(_,i)=>`Paragraph ${i}: observations, decisions and follow-up work for the current project.\n\n`).join('');
@@ -85,15 +85,17 @@ for(const mode of ['source','formatted'])for(const transition of ['post-save','r
     // The refresh must preserve the native/ProseMirror undo history as well as the DOM.
     await field.press('ControlOrMeta+z');
     if(mode==='source')await expect(field).not.toHaveValue(/Drafted while synchronizing/);else await expect(field).not.toContainText('Drafted while synchronizing');
+    // WebKit can group native label/body edits into the same undo action.
+    // Label preservation across publication was checked before invoking Undo.
+    await page.locator('#today-note-text').fill('Label drafted during synchronization');
     if(mode==='source'){await field.press('ControlOrMeta+End');await page.keyboard.insertText(' Final local draft.');}
     else await appendEditorText(field.locator('p').last(),' Final local draft.');
-    await field.press('ControlOrMeta+s');await expect.poll(async()=>(await(await api('GET','/day-entries/'+date)).json()).body).toContain('Final local draft.');
-    expect((await(await api('GET','/day-entries/'+date)).json()).text).toBe('Label drafted during synchronization');
+    await field.press('ControlOrMeta+s');await expect.poll(async()=>{const value=await(await api('GET','/day-entries/'+date)).json();return value.body.includes('Final local draft.')&&value.text==='Label drafted during synchronization';}).toBe(true);
   }finally{gate.release();await page.unrouteAll({behavior:'wait'});}
 });
 
 for(const mode of ['source','formatted'])test(`Today ${mode} retains a recovery draft when a peer changes the same note`,async({page,request})=>{
-  const {api}=await setup(page,request),field=await editor(page,mode),gate=holdSnapshots(page),base=await(await api('GET','/day-entries/'+date)).json();
+  const {api}=await setup(page,request),field=await editor(page,mode),gate=holdSnapshots(page),base=await(await api('GET','/day-entries/'+date)).json(),confirmations=nativeConfirmations(page);
   const writes=[];page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/api/v1/day-entries/'+date)writes.push(request.postDataJSON());});
   await gate.install();
   try{
@@ -108,9 +110,9 @@ for(const mode of ['source','formatted'])test(`Today ${mode} retains a recovery 
     expect(writes).toHaveLength(1);expect(writes[0].noteVersion).toBe(base.version);expect(writes[0].labelVersion).toBe(base.labelVersion);
     const current=await(await api('GET','/day-entries/'+date)).json();expect(current.body).toBe('# Peer body\n');expect(current.text).toBe('Peer label');
     const reload=page.locator('#today-note-editor').getByRole('button',{name:'Reload saved note',exact:true});await expect(reload).toBeEnabled();
-    page.once('dialog',dialog=>dialog.dismiss());await reload.click();await expect(page.locator('#today-note-text')).toHaveValue('Local conflict label');
-    page.once('dialog',dialog=>dialog.accept());await reload.click();await expect(page.locator('#today-note-text')).toHaveValue('Peer label');
-  }finally{gate.release();await page.unrouteAll({behavior:'wait'});}
+    await confirmations.run('Keep the recovery draft',[false],async()=>{const prompt=page.waitForEvent('dialog');await reload.focus();await reload.press('Enter');await prompt;await expect(page.locator('#today-note-text')).toHaveValue('Local conflict label');});
+    await confirmations.run('Review the saved peer note',[true],async()=>{const prompt=page.waitForEvent('dialog');await reload.press('Enter');await prompt;await expect(page.locator('#today-note-text')).toHaveValue('Peer label');});
+  }finally{gate.release();confirmations.dispose();await page.unrouteAll({behavior:'wait'});}
 });
 
 for(const mode of ['source','formatted'])test(`Today ${mode} preserves edits made during an acknowledged note write and refresh`,async({page,request})=>{
