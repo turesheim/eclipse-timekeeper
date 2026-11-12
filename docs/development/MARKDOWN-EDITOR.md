@@ -20,8 +20,10 @@ the separate About prototype and its scratchpad controls have been retired.
   unchanged top-level Markdown spans after a rich edit. Unfamiliar blocks remain
   inert editable source fragments rather than being discarded or executed.
 - Markdown source is a native textarea. There is no enhanced-source editor,
-  source-tools toolbar, separate document outline or split-preview renderer.
-  Switching modes retains the rich document/history when it can be reconciled.
+  source-tools toolbar or split-preview renderer. Switching modes retains the
+  rich document/history when it can be reconciled. Notes and Today provide a
+  host-owned `NoteContents` sidebar using the same heading and navigation API in
+  either mode; selecting a heading does not reserialize the document.
 - `src/markdown-experience.js` adds resource-aware completion, existing-asset
   selection, image properties and guarded revision comparison through the same
   component. `src/markdown-actions.js` groups these and host document actions in
@@ -114,8 +116,9 @@ adds it, and an outlined dash appears when removing it with pointer or keyboard.
 A visible keyboard focus outline and a touch target of at least 44 pixels remain.
 Popup bookmarks align with their note-content edge below the window controls.
 
-The Note tools menu includes **Associate with client** for an owned note or empty
-daily/weekly page. The dialog lists every owned client, including those outside
+**Associate with client** appears in Notes/Today **Main actions** and in
+**Note tools** for dialog editors, including empty daily/weekly pages.
+The dialog lists every owned client, including those outside
 the workspace focus filter, and **No client** removes the association. A small
 name and color marker appear at the top right of the note. Read-only sessions
 can see the label. Selecting a client does not save a body draft or change its

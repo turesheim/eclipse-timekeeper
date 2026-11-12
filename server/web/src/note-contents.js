@@ -1,12 +1,17 @@
 import {t} from './i18n.js';
 
-/** A live outline of Today's journal. Selecting an entry only moves the caret. */
-export class TodayContents {
-  constructor(root,field){
+/** A live document outline. Selecting an entry only moves the caret. */
+export class NoteContents {
+  constructor(root,field,{available=()=>true}={}){
+    this.available=available;root.classList.add('note-contents');
+    if(!root.querySelector('ol')){
+      const title=document.createElement('h2'),navigation=document.createElement('nav'),list=document.createElement('ol'),empty=document.createElement('p');
+      title.id=root.id+'-title';title.textContent=t('today.contents');root.setAttribute('aria-labelledby',title.id);navigation.setAttribute('aria-labelledby',title.id);empty.className='hint';navigation.append(list);root.append(title,navigation,empty);
+    }
     this.root=root;this.field=field;this.list=root.querySelector('ol');this.empty=root.querySelector('p');this.generation=0;
   }
   show(){this.active=true;this.update();}
-  hide(){this.active=false;++this.generation;}
+  hide(){this.active=false;++this.generation;clearTimeout(this.timer);}
   reset(){this.hide();this.key=null;this.list.replaceChildren();this.empty.textContent=t('today.no_headings');this.empty.hidden=false;}
   update(){
     if(!this.active)return;
@@ -16,6 +21,7 @@ export class TodayContents {
   async paint(generation){
     try{
       if(generation!==this.generation||!this.active)return;
+      if(!this.available()){this.key=null;this.list.replaceChildren();this.empty.textContent=t('notes.select');this.empty.hidden=false;return;}
       if(this.field.loading){this.key=null;this.list.replaceChildren();this.empty.textContent=t('markdown.loading');this.empty.hidden=false;return;}
       const editor=this.field.editor,headings=await this.field.outline();
       if(generation!==this.generation||!this.active)return;

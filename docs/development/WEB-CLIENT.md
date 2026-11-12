@@ -227,10 +227,16 @@ The date navigator, day title and **Main actions** span the left/main area;
 **Note revisions**, **Associate with client** and **Delete note** are available
 there. Left/right sidebar buttons appear in Main actions for the sidebars present.
 Each toggles its sidebar independently and gives the journal the freed space.
-Other note editors retain note actions in **Note tools**.
+Notes uses the same **Main actions** controls for sidebar visibility, revisions,
+client association, deletion, renaming/moving and reloading. Its left sidebar
+contains separate navigation and recent-note cards; its right sidebar shares
+Today's live outline in source and formatted modes. Outline links use normal
+body text. Dialog editors retain note actions in **Note tools**.
 
-Drag the separator between the left overview and journal to resize the overview,
-or use Left/Right, Home and End while the separator has keyboard focus. Both
+Drag either desktop sidebar separator to resize that panel, or use Left/Right,
+Home and End while the separator has keyboard focus. This also applies to
+Notes. Left/Right moves the separator; Home and End select the minimum and
+maximum width. Collapsing a sidebar retains its width and draft. Both
 sidebars scroll independently and the journal stays above the fixed view selector.
 On narrow screens the contents sidebar starts hidden and can be expanded from
 Main actions above the journal; the overview follows the journal. Sidebar choices

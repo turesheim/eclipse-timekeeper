@@ -145,11 +145,23 @@ contain the source, without generated diagram files.
 The heading menu selects plain text or H1–H6. Toolbar tooltips name each action
 and available shortcut; active formatting is indicated. Use the main toolbar to
 format a selection. Type `/` at the start of a paragraph for commands.
-Formatting actions wrap on narrow screens. **Note tools** opens a keyboard-
-accessible menu for existing attachments, image properties, revisions and document
-actions such as rename, delete and reload. Returning to a note retains its
+Formatting actions wrap on narrow screens and scroll horizontally on short
+screens. **Note tools** opens a keyboard-accessible menu for existing attachments
+and image properties. In Notes, **Main actions** contains revisions, client
+association, delete, rename/move and reload, alongside the left/right sidebar
+controls. Today also exposes revisions, client association and deletion in
+**Main actions**. Dialog editors retain these actions in **Note tools**.
+Returning to a note retains its
 in-memory mode, cursor and scroll position while the session remains open.
 Notes open in formatted mode by default.
+
+Notes has separate **Folders and notes** and **Recent notes** cards on the left,
+and a live **Table of contents** on the right. Selecting a heading moves the
+caret without changing the document in either editor mode. Drag a desktop
+sidebar separator to resize the panel, or focus it and use Left/Right, Home and
+End. The same resize controls are available for both Today sidebars.
+On short screens, saved-date details scroll horizontally; focus them to use
+Left/Right or Home/End.
 
 Use Command/Ctrl+B for bold, Command/Ctrl+I for italic, and Command/Ctrl+Z for undo.
 Redo uses Command/Ctrl+Shift+Z. Undo and Redo have no toolbar buttons. Mode changes retain rich history;
@@ -226,6 +238,7 @@ one-second pause, at least every five seconds while typing, and before switching
 documents, dates, tabs or account pages, closing an editor, or signing out.
 **Saved**, **Unsaved changes** and **Saving…** show the current state. There are
 no document Save or Cancel buttons. Command/Ctrl+S can flush pending edits early.
+Today's **Delete note** action is in **Main actions**. In journal dialogs,
 **Delete note** is in **Note tools**, directly below **Note revisions**.
 
 You can keep typing during a save. Navigation waits until the newest draft is
