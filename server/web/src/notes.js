@@ -87,6 +87,10 @@ export class NotesView {
     this.preview=node('div',undefined,'notes-image-preview');this.preview.hidden=true;
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.timestamps=node('p',undefined,'hint notes-timestamps');this.timestamps.hidden=true;this.savedDates={};
+    this.timestamps.addEventListener('keydown',event=>{
+      if(this.timestamps.tabIndex!==0||event.ctrlKey||event.metaKey||event.altKey||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();this.timestamps.scrollLeft=event.key==='Home'?0:event.key==='End'?this.timestamps.scrollWidth:this.timestamps.scrollLeft+(event.key==='ArrowRight'?40:-40);
+    });
     for(const [field,key]of [['createdAt','notes.created'],['modifiedAt','notes.modified']]){const label=node('span'),time=node('time');label.append(document.createTextNode(t(key)+' '),time);this.savedDates[field]=time;this.timestamps.append(label);}
     this.documentPath=node('span',undefined,'notes-document-path');this.timestamps.append(this.documentPath);
     const footer=node('div',undefined,'notes-footer');footer.append(this.status,this.timestamps);this.retrySave=action(t('journal.retry_save'),()=>void this.retryCommit());this.retrySave.hidden=true;footer.append(this.retrySave);

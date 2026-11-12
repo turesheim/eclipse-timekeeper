@@ -160,6 +160,8 @@ and a live **Table of contents** on the right. Selecting a heading moves the
 caret without changing the document in either editor mode. Drag a desktop
 sidebar separator to resize the panel, or focus it and use Left/Right, Home and
 End. The same resize controls are available for both Today sidebars.
+On short screens, saved-date details scroll horizontally; focus them to use
+Left/Right or Home/End.
 
 Use Command/Ctrl+B for bold, Command/Ctrl+I for italic, and Command/Ctrl+Z for undo.
 Redo uses Command/Ctrl+Shift+Z. Undo and Redo have no toolbar buttons. Mode changes retain rich history;
