@@ -220,7 +220,7 @@ test('Notes keeps navigation and both editor modes anchored while their contents
       const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
       await captureScreenshot(page,{path:`test-results/notes-anchored-${width}-${mode==='Formatted'?'formatted':'source'}.png`});
     }
-    if(width===320){const last=page.locator('.notes-markdown [data-command=hr]');await last.focus();await expect(last).toBeInViewport();}
+    if(width===320){const timestamps=page.locator('.notes-timestamps');await expect(timestamps).toHaveAttribute('tabindex','0');await timestamps.focus();await timestamps.press('ArrowRight');await expect.poll(()=>timestamps.evaluate(node=>node.scrollLeft)).toBeGreaterThan(0);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);const last=page.locator('.notes-markdown [data-command=hr]');await last.focus();await expect(last).toBeInViewport();}
   }
 });
 
