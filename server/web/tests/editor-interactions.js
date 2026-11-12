@@ -6,8 +6,9 @@ export async function noteActions(page,scope){
   const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu).toBeVisible();return menu;
 }
 export async function clickNoteAction(page,scope,name){
-  if(await scope.getAttribute('id')==='today-note-editor'){
-    const action=page.locator('#today-main-actions').getByRole('button',{name,exact:true});
+  const id=await scope.getAttribute('id');
+  if(['today-note-editor','notes-panel'].includes(id)){
+    const action=page.locator(id==='notes-panel'?'#notes-main-actions':'#today-main-actions').getByRole('button',{name,exact:true,includeHidden:true});
     if(await action.count()){await action.click();return;}
   }
   await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();

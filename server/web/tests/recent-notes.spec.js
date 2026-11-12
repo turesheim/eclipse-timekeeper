@@ -28,7 +28,7 @@ test('Notes sidebar keeps Recent notes below the navigator and restores its own 
   await page.reload();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(2);
   await page.evaluate(()=>{window.sharedRecentSection=document.querySelector('#today-recent-notes').closest('section');});await page.locator('[data-tab=notes]').click();
   const recent=page.locator('#notes-recent-notes'),section=page.getByRole('region',{name:'Recent notes',exact:true});await expect(section).toBeVisible();await expect(recent.locator('[data-recent-note]')).toHaveCount(2);
-  expect(await section.evaluate(node=>node===window.sharedRecentSection)).toBe(true);expect(await section.evaluate(node=>node.parentElement.previousElementSibling.classList.contains('notes-navigation-browser'))).toBe(true);await expect(recent.locator(`[data-recent-note="${other.id}"] .today-recent-note-label`)).toHaveText('Other');
+  expect(await section.evaluate(node=>node===window.sharedRecentSection)).toBe(true);expect(await section.evaluate(node=>node.parentElement.parentElement.id==='notes-sidebar'&&node.parentElement.previousElementSibling.id==='notes-navigation')).toBe(true);await expect(recent.locator(`[data-recent-note="${other.id}"] .today-recent-note-label`)).toHaveText('Other');
   const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,current.path).click();
   const pick=recent.locator(`[data-recent-note="${other.id}"]`);await pick.focus();await pick.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(page.locator('#notes-document-title .notes-title-input')).toHaveValue('Current');
   let refreshed=false;await page.route('**/api/v1/notes/recent?*',async route=>{await route.continue();refreshed=true;});await page.evaluate(()=>document.dispatchEvent(new Event('timekeeper:notes-changed')));await expect.poll(()=>refreshed).toBe(true);await expect(recent).toHaveAttribute('aria-busy','false');
@@ -36,7 +36,7 @@ test('Notes sidebar keeps Recent notes below the navigator and restores its own 
   refreshed=false;await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>refreshed).toBe(true);await expect(recent).toHaveAttribute('aria-busy','false');
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('# Current\n\nPrivate unsaved draft.\n');await pick.click();await expect(popup).toBeVisible();expect(await(await api('GET','/notes/entries/'+current.id+'/content')).text()).toContain('Private unsaved draft.');
   await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(page.locator('#notes-document-title .notes-title-input')).toHaveValue('Other');
-  await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();await expect(section).toBeHidden();await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();await expect(section).toBeVisible();
+  await page.locator('#notes-main-actions-toggle-left-sidebar').click();await expect(section).toBeHidden();await page.locator('#notes-main-actions-toggle-left-sidebar').click();await expect(section).toBeVisible();
 });
 
 test('Notes Recent notes scrolls independently and fits the drawer in every theme',async({page,request})=>{
@@ -47,10 +47,10 @@ test('Notes Recent notes scrolls independently and fits the drawer in every them
   await page.locator('[data-tab=today]').click();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(23);await expect(page.locator('#notes-recent-notes')).toHaveCount(0);
   await page.locator('[data-tab=notes]').click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);expect(requests).toEqual([]);
   for(const width of [1280,390]){
-    await page.setViewportSize({width,height:844});if(width===390)await page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true}).click();
+    await page.setViewportSize({width,height:844});if(width===390)await page.locator('#notes-main-actions-toggle-left-sidebar').click();
     for(const theme of ['timekeeper','timekeeper-dark']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);await expect(recent).toBeVisible();expect(await recent.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);expect(await navigation.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
-      expect((await new AxeBuilder({page}).include('#notes-navigation').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/notes-recent-${theme}-${width}.png`,fullPage:false});
+      expect((await new AxeBuilder({page}).include('#notes-sidebar').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/notes-recent-${theme}-${width}.png`,fullPage:false});
     }
   }
   await recent.locator('[data-recent-note]').last().focus();await page.keyboard.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(navigation).toBeHidden();await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();
