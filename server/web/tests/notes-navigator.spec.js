@@ -229,7 +229,8 @@ test('navigator toolbar sorts complete paginated folders in all six orders witho
   for(const name of ['Alpha','Beta','Zulu'])await put(api,'Notes/'+name+'.md');
   const dates={Alpha:['2022','2023'],Beta:['2021','2021'],Zulu:['2020','2022']},offsets=[];
   await page.route(/\/api\/v1\/notes\/entries\?/,async route=>{
-    const response=await route.fetch(),body=await response.json(),query=new URL(route.request().url()).searchParams;
+    const response=await route.fetch();if(!response.ok()){await route.fulfill({response});return;}
+    const body=await response.json(),query=new URL(route.request().url()).searchParams;
     for(const entry of body.items){const name=entry.path.split('/').at(-1).replace('.md','');if(dates[name]){entry.createdAt=dates[name][0]+'-01-01T00:00:00Z';entry.modifiedAt=dates[name][1]+'-01-01T00:00:00Z';}}
     if(query.get('parentId')===folder.id){const offset=Number(query.get('offset'));offsets.push(offset);if(body.items.length>1)body.nextOffset=offset+1;else delete body.nextOffset;body.items=body.items.slice(0,1);}
     await route.fulfill({response,json:body});
