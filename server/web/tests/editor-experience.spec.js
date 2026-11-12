@@ -26,8 +26,8 @@ test('extended inline styles render and retain exact source, nested formatting a
   const changed=await page.evaluate(()=>globalThis.field.value());expect(changed).toContain('==Very **important** words==');expect(changed).toContain('H~2~O');expect(changed).toContain('X^2^');
   const host=page.locator('#experience-field');await host.getByRole('button',{name:'Markdown source',exact:true}).click();await host.getByRole('button',{name:'Formatted',exact:true}).click();
   await expect(rich.locator('sub')).toHaveText('2');await expect(rich.locator('sup')).toHaveText('2');expect(await page.evaluate(()=>globalThis.field.value())).toBe(changed);
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
     const mark=rich.locator('mark').first();await expect(mark).toBeVisible();
     expect(await mark.evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   }
@@ -48,8 +48,8 @@ test('prose hashtags use accent links without changing Markdown or literal code 
   await engine(page,value,{tags:true});const tags=page.locator('#experience-editor [data-hashtag]');await expect(tags).toHaveCount(4);expect(await tags.evaluateAll(nodes=>[...new Set(nodes.map(node=>node.dataset.hashtag))])).toEqual(['#openshift','#café','#work/cloud']);expect(await source(page)).toBe(value);
   await tags.first().click();expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift']);
   const café=page.locator('[data-hashtag="#café"]');await café.focus();await café.press('Enter');expect(await page.evaluate(()=>globalThis.searchedTags)).toEqual(['#openshift','#café']);expect(await source(page)).toBe(value);
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
     expect(await café.evaluate(node=>{const probe=document.createElement('span');probe.style.color='var(--accent)';node.after(probe);const expected=getComputedStyle(probe).color;probe.remove();return getComputedStyle(node).color===expected;})).toBe(true);
     expect((await new AxeBuilder({page}).include('#experience-editor .markdown-hashtag').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
   }
@@ -203,8 +203,8 @@ test('multi-file upload retry keeps completed files and does not move an unrelat
 });
 test('shared controls remain keyboard accessible and fit narrow screens in every theme',async({page})=>{
   await page.setViewportSize({width:390,height:844});await field(page,'# Heading\n\n- [ ] Task\n\nParagraph.\n');
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
     expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
   await page.locator('#experience-field').screenshot({path:'test-results/editor-experience-mobile.png'});
@@ -314,8 +314,8 @@ test('completion choices keep readable rows and scroll to keyboard selection on 
     const label=await choices.last().textContent(),shortcode=label.match(/:[a-z0-9_+-]+:/)[0];await page.keyboard.press('Enter');await expect(list).toBeHidden();expect(await page.evaluate(()=>globalThis.field.value())).toContain(shortcode);
     await appendEditorText(rich.locator('p'),' :a');await expect(list).toBeVisible();await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(rich).toBeFocused();
     await appendEditorText(rich.locator('p'),' :airplane');await expect(choices).toHaveCount(2);await expect(list).toBeVisible();
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
     }
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/completion-readable-${width}.png`,fullPage:true});
@@ -404,8 +404,8 @@ test('internal-link choices fit phones and remain accessible in every theme in b
     await field(page,'',formatted,catalog);const edit=page.locator(formatted?'#experience-formatted .ProseMirror':'#experience-body');await edit.click();await page.keyboard.type('[[');
     const list=page.locator('#experience-field .markdown-suggestions');await expect(list.getByRole('option')).toHaveCount(20);
     const fits=await list.evaluate(node=>{const rect=node.getBoundingClientRect();return rect.left>=7&&rect.right<=innerWidth-7&&rect.top>=7&&rect.bottom<=innerHeight-7;});expect(fits).toBe(true);
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       expect((await new AxeBuilder({page}).include('#experience-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
     }
     await captureScreenshot(page,{path:`test-results/internal-choices-phone-${formatted?'formatted':'source'}.png`,fullPage:true});

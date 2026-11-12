@@ -32,8 +32,8 @@ test('code uses highlight.js in a compact badge, preserving source, copy and lan
   await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));expect(await badge.locator('.icon').evaluate(node=>getComputedStyle(node,'::before').fontFamily)).toContain('bootstrap-icons');
   await expect(root.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);
   for(const width of [1440,320]){
-    await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+    await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       const colors=await script.locator('code').evaluate(code=>{
         // Normalize color-mix() and rgb() to actual rendered sRGB pixels.
         const context=document.createElement('canvas').getContext('2d'),color=node=>{context.fillStyle=getComputedStyle(node).color;context.fillRect(0,0,1,1);return [...context.getImageData(0,0,1,1).data].join(',');};

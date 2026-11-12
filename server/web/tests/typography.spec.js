@@ -208,8 +208,8 @@ test('typography settings fit mobile screens, support keyboard editing and are a
     await expect(page.locator('.css-editor')).toHaveClass(/is-highlighted/);
     await editor(page).focus();await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByRole('button', {name: 'Save font sizes', exact: true})).toBeFocused();
-    for (const theme of ['timekeeper', 'timekeeper-dark', 'timekeeper-reinvented', 'timekeeper-reinvented-dark', 'solarized-light', 'solarized-dark', 'nord', 'dracula', 'newspaper']) {
-      await page.evaluate(theme => {document.documentElement.dataset.theme = theme;document.documentElement.dataset.bsTheme = ['timekeeper', 'timekeeper-reinvented', 'solarized-light', 'newspaper'].includes(theme) ? 'light' : 'dark';}, theme);
+    for (const theme of ['timekeeper','timekeeper-dark']) {
+      await page.evaluate(theme => {document.documentElement.dataset.theme = theme;document.documentElement.dataset.bsTheme = theme === 'timekeeper' ? 'light' : 'dark';}, theme);
       expect((await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations, theme).toEqual([]);
     }
     await page.evaluate(() => {document.documentElement.dataset.theme = 'timekeeper';document.documentElement.dataset.bsTheme = 'light';});

@@ -156,8 +156,8 @@ test('Internet accounts administration checks registrations, explains Google set
     await expect(page.locator('#account-content tr').filter({hasText:'Google registration'})).toContainText('Configured');await expect(page.locator('#account-content tr').filter({hasText:'Microsoft registration'})).toContainText('Not configured');
     await expect(page.locator('#account-content')).toContainText('https://connect.example.test/oauth/google/callback');await expect(page.locator('#account-content')).toContainText('TIMEKEEPER_CONNECT_GOOGLE_CLIENT_SECRET');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');
     for(const width of [1440,390]){
-      await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
-        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light','newspaper'].includes(theme)?'light':'dark';},theme);
+      await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark']){
+        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
         await captureScreenshot(page,{path:`test-results/admin-internet-${theme}-${width}.png`,fullPage:true});
       }

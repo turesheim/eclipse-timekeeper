@@ -41,8 +41,8 @@ are tracked independently of work sessions; their time overlap provides context.
   totals. Start a task timer or record time manually, including taskless work.
 - **Clients and projects** organize your work with client colors and searchable
   project icons.
-- **Themes** include the original Dagsverk palette, Dagsverk Dark, Solarized
-  Light/Dark, Nord and Dracula. Choose a theme in the account menu.
+- **Themes** are Dagsverk (light) and Nattverk (dark). Choose a theme under
+  **My Account → Profile**.
 - **Toggl Track import** maps source clients and projects to new or existing
   records and supports undoing a whole import. Prefer the Legacy CSV export
   because it includes client names. Duration is calculated from Start/End times;

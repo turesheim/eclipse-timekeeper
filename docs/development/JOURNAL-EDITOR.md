@@ -68,4 +68,4 @@ Browser verification covers label/body combinations, icon transitions and
 opacity without hover/focus, unchanged work totals, formatting/task edits,
 exact frontmatter/unsupported source, stale and unknown saves, failed reads and
 module loads, readonly keyboard behavior, late loading after logout, Norwegian
-controls, UTF-8 byte limits, touch input and all six themes at narrow widths.
+controls, UTF-8 byte limits, touch input and both themes at narrow widths.

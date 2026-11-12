@@ -17,6 +17,17 @@ async function setup(page,request){
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return api;
 }
 
+async function dailyNote(page){
+  // Load the target day before switching its fully rendered editor to source.
+  await page.goto('/web/?day=2026-11-02');await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('[data-tab=today]').click();
+  const daily=page.locator('#today-note-editor');
+  await expect(daily.getByRole('textbox',{name:'Note body',exact:true})).toBeVisible();
+  await expect(daily.locator('.dialog-actions > [role=status]')).toHaveText('Saved');
+  await daily.getByRole('button',{name:'Markdown source',exact:true}).click();
+  await expect(page.locator('#today-journal-body')).toBeVisible();return daily;
+}
+
 async function document(page,api,name='First.md'){
   const entry=await(await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/'+name}),Buffer.from('Original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();
@@ -65,7 +76,7 @@ test('an autosave that never reached the server retries safely after checking th
 });
 
 test('checking an unknown daily-note save retains edits made while its first write was pending',async({page,request})=>{
-  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-02');const daily=page.locator('#today-note-editor');await daily.getByRole('button',{name:'Markdown source',exact:true}).click();let release,writes=0;const gate=new Promise(resolve=>release=resolve),path='**/api/v1/day-entries/2026-11-02';
+  const api=await setup(page,request),daily=await dailyNote(page);let release,writes=0;const gate=new Promise(resolve=>release=resolve),path='**/api/v1/day-entries/2026-11-02';
   await page.route(path,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;if(writes===1){await route.fetch();await gate;await route.abort('connectionfailed');}else await route.continue();});
   try{
     await page.locator('#today-journal-body').fill('First body');await expect.poll(()=>writes).toBe(1);await expect(page.locator('#today-journal-body')).toBeEditable();await page.locator('#today-journal-body').fill('Newest body');release();await expect(daily.getByRole('alert')).toContainText('could not be confirmed');
@@ -74,15 +85,20 @@ test('checking an unknown daily-note save retains edits made while its first wri
 });
 
 test('daily and weekly notes autosave on edits and close with Delete note below revisions',async({page,request})=>{
-  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-02');const daily=page.locator('#today-note-editor');await daily.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#today-journal-body').fill('# Daily :rocket:\n');await page.locator('#today-note-text').fill('Independent label');
-  await page.locator('#today-next').click();await expect.poll(async()=>(await(await api('GET','/day-entries/2026-11-02')).json()).body).toBe('# Daily :rocket:\n');expect((await(await api('GET','/day-entries/2026-11-02')).json()).text).toBe('Independent label');
+  const api=await setup(page,request);await dailyNote(page);let release,writes=0;const gate=new Promise(resolve=>release=resolve),path='**/api/v1/day-entries/2026-11-02';
+  await page.route(path,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}if(++writes===1)await gate;await route.continue();});
+  try{
+    await page.locator('#today-journal-body').fill('# Daily :rocket:\n');await expect.poll(()=>writes).toBe(1);await page.locator('#today-note-text').fill('Independent label');
+    await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue('2026-11-02');release();await expect(page.locator('#today-date')).toHaveValue('2026-11-03');
+    const saved=await(await api('GET','/day-entries/2026-11-02')).json();expect(saved.body).toBe('# Daily :rocket:\n');expect(saved.text).toBe('Independent label');expect(writes).toBe(2);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
   await page.locator('[data-week="2026-W45"]').click();const weekly=page.locator('#today-week-note-editor');await expect(weekly).toBeVisible();await weekly.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#weekly-journal-body').fill('# Weekly :smile:\n');await page.keyboard.press('Escape');await expect(weekly).toBeHidden();expect((await(await api('GET','/week-notes/2026-W45')).json()).body).toBe('# Weekly :smile:\n');
   await page.locator('[data-week="2026-W45"]').click();await expect(weekly.locator('[data-emoji=smile]')).toBeVisible();const menu=await noteActions(page,weekly),labels=await menu.getByRole('menuitem').allTextContents();expect(labels.findIndex(value=>value.includes('Delete note'))).toBeGreaterThan(labels.findIndex(value=>value.includes('Note revisions')));await page.keyboard.press('Escape');
   page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,weekly,'Delete note');await expect(weekly).toBeHidden();expect((await(await api('GET','/week-notes/2026-W45')).json()).deleted).toBe(true);
 });
 
 test('a body autosave accepts an independent peer label without writing the old label back',async({page,request})=>{
-  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-02');const daily=page.locator('#today-note-editor');await daily.getByRole('button',{name:'Markdown source',exact:true}).click();let release,writes=0;const gate=new Promise(resolve=>release=resolve);
+  const api=await setup(page,request),daily=await dailyNote(page);let release,writes=0;const gate=new Promise(resolve=>release=resolve);
   await page.route('**/api/v1/day-entries/2026-11-02',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;if(writes===1)await gate;await route.continue();});
   try{
     await page.locator('#today-journal-body').fill('My body');await expect.poll(()=>writes).toBe(1);const label=await api('GET','/day-labels/2026-11-02');await api('PUT','/day-labels/2026-11-02',{text:'Peer label'},{'If-Match':label.headers().etag});release();await expect(daily.locator('.dialog-actions > [role=status]')).toHaveText('Saved');await expect(page.locator('#today-note-text')).toHaveValue('Peer label');
@@ -91,7 +107,7 @@ test('a body autosave accepts an independent peer label without writing the old 
 });
 
 test('a label autosave cannot adopt a peer body version for newer local body edits',async({page,request})=>{
-  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-02');const daily=page.locator('#today-note-editor');await daily.getByRole('button',{name:'Markdown source',exact:true}).click();let release,writes=0;const gate=new Promise(resolve=>release=resolve);
+  const api=await setup(page,request),daily=await dailyNote(page);let release,writes=0;const gate=new Promise(resolve=>release=resolve);
   await page.route('**/api/v1/day-entries/2026-11-02',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;if(writes===1)await gate;await route.continue();});
   try{
     await page.locator('#today-note-text').fill('My label');await expect.poll(()=>writes).toBe(1);const body=await api('GET','/day-notes/2026-11-02/content');await api('PUT','/day-notes/2026-11-02/content',{body:'Peer body'},{'If-Match':body.headers().etag});await page.locator('#today-journal-body').fill('My newer body draft');release();

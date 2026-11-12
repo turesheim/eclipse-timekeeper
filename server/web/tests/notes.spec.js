@@ -144,7 +144,7 @@ test('Notes shows saved creation and change times in the account zone, retaining
   await expect(page.locator('.notes-timestamps')).toContainText('Opprettet:');await expect(page.locator('.notes-timestamps')).toContainText('Sist endret:');await expect(times.nth(0)).toContainText('12:34:56');
   for(const width of [1440,320]){
     await page.setViewportSize({width,height:900});await expect(times.nth(0)).toBeInViewport();await expect(times.nth(1)).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);}
+    for(const theme of ['timekeeper','timekeeper-dark']){await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);}
     await captureScreenshot(page,{path:`test-results/notes-saved-dates-${width}.png`});
   }
 });
@@ -244,7 +244,7 @@ test('Notes supports all themes, Norwegian labels and a read-only client',async(
   test.setTimeout(150000);const api=await setup(page,request);
   const themeEntry=await(await api('PUT','/notes/files?path=Notes%2FTheme.md',Buffer.from('# Theme note\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   const bookmarkPath='/notes/bookmark?'+new URLSearchParams({sourceType:themeEntry.sourceType,sourceKey:themeEntry.sourceKey});const bookmark=await api('GET',bookmarkPath);await api('PUT',bookmarkPath,{bookmarked:true},{'If-Match':bookmark.headers().etag});
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+  for(const theme of ['timekeeper','timekeeper-dark']){
     await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();
     if(!await noteEntry(page.locator('#notes-navigation'),'Notes/Theme.md').isVisible())await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Theme.md').click();const bookmarkButton=page.locator('#notes-panel .note-bookmark');await expect(bookmarkButton).toHaveAttribute('aria-pressed','true');await expect(bookmarkButton).toHaveCSS('border-top-width','0px');await expect(bookmarkButton).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
     expect(await bookmarkButton.evaluate(button=>{const box=button.getBoundingClientRect();return box.right<=innerWidth&&box.width>=44&&box.height>=44;})).toBe(true);await captureScreenshot(page,{path:test.info().outputPath('bookmark-'+theme+'.png')});
@@ -575,7 +575,7 @@ test('event search finds calendar details without creating a note and keeps the 
     const results=await searchNotes(reader,'event:observatory');await expect(results.locator('[data-search-note]')).toHaveCount(1);await results.locator('[data-search-note]').click();const preview=reader.locator('#calendar-search-popup-editor');await expect(preview.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');
     await preview.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(reader.locator('#calendar-search-workspace-editor .ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
   }finally{await context.close();}
-  for(const theme of ['timekeeper','timekeeper-dark','newspaper']){
+  for(const theme of ['timekeeper','timekeeper-dark']){
     await setTheme(page,theme);await searchNotes(page,'event:observatory');await result.click();await expect(popup.locator('.ProseMirror')).toContainText('workspace edit.');
     for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#calendar-search-popup-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/event-search-saved-${theme}-${width}.png`});}
     await popup.getByRole('button',{name:'Close',exact:true}).click();await panel.getByRole('button',{name:'Close',exact:true}).click();
@@ -617,13 +617,12 @@ test('Notes content search finds body text, keeps relevance order and pages on d
   await expect(page.locator('#notes-navigation').getByRole('button',{name:'Sort notes',exact:true})).toBeEnabled();await expect(rows.first().locator('mark').first()).toContainText(/sparrow/i);
   await navigation.getByRole('button',{name:'More results',exact:true}).focus();await navigation.getByRole('button',{name:'More results',exact:true}).press('Enter');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();await expect(navigation.getByRole('button',{name:'More results',exact:true})).toBeHidden();
   await page.locator('#refresh').evaluate(button=>button.click());await expect(page.locator('#status')).toHaveText('Up to date');await expect(navigation.locator('#notes-search-results')).toHaveAttribute('aria-busy','false');await expect(rows).toHaveCount(55);await expect(rows.nth(50)).toBeFocused();
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula','newspaper']){
+  for(const theme of ['timekeeper','timekeeper-dark']){
     await navigation.getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:1440,height:900});await setTheme(page,theme);await page.locator('[data-tab=notes]').click();await searchNotes(page,word);await expect(rows).toHaveCount(50);
-    if(theme==='newspaper'){await expect(navigation).toHaveCSS('box-shadow','none');await expect(rows.first().locator('mark').first()).toHaveCSS('background-image',/conic-gradient/);}
     for(const width of [1440,390,320]){
       await page.setViewportSize({width,height:900});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#notes-search-panel').analyze()).violations).toEqual([]);
-      if(theme==='newspaper'){
+      if(theme==='timekeeper'){
         const query=page.locator('#notes-search-query'),box=await query.boundingBox();await query.click({position:{x:box.width-20,y:box.height/2}});await expect(query).toHaveValue('');await expect(rows).toHaveCount(0);await searchNotes(page,word);await expect(rows).toHaveCount(50);
       }
       await captureScreenshot(page,{path:`test-results/notes-content-search-${theme}-${width}.png`});

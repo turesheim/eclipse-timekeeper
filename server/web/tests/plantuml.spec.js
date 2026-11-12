@@ -34,8 +34,8 @@ test('PlantUML syntax, files and image failures leave their canonical source ava
 
 test('PlantUML previews fit every theme and phones and remain read-only with no source rewrite',async({page})=>{
   const value=fence('@startuml\ntitle Blåbær café 🚀\nAlice -> Bob: Feilsøking\n@enduml'),root=await open(page,value,{readOnly:true});await rendered(root);
-  for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);await rendered(root);
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);await rendered(root);
     for(const width of [1440,390]){await page.setViewportSize({width,height:844});expect(await root.locator('.markdown-plantuml-block img').evaluate(node=>node.getBoundingClientRect().width<=node.parentElement.getBoundingClientRect().width)).toBe(true);expect((await new AxeBuilder({page}).include('#plantuml-field').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   }
   await captureScreenshot(page,{path:'test-results/plantuml-preview-phone.png',fullPage:true});expect(await source(page)).toBe(value);await root.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#plantuml-body')).toHaveAttribute('readonly','');

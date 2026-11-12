@@ -40,7 +40,7 @@
   --font-eyebrow: .7rem;
   /* Timekeeper name in the application header. */
   --font-brand: 1.4rem;
-  /* Version number beside the Timekeeper name. */
+  /* Legacy header preference, retained for saved account styles. */
   --font-brand-version: .75rem;
   /* Synchronization status and its refresh button. */
   --font-sync-status: .875rem;
@@ -134,7 +134,7 @@
   /* Markdown and journal editors */
   /* Plain Markdown source editor text. */
   --font-markdown-source: .9rem;
-  /* Body text in formatted Markdown notes; Dagsverk-reinvented uses an 18px default. */
+  /* Body text in formatted Markdown notes. */
   --font-markdown-body: 1rem;
   /* Level 1 heading in formatted Markdown notes. */
   --font-markdown-h1: 1.7rem;

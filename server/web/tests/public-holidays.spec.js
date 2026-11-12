@@ -56,7 +56,7 @@ test('public holiday highlights stay subtle and consistent in Track and Calendar
     await page.reload();await trackingReady(page);await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');
     const track=page.locator('[data-track-date="2026-05-17"]'),ordinary=page.locator('[data-track-date="2026-05-18"]');
     const column=page.locator('.calendar-day[data-date="2026-05-17"]'),header=page.locator('.calendar-heading[data-date="2026-05-17"]');
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
+    for(const theme of ['timekeeper','timekeeper-dark']) {
       await page.locator('[data-tab=track]').click();await expect(track).toHaveClass(/track-public-holiday/);
       await setTheme(page,theme);
       const tint=await track.evaluate(node=>getComputedStyle(node).backgroundColor);
@@ -73,10 +73,8 @@ test('public holiday highlights stay subtle and consistent in Track and Calendar
       await expect.poll(()=>header.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe(tint);
       expect(await page.locator('.calendar-day[data-date="2026-05-16"]').evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe(tint);
       const audit=await new AxeBuilder({page}).include('#calendar-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);
-      if(theme==='solarized-dark'||theme==='timekeeper') {
-        await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:`test-results/holiday-calendar-${theme}.png`,fullPage:true});
-        await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/holiday-track-${theme}.png`,fullPage:true});
-      }
+      await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:`test-results/holiday-calendar-${theme}.png`,fullPage:true});
+      await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/holiday-track-${theme}.png`,fullPage:true});
     }
     await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-04');
     await expect(page.locator('.calendar-day.public-holiday')).toHaveCount(0);
@@ -181,7 +179,7 @@ test('public holiday details fit narrow screens in every theme and delayed data 
     await signIn(page,user);await page.locator('#track-month').fill('2026-05');await expect(holiday(page,'2026-05-17')).toBeVisible();
     await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/public-holidays-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
-    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
+    for(const theme of ['timekeeper','timekeeper-dark']) {
       await setTheme(page,theme);
       const monthAudit=await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(monthAudit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);
       await holiday(page,'2026-05-17').click();await expect(page.locator('#track-holiday-details')).toContainText('Grunnlovsdagen');
