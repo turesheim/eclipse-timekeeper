@@ -63,7 +63,7 @@ else:
 ''')
         docker.chmod(0o755)
         self.environment = {key: value for key, value in os.environ.items()
-                            if not key.startswith('TIMEKEEPER_')}
+                            if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_'))}
         self.environment['PATH'] = str(binary) + os.pathsep + os.environ['PATH']
 
     def backup(self, **environment):

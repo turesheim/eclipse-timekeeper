@@ -77,7 +77,7 @@ def main():
                  **({'expiresAt': '2000-01-01T00:00:00Z'} if role == 'expired' else {})}
                 for role, token in tokens.items()]
     (state / 'config/tokens.json').write_text(json.dumps(registry))
-    environment = dict(os.environ)
+    environment = {key:value for key,value in os.environ.items() if not key.startswith('DAGSVERK_')}
     for name in ('TIMEKEEPER_STATE_DIR', 'TIMEKEEPER_SERVER_IMAGE', 'TIMEKEEPER_POSTGRES_IMAGE', 'TIMEKEEPER_HTTP_PORT', 'TIMEKEEPER_DEPLOYED_AT', 'TIMEKEEPER_SERVER_SETUP_FILE', 'TIMEKEEPER_PUBLIC_ORIGIN'):
         environment.pop(name, None)
     command = ['docker', 'compose', '-p', project]
@@ -362,7 +362,7 @@ def main():
         deployment_time = deployed_information['api-1']['deployedAt']
         client.assertNotEqual(initial_information['api-1']['deployedAt'], deployment_time)
         client.assertEqual(deployment_time, deployed_information['api-2']['deployedAt'])
-        client.assertIn('TIMEKEEPER_DEPLOYED_AT=' + deployment_time, env_file.read_text())
+        client.assertIn('DAGSVERK_DEPLOYED_AT=' + deployment_time, env_file.read_text())
         publish_replacement(broken=True)
         failed, receipt['requestsDuringRollback'], receipt['longPollsDuringRollback'] = update_with_requests('first-rollback')
         client.assertNotEqual(0, failed.returncode)

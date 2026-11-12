@@ -20,7 +20,7 @@ class MaintenanceEntrypointTest(unittest.TestCase):
     def test_completed_maintenance_starts_the_server_with_normal_java_options(self):
         with tempfile.TemporaryDirectory() as temp:
             java=Path(temp)/'java';java.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n');java.chmod(0o755)
-            environment={key:value for key,value in os.environ.items() if not key.startswith('TIMEKEEPER_')}
+            environment={key:value for key,value in os.environ.items() if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_'))}
             result=subprocess.run(['sh',str(ROOT/'server/deploy/server-entrypoint.sh')],
                 env={**environment,'PATH':temp+os.pathsep+os.environ['PATH'],
                      'TIMEKEEPER_MAINTENANCE_FILE':str(Path(temp)/'completed'), 'JAVA_OPTS':'-Xmx384m'},capture_output=True,text=True)

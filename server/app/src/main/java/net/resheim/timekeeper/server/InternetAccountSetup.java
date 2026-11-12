@@ -59,7 +59,7 @@ class InternetAccountSetup {
             if(check){
                 shared.recheck();var endpoint=shared.endpoint();endpoint(result,endpoint);var registrations=clients.shared(endpoint).providers();
                 result.put("googleConfigured",registrations.path("google").asBoolean());
-                result.put("microsoftConfigured",registrations.path("microsoft").asBoolean());result.put("status","READY");
+                result.put("microsoftConfigured",registrations.path("microsoft").asBoolean());result.put("status",registrations.path("google").asBoolean()||registrations.path("microsoft").asBoolean()?"READY":"REGISTRATION_REQUIRED");
             }
         }catch(RuntimeException unavailable){result.put("status","UNAVAILABLE");}
         return result;

@@ -48,8 +48,9 @@ For environment-based first setup, the corresponding supported variables are
 `DAGSVERK_MICROSOFT_TASKS_CLIENT_ID` and
 `DAGSVERK_MICROSOFT_TASKS_CLIENT_SECRET`. Persisted administration settings remain
 active across restarts and take precedence over first-boot environment defaults.
-Use the documented offline settings recovery only when intentionally replacing
-persisted configuration. See [configuration migration](CONFIGURATION.md).
+Change existing provider registrations through Administration. General
+authentication/settings recovery deliberately preserves provider settings and
+secrets. See [configuration migration](CONFIGURATION.md).
 
 ## Managed
 

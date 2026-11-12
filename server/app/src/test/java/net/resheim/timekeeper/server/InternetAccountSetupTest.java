@@ -48,5 +48,10 @@ class InternetAccountSetupTest {
         setup.origins.configure("http://nas.example.test:8443");assertEquals("TASK_PROVIDER_CALLBACK_INVALID",setup.readiness(false).path("google").asText());assertEquals(2,calls.get());
         setup.origins.configure("NONE");assertEquals("TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED",setup.readiness(false).path("google").asText());assertEquals(2,calls.get());
     }
+    @Test void aHealthyBrokerWithNoRegistrationsIsNotReportedReady(){
+        var setup=setup("{\"protocol\":1,\"google\":false,\"microsoft\":false}",new AtomicInteger());
+        assertEquals("REGISTRATION_REQUIRED",setup.inspect(true).path("status").asText());
+        var readiness=setup.readiness(true);assertEquals("TASK_PROVIDER_NOT_CONFIGURED",readiness.path("google").asText());assertEquals("TASK_PROVIDER_NOT_CONFIGURED",readiness.path("microsoft").asText());
+    }
 
 }
