@@ -41,6 +41,16 @@ when event content, subscription warnings, focus, client presentation or the
 selected date/time zone changes. Unchanged feed polls also retain Week's timed
 and all-day cards. Synchronization leaves the journal draft and keyboard focus
 available while requests are pending.
+For a loaded Today journal, permission to draft depends on the signed-in
+account's write permission, separately from permission to submit changes.
+After a record save or a connection failure, account recovery pauses mutations
+but leaves the day label and body editable. A journal status explains that
+changes remain in the current tab while synchronization is pending; Refresh
+retries the connection. A consistent snapshot resumes autosave using the draft's
+original note and label versions, so concurrent edits still require review.
+Refresh publication retains the editor, selection, scroll and undo history.
+Queued refreshes cancel the older snapshot's outstanding reads before starting
+the replacement. Sign-out and authorization failures still clear the draft.
 See [Synology synchronization diagnostics](../operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
 for request and database timings in the container logs.
 

@@ -992,6 +992,7 @@
   "journal.saved": "Lagret",
   "journal.saving": "Lagrer…",
   "journal.read_only": "Journalen er skrivebeskyttet. Du kan lese og laste ned dette notatet.",
+  "journal.waiting_sync": "Venter på synkronisering. Fortsett å skrive; endringene blir i denne fanen til forbindelsen er tilbake. Bruk Oppdater for å prøve igjen.",
   "journal.discard": "Forkast de ulagrede endringene i dagsetiketten og notatet?",
   "journal.reload_confirm": "Erstatt utkastet med det lagrede notatet? Last ned Markdown først for å beholde notatteksten.",
   "journal.review_saved": "Det lagrede notatet er forskjellig fra utkastet. Last ned utkastet før du laster inn det lagrede notatet.",

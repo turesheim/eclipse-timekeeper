@@ -86,7 +86,7 @@ export class TodayView {
     if(!this.data||!this.date)return;
     byId('today-title').textContent=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(this.date+'T12:00:00Z'));
     this.paintMonth();void this.loadMonthNotes();this.paintSessions();this.paintEvents();this.paintTasks();
-    this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite());this.sizeEditor();
+    this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite(),this.callbacks.canWrite());this.sizeEditor();
   }
   sizeEditor(){
     if(!this.visible||!this.root.offsetParent)return;

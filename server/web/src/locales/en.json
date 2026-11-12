@@ -992,6 +992,7 @@
   "journal.saved": "Saved",
   "journal.saving": "Saving…",
   "journal.read_only": "Read-only journal. You can view and download this note.",
+  "journal.waiting_sync": "Waiting for synchronization. Keep writing; changes stay in this tab until connected. Use Refresh to retry.",
   "journal.discard": "Discard the unsaved day label and note changes?",
   "journal.reload_confirm": "Replace this draft with the saved note? Download Markdown first to keep the current body.",
   "journal.review_saved": "The saved note differs from this draft. Download your draft before reloading the saved note.",
