@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
-import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
+import {clickNoteAction,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {openAccountMenu} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
@@ -92,7 +92,7 @@ test('a read-only session sees the client label and cannot change the associatio
   try{
     const reader=await context.newPage();let writes=0;reader.on('request',request=>{if(request.method()==='PUT'&&new URL(request.url()).pathname==='/api/v1/notes/client')writes++;});
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await openNote(reader);
-    const scope=reader.locator('#notes-panel');await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);await expect((await noteActions(reader,scope)).getByRole('menuitem',{name:'Associate with client',exact:true})).toBeDisabled();expect(writes).toBe(0);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
+    const scope=reader.locator('#notes-panel');await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);await expect(reader.locator('#notes-main-actions').getByRole('button',{name:'Associate with client',exact:true})).toBeDisabled();expect(writes).toBe(0);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
   }finally{await context.close();}
 });
 

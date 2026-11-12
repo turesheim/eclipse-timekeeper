@@ -301,7 +301,7 @@ test('Notes main actions collapse sidebars while preserving the draft and naviga
   await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
   await toggle.press('Enter');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toBeHidden();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
-  await toggle.click();await page.setViewportSize({width:390,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();await expect(navigation).toBeVisible();await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();
+  await toggle.click();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
 });
 

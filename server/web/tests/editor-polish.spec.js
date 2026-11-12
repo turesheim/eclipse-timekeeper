@@ -23,14 +23,14 @@ async function setup(page,request){
 async function open(page,path){await page.locator('[data-tab=notes]').click();const tree=page.locator('#notes-navigation');await noteEntry(tree,'Notes').click();await noteEntry(tree,path).click();await expect(noteEntry(tree,path).locator('..')).toHaveAttribute('aria-selected','true');}
 const upload=(api,path,body)=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
 
-test('Notes opens formatted and keeps document actions in a compact keyboard-accessible menu',async({page,request})=>{
+test('Notes opens formatted with main document actions and a compact keyboard-accessible resource menu',async({page,request})=>{
  const api=await setup(page,request);await upload(api,'Notes/Toolbar.md','# Toolbar\n\nText.\n');await upload(api,'Notes/asset.bin','binary');await open(page,'Notes/Toolbar.md');
  const panel=page.locator('#notes-panel'),toolbar=panel.locator('.markdown-toolbar'),trigger=toolbar.getByRole('button',{name:'Note tools',exact:true});
  await expect(panel.locator('.ProseMirror')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toHaveAttribute('aria-pressed','true');await expect(panel.locator('#notes-body')).toBeHidden();await expect(panel.getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
  await expect(toolbar.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('menuitem')).toHaveCount(0);
  await page.clock.install();
  for(const width of [1440,320]){
-  await page.setViewportSize({width,height:900});await trigger.focus();await trigger.press('ArrowDown');const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu.getByRole('menuitem').first()).toBeFocused();await expect(menu.getByRole('menuitem',{name:'Rename or move',exact:true})).toBeInViewport();await expect(menu.getByRole('menuitem',{name:'Note revisions',exact:true})).toBeInViewport();
+  await page.setViewportSize({width,height:900});await trigger.focus();await trigger.press('ArrowDown');const menu=page.getByRole('menu',{name:'Note tools',exact:true});await expect(menu.getByRole('menuitem').first()).toBeFocused();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Rename or move',exact:true})).toBeInViewport();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeInViewport();await expect(menu.getByRole('menuitem',{name:'Rename or move',exact:true})).toHaveCount(0);
   expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);if(width===1440){await noteEntry(page.locator('#notes-navigation'),'Notes/Toolbar.md').hover();await page.clock.runFor(1000);await expect(page.getByRole('tooltip')).toBeVisible();}await menu.getByRole('menuitem').first().press('Escape');await expect(trigger).toBeFocused();await expect(menu).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }
  await captureScreenshot(page,{path:'test-results/notes-compact-toolbar.png'});
