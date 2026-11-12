@@ -214,9 +214,10 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 async function tab(name) {
+  if(['clients','projects'].includes(name)){location.hash='#account/'+name;return true;}
   ++calendarNavigation;const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return false;
   notePopup.close(true);calendarSearchPopup.close(true);calendarSearchWorkspace.close(true);
-  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects','notes','tasks','calendar-search']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['today', 'track', 'week', 'calendar', 'activities','notes','tasks','calendar-search']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if(name==='notes')notes.show();else notes.hide();
@@ -238,6 +239,11 @@ const auth = authentication({
   beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
+  renderCatalog(view,part) {
+    const panel=$(part+'-panel');view.root.append(panel);panel.hidden=false;
+    if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
+    view.cleanup.add(()=>{panel.hidden=true;$('account-'+part+'-home').append(panel);});
+  },
   renderLabels(view) {
     const panel=$('labels-panel');view.root.append(panel);panel.hidden=false;
     if(snapshot){const current=focusedSnapshot(snapshot,currentFocus());renderLegacyViews(current,current.profile.data.zoneId);}
@@ -456,8 +462,10 @@ function renderChangedList(id,records,paint){
   paint();legacyRenderKeys.set(id,key);
 }
 function renderLegacyViews(s,zone){
-  if(!$('clients-panel').hidden)renderChangedList('clients',s.clients,()=>table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))]))));
-  if(!$('projects-panel').hidden)renderChangedList('projects',[s.clients,s.projects],()=>renderProjects(s));
+  const catalogs=snapshot||s;
+  if(!$('clients-panel').hidden)renderChangedList('clients',catalogs.clients,()=>table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], catalogs.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))]))));
+  if(!$('projects-panel').hidden)renderChangedList('projects',[catalogs.clients,catalogs.projects],()=>renderProjects(catalogs));
+  for(const action of document.querySelectorAll('#add-client,#add-project,#clients td.actions button,#projects td.actions button'))action.disabled=!connected||!canWrite;
   if(!$('labels-panel').hidden){
     renderChangedList('labels',s.labels,()=>table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))]))));
     for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;

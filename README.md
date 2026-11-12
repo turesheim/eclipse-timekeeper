@@ -39,8 +39,8 @@ are tracked independently of work sessions; their time overlap provides context.
   edits and deletions show a temporary **Undo** notification.
 - **Activities** contains the project/task/activity table and its daily and weekly
   totals. Start a task timer or record time manually, including taskless work.
-- **Clients and projects** organize your work with client colors and searchable
-  project icons.
+- **Clients and projects** under **My Account** organize your work with client
+  colors and searchable project icons.
 - **Themes** are Dagsverk (light) and Nattverk (dark). Choose a theme under
   **My Account → Profile**.
 - **Toggl Track import** maps source clients and projects to new or existing

@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -52,27 +53,32 @@ test('focus areas filter every client view, totals and separately loaded calenda
   await page.locator('#today-date').fill('2025-05-17');await selectFocus(page,'Work');
   await expect(page.locator('#today-sessions')).toContainText(clients[0].name);await expect(page.locator('#today-sessions')).not.toContainText(clients[1].name);
   await expect(page.locator('#today-events')).toContainText(clients[0].name+' meeting');await expect(page.locator('#today-events')).not.toContainText(clients[1].name);
-  for(const [tab,root] of [['clients','#clients'],['projects','#projects']]){await page.locator(`[data-tab=${tab}]`).click();await expect(page.locator(root)).toContainText(clients[0].name);await expect(page.locator(root)).not.toContainText(clients[1].name);}
-  await page.locator('[data-tab=activities]').click();await page.locator('#week-date').fill('2025-05-17');
-  await expect(page.locator('#week-total')).toHaveText('1h 0m');await expect(page.locator('#activities')).toContainText(clients[0].name+' task');await expect(page.locator('#activities')).not.toContainText(clients[1].name);
-  await page.locator('[data-tab=week]').click();await expect(page.locator('#week-sessions-section')).toContainText(clients[0].name);await expect(page.locator('#week-sessions-section')).not.toContainText(clients[1].name);
-  await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2025-05-17');
+  for(const [tab,root] of [['clients','#clients'],['projects','#projects']]){await navigateView(page,tab);await expect(page.locator(root)).toContainText(clients[0].name);await expect(page.locator(root)).toContainText(clients[1].name);}
+  await test.step('Opening catalog settings preserves the focused activity report',async()=>{
+    await navigateView(page,'activities');await page.getByLabel('Week containing',{exact:true}).fill('2025-05-17');
+    await expect(page.locator('#week-total')).toHaveText('1h 0m');await expect(page.locator('#activities')).toContainText(tasks[0].summary);await expect(page.locator('#activities')).not.toContainText(tasks[1].summary);
+    await navigateView(page,'clients');await page.locator('#account-page a[href="#tracking"]').click();
+    await expect(page.locator('#activities-panel')).toBeVisible();await expect(page.locator('#week-total')).toHaveText('1h 0m');
+    await expect(page.locator('#activities')).toContainText(tasks[0].summary);await expect(page.locator('#activities')).not.toContainText(tasks[1].summary);
+  });
+  await navigateView(page,'week');await expect(page.locator('#week-sessions-section')).toContainText(clients[0].name);await expect(page.locator('#week-sessions-section')).not.toContainText(clients[1].name);
+  await navigateView(page,'calendar');await page.locator('#calendar-date').fill('2025-05-17');
   await expect(page.locator(`[data-session-id="${sessions[0].id}"]`).first()).toBeVisible();await expect(page.locator(`[data-session-id="${sessions[1].id}"]`)).toHaveCount(0);
   await expect(page.locator('.calendar-planned')).toContainText([clients[0].name+' meeting']);
-  await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-05');
+  await navigateView(page,'track');await page.locator('#track-month').fill('2025-05');
   await expect(page.locator('#track-panel')).toContainText(clients[0].name);await expect(page.locator('#track-panel')).not.toContainText(clients[1].name);
   await expect(page.locator('#work-session-title')).toHaveText(clients[0].name+' session');
   await captureScreenshot(page,{path:'test-results/focus-calendar.png',fullPage:true});
   await selectFocus(page,'Empty');await expect(page.locator('#track-panel')).not.toContainText(clients[0].name);
   await expect(page.locator('#session-edit')).toBeDisabled();
-  await page.locator('[data-tab=clients]').click();await expect(page.locator('#clients tbody tr')).toHaveCount(0);
+  await navigateView(page,'clients');await expect(page.locator('#clients')).toContainText(clients[0].name);await expect(page.locator('#clients')).toContainText(clients[1].name);
   await selectFocus(page,'No focus');await expect(page.locator('#clients')).toContainText(clients[1].name);
   expect((await(await api('GET','/work-sessions')).json()).items).toHaveLength(2);
   // Activity reports follow a task's current project after a move. Session
   // client ownership remains unchanged, independently of that task move.
   let task=await api('GET','/tasks/'+tasks[0].id);
   await api('PUT','/tasks/'+tasks[0].id,{summary:tasks[0].summary,projectId:projects[1].id,parentTaskId:null,url:null},{'If-Match':task.headers().etag});
-  await page.locator('#refresh').click();await selectFocus(page,'Work');await page.locator('[data-tab=activities]').click();
+  await page.locator('#refresh').click();await selectFocus(page,'Work');await navigateView(page,'activities');
   await expect(page.locator('#week-total')).toHaveText('0h 0m');await expect(page.locator('#activities')).not.toContainText(tasks[0].summary);
   const report=await(await api('GET','/reports/activities?'+new URLSearchParams({from:'2025-05-12T00:00:00Z',to:'2025-05-19T00:00:00Z',projectId:projects[0].id,zoneId:'UTC'}))).json();expect(report.total).toBe('PT0S');
   task=await api('GET','/tasks/'+tasks[0].id);

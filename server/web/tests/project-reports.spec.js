@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -21,7 +22,7 @@ async function fixture(request) {
 async function signIn(page,credential=token) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token',{exact:true}).fill(credential);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.getByRole('button',{name:'Projects',exact:true}).click();
+  await navigateView(page,'projects');
 }
 async function openReport(page,project) {
   await expandProjectClient(page,project.clientId);
@@ -51,7 +52,7 @@ test('project session reports open a separate tab, include every page and date, 
     await report.setViewportSize({width:1440,height:1000});await report.screenshot({path:'test-results/project-report-desktop.png',fullPage:true});
     await report.setViewportSize({width:390,height:844});expect(await report.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await report.screenshot({path:'test-results/project-report-mobile.png',fullPage:true});
-    await expect(page.locator('#workspace')).toHaveAttribute('data-view','projects');await expect(page.locator('#editor')).not.toBeVisible();
+    await expect(page).toHaveURL(/#account\/projects$/);await expect(page.locator('#account-content #projects-panel')).toBeVisible();await expect(page.locator('#editor')).not.toBeVisible();
   } finally {await report?.close();await f.close();}
 });
 test('project reports support read-only sessions, running entries and retry without partial results',async({page,request})=>{

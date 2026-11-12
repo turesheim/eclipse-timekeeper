@@ -1,3 +1,4 @@
+import {navigateView} from './navigation.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {expandProjectClient} from './navigation.js';
@@ -18,21 +19,21 @@ test('client and project lists and choices sort names after create, rename and r
     for(const suffix of names) projects.push(await (await api(request,'POST','/projects',{name:prefix+' '+suffix,clientId:clients[0].id})).json());
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     const expected=['alpha 2','alpha 10','Beta','Zulu'].map(value=>prefix+' '+value);
-    for(const [tab,id] of [['Clients','clients'],['Projects','projects']]) {
-      await page.getByRole('button',{name:tab,exact:true}).click();
+    for(const id of ['clients','projects']) {
+      await navigateView(page,id);
       await expect(page.locator(`#${id} tbody tr`).filter({hasText:prefix}).locator('td:first-child')).toHaveText(expected);
     }
     await page.getByRole('button',{name:'New project',exact:true}).click();
     await expect(page.getByLabel('Client',{exact:true}).locator('option').filter({hasText:prefix})).toHaveText(expected);await page.locator('#cancel').click();
-    await page.getByRole('button',{name:'Activities',exact:true}).click();await page.getByRole('button',{name:'Add time',exact:true}).click();
+    await navigateView(page,'activities');await page.getByRole('button',{name:'Add time',exact:true}).click();
     await expect(page.getByLabel('Project (without task)',{exact:true}).locator('option').filter({hasText:prefix})).toHaveText(expected);await page.locator('#cancel').click();
     for(const [collection,record] of [['clients',clients[0]],['projects',projects[0]]]) {
       const loaded=await api(request,'GET',`/${collection}/${record.id}`);
       await api(request,'PUT',`/${collection}/${record.id}`,{name:prefix+' Aardvark',...(collection==='clients' ? {color:record.color} : {clientId:record.clientId})},{'If-Match':loaded.headers().etag});
     }
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
-    for(const [tab,id] of [['Clients','clients'],['Projects','projects']]) {
-      await page.getByRole('button',{name:tab,exact:true}).click();
+    for(const id of ['clients','projects']) {
+      await navigateView(page,id);
       await expect(page.locator(`#${id} tbody tr`).filter({hasText:prefix}).locator('td:first-child')).toHaveText(['Aardvark','alpha 2','alpha 10','Beta'].map(value=>prefix+' '+value));
     }
   } finally {
@@ -45,16 +46,16 @@ test('clients maintain names and colors, own projects and color work-session sum
   const prefix='Client '+randomUUID().slice(0,6);let client,session;const projects=[];
   try {
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByRole('button',{name:'Clients',exact:true}).click();await page.getByRole('button',{name:'New client',exact:true}).click();
+    await navigateView(page,'clients');await page.getByRole('button',{name:'New client',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix);await page.getByLabel('Color',{exact:true}).fill('#ffee00');await save(page);
     client=(await (await api(request,'GET','/clients?q='+encodeURIComponent(prefix))).json()).items[0];
     for(let i=0;i<2;i++) {
-      await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
+      await navigateView(page,'projects');await page.getByRole('button',{name:'New project',exact:true}).click();
       await page.getByLabel('Name',{exact:true}).fill(prefix+' project '+i);await page.getByLabel('Client',{exact:true}).selectOption(client.id);await save(page);
     }
     projects.push(...(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items);expect(projects).toHaveLength(2);
     for(const project of projects) await expect(page.locator(`#projects tbody[data-client-id="${client.id}"] [data-project-id="${project.id}"]`)).toHaveText(new RegExp(project.name));
-    await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
+    await navigateView(page,'today');await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveAttribute('type','datetime-local');await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveAttribute('type','datetime-local');
     await expect(page.getByLabel('Enter exact times',{exact:true})).toHaveCount(0);
     await captureScreenshot(page,{path:'test-results/work-session-date-picker.png',fullPage:true});
@@ -63,14 +64,14 @@ test('clients maintain names and colors, own projects and color work-session sum
     await captureScreenshot(page,{path:'test-results/work-session-date-picker-narrow.png',fullPage:true});await page.setViewportSize({width:1280,height:720});
     await page.getByLabel('Summary',{exact:true}).fill('A separate description');await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');await save(page);
     session=(await (await api(request,'GET','/work-sessions?clientId='+client.id)).json()).items[0];expect(session.summary).toBe('A separate description');
-    await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
+    await navigateView(page,'calendar');await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
     const bar=page.locator(`.calendar-session[data-session-id="${session.id}"]`).first();await expect(bar).toHaveCSS('border-inline-start-color','rgb(255, 238, 0)');await expect(await tooltipFor(bar)).toContainText(new RegExp(prefix));
-    await page.getByRole('button',{name:'Clients',exact:true}).click();let row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Edit',exact:true}).click();
+    await navigateView(page,'clients');let row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Edit',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' renamed');await page.getByLabel('Color',{exact:true}).fill('#102030');await save(page);
-    await page.getByRole('button',{name:'Week',exact:true}).click();await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(bar).toHaveCSS('color',await page.locator('body').evaluate(node=>getComputedStyle(node).color));
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(await tooltipFor(bar)).toContainText(new RegExp(prefix+' renamed'));
+    await navigateView(page,'calendar');await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(bar).toHaveCSS('color',await page.locator('body').evaluate(node=>getComputedStyle(node).color));
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await navigateView(page,'calendar');await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(await tooltipFor(bar)).toContainText(new RegExp(prefix+' renamed'));
     await captureScreenshot(page,{path:'test-results/client-calendar.png',fullPage:true});
-    await page.getByRole('button',{name:'Clients',exact:true}).click();row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');await page.locator('#cancel').click();
+    await navigateView(page,'clients');row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');await page.locator('#cancel').click();
     for(const [collection,values] of [['work-sessions',[session]],['projects',projects]]) for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
     session=null;projects.length=0;
     await page.getByRole('button',{name:/^Refresh: /}).click();await expect(row).toBeVisible();await row.getByRole('button',{name:'Delete',exact:true}).click();await save(page);await expect(row).toHaveCount(0);client=null;
@@ -117,7 +118,7 @@ test('Projects groups clients with keyboard collapsible headings and retains gro
     for(const suffix of ['Beta','Alpha'])clients.push(await (await api(request,'POST','/clients',{name:prefix+' '+suffix,color:'#6750a4'})).json());
     for(const [index,name] of [[0,'Shared project'],[0,'Another project'],[1,'Shared project']])projects.push(await (await api(request,'POST','/projects',{name,clientId:clients[index].id})).json());
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await navigateView(page,'projects');
     const beta=page.locator(`#projects tbody[data-client-id="${clients[0].id}"]`),alpha=page.locator(`#projects tbody[data-client-id="${clients[1].id}"]`);
     await expect(beta.locator('[data-project-id]')).toHaveCount(2);await expect(alpha.locator('[data-project-id]')).toHaveCount(1);
     await expect(beta.locator('[data-project-id]').first()).not.toBeVisible();await expect(alpha.locator('[data-project-id]')).not.toBeVisible();
@@ -132,7 +133,7 @@ test('Projects groups clients with keyboard collapsible headings and retains gro
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.locator('#projects').screenshot({path:'test-results/projects-grouped-mobile.png'});
     await alpha.getByRole('button',{name:'Collapse '+clients[1].name,exact:true}).click();await expect(alpha.locator('[data-project-id]').first()).not.toBeVisible();
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await navigateView(page,'projects');
     await expect(beta.locator('.projects-client-toggle')).toHaveAttribute('aria-expanded','false');await expect(alpha.locator('.projects-client-toggle')).toHaveAttribute('aria-expanded','false');
   } finally {
     for(const [collection,records] of [['projects',projects],['clients',clients]])for(const record of records){const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});}
@@ -144,7 +145,7 @@ test('project icon picker searches the full catalog with bounded rendering and p
   const client=await(await api(request,'POST','/clients',{name:prefix,color:'#176653'})).json();let project;
   try {
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
+    await navigateView(page,'projects');await page.getByRole('button',{name:'New project',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix);await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     const picker=page.locator('.project-icon-picker'),choices=picker.locator('.project-icon-choices'),search=page.getByRole('searchbox',{name:'Search project icons',exact:true});
     await expect(choices.locator('input')).toHaveCount(61);
@@ -182,7 +183,7 @@ test('Bootstrap project icons persist after selection and reload',async({page,re
   try {
     project=await(await api(request,'POST','/projects',{name:'Bootstrap project',clientId:client.id,icon:'phone'})).json();
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await navigateView(page,'projects');
     const row=page.locator(`#projects [data-project-id="${project.id}"]`);
     await expandProjectClient(page,client.id);
     await expect(row.locator('[data-project-icon="phone"]')).toHaveClass(/bi-phone/);
@@ -190,7 +191,7 @@ test('Bootstrap project icons persist after selection and reload',async({page,re
     await page.getByRole('searchbox',{name:'Search project icons',exact:true}).fill('airplane-engines');
     await page.getByRole('radio',{name:'Airplane Engines',exact:true}).check();await save(page);
     expect((await(await api(request,'GET','/projects/'+project.id)).json()).icon).toBe('airplane-engines');
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await navigateView(page,'projects');
     await expandProjectClient(page,client.id);
     await expect(row.locator('[data-project-icon="airplane-engines"]')).toHaveClass(/bi-airplane-engines/);
   } finally {
@@ -206,7 +207,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
     const client=await create('clients',{name:prefix+' client',color:'#176653'});
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
+    await navigateView(page,'projects');await page.getByRole('button',{name:'New project',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByRole('radio',{name:'None',exact:true})).toBeChecked();await page.getByRole('radio',{name:'Code',exact:true}).check();
     const search=page.getByRole('searchbox',{name:'Search project icons',exact:true});await search.fill('gavel');await page.getByRole('radio',{name:'Hammer',exact:true}).check();await search.fill('rocket');expect(await page.locator('[name=icon]:checked').inputValue()).toBe('hammer');await search.fill('');await page.getByRole('radio',{name:'Code',exact:true}).check();
@@ -215,11 +216,11 @@ test('optional project icons persist and Track shows distinct icons to the right
     const project=(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];records.unshift(['projects',project.id]);expect(project.icon).toBe('code');
     const other=await create('projects',{name:prefix+' Backend',clientId:client.id,icon:'code'}),globe=await create('projects',{name:prefix+' Research',clientId:client.id,icon:'globe'});
     for(const [index,projectId] of [project.id,project.id,other.id,globe.id,null].entries())await create('work-sessions',{clientId:client.id,projectId,summary:prefix+' session '+index,start:`2025-10-20T${String(6+index).padStart(2,'0')}:00:00Z`,end:`2025-10-20T${String(7+index).padStart(2,'0')}:00:00Z`});
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await navigateView(page,'projects');
     await expandProjectClient(page,client.id);const row=page.locator(`#projects [data-project-id="${project.id}"]`);await expect(row.locator('[data-project-icon=code]')).toBeVisible();await row.getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByRole('radio',{name:'Code',exact:true})).toBeChecked();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website renamed');await save(page);
-    await page.getByRole('button',{name:'Workweek',exact:true}).click();await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
-    await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+    await navigateView(page,'week');await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
+    await navigateView(page,'track');await page.getByLabel('Month',{exact:true}).fill('2025-10');
     const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
     await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(await tooltipFor(entry.locator('[data-project-icon=code]'))).toContainText(new RegExp(other.name));await expect(await tooltipFor(entry)).toContainText(new RegExp(globe.name));
     async function iconsFollow(selector){
@@ -232,10 +233,10 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow('.track-client-day-time-short');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/track-project-icons-mobile.png',fullPage:true});
-    await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
+    await navigateView(page,'projects');await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
     expect((await (await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
     const current=await api(request,'GET','/projects/'+other.id);await api(request,'PUT','/projects/'+other.id,{name:other.name,icon:null},{'If-Match':current.headers().etag});
-    await page.getByRole('button',{name:'Calendar',exact:true}).click();await expect(icons).toHaveCount(1);await expect(entry.locator('[data-project-icon=globe]')).toBeVisible();await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');
+    await navigateView(page,'track');await expect(icons).toHaveCount(1);await expect(entry.locator('[data-project-icon=globe]')).toBeVisible();await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');
   } finally {
     for(const [collection,id] of records){const current=await api(request,'GET',`/${collection}/${id}`);await api(request,'DELETE',`/${collection}/${id}`,undefined,{'If-Match':current.headers().etag});}
     const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:previous.zoneId},{'If-Match':profile.headers().etag});

@@ -21,11 +21,11 @@ test('Today sidebar resizes with pointer and keyboard while preserving the journ
     await page.setViewportSize({width:1440,height:1000});await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);
     const resize=page.getByRole('separator',{name:'Resize Today sidebar',exact:true}),sidebar=page.locator('#today-sidebar'),journal=page.locator('#today-note-editor');await expect(resize).toBeVisible();await expect(resize).toHaveAttribute('aria-orientation','vertical');
     await journal.getByRole('button',{name:'Markdown source',exact:true}).click();const body=page.locator('#today-journal-body');await body.fill(draft);
-    const start=await resize.boundingBox(),initial=(await sidebar.boundingBox()).width;await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2-100,start.y+start.height/2,{steps:4});await page.mouse.up();
+    const start=await resize.boundingBox(),initial=(await sidebar.boundingBox()).width;await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2+100,start.y+start.height/2,{steps:4});await page.mouse.up();
     await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(initial+100,0);await expect(body).toHaveValue(draft);
     await resize.focus();await resize.press('End');await expect(resize).toHaveAttribute('aria-valuenow','480');await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(480,0);
-    await resize.press('ArrowRight');await expect(resize).toHaveAttribute('aria-valuenow','460');await resize.press('ArrowLeft');await expect(resize).toHaveAttribute('aria-valuenow','480');await resize.press('ArrowLeft');await expect(resize).toHaveAttribute('aria-valuenow','480');
-    await resize.press('Home');await expect(resize).toHaveAttribute('aria-valuenow','180');await resize.press('ArrowRight');await expect(resize).toHaveAttribute('aria-valuenow','180');await resize.press('End');
+    await resize.press('ArrowLeft');await expect(resize).toHaveAttribute('aria-valuenow','460');await resize.press('ArrowRight');await expect(resize).toHaveAttribute('aria-valuenow','480');await resize.press('ArrowRight');await expect(resize).toHaveAttribute('aria-valuenow','480');
+    await resize.press('Home');await expect(resize).toHaveAttribute('aria-valuenow','180');await resize.press('ArrowLeft');await expect(resize).toHaveAttribute('aria-valuenow','180');await resize.press('End');
     await expect(body).toHaveValue(draft);await expect.poll(async()=>(await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body).toBe(draft);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/today-sidebar-wide.png'});
     await resize.focus();await page.setViewportSize({width:1000,height:844});await expect(resize).toBeHidden();await expect(page.locator('#today-date')).toBeFocused();
@@ -242,24 +242,28 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
     const check=async(width,font,heading=null,brand=originalBrand)=>{
       if(page.viewportSize()?.width!==width||page.viewportSize()?.height!==1000)await page.setViewportSize({width,height:1000});
       await page.evaluate(({font,heading,brand})=>{const root=document.documentElement;root.style.setProperty('--font-base',font+'px');heading?root.style.setProperty('--font-section-heading',heading):root.style.removeProperty('--font-section-heading');brand?root.style.setProperty('--font-brand',brand):root.style.removeProperty('--font-brand');scrollTo(0,0);},{font,heading,brand});
+      await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toHaveAttribute('aria-expanded',String(width>1050));
       const gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));
       // Font-only changes must redock both columns without a synthetic resize.
       await expect.poll(()=>page.evaluate(gap=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector('#workspace-navigation').getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},gap)).toBeLessThan(2);
       const geometry=await page.evaluate(()=>{
         const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),controls=rect('.today-date-navigation'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect('#workspace-navigation'),main=rect('.today-main'),session=rect('#work-session');
-        return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,headerRight:toolbar.right,controlsRight:controls.right,controlsTop:controls.top,controlsCenter:controls.top+controls.height/2,titleTop:title.top,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,columnGap:parseFloat(getComputedStyle(document.querySelector('.today-toolbar')).columnGap),overflow:document.documentElement.scrollWidth>innerWidth};
+        return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,headerBottom:toolbar.bottom,headerRight:toolbar.right,actionsLeft:rect('#today-main-actions').left,contentsTop:rect('#today-contents').top,editorTop:editor.top,sidebarRight:sidebar.right,controlsRight:controls.right,controlsTop:controls.top,controlsCenter:controls.top+controls.height/2,titleTop:title.top,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,columnGap:parseFloat(getComputedStyle(document.querySelector('.today-toolbar')).columnGap),overflow:document.documentElement.scrollWidth>innerWidth};
       });
       expect(geometry.overflow,`${locale}: viewport ${width}px, base font ${font}px, heading ${heading||'default'}, brand ${brand||'default'}`).toBe(false);
       if(width>650){
-        expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.columnGap+geometry.headerRight)/2)).toBeLessThan(2);
+        expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.actionsLeft)/2)).toBeLessThan(2);
         expect(Math.abs(geometry.titleCenterY-geometry.controlsCenter)).toBeLessThan(2);
       }else{
         expect(geometry.titleBottom).toBeLessThanOrEqual(geometry.controlsTop+1);
         expect(Math.abs(geometry.titleCenterX-(geometry.mainLeft+geometry.mainRight)/2)).toBeLessThan(2);
       }
       if(width>1050){
-        expect(Math.abs(geometry.sidebarTop-geometry.headerTop)).toBeLessThan(1);
-        expect(geometry.sidebarTop-geometry.sessionBottom).toBeGreaterThanOrEqual(0);expect(geometry.sidebarTop-geometry.sessionBottom).toBeLessThanOrEqual(gap+1);
+        expect(Math.abs(geometry.sidebarTop-geometry.editorTop)).toBeLessThan(1);
+        expect(Math.abs(geometry.contentsTop-geometry.headerTop)).toBeLessThan(1);
+        expect(geometry.sidebarRight).toBeLessThanOrEqual(geometry.mainLeft);
+        expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.headerBottom);
+        expect(geometry.headerTop-geometry.sessionBottom).toBeGreaterThanOrEqual(0);expect(geometry.headerTop-geometry.sessionBottom).toBeLessThanOrEqual(gap+1);
         expect(geometry.sidebarBottom).toBeLessThanOrEqual(geometry.dockTop-gap+1);
       }else expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.editorBottom);
       for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);}
