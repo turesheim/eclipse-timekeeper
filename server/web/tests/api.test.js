@@ -131,6 +131,22 @@ test('work-session Undo metadata is opt-in and validated after owner binding',as
 });
 
 const snapshotDates=()=>({first:'2026-05-04',from:'2026-05-04T00:00:00Z',to:'2026-05-11T00:00:00Z'});
+test('superseding a snapshot cancels every outstanding read without closing the account',async()=>{
+  const controller=new AbortController(),signals=[];let stalled=true,started;
+  const ready=new Promise(resolve=>started=resolve);
+  const api=new Api('token',async(url,options)=>{
+    if(stalled&&new URL(url,'http://localhost').pathname!=='/api/v1/me'){
+      signals.push(options.signal);if(signals.length===10)started();
+      await new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}));
+    }
+    return snapshotReply(url);
+  });
+  const pending=api.snapshot(snapshotDates,null,{signal:controller.signal});
+  const rejected=assert.rejects(pending,error=>error.code==='UNAVAILABLE');await ready;controller.abort();await rejected;
+  assert.equal(signals.length,10);assert.ok(signals.every(signal=>signal.aborted));
+  stalled=false;assert.equal((await api.snapshot(snapshotDates)).revision,1);
+  await assert.rejects(api.snapshot(snapshotDates,null,{signal:controller.signal}),error=>error.code==='UNAVAILABLE');
+});
 function snapshotReply(url,reportRevision=1){
   const path=new URL(url,'http://localhost').pathname;
   if(path==='/api/v1/me')return reply({ownerId:'owner-a',zoneId:'UTC',version:1});

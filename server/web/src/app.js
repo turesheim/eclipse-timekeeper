@@ -37,7 +37,7 @@ accountMenu($('account-menu'));
 $('about-open').addEventListener('click', () => openAbout($('server-info'),snapshot?.profile.data.holidayCountry));
 $('about-close').addEventListener('click', () => $('server-info').close());
 $('server-info').addEventListener('close', () => {if (!$('session').hidden) $('account-menu').querySelector('summary').focus();});
-let api = null,snapshot = null,connected = false,refreshing = null,reloadAgain = false;
+let api = null,snapshot = null,connected = false,refreshing = null,refreshController = null,reloadAgain = false;
 let editor = null,deleteCandidate = null,selectedActivity = null,selectedDay = null;
 let focusId = '';
 let watchSession = null;
@@ -203,7 +203,7 @@ function readOnlyWhileDisconnected() {
   for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
-  today.journal.setWritable(connected && canWrite);
+  today.journal.setWritable(connected && canWrite,canWrite);
   notes.writable=connected && canWrite;notes.controls();
   notePopup.writable=connected&&canWrite;notePopup.controls();
   for(const view of [calendarSearchPopup,calendarSearchWorkspace]){view.writable=connected&&canWrite&&!!view.context?.entry;view.controls();}
@@ -271,7 +271,7 @@ const auth = authentication({
   clear({restoring = false} = {}) {
     editorPreferences.reset();
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
-    refreshing = null;reloadAgain = false;
+    refreshController?.abort();refreshController = null;refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
     ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
@@ -295,7 +295,7 @@ $('expand-activities').addEventListener('click', () => {activitiesCollapsed = fa
 
 async function refresh() {
   if (!api) return;
-  if (refreshing) {reloadAgain = true;await refreshing;return;}
+  if (refreshing) {reloadAgain = true;refreshController?.abort();await refreshing;return;}
   const session = api;
   const pending = (async () => {
     $('workspace').setAttribute('aria-busy', 'true');
@@ -304,7 +304,14 @@ async function refresh() {
     do {
       reloadAgain = false;
       const date = $('week-date').value;
-      const current = await session.snapshot((zone) => weekRange(date, zone));
+      const controller = new AbortController();refreshController = controller;
+      let current;
+      try {current = await session.snapshot((zone) => weekRange(date, zone),null,{signal:controller.signal});}
+      catch (error) {
+        // A queued refresh supersedes this read, not the authenticated session.
+        if (controller.signal.aborted && reloadAgain && session === api) continue;
+        throw error;
+      } finally {if (refreshController === controller) refreshController = null;}
       if (session !== api) return;
       if (date !== $('week-date').value) {reloadAgain = true;continue;}
       // A save may have queued another read while this older snapshot was in
@@ -339,7 +346,7 @@ async function watch(session) {
       delay = 1000;
     } catch (error) {
       if (session !== api) return;
-      if (error.code === 'RESYNC_REQUIRED') {connected = false;continue;}
+      if (error.code === 'RESYNC_REQUIRED') {connected = false;readOnlyWhileDisconnected();continue;}
       connected = false;setStatus(errorText(error));readOnlyWhileDisconnected();
       if (error.status === 401) {auth.clear(errorText(error));return;}
       if (error.status === 403) return;

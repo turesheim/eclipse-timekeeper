@@ -207,12 +207,13 @@ export class Api {
       return this.request('/me');
     }
   }
-  async snapshot(range, selectedSession = null, {timeout = 30000} = {}) {
+  async snapshot(range, selectedSession = null, {timeout = 30000, signal} = {}) {
     const started=performance.now();let attempts=0;
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const remaining=timeout-(performance.now()-started);if(remaining<=0)throw new ApiError('UNAVAILABLE');
+        const remaining=timeout-(performance.now()-started);if(remaining<=0||signal?.aborted)throw new ApiError('UNAVAILABLE');
         const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),remaining),options={signal:controller.signal};++attempts;
+        const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});
         try {
           // Bind the owner before issuing parallel reads, including empty pages.
           const profile = await this.request('/me',options);
@@ -231,7 +232,7 @@ export class Api {
           if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version || focusAreas.data.version !== confirmedFocus.data.version) throw new ApiError('BUSY');
           return { profile, focusAreas, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
         } catch (error) {if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error;}
-        finally {clearTimeout(timer);controller.abort();}
+        finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);controller.abort();}
       }
     } finally {
       const durationMs=Math.round(performance.now()-started);

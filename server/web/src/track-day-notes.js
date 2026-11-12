@@ -130,30 +130,32 @@ export class TrackDayNotes {
   focusDate(date){if(!this.root.hidden)(this.grid.querySelector(`button[${this.noteAttr}="${date}"]`)||this.monthInput).focus();}
   dateLabel(date){return dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));}
   async canLeaveInline(){return !this.editor?.busy&&await this.autosave.flush();}
-  showInline(date,session,writable){
+  showInline(date,session,writable,draftable=writable){
     if(!this.inline)return;
     if(session!==this.session){this.reset();this.session=session;}
-    this.writable=writable;
+    this.writable=writable;this.draftable=draftable;
     if(this.editor?.date===date){this.controls();return;}
     if(this.editor)this.closeEditor();
     void this.open(date);
   }
   update(calendar,cells,session,revision,writable,focused){
     if(session!==this.session){this.reset();this.session=session;}
-    Object.assign(this,{calendar,cells,revision,writable});
+    Object.assign(this,{calendar,cells,revision,writable,draftable:writable});
     this.paint(focused);this.load();
   }
-  setWritable(value){this.writable=value;if(!value){this.cancelHold();this.closeMenu();}this.controls();this.paint();}
+  // A loaded Today draft can remain editable while recovery pauses mutations.
+  // Other journal hosts keep their existing connected/read-only behavior.
+  setWritable(value,draftable=value){this.writable=value;this.draftable=draftable;if(!value){this.cancelHold();this.closeMenu();}this.controls();this.paint();}
   controls(){
     this.callbacks.onContentState?.();
     const editor=this.editor;this.markdown?.bookmark?.sync();if(!editor)return;
-    this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.writable;
-    const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
+    this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.draftable;
+    const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.draftable;
     if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
     this.retrySave.hidden=!editor.saveFailed||editor.uncertain||editor.stale;this.retrySave.disabled=editor.loading||editor.busy||editor.saving||!this.writable;
     this.delete.disabled=editor.loading||editor.failedRead||editor.busy||editor.saving||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!editor.present||!this.writable;
     this.cancel.disabled=editor.busy;this.markdown.syncActions();
-    if(!editor.loading&&!editor.busy&&!editor.failedRead&&!editor.uncertain&&!editor.stale&&!editor.saveFailed)this.savedStatus.textContent=t(editor.saving?'journal.saving':!this.writable?'journal.read_only':this.dirty()?'journal.unsaved':'journal.saved');
+    if(!editor.loading&&!editor.busy&&!editor.failedRead&&!editor.uncertain&&!editor.stale&&!editor.saveFailed)this.savedStatus.textContent=t(editor.saving?'journal.saving':!this.draftable?'journal.read_only':!this.writable?'journal.waiting_sync':this.dirty()?'journal.unsaved':'journal.saved');
     if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
     if(this.recovery){
       if(editor.failedRead||editor.stale||editor.uncertain){if(this.markdown.root.previousSibling!==this.recovery)this.markdown.root.before(this.recovery);}
@@ -163,7 +165,7 @@ export class TrackDayNotes {
     if(this.autosave&&this.dirty()&&this.writable&&!editor.loading&&!editor.busy&&!editor.saving&&!editor.failedRead&&!editor.stale&&!editor.uncertain&&!editor.saveFailed&&!this.markdown.loading)this.autosave.changed();
   }
   reset(){
-    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.positions.clear();this.notes.clear();this.bodyDates.clear();this.bookmarkedDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
+    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.writable=false;this.draftable=false;this.key=null;this.range=null;this.loaded=false;this.positions.clear();this.notes.clear();this.bodyDates.clear();this.bookmarkedDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
     this.closeEditor();this.text.value='';this.error.textContent='';this.status.hidden=true;this.message.textContent='';this.retry.hidden=true;
   }
   hide(){this.cancelHold();this.closeMenu();if(!this.editor?.busy)this.closeEditor();}
