@@ -116,8 +116,9 @@ adds it, and an outlined dash appears when removing it with pointer or keyboard.
 A visible keyboard focus outline and a touch target of at least 44 pixels remain.
 Popup bookmarks align with their note-content edge below the window controls.
 
-The Note tools menu includes **Associate with client** for an owned note or empty
-daily/weekly page. The dialog lists every owned client, including those outside
+**Associate with client** appears in Notes/Today **Main actions** and in
+**Note tools** for dialog editors, including empty daily/weekly pages.
+The dialog lists every owned client, including those outside
 the workspace focus filter, and **No client** removes the association. A small
 name and color marker appear at the top right of the note. Read-only sessions
 can see the label. Selecting a client does not save a body draft or change its
