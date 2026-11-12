@@ -85,7 +85,7 @@ test('clicking a hashtag searches exact private tags and retains the current Not
   await expect(page.locator('#notes-search-mode')).toHaveCount(0);await expect(page.locator('#notes-search-query')).toHaveValue('tag:#openshift');
   const rows=page.locator('#notes-search-results [data-search-note]');await expect(rows).toHaveCount(2);await expect(rows.first()).toContainText('A-current.md');await expect(rows.last()).toContainText('B-tagged.md');await expect(page.locator('#notes-formatted')).toContainText('Keep this private draft.');
   const read=await api('GET','/notes/entries/'+current.id+'/content');expect(await read.text()).not.toContain('Keep this private draft.');
-  await page.locator('#notes-search-panel').getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-panel').getByRole('button',{name:'Folders and notes',exact:true})).toHaveAttribute('aria-expanded','false');
+  await page.locator('#notes-search-panel').getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:390,height:844});await expect(page.locator('#notes-panel').getByRole('button',{name:'Expand left sidebar',exact:true})).toHaveAttribute('aria-expanded','false');
   await page.locator('#notes-formatted [data-hashtag="#openshift"]').focus();await page.locator('#notes-formatted [data-hashtag="#openshift"]').press('Enter');await expect(page.locator('#notes-search-query')).toBeVisible();await expect(rows).toHaveCount(2);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 

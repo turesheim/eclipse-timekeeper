@@ -6,6 +6,13 @@ import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {captureScreenshot} from './screenshots.js';
 import {noteEntry} from './note-entry.js';
+import {setTheme} from './navigation.js';
+
+async function openLayoutNote(page,api,body){
+  await put(api,'Notes/Layout.md',body);const navigation=page.locator('#notes-navigation');
+  await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Layout.md').click();
+  await expect(page.locator('#notes-formatted .ProseMirror')).toBeVisible();
+}
 
 async function setup(page,request){
   const username='navigator-'+randomUUID().slice(0,8),password='Private navigator test passphrase';
@@ -18,6 +25,52 @@ async function setup(page,request){
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return {api,folder};
 }
 const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(text),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+
+test('Notes separates navigation and recent notes, exposes main actions and follows live headings in both editor modes',async({page,request})=>{
+  const {api}=await setup(page,request),body='# Outline\n\n## Planning\n\nDecisions.\n\n```md\n# Not a heading\n```\n\n## Delivery\n\nNext steps.\n';
+  await openLayoutNote(page,api,body);const panel=page.locator('#notes-panel'),contents=page.locator('#notes-contents'),rich=page.locator('#notes-formatted .ProseMirror'),actions=page.locator('#notes-main-actions'),entry=await(await api('GET','/notes/resolve?path=Notes%2FLayout.md')).json();
+  await expect(page.locator('#notes-sidebar > #notes-navigation')).toHaveCount(1);await expect(page.locator('#notes-sidebar > .notes-recent .recent-notes')).toBeVisible();await expect(page.locator('#notes-navigation .recent-notes')).toHaveCount(0);
+  for(const name of ['Note revisions','Associate with client','Delete file or folder','Rename or move','Reload from server','Collapse left sidebar','Collapse right sidebar'])await expect(actions.getByRole('button',{name,exact:true})).toBeVisible();
+  await expect(contents.getByRole('button')).toHaveText(['Outline','Planning','Delivery']);
+  await expect(contents.getByRole('button').first()).toHaveCSS('font-family',await panel.evaluate(node=>getComputedStyle(node).fontFamily));
+  await contents.getByRole('button',{name:'Planning',exact:true}).click();await expect(rich).toBeFocused();expect(await page.evaluate(()=>getSelection().anchorNode.parentElement.closest('h2')?.textContent)).toBe('Planning');
+  await panel.getByRole('button',{name:'Markdown source',exact:true}).click();const source=page.locator('#notes-body'),draft=(await source.inputValue())+'\n## New decision\n';await source.fill(draft);
+  await source.evaluate(node=>node.setSelectionRange(4,9));await expect(contents.getByRole('button',{name:'New decision',exact:true})).toBeVisible();await expect(source).toBeFocused();expect(await source.evaluate(node=>[node.selectionStart,node.selectionEnd])).toEqual([4,9]);
+  await contents.getByRole('button',{name:'New decision',exact:true}).click();await expect(source).toBeFocused();expect(await source.evaluate(node=>node.selectionStart)).toBe(draft.indexOf('## New decision'));
+  await actions.getByRole('button',{name:'Collapse right sidebar',exact:true}).press('ControlOrMeta+s');await expect.poll(async()=>(await(await api('GET','/notes/entries/'+entry.id+'/content')).body()).toString()).toBe(draft);
+  await put(api,'Notes/Without headings.md','An ordinary paragraph.\n');await page.locator('#notes-navigation').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes/Without headings.md').click();await expect(contents.getByRole('button')).toHaveCount(0);await expect(contents).toContainText('No headings in this note yet.');
+});
+
+test('Notes right sidebar resizes and collapses without replacing the draft, and fits both themes and narrow screens',async({page,request})=>{
+  await page.setViewportSize({width:1440,height:1000});const {api}=await setup(page,request),body='# Layout\n\n'+Array.from({length:80},(_,i)=>`Paragraph ${i}.\n\n`).join('');
+  await openLayoutNote(page,api,body);await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();const source=page.locator('#notes-body'),contents=page.locator('#notes-contents'),separator=page.getByRole('separator',{name:'Resize notes table of contents',exact:true}),toggle=page.locator('#notes-main-actions-toggle-right-sidebar');
+  const metadata=await(await api('GET','/notes/resolve?path=Notes%2FLayout.md')).json(),saved=await api('GET','/notes/entries/'+metadata.id+'/content');await source.evaluate(node=>{window.layoutSource=node;node.setSelectionRange(5,12);node.scrollTop=100;});
+  const initial=(await contents.boundingBox()).width,handle=await separator.boundingBox();await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();await page.mouse.move(handle.x+handle.width/2-80,handle.y+handle.height/2,{steps:4});await page.mouse.up();
+  await expect.poll(async()=>(await contents.boundingBox()).width).toBeCloseTo(initial+80,0);await separator.press('ArrowLeft');await expect(separator).toHaveAttribute('aria-valuenow',String(initial+100));await separator.press('Home');await expect(separator).toHaveAttribute('aria-valuenow','180');await separator.press('End');await expect(separator).toHaveAttribute('aria-valuenow','480');
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await setTheme(page,theme);await captureScreenshot(page,{path:`test-results/notes-layout-${theme}.png`});
+    expect((await new AxeBuilder({page}).include('#notes-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+  }
+  const width=(await page.locator('.notes-editor').boundingBox()).width;await toggle.click();await expect(contents).toBeHidden();await expect(separator).toBeHidden();expect((await page.locator('.notes-editor').boundingBox()).width).toBeGreaterThan(width);await toggle.click();await expect(separator).toHaveAttribute('aria-valuenow','480');
+  expect(await source.evaluate(node=>({same:node===window.layoutSource,start:node.selectionStart,end:node.selectionEnd,scroll:node.scrollTop}))).toEqual({same:true,start:5,end:12,scroll:100});expect((await api('GET','/notes/entries/'+metadata.id+'/content')).headers().etag).toBe(saved.headers().etag);
+  await separator.focus();await page.setViewportSize({width:390,height:844});await expect(separator).toBeHidden();await expect(contents).toBeHidden();await expect(toggle).toBeFocused();
+  for(const viewportWidth of [390,320]){
+    await page.setViewportSize({width:viewportWidth,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();await expect(contents).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-contents-mobile-${viewportWidth}.png`});await toggle.click();
+    const editor=await page.locator('.notes-editor').boundingBox(),dock=await page.locator('#workspace-navigation').boundingBox();expect(editor.y+editor.height).toBeLessThanOrEqual(dock.y+1);
+  }
+  await source.fill('Draft survives the sidebar controls.');await toggle.focus();await toggle.press('ControlOrMeta+s');await expect.poll(async()=>(await(await api('GET','/notes/entries/'+metadata.id+'/content')).body()).toString()).toBe('Draft survives the sidebar controls.');
+});
+
+test('Notes outline and main actions retain read-only guards and clear headings at sign-out',async({page,request,browser})=>{
+  const {api}=await setup(page,request);await openLayoutNote(page,api,'# Private outline\n\n## Readable section\n\nBody.\n');const token=await(await api('POST','/auth/tokens',{name:'Read-only layout',permissions:['read'],expiresAt:null})).json(),entry=await(await api('GET','/notes/resolve?path=Notes%2FLayout.md')).json(),before=await api('GET','/notes/entries/'+entry.id+'/content');
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true}),reader=await context.newPage();
+  try{
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#status')).toHaveText('Up to date');await reader.locator('[data-tab=notes]').click();const navigation=reader.locator('#notes-navigation');await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Layout.md').click();
+    await expect(reader.locator('#notes-contents').getByRole('button',{name:'Readable section',exact:true})).toBeVisible();await reader.locator('#notes-contents').getByRole('button',{name:'Readable section',exact:true}).click();await expect(reader.locator('#notes-formatted .ProseMirror')).not.toBeEditable();
+    for(const name of ['Associate with client','Delete file or folder','Rename or move'])await expect(reader.locator('#notes-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
+    expect((await api('GET','/notes/entries/'+entry.id+'/content')).headers().etag).toBe(before.headers().etag);await reader.locator('#account-menu > summary').click();await reader.locator('#sign-out').click();await expect(reader.locator('#workspace')).toBeHidden();await expect(reader.locator('#notes-contents ol > li')).toHaveCount(0);
+  }finally{await context.close();}
+});
 
 test('a late heading-link completion preserves a pressed navigator action',async({page,request})=>{
   const {api}=await setup(page,request),navigation=page.locator('#notes-navigation');
@@ -221,15 +274,12 @@ test('expand and collapse cover nested folders, exclude a hidden journal and can
   expect(parents).not.toContain(journal.id);await expect(page.locator('#notes-body')).toHaveValue('Retain this draft.');
 });
 
-test('navigation toggle stays left of Notes while collapse preserves the draft and navigator width',async({page,request})=>{
+test('Notes main actions collapse sidebars while preserving the draft and navigator width',async({page,request})=>{
   await page.setViewportSize({width:1440,height:900});
   const {api}=await setup(page,request);await put(api,'Notes/Review.md','# Project review\n\nNotes for the next release.\n');
   const navigation=page.locator('#notes-navigation'),toggle=page.locator('.notes-drawer-toggle'),editor=page.locator('.notes-editor'),title=page.locator('#notes-document-title'),resize=page.getByRole('separator',{name:'Resize notes navigation'});
-  const toggleOffset=async()=>{
-    const label=page.locator('#notes-title');await expect(label).toBeVisible();const button=await toggle.boundingBox(),text=await label.boundingBox(),heading=await page.locator('.notes-heading').boundingBox();
-    expect(button.x+button.width).toBeLessThanOrEqual(text.x);expect(Math.abs(button.y+button.height/2-text.y-text.height/2)).toBeLessThan(1);return button.x-heading.x;
-  };
-  const originalOffset=await toggleOffset();
+  const rightToggle=page.locator('#notes-main-actions-toggle-right-sidebar');
+  await expect(page.locator('#notes-main-actions .notes-drawer-toggle')).toHaveCount(1);
   await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Review.md').click();
   await expect(title).toHaveText('Review');await expect(toggle).toHaveAttribute('aria-expanded','true');
   for(const property of ['font-family','font-size','font-weight'])await expect(title).toHaveCSS(property,await page.locator('#notes-title').evaluate((node,property)=>getComputedStyle(node).getPropertyValue(property),property));
@@ -240,19 +290,16 @@ test('navigation toggle stays left of Notes while collapse preserves the draft a
   const expandedWidth=(await editor.boundingBox()).width;
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('Unsaved layout draft.');
   await toggle.focus();await toggle.press('Enter');await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(navigation).toBeHidden();await expect(resize).toBeHidden();
-  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
+  await rightToggle.click();await expect(rightToggle).toHaveAttribute('aria-expanded','false');
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-(await page.locator('.notes-layout').boundingBox()).width)).toBeLessThan(2);
   expect((await editor.boundingBox()).width).toBeGreaterThan(expandedWidth);
   await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');await expect(page.locator('#notes-panel').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
   await captureScreenshot(page,{path:'test-results/notes-workspace-collapsed.png',fullPage:false});
-  await toggle.press('Space');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toHaveAttribute('aria-valuenow','480');
-  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
+  await rightToggle.click();await toggle.focus();await toggle.press('Space');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toHaveAttribute('aria-valuenow','480');
   await expect.poll(async()=>Math.abs((await editor.boundingBox()).width-expandedWidth)).toBeLessThan(2);await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
   // A viewport change must not leave focus in navigation that is now hidden.
   await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();await page.setViewportSize({width:390,height:844});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
-  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await toggle.press('Enter');await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(resize).toBeHidden();
-  expect(await toggleOffset()).toBeCloseTo(originalOffset,1);
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
   await toggle.click();await page.setViewportSize({width:390,height:844});await toggle.click();await expect(navigation).toBeVisible();await navigation.getByRole('button',{name:'Refresh',exact:true}).focus();
   await page.setViewportSize({width:1440,height:900});await expect(navigation).toBeHidden();await expect(toggle).toBeFocused();await expect(page.locator('#notes-body')).toHaveValue('Unsaved layout draft.');
