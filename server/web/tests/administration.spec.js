@@ -144,7 +144,7 @@ test('Internet accounts administration checks registrations, explains Google set
   test.setTimeout(120000);const admin=await settingsAdministrator(page,request),client=browserRequest(page);
   const actual=await client.get('/api/v1/admin/internet-accounts');expect(actual.status()).toBe(200);expect(actual.headers()['cache-control']).toBe('no-store');
   const local=await actual.json();expect(Object.keys(local).sort()).toEqual(['mode','status','publicOrigin','callbackUrl','serviceUrl','discoveryUrl','googleRedirectUrl','googleConfigured','microsoftConfigured','version','effectiveVersion','restartRequired','canEdit','saved','effective'].sort());
-  const sample={...local,mode:'SHARED',status:'NOT_CHECKED',serviceUrl:'https://connect.example.test',googleRedirectUrl:'https://connect.example.test/oauth/google/callback',googleConfigured:null,microsoftConfigured:null};
+  const sample={...local,publicOrigin:'https://nas.example-tailnet.ts.net:8443',callbackUrl:'https://nas.example-tailnet.ts.net:8443/web/task-provider-callback.html',mode:'SHARED',status:'NOT_CHECKED',serviceUrl:'https://connect.example.test',googleRedirectUrl:'https://connect.example.test/oauth/google/callback',googleConfigured:null,microsoftConfigured:null};
   let checks=0,unavailable=false;const external=[];page.on('request',request=>{if(new URL(request.url()).origin!==origin())external.push(request.url());});
   await page.route('**/api/v1/admin/internet-accounts*',route=>{
     const check=new URL(route.request().url()).searchParams.get('check')==='true';if(check)checks++;
