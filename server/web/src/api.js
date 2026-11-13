@@ -222,7 +222,7 @@ export class Api {
           const profile = await this.request('/me',options);
           const dates = range(profile.data.zoneId);
           const [clients,projects,tasks,labels,workSessions,activeWorkSession,activities,active,report,focusAreas] = await Promise.all([
-            this.page('/clients',{},options),this.page('/projects',{},options),this.page('/tasks',{},options),this.page('/labels',{},options),
+            this.page('/clients',{},options),this.page('/projects',{},options),this.page('/tasks',{includeNoteSources:true},options),this.page('/labels',{},options),
             this.page('/work-sessions',{},options),this.request('/work-sessions/active',options),
             this.page('/activities',{from:dates.from,to:dates.to},options),this.request('/activities/active',options),
             this.request(`/reports/activities?${new URLSearchParams({from:dates.from,to:dates.to,zoneId:profile.data.zoneId})}`,options),this.request('/focus-areas',options)

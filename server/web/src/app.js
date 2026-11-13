@@ -31,6 +31,7 @@ import {focusedSnapshot,focusedCurrentSession,focusIncludesActivity} from './foc
 import {renderFocusSettings} from './focus-settings.js';
 import {dailyNoteDate,dailyNoteHref,dailyNoteDateFromSearch,dayNoteNavigation} from './journal-links.js';
 import {openAbout} from './about.js';
+import {renderMarkdown} from './assets/milkdown/markdown-preview.js';
 
 const $ = (id) => document.getElementById(id);
 accountMenu($('account-menu'));
@@ -383,7 +384,7 @@ function action(text, operation) {
 function name(list, id, field = 'name') {const value = list.find((v) => v.id === id);return value && field === 'summary' ? taskPresentation(value).title : value?.[field] ?? i18nText("ui.unassigned");}
 function taskLabel(task) {
   if (!task) return element('span', i18nText("ui.unassigned"));
-  const { title, url } = taskPresentation(task),node = element(url ? 'a' : 'span', title, 'task-title');
+  const { title, url } = taskPresentation(task),node = element(url ? 'a' : 'span', undefined, 'task-title');node.append(renderMarkdown(title,{inline:true,links:false}));
   node.dataset.taskId = task.id;
   if (url) {node.href = url;node.target = '_blank';node.rel = "noopener noreferrer";}
   return node;
@@ -451,7 +452,10 @@ function render() {
   const active = s.active.data;
   $('active-title').closest('.tracking').dataset.active = String(!!active);
   $('active-title').replaceChildren(active && !focusIncludesActivity(s,active) ? document.createTextNode(i18nText('focus.running_outside')) : active ? taskLabel(s.tasks.find((task) => task.id === active.taskId)) : document.createTextNode(i18nText("ui.ready_when_you_are")));
-  $('active-details').textContent = active && !focusIncludesActivity(s,active) ? '' : active ? i18nText("ui.started", { value0: instantText(active.start, zone), value1: active.summary || i18nText("ui.tracking_time") }) : i18nText("ui.choose_a_task_below_to_start_tracking");
+  $('active-details').replaceChildren();
+  if(active&&focusIncludesActivity(s,active)){
+    $('active-details').append(renderMarkdown(i18nText('ui.started',{value0:instantText(active.start,zone),value1:active.summary||i18nText('ui.tracking_time')}),{inline:true,links:false}));
+  }else if(!active)$('active-details').textContent=i18nText('ui.choose_a_task_below_to_start_tracking');
   $('stop').hidden = !active;readOnlyWhileDisconnected();
   renderLegacyViews(s,zone);
   refreshLabelFields();refreshClientChoices();renderSession();
@@ -462,6 +466,7 @@ function render() {
   notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite,s.revision);
   recentNotes.update(api,s.profile.data.zoneId,s.revision);
   tasks.update(s,connected,api,canWrite);
+  renderSessionTime();
 }
 function renderChangedList(id,records,paint){
   const key=JSON.stringify([getLocale(),records]);
@@ -836,6 +841,9 @@ function renderSessionTime() {
   const session = displayedSession();
   if (connected) activeAsOf = instantNanos(snapshot.report.generatedAt) + elapsed;
   if (session) $('work-session-elapsed').textContent = displayNanos(sessionTimeNanos(session, [], activeAsOf).duration);
+  const active=snapshot.active.data;
+  $('active-elapsed').textContent=active?displayNanos(activeAsOf>instantNanos(active.start)?activeAsOf-instantNanos(active.start):0n):'';
+  tasks.tick(activeAsOf);
   track.tick(activeAsOf);
   weekSessions.tick(activeAsOf);
 }

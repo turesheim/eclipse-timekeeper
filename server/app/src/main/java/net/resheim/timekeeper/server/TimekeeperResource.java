@@ -506,7 +506,7 @@ public class TimekeeperResource {
     @GET @Path("/{collection}") public Response list(@PathParam("collection") String collection) {
         String type=ContractInputs.type(collection);var query=uri.getQueryParameters();
         if(type.equals("ACTIVITY")) ContractInputs.queries(query,"from","to","taskId","projectId","labelId","limit","cursor");
-        else if(type.equals("TASK")) ContractInputs.queries(query,"q","projectId","parentTaskId","unassigned","limit","cursor");
+        else if(type.equals("TASK")) ContractInputs.queries(query,"q","projectId","parentTaskId","unassigned","includeNoteSources","limit","cursor");
         else if(type.equals("WORK_SESSION")) ContractInputs.queries(query,"q","clientId","projectId","labelId","limit","cursor");
         else if(type.equals("PROJECT")) ContractInputs.queries(query,"q","clientId","limit","cursor");
         else if(type.equals("TASK_LIST")) ContractInputs.queries(query,"q","connectionId","limit","cursor");
@@ -516,6 +516,9 @@ public class TimekeeperResource {
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
         return tx(() -> {
+            boolean noteSources=type.equals("TASK")&&query.containsKey("includeNoteSources");
+            if(noteSources&&!Set.of("true","false").contains(query.getFirst("includeNoteSources")))throw ApiFailure.badRequest();
+            var origins=noteSources&&query.getFirst("includeNoteSources").equals("true")?new NoteTasks(store).origins():Map.<String,ObjectNode>of();
             validateFilters(query);List<JsonNode> values;
             if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)resourceSnapshot(value)).toList();
             else values=store.list(type).stream().filter(value -> {
@@ -533,6 +536,7 @@ public class TimekeeperResource {
                     if(query.containsKey("unassigned")) {String flag=query.getFirst("unassigned");if(!Set.of("true","false").contains(flag)) throw ApiFailure.badRequest();if(flag.equals("true") && !value.get("projectId").isNull()) return false;}
                 }return true;
             }).sorted(Comparator.comparing(value -> value.get("id").asText())).toList();
+            if(!origins.isEmpty())values=values.stream().map(value->{var source=origins.get(value.path("id").asText());if(source==null)return value;var enriched=((ObjectNode)value).deepCopy();enriched.set("sourceNote",source);return (JsonNode)enriched;}).toList();
             ObjectNode filters=object();query.forEach((name,entries) -> {
                 if(Set.of("limit","cursor").contains(name) || (name.equals("q") && q.isEmpty()) || (name.equals("unassigned") && entries.getFirst().equals("false"))) return;
                 String value=entries.getFirst();

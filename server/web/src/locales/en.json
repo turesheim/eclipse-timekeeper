@@ -1792,5 +1792,13 @@
   "internet_admin.status_callback_invalid": "The effective HTTPS origin or callback is invalid. Correct the public HTTPS address and restart.",
   "internet_admin.provider_new_secret": "New {{provider}} client secret",
   "internet_admin.provider_clear_secret": "Clear saved {{provider}} client secret",
-  "internet_accounts.registration_required": "An administrator must configure this provider in Internet account settings before accounts can connect."
+  "internet_accounts.registration_required": "An administrator must configure this provider in Internet account settings before accounts can connect.",
+  "tasks.actions": "Task actions",
+  "tasks.complete_visible": "Complete all visible tasks",
+  "tasks.complete_visible_description_one": "Complete {{count}} visible, unfinished task? Calendar tasks are read-only and are skipped. Tasks beyond Show more tasks are not included.",
+  "tasks.complete_visible_description_other": "Complete {{count}} visible, unfinished tasks? Calendar tasks are read-only and are skipped. Tasks beyond Show more tasks are not included.",
+  "tasks.complete_visible_failed_one": "{{count}} task confirmed completed before stopping: {{message}}. Refresh to review the current tasks before trying again.",
+  "tasks.complete_visible_failed_other": "{{count}} tasks confirmed completed before stopping: {{message}}. Refresh to review the current tasks before trying again.",
+  "tasks.tracking": "Tracking · {{duration}}",
+  "tasks.elapsed": "Tracked time"
 }

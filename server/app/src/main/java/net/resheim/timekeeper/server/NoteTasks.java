@@ -109,6 +109,22 @@ final class NoteTasks {
         var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();var entry=new VaultIndex(store).referenced(ref.type(),ref.id());
         if(entry==null||entry.path("deleted").asBoolean())throw ApiFailure.notFound();return vault.metadata(vault.get(VaultCollection.id(entry)));
     }
+    /** Optional list projection; resolve each owned source once without changing task validators. */
+    Map<String,ObjectNode> origins(){
+        var links=store.list(LINK);if(links.isEmpty())return Map.of();
+        var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();
+        var documents=new HashMap<String,ObjectNode>();var result=new HashMap<String,ObjectNode>();var missing=new HashSet<String>();
+        for(var link:links){
+            String document=link.path("documentId").asText();if(missing.contains(document))continue;
+            var entry=documents.get(document);
+            if(entry==null){
+                try{entry=origin(uuid(link.path("id")));documents.put(document,entry);}
+                catch(ApiFailure error){if(error.status!=404&&!(error.status==403&&error.code.equals("VAULT_CONFIG_DISABLED")))throw error;missing.add(document);continue;}
+            }
+            result.put(link.path("id").asText(),entry);
+        }
+        return result;
+    }
     /** Called by the canonical task repository; guarded against source -> task recursion. */
     void task(Task task){
         if(store.noteTaskSync())return;

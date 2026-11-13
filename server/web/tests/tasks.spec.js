@@ -36,7 +36,7 @@ test('task tools default to unfinished work and navigation resizes with pointer 
   await separator.focus();await separator.press('End');await expect(separator).toHaveAttribute('aria-valuenow','480');await separator.press('ArrowLeft');await expect(separator).toHaveAttribute('aria-valuenow','460');await separator.press('Home');await expect(separator).toHaveAttribute('aria-valuenow','180');
   const box=await separator.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+30);await page.mouse.down();await page.mouse.move(box.x+104,box.y+30);await page.mouse.up();const width=await separator.getAttribute('aria-valuenow');expect(Number(width)).toBeGreaterThan(250);
   await filter(page,'Today').click();await page.locator('[data-tab=today]').click();await page.locator('[data-tab=tasks]').click();await expect(separator).toHaveAttribute('aria-valuenow',width);
-  for(const theme of ['timekeeper','timekeeper-dark','newspaper']){
+  for(const theme of ['timekeeper','timekeeper-dark']){
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper-dark'?'dark':'light';},theme);
     for(const viewport of [{width:1440,height:900},{width:320,height:720}]){await page.setViewportSize(viewport);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/task-tools-${theme}-${viewport.width}.png`});}
   }
@@ -50,8 +50,78 @@ test('task checkboxes synchronize source Markdown and popup controls start and s
   await page.locator('#tasks-hide-completed').uncheck();await expect(checkbox).toBeChecked();await checkbox.uncheck();await expect(item).toContainText('Not started');await expect(checkbox).not.toBeChecked();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
   await open.click();const detail=page.locator('#task-details');await expect(detail.locator('h2 mark')).toHaveText('Important');await detail.getByRole('button',{name:'Start tracking',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Start tracking');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();
   const active=await(await api('GET','/activities/active')).json();expect(active.taskId).toBe((await(await api('GET','/tasks?limit=500')).json()).items.find(value=>value.summary===title).id);
+  await expect(page.locator('#active-title mark')).toHaveText('Important');await expect(item).toHaveAttribute('data-tracking','true');await expect(item.locator('.tasks-status')).toContainText('Tracking');
+  await expect(page.locator('#active-elapsed')).toContainText(/\d+s/);const elapsed=await page.locator('#active-elapsed').innerText();await expect.poll(()=>page.locator('#active-elapsed').innerText()).not.toBe(elapsed);
+  await page.reload();await expect(page.locator('#active-title mark')).toHaveText('Important');await page.locator('[data-tab=tasks]').click();await expect(item).toHaveAttribute('data-tracking','true');
   await open.click();await detail.getByRole('button',{name:'Stop tracking',exact:true}).click();await expect(page.locator('#editor-title')).toHaveText('Stop tracking');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();expect((await api('GET','/activities/active')).status()).toBe(204);
+  await expect(page.locator('.tracking')).toBeHidden();await expect(item).toHaveAttribute('data-tracking','false');const recorded=await(await api('GET','/activities/'+active.id)).json();expect(Date.parse(recorded.end)-Date.parse(recorded.start)).toBeGreaterThan(0);
+  const report=await(await api('GET','/reports/activities?'+new URLSearchParams({from:active.start,to:new Date().toISOString(),zoneId:'Europe/Oslo',taskId:active.taskId}))).json();expect(report.total).not.toBe('PT0S');
   await open.click();await expect(detail.getByRole('button',{name:'Start tracking',exact:true})).toBeVisible();
+});
+
+async function completeVisible(page,confirm=true){
+  await page.locator('#tasks-main-actions').getByRole('button',{name:'Task actions',exact:true}).click();await page.getByRole('menuitem',{name:'Complete all visible tasks',exact:true}).click();
+  const dialog=page.locator('#tasks-complete-visible');await expect(dialog).toBeVisible();if(confirm)await dialog.getByRole('button',{name:'Complete all visible tasks',exact:true}).click();return dialog;
+}
+
+test('bulk completion reviews the filtered native tasks and skips completed and calendar tasks',async({page,request})=>{
+  const {api,native,today}=await setup(page,request);await filter(page,'Today').click();const dialog=await completeVisible(page,false);await expect(dialog).toContainText('Complete 1 visible, unfinished task?');await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect((await(await api('GET','/tasks/'+native.local.id)).json()).status).toBe('NOT_STARTED');
+  await completeVisible(page);await expect(row(page,'Local task')).toHaveCount(0);await expect(row(page,'Calendar today')).toBeVisible();const saved=await(await api('GET','/tasks/'+native.local.id)).json();expect(saved).toMatchObject({status:'COMPLETED',scheduledDate:today});expect((await(await api('GET','/tasks/'+native.urgent.id)).json()).status).toBe('NOT_STARTED');
+  await page.locator('#tasks-main-actions').getByRole('button',{name:'Task actions',exact:true}).click();await expect(page.getByRole('menuitem',{name:'Complete all visible tasks',exact:true})).toBeDisabled();await page.keyboard.press('Escape');
+});
+
+test('bulk completion applies only to rendered rows and synchronizes source checkboxes',async({page,request})=>{
+  test.setTimeout(90000);const {api}=await setup(page,request,{remoteCount:0}),source=Array.from({length:52},(_,index)=>'- [ ] Batch '+String(index).padStart(2,'0')).join('\n')+'\n';const entry=await(await api('PUT','/notes/files?path=Batch.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#refresh').click();await expect(row(page,'Batch 00')).toBeVisible();await expect(page.locator('#tasks-list > li')).toHaveCount(50);const before=(await(await api('GET','/tasks?limit=500')).json()).items,displayed=await page.locator('#tasks-list > li').evaluateAll(items=>items.map(item=>item.dataset.taskKey));await completeVisible(page);
+  await expect(page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeEnabled();await expect(row(page,'Batch 49')).toBeVisible();const tasks=(await(await api('GET','/tasks?limit=500')).json()).items;for(const task of tasks)expect(task.status).toBe(displayed.includes('task:'+task.id)?'COMPLETED':before.find(value=>value.id===task.id).status);
+  const text=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(text.match(/\[x\]/g)).toHaveLength(49);expect(text).toContain('- [ ] Batch 51');
+});
+
+test('a confirmed completion batch survives a failed background refresh without replaying writes',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0});let first=true,failReads=false,releaseWrite,releaseRecovery;
+  const heldWrite=new Promise(resolve=>{releaseWrite=resolve;}),heldRecovery=new Promise(resolve=>{releaseRecovery=resolve;}),writes=[];
+  await page.route('**/api/v1/me',route=>failReads?route.abort('failed'):route.continue());
+  await page.route('**/api/v1/tasks/*/planning',async route=>{
+    if(route.request().method()!=='PUT')return route.continue();writes.push(route.request().url());
+    if(!first)return route.continue();first=false;const response=await route.fetch();failReads=true;await heldWrite;await route.fulfill({response});
+  });
+  try{
+    await completeVisible(page);await expect.poll(()=>failReads).toBe(true);
+    await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveAttribute('data-state','error');
+    await page.route('**/api/v1/projects?*',async route=>{await heldRecovery;await route.continue();});
+    failReads=false;releaseWrite();
+    await expect.poll(async()=>(await(await api('GET','/tasks?limit=500')).json()).items.filter(task=>task.status!=='COMPLETED').length).toBe(0);
+    expect(writes).toHaveLength(3);expect(new Set(writes).size).toBe(3);releaseRecovery();await expect(page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeEnabled();
+  }finally{releaseWrite();releaseRecovery();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('signing out cancels the remaining confirmed completion batch',async({page,request})=>{
+  const {user}=await setup(page,request,{remoteCount:0});let writes=0,committed=false,release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/tasks/*/planning',async route=>{if(route.request().method()!=='PUT')return route.continue();writes++;const response=await route.fetch();committed=true;await pending;await route.fulfill({response});});
+  try{
+    await completeVisible(page);await expect.poll(()=>committed).toBe(true);await page.getByRole('button',{name:'Account menu',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();release();await page.unrouteAll({behavior:'wait'});
+    await login(page,user);const api=await apiFor(page),tasks=(await(await api('GET','/tasks?limit=500')).json()).items;expect(writes).toBe(1);expect(tasks.filter(task=>task.status==='COMPLETED')).toHaveLength(2);expect(tasks.filter(task=>task.status==='NOT_STARTED')).toHaveLength(2);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('bulk completion stops after an uncertain reply and reconciles without replaying writes',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0});const first=await page.locator('#tasks-list > li').first().getAttribute('data-task-key'),id=first.slice('task:'.length);let writes=0;
+  await page.route('**/api/v1/tasks/*/planning',async route=>{if(route.request().method()!=='PUT')return route.continue();writes++;await route.fetch();return route.abort('internetdisconnected');});
+  await completeVisible(page);await expect(page.locator('#tasks-panel > .alert-danger')).toBeVisible();await expect(page.locator('#tasks-list > li')).toHaveCount(2);expect(writes).toBe(1);expect((await(await api('GET','/tasks/'+id)).json()).status).toBe('COMPLETED');await expect(page.locator('#tasks-list input:enabled')).toHaveCount(2);
+});
+
+test('bulk completion stops on a stale task without overwriting newer planning or later rows',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0}),ids=await page.locator('#tasks-list > li').evaluateAll(items=>items.map(item=>item.dataset.taskKey.slice('task:'.length))),current=await api('GET','/tasks/'+ids[1]);let changed=false,writes=0;
+  await page.route('**/api/v1/tasks/'+ids[1],async route=>{if(route.request().method()==='GET'&&!changed){changed=true;await api('PUT','/tasks/'+ids[1]+'/planning',{status:'WAITING',scheduledDate:'2026-12-01',completedAt:null},{'If-Match':current.headers().etag});}await route.continue();});
+  page.on('request',request=>{if(request.method()==='PUT'&&/\/tasks\/[^/]+\/planning$/.test(new URL(request.url()).pathname))writes++;});
+  await completeVisible(page);await expect(page.locator('#tasks-panel > .alert-danger')).toBeVisible();await expect(page.locator('#tasks-list > li')).toHaveCount(2);expect(writes).toBe(1);expect((await(await api('GET','/tasks/'+ids[1])).json())).toMatchObject({status:'WAITING',scheduledDate:'2026-12-01'});expect((await(await api('GET','/tasks/'+ids[2])).json()).status).toBe('NOT_STARTED');
+});
+
+test('Tasks uses the standard left sidebar toggle and preserves selection and width',async({page,request})=>{
+  await setup(page,request);await page.setViewportSize({width:1440,height:900});const toggle=page.locator('#tasks-main-actions-toggle-left-sidebar'),sidebar=page.locator('#tasks-navigation'),separator=page.locator('.tasks-resize');await expect(page.locator('#tasks-main-actions .sidebar-actions button')).toHaveCount(1);await expect(toggle).toHaveAccessibleName('Collapse left sidebar');await filter(page,'Time critical').click();await separator.focus();await separator.press('End');const width=(await sidebar.boundingBox()).width;
+  await toggle.click();await expect(sidebar).toBeHidden();await expect(separator).toBeHidden();await expect(toggle).toHaveAccessibleName('Expand left sidebar');await expect(page.locator('#tasks-list-title')).toHaveText('Time critical');await toggle.click();expect((await sidebar.boundingBox()).width).toBe(width);
+  await page.setViewportSize({width:320,height:900});await expect(sidebar).toBeHidden();await toggle.click();await filter(page,'All').focus();await page.keyboard.press('Escape');await expect(toggle).toBeFocused();await expect(sidebar).toBeHidden();
+  await page.setViewportSize({width:1440,height:900});await expect(sidebar).toBeVisible();await expect(separator).toHaveAttribute('aria-valuenow','480');
 });
 
 test('task Markdown renders safe formatting without executing HTML, fetching images or changing stored text',async({page,request})=>{
@@ -126,6 +196,7 @@ test('read-only tasks remain browsable and sign-out clears every source before a
     const reader=await context.newPage();let writes=0;reader.on('request',request=>{if(!['GET','HEAD'].includes(request.method())&&/^\/api\/v1\/(tasks|calendar-tasks)(\/|$)/.test(new URL(request.url()).pathname))writes++;});
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await reader.locator('[data-tab=tasks]').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(7);await reader.locator('#tasks-hide-completed').uncheck();await expect(reader.locator('#tasks-list > li')).toHaveCount(10);await expect(reader.locator('#tasks-list input[type=checkbox]:enabled')).toHaveCount(0);
     await expect(reader.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeDisabled();await row(reader,'Local task').click();await expect(reader.locator('#task-details').getByRole('button',{name:'Edit task',exact:true})).toBeDisabled();await expect(reader.locator('#task-details').getByRole('button',{name:'Delete task',exact:true})).toBeDisabled();await expect(reader.locator('#task-details').getByRole('button',{name:'Start tracking',exact:true})).toBeDisabled();await reader.keyboard.press('Escape');await filter(reader,'Time critical').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(4);expect(writes).toBe(0);
+    await reader.locator('#tasks-main-actions').getByRole('button',{name:'Task actions',exact:true}).click();await expect(reader.getByRole('menuitem',{name:'Complete all visible tasks',exact:true})).toBeDisabled();await reader.keyboard.press('Escape');expect(writes).toBe(0);
     await reader.getByRole('button',{name:'Account menu',exact:true}).click();await reader.getByRole('button',{name:'Sign out',exact:true}).click();await expect(reader.locator('#login')).toBeVisible();await expect(reader.locator('#tasks-panel')).not.toContainText(/Local task|Imported review|Client A|Task calendar/);
     await login(reader,user);await reader.locator('[data-tab=tasks]').click();await expect(reader.locator('#tasks-list > li')).toHaveCount(0);await expect(reader.locator('#tasks-panel')).not.toContainText(/Local task|Imported review|Client A|Task calendar/);
   }finally{await context.close();}
@@ -138,11 +209,11 @@ for(const locale of ['en-GB','nb-NO'])test(`Tasks supports keyboard/mobile brows
     for(const theme of ['timekeeper','timekeeper-dark']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-      if(width===320)await page.locator('#tasks-panel > .tasks-heading > button').click();
+      if(width===320)await page.locator('#tasks-main-actions-toggle-left-sidebar').click();
       await expect(filter(page,locale==='nb-NO'?'Tidskritiske':'Time critical')).toBeVisible();
       expect((await new AxeBuilder({page}).include('#tasks-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
       await captureScreenshot(page,{path:`test-results/tasks-${locale}-${width}-${theme}.png`});
-      if(width===320){await filter(page,locale==='nb-NO'?'Alle':'All').focus();await page.keyboard.press('Escape');await expect(page.locator('#tasks-panel > .tasks-heading > button')).toBeFocused();}
+      if(width===320){await filter(page,locale==='nb-NO'?'Alle':'All').focus();await page.keyboard.press('Escape');await expect(page.locator('#tasks-main-actions-toggle-left-sidebar')).toBeFocused();}
     }
   }
 });

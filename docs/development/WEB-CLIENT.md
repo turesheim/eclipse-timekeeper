@@ -153,7 +153,7 @@ enabled. All includes completed, cancelled, undated and distant calendar tasks;
 recurrence definitions and detached instances retain their published identities.
 It does not manufacture an unbounded list of virtual occurrences.
 
-The single-column sidebar provides Today, All and Time critical, followed by
+The standard left sidebar provides Today, All and Time critical, followed by
 clients and categories. Categories include task metadata, calendar categories
 and project names, preserving the Eclipse/Mylyn project/category mapping.
 Focus areas apply to native and calendar tasks. Today selects unfinished tasks
@@ -168,11 +168,23 @@ including direct client assignment without a project, priority and civil or time
 deadlines. The editor retains unedited start values, flags and deadline precision.
 The task toolbar groups **New task**, **Refresh tasks**, and **Hide completed
 tasks**, which starts enabled and applies to all sidebar filters and sources.
+**Main actions** contains the left-sidebar toggle and **Task actions → Complete
+all visible tasks**. The latter reviews a count before completing only the
+rendered, unfinished native tasks in the current filter. Completed/cancelled and
+read-only calendar tasks are skipped; **Show more tasks** controls which rows
+are included. Each conditional write retains its own validator; a conflict or
+uncertain reply stops the batch and refreshes current records without replaying
+writes.
 Each row has a completion checkbox; native tasks use conditional planning writes
 and update linked note checkboxes, while calendar tasks remain read-only.
 Uncertain replies are reconciled by refreshing rather than replaying a write.
 The navigator resizes by dragging its separator or using Left/Right and Home/End;
-its width survives tab and filter changes during the session. Details
+its width and desktop collapse state survive tab and filter changes during the session.
+The mobile drawer uses the same sidebar control and closes with Escape or a
+filter selection. Task rows link directly to their current source note using
+the shared note icon. Running tasks have a tracking marker and an advancing
+elapsed duration, also shown below the work-session tracker. Stopping records
+the activity independently of the work session. Details
 include guarded deletion and a type-specific link to the current source note
 for Markdown checklist tasks, plus **Start tracking** / **Stop tracking** through
 the existing reviewed activity commands. Titles and native task text render the

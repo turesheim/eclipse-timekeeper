@@ -1792,5 +1792,13 @@
   "internet_admin.status_callback_invalid": "Den effektive HTTPS-adressen eller returadressen er ugyldig. Rett HTTPS-adressen og start på nytt.",
   "internet_admin.provider_new_secret": "Ny {{provider}}-klienthemmelighet",
   "internet_admin.provider_clear_secret": "Slett lagret {{provider}}-klienthemmelighet",
-  "internet_accounts.registration_required": "En administrator må konfigurere denne leverandøren i innstillingene for internettkontoer før kontoer kan kobles til."
+  "internet_accounts.registration_required": "En administrator må konfigurere denne leverandøren i innstillingene for internettkontoer før kontoer kan kobles til.",
+  "tasks.actions": "Oppgavehandlinger",
+  "tasks.complete_visible": "Fullfør alle synlige oppgaver",
+  "tasks.complete_visible_description_one": "Fullfør {{count}} synlig, ufullført oppgave? Kalenderoppgaver er skrivebeskyttet og hoppes over. Oppgaver bak Vis flere oppgaver tas ikke med.",
+  "tasks.complete_visible_description_other": "Fullfør {{count}} synlige, ufullførte oppgaver? Kalenderoppgaver er skrivebeskyttet og hoppes over. Oppgaver bak Vis flere oppgaver tas ikke med.",
+  "tasks.complete_visible_failed_one": "{{count}} oppgave er bekreftet fullført før handlingen stoppet: {{message}}. Oppdater for å kontrollere oppgavene før du prøver igjen.",
+  "tasks.complete_visible_failed_other": "{{count}} oppgaver er bekreftet fullført før handlingen stoppet: {{message}}. Oppdater for å kontrollere oppgavene før du prøver igjen.",
+  "tasks.tracking": "Tid registreres · {{duration}}",
+  "tasks.elapsed": "Registrert tid"
 }
