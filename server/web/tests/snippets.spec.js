@@ -10,8 +10,9 @@ async function field(page,value){await page.evaluate(value=>globalThis.fixtureFi
 
 test('source and formatted shortcuts expand on typed space with Undo, code and paste guards',async({page})=>{
   await page.clock.setFixedTime(new Date('2026-11-12T15:43:00Z'));await openEditorFixture(page);await configure(page);
-  const source=page.locator('#markdown-body');await field(page,'');await source.focus();await page.keyboard.type(';dt ');await expect(source).toHaveValue('2026-11-12 16:43 ');
-  await page.keyboard.press('ControlOrMeta+z');await expect(source).toHaveValue(';dt');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(source).toHaveValue('2026-11-12 16:43 ');
+  const source=page.locator('#markdown-body');await field(page,'');await source.evaluate(element=>{window.sourceEdits=[];element.addEventListener('input',()=>window.sourceEdits.push(element.value));});await source.focus();await page.keyboard.type(';dt ');await expect(source).toHaveValue('2026-11-12 16:43 ');
+  expect(await page.evaluate(()=>window.sourceEdits)).toEqual([';',';d',';dt','2026-11-12 16:43 ']);
+  await page.keyboard.press('ControlOrMeta+z');await expect(source).toHaveValue(';dt');await page.keyboard.press('ControlOrMeta+z');await expect(source).toHaveValue('');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(source).toHaveValue(';dt');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(source).toHaveValue('2026-11-12 16:43 ');
   await field(page,'```text\n');await source.focus();await source.evaluate(element=>element.setSelectionRange(element.value.length,element.value.length));await page.keyboard.type(';dd ');await expect(source).toHaveValue('```text\n;dd ');
   await field(page,'');await source.fill(';dd ');await expect(source).toHaveValue(';dd ');
   await field(page,'');await page.locator('#markdown-rich').click();const rich=page.locator('#markdown-formatted [role=textbox]');await expect(rich).toBeVisible();await rich.click();await page.keyboard.type(';dd+7 ');await expect(rich).toHaveText('2026-11-19 ');

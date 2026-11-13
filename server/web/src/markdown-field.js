@@ -105,10 +105,32 @@ export class MarkdownField {
     buildExperience(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
+  closeSourceTyping(){
+    // WebKit coalesces execCommand replacements with the preceding typed word.
+    // Restoring the native typing step closes that group while retaining its
+    // Undo/Redo history. Intermediate history events must not publish drafts.
+    if(!document.queryCommandEnabled('undo'))return;
+    const value=this.text.value,start=this.text.selectionStart,end=this.text.selectionEnd,direction=this.text.selectionDirection,top=this.text.scrollTop,left=this.text.scrollLeft;
+    let undone=false;
+    const history=event=>{
+      if(!['historyUndo','historyRedo'].includes(event.inputType))return;
+      if(event.target!==this.text){if(event.type==='beforeinput')event.preventDefault();return;}
+      event.stopImmediatePropagation();
+      if(event.type==='input'&&event.inputType==='historyUndo')undone=true;
+    };
+    document.addEventListener('beforeinput',history,true);document.addEventListener('input',history,true);
+    try{document.execCommand('undo');if(undone)document.execCommand('redo');}
+    finally{
+      document.removeEventListener('beforeinput',history,true);document.removeEventListener('input',history,true);
+      // A programmatically loaded value may supersede the browser's old step.
+      if(this.text.value!==value)this.text.value=value;
+      this.text.setSelectionRange(start,end,direction);this.text.scrollTop=top;this.text.scrollLeft=left;
+    }
+  }
   expandSourceSnippet(event){
     if(event.key!==' '||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||this.readOnly||this.text.selectionStart!==this.text.selectionEnd)return false;
     const end=this.text.selectionStart,result=sourceSnippetAt(this.text.value.slice(0,end));if(!result)return false;
-    event.preventDefault();this.text.setSelectionRange(end-result.length,end);
+    event.preventDefault();this.closeSourceTyping();this.text.setSelectionRange(end-result.length,end);
     const inserted=result.text+' ';
     if(!document.execCommand('insertText',false,inserted)){this.text.setRangeText(inserted,end-result.length,end,'end');this.text.dispatchEvent(new Event('input'));}
     if(result.cursor!==null)this.text.setSelectionRange(end-result.length+result.cursor,end-result.length+result.cursor);
