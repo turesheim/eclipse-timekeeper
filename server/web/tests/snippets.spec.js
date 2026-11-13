@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
 import {openEditorFixture} from './editor-fixture.js';
 import {browserRequest} from './browser-request.js';
+import {saveMarkdown} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
 async function configure(page,values=null){await page.evaluate(async values=>{const {configureSnippets}=await import('/web/snippets.js');configureSnippets({zoneId:'Europe/Oslo',locale:'en-GB',textSnippets:values});},values);}
 async function field(page,value){await page.evaluate(value=>globalThis.fixtureField.setValue(value),value);}
@@ -11,11 +12,16 @@ test('source and formatted shortcuts expand on typed space with Undo, code and p
   await page.clock.setFixedTime(new Date('2026-11-12T15:43:00Z'));await openEditorFixture(page);await configure(page);
   const source=page.locator('#markdown-body');await field(page,'');await source.focus();await page.keyboard.type(';dt ');await expect(source).toHaveValue('2026-11-12 16:43 ');
   await page.keyboard.press('ControlOrMeta+z');await expect(source).toHaveValue(';dt');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(source).toHaveValue('2026-11-12 16:43 ');
-  await field(page,'```text\n');await source.focus();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type(';dd ');await expect(source).toHaveValue('```text\n;dd ');
+  await field(page,'```text\n');await source.focus();await source.evaluate(element=>element.setSelectionRange(element.value.length,element.value.length));await page.keyboard.type(';dd ');await expect(source).toHaveValue('```text\n;dd ');
   await field(page,'');await source.fill(';dd ');await expect(source).toHaveValue(';dd ');
   await field(page,'');await page.locator('#markdown-rich').click();const rich=page.locator('#markdown-formatted [role=textbox]');await expect(rich).toBeVisible();await rich.click();await page.keyboard.type(';dd+7 ');await expect(rich).toHaveText('2026-11-19 ');
   await page.keyboard.press('ControlOrMeta+z');await expect(rich).toHaveText(';dd+7');await page.keyboard.press('ControlOrMeta+Shift+z');await expect(rich).toHaveText('2026-11-19 ');
   await page.evaluate(()=>fixtureField.setReadOnly(true));await rich.focus();await page.keyboard.type(';dt ');await expect(rich).toHaveText('2026-11-19 ');
+});
+
+test('formatted code blocks retain literal shortcuts',async({page})=>{
+  await openEditorFixture(page);await configure(page);await field(page,'```text\nliteral\n```\n');await page.locator('#markdown-rich').click();
+  const code=page.locator('#markdown-formatted pre code');await expect(code).toBeVisible();await code.click();await page.keyboard.press('End');await page.keyboard.type(';dd ');await expect(code).toContainText(';dd');await expect(code).not.toContainText(/2026-\d\d-/);
 });
 
 test('multiline snippets insert safe text, position the cursor, and retain one rich Undo step',async({page})=>{
@@ -36,6 +42,9 @@ test('account snippets persist, disable and restore defaults at narrow and deskt
   const root=page.locator('#account-content');await expect(root.getByRole('heading',{name:'Text snippets',exact:true})).toBeVisible();
   await root.getByLabel('Expansion',{exact:true}).first().fill('Account-owned {isodate:yyyy}');await root.getByRole('button',{name:'Save snippets',exact:true}).click();await expect(root.getByRole('status')).toHaveText('Snippets saved.');
   await page.reload();await expect(root.getByLabel('Expansion',{exact:true}).first()).toHaveValue('Account-owned {isodate:yyyy}');
+  await page.locator('a[href="#tracking"]').click();await page.locator('[data-tab=today]').click();
+  const today=page.locator('#today-note-editor');await today.getByRole('button',{name:'Markdown source',exact:true}).click();const body=page.locator('#today-journal-body');await body.fill('');await body.focus();await page.keyboard.type(';dt ');await expect(body).toHaveValue(/Account-owned \d{4} /);await saveMarkdown(today);
+  await page.goto('/web/#account/snippets');await expect(root.getByLabel('Expansion',{exact:true}).first()).toHaveValue('Account-owned {isodate:yyyy}');
   for(const width of [1440,320]){await page.setViewportSize({width,height:1000});for(const theme of ['timekeeper','timekeeper-dark']){
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#account-page').analyze()).violations).toEqual([]);
@@ -44,4 +53,6 @@ test('account snippets persist, disable and restore defaults at narrow and deskt
   for(let i=0;i<3;i++)await root.getByRole('button',{name:'Remove snippet',exact:true}).first().click();await root.getByRole('button',{name:'Save snippets',exact:true}).click();await expect(root.getByRole('status')).toHaveText('Snippets saved.');
   const api=browserRequest(page);expect((await(await api.get('/api/v1/me')).json()).textSnippets).toEqual([]);
   await root.getByRole('button',{name:'Restore defaults',exact:true}).click();await expect(root.getByLabel('Keyword',{exact:true})).toHaveCount(3);expect((await(await api.get('/api/v1/me')).json()).textSnippets).toBeNull();
+  const profile=await api.get('/api/v1/me'),identity=await(await api.get('/api/v1/auth/session')).json();expect((await api.fetch('/api/v1/me',{method:'PUT',headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf},data:{zoneId:(await profile.json()).zoneId,locale:'nb-NO'}})).status()).toBe(200);
+  await page.reload();await expect(root.getByRole('heading',{name:'Tekstsnutter',exact:true})).toBeVisible();await expect(root.getByRole('button',{name:'Lagre tekstsnutter',exact:true})).toBeEnabled();expect((await new AxeBuilder({page}).include('#account-page').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/snippets-norwegian-mobile.png',fullPage:true});
 });

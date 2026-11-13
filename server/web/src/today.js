@@ -237,7 +237,7 @@ export class TodayView {
     try{
       const [reply,subscriptions]=await Promise.all([scope.request('/calendar-events?'+new URLSearchParams({fromDate:date,toDate:addDays(date,1)})),scope.request('/calendar-subscriptions')]);
       if(generation!==this.generation||scope!==this.scope||date!==this.date)return;
-      this.eventsLoaded=true;this.events=reply.data.items;this.eventFailures=subscriptions.data.items.filter(item=>item.visible&&(item.lastError||reply.data.errors?.[item.id])).map(item=>({...item,lastError:item.lastError||reply.data.errors[item.id]}));this.eventWarning=this.eventFailures.length>0;this.paintEvents();
+      this.eventsLoaded=true;this.events=reply.data.items;this.eventFailures=subscriptions.data.items.filter(item=>item.visible&&(item.lastError||reply.data.errors?.[item.id])).map(item=>({...item,lastError:item.lastError||reply.data.errors[item.id]}));this.eventWarning=Object.keys(reply.data.errors||{}).length>0||this.eventFailures.length>0;this.paintEvents();
     }catch(error){
       if(generation!==this.generation||scope!==this.scope)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}
