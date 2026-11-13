@@ -129,3 +129,33 @@ notes, native journal editors and ordinary note popups share this behavior.
 An associated note supplies the client/project of new checklist tasks. Changing
 its association updates existing linked tasks atomically without rewriting the
 note. Normal task dependency rules apply; a conflict leaves all records intact.
+
+## Text snippets
+
+**My account → Text snippets** stores up to 50 private keyword/expansion pairs.
+Type a keyword and a space in either editor mode. Defaults are `;dt` (current
+account date/time), `;dd` (date), and `;tm` (time). `;dd+7` adds seven calendar
+days; `;dd+1m` adds one calendar month, clamping to the last valid day. Negative
+offsets work too. Saving an empty list disables expansion; Restore defaults
+removes the account override. Existing profile writes that omit `textSnippets`
+preserve the saved list. Snippets follow the account time zone, independently
+of the date of the open journal page.
+
+Templates support the [Alfred date/time placeholder syntax](https://www.alfredapp.com/help/workflows/advanced/placeholders/):
+`{date}`, `{time}`, `{datetime}`, `{isodate:yyyy-MM-dd}`, `{isotime:HH:mm}`, and
+`{date +1M -7d:MMMM yyyy}`. Placeholder arithmetic uses `Y`/`y` for years, `M`
+for months, `D`/`d` for days, `h` for hours, `m` for minutes and `s` for seconds.
+Calendar arithmetic preserves civil time. ISO-prefixed formats use English
+month/day names; other formats follow the account locale. Supported custom
+format fields are `yyyy`, `yy`, `MMMM`, `MMM`, `MM`, `M`, `dd`, `d`, `EEEE`,
+`EEE`, `HH`, `H`, `hh`, `h`, `mm`, `m`, `ss`, `s`, `a`, and quoted literals.
+Localized styles are `short`, `medium`, `long`, and `full`. `{cursor}` positions
+the caret. Unknown placeholders and unsupported formats remain literal;
+clipboard, workflows, scripts, recursive snippets and HTML execution are not
+supported.
+
+Expansion requires a typed space and a collapsed selection. Code blocks,
+inline code, links, paste, IME composition and read-only editors leave the
+shortcut literal. One Undo restores the shortcut. The expansion is plain text,
+including multiline content. Each template is bounded to 8,192 Unicode code
+points; account templates are limited to 64 KiB of UTF-8 text in total.

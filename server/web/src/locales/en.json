@@ -1805,5 +1805,17 @@
   "calendar.source_failure": "{{name}} ({{source}}): {{message}}",
   "calendar.service_status": "{{provider}} service status",
   "notes.no_project": "No project",
-  "notes.association_tasks": "Tasks from this note inherit its client and project. Changing this choice updates all linked tasks."
+  "notes.association_tasks": "Tasks from this note inherit its client and project. Changing this choice updates all linked tasks.",
+  "snippets.title": "Text snippets",
+  "snippets.description": "Type a keyword followed by a space in a note to expand it. Snippets use your account time zone. Remove all snippets to disable expansion.",
+  "snippets.help": "Defaults: ;dt inserts date and time, ;dd inserts a date, ;tm inserts time. Add +7 for seven days or +1m for one month. Templates support Alfred-style {date}, {time}, {datetime}, {isodate:yyyy-MM-dd}, {isotime:HH:mm}, date arithmetic such as {date +1M:MMMM}, and {cursor}. M means months and m means minutes inside placeholders. Unsupported placeholders remain literal.",
+  "snippets.snippet": "Snippet",
+  "snippets.keyword": "Keyword",
+  "snippets.content": "Expansion",
+  "snippets.remove": "Remove snippet",
+  "snippets.add": "Add snippet",
+  "snippets.save": "Save snippets",
+  "snippets.reset": "Restore defaults",
+  "snippets.saved": "Snippets saved.",
+  "snippets.invalid": "Use unique keywords, at most 8,192 characters per expansion and 64 KiB in total."
 }

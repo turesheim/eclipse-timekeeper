@@ -1805,5 +1805,17 @@
   "calendar.source_failure": "{{name}} ({{source}}): {{message}}",
   "calendar.service_status": "Tjenestestatus for {{provider}}",
   "notes.no_project": "Ingen prosjekt",
-  "notes.association_tasks": "Oppgaver fra dette notatet arver kunden og prosjektet. Når du endrer valget, oppdateres alle tilknyttede oppgaver."
+  "notes.association_tasks": "Oppgaver fra dette notatet arver kunden og prosjektet. Når du endrer valget, oppdateres alle tilknyttede oppgaver.",
+  "snippets.title": "Tekstsnutter",
+  "snippets.description": "Skriv et nøkkelord etterfulgt av et mellomrom i et notat for å sette inn en tekstsnutt. Tekstsnutter bruker kontoens tidssone. Fjern alle for å deaktivere utvidelse.",
+  "snippets.help": "Standard: ;dt setter inn dato og tid, ;dd setter inn dato og ;tm setter inn tid. Legg til +7 for sju dager eller +1m for én måned. Maler støtter Alfred-syntaks: {date}, {time}, {datetime}, {isodate:yyyy-MM-dd}, {isotime:HH:mm}, datoregning som {date +1M:MMMM} og {cursor}. M betyr måneder og m betyr minutter i plassholdere. Plassholdere som ikke støttes, beholdes uendret.",
+  "snippets.snippet": "Tekstsnutt",
+  "snippets.keyword": "Nøkkelord",
+  "snippets.content": "Utvidelse",
+  "snippets.remove": "Fjern tekstsnutt",
+  "snippets.add": "Legg til tekstsnutt",
+  "snippets.save": "Lagre tekstsnutter",
+  "snippets.reset": "Gjenopprett standarder",
+  "snippets.saved": "Tekstsnutter lagret.",
+  "snippets.invalid": "Bruk unike nøkkelord, maksimalt 8 192 tegn per utvidelse og 64 KiB totalt."
 }

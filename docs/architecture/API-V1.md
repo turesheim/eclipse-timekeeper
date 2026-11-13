@@ -1499,3 +1499,17 @@ read-only, and Google task writes require explicit TWO_WAY consent. Existing gra
 retain their original refresh path through mode changes. Initialization failures
 are retryable connection errors, not uncertain business-record writes. Genuine
 persistent-write uncertainty still requires review of current values.
+
+### Account text snippets
+
+`GET /me` includes nullable `textSnippets`. `PUT /me` accepts the same optional
+field under the existing profile ETag and write permission. Omission preserves
+the preference, `null` restores the built-in defaults, and `[]` disables snippet
+expansion. An override contains at most 50 objects with exactly `keyword` and
+`content`. Keywords match `;[A-Za-z][A-Za-z0-9_-]{0,31}` and must be unique ignoring
+case. Expansion templates are nonempty, limited to 8,192 Unicode code points
+each and 64 KiB combined UTF-8 keyword/content bytes. Invalid input is 422 and
+does not change the profile version. This private preference is separate from
+note bodies and never executes template code. It follows the existing profile
+preference policy for portable account archives (selected preferences only);
+full instance backups retain it.
