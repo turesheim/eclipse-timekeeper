@@ -23,9 +23,11 @@ export class NoteContents {
       if(generation!==this.generation||!this.active)return;
       if(!this.available()){this.key=null;this.list.replaceChildren();this.empty.textContent=t('notes.select');this.empty.hidden=false;return;}
       if(this.field.loading){this.key=null;this.list.replaceChildren();this.empty.textContent=t('markdown.loading');this.empty.hidden=false;return;}
-      const editor=this.field.editor,headings=await this.field.outline();
+      const headings=await this.field.outline();
       if(generation!==this.generation||!this.active)return;
-      const key=JSON.stringify([!!editor,headings]);if(key===this.key)return;this.key=key;
+      // Clicks resolve current positions below. Mode and offset changes alone
+      // must preserve a button that can already be pressed or focused.
+      const key=JSON.stringify(headings.map(({text,level})=>[text,level]));if(key===this.key)return;this.key=key;
       const focused=this.list.contains(document.activeElement)?[...this.list.querySelectorAll('button')].indexOf(document.activeElement):-1;
       this.list.replaceChildren();const base=Math.min(6,...headings.map(heading=>heading.level));
       for(const [index,heading] of headings.entries()){
