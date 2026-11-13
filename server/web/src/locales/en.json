@@ -1817,5 +1817,7 @@
   "snippets.save": "Save snippets",
   "snippets.reset": "Restore defaults",
   "snippets.saved": "Snippets saved.",
-  "snippets.invalid": "Use unique keywords, at most 8,192 characters per expansion and 64 KiB in total."
+  "snippets.invalid": "Use unique keywords, at most 8,192 characters per expansion and 64 KiB in total.",
+  "notes.client_label": "Note client",
+  "notes.project_label": "Note project"
 }

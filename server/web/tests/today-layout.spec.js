@@ -96,7 +96,7 @@ test('Today main actions reuse revisions, client association and confirmed delet
     await expect(actions.getByRole('button')).toHaveCount(5);
     for(const name of ['Note revisions','Associate with client or project','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
     const history=actions.getByRole('button',{name:'Note revisions',exact:true});await history.focus();await history.press('Enter');await expect(page.getByRole('dialog',{name:'Note revisions',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(history).toBeFocused();
-    const associate=actions.getByRole('button',{name:'Associate with client or project',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await dialog.getByLabel('Client',{exact:true}).selectOption(client.id);
+    const associate=actions.getByRole('button',{name:'Associate with client or project',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await dialog.getByLabel('Note client',{exact:true}).selectOption(client.id);
     let held=false,release;const pending=new Promise(resolve=>{release=resolve;});
     await page.route('**/api/v1/notes/client?**',async route=>{
       const url=new URL(route.request().url());if(route.request().method()==='GET'&&url.searchParams.get('sourceType')==='DAY_NOTE'&&url.searchParams.get('sourceKey')===date&&!held){held=true;await pending;}await route.continue();

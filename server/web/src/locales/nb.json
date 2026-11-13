@@ -1817,5 +1817,7 @@
   "snippets.save": "Lagre tekstsnutter",
   "snippets.reset": "Gjenopprett standarder",
   "snippets.saved": "Tekstsnutter lagret.",
-  "snippets.invalid": "Bruk unike nøkkelord, maksimalt 8 192 tegn per utvidelse og 64 KiB totalt."
+  "snippets.invalid": "Bruk unike nøkkelord, maksimalt 8 192 tegn per utvidelse og 64 KiB totalt.",
+  "notes.client_label": "Kunde for notatet",
+  "notes.project_label": "Prosjekt for notatet"
 }
