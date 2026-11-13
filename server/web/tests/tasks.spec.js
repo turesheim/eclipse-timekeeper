@@ -77,6 +77,33 @@ test('bulk completion applies only to rendered rows and synchronizes source chec
   const text=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(text.match(/\[x\]/g)).toHaveLength(49);expect(text).toContain('- [ ] Batch 51');
 });
 
+test('a confirmed completion batch survives a failed background refresh without replaying writes',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0});let first=true,failReads=false,releaseWrite,releaseRecovery;
+  const heldWrite=new Promise(resolve=>{releaseWrite=resolve;}),heldRecovery=new Promise(resolve=>{releaseRecovery=resolve;}),writes=[];
+  await page.route('**/api/v1/me',route=>failReads?route.abort('failed'):route.continue());
+  await page.route('**/api/v1/tasks/*/planning',async route=>{
+    if(route.request().method()!=='PUT')return route.continue();writes.push(route.request().url());
+    if(!first)return route.continue();first=false;const response=await route.fetch();failReads=true;await heldWrite;await route.fulfill({response});
+  });
+  try{
+    await completeVisible(page);await expect.poll(()=>failReads).toBe(true);
+    await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveAttribute('data-state','error');
+    await page.route('**/api/v1/projects?*',async route=>{await heldRecovery;await route.continue();});
+    failReads=false;releaseWrite();
+    await expect.poll(async()=>(await(await api('GET','/tasks?limit=500')).json()).items.filter(task=>task.status!=='COMPLETED').length).toBe(0);
+    expect(writes).toHaveLength(3);expect(new Set(writes).size).toBe(3);releaseRecovery();await expect(page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeEnabled();
+  }finally{releaseWrite();releaseRecovery();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('signing out cancels the remaining confirmed completion batch',async({page,request})=>{
+  const {user}=await setup(page,request,{remoteCount:0});let writes=0,committed=false,release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/tasks/*/planning',async route=>{if(route.request().method()!=='PUT')return route.continue();writes++;const response=await route.fetch();committed=true;await pending;await route.fulfill({response});});
+  try{
+    await completeVisible(page);await expect.poll(()=>committed).toBe(true);await page.getByRole('button',{name:'Account menu',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();release();await page.unrouteAll({behavior:'wait'});
+    await login(page,user);const api=await apiFor(page),tasks=(await(await api('GET','/tasks?limit=500')).json()).items;expect(writes).toBe(1);expect(tasks.filter(task=>task.status==='COMPLETED')).toHaveLength(2);expect(tasks.filter(task=>task.status==='NOT_STARTED')).toHaveLength(2);
+  }finally{release();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('bulk completion stops after an uncertain reply and reconciles without replaying writes',async({page,request})=>{
   const {api}=await setup(page,request,{remoteCount:0});const first=await page.locator('#tasks-list > li').first().getAttribute('data-task-key'),id=first.slice('task:'.length);let writes=0;
   await page.route('**/api/v1/tasks/*/planning',async route=>{if(route.request().method()!=='PUT')return route.continue();writes++;await route.fetch();return route.abort('internetdisconnected');});

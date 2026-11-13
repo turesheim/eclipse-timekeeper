@@ -37,8 +37,11 @@ function holdSnapshots(page){
   return {install,held:()=>held,release};
 }
 async function recover(page,gate){
-  await page.route('**/api/v1/me',async route=>{await page.unroute('**/api/v1/me');await route.abort('failed');});
-  await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveAttribute('data-state','error');
+  // A superseded read can consume a one-shot failure before the replacement
+  // refresh starts. Keep failing until disconnection is actually published.
+  const fail=route=>route.abort('failed');await page.route('**/api/v1/me',fail);
+  try{await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveAttribute('data-state','error');}
+  finally{await page.unroute('**/api/v1/me',fail);}
   await expect.poll(gate.held).toBe(true);
 }
 async function rememberPosition(field,mode){

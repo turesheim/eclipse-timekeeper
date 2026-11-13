@@ -68,15 +68,18 @@ export class TasksView {
   }
   closeTaskActions(){if(this.actionsMenu.matches(':popover-open'))this.actionsMenu.hidePopover();}
   completable(){const rows=new Map((this.rows||[]).map(row=>[row.key,row]));return [...this.list.children].map(item=>rows.get(item.dataset.taskKey)).filter(row=>row?.source==='task'&&!['COMPLETED','CANCELLED'].includes(row.status)&&!this.pending.has(row.key));}
-  async writeCompletion(row,checked,session){
-    const current=await session.request('/tasks/'+row.id);if(session!==this.session||!this.writable)return false;
+  async writeCompletion(row,checked,session,operation=null){
+    const current=await session.request('/tasks/'+row.id);if(session!==this.session||(operation?this.bulk!==operation:!this.writable))return false;
     if(current.data.version!==row.record.version)throw new Error(t('tasks.completion_stale'));
     await session.request('/tasks/'+row.id+'/planning',{method:'PUT',etag:current.etag,body:{status:checked?'COMPLETED':'NOT_STARTED',scheduledDate:current.data.scheduledDate||null,completedAt:checked?new Date().toISOString():null}});return true;
   }
   async completeAll(targets){
     const session=this.session;if(!this.writable||this.bulk||!targets?.length)return;
     const operation={};this.bulk=operation;this.error.hidden=true;this.errorSource='completion';this.controls();let completed=0;
-    try{for(const row of targets){if(session!==this.session||!this.writable||this.bulk!==operation)break;if(!await this.writeCompletion(row,true,session))break;++completed;}}
+    // Confirmation authorizes this captured batch. Background snapshot failures
+    // can disable new actions while its conditional writes remain in progress.
+    // Session changes still cancel it; every read/write checks server permission.
+    try{for(const row of targets){if(session!==this.session||this.bulk!==operation)break;if(!await this.writeCompletion(row,true,session,operation))break;++completed;}}
     catch(error){if(session===this.session){this.error.textContent=t('tasks.complete_visible_failed',{count:completed,message:error.message});this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
     finally{if(session===this.session&&this.bulk===operation){await this.callbacks.onChanged();if(session===this.session&&this.bulk===operation){this.bulk=null;this.paint();this.controls();}}}
   }
