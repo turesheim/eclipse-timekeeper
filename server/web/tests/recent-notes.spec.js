@@ -56,7 +56,7 @@ test('Today and Notes stack Recent notes below the outline with one scrollbar pe
       await page.setViewportSize({width,height:844});if(width===390)await expect(toggle).toHaveAttribute('aria-expanded','false');if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
       for(const theme of ['timekeeper','timekeeper-dark']){
         await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
-        await expect(right).toBeVisible();await expect.poll(()=>right.evaluate(root=>[root,...root.querySelectorAll('*')].filter(node=>node.clientHeight>0&&node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).map(node=>node.id))).toEqual([view+'-contents']);
+        await expect(right).toBeVisible();const row=await outline.locator('button').first().boundingBox();expect(row.height).toBeGreaterThanOrEqual(24);expect(row.height).toBeLessThan(32);await expect.poll(()=>right.evaluate(root=>[root,...root.querySelectorAll('*')].filter(node=>node.clientHeight>0&&node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).map(node=>node.id))).toEqual([view+'-contents']);
         const outlineBox=await outline.boundingBox(),recentBox=await list.boundingBox();expect(recentBox.y).toBeGreaterThanOrEqual(outlineBox.y+outlineBox.height);
         const last=list.locator('[data-recent-note]').last();await last.focus();await expect(last).toBeInViewport();expect(await right.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
         await outline.locator('button').first().focus();await expect(outline.locator('button').first()).toBeInViewport();

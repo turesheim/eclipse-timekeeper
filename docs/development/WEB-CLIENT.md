@@ -243,7 +243,7 @@ Notes uses the same **Main actions** controls for sidebar visibility, revisions,
 client association, deletion, renaming/moving and reloading. Its left sidebar
 contains the folder navigator; its right sidebar places Recent notes below
 Today's shared live outline in source and formatted modes. Outline links use normal
-body text. Dialog editors retain note actions in **Note tools**.
+body text with compact line spacing and at least 24px row targets. Dialog editors retain note actions in **Note tools**.
 
 Drag either desktop sidebar separator to resize that panel, or use Left/Right,
 Home and End while the separator has keyboard focus. This also applies to
