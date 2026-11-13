@@ -57,7 +57,7 @@ test('Today and Notes stack Recent notes below the outline with one scrollbar pe
       for(const theme of ['timekeeper','timekeeper-dark']){
         await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
         await expect(right).toBeVisible();await expect.poll(()=>right.evaluate(root=>[root,...root.querySelectorAll('*')].filter(node=>node.clientHeight>0&&node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).map(node=>node.id))).toEqual([view+'-contents']);
-        expect(await list.evaluate(node=>node.closest('section').previousElementSibling?.id||node.parentElement.previousElementSibling?.id)).toBe(view+'-outline');
+        const outlineBox=await outline.boundingBox(),recentBox=await list.boundingBox();expect(recentBox.y).toBeGreaterThanOrEqual(outlineBox.y+outlineBox.height);
         const last=list.locator('[data-recent-note]').last();await last.focus();await expect(last).toBeInViewport();expect(await right.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
         await outline.locator('button').first().focus();await expect(outline.locator('button').first()).toBeInViewport();
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -137,7 +137,7 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   await page.evaluate(()=>document.documentElement.style.setProperty('--font-today-recent-note','1.1rem'));
   expect(await recent.locator('[data-recent-note]').first().evaluate(node=>parseFloat(getComputedStyle(node).fontSize)/parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(1.1,2);
   await page.evaluate(()=>document.documentElement.style.removeProperty('--font-today-recent-note'));
-  const current=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':current.headers().etag});await page.reload();
+  const current=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':current.headers().etag});await page.reload();await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toHaveAttribute('aria-expanded','false');await page.locator('#today-main-actions-toggle-right-sidebar').click();
   for(const [entry,,,label] of cases)await expect(recent.locator(`[data-recent-note="${entry.id}"]`)).toHaveAccessibleName(new RegExp('^'+label+': '));
 });
 
