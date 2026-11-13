@@ -1477,7 +1477,7 @@
   "notes.create_linked_confirm": "The note “{{path}}” does not exist. Create it and open the editor?",
   "notes.search_title": "Search results",
   "notes.search_help": "Search notes and event details. Use tag:#name, file:name, event:words, journal:words or note:words to narrow the results. Put phrases in double quotes.",
-  "notes.client": "Associate with client",
+  "notes.client": "Associate with client or project",
   "notes.no_client": "No client",
   "notes.client_associations": "Notes linked to clients",
   "notes.search_event_series": "Recurring series details",
@@ -1803,5 +1803,7 @@
   "tasks.elapsed": "Tracked time",
   "calendar.subscription_source": "Calendar subscription",
   "calendar.source_failure": "{{name}} ({{source}}): {{message}}",
-  "calendar.service_status": "{{provider}} service status"
+  "calendar.service_status": "{{provider}} service status",
+  "notes.no_project": "No project",
+  "notes.association_tasks": "Tasks from this note inherit its client and project. Changing this choice updates all linked tasks."
 }

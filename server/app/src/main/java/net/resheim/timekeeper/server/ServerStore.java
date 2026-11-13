@@ -574,7 +574,8 @@ public class ServerStore {
         }
         if(update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),owner(),type,id,node.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=? AND kind='client'",owner(),type,id);
-        if(node.hasNonNull("clientId"))relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
+        if(node.hasNonNull("clientId"))relation(type,id,"client","CLIENT",uuid(node.get("clientId")));
+        if(type.equals("PROJECT")&&input.has("clientId"))new NoteClients(this).projectClientChanged(id,uuid(node.get("clientId")));return node;
     }
     private boolean sessionUsesProject(UUID project) {
         try(var query=statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND kind='project' AND to_type='PROJECT' AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),project);var rows=query.executeQuery()) {return rows.next();}

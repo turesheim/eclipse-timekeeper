@@ -30,7 +30,7 @@ test('Notes separates navigation and recent notes, exposes main actions and foll
   const {api}=await setup(page,request),body='# Outline\n\n## Planning\n\nDecisions.\n\n```md\n# Not a heading\n```\n\n## Delivery\n\nNext steps.\n';
   await openLayoutNote(page,api,body);const panel=page.locator('#notes-panel'),contents=page.locator('#notes-contents'),rich=page.locator('#notes-formatted .ProseMirror'),actions=page.locator('#notes-main-actions'),entry=await(await api('GET','/notes/resolve?path=Notes%2FLayout.md')).json();
   await expect(page.locator('#notes-sidebar > #notes-navigation')).toHaveCount(1);await expect(page.locator('#notes-sidebar > .notes-recent .recent-notes')).toBeVisible();await expect(page.locator('#notes-navigation .recent-notes')).toHaveCount(0);
-  for(const name of ['Note revisions','Associate with client','Delete file or folder','Rename or move','Reload from server','Collapse left sidebar','Collapse right sidebar'])await expect(actions.getByRole('button',{name,exact:true})).toBeVisible();
+  for(const name of ['Note revisions','Associate with client or project','Delete file or folder','Rename or move','Reload from server','Collapse left sidebar','Collapse right sidebar'])await expect(actions.getByRole('button',{name,exact:true})).toBeVisible();
   await expect(contents.getByRole('button')).toHaveText(['Outline','Planning','Delivery']);
   await expect(contents.getByRole('button').first()).toHaveCSS('font-family',await panel.evaluate(node=>getComputedStyle(node).fontFamily));
   await contents.getByRole('button',{name:'Planning',exact:true}).click();await expect(rich).toBeFocused();expect(await page.evaluate(()=>getSelection().anchorNode.parentElement.closest('h2')?.textContent)).toBe('Planning');
@@ -67,7 +67,7 @@ test('Notes outline and main actions retain read-only guards and clear headings 
   try{
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#status')).toHaveText('Up to date');await reader.locator('[data-tab=notes]').click();const navigation=reader.locator('#notes-navigation');await navigation.getByRole('button',{name:'Notes',exact:true}).click();await noteEntry(navigation,'Notes/Layout.md').click();
     await expect(reader.locator('#notes-contents').getByRole('button',{name:'Readable section',exact:true})).toBeVisible();await reader.locator('#notes-contents').getByRole('button',{name:'Readable section',exact:true}).click();await expect(reader.locator('#notes-formatted .ProseMirror')).not.toBeEditable();
-    for(const name of ['Associate with client','Delete file or folder','Rename or move'])await expect(reader.locator('#notes-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
+    for(const name of ['Associate with client or project','Delete file or folder','Rename or move'])await expect(reader.locator('#notes-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
     expect((await api('GET','/notes/entries/'+entry.id+'/content')).headers().etag).toBe(before.headers().etag);await reader.locator('#account-menu > summary').click();await reader.locator('#sign-out').click();await expect(reader.locator('#workspace')).toBeHidden();await expect(reader.locator('#notes-contents ol > li')).toHaveCount(0);
   }finally{await context.close();}
 });

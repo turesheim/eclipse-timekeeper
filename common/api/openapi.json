@@ -37624,6 +37624,17 @@
                 "type": "null"
               }
             ]
+          },
+          "projectId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owned project; its client is inherited. Omission preserves the project when the client is unchanged; a client change clears it."
           }
         }
       },
@@ -37643,6 +37654,17 @@
                 "type": "null"
               }
             ]
+          },
+          "projectId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owned project; its client is inherited. Omission preserves the project when the client is unchanged; a client change clears it."
           }
         }
       },
@@ -37671,6 +37693,17 @@
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
+          },
+          "projectId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owned project; its client is inherited. Omission preserves the project when the client is unchanged; a client change clears it."
           }
         }
       },

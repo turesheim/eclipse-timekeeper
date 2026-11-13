@@ -444,7 +444,7 @@ $('focus-select').addEventListener('change',()=>{
   focusId=$('focus-select').value;selectedDay=null;render();
 });
 function render() {
-  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision);
+  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision,snapshot.projects);
   paintFocus();
   const s = focusedSnapshot(snapshot,currentFocus()),zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;
