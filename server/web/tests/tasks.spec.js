@@ -73,7 +73,7 @@ test('bulk completion reviews the filtered native tasks and skips completed and 
 test('bulk completion applies only to rendered rows and synchronizes source checkboxes',async({page,request})=>{
   test.setTimeout(90000);const {api}=await setup(page,request,{remoteCount:0}),source=Array.from({length:52},(_,index)=>'- [ ] Batch '+String(index).padStart(2,'0')).join('\n')+'\n';const entry=await(await api('PUT','/notes/files?path=Batch.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   await page.locator('#refresh').click();await expect(row(page,'Batch 00')).toBeVisible();await expect(page.locator('#tasks-list > li')).toHaveCount(50);const before=(await(await api('GET','/tasks?limit=500')).json()).items,displayed=await page.locator('#tasks-list > li').evaluateAll(items=>items.map(item=>item.dataset.taskKey));await completeVisible(page);
-  await expect(row(page,'Batch 49')).toBeVisible();const tasks=(await(await api('GET','/tasks?limit=500')).json()).items;for(const task of tasks)expect(task.status).toBe(displayed.includes('task:'+task.id)?'COMPLETED':before.find(value=>value.id===task.id).status);
+  await expect(page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true})).toBeEnabled();await expect(row(page,'Batch 49')).toBeVisible();const tasks=(await(await api('GET','/tasks?limit=500')).json()).items;for(const task of tasks)expect(task.status).toBe(displayed.includes('task:'+task.id)?'COMPLETED':before.find(value=>value.id===task.id).status);
   const text=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(text.match(/\[x\]/g)).toHaveLength(49);expect(text).toContain('- [ ] Batch 51');
 });
 
