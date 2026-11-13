@@ -53,7 +53,7 @@ test('Today and Notes stack Recent notes below the outline with one scrollbar pe
     await expect(list.locator('[data-recent-note]')).toHaveCount(23);await expect(outline.locator('ol button')).toHaveCount(12);expect(requests).toEqual([]);
     await expect(page.locator(view==='today'?'.today-sidebar .recent-notes':'#notes-sidebar .recent-notes')).toHaveCount(0);
     for(const width of [1280,390,320]){
-      await page.setViewportSize({width,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
+      await page.setViewportSize({width,height:844});if(width===390)await expect(toggle).toHaveAttribute('aria-expanded','false');if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
       for(const theme of ['timekeeper','timekeeper-dark']){
         await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
         await expect(right).toBeVisible();await expect.poll(()=>right.evaluate(root=>[root,...root.querySelectorAll('*')].filter(node=>node.clientHeight>0&&node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).map(node=>node.id))).toEqual([view+'-contents']);
@@ -120,7 +120,7 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
     await expect(button.locator('.today-recent-note-label')).toHaveText(title.split('/').at(-1));await button.click();await expect(page.locator('#note-popup-title')).toHaveText(title);await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();if(entry.kind==='DAY'){await expect(page.locator('#today-date')).toHaveValue(entry.sourceKey);await expect(page.locator('#today-journal-formatted')).toContainText('Daily journal body');}else await expect(page.locator('#notes-document-title')).toHaveText(title);await page.locator('[data-tab=today]').click();
   }
   for(const [width,height] of [[1440,1000],[320,900]]){
-    await page.setViewportSize({width,height});const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');if(await sidebar.getAttribute('aria-expanded')==='false')await sidebar.click();await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
+    await page.setViewportSize({width,height});const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');if(width===320)await expect(sidebar).toHaveAttribute('aria-expanded','false');if(await sidebar.getAttribute('aria-expanded')==='false')await sidebar.click();await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
     for(const theme of ['timekeeper','timekeeper-dark']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       for(const [entry] of cases){
