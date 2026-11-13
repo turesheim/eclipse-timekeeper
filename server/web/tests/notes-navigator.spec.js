@@ -29,16 +29,16 @@ const put=(api,path,text='Body.')=>api('PUT','/notes/files?'+new URLSearchParams
 test('Notes separates navigation and recent notes, exposes main actions and follows live headings in both editor modes',async({page,request})=>{
   const {api}=await setup(page,request),body='# Outline\n\n## Planning\n\nDecisions.\n\n```md\n# Not a heading\n```\n\n## Delivery\n\nNext steps.\n';
   await openLayoutNote(page,api,body);const panel=page.locator('#notes-panel'),contents=page.locator('#notes-contents'),rich=page.locator('#notes-formatted .ProseMirror'),actions=page.locator('#notes-main-actions'),entry=await(await api('GET','/notes/resolve?path=Notes%2FLayout.md')).json();
-  await expect(page.locator('#notes-sidebar > #notes-navigation')).toHaveCount(1);await expect(page.locator('#notes-sidebar > .notes-recent .recent-notes')).toBeVisible();await expect(page.locator('#notes-navigation .recent-notes')).toHaveCount(0);
+  await expect(page.locator('#notes-sidebar > #notes-navigation')).toHaveCount(1);await expect(page.locator('#notes-contents > .notes-recent .recent-notes')).toBeVisible();await expect(page.locator('#notes-navigation .recent-notes')).toHaveCount(0);
   for(const name of ['Note revisions','Associate with client or project','Delete file or folder','Rename or move','Reload from server','Collapse left sidebar','Collapse right sidebar'])await expect(actions.getByRole('button',{name,exact:true})).toBeVisible();
-  await expect(contents.getByRole('button')).toHaveText(['Outline','Planning','Delivery']);
-  await expect(contents.getByRole('button').first()).toHaveCSS('font-family',await panel.evaluate(node=>getComputedStyle(node).fontFamily));
+  await expect(contents.locator('ol').getByRole('button')).toHaveText(['Outline','Planning','Delivery']);
+  await expect(contents.locator('ol').getByRole('button').first()).toHaveCSS('font-family',await panel.evaluate(node=>getComputedStyle(node).fontFamily));
   await contents.getByRole('button',{name:'Planning',exact:true}).click();await expect(rich).toBeFocused();expect(await page.evaluate(()=>getSelection().anchorNode.parentElement.closest('h2')?.textContent)).toBe('Planning');
   await panel.getByRole('button',{name:'Markdown source',exact:true}).click();const source=page.locator('#notes-body'),draft=(await source.inputValue())+'\n## New decision\n';await source.fill(draft);
   await source.evaluate(node=>node.setSelectionRange(4,9));await expect(contents.getByRole('button',{name:'New decision',exact:true})).toBeVisible();await expect(source).toBeFocused();expect(await source.evaluate(node=>[node.selectionStart,node.selectionEnd])).toEqual([4,9]);
   await contents.getByRole('button',{name:'New decision',exact:true}).click();await expect(source).toBeFocused();expect(await source.evaluate(node=>node.selectionStart)).toBe(draft.indexOf('## New decision'));
   await actions.getByRole('button',{name:'Collapse right sidebar',exact:true}).press('ControlOrMeta+s');await expect.poll(async()=>(await(await api('GET','/notes/entries/'+entry.id+'/content')).body()).toString()).toBe(draft);
-  await put(api,'Notes/Without headings.md','An ordinary paragraph.\n');await page.locator('#notes-navigation').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes/Without headings.md').click();await expect(contents.getByRole('button')).toHaveCount(0);await expect(contents).toContainText('No headings in this note yet.');
+  await put(api,'Notes/Without headings.md','An ordinary paragraph.\n');await page.locator('#notes-navigation').getByRole('button',{name:'Refresh',exact:true}).click();await noteEntry(page.locator('#notes-navigation'),'Notes/Without headings.md').click();await expect(contents.locator('ol').getByRole('button')).toHaveCount(0);await expect(contents).toContainText('No headings in this note yet.');
 });
 
 test('Notes right sidebar resizes and collapses without replacing the draft, and fits both themes and narrow screens',async({page,request})=>{

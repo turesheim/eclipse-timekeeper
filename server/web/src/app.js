@@ -226,7 +226,7 @@ async function tab(name) {
   if(name==='tasks')tasks.show();else tasks.hide();
   if (name === 'track') track.show();else track.hide();
   if (name === 'today') today.show();else today.hide();
-  if(name==='today')recentNotes.show(today.sidebar,'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
+  if(name==='today')recentNotes.show($('today-contents'),'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
   if (name === 'week') weekSessions.show();else weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);

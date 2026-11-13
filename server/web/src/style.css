@@ -177,7 +177,8 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-main-actions { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; grid-column: 3; grid-row: 1; }
 .sidebar-actions { padding-inline-end: .5rem; margin-inline-end: .15rem; border-inline-end: 1px solid var(--line); }
 .today-client-action { display: contents; }
-.today-contents { position: absolute; inset-block-start: 0; inset-inline-end: 0; width: var(--today-contents-width,16rem); grid-column: auto; grid-row: auto; }
+.today-contents { display: flex; flex-direction: column; gap: .75rem; min-width: 0; overscroll-behavior: contain; position: absolute; inset-block-start: 0; inset-inline-end: 0; width: var(--today-contents-width,16rem); grid-column: auto; grid-row: auto; }
+.today-contents > *, .notes-contents > * { flex-shrink: 0; }
 .note-contents { min-width: 0; min-height: 0; padding: .85rem; }
 .note-contents :is(h2,h3) { font-size: var(--font-today-sidebar-heading); font-weight: 650; margin: 0; }
 .note-contents ol { list-style: none; margin: .5rem 0 0; padding: 0; }
@@ -220,7 +221,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
   .today-resize, .today-contents-resize { display: none; }
   .today-toolbar { grid-column: 1; grid-row: 1; margin-bottom: 0; }
   .today-contents { position: static; width: auto; grid-column: 1; grid-row: 2; }
-  .today-contents nav { max-height: 16rem; overflow-y: auto; }
+  .today-contents { max-height: min(40dvh,24rem); overflow-y: auto; }
   .today-main { grid-column: 1; grid-row: 3; }
   .today-sidebar { grid-column: 1; grid-row: 4; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .today-layout.sidebar-right-collapsed .today-main { grid-row: 2; }
@@ -554,7 +555,7 @@ code, pre { font-size: var(--font-code); }
 .today-recent-list { display: grid; gap: .35rem; }
 .recent-notes { --today-sidebar-heading-font-size: var(--font-today-sidebar-heading); display:flex; flex-direction:column; min-height:0; }
 .recent-notes > h3 { flex-shrink:0; }
-.recent-notes > div { min-height:0; overflow:auto; overscroll-behavior:contain; }
+.recent-notes > div { min-width:0; }
 .today-recent-note { display: grid; width: 100%; min-width: 0; border: 0; text-align: start; font-size: var(--font-today-recent-note); }
 .today-recent-note > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-recent-note-title { display: flex; align-items: center; gap: .4rem; min-width: 0; }

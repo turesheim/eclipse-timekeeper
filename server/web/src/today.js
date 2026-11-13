@@ -31,7 +31,7 @@ export class TodayView {
     this.sidebarResize=new SidebarResize(root,this.sidebar,{variable:'--today-sidebar-width',label:t('today.resize_sidebar'),width:196,changed:()=>this.sizeEditor(),focusFallback:()=>this.dateInput,className:'today-resize'}).element;
     this.sidebar.after(this.sidebarResize);
     this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions:byId('today-main-actions'),inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
-    this.contents=new NoteContents(byId('today-contents'),this.journal.markdown);
+    this.contents=new NoteContents(byId('today-outline'),this.journal.markdown);
     this.contentsResize=new SidebarResize(root,byId('today-contents'),{side:'right',variable:'--today-contents-width',label:t('today.resize_contents'),changed:()=>this.sizeEditor(),focusFallback:()=>byId('today-main-actions-toggle-right-sidebar'),className:'today-contents-resize'}).element;
     byId('today-contents').before(this.contentsResize);
     this.sidebarActions=new SidebarActions(byId('today-main-actions'),root.querySelector('.today-layout'),{left:{panel:this.sidebar,separator:this.sidebarResize},right:{panel:byId('today-contents'),separator:this.contentsResize,collapseOnNarrow:true}},()=>this.sizeEditor());

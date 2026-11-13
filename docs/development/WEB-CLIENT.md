@@ -241,8 +241,8 @@ there. Left/right sidebar buttons appear in Main actions for the sidebars presen
 Each toggles its sidebar independently and gives the journal the freed space.
 Notes uses the same **Main actions** controls for sidebar visibility, revisions,
 client association, deletion, renaming/moving and reloading. Its left sidebar
-contains separate navigation and recent-note cards; its right sidebar shares
-Today's live outline in source and formatted modes. Outline links use normal
+contains the folder navigator; its right sidebar places Recent notes below
+Today's shared live outline in source and formatted modes. Outline links use normal
 body text. Dialog editors retain note actions in **Note tools**.
 
 Drag either desktop sidebar separator to resize that panel, or use Left/Right,
@@ -1241,11 +1241,12 @@ tree. Folder and document names default to 2px smaller than the base text; the
 navigation and document headings share the Notes heading font setting. The
 document title sits above the editor card.
 
-Recent notes also appears below the Notes folder navigator. Today and Notes
-move the same section between their sidebars, retaining its loaded pages and
-using the same card, heading and guarded popup navigation. The navigator and
-recent list scroll separately, and the list stays inside the navigation drawer
-on phones. Leaving both views stops polling and fences pending replies.
+Recent notes appears in the right sidebar of Today and Notes, below the table
+of contents. Both views move the same section between their right sidebars,
+retaining its loaded pages and guarded popup navigation. Each right sidebar has
+one scrolling area for its outline and Recent notes; cards and lists do not add
+nested scrollbars. On phones, Main actions expands the right sidebar. Opening a
+recent note in the Notes workspace closes the narrow sidebar to expose the editor. Leaving both views stops polling and fences pending replies.
 
 Notes navigation and editor content scroll independently within the available
 viewport. Its flex layout fills the space above navigation after the old view's
