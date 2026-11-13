@@ -1249,7 +1249,7 @@ association; inline `@` assignments remain available on unassociated notes.
 Normal task hierarchy conflicts roll back the entire association change.
 
 Association writes retain canonical note bytes, dates, content validators and
-edit history. Client and project relations protect the associated client from deletion
+edit history. Client and project relations protect the associated client and project from deletion
 until its notes are detached. Account archives include optional `noteClients`
 metadata and remap client and optional project IDs with the imported work graph. Review rolls back
 these associations; an existing different association is an import conflict.

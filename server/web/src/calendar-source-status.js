@@ -9,7 +9,7 @@ const providers={
 /** Only known public status pages become links; private calendar URLs never do. */
 export function calendarSource(value){
   const host=typeof value?.origin==='string'?value.origin.toLowerCase():'';
-  const provider=providers[value?.providerId]||Object.values(providers).find(provider=>provider.hosts.some(domain=>host===domain||host.endsWith('.'+domain)));
+  const provider=(Object.hasOwn(providers,value?.providerId)?providers[value.providerId]:null)||Object.values(providers).find(provider=>provider.hosts.some(domain=>host===domain||host.endsWith('.'+domain)));
   return {label:provider?.name||host||t('calendar.subscription_source'),url:provider?.url||null};
 }
 

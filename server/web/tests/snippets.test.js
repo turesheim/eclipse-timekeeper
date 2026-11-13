@@ -21,7 +21,7 @@ test('configuration is account scoped and empty preferences disable shortcuts',(
   configureSnippets({zoneId:'UTC',textSnippets:[{keyword:';Hello',content:'Hi {cursor}friend'}]});
   assert.deepEqual(sourceSnippetAt(';hello'),{text:'Hi friend',cursor:3,length:6});
   assert.equal(sourceSnippetAt('email;hello'),null);
-  for(const prefix of ['```js\n;hello','~~~\n;hello','    ;hello','`;hello','[link](;hello','[[;hello','<tag ;hello'])assert.equal(sourceSnippetAt(prefix),null,prefix);
+  for(const prefix of ['```js\n;hello','~~~\n;hello','    ;hello','`;hello','``code\n;hello','[link](;hello','[[;hello','<tag ;hello'])assert.equal(sourceSnippetAt(prefix),null,prefix);
   assert.equal(sourceSnippetAt('```\ncode\n```\n;hello').text,'Hi friend');
   configureSnippets({zoneId:'UTC',textSnippets:[]});assert.equal(sourceSnippetAt(';hello'),null);
   configureSnippets(null);assert.equal(sourceSnippetAt(';dd'),null);

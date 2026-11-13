@@ -64,12 +64,13 @@ export function snippetAt(prefix,options=preferences){
 }
 export function sourceSnippetAt(prefix){
   // Source editing must leave fenced/indented code, inline code, HTML and links literal.
-  let fence=null;
+  let fence=null,inline=null;
   for(const line of prefix.split('\n')){
     const match=/^ {0,3}(`{3,}|~{3,})/.exec(line);
-    if(match){if(!fence)fence=match[1];else if(match[1][0]===fence[0]&&match[1].length>=fence.length)fence=null;}
+    if(match){if(!fence)fence=match[1];else if(match[1][0]===fence[0]&&match[1].length>=fence.length)fence=null;continue;}
+    if(!fence)for(const run of line.matchAll(/(?<!\\)`+/g)){if(!inline)inline=run[0];else if(run[0]===inline)inline=null;}
   }
   const line=prefix.slice(prefix.lastIndexOf('\n')+1);
-  if(fence||/^(?: {4}|\t)|<|\]\([^)]*$|\[\[[^\]]*$/.test(line)||((line.match(/(?<!\\)`+/g)||[]).length%2))return null;
+  if(fence||/^(?: {4}|\t)|<|\]\([^)]*$|\[\[[^\]]*$/.test(line)||inline)return null;
   return snippetAt(prefix);
 }

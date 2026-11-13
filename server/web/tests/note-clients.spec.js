@@ -39,6 +39,15 @@ test('an optional note project is inherited by existing and new tasks and client
   await choose(page,scope,beta.id);tasks=(await(await api('GET','/tasks?limit=500')).json()).items;expect(tasks.every(task=>task.projectId===null&&task.clientId===beta.id)).toBe(true);expect((await(await api('GET',association(entry))).json()).projectId).toBeNull();await expect(scope.locator('.note-client-label')).toHaveText(beta.name);
 });
 
+test('No client clears a selected project and its inherited client',async({page,request})=>{
+  const {api,alpha,entry}=await setup(page,request),project=await(await api('POST','/projects',{name:'Temporary project',clientId:alpha.id})).json();
+  await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await openNote(page);
+  const scope=page.locator('#notes-panel');await clickNoteAction(page,scope,'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});
+  await dialog.getByLabel('Project',{exact:true}).selectOption(project.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();
+  await clickNoteAction(page,scope,'Associate with client or project');await expect(dialog.getByLabel('Client',{exact:true})).toBeEnabled();await dialog.getByLabel('Client',{exact:true}).selectOption('');await expect(dialog.getByLabel('Project',{exact:true})).toHaveValue('');
+  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();const value=await(await api('GET',association(entry))).json();expect(value.clientId).toBeNull();expect(value.projectId).toBeNull();await expect(scope.locator('.note-client-label')).toBeHidden();
+});
+
 test('client choice includes clients outside the focus filter and preserves note bytes, dates and a failed body draft',async({page,request})=>{
   const {api,alpha,beta,entry,source}=await setup(page,request),focusId=randomUUID();const focus=await api('GET','/focus-areas');await api('PUT','/focus-areas',{areas:[{id:focusId,name:'Only Alpha',clientIds:[alpha.id]}]},{'If-Match':focus.headers().etag});
   await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await openAccountMenu(page);await page.locator('#focus-select').selectOption(focusId);await page.getByRole('button',{name:'Account menu',exact:true}).click();await openNote(page);
