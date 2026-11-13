@@ -133,6 +133,8 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .tracking h2, .session-title h2 { font-size: var(--font-tracking-heading); }
 .tracking[data-active=false] { display: none; }
 #active-details { color: var(--muted); }
+.active-tracking-actions { display:flex;align-items:center;gap:1rem;flex-wrap:wrap; }
+#active-elapsed { font-variant-numeric:tabular-nums;white-space:nowrap; }
 #stop { display: inline-flex; align-items: center; gap: .6rem; white-space: nowrap; }
 #workspace { padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 .workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + var(--workspace-nav-bottom-inset)); box-shadow: 0 -.25rem 1rem #233b380d; }

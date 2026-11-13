@@ -91,4 +91,23 @@ class NoteTasksTest {
         assertEquals(403,given().header("Authorization","Bearer test-read").header("If-Match",created.header("ETag")).contentType("application/octet-stream").body(bytes("- [x] HTTP task\n")).put("/api/v1/notes/entries/"+entry+"/content").statusCode());
         assertEquals("- [ ] HTTP task\n",given().header("Authorization","Bearer test-a").get("/api/v1/notes/entries/"+entry+"/content").asString());
     }
+    @Test void disabledConfigurationSourcesDoNotBreakTheTaskListProjection(){
+        store.transaction("tasks-disabled-source",()->{
+            var settings=new VaultSettings(store);settings.save(etag(settings.get()),object().put("syncObsidianConfig",true));
+            var vault=vault();vault.mkdir(new VaultPath(".obsidian"));vault.put(new VaultPath(".obsidian/Checklist.md"),null,true,bytes("- [ ] Configuration task\n"));assertEquals(1,new NoteTasks(store).origins().size());
+            settings.save(etag(settings.get()),object().put("syncObsidianConfig",false));assertTrue(new NoteTasks(store).origins().isEmpty());assertEquals(1,store.service().tasks().size());return null;
+        });
+    }
+    @Test void taskListSourceProjectionIsOptionalOwnedAndKeepsCanonicalValidators(){
+        String title="List source "+UUID.randomUUID(),path=title+".md";
+        var created=given().header("Authorization","Bearer test-a").queryParam("path",path).header("If-None-Match","*").contentType("application/octet-stream").body(bytes("- [ ] "+title+"\n")).put("/api/v1/notes/files");assertEquals(201,created.statusCode());String entry=created.jsonPath().getString("id");
+        var plain=given().header("Authorization","Bearer test-a").queryParam("q",title).get("/api/v1/tasks");assertEquals(200,plain.statusCode());String task=plain.jsonPath().getString("items[0].id");assertNull(plain.jsonPath().get("items[0].sourceNote"));
+        String tag=given().header("Authorization","Bearer test-a").get("/api/v1/tasks/"+task).header("ETag");
+        var projected=given().header("Authorization","Bearer test-read").queryParam("q",title).queryParam("includeNoteSources",true).get("/api/v1/tasks");assertEquals(200,projected.statusCode());assertEquals(entry,projected.jsonPath().getString("items[0].sourceNote.id"));assertEquals("MARKDOWN",projected.jsonPath().getString("items[0].sourceNote.kind"));
+        assertEquals(tag,given().header("Authorization","Bearer test-a").get("/api/v1/tasks/"+task).header("ETag"));
+        assertTrue(given().header("Authorization","Bearer test-b").queryParam("q",title).queryParam("includeNoteSources",true).get("/api/v1/tasks").jsonPath().getList("items").isEmpty());
+        assertEquals(400,given().header("Authorization","Bearer test-a").queryParam("includeNoteSources","maybe").get("/api/v1/tasks").statusCode());
+        assertEquals(204,given().header("Authorization","Bearer test-a").header("If-Match",created.header("ETag")).delete("/api/v1/notes/entries/"+entry).statusCode());
+        var trashed=given().header("Authorization","Bearer test-a").queryParam("q",title).queryParam("includeNoteSources",true).get("/api/v1/tasks");assertEquals(200,trashed.statusCode());assertEquals(task,trashed.jsonPath().getString("items[0].id"));assertNull(trashed.jsonPath().get("items[0].sourceNote"));
+    }
 }

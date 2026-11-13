@@ -463,6 +463,16 @@
           },
           {
             "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "includeNoteSources",
+            "in": "query",
+            "required": false,
+            "description": "Include current owned source-note metadata for checklist tasks in this list projection. Does not change canonical task resources or validators.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ]
       },
@@ -22571,6 +22581,11 @@
               }
             ],
             "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
+          },
+          "sourceNote": {
+            "$ref": "#/components/schemas/VaultEntry",
+            "readOnly": true,
+            "description": "Current source note, included only by listTasks with includeNoteSources=true. Absent when the task has no available source note."
           }
         },
         "required": [

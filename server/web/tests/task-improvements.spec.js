@@ -23,7 +23,9 @@ test('Markdown assignments, source note links and removals use the same owned ta
   const entry=await(await api('PUT','/notes/files?path=Assignments.md',Buffer.from(text),{'If-None-Match':'*','Content-Type':'application/octet-stream'})).json();
   await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=tasks]').click();
   const values=await allTasks(api);expect(values.find(task=>task.summary.startsWith('Direct'))).toMatchObject({clientId:client.id,projectId:null});expect(values.find(task=>task.summary.startsWith('Project'))).toMatchObject({projectId:project.id});
-  await expect(taskButton(page,'Direct 😃 @Client_With_Spaces')).toContainText(client.name);await taskButton(page,'Direct 😃 @Client_With_Spaces').click();
+  await expect(taskButton(page,'Direct 😃 @Client_With_Spaces')).toContainText(client.name);
+  const overview=page.locator('#tasks-list > li').filter({has:taskButton(page,'Direct 😃 @Client_With_Spaces')}),directSource=overview.getByRole('link',{name:'Open source note: Assignments',exact:true});await expect(directSource.locator('.bi-file-earmark-text')).toBeVisible();await directSource.click();await expect(page.locator('#note-popup-editor')).toBeVisible();await page.locator('#note-popup-editor').getByRole('button',{name:'Close',exact:true}).click();
+  await taskButton(page,'Direct 😃 @Client_With_Spaces').click();
   const source=page.locator('#task-details').getByRole('link',{name:'Open source note: Assignments',exact:true});await expect(source.locator('.bi-file-earmark-text')).toBeVisible();await source.click();
   const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(popup.getByRole('checkbox',{name:'Task: Direct 😃 @Client_With_Spaces',exact:true})).toBeVisible();await popup.getByRole('button',{name:'Close',exact:true}).click();
   await page.locator('#tasks-hide-completed').check();await expect(taskButton(page,'Project @Project_With_Spaces')).toHaveCount(0);await page.locator('#tasks-hide-completed').uncheck();await expect(taskButton(page,'Project @Project_With_Spaces')).toBeVisible();

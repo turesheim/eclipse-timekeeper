@@ -1,5 +1,7 @@
 import {t,getLocale} from './i18n.js';
-import {dateInZone,localDateTime,localDateTimeToInstant} from './model.js';
+import {dateInZone,localDateTime,localDateTimeToInstant,instantNanos,nanosText} from './model.js';
+import {SidebarActions} from './sidebar-actions.js';
+import {SidebarResize} from './sidebar-resize.js';
 import {iconButton,icon} from './icons.js';
 import {noteIcon} from './note-presentation.js';
 import {noteTitle} from './note-title.js';
@@ -26,9 +28,9 @@ export class TasksView {
     Object.assign(this,{root,callbacks,generation:0,sourceTasks:[],visibleLimit:50,filterButtons:new Map(),rowElements:new Map(),pending:new Set(),selection:{kind:'smart',value:'all'}});
     this.narrow=matchMedia('(max-width:760px)');
     const heading=node('div',undefined,'tasks-heading');this.title=node('h2',t('ui.tasks'));this.title.id='tasks-title';
-    this.toggle=button(t('tasks.browse'),()=>this.navigationState(!root.classList.contains('tasks-navigation-open')),'layout-sidebar');this.toggle.setAttribute('aria-controls','tasks-navigation');
+    this.mainActions=node('div',undefined,'tasks-main-actions');this.mainActions.id='tasks-main-actions';this.mainActions.setAttribute('role','group');this.mainActions.setAttribute('aria-label',t('today.main_actions'));
     this.create=button(t('tasks.new'),()=>{if(!this.writable)return;this.selection={kind:'smart',value:'all'};this.paint();callbacks.onNew();},'add');
-    this.refresh=button(t('tasks.refresh'),()=>{callbacks.onRefresh?.();void this.load();},'refresh');const actions=node('div',undefined,'btn-group');actions.append(this.create,this.refresh);heading.append(this.toggle,this.title);
+    this.refresh=button(t('tasks.refresh'),()=>{callbacks.onRefresh?.();void this.load();},'refresh');const actions=node('div',undefined,'btn-group');actions.append(this.create,this.refresh);heading.append(this.title,this.mainActions);
     this.error=node('p','','alert alert-danger');this.error.hidden=true;this.error.setAttribute('role','alert');
     this.warning=node('p',t('tasks.source_warning'),'alert alert-warning');this.warning.hidden=true;this.warning.setAttribute('role','status');
     const layout=node('div',undefined,'tasks-layout');this.navigation=node('nav',undefined,'tasks-navigation card');this.navigation.id='tasks-navigation';this.navigation.setAttribute('aria-label',t('tasks.browse'));
@@ -39,14 +41,10 @@ export class TasksView {
     const content=node('section',undefined,'tasks-results card');this.listTitle=node('h3',t('tasks.all'));this.listTitle.id='tasks-list-title';this.listTitle.tabIndex=-1;content.setAttribute('aria-labelledby',this.listTitle.id);
     const completedLabel=node('label',undefined,'form-check m-0');this.hideCompleted=node('input',undefined,'form-check-input');this.hideCompleted.type='checkbox';this.hideCompleted.checked=true;this.hideCompleted.id='tasks-hide-completed';completedLabel.htmlFor=this.hideCompleted.id;completedLabel.append(this.hideCompleted,node('span',t('tasks.hide_completed'),'form-check-label'));this.hideCompleted.addEventListener('change',()=>{this.visibleLimit=50;this.paint();});
     const toolbar=node('div',undefined,'btn-toolbar tasks-toolbar align-items-center gap-3');toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label',t('tasks.tools'));toolbar.append(actions,completedLabel);
-    this.resize=node('div',undefined,'tasks-resize');this.resize.tabIndex=0;
-    for(const [name,value]of Object.entries({role:'separator','aria-orientation':'vertical','aria-label':t('tasks.resize'),'aria-controls':'tasks-navigation','aria-valuemin':'180','aria-valuemax':'480','aria-valuenow':'256'}))this.resize.setAttribute(name,value);
-    const width=value=>{this.navWidth=Math.max(180,Math.min(480,value));root.style.setProperty('--tasks-nav-width',this.navWidth+'px');this.resize.setAttribute('aria-valuenow',String(Math.round(this.navWidth)));};
-    this.resize.addEventListener('pointerdown',event=>{event.preventDefault();this.resize.setPointerCapture(event.pointerId);});
-    this.resize.addEventListener('pointermove',event=>{if(this.resize.hasPointerCapture(event.pointerId))width(event.clientX-layout.getBoundingClientRect().left);});
-    this.resize.addEventListener('pointerup',event=>this.resize.releasePointerCapture(event.pointerId));
-    this.resize.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();width(event.key==='Home'?180:event.key==='End'?480:(this.navWidth||256)+(event.key==='ArrowLeft'?-20:20));}});
+    this.resize=new SidebarResize(root,this.navigation,{variable:'--tasks-nav-width',label:t('tasks.resize'),width:256,breakpoint:760,focusFallback:()=>this.toggle,className:'tasks-resize'}).element;
     this.count=node('p','','hint');this.count.setAttribute('role','status');this.list=node('ul',undefined,'tasks-list');this.list.id='tasks-list';this.empty=node('p',t('tasks.empty'),'hint');this.more=button(t('tasks.more'),()=>{this.visibleLimit+=50;this.paint();});this.more.hidden=true;content.append(this.listTitle,toolbar,this.count,this.list,this.empty,this.more);layout.append(this.navigation,this.resize,content);root.append(heading,this.error,this.warning,layout);
+    this.sidebarActions=new SidebarActions(this.mainActions,root,{left:{panel:this.navigation,separator:this.resize,collapseOnNarrow:true,breakpoint:760}});this.toggle=this.sidebarActions.items[0].button;
+    this.buildTaskActions();
     this.detail=node('dialog',undefined,'app-dialog task-details');this.detail.id='task-details';this.detailTitle=node('h2');this.detailTitle.id='task-details-title';this.detail.setAttribute('aria-labelledby',this.detailTitle.id);
     const close=button(t('ui.close'),()=>this.detail.close(),'close');close.classList.add('task-details-close');this.detailBody=node('div');
     this.edit=button(t('ui.edit_task'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onEdit(row.id);}});
@@ -54,29 +52,56 @@ export class TasksView {
     this.remove=button(t('tasks.delete'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onDelete(row.id);}},'delete');this.remove.className='btn btn-outline-danger';const detailActions=node('div',undefined,'dialog-actions');detailActions.append(this.track,this.remove,this.edit);
     this.detail.append(close,this.detailTitle,this.detailBody,detailActions);root.append(this.detail);
     this.detail.addEventListener('close',()=>{++this.detailGeneration;if(this.visible&&!document.querySelector('dialog[open]'))this.rowElements.get(this.detailKey)?.button.focus();});this.detailGeneration=0;
-    this.narrow.addEventListener('change',()=>{const focused=this.navigation.contains(document.activeElement)||document.activeElement===this.resize;this.navigationState(false);if(focused&&this.narrow.matches)this.toggle.focus();});this.navigationState(false);this.controls();
+    this.controls();
+  }
+  buildTaskActions(){
+    this.actionsButton=button(t('tasks.actions'),()=>open(),'three-dots');this.actionsButton.setAttribute('aria-haspopup','menu');this.actionsButton.setAttribute('aria-expanded','false');
+    this.actionsMenu=node('div',undefined,'dropdown-menu tasks-actions-menu shadow');this.actionsMenu.id='tasks-actions-menu';this.actionsMenu.popover='auto';this.actionsMenu.setAttribute('role','menu');this.actionsMenu.setAttribute('aria-label',t('tasks.actions'));this.actionsButton.setAttribute('aria-controls',this.actionsMenu.id);
+    this.completeVisible=button(t('tasks.complete_visible'),()=>{this.closeTaskActions();this.bulkTargets=this.completable();if(!this.writable||this.bulk||!this.bulkTargets.length)return;this.bulkDescription.textContent=t('tasks.complete_visible_description',{count:this.bulkTargets.length});this.bulkDialog.showModal();});this.completeVisible.className='dropdown-item';this.completeVisible.setAttribute('role','menuitem');this.completeVisible.tabIndex=-1;this.actionsMenu.append(this.completeVisible);this.mainActions.append(this.actionsButton);this.root.append(this.actionsMenu);
+    const position=()=>{if(!this.actionsMenu.matches(':popover-open'))return;const box=this.actionsButton.getBoundingClientRect();this.actionsMenu.style.left=Math.max(8,Math.min(box.right-this.actionsMenu.offsetWidth,innerWidth-this.actionsMenu.offsetWidth-8))+'px';this.actionsMenu.style.top=Math.max(8,Math.min(box.bottom+4,innerHeight-this.actionsMenu.offsetHeight-8))+'px';};
+    const open=()=>{if(this.actionsMenu.matches(':popover-open'))return this.closeTaskActions();this.actionsMenu.showPopover();position();if(!this.completeVisible.disabled)this.completeVisible.focus();};
+    this.actionsButton.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();if(!this.actionsMenu.matches(':popover-open'))open();}});
+    this.actionsMenu.addEventListener('beforetoggle',event=>{const opened=event.newState==='open';this.actionsButton.setAttribute('aria-expanded',String(opened));window[opened?'addEventListener':'removeEventListener']('resize',position);document[opened?'addEventListener':'removeEventListener']('scroll',position,true);});
+    this.actionsMenu.addEventListener('keydown',event=>{if(['Escape','Tab'].includes(event.key)){if(event.key==='Escape'){event.preventDefault();event.stopPropagation();}this.closeTaskActions();this.actionsButton.focus();}else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();if(!this.completeVisible.disabled)this.completeVisible.focus();}});
+    this.bulkDialog=node('dialog',undefined,'app-dialog');this.bulkDialog.id='tasks-complete-visible';const title=node('h2',t('tasks.complete_visible'));title.id='tasks-complete-visible-title';this.bulkDialog.setAttribute('aria-labelledby',title.id);this.bulkDescription=node('p');this.bulkDescription.id='tasks-complete-visible-description';this.bulkDialog.setAttribute('aria-describedby',this.bulkDescription.id);
+    const actions=node('div',undefined,'dialog-actions'),cancel=button(t('ui.cancel'),()=>this.bulkDialog.close()),confirm=button(t('tasks.complete_visible'),()=>{const targets=this.bulkTargets;this.bulkDialog.close();void this.completeAll(targets);});confirm.className='btn btn-primary';actions.append(cancel,confirm);this.bulkDialog.append(title,this.bulkDescription,actions);this.root.append(this.bulkDialog);this.bulkDialog.addEventListener('close',()=>{if(this.visible)this.actionsButton.focus();});
+  }
+  closeTaskActions(){if(this.actionsMenu.matches(':popover-open'))this.actionsMenu.hidePopover();}
+  completable(){const rows=new Map((this.rows||[]).map(row=>[row.key,row]));return [...this.list.children].map(item=>rows.get(item.dataset.taskKey)).filter(row=>row?.source==='task'&&!['COMPLETED','CANCELLED'].includes(row.status)&&!this.pending.has(row.key));}
+  async writeCompletion(row,checked,session){
+    const current=await session.request('/tasks/'+row.id);if(session!==this.session||!this.writable)return false;
+    if(current.data.version!==row.record.version)throw new Error(t('tasks.completion_stale'));
+    await session.request('/tasks/'+row.id+'/planning',{method:'PUT',etag:current.etag,body:{status:checked?'COMPLETED':'NOT_STARTED',scheduledDate:current.data.scheduledDate||null,completedAt:checked?new Date().toISOString():null}});return true;
+  }
+  async completeAll(targets){
+    const session=this.session;if(!this.writable||this.bulk||!targets?.length)return;
+    const operation={};this.bulk=operation;this.error.hidden=true;this.errorSource='completion';this.controls();let completed=0;
+    try{for(const row of targets){if(session!==this.session||!this.writable||this.bulk!==operation)break;if(!await this.writeCompletion(row,true,session))break;++completed;}}
+    catch(error){if(session===this.session){this.error.textContent=t('tasks.complete_visible_failed',{count:completed,message:error.message});this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
+    finally{if(session===this.session&&this.bulk===operation){await this.callbacks.onChanged();if(session===this.session&&this.bulk===operation){this.bulk=null;this.paint();this.controls();}}}
   }
   controls(){
-    this.create.disabled=!this.writable;this.refresh.disabled=!this.session||this.loading;this.edit.disabled=this.remove.disabled=this.track.disabled=!this.writable;
+    this.create.disabled=!this.writable||!!this.bulk;this.refresh.disabled=!this.session||this.loading||!!this.bulk;this.edit.disabled=this.remove.disabled=this.track.disabled=!this.writable||!!this.bulk;
+    this.completeVisible.disabled=!this.writable||this.loading||!!this.bulk||!!this.pending.size||!this.completable().length;
     const row=this.rows?.find(row=>row.key===this.detailKey),active=row?.source==='task'&&this.data?.active?.data?.taskId===row.id,label=t(active?'ui.stop_tracking':'ui.start_tracking');this.track.hidden=row?.source!=='task';
     if(this.track.getAttribute('aria-label')!==label)iconButton(this.track,active?'stop':'start',label);
-    for(const [key,entry]of this.rowElements){const row=this.rows.find(row=>row.key===key);entry.checkbox.disabled=!this.writable||row?.source!=='task'||this.pending.has(key);}
+    for(const [key,entry]of this.rowElements){const row=this.rows.find(row=>row.key===key);entry.checkbox.disabled=!this.writable||!!this.bulk||row?.source!=='task'||this.pending.has(key);}
     this.list.setAttribute('aria-busy',String(!!this.loading));if(this.loading){this.count.textContent=t('tasks.loading');this.empty.hidden=true;}
   }
-  navigationState(open){this.root.classList.toggle('tasks-navigation-open',open);this.toggle.setAttribute('aria-expanded',String(!this.narrow.matches||open));}
+  navigationState(open){this.sidebarActions.setExpanded('left',open);}
   update(data,connected,session,writable){
     if(this.session&&session!==this.session)this.reset();const changed=this.data?.revision!==data.revision||this.data?.profile.data.zoneId!==data.profile.data.zoneId;
     this.data=data;this.session=session;this.connected=connected;this.writable=connected&&writable;this.controls();if(this.visible){this.paint();if(changed||this.catalogZone!==data.profile.data.zoneId)void this.load();}
   }
   show(){this.visible=true;this.paint();void this.load();this.timer??=setInterval(()=>{this.paint();void this.load();},30000);}
-  hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detail.close();this.navigationState(false);this.controls();}
-  reset(){this.hide();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.catalogZone=null;this.rows=[];this.selection={kind:'smart',value:'all'};this.hideCompleted.checked=true;this.pending.clear();this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
+  hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detail.close();this.closeTaskActions();this.bulkDialog.close();if(this.narrow.matches)this.navigationState(false);this.controls();}
+  reset(){this.hide();this.bulk=null;this.bulkTargets=null;this.sidebarActions.reset();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.catalogZone=null;this.rows=[];this.selection={kind:'smart',value:'all'};this.hideCompleted.checked=true;this.pending.clear();this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
   async load(){
     if(!this.visible||!this.session||!this.root.offsetParent)return;if(this.loading){this.reloadRequested=true;return;}const session=this.session,current=++this.generation,zone=this.data.profile.data.zoneId;this.controller=new AbortController();const signal=this.controller.signal;this.loading=true;this.controls();
     try{
       const reply=await calendarTasks(session,signal);if(session!==this.session||current!==this.generation||zone!==this.data.profile.data.zoneId)return;
-      this.sourceTasks=reply.items;this.catalogZone=reply.zoneId;this.warning.hidden=!Object.keys(reply.errors).length;this.error.hidden=true;
-    }catch(error){if(!signal.aborted&&session===this.session&&current===this.generation){this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
+      this.sourceTasks=reply.items;this.catalogZone=reply.zoneId;this.warning.hidden=!Object.keys(reply.errors).length;if(this.errorSource==='load')this.error.hidden=true;
+    }catch(error){if(!signal.aborted&&session===this.session&&current===this.generation){this.error.textContent=error.message;this.error.hidden=false;this.errorSource='load';if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
     finally{if(session===this.session&&current===this.generation){this.loading=false;this.controller=null;this.paint();this.controls();if(this.reloadRequested){this.reloadRequested=false;void this.load();}}}
   }
   filter(group,specs,today,keys){
@@ -107,18 +132,27 @@ export class TasksView {
       entry.checkbox.setAttribute('aria-label',t('tasks.completion',{title:row.title}));entry.checkbox.checked=['COMPLETED','CANCELLED'].includes(row.status);
       const client=this.data.clients.find(client=>client.id===row.clientId)?.name||t('ui.unassigned');entry.context.textContent=[client,row.projectName,row.source==='calendar'?row.record.calendarName:t('tasks.native')].filter(Boolean).join(' · ');
       entry.timing.textContent=[row.dueDate?t('tasks.due',{date:row.dueDate}):'',row.urgent?t('tasks.urgent'):'',row.recurring?t('tasks.recurring'):'',row.unresolvedTiming?t('tasks.unresolved'):''].filter(Boolean).join(' · ');entry.status.textContent=t('tasks.status.'+row.status);
+      const source=row.source==='task'?row.record.sourceNote:null;
+      if(source){if(!entry.noteLink){const link=node('a',undefined,'btn btn-outline-secondary task-source-note');link.href='#notes';link.addEventListener('click',event=>{event.preventDefault();void this.openSource(row.id,link);});entry.item.append(link);entry.noteLink=link;}const label=t('tasks.source_note',{title:noteTitle(source)}),glyph=noteIcon(source);if(entry.noteLabel!==label||entry.noteGlyph!==glyph){iconButton(entry.noteLink,glyph,label);entry.noteLabel=label;entry.noteGlyph=glyph;}}
+      else{entry.noteLink?.remove();entry.noteLink=null;entry.noteLabel=null;}
       if(this.list.children[index]!==entry.item)this.list.insertBefore(entry.item,this.list.children[index]||null);
     });
     for(const [key,entry]of this.rowElements)if(!visibleKeys.has(key)){entry.item.remove();this.rowElements.delete(key);}
-    this.controls();
+    this.tick(instantNanos(this.data.report.generatedAt));this.controls();
+  }
+  tick(asOf){
+    if(!this.visible||!this.data)return;const active=this.data.active.data;
+    for(const [key,entry]of this.rowElements){const row=this.rows.find(row=>row.key===key),tracking=row?.source==='task'&&active?.taskId===row.id;entry.item.dataset.tracking=String(!!tracking);entry.item.classList.toggle('is-tracking',!!tracking);entry.status.textContent=tracking?t('tasks.tracking',{duration:nanosText(asOf>instantNanos(active.start)?asOf-instantNanos(active.start):0n)}):t('tasks.status.'+row.status);}
+  }
+  async openSource(id,originElement){
+    const session=this.session;try{const reply=await session.request('/tasks/'+id+'/note');if(session!==this.session)return;document.dispatchEvent(new CustomEvent(vaultNoteNavigation,{cancelable:true,detail:{entry:reply.data,popup:true,guards:[()=>session===this.session],leave:[],originElement}}));}
+    catch(error){if(session===this.session){this.error.textContent=error.message;this.error.hidden=false;this.errorSource='note';if(error.status===401)this.callbacks.onUnauthorized?.(error);}}
   }
   async complete(key,checked){
-    const row=this.rows.find(row=>row.key===key),session=this.session;if(!this.writable||row?.source!=='task'||this.pending.has(key))return;
-    this.pending.add(key);this.controls();this.error.hidden=true;
+    const row=this.rows.find(row=>row.key===key),session=this.session;if(!this.writable||this.bulk||row?.source!=='task'||this.pending.has(key))return;
+    this.pending.add(key);this.controls();this.error.hidden=true;this.errorSource='completion';
     try{
-      const current=await session.request('/tasks/'+row.id);if(session!==this.session||!this.writable)return;
-      if(current.data.version!==row.record.version)throw new Error(t('tasks.completion_stale'));
-      await session.request('/tasks/'+row.id+'/planning',{method:'PUT',etag:current.etag,body:{status:checked?'COMPLETED':'NOT_STARTED',scheduledDate:current.data.scheduledDate||null,completedAt:checked?new Date().toISOString():null}});
+      if(!await this.writeCompletion(row,checked,session))return;
       if(session===this.session)await this.callbacks.onChanged();
     }catch(error){if(session===this.session){this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);else await this.callbacks.onChanged();}}
     finally{if(session===this.session){this.pending.delete(key);this.paint();}}

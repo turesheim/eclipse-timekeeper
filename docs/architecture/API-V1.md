@@ -128,6 +128,11 @@ separately from the editable task fields. A reference conflict at creation must
 not leave an orphan task. After an ambiguous provider-linked create, reconcile
 through the external-reference lookup instead of creating a duplicate.
 
+`GET /tasks?includeNoteSources=true` optionally adds `sourceNote` metadata to
+checklist-task list rows with a currently available owned source. The default
+list and canonical task resources/ETags remain unchanged. Trashed sources are
+omitted; `/tasks/{id}/note` resolves the current source when navigating.
+
 Task planning is a separate conditional `PUT /tasks/{id}/planning` resource.
 Its `status` is `NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `WAITING`, or
 `DEFERRED`; `scheduledDate` is a date-only civil day, and `completedAt` is a UTC
