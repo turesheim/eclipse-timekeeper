@@ -2,6 +2,7 @@ import {t} from './i18n.js';
 import {ApiError} from './api.js';
 import {instantText} from './model.js';
 import {node} from './account-ui.js';
+import {calendarSourceFailure} from './calendar-source-status.js';
 
 /** Calendar choices have their own draft and version; task-list saves cannot overwrite them. */
 export function internetCalendarAccount(view,panel,{reload,clients,zone,controls:allControls}){
@@ -27,7 +28,7 @@ export function internetCalendarAccount(view,panel,{reload,clients,zone,controls
   return {
     update(value){
       data=value;root.hidden=!value.services?.calendars;
-      status.textContent=t('task_providers.last_success',{date:value.calendarLastSuccess?instantText(value.calendarLastSuccess,zone()):t('task_providers.never')});error.hidden=!value.calendarLastError;error.textContent=value.calendarLastError?t('internet_accounts.calendar_refresh_failed'):'';
+      status.textContent=t('task_providers.last_success',{date:value.calendarLastSuccess?instantText(value.calendarLastSuccess,zone()):t('task_providers.never')});error.hidden=!value.calendarLastError;error.replaceChildren(...(value.calendarLastError?[calendarSourceFailure(value,t('internet_accounts.calendar_refresh_failed'))]:[]));
       if(!view.dirty.has(form)){
         draftVersion=value.calendarConfigurationVersion??0;const next=JSON.stringify([value.availableCalendars,value.selectedCalendars,value.calendarMappings]);
         if(next!==signature){

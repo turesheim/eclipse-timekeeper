@@ -1800,5 +1800,8 @@
   "tasks.complete_visible_failed_one": "{{count}} task confirmed completed before stopping: {{message}}. Refresh to review the current tasks before trying again.",
   "tasks.complete_visible_failed_other": "{{count}} tasks confirmed completed before stopping: {{message}}. Refresh to review the current tasks before trying again.",
   "tasks.tracking": "Tracking · {{duration}}",
-  "tasks.elapsed": "Tracked time"
+  "tasks.elapsed": "Tracked time",
+  "calendar.subscription_source": "Calendar subscription",
+  "calendar.source_failure": "{{name}} ({{source}}): {{message}}",
+  "calendar.service_status": "{{provider}} service status"
 }

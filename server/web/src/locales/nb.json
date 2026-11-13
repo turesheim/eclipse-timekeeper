@@ -1800,5 +1800,8 @@
   "tasks.complete_visible_failed_one": "{{count}} oppgave er bekreftet fullført før handlingen stoppet: {{message}}. Oppdater for å kontrollere oppgavene før du prøver igjen.",
   "tasks.complete_visible_failed_other": "{{count}} oppgaver er bekreftet fullført før handlingen stoppet: {{message}}. Oppdater for å kontrollere oppgavene før du prøver igjen.",
   "tasks.tracking": "Tid registreres · {{duration}}",
-  "tasks.elapsed": "Registrert tid"
+  "tasks.elapsed": "Registrert tid",
+  "calendar.subscription_source": "Kalenderabonnement",
+  "calendar.source_failure": "{{name}} ({{source}}): {{message}}",
+  "calendar.service_status": "Tjenestestatus for {{provider}}"
 }

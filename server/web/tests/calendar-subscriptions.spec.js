@@ -229,6 +229,17 @@ test('calendar refresh errors explain the cause and delayed event changes preser
   }finally{release();await context.close();}
 });
 
+test('calendar failures identify the source and offer provider status from settings, Today and Calendar',async({browser,request})=>{
+  const {page,context,client}=await setup(browser,request);
+  try{
+    await calendar(page);const feed=await provider(request,[meeting],{status:503}),subscription=await subscribe(page,client,feed);
+    await page.route('**/api/v1/calendar-subscriptions',async route=>{if(route.request().method()!=='GET')return route.continue();const response=await route.fetch(),data=await response.json();for(const item of data.items)if(item.id===subscription.id)item.origin='outlook.office365.com';await route.fulfill({response,json:data});});
+    await manage(page);const settings=page.locator('#calendar-subscription-list .calendar-source-failure');await expect(settings).toContainText('Team planning (Microsoft)');await expect(settings.getByRole('link',{name:'Microsoft service status',exact:true})).toHaveAttribute('href','https://status.cloud.microsoft/');
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');const today=page.locator('#today-events .calendar-source-failure');await expect(today).toContainText('Team planning (Microsoft)');await expect(today.getByRole('link')).toHaveAttribute('rel','noopener noreferrer');
+    await calendar(page);const warning=page.locator('#calendar-source-warnings');await expect(warning).toContainText('Team planning (Microsoft)');await expect(warning.getByRole('link')).toHaveAttribute('href','https://status.cloud.microsoft/');await expect(warning).not.toContainText(feed.url);
+  }finally{await context.close();}
+});
+
 test('calendar subscriptions and event dialogs fit narrow screens and remain accessible in Norwegian across every theme',async({browser,request})=>{
   test.setTimeout(90000);const {page,api,context,client}=await setup(browser,request);
   try{

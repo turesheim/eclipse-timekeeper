@@ -976,6 +976,12 @@ or repeating an ordinary write.
 
 ### Calendar subscriptions
 
+Refresh failures identify the calendar name and source in Today, Calendar and
+account settings. Recognized Google, Microsoft and iCloud sources offer their
+fixed official service-status page. Other sources show only the published host;
+private feed URLs and credentials are never linked or displayed. Status pages
+are opened only by the user, without background third-party requests.
+
 Open **My Account → Weeks** to manage read-only iCalendar subscriptions.
 Planned events remain visible in Week.
 Choose **Add calendar**, enter a descriptive name and subscription URL, and select
