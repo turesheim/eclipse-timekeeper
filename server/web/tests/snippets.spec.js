@@ -41,6 +41,7 @@ test('account snippets persist, disable and restore defaults at narrow and deskt
   expect((await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}})).status()).toBe(201);
   await page.goto('/web/#account/snippets');await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(username);await page.locator('#password').fill(password);await page.locator('#login-form button[type=submit]').click();
   const root=page.locator('#account-content');await expect(root.getByRole('heading',{name:'Text snippets',exact:true})).toBeVisible();
+  const keyword=root.getByLabel('Keyword',{exact:true}).first();await keyword.fill(';bad!');expect(await keyword.evaluate(element=>element.validity.patternMismatch)).toBe(true);await keyword.fill(';dt');
   await root.getByLabel('Expansion',{exact:true}).first().fill('Account-owned {isodate:yyyy}');await root.getByRole('button',{name:'Save snippets',exact:true}).click();await expect(root.getByRole('status')).toHaveText('Snippets saved.');
   await page.reload();await expect(root.getByLabel('Expansion',{exact:true}).first()).toHaveValue('Account-owned {isodate:yyyy}');
   await page.locator('a[href="#tracking"]').click();await page.locator('[data-tab=today]').click();

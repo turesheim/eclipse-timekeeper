@@ -10,7 +10,7 @@ export async function renderSnippets(view){
   const entries=[];
   function row(value={keyword:'',content:''}){
     const wrap=node('fieldset',undefined,'border rounded p-3 mb-3');wrap.append(node('legend',t('snippets.snippet'),'fs-6'));
-    const keyword=field(wrap,t('snippets.keyword'),value.keyword,{maxLength:33});keyword.pattern=';[A-Za-z][A-Za-z0-9_-]{0,31}';keyword.spellcheck=false;
+    const keyword=field(wrap,t('snippets.keyword'),value.keyword,{maxLength:33});keyword.pattern=';[A-Za-z](?:[A-Za-z0-9_]|-){0,31}';keyword.spellcheck=false;
     const label=node('label',t('snippets.content'),'form-label'),content=node('textarea',undefined,'form-control');content.id=keyword.id+'-content';label.htmlFor=content.id;content.value=value.content;content.required=true;content.rows=3;content.maxLength=16384;content.setAttribute('aria-describedby',help.id);
     const entry={keyword,content,wrap};entries.push(entry);keyword.disabled=content.disabled=!view.canWrite;
     const remove=button(t('snippets.remove'),()=>{entries.splice(entries.indexOf(entry),1);wrap.remove();view.dirty.add(form);add.disabled=entries.length>=50||!view.canWrite;});remove.disabled=!view.canWrite;
