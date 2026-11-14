@@ -116,7 +116,7 @@ test('calendar-only connection actions keep errors visible outside hidden task c
   const owner=await signIn(page,request),row=connection(owner,{services:{calendars:true,tasks:false},selectedLists:[],availableCalendars:[],selectedCalendars:[]});await providerFixture(page,owner,{rows:[row]});
   await page.route('**/api/v1/task-providers/'+row.id+'/refresh',route=>route.fulfill({status:503,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({code:'TASK_PROVIDER_UNAVAILABLE',status:503})}));await open(page,{expanded:false});const panel=card(page,row.id);
   await expect(panel.getByRole('heading',{name:'Tasks',exact:true})).toBeHidden();const refresh=panel.getByRole('button',{name:'Refresh from provider',exact:true});await refresh.focus();await refresh.press('Enter');
-  await expect(panel.locator(':scope > .form-feedback')).toBeVisible();await expect(panel.locator(':scope > .form-feedback')).not.toBeEmpty();await expect(refresh).toBeEnabled();
+  await expect(panel.locator(':scope > .form-feedback')).toBeVisible();await expect(panel.getByRole('button',{name:'Reload current values',exact:true})).toBeVisible();await expect(refresh).toBeDisabled();
 });
 
 test('direct connections offer calendar and task choices without infrastructure controls',async({page,request})=>{
