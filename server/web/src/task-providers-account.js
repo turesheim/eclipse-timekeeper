@@ -118,8 +118,8 @@ export async function renderTaskProviders(view){
       if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);card.taskSection.hidden=!tasks&&!card.reviewRoots.some(root=>!root.hidden);
       const failures=Object.entries(value.listErrors||{}),syncFailure=code=>['CONFLICT','STALE_VERSION'].includes(code)?t('task_providers.sync_conflict'):providerError(code);
       card.error.hidden=!value.lastError&&!failures.length;card.error.replaceChildren();
-      if(failures.length)for(const [id,code]of failures)card.error.append(node('p',t('task_providers.list_error',{name:value.availableLists.find(list=>list.id===id)?.name||id,message:syncFailure(code)}),'mb-0'));
-      else if(value.lastError)card.error.append(node('p',syncFailure(value.lastError),'mb-0'));
+      if(value.lastError&&!failures.some(([,code])=>code===value.lastError))card.error.append(node('p',syncFailure(value.lastError),'mb-0 text-break'));
+      for(const [id,code]of failures)card.error.append(node('p',t('task_providers.list_error',{name:value.availableLists.find(list=>list.id===id)?.name||id,message:syncFailure(code)}),'mb-0 text-break'));
       if(value.pendingCount)card.error.append(node('p',t('task_providers.pending',{count:value.pendingCount}),'mb-0'));
       card.retry.hidden=!value.lastError||!value.nextRefresh;card.retry.textContent=card.retry.hidden?'':t('task_providers.next_attempt',{date:instantText(value.nextRefresh,zone)});
       if(!view.dirty.has(card.form)){
