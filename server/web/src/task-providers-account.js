@@ -14,11 +14,8 @@ const providerError=code=>new ApiError(code).message;
 
 /** Account-scoped cloud connections. Polls update status without replacing a list-selection draft. */
 export async function renderTaskProviders(view){
-  const overview=section(view,t('task_providers.title'));overview.append(node('p',t('task_providers.help'),'hint'),node('p',t('task_providers.direction'),'hint'));
-  const setup=node('p',t('task_providers.not_configured'),'hint'),feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
-  const refresh=button(t('task_providers.refresh_status'),()=>void view.run(()=>load(true),{submit:refresh,feedback}));
-  overview.append(setup,refresh,feedback);
-  const administration=link(t('internet_accounts.administration'),'/admin/#internet-accounts');administration.hidden=true;overview.append(administration);const cards=new Map(),connectButtons=new Map(),providerPanels=new Map(),providerServices=new Map(),providerFeedback=new Map(),providerStatus=new Map();
+  const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');view.root.append(feedback);
+  const cards=new Map(),connectButtons=new Map(),providerPanels=new Map(),providerServices=new Map(),providerFeedback=new Map(),providerStatus=new Map(),providerConnect=new Map();
   const accessLabel=node('label',t('task_providers.google_access'),'form-label'),access=node('select',undefined,'form-select');
   for(const direction of ['IMPORT','TWO_WAY'])access.append(new Option(t('task_providers.access_'+direction),direction));accessLabel.append(access);
   let generation=0,timer=null,controller=null,zone='UTC',configured={},projects=[],clients=[],calendarSynchronization=true;
@@ -33,6 +30,8 @@ export async function renderTaskProviders(view){
     for(const card of cards.values()){
       card.services.controls();
       for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
+      card.additions.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
+      for(const select of card.form.querySelectorAll('[data-project-for]')){const checked=!!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(select.dataset.projectFor)}"]`)?.checked;select.closest('label').hidden=!checked;select.closest('.internet-selection-row').classList.toggle('is-selected',checked);}
       card.save.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       card.refresh.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused||card.data.syncing||!card.data.enabled;
       card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;card.reconnect.disabled=!configured[card.data.providerId]||!view.canWrite||view.busy||view.uncertain||!Object.values(card.services.read()).some(Boolean);
@@ -54,22 +53,26 @@ export async function renderTaskProviders(view){
   };
   for(const provider of ['google','microsoft']){
     const panel=section(view,t('internet_accounts.'+provider));panel.dataset.internetProvider=provider;providerPanels.set(provider,panel);
-    panel.append(node('p',t(provider==='microsoft'?'internet_accounts.microsoft_help':'internet_accounts.provider_help'),'hint'));
-    const readiness=node('p','','hint');readiness.setAttribute('role','status');providerStatus.set(provider,readiness);panel.append(readiness);
-    const services=serviceChoices();services.fieldset.addEventListener('change',controls);providerServices.set(provider,services);panel.append(services.fieldset);
-    if(provider==='google')panel.append(accessLabel);
-    const pick=button(t('task_providers.connect',{provider:providerName(provider)}),()=>connect(provider),'btn btn-primary');pick.dataset.taskProviderConnect=provider;connectButtons.set(provider,pick);panel.append(pick);
-    const status=node('p','','form-feedback');status.setAttribute('role','status');providerFeedback.set(provider,status);panel.append(status);
+    const connectDetails=node('details',undefined,'internet-provider-connect'),connectSummary=node('summary',t('internet_accounts.add_account',{provider:providerName(provider)}));connectDetails.dataset.providerConnect=provider;connectDetails.append(connectSummary,node('p',t(provider==='microsoft'?'internet_accounts.microsoft_help':'internet_accounts.provider_help'),'hint'));providerConnect.set(provider,connectDetails);panel.append(connectDetails);
+    const readiness=node('p','','hint');readiness.setAttribute('role','status');providerStatus.set(provider,readiness);connectDetails.append(readiness);
+    const status=node('p','','form-feedback');status.setAttribute('role','status');providerFeedback.set(provider,status);
+    const refresh=button(t('internet_accounts.refresh_provider',{provider:providerName(provider)}),()=>void view.run(async()=>{
+      status.textContent=t('internet_accounts.refreshing_status');await load(true);if(view.valid())status.textContent=t('internet_accounts.status_refreshed');
+    },{submit:refresh,feedback:status}));connectDetails.append(refresh);
+    const services=serviceChoices();services.fieldset.addEventListener('change',controls);providerServices.set(provider,services);connectDetails.append(services.fieldset);
+    if(provider==='google')connectDetails.append(accessLabel);
+    const pick=button(t('task_providers.connect',{provider:providerName(provider)}),()=>connect(provider),'btn btn-primary');pick.dataset.taskProviderConnect=provider;connectButtons.set(provider,pick);connectDetails.append(pick);
+    connectDetails.append(status);
   }
   const subscriptions=section(view,t('internet_accounts.subscription_title'));subscriptions.append(node('p',t('internet_accounts.subscription_help'),'hint'),link(t('internet_accounts.subscription_action'),'#account/calendars'));
   function cardFor(data){
-    const card={data},panel=section(view,t('task_providers.account',{provider:providerName(data.providerId),name:data.name}));card.panel=panel;panel.dataset.taskProviderId=data.id;panel.firstElementChild.replaceWith(node('h3',t('task_providers.account',{provider:providerName(data.providerId),name:data.name}),'h5 text-break'));providerPanels.get(data.providerId)?.append(panel);
-    card.status=node('p','','hint');card.status.setAttribute('role','status');card.direction=node('p','','hint');card.error=node('p','','alert alert-warning');card.error.hidden=true;card.retry=node('p','','hint');card.retry.hidden=true;
+    const card={data},panel=section(view,t('task_providers.account',{provider:providerName(data.providerId),name:data.name}));card.panel=panel;panel.dataset.taskProviderId=data.id;card.heading=node('h3',t('task_providers.account',{provider:providerName(data.providerId),name:data.name}),'h5 text-break mb-1');card.heading.id='internet-account-'+data.id;panel.firstElementChild.replaceWith(card.heading);panel.classList.remove('card','account-card');panel.classList.add('internet-connection');panel.setAttribute('aria-labelledby',card.heading.id);providerPanels.get(data.providerId)?.append(panel);
+    card.status=node('p','','hint small mb-0');card.status.setAttribute('role','status');card.direction=node('p','','hint');card.error=node('p','','alert alert-warning');card.error.hidden=true;card.retry=node('p','','hint');card.retry.hidden=true;
     card.form=node('form');card.form.addEventListener('change',()=>{view.dirty.add(card.form);controls();});
-    const additions=node('label',undefined,'d-flex gap-2 align-items-start mb-3');card.additions=node('input',undefined,'form-check-input');card.additions.type='checkbox';card.additions.checked=data.reviewAdditions!==false;additions.hidden=data.providerId!=='google';additions.append(card.additions,node('span',t('task_identities.review_additions')));card.form.append(additions);
-    const fields=node('fieldset');fields.append(node('legend',t('task_providers.lists'),'h6 mb-2'));card.choices=node('div');fields.append(card.choices);card.form.append(fields);
-    card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('ui.save'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
-    card.form.append(card.feedback,card.save);card.form.addEventListener('submit',event=>{
+    const additions=node('label',undefined,'d-flex gap-2 align-items-start mb-3');card.additions=node('input',undefined,'form-check-input');card.additions.type='checkbox';card.additions.checked=data.reviewAdditions!==false;additions.hidden=data.providerId!=='google';additions.append(card.additions,node('span',t('task_identities.review_additions')));card.additionsLabel=additions;
+    const fields=node('div',undefined,'internet-selection-list');fields.setAttribute('role','group');fields.setAttribute('aria-label',t('task_providers.lists'));card.choices=node('div');fields.append(card.choices);card.form.append(fields,additions);
+    card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('task_providers.save_lists'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
+    card.form.append(card.save);card.form.addEventListener('submit',event=>{
       event.preventDefault();run(async()=>{
         const selectedLists=[...card.form.querySelectorAll('input[name=selectedLists]:checked')].map(input=>input.value);
         const projectMappings=Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null]));
@@ -100,9 +103,13 @@ export async function renderTaskProviders(view){
     const identities=node('div',undefined,'mt-3');card.identities=taskProviderIdentities(view,identities,{reload:load,controls,projects});
     const incoming=node('div',undefined,'mt-3');card.incoming=taskProviderReviews(view,incoming,{reload:load,controls});
     const writes=node('div',undefined,'mt-3');card.writes=taskProviderWrites(view,writes,{reload:load,controls});
-    const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.refresh,card.pause,card.reconnect,card.disconnect);
-    panel.append(card.status,card.error,card.retry);card.calendars=internetCalendarAccount(view,panel,{reload:load,clients,zone:()=>zone,controls});
-    card.taskHeading=node('h4',t('internet_accounts.tasks'),'h5 mt-3');panel.append(card.taskHeading,card.direction,card.form,card.imports,card.reviewPanel,identities,incoming,writes,card.services.fieldset,accessLabel,actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));cards.set(data.id,card);return card;
+    const header=node('div',undefined,'internet-connection-header'),identity=node('div');identity.append(card.heading,card.status);header.append(identity,card.refresh);
+    const columns=node('div',undefined,'internet-connection-columns');card.calendars=internetCalendarAccount(view,columns,{reload:load,clients,zone:()=>zone,controls});
+    card.taskSection=node('section',undefined,'internet-connection-section');card.taskHeading=node('h4',t('internet_accounts.tasks'),'h5');card.taskHeading.id='internet-tasks-'+data.id;card.taskSection.setAttribute('aria-labelledby',card.taskHeading.id);
+    card.reviewRoots=[identities,incoming,writes];card.taskSection.append(card.taskHeading,card.direction,card.form,card.imports,card.reviewPanel,identities,incoming,writes);columns.append(card.taskSection);
+    const settings=node('details',undefined,'internet-connection-settings');settings.dataset.connectionSettings=data.id;settings.append(node('summary',t('internet_accounts.connection_settings')),card.services.fieldset,accessLabel,node('p',t('internet_accounts.reconnect_help'),'hint'));
+    const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.pause,card.reconnect,card.disconnect);settings.append(actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));
+    panel.append(header,card.feedback,card.error,card.retry,columns,settings);cards.set(data.id,card);return card;
   }
   function paintImports(card){
     const values=card.data.imports||[],signature=JSON.stringify(values);if(signature===card.importSignature)return;
@@ -120,7 +127,7 @@ export async function renderTaskProviders(view){
         const mapping=node('p',t('task_providers.import_project',{name:project?.label||t('task_providers.no_project')}),'hint');
         card.approve=button(t('task_providers.approve_import'),()=>run(async()=>{
           await view.session.request('/task-providers/'+card.data.id+'/imports/'+value.id,{method:'POST',etag:reply.etag});if(!view.valid())return;
-          card.reviewPanel.hidden=true;card.reviewPanel.replaceChildren();card.approve=null;await load();card.panel.firstElementChild.tabIndex=-1;card.panel.firstElementChild.focus();
+          card.reviewPanel.hidden=true;card.reviewPanel.replaceChildren();card.approve=null;await load();card.heading.tabIndex=-1;card.heading.focus();
         },card.approve,card.feedback),'btn btn-primary');
         const close=button(t('ui.cancel'),()=>{card.reviewPanel.hidden=true;card.reviewPanel.replaceChildren();card.approve=null;review.focus();});
         const actions=node('div',undefined,'d-flex flex-wrap gap-2');actions.append(card.approve,close);
@@ -133,11 +140,11 @@ export async function renderTaskProviders(view){
     for(const [provider,status]of providerStatus){const ready=!!data.providers[provider];status.textContent=ready?t('internet_accounts.ready'):providerError(data.readiness?.[provider]||'TASK_PROVIDER_NOT_CONFIGURED');status.className=ready?'hint':'alert alert-warning';}
     const present=new Set();for(const value of data.items){
       if(value.ownerId!==view.session.owner)throw new ApiError('OWNER_CHANGED',401);present.add(value.id);const card=cards.get(value.id)||cardFor(value);card.data=value;
-      card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('task_providers.last_success',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});
+      card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('internet_accounts.tasks_last_refresh',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});
       card.direction.textContent=t(value.direction==='TWO_WAY'?'task_providers.mode_two_way':'task_providers.mode_import');card.pause.textContent=t(value.paused?'task_providers.resume':'task_providers.pause');paintImports(card);
-      const tasks=value.services?.tasks!==false;card.form.hidden=!tasks;card.taskHeading.hidden=!tasks;card.direction.hidden=!tasks;card.imports.hidden=!tasks;card.calendars.update(value);
+      const tasks=value.services?.tasks!==false;card.status.hidden=!tasks&&value.enabled&&!value.paused&&!value.syncing;card.form.hidden=!tasks;card.additionsLabel.hidden=value.providerId!=='google'||!tasks;card.direction.hidden=!tasks;card.imports.hidden=!tasks;card.calendars.update(value);
       if(!card.servicesDirty)for(const [key,input]of Object.entries(card.services.choices))input.checked=value.services?!!value.services[key]:key==='tasks';
-      if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);
+      if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);card.taskSection.hidden=!tasks&&!card.reviewRoots.some(root=>!root.hidden)&&card.reviewPanel.hidden;
       card.error.hidden=!value.lastError;card.error.textContent=value.lastError?providerError(value.lastError)+(value.pendingCount?' '+t('task_providers.pending',{count:value.pendingCount}):''):'';
       card.retry.hidden=!value.lastError||!value.nextRefresh;card.retry.textContent=card.retry.hidden?'':t('task_providers.next_attempt',{date:instantText(value.nextRefresh,zone)});
       if(!view.dirty.has(card.form)){
@@ -145,11 +152,11 @@ export async function renderTaskProviders(view){
         const signature=JSON.stringify([value.availableLists,value.selectedLists,value.projectMappings]);if(signature!==card.signature){
           card.signature=signature;card.choices.replaceChildren();
           for(const list of value.availableLists){
-            const row=node('div',undefined,'mb-3'),label=node('label',undefined,'d-flex gap-2 align-items-start mb-2'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.name='selectedLists';input.value=list.id;input.checked=value.selectedLists.includes(list.id);label.append(input,node('span',list.name,'text-break'));
-            const projectLabel=node('label',undefined,'d-block'),select=node('select',undefined,'form-select w-100');select.dataset.projectFor=list.id;select.append(new Option(t('task_providers.no_project'),''));
+            const row=node('div',undefined,'internet-selection-row'),label=node('label',undefined,'internet-selection-check'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.name='selectedLists';input.value=list.id;input.checked=value.selectedLists.includes(list.id);label.append(input,node('span',list.name,'text-break'));
+            const projectLabel=node('label',undefined,'internet-selection-mapping'),select=node('select',undefined,'form-select form-select-sm');select.dataset.projectFor=list.id;select.append(new Option(t('task_providers.no_project'),''));
             for(const project of projects)select.append(new Option(project.label,project.id));select.value=value.projectMappings?.[list.id]||'';
             if(value.projectMappings?.[list.id]&&!select.value){select.append(new Option(t('task_providers.project_missing'),value.projectMappings[list.id]));select.value=value.projectMappings[list.id];}
-            projectLabel.append(node('span',t('task_providers.project_for',{name:list.name}),'form-label'),select);row.append(label,projectLabel);card.choices.append(row);
+            const visible=node('span',t('internet_accounts.project_mapping'),'form-label');visible.setAttribute('aria-hidden','true');projectLabel.append(visible,node('span',t('task_providers.project_for',{name:list.name}),'visually-hidden'),select);row.append(label,projectLabel);card.choices.append(row);
           }
           for(const missing of value.selectedLists.filter(id=>!value.availableLists.some(list=>list.id===id)))card.choices.append(node('p',t('task_providers.list_missing'),'alert alert-warning'));
           if(!value.availableLists.length)card.choices.append(node('p',t('task_providers.no_lists'),'hint'));
@@ -157,7 +164,7 @@ export async function renderTaskProviders(view){
       }
     }
     for(const [id,card]of cards)if(!present.has(id)){view.clean(card.form);card.calendars.dispose();card.writes.dispose();card.incoming.dispose();card.identities.dispose();card.panel.remove();cards.delete(id);}
-    configured=data.providers;setup.hidden=Object.values(configured).every(Boolean);administration.hidden=setup.hidden||!view.account?.administrator||!view.canWrite;controls();
+    configured=data.providers;for(const [provider,details]of providerConnect)if(!details.dataset.initialized){details.open=!!configured[provider]&&!data.items.some(item=>item.providerId===provider&&item.enabled);details.dataset.initialized='true';}controls();
   }
   async function load(check=false){
     const current=++generation;controller?.abort();controller=new AbortController();

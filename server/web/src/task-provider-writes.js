@@ -13,12 +13,13 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
   const valid=()=>!disposed&&view.valid(),base=()=>'/task-providers/'+connection.id+'/writes';
   const heading=node('h3',t('task_writes.title'),'h5'),help=node('p',t('task_writes.help'),'hint');
   const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
-  const details=node('details'),summary=node('summary',t('task_writes.prepare'),'mb-2'),form=node('form');details.append(summary,form);
+  const details=node('details'),summary=node('summary',t('task_writes.prepare'),'mb-2'),form=node('form');details.append(summary,help,form);
   const taskLabel=node('label',t('task_writes.task'),'form-label'),task=node('select',undefined,'form-select mb-2');task.required=true;taskLabel.append(task);
   const actionLabel=node('label',t('task_writes.action'),'form-label'),action=node('select',undefined,'form-select mb-2');
   for(const kind of ['UPDATE','DELETE','CREATE'])action.append(new Option(t('task_writes.action_'+kind),kind));actionLabel.append(action);
   const prepare=node('button',t('task_writes.review'),'btn btn-primary');prepare.type='submit';form.append(taskLabel,actionLabel,prepare);
-  const history=node('div'),comparison=node('div',undefined,'mt-3');comparison.hidden=true;root.append(heading,help,details,feedback,history,comparison);
+  const candidateFeedback=node('p','','hint');candidateFeedback.setAttribute('role','status');details.append(candidateFeedback);
+  const history=node('div'),comparison=node('div',undefined,'mt-3');comparison.hidden=true;root.append(heading,details,feedback,history,comparison);
   function controls(){
     const write=valid()&&view.canWrite&&!view.busy&&!view.uncertain&&!connection?.paused&&connection?.enabled;
     for(const input of form.querySelectorAll('select,button'))input.disabled=!write||connection?.direction!=='TWO_WAY'||!loaded;
@@ -42,7 +43,7 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     }
     task.replaceChildren(new Option(t('task_writes.choose_task'),''));for(const item of options)task.append(new Option(item.title,JSON.stringify({taskId:item.taskId,listId:item.listId})));
     if([...task.options].some(option=>option.value===previous))task.value=previous;
-    feedback.textContent=options.length?'':t('task_writes.no_tasks');
+    candidateFeedback.textContent=options.length?'':t('task_writes.no_tasks');
   }
   const refreshTasks=button(t('task_writes.refresh_tasks'),()=>run(candidates,refreshTasks,false));refreshTasks.dataset.writeReview='tasks';details.append(refreshTasks);
   details.addEventListener('toggle',()=>{if(details.open&&(!loaded||!view.dirty.has(form)))run(candidates,prepare,false);});
@@ -121,5 +122,5 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     }
     if(focused)[...history.querySelectorAll('[data-write-review]')].find(pick=>pick.dataset.writeReview===focused)?.focus();controls();
   }
-  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||value.direction!=='TWO_WAY'&&!value.pendingWrites;details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;++reviewGeneration;view.clean(form);}};
+  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||!value.pendingWrites&&(value.direction!=='TWO_WAY'||!value.selectedLists.length);details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;++reviewGeneration;view.clean(form);}};
 }

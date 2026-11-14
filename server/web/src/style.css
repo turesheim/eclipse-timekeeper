@@ -561,3 +561,28 @@ code, pre { font-size: var(--font-code); }
 .today-recent-note-title { display: flex; align-items: center; gap: .4rem; min-width: 0; }
 .today-recent-note-title > .icon { flex: none; }
 .today-recent-note-label { font-weight: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.internet-provider-connect > summary,
+.internet-connection-settings > summary { cursor: pointer; padding-block: .5rem; font-weight: 600; }
+.internet-provider-connect[open] > summary { margin-bottom: .5rem; }
+.internet-connection { border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 1rem; }
+.internet-connection-header { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.internet-connection-header > div { min-width: 0; }
+.internet-connection-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1.25rem; }
+.internet-connection-section { min-width: 0; }
+.internet-connection-section[hidden] { display: none; }
+.internet-connection-section form { max-width: none; }
+.internet-selection-list { margin-bottom: .75rem; }
+.internet-selection-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(9rem, 1fr); align-items: center; gap: .5rem .75rem; padding-block: .5rem; border-bottom: 1px solid var(--line); }
+.internet-selection-check { display: flex; align-items: center; gap: .5rem; min-height: 2.75rem; margin: 0; overflow-wrap: anywhere; }
+.internet-selection-row:not(.is-selected) > .internet-selection-check { grid-column: 1 / -1; }
+.internet-selection-mapping { display: flex; flex-direction: column; min-width: 0; margin: 0; }
+.internet-selection-mapping[hidden] { display: none; }
+.internet-selection-mapping .form-label { font-size: .8rem; margin-bottom: .15rem; }
+.internet-selection-mapping select { min-width: 0; }
+.internet-connection-settings { border-top: 1px solid var(--line); margin-top: 1rem; }
+.internet-connection-settings > .form-label { display: block; margin-block: .75rem; }
+@media (max-width: 420px) {
+  .internet-selection-row { grid-template-columns: minmax(0, 1fr); }
+  .internet-selection-mapping { padding-inline-start: 1.75rem; }
+}

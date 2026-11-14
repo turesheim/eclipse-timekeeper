@@ -151,11 +151,12 @@ support calendars, tasks or both.
 redirect URIs and registration status. **OAuth application settings** lets an
 administrator save client IDs and replace or clear write-only secrets. Blank
 secret fields keep the saved values. Saving requires your administrator password
-and the current settings version; restart every instance to activate changes.
+and the current settings version. OAuth credentials take effect immediately;
+changing the connection mode or public HTTPS address requires a coordinated restart.
 
-**Check setup** validates active local settings or contacts the managed service.
-It does not start provider consent or read personal calendars/tasks. Verify a
-real connection after setup; configured credentials alone do not prove API access.
+**Refresh setup status** validates active local settings or contacts the managed service.
+It does not start provider consent or read personal calendars/tasks. Use
+**Verify configuration** to test provider sign-in and the selected API access.
 
 Settings are private, retained by protected instance backups and excluded from
 portable account archives. Authentication recovery preserves them. General

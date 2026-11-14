@@ -152,7 +152,7 @@ test('Internet accounts administration checks registrations, links provider setu
   });
   try{
     await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'OAuth setup guidance',exact:true})).toBeVisible();expect(checks).toBe(0);
-    const check=page.getByRole('button',{name:'Check setup',exact:true});await check.focus();await check.press('Enter');await expect(page.locator('#account-content')).toContainText('Setup checks passed.');expect(checks).toBe(1);
+    const check=page.getByRole('button',{name:'Refresh setup status',exact:true});await check.focus();await check.press('Enter');await expect(page.locator('#account-content')).toContainText('Registration settings are available.');expect(checks).toBe(1);
     await expect(page.locator('#account-content tr').filter({hasText:'Google registration'})).toContainText('Configured');await expect(page.locator('#account-content tr').filter({hasText:'Microsoft registration'})).toContainText('Not configured');
     await expect(page.locator('#account-content')).toContainText('https://connect.example.test/oauth/google/callback');await expect(page.locator('#account-content')).toContainText('Dagsverk sign-in is separate');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');
     for(const [name,url]of [
@@ -170,7 +170,7 @@ test('Internet accounts administration checks registrations, links provider setu
     }
     unavailable=true;await check.click();await expect(page.locator('#account-content [role=status]').filter({hasText:'Managed OAuth discovery'})).toBeVisible();await expect(check).toBeEnabled();
     const identity=await(await client.get('/api/v1/auth/session')).json(),profile=await client.get('/api/v1/me');const me=await profile.json();expect((await client.put('/api/v1/me',{headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf},data:{zoneId:me.zoneId,locale:'nb-NO'}})).ok()).toBe(true);
-    await page.reload();await expect(page.getByRole('heading',{name:'Veiledning for OAuth-oppsett',exact:true})).toBeVisible();await page.setViewportSize({width:320,height:900});await expect(page.getByRole('button',{name:'Kontroller oppsett',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/admin-internet-nb-320.png',fullPage:true});expect(external).toEqual([]);
+    await page.reload();await expect(page.getByRole('heading',{name:'Veiledning for OAuth-oppsett',exact:true})).toBeVisible();await page.setViewportSize({width:320,height:900});await expect(page.getByRole('button',{name:'Oppdater oppsettstatus',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/admin-internet-nb-320.png',fullPage:true});expect(external).toEqual([]);
   }finally{await admin.close();}
 });
 
@@ -182,7 +182,7 @@ test('OAuth application settings preserve, replace and clear a write-only secret
     await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'OAuth application settings',exact:true})).toBeVisible();
     await page.getByLabel('OAuth mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('synthetic-google-client');await page.getByLabel('New Google client secret',{exact:true}).fill(secret);await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();
     await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText(before.restartRequired?'OAuth settings are active. Other server settings still await a restart.':'Saved OAuth settings are active. No restart is needed.');
-    let response=await client.get(path),saved=await response.json();expect(saved.saved.googleClientId).toBe('synthetic-google-client');expect(saved.saved.googleClientSecretConfigured).toBe(true);expect(saved.effective).toEqual(saved.saved);expect(saved.restartRequired).toBe(before.restartRequired);expect(JSON.stringify(saved)).not.toContain(secret);expect(await(await client.get('/api/v1/admin/settings')).text()).not.toContain(secret);
+    let response=await client.get(path),saved=await response.json();expect(saved.saved.googleClientId).toBe('synthetic-google-client');expect(saved.saved.googleClientSecretConfigured).toBe(true);await expect(page.locator('[data-oauth-registration=google]')).toContainText('client ID and secret are saved');expect(saved.effective).toEqual(saved.saved);expect(saved.restartRequired).toBe(before.restartRequired);expect(JSON.stringify(saved)).not.toContain(secret);expect(await(await client.get('/api/v1/admin/settings')).text()).not.toContain(secret);
     await page.getByLabel('Google client ID',{exact:true}).fill('updated-synthetic-google-client');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Your password',{exact:true})).toHaveValue('');saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(true);
     await page.getByLabel('Clear saved Google client secret',{exact:true}).check();await page.getByLabel('Your password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Clear saved Google client secret',{exact:true})).not.toBeChecked();saved=await(await client.get(path)).json();expect(saved.saved.googleClientSecretConfigured).toBe(false);await captureScreenshot(page,{path:'test-results/admin-google-edit.png',fullPage:true});
   }finally{
@@ -202,7 +202,7 @@ test('checking Google setup cannot authorize overwriting a concurrently changed 
   });
   try{
     await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await page.getByLabel('OAuth mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('Google client ID',{exact:true}).fill('my-registration-draft');await page.getByLabel('New Google client secret',{exact:true}).fill('Private replacement draft');await page.getByLabel('Your password',{exact:true}).fill(admin.secret);
-    await page.getByRole('button',{name:'Check setup',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Setup checks passed.');await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Your draft is kept');expect(writes).toBe(1);await expect(page.getByLabel('Google client ID',{exact:true})).toHaveValue('my-registration-draft');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('Private replacement draft');
+    await page.getByRole('button',{name:'Refresh setup status',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Registration settings are available.');await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Your draft is kept');expect(writes).toBe(1);await expect(page.getByLabel('Google client ID',{exact:true})).toHaveValue('my-registration-draft');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('Private replacement draft');
   }finally{await admin.close();}
 });
 
@@ -263,5 +263,23 @@ test('OAuth verification keeps settings edited while authorization is starting',
     await page.goto('/admin/#internet-accounts');await page.getByRole('button',{name:'Verify with Google',exact:true}).click();await waiting;
     await page.getByLabel('OAuth mode',{exact:true}).selectOption('DIRECT');await page.getByLabel('New Google client secret',{exact:true}).fill('Private draft entered during verification');release();
     await expect(page.locator('#account-content')).toContainText('Save your OAuth settings before verifying them.');await expect(page).toHaveURL(/\/admin\/#internet-accounts$/);await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('Private draft entered during verification');
+  }finally{release?.();await admin.close();}
+});
+
+for(const language of ['en','nb'])test(`saved Google registration and setup refresh give accurate feedback (${language})`,async({page,request})=>{
+  const admin=await settingsAdministrator(page,request),client=browserRequest(page),original=await client.get('/api/v1/admin/internet-accounts'),data=await original.json(),headers={'X-Timekeeper-Owner':original.headers()['x-timekeeper-owner'],ETag:original.headers().etag},nb=language==='nb';
+  const saved={...data.saved,mode:'DIRECT',serviceUrl:null,googleClientId:'existing-google-registration',googleClientSecretConfigured:true,microsoftClientId:'',microsoftClientSecretConfigured:false},sample={...data,mode:'DIRECT',status:'READY',googleConfigured:true,microsoftConfigured:false,saved,effective:{...saved}};
+  let release,started,checks=0;const checking=new Promise(resolve=>{started=resolve;});
+  await page.route('**/api/v1/admin/internet-accounts*',async route=>{
+    if(new URL(route.request().url()).searchParams.get('check')==='true'){checks++;started();await new Promise(resolve=>{release=resolve;});}return route.fulfill({headers,json:sample});
+  });
+  try{
+    if(nb){const identity=await(await client.get('/api/v1/auth/session')).json(),profile=await client.get('/api/v1/me'),me=await profile.json();expect((await client.put('/api/v1/me',{headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf},data:{zoneId:me.zoneId,locale:'nb-NO'}})).ok()).toBe(true);await page.reload();}
+    await page.goto('/admin/#internet-accounts');await expect(page.locator('[data-oauth-registration=google]')).toHaveText(nb?'Klient-ID og hemmelighet for Google er lagret. Bruk Bekreft med Google for å teste tilgang.':'Google client ID and secret are saved. Use Verify with Google to test access.');
+    await expect(page.locator('[data-oauth-registration=microsoft]')).toContainText(nb?'Legg det til bare hvis':'Add it only if');await expect(page.getByText('Create a Google OAuth client and/or Microsoft Entra app registration for this installation.',{exact:false})).toHaveCount(0);
+    const button=page.getByRole('button',{name:nb?'Oppdater oppsettstatus':'Refresh setup status',exact:true});await button.click();await checking;
+    await expect(page.getByRole('button',{name:nb?'Oppdaterer oppsettstatus…':'Refreshing setup status…',exact:true})).toBeDisabled();await expect(page.locator('[role=status]').filter({hasText:nb?'Oppdaterer oppsettstatus…':'Refreshing setup status…'})).toBeVisible();release();
+    await expect(page.locator('[role=status]').filter({hasText:nb?'Status oppdatert: HTTPS-':'Status refreshed: HTTPS/'})).toBeVisible();await expect(button).toBeEnabled();expect(checks).toBe(1);await expect(page.locator('[data-oauth-registration=google]')).toContainText(nb?'er lagret':'are saved');
+    await page.setViewportSize({width:390,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/admin-saved-registration-${language}.png`,fullPage:true});
   }finally{release?.();await admin.close();}
 });
