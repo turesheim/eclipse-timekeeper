@@ -90,12 +90,12 @@ class SharedConnectResourceHttpTest {
     @Test void aSharedServiceCannotRedirectTheBrowserToAnUnrelatedOrigin(){Fixture.badTarget=true;try{var response=call("POST","/google/authorize",object(),null);assertEquals(503,response.statusCode());assertEquals("TASK_PROVIDER_INVALID_RESPONSE",response.jsonPath().getString("code"));}finally{Fixture.badTarget=false;}}
     @Test void changingNewSignInsToDirectModeDoesNotStopAnExistingSharedAccount()throws Exception{
         var pending=begin(false,true);var connection=complete(pending);String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();int before=Fixture.REFRESHES.get();
-        shared.configure(false,null);
+        configuration.configure(object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","").put("googleClientSecret","").put("microsoftClientId","").put("microsoftClientSecret",""));
         try{
             assertFalse(configuration.available(TaskCloudProvider.Provider.GOOGLE));
             store.transaction(owner,()->{var auth=new TaskProviderConnections(store).required(UUID.fromString(id));auth.put("tokenExpires",Instant.now().minusSeconds(1).toString()).put("lastAttempt",Instant.now().minusSeconds(31).toString()).put("nextRefresh",Instant.now().minusSeconds(1).toString()).put("requested",true);new TaskProviderConnections(store).save(TaskProviderConnections.AUTH,auth);return null;});refresh.wake();
             long deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();while(Fixture.REFRESHES.get()==before&&System.nanoTime()<deadline)Thread.sleep(20);assertEquals(before+1,Fixture.REFRESHES.get());assertTrue(idle(id).path("lastError").isNull());
-        }finally{shared.configure(true,"https://connect.example.test");}
+        }finally{configuration.configure(object().put("mode","SHARED").put("serviceUrl","https://connect.example.test").put("googleClientId","").put("googleClientSecret","").put("microsoftClientId","").put("microsoftClientSecret",""));}
     }
     @Test void aTaskCatalogFailureDoesNotPreventTheSeparateCalendarSynchronizer()throws Exception{
         var pending=begin(true,true);var connection=complete(pending);String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();UUID client=store.transaction(owner,()->uuid(store.createClient(object().put("name","Calendar client")).get("id")));

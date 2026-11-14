@@ -14,6 +14,15 @@ final class SharedConnectRevocations {
         if(!credentials.hasNonNull("brokerEndpoint"))return;
         new TaskProviderConnections(store).insert(KIND,UUID.randomUUID(),object().put("endpoint",credentials.path("brokerEndpoint").asText()).put("credential",credentials.path("refreshToken").asText()).put("nextAttempt",store.now().toString()).put("attempts",0));
     }
+    ObjectNode temporary(java.net.URI endpoint,String credential){
+        return new TaskProviderConnections(store).insert(KIND,UUID.randomUUID(),object().put("endpoint",endpoint.toString()).put("credential",credential)
+            .put("nextAttempt",store.now().plusSeconds(600).toString()).put("attempts",0));
+    }
+    void release(ObjectNode queued){
+        var found=store.find(KIND,uuid(queued.get("id")));if(found.isEmpty())return;
+        var value=((ObjectNode)found.get()).deepCopy();value.put("nextAttempt",store.now().toString());
+        new TaskProviderConnections(store).save(KIND,value);
+    }
     ObjectNode claim(UUID id){
         var found=store.find(KIND,id);if(found.isEmpty())return null;var value=((ObjectNode)found.get()).deepCopy();
         if(value.hasNonNull("leaseUntil")&&Instant.parse(value.path("leaseUntil").asText()).isAfter(store.now())||Instant.parse(value.path("nextAttempt").asText()).isAfter(store.now()))return null;

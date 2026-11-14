@@ -14,7 +14,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-/** Shared desired/effective configuration. Only coordinated startup activates a saved version. */
+/** OAuth registrations apply live; authentication and SMTP activation remains coordinated. */
 @ApplicationScoped
 class ServiceSettings {
     @Inject AccountStore accounts;
@@ -23,17 +23,24 @@ class ServiceSettings {
     @Inject BrowserOrigins browserOrigins;
     @Inject RecoveryMail mail;
     @Inject TaskProviderConfiguration taskProviders;
-    @Inject SharedConnectConfiguration sharedConnect;
     @Inject InstanceAdministrator administrators;
     static final String INTERNET="internetAccounts";
     @ConfigProperty(name="timekeeper.service-settings.recover",defaultValue="false") boolean recover;
     private volatile long localVersion=-1;
+    private volatile long observedVersion=-1;
+    private volatile ObjectNode restartSnapshot;
+    private volatile String localSmtpPassword;
+    private final Object reloadLock=new Object();
     private static final Set<String> FIELDS=Set.of("publicOrigin","originEpoch","passkeysEnabled","passkeyRpId","emailRecoveryEnabled",
             "smtpHost","smtpPort","smtpFrom","smtpUsername","smtpTls","smtpStartTls");
     record Stored(long version,long active,ObjectNode saved,ObjectNode effective,String savedPassword,String effectivePassword) {
         @Override public String toString() {return "Private service configuration";}
     }
     record Reply(ObjectNode data,String etag) { }
+    private static ObjectNode restartSettings(ObjectNode value){
+        var result=value.deepCopy();result.remove(List.of(INTERNET,VaultLimits.SETTINGS_KEY));return result;
+    }
+    private static boolean pending(Stored value){return !value.saved().equals(value.effective())||!Objects.equals(value.savedPassword(),value.effectivePassword());}
     static String tag(long version) {return "\"service-settings-"+version+"\"";}
     private static String config(String name,String fallback) {return ConfigProvider.getConfig().getOptionalValue(name,String.class).orElse(fallback);}
     private static ObjectNode deployment() {
@@ -136,16 +143,26 @@ class ServiceSettings {
         var effective=stored.effective();
         origin.configure(publicOrigin(effective),effective.path("originEpoch").asLong());browserOrigins.configure(publicOrigin(effective));
         realm.configure(effective.path("passkeysEnabled").asBoolean(),effective.path("passkeyRpId").asText());
-        mail.configure(effective,stored.effectivePassword());localVersion=stored.active();
-        var internet=internet(effective);sharedConnect.configure(internet.path("mode").asText().equals("SHARED"),internet.path("serviceUrl").isNull()?null:internet.path("serviceUrl").asText());
-        taskProviders.configureGoogle(internet.path("googleClientId").asText(),internet.path("googleClientSecret").asText());
-        taskProviders.configureMicrosoft(internet.path("microsoftClientId").asText(),internet.path("microsoftClientSecret").asText());
+        mail.configure(effective,stored.effectivePassword());
+        synchronized(reloadLock){
+            restartSnapshot=restartSettings(effective);localSmtpPassword=stored.effectivePassword();
+            taskProviders.configure(internet(effective));observedVersion=stored.version();localVersion=stored.active();
+        }
     }
     void requireCurrent(Connection c) {
         if(localVersion<0) throw new ApiFailure(503,"UNAVAILABLE");
-        try(var statement=query(c,"SELECT active_version FROM tk_service_settings WHERE id=1");var rows=statement.executeQuery()) {
-            if(!rows.next() || rows.getLong(1)!=localVersion) throw new ApiFailure(503,"UNAVAILABLE");
+        try(var statement=query(c,"SELECT version,active_version FROM tk_service_settings WHERE id=1");var rows=statement.executeQuery()) {
+            if(!rows.next())throw new ApiFailure(503,"UNAVAILABLE");
+            if(rows.getLong(1)==observedVersion&&rows.getLong(2)==localVersion)return;
         }catch(SQLException failure) {throw databaseFailure(failure);}
+        var current=read(c,false);if(current==null)throw new ApiFailure(503,"UNAVAILABLE");
+        synchronized(reloadLock){
+            if(!restartSettings(current.effective()).equals(restartSnapshot)||!Objects.equals(current.effectivePassword(),localSmtpPassword))
+                throw new ApiFailure(503,"UNAVAILABLE");
+            if(current.version()>=observedVersion){
+                taskProviders.configure(internet(current.effective()));localVersion=current.active();observedVersion=current.version();
+            }else if(current.active()!=localVersion)throw new ApiFailure(503,"UNAVAILABLE");
+        }
     }
     boolean available() {
         if(localVersion<0) return false;
@@ -184,7 +201,7 @@ class ServiceSettings {
         var result=object().put("canEdit",true).put("configurationManagedBy","administration").put("schemaVersion",ServerSchema.CURRENT)
                 .put("publicOrigin",origin.configured().equals("NONE") ? null : origin.configured()).put("originEpoch",origin.epoch())
                 .put("passkeysEnabled",realm.enabled()).put("passkeyRpId",realm.rpId().orElse(null)).put("emailRecoveryEnabled",mail.configuredEnabled())
-                .put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",value.version()!=value.active())
+                .put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",pending(value))
                 .put("smtpPasswordConfigured",value.savedPassword()!=null && !value.savedPassword().isEmpty())
                 .put("effectiveSmtpPasswordConfigured",value.effectivePassword()!=null && !value.effectivePassword().isEmpty());
         var saved=value.saved().deepCopy();var effective=value.effective().deepCopy();saved.remove(List.of(VaultLimits.SETTINGS_KEY,INTERNET));effective.remove(List.of(VaultLimits.SETTINGS_KEY,INTERNET));
@@ -193,7 +210,7 @@ class ServiceSettings {
     Reply internetSettings(TokenRegistry.Principal principal){return accounts.tx(c->{manager(c,principal,false);return internetReply(read(c,false),accountSession(c,principal));});}
     Reply saveInternet(InstanceAdministrator.Proof proof,String match,JsonNode input){
         administrators.requireFresh(proof);
-        return accounts.tx(c->{
+        var reply=accounts.tx(c->{
             lock(c);manager(c,proof.principal(),true);var current=read(c,true);
             if(match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");if(!tag(current.version()).equals(match))throw new ApiFailure(412,"STALE_VERSION");
             var value=internet(current.saved());value.put("mode",input.path("mode").asText());value.set("serviceUrl",input.get("serviceUrl"));value.put("googleClientId",input.path("googleClientId").asText());
@@ -211,14 +228,19 @@ class ServiceSettings {
             // Preserve the old payload during rolling upgrades until Microsoft settings are actually changed.
             var previous=current.saved().path(INTERNET);var defaults=internetDeployment();
             if(previous.isObject()&&!previous.has("microsoftClientId")&&value.path("microsoftClientId").equals(defaults.path("microsoftClientId"))&&value.path("microsoftClientSecret").equals(defaults.path("microsoftClientSecret")))value.remove(List.of("microsoftClientId","microsoftClientSecret"));
-            long version=current.version()+1;if(version>9007199254740991L)throw ApiFailure.conflict();var saved=current.saved().deepCopy();saved.set(INTERNET,value);
-            if(execute(c,"UPDATE tk_service_settings SET version=?,saved=? WHERE id=1 AND version=?",version,saved.toString(),current.version())!=1)throw new ApiFailure(412,"STALE_VERSION");
+            long version=current.version()+1;if(version>9007199254740991L)throw ApiFailure.conflict();
+            var saved=current.saved().deepCopy();saved.set(INTERNET,value);
+            var effective=current.effective().deepCopy();effective.set(INTERNET,value.deepCopy());
+            boolean otherPending=!saved.equals(effective)||!Objects.equals(current.savedPassword(),current.effectivePassword());
+            long active=otherPending?current.active():version;
+            if(execute(c,"UPDATE tk_service_settings SET version=?,active_version=?,saved=?,effective=? WHERE id=1 AND version=?",version,active,saved.toString(),effective.toString(),current.version())!=1)throw new ApiFailure(412,"STALE_VERSION");
             return internetReply(read(c,false),true);
         });
+        accounts.tx(c->{requireCurrent(c);return null;});return reply;
     }
     private static ObjectNode redactedInternet(JsonNode settings){var value=internet(settings);for(String provider:List.of("google","microsoft")){value.put(provider+"ClientSecretConfigured",!value.path(provider+"ClientSecret").asText().isBlank());value.remove(provider+"ClientSecret");}return value;}
     private static Reply internetReply(Stored value,boolean canEdit){
-        var result=object().put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",value.version()!=value.active()).put("canEdit",canEdit);
+        var result=object().put("version",value.version()).put("effectiveVersion",value.active()).put("restartRequired",pending(value)).put("canEdit",canEdit);
         result.set("saved",redactedInternet(value.saved()));result.set("effective",redactedInternet(value.effective()));return new Reply(result,tag(value.version()));
     }
 }

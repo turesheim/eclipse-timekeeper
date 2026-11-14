@@ -27,7 +27,7 @@ write consent and review of outgoing changes.
    `https://nas.example-tailnet.ts.net:8443/web/task-provider-callback.html`.
 3. Complete the Google and/or Microsoft setup below with that URI. Enter each
    client ID and client secret in Dagsverk, save with your administrator password,
-   and restart every instance. A blank secret field keeps the saved secret.
+   to apply them immediately on every instance. A blank secret field keeps the saved secret.
 4. Select **Check setup**, then [test the connection](#verify-the-connection).
 
 ### Google
@@ -120,8 +120,21 @@ See [OAuth service operations](CONNECT-SERVICE.md) for hosting, discovery and ba
 ## Verify the connection
 
 **Check setup** checks active local settings or service availability and configured
-registrations. It does not validate provider consent or API access. Saved settings
-take effect after restart; the page shows the active mode and any pending restart.
+registrations. OAuth settings apply immediately on every instance; changing the
+public HTTPS address still requires a coordinated restart.
+
+Under **Verify configuration**, select Calendar and/or Tasks access, then choose
+**Verify with Google** or **Verify with Microsoft**. Sign in with a test account
+and consent. The result checks the active configuration, sign-in, background access
+and each selected API. Optional Google Tasks editing checks the granted permission
+without changing a task. No Dagsverk connection is created and nothing is imported.
+Temporary managed-service grants are queued for deletion after the check.
+
+If the provider stops before returning to Dagsverk, check the exact redirect URI
+and consent audience/test users. Review any failed check, correct the setup and
+start verification again. For
+Google, enable Calendar API and Tasks API for the services selected; use the scopes
+listed above. For Microsoft, check the delegated permissions and tenant policy.
 
 In **My Account → Internet accounts**, connect a test Google or Microsoft account.
 Test calendars, tasks and combined access as applicable; save selections, review

@@ -101,14 +101,14 @@ class ServiceSettingsTest {
         var before=call(admin,"GET",path,null,null,false);
         var input=object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","").put("googleSecretAction","PRESERVE").put("microsoftClientId","microsoft-app").put("microsoftSecretAction","REPLACE").put("microsoftClientSecret",secret).put("currentPassword",PASSWORD);
         var written=call(admin,"PUT",path,input,before.header("ETag"),true);var data=success(written,200);inputs.validate("AdministrationInternetAccounts",data);
-        assertTrue(data.path("saved").path("microsoftClientSecretConfigured").asBoolean());assertFalse(data.path("effective").path("microsoftClientSecretConfigured").asBoolean());assertFalse(written.asString().contains(secret));
-        settings.initialize();assertEquals("microsoft-app",ClientProxy.unwrap(taskProviders).microsoftId.orElseThrow());assertEquals(secret,ClientProxy.unwrap(taskProviders).microsoftSecret.orElseThrow());
+        assertTrue(data.path("saved").path("microsoftClientSecretConfigured").asBoolean());assertTrue(data.path("effective").path("microsoftClientSecretConfigured").asBoolean());assertFalse(written.asString().contains(secret));
+        assertEquals("microsoft-app",taskProviders.current().microsoftId());assertEquals(secret,taskProviders.current().microsoftSecret());
         var legacy=input.deepCopy();legacy.remove(List.of("microsoftClientId","microsoftSecretAction","microsoftClientSecret"));var current=call(admin,"GET",path,null,null,false);
         var preserved=call(admin,"PUT",path,legacy,current.header("ETag"),true);assertTrue(success(preserved,200).path("saved").path("microsoftClientSecretConfigured").asBoolean());
         var clear=input.deepCopy().put("microsoftSecretAction","CLEAR");clear.remove("microsoftClientSecret");var cleared=call(admin,"PUT",path,clear,preserved.header("ETag"),true);assertFalse(success(cleared,200).path("saved").path("microsoftClientSecretConfigured").asBoolean());
-        settings.initialize();assertTrue(ClientProxy.unwrap(taskProviders).microsoftSecret.isEmpty());assertFalse(current(admin).asString().contains(secret));
+        assertTrue(taskProviders.current().microsoftSecret().isEmpty());assertFalse(current(admin).asString().contains(secret));
     }
-    @Test void googleCredentialsAreWriteOnlyVersionedAndActivateOnlyOnRestart()throws Exception{
+    @Test void googleCredentialsAreWriteOnlyVersionedAndApplyWithoutRestart()throws Exception{
         var admin=setup();String path="/admin/internet-accounts",secret="private-google-application-secret";
         var initial=call(admin,"GET",path,null,null,false);success(initial,200);
         var input=object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","installation-google-id").put("googleSecretAction","REPLACE").put("googleClientSecret",secret).put("currentPassword",PASSWORD);
@@ -116,15 +116,29 @@ class ServiceSettingsTest {
         assertEquals(428,call(admin,"PUT",path,input,null,true).statusCode());
         assertEquals(422,call(admin,"PUT",path,input.deepCopy().put("currentPassword","wrong-password"),initial.header("ETag"),true).statusCode());
         var written=call(admin,"PUT",path,input,initial.header("ETag"),true);var data=success(written,200);inputs.validate("AdministrationInternetAccounts",data);
-        assertEquals("no-store",written.header("Cache-Control"));assertTrue(data.path("saved").path("googleClientSecretConfigured").asBoolean());assertFalse(data.path("effective").path("googleClientSecretConfigured").asBoolean());assertTrue(data.path("restartRequired").asBoolean());
+        assertEquals("no-store",written.header("Cache-Control"));assertTrue(data.path("saved").path("googleClientSecretConfigured").asBoolean());assertTrue(data.path("effective").path("googleClientSecretConfigured").asBoolean());assertFalse(data.path("restartRequired").asBoolean());
         assertFalse(written.asString().contains(secret));assertFalse(current(admin).asString().contains("installation-google-id"));assertFalse(current(admin).asString().contains(secret));
         var preserve=input.deepCopy();preserve.remove("googleClientSecret");preserve.put("googleSecretAction","PRESERVE").put("googleClientId","updated-google-id");
         assertEquals(412,call(admin,"PUT",path,preserve,initial.header("ETag"),true).statusCode());
         var kept=call(admin,"PUT",path,preserve,written.header("ETag"),true);assertTrue(success(kept,200).path("saved").path("googleClientSecretConfigured").asBoolean());
-        settings.initialize();assertFalse(sharedConnect.enabled());assertEquals("updated-google-id",ClientProxy.unwrap(taskProviders).googleId.orElseThrow());assertEquals(secret,ClientProxy.unwrap(taskProviders).googleSecret.orElseThrow());
+        assertFalse(sharedConnect.enabled());assertEquals("updated-google-id",taskProviders.current().googleId());assertEquals(secret,taskProviders.current().googleSecret());
         var active=call(admin,"GET",path,null,null,false);assertFalse(success(active,200).path("restartRequired").asBoolean());
-        var clear=preserve.deepCopy().put("googleSecretAction","CLEAR");var cleared=call(admin,"PUT",path,clear,active.header("ETag"),true);var empty=success(cleared,200);assertFalse(empty.path("saved").path("googleClientSecretConfigured").asBoolean());assertTrue(empty.path("effective").path("googleClientSecretConfigured").asBoolean());
-        settings.initialize();assertTrue(ClientProxy.unwrap(taskProviders).googleSecret.isEmpty());assertFalse(call(admin,"GET",path,null,null,false).asString().contains(secret));
+        var clear=preserve.deepCopy().put("googleSecretAction","CLEAR");var cleared=call(admin,"PUT",path,clear,active.header("ETag"),true);var empty=success(cleared,200);assertFalse(empty.path("saved").path("googleClientSecretConfigured").asBoolean());assertFalse(empty.path("effective").path("googleClientSecretConfigured").asBoolean());
+        assertTrue(taskProviders.current().googleSecret().isEmpty());assertFalse(call(admin,"GET",path,null,null,false).asString().contains(secret));
+    }
+    @Test void oauthChangesReloadOnReplicasWithoutActivatingPendingSmtpOrRetiringSessions()throws Exception{
+        var admin=setup();
+        var replicaProviders=new TaskProviderConfiguration();replicaProviders.origins=origins;
+        var replica=new ServiceSettings();replica.accounts=accounts;replica.origin=origin;replica.realm=realm;replica.browserOrigins=origins;replica.mail=mail;replica.taskProviders=replicaProviders;replica.initialize();
+        var previous=current(admin);success(save(admin,input(previous).put("smtpPort",2525),previous),200);
+        var initial=call(admin,"GET","/admin/internet-accounts",null,null,false);
+        var input=object().put("mode","DIRECT").putNull("serviceUrl").put("googleClientId","live-google").put("googleSecretAction","REPLACE").put("googleClientSecret","live-secret").put("currentPassword",PASSWORD);
+        var written=success(call(admin,"PUT","/admin/internet-accounts",input,initial.header("ETag"),true),200);
+        assertTrue(written.path("restartRequired").asBoolean());assertTrue(replica.available());
+        assertEquals("live-google",replicaProviders.current().googleId());assertEquals("live-secret",replicaProviders.current().googleSecret());
+        var general=success(current(admin),200);assertEquals(2525,general.path("saved").path("smtpPort").asInt());assertNotEquals(2525,general.path("effective").path("smtpPort").asInt());
+        assertEquals(200,call(admin,"GET","/auth/session",null,null,false).statusCode());
+        settings.initialize();realm.initialize();assertFalse(replica.available());assertTrue(settings.available());
     }
     @Test void notesQuotasAreLiveSharedDurableAndIndependentOfPendingAuthenticationSettings() throws Exception {
         var admin=setup();var defaults=noteLimits(admin);var initial=success(defaults,200);
@@ -236,7 +250,7 @@ class ServiceSettingsTest {
     }
     @Test void restartActivatesSavedPolicyFencesStaleReplicasAndPreservesAccountsAndWork() throws Exception {
         var admin=setup();var client=success(call(admin,"POST","/clients",object().put("name","Keep private work").put("color","#176653"),null,true),201);
-        var stale=new ServiceSettings();stale.accounts=accounts;stale.origin=origin;stale.realm=realm;stale.browserOrigins=origins;stale.mail=mail;stale.taskProviders=taskProviders;stale.sharedConnect=sharedConnect;stale.initialize();assertTrue(stale.available());
+        var stale=new ServiceSettings();stale.accounts=accounts;stale.origin=origin;stale.realm=realm;stale.browserOrigins=origins;stale.mail=mail;stale.taskProviders=taskProviders;stale.initialize();assertTrue(stale.available());
         var previous=current(admin);var saved=save(admin,input(previous).put("smtpPort",2525),previous);assertEquals(200,saved.statusCode());assertTrue(stale.available());
         settings.initialize();realm.initialize();assertFalse(stale.available());assertTrue(settings.available());
         assertEquals(401,call(admin,"GET","/auth/session",null,null,false).statusCode());
@@ -252,7 +266,7 @@ class ServiceSettingsTest {
     }
     @Test void explicitOperatorRecoveryRequiresANewerEpochAndNormalRestartNeverRestoresOldDefaults() throws Exception {
         var admin=setup();var previous=current(admin);success(save(admin,input(previous).put("smtpPort",2525),previous),200);
-        settings.initialize();realm.initialize();var recovering=new ServiceSettings();recovering.accounts=accounts;recovering.origin=origin;recovering.realm=realm;recovering.browserOrigins=origins;recovering.mail=mail;recovering.taskProviders=taskProviders;recovering.sharedConnect=sharedConnect;recovering.recover=true;
+        settings.initialize();realm.initialize();var recovering=new ServiceSettings();recovering.accounts=accounts;recovering.origin=origin;recovering.realm=realm;recovering.browserOrigins=origins;recovering.mail=mail;recovering.taskProviders=taskProviders;recovering.recover=true;
         assertThrows(IllegalStateException.class,recovering::initialize);assertTrue(settings.available());
         String old=System.getProperty("timekeeper.auth.origin-epoch");
         try {

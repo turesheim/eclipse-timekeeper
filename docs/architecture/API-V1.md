@@ -248,15 +248,26 @@ and never includes client secrets, account grants or tokens. The administrator
 can inspect the installation client ID and saved/effective sign-in settings.
 `PUT` requires a browser administrator session, CSRF, `If-Match` and the current
 administrator password. Secret updates explicitly preserve, replace or clear
-the private value; changes activate only after a coordinated restart. Shared
+the private value; OAuth changes apply immediately across server instances without
+activating pending authentication or SMTP settings. Shared
 service registrations remain independent. A configured registration does not
 establish successful live provider consent.
+
+A browser administrator can authorize with `verification: true` to test saved
+configuration without creating an account connection. Completion returns
+`InternetAccountVerification` with separate configuration, consent, background
+access, Calendar and Tasks results; optional task editing checks the granted scope
+without making a write. Provider credentials are discarded and temporary managed
+grants are queued for deletion. Owner/browser binding, one-use state and current
+administrator authority still apply. Settings are rechecked after network calls.
+Verification cancellation returns `200` with `verification` and `cancelled`;
+ordinary cancellation remains `204`.
 
 Internet account sign-in and synchronization use `/task-providers`, separate from portable connection
 metadata. `GET` returns configured-provider availability and owned status with
 discovered/selected lists. Its `calendarSynchronization` flag describes whether
-new sign-ins support calendars; direct registration is task-only. A direct
-calendar request is rejected without requesting task access in its place.
+new sign-ins support calendars; direct and managed registration support calendars
+and tasks independently.
 `POST /task-providers/{provider}/authorize` starts a
 browser-bound PKCE flow for `google` or `microsoft`; `POST
 /task-providers/complete` consumes its one-use state and code. `POST
