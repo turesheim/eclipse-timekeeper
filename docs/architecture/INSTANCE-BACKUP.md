@@ -217,8 +217,10 @@ append-only audit records. Actor references intentionally have no owner foreign
 key: replacing a destination's bootstrap account must not erase the evidence of
 who authorized its restore. These rows are installation-private and must never
 appear in personal exports or owner-scoped resource lists. Full-instance images
-include them without filtering. The new physical table requires the explicitly
-authorized schema-9 upgrade with older replicas stopped. PostgreSQL upgrades in
+include them without filtering. Schema 9 introduced this physical table; current
+startup also requires the schema-10 compatibility fence. Use the explicit
+[server upgrade procedure](../operations/ACCOUNTS.md#existing-data-and-accounts)
+with older replicas stopped. PostgreSQL upgrades in
 one transaction. H2 can resume an interrupted table creation/seed only with
 explicit authorization, the exact canonical shape, and a `MIGRATING` marker.
 Normal startup requires the unique control row.

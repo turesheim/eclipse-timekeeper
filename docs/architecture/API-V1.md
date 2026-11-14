@@ -1,14 +1,13 @@
-# Timekeeper HTTP API v1
+# Dagsverk HTTP API v1
 
-This contract implements the design part of #217 and is the authority for the
-Quarkus server (#218), remote Eclipse adapter (#220), web frontend (#221) and
-change synchronization (#219). All five are required before Timekeeper 2.0.
+This contract defines the shared HTTP boundary for the Quarkus server, remote
+Eclipse adapter, browser client and change synchronization.
 The embedded implementation remains available and its database is not implicitly
 copied, merged or opened by the server.
 
 [openapi.json](../../common/api/openapi.json) describes `/api/v1` using
 [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.1.html). API version 1 is
-independent of the Timekeeper product version. The server must serve this
+independent of the Dagsverk product version. The server must serve this
 contract at `/api/v1/openapi.json`; publishing the contract does not certify an
 implemented server. HTTP behavior follows
 [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), bearer authentication
@@ -830,10 +829,11 @@ python common/api/tests/http_acceptance.py --base-url http://127.0.0.1:8080/api/
 The suite checks actual HTTP authentication/authorization, cross-owner relations,
 stale writes, atomic switching, duplicate commands, provider identities, DST
 reports, pagination, imports and owner-scoped notifications. Static schema tests
-do not prove server enforcement. #218 must run this suite against the real
-Quarkus server/database and separately verify restart/durable receipts, concurrent
-requests, schema guards and operational configuration. #220/#221/#219 add actual
-client behavior, unsaved-edit and reconnect acceptance before the parent closes.
+do not prove server enforcement. The [packaged server suite](../operations/SERVER.md#build-and-automatic-acceptance)
+also checks restart, durable receipts, concurrency and schema guards.
+[Browser acceptance](../development/WEB-ACCEPTANCE.md) and
+[installed Eclipse acceptance](../development/REMOTE-ECLIPSE.md) exercise client
+behavior, unsaved edits and reconnect. Dated results are kept in verification.
 
 ## Clients in the server and web client
 
@@ -1093,18 +1093,19 @@ copies on import; actual local restoration emits new `ARCHIVE_RESTORE` events.
 See [API diagnostics](../operations/API-DIAGNOSTICS.md) for a read-only workflow,
 privacy boundaries, portability and the coordinated schema-8 upgrade.
 
-### Administrator instance backup operations (in progress)
+### Administrator instance backup operations
 
 An instance operation can report terminal `RESTORED` after the offline coordinator
 has committed its database and material phases. It retains its audit receipt and
-is not an upload that can be resumed or downloaded. The public confirmation and
-automatic restart workflow are still under implementation; current archive review
-continues to return `restoreReady: false`. Completed-generation startup requires
+is not an upload that can be resumed or downloaded. Public confirmation commits
+maintenance consent; it does not restart a host service. Stop every destination
+process, then start one to run exclusive preboot recovery. Archive/target review
+alone is advisory and keeps `restoreReady: false`. Completed-generation startup requires
 the verified recovered material, or fails with `INSTANCE_RESTORE_MATERIAL_REQUIRED`.
 
-Issue [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473) is still
-being implemented. The current draft adds these routes under the separate
-`/api/v1/admin/instance` namespace:
+The implemented routes use the separate `/api/v1/admin/instance` namespace.
+The [operator guide](../operations/INSTANCE-BACKUP.md) describes preparation,
+confirmation, restart and interrupted-operation recovery:
 
 | Method | Path | Behavior |
 | --- | --- | --- |
@@ -1119,6 +1120,9 @@ being implemented. The current draft adds these routes under the separate
 | PUT | `/uploads/{id}/content?offset=…` | Append at most 1 MiB of binary ciphertext, or retry an acknowledged range with identical bytes. |
 | POST | `/uploads/{id}/target` | Re-verify `currentPassword` and inspect the target database for existing accounts, business data, tokens and history. Requires archive REVIEW and the initiating session; returns advisory `databaseEligible`, blockers and `restoreReady: false`. Activation must recheck under an exclusive fence. |
 | POST | `/uploads/{id}/validate` | Re-verify `currentPassword`, consume `passphrase`, and return `202` before full-file verification. |
+| GET | `/uploads/{id}/staging` | Read the private preparation state and destination mapping. |
+| POST | `/uploads/{id}/staging` | Verify current password/passphrase and reviewed operation version; prepare an immutable generation with destination origin/RP mapping. |
+| POST | `/uploads/{id}/confirm` | Verify current password, reviewed version, generation and explicit confirmation; commit maintenance consent and return `202` requiring coordinated restart. |
 
 The Administration **Backup & Restore** page uses these routes. It polls recent
 operation metadata so a reload or lost start response does not require replaying
@@ -1176,8 +1180,9 @@ Interrupted transfers require a new password-verified grant.
 
 The audit records `DOWNLOAD_AUTHORIZED` and `DOWNLOAD_STARTED` without cookies,
 digests, passwords or paths. The started event records consumption of authority,
-not a claim that a browser saved the file. Upload and archive-only review are implemented. Restore activation and the
-Administration UI remain unfinished parts of #473.
+not a claim that a browser saved the file. Preparation and confirmation bind the
+reviewed operation version and generation; replacement happens only under the
+exclusive startup coordinator, not inside the running web process.
 
 Uploads are bound to their initiating administrator account session. The status
 reply includes the original ciphertext checksum for safe resume. Chunk writes use

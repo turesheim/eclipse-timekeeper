@@ -60,7 +60,7 @@ when no display is available. Native idle detection additionally requires
 X11/XScreenSaver. The standalone server and Node unit tests need no display.
 The Node commands above run unit/asset checks; browser acceptance additionally
 requires Playwright browser installation and a packaged server, as described
-in the [web acceptance guide](WEB-CLIENT.md#automated-verification).
+in the [web acceptance guide](WEB-ACCEPTANCE.md).
 
 Ubuntu CI uses `scripts/ci_ubuntu_mirror.py` before installing browser or X11
 dependencies. It selects the kernel.org Ubuntu mirror through the hosted
@@ -71,7 +71,7 @@ browser and installed-client scenarios.
 
 See [remote Eclipse acceptance](REMOTE-ECLIPSE.md),
 [remote Mylyn acceptance](REMOTE-MYLYN.md),
-[web acceptance](WEB-CLIENT.md) and [release packaging](RELEASING.md)
+[web acceptance](WEB-ACCEPTANCE.md) and [release packaging](RELEASING.md)
 for the installed-client and distribution checks.
 The **Installed client tests** CI job (formerly **Remote-Eclipse**) installs the
 base and optional features in isolated Eclipse runtimes and verifies real

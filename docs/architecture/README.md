@@ -1,9 +1,9 @@
-# Timekeeper architecture
+# Dagsverk architecture
 
-Timekeeper has two storage paths. Eclipse can use an embedded H2 database through
-the JPA adapter, or connect to the Timekeeper server through the Java HTTP client.
+Dagsverk has two storage paths. Eclipse can use an embedded H2 database through
+the JPA adapter, or connect to the Dagsverk server through the Java HTTP client.
 The browser uses the same server API. Optional Mylyn integration adapts Eclipse
-task activation and Task List projections to Timekeeper services.
+task activation and Task List projections to Dagsverk services.
 
 ```mermaid
 flowchart TD
@@ -51,3 +51,10 @@ business clients are distinct from the Eclipse and browser applications.
   and test commands.
 - [Eclipse connection guide](../operations/ECLIPSE-CLIENT.md): backend selection.
 - [Server operations](../operations/SERVER.md): server configuration and storage.
+
+- [Notes vault](NOTES-VAULT.md): canonical documents, attachments, search and journal projections.
+- [Task synchronization](TASK-SYNC-PROTOCOL.md) and [provider capabilities](TASK-SYNC-CAPABILITIES.md): review, identity and write boundaries.
+- [Instance backup implementation](INSTANCE-BACKUP.md): archive, authority and exclusive recovery phases.
+
+User procedures are indexed in [operations](../operations/README.md); implementation
+and acceptance commands are indexed in [development](../development/README.md).
