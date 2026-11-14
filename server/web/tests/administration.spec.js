@@ -212,7 +212,7 @@ for(const language of ['en','nb'])test(`OAuth verification reports individual ch
   const before=await(await client.get('/api/v1/task-providers')).json();
   const norwegian=language==='nb',state='v'.repeat(43);let authorizations=0,completions=0;
   try{
-    if(norwegian){const identity=await(await client.get('/api/v1/auth/session')).json(),profile=await client.get('/api/v1/me'),me=await profile.json();expect((await client.put('/api/v1/me',{headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf},data:{zoneId:me.zoneId,locale:'nb-NO'}})).ok()).toBe(true);}
+    if(norwegian){const identity=await(await client.get('/api/v1/auth/session')).json(),profile=await client.get('/api/v1/me'),me=await profile.json();expect((await client.put('/api/v1/me',{headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf},data:{zoneId:me.zoneId,locale:'nb-NO'}})).ok()).toBe(true);await page.reload();}
     await page.goto('/admin/#internet-accounts');
     const verify=page.getByRole('button',{name:norwegian?'Bekreft med Google':'Verify with Google',exact:true}),id=page.getByLabel(norwegian?'Google-klient-ID':'Google client ID',{exact:true});
     const mode=page.getByLabel(norwegian?'OAuth-modus':'OAuth mode',{exact:true}),originalMode=await mode.inputValue();await mode.selectOption('DIRECT');
@@ -223,13 +223,13 @@ for(const language of ['en','nb'])test(`OAuth verification reports individual ch
       authorizations++;expect(route.request().postDataJSON()).toEqual({verification:true,services:{calendars:true,tasks:false},direction:'IMPORT',language});
       return route.fulfill({headers,json:{authorizationUrl:`https://accounts.google.com/o/oauth2/v2/auth?state=${state}`,expiresAt:new Date(Date.now()+600000).toISOString()}});
     });
-    await page.route('https://accounts.google.com/**',route=>route.fulfill({status:302,headers:{location:origin()+`/web/task-provider-callback.html?state=${state}&code=synthetic-verification-code`}}));
+    await page.route('https://accounts.google.com/**',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="en"><title>Provider fixture</title><body><a href="${origin()}/web/task-provider-callback.html?state=${state}&amp;code=synthetic-verification-code">Continue</a></body></html>`}));
     await page.route('**/api/v1/task-providers/complete',route=>{
       completions++;expect(route.request().postDataJSON()).toEqual({state,code:'synthetic-verification-code'});
       const checks=Object.fromEntries(['configuration','authorization','offlineAccess','calendars','tasks','taskWrites'].map(name=>[name,{status:['tasks','taskWrites'].includes(name)?'NOT_REQUESTED':name==='calendars'&&norwegian?'FAILED':'PASSED',code:name==='calendars'&&norwegian?'TASK_PROVIDER_PERMISSION_REQUIRED':null}]));
       return route.fulfill({headers,json:{verification:true,provider:'google',status:norwegian?'FAILED':'PASSED',checkedAt:new Date().toISOString(),checks}});
     });
-    await verify.click();await expect(page).toHaveURL(/\/web\/task-provider-callback.html$/);
+    await verify.click();await page.getByRole('link',{name:'Continue',exact:true}).click();await expect(page).toHaveURL(/\/web\/task-provider-callback.html$/);
     await expect(page.getByRole('heading',{name:norwegian?'Bekreft konfigurasjon':'Verify configuration',exact:true})).toBeVisible();
     await expect(page.locator('#task-provider-result')).toHaveText(norwegian?'Konfigurasjonen kunne ikke bekreftes fullstendig. Se kontrollene nedenfor.':'All selected checks passed.');
     await expect(page.locator('tr').filter({hasText:norwegian?'Oppgave-API':'Tasks API'})).toContainText(norwegian?'Ikke valgt':'Not selected');
@@ -249,9 +249,9 @@ test('OAuth verification cancellation returns to application settings',async({pa
   const admin=await settingsAdministrator(page,request),client=browserRequest(page),response=await client.get('/api/v1/admin/internet-accounts'),headers={'X-Timekeeper-Owner':response.headers()['x-timekeeper-owner']},state='c'.repeat(43);
   try{
     await page.route('**/api/v1/task-providers/microsoft/authorize',route=>route.fulfill({headers,json:{authorizationUrl:`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?state=${state}`,expiresAt:new Date(Date.now()+600000).toISOString()}}));
-    await page.route('https://login.microsoftonline.com/**',route=>route.fulfill({status:302,headers:{location:origin()+`/web/task-provider-callback.html?state=${state}&error=access_denied`}}));
+    await page.route('https://login.microsoftonline.com/**',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="en"><title>Provider fixture</title><body><a href="${origin()}/web/task-provider-callback.html?state=${state}&amp;error=access_denied">Continue</a></body></html>`}));
     await page.route('**/api/v1/task-providers/cancel',route=>{expect(route.request().postDataJSON()).toEqual({state});return route.fulfill({headers,json:{verification:true,cancelled:true}});});
-    await page.goto('/admin/#internet-accounts');await page.getByRole('button',{name:'Verify with Microsoft',exact:true}).click();await expect(page.locator('#task-provider-result')).toContainText('cancelled');await expect(page.locator('#task-provider-return')).toHaveAttribute('href','/admin/#internet-accounts');
+    await page.goto('/admin/#internet-accounts');await page.getByRole('button',{name:'Verify with Microsoft',exact:true}).click();await page.getByRole('link',{name:'Continue',exact:true}).click();await expect(page.locator('#task-provider-result')).toContainText('cancelled');await expect(page.locator('#task-provider-return')).toHaveAttribute('href','/admin/#internet-accounts');
   }finally{await admin.close();}
 });
 
