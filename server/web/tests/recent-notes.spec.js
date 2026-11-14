@@ -137,7 +137,11 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   await page.evaluate(()=>document.documentElement.style.setProperty('--font-today-recent-note','1.1rem'));
   expect(await recent.locator('[data-recent-note]').first().evaluate(node=>parseFloat(getComputedStyle(node).fontSize)/parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(1.1,2);
   await page.evaluate(()=>document.documentElement.style.removeProperty('--font-today-recent-note'));
-  const current=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':current.headers().etag});await page.reload();await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toHaveAttribute('aria-expanded','false');await page.locator('#today-main-actions-toggle-right-sidebar').click();
+  const current=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':current.headers().etag});await page.reload();
+  // The first account snapshot resets sidebar state. Interact after that reset,
+  // rather than mistaking the constructor's collapsed state for readiness.
+  await expect(page.locator('#status')).toHaveAttribute('data-state','ready');await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+  const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');await expect(sidebar).toHaveAttribute('aria-expanded','false');await sidebar.click();await expect(sidebar).toHaveAttribute('aria-expanded','true');await expect(recent).toBeVisible();
   for(const [entry,,,label] of cases)await expect(recent.locator(`[data-recent-note="${entry.id}"]`)).toHaveAccessibleName(new RegExp('^'+label+': '));
 });
 
