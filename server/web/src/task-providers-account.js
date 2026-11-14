@@ -72,7 +72,7 @@ export async function renderTaskProviders(view){
     const additions=node('label',undefined,'d-flex gap-2 align-items-start mb-3');card.additions=node('input',undefined,'form-check-input');card.additions.type='checkbox';card.additions.checked=data.reviewAdditions!==false;additions.hidden=data.providerId!=='google';additions.append(card.additions,node('span',t('task_identities.review_additions')));card.additionsLabel=additions;
     const fields=node('div',undefined,'internet-selection-list');fields.setAttribute('role','group');fields.setAttribute('aria-label',t('task_providers.lists'));card.choices=node('div');fields.append(card.choices);card.form.append(fields,additions);
     card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('task_providers.save_lists'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
-    card.form.append(card.feedback,card.save);card.form.addEventListener('submit',event=>{
+    card.form.append(card.save);card.form.addEventListener('submit',event=>{
       event.preventDefault();run(async()=>{
         const selectedLists=[...card.form.querySelectorAll('input[name=selectedLists]:checked')].map(input=>input.value);
         const projectMappings=Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null]));
@@ -109,7 +109,7 @@ export async function renderTaskProviders(view){
     card.reviewRoots=[identities,incoming,writes];card.taskSection.append(card.taskHeading,card.direction,card.form,card.imports,card.reviewPanel,identities,incoming,writes);columns.append(card.taskSection);
     const settings=node('details',undefined,'internet-connection-settings');settings.dataset.connectionSettings=data.id;settings.append(node('summary',t('internet_accounts.connection_settings')),card.services.fieldset,accessLabel,node('p',t('internet_accounts.reconnect_help'),'hint'));
     const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.pause,card.reconnect,card.disconnect);settings.append(actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));
-    panel.append(header,card.error,card.retry,columns,settings);cards.set(data.id,card);return card;
+    panel.append(header,card.feedback,card.error,card.retry,columns,settings);cards.set(data.id,card);return card;
   }
   function paintImports(card){
     const values=card.data.imports||[],signature=JSON.stringify(values);if(signature===card.importSignature)return;

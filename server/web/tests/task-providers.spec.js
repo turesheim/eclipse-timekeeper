@@ -112,6 +112,13 @@ test('calendar-only sign-in uses the shared service and does not request task wr
   await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(target);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:false,calendars:true},language:'en',direction:'IMPORT'});
 });
 
+test('calendar-only connection actions keep errors visible outside hidden task controls',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{services:{calendars:true,tasks:false},selectedLists:[],availableCalendars:[],selectedCalendars:[]});await providerFixture(page,owner,{rows:[row]});
+  await page.route('**/api/v1/task-providers/'+row.id+'/refresh',route=>route.fulfill({status:503,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},body:JSON.stringify({code:'TASK_PROVIDER_UNAVAILABLE',status:503})}));await open(page,{expanded:false});const panel=card(page,row.id);
+  await expect(panel.getByRole('heading',{name:'Tasks',exact:true})).toBeHidden();const refresh=panel.getByRole('button',{name:'Refresh from provider',exact:true});await refresh.focus();await refresh.press('Enter');
+  await expect(panel.locator(':scope > .form-feedback')).toBeVisible();await expect(panel.locator(':scope > .form-feedback')).not.toBeEmpty();await expect(refresh).toBeEnabled();
+});
+
 test('direct connections offer calendar and task choices without infrastructure controls',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[]});await page.route('https://accounts.google.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Google consent fixture</title>'}));await open(page);
   const google=page.locator('[data-internet-provider=google]');await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeChecked();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('link',{name:'Add a calendar subscription',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:true},language:'en',direction:'IMPORT'});
