@@ -230,11 +230,11 @@ the explicit [operator recovery](ACCOUNTS.md#change-the-public-hostname) workflo
 See [email recovery and hostname changes](ACCOUNTS.md#recovery-email-addresses)
 before enabling delivery or changing a VPN/public hostname.
 
-Internet accounts use shared sign-in without per-NAS OAuth setup. Optional
-legacy direct task app registrations retain their
-`secrets/task_providers.properties` stays outside generated runtime settings and
-is included in native and Hyper Backup application archives. See
-[task-provider setup](TASK-PROVIDERS.md) for registration and account sign-in.
+For Internet accounts, choose a managed OAuth service or register Google and
+Microsoft applications for this NAS. See [OAuth setup](SHARED-SIGN-IN.md). Existing
+`secrets/task_providers.properties` files stay outside generated runtime settings
+and are included in native and Hyper Backup application archives; see
+[retained settings](TASK-PROVIDERS.md#retain-operator-settings).
 
 Back up before upgrades. A failed application upgrade leaves native data and
 retained configuration intact; retain the previous `.spk` for recovery. Real DSM

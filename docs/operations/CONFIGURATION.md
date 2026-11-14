@@ -43,4 +43,4 @@ instance backups remain readable. CI test harness variables and historical
 verification records retain their original names; they are not operator settings.
 
 For direct OAuth setup see [direct registration](SHARED-SIGN-IN.md#direct).
-For managed deployment see [managed OAuth](SHARED-SIGN-IN.md#managed).
+For managed service deployment see [OAuth service operations](CONNECT-SERVICE.md).

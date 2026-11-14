@@ -123,12 +123,12 @@ HTTPS/webcal feed setup without provider login. Specialized feeds that actually
 include VTODO remain supported under Advanced feed options. Google and Microsoft
 calendar feeds should use the normal Calendar events choice.
 
-Shared sign-in is the default. Its one central OAuth registration serves all
-installations; each user still authorizes their own account and selected
-services. No local administrator provider enablement or per-NAS registration is
-required. If shared sign-in is temporarily unavailable, existing imported data
-and ordinary subscriptions remain usable. The service must first be hosted and
-registered by the project; see [OAuth mode setup](SHARED-SIGN-IN.md).
+The default **Managed OAuth service** uses app registrations maintained by a
+service operator for several installations. Each user authorizes their own
+account. The service must be deployed and configured before use; for self-hosting,
+use **Direct registration**. See [Google and Microsoft OAuth setup](SHARED-SIGN-IN.md).
+Existing imported data and ordinary subscriptions remain usable if the service
+is unavailable.
 
 Google calendar synchronization keeps incremental checkpoints, resetting expired
 sync tokens with a complete scan. Microsoft reads complete calendar definitions,
@@ -141,82 +141,36 @@ mapping and its bundled Unicode license.
 Microsoft exception definitions count toward the same calendar budget. Each
 recurring series also has a 4 MiB total response budget across its exception pages.
 
-## Check the installation in Administration
+## Administrator setup
 
-Open **Administration → Internet accounts**. The page shows the active sign-in
-mode, public address, installation return address and Google redirect URI.
-**Check setup** resolves shared-service discovery and reads its configured
-Google/Microsoft registrations. Loading the page alone makes no provider request;
-the check does not start consent or read personal calendars or tasks.
+Follow [Google and Microsoft OAuth setup](SHARED-SIGN-IN.md) for provider console
+links, redirect URIs, scopes and credentials. Both managed and direct connections
+support calendars, tasks or both.
 
-If the public address is missing, use **Set public HTTPS address** to open
-General settings, save the exact public origin and restart Dagsverk. Shared mode
-uses `https://SHARED_HOST/oauth/google/callback` in Google Cloud; the displayed
-installation return address is a separate handoff and is not Google's redirect.
+**Administration → Internet accounts** shows the active mode, HTTPS address,
+redirect URIs and registration status. **OAuth application settings** lets an
+administrator save client IDs and replace or clear write-only secrets. Blank
+secret fields keep the saved values. Saving requires your administrator password
+and the current settings version; restart every instance to activate changes.
 
-Shared-service client IDs and secrets stay in the service's private environment.
-For self-managed Google and Microsoft registrations, **OAuth application settings** lets an
-administrator edit this installation's client ID and replace or clear its
-write-only secret. Blank preserves the saved secret. Saves require the current
-administrator password and a current version, then a coordinated restart.
-Shared-service registrations remain separate from these installation settings.
-A configured registration is not proof that Google APIs, consent, refresh or reconnect work;
-perform those live checks before making the shared service public. The complete
-operator setup is in [OAuth mode setup](SHARED-SIGN-IN.md).
+**Check setup** validates active local settings or contacts the managed service.
+It does not start provider consent or read personal calendars/tasks. Verify a
+real connection after setup; configured credentials alone do not prove API access.
 
-## Advanced: direct server registration
-
-Installation settings are stored privately with the service configuration and
-retained by protected instance backups. They are excluded from portable account
-archives. The Google secret is never returned by the Admin API. General settings
-and Internet accounts share an optimistic version, preventing either page from
-overwriting newer saved settings. Authentication recovery preserves these values.
-
-Self-managed registrations support calendar-only, tasks-only and combined connections.
-In **Administration → Internet accounts → OAuth application settings**, choose
-**Direct registration (own OAuth application)**. Register the displayed **Google redirect
-URI for direct registration** in Google Cloud, enter the client ID and secret,
-save with the current administrator password and restart every server instance.
-Use **Check setup** after restart, then connect Google under Account → Internet
-accounts with the desired Calendar and/or Tasks services selected. The optional environment settings below initialize
-new installations; settings saved in Administration take precedence. Direct
-registration uses the same calendar API synchronizer as managed OAuth. No provider password
-is entered into Dagsverk.
-
-Configure Dagsverk's public HTTPS origin first, including its port. For example,
-`https://dagsverk.example.ts.net:8443` requires this exact redirect:
-
-```text
-https://dagsverk.example.ts.net:8443/web/task-provider-callback.html
-```
-
-Use the same hostname when opening Dagsverk and completing sign-in. The return
-is bound to the initiating account and browser. Do not append a fragment, query
-or trailing slash. Changing the public origin requires updating registrations
-and reconnecting.
-
-For Google, enable the Google Tasks API in a Google Cloud project, configure
-the OAuth consent audience, and create a **Web application** OAuth client.
-Register the redirect above and retain its client ID and secret. Dagsverk
-requests `openid` and `https://www.googleapis.com/auth/tasks.readonly` for
-import-only access, or `https://www.googleapis.com/auth/tasks` after an explicit
-two-way choice, with offline access for background refresh. In Testing, add intended accounts as
-test users; Google's testing and verification policies apply. See Google's
-[web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server)
-and [Tasks scopes](https://developers.google.com/workspace/tasks/auth).
-
-For Microsoft, register an Entra application supporting accounts in any
-organizational directory and personal Microsoft accounts. Add a **Web** platform
-with the redirect above. Create a client secret and retain its **value**, not its
-secret ID. Configure Graph delegated `User.Read` and `Tasks.Read`; Dagsverk also
-requests `openid` and `offline_access`. Tenant consent policies may require
-administrator approval. The connector uses the `common` authorization endpoint.
-See [app registration](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
-and [Graph permissions](https://learn.microsoft.com/en-us/graph/permissions-reference#tasksread).
+Settings are private, retained by protected instance backups and excluded from
+portable account archives. Authentication recovery preserves them. General
+settings and Internet accounts share a version to prevent overwriting newer edits.
 
 ## Retain operator settings
 
-Use a Java properties file with only the configured providers:
+For environment-based first setup, use `DAGSVERK_CONNECT_SHARED=false`,
+`DAGSVERK_PUBLIC_ORIGIN`, `DAGSVERK_GOOGLE_TASKS_CLIENT_ID`,
+`DAGSVERK_GOOGLE_TASKS_CLIENT_SECRET`, `DAGSVERK_MICROSOFT_TASKS_CLIENT_ID`
+and `DAGSVERK_MICROSOFT_TASKS_CLIENT_SECRET`. Settings saved in Administration
+take precedence over these first-boot defaults.
+
+Existing operator setups can use a Java properties file with only the configured
+providers:
 
 ```properties
 timekeeper.tasks.google.client-id=REPLACE_WITH_CLIENT_ID

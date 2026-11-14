@@ -8,6 +8,8 @@ import re
 import subprocess
 import zipfile
 
+from documentation import render_document
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -38,8 +40,12 @@ def package(output, commit):
         for path in sorted(app.rglob('*')):
             if path.is_file():
                 target.write(path, 'dagsverk-connect/' + path.relative_to(app).as_posix())
+        guides = {'docs/operations/SHARED-SIGN-IN.md': 'README.md',
+                  'docs/operations/CONNECT-SERVICE.md': 'CONNECT-SERVICE.md'}
+        for source, destination in guides.items():
+            target.writestr('dagsverk-connect/' + destination, render_document(ROOT, source, guides, commit))
         for source, destination in (
-                ('docs/operations/SHARED-SIGN-IN.md', 'README.md'), ('LICENSE', 'LICENSE'),
+                ('LICENSE', 'LICENSE'),
                 ('server/connect/deploy/compose.yaml', 'deploy/compose.yaml'),
                 ('server/connect/deploy/service.env.example', 'deploy/service.env.example')):
             target.write(ROOT / source, 'dagsverk-connect/' + destination)

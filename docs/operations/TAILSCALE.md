@@ -141,5 +141,5 @@ The browser can return to a VPN-only Dagsverk HTTPS callback when it remains on
 Tailscale and the provider accepts the exact registered URI, including its port.
 Dagsverk does not need public ingress for this browser return. Managed OAuth
 returns through the central broker before handing back to the private installation;
-direct OAuth returns straight to the installation. See the [OAuth setup and live
-Synology/Tailscale acceptance checks](SHARED-SIGN-IN.md#private-synology-and-tailscale-callbacks).
+direct OAuth returns straight to the installation. See the [OAuth setup](SHARED-SIGN-IN.md#private-https-addresses) and
+[service acceptance checks](CONNECT-SERVICE.md#discovery-and-acceptance).
