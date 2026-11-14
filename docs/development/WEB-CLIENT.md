@@ -1,1381 +1,196 @@
-# Timekeeper web client
+# Web client implementation
 
-The **About** item at the bottom of the account menu opens a dialog that reads
-`/api/v1/server` to identify the running server version and commit. Its details distinguish immutable build time, explicitly
-recorded deployment time and process-start time. Information refreshes after
-long polls and manual refreshes, including during rolling updates. Missing
-deployment metadata is shown as **Not recorded**. The Docker/Synology deployment
-guide records `DAGSVERK_DEPLOYED_AT`; direct JVM deployments may supply the
-same UTC timestamp as an environment variable. Maven embeds Git identity and
-build time in the server, and Docker builds receive Git identity as build args.
+The bundled client at `/web/` uses native browser modules and Bootstrap 5.3.8.
+Maven includes `server/web/src` in the server JAR; production needs no Node
+service or CDN. Use Node 24 for development and the pinned npm lockfile.
 
-The standalone server serves its bundled client at `/web/`. Production uses
-native browser modules; no Node process, CDN or separate database is needed.
-Maven includes `server/web/src` in the server JAR. Users sign in with username and
-password; the [account guide](../operations/ACCOUNTS.md) describes first setup,
-legacy owner migration and recovery. The browser restores an HttpOnly Secure
-cookie after reload. **Remember me** controls persistence across browser restarts.
-API tokens for Eclipse are created under **My Account → API tokens**, shown once, and stored only
-as hashes on the server. New credentials never enter browser storage. Existing
-saved tokens are exchanged for a parent-bound cookie and then removed. Sign out
-revokes the cookie session and clears records, drafts, requests and clipboard.
+For user workflows, see the [web client guide](../operations/WEB-CLIENT.md).
+For build, package and Playwright commands, see [browser acceptance](WEB-ACCEPTANCE.md).
+The [repository guide](REPOSITORY.md) covers the two Java reactors.
 
 ## Synchronization
 
-Refresh binds the account first, then loads independent collections and reports
-in parallel. Profile and revision checks still reject mixed snapshots and retry
-up to three times. A 30-second overall deadline covers all pages and attempts;
-failed or superseded attempts abort their outstanding reads. Browser console
-warnings report refreshes lasting at least five seconds without exposing records.
-Change polling shares any refresh already in flight. It reloads again if that
-completed read is older than the batch; running work keeps its periodic refresh.
-Popup saves use the shared notes-changed event to request a single refresh.
-Inactive client, project, label, activity, month and week views retain their data
-and paint when selected. Unchanged client, project and label lists keep their
-existing rows and focused actions during unrelated synchronization. Notes retains its catalog for unchanged account
-revisions; note changes, local invalidation and the Notes Refresh action reload it.
-Notifications arriving during a catalog read or another busy operation remain
-pending for one follow-up reload when the view is ready.
-Today retains its calendar cards during background reads and only replaces them
-when event content, subscription warnings, focus, client presentation or the
-selected date/time zone changes. Unchanged feed polls also retain Week's timed
-and all-day cards. Synchronization leaves the journal draft and keyboard focus
-available while requests are pending.
-For a loaded Today journal, permission to draft depends on the signed-in
-account's write permission, separately from permission to submit changes.
-After a record save or a connection failure, account recovery pauses mutations
-but leaves the day label and body editable. A journal status explains that
-changes remain in the current tab while synchronization is pending; Refresh
-retries the connection. A consistent snapshot resumes autosave using the draft's
-original note and label versions, so concurrent edits still require review.
-Refresh publication retains the editor, selection, scroll and undo history.
-Queued refreshes cancel the older snapshot's outstanding reads before starting
-the replacement. Sign-out and authorization failures still clear the draft.
-See [Synology synchronization diagnostics](../operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
-for request and database timings in the container logs.
+The API session binds all requests to the authenticated owner. Refresh loads
+independent collections in parallel, validates profile/revision consistency and
+rejects mixed snapshots. It has a 30-second overall budget and up to three
+attempts; failed or superseded reads are aborted. Polls share in-flight refreshes
+and schedule a follow-up when that read predates a received change.
+
+Preserve focused controls and drafts during background publication. Retain
+unchanged rows/cards instead of repainting inactive views. Notes catalog changes
+arriving during a read or busy operation stay pending for a follow-up. A
+recoverable connection failure pauses writes while retaining an editable journal;
+consistent recovery uses the original note/label validators. Sign-out or lost
+authority clears owner data, requests and drafts. Never replay an ordinary write
+because its response was lost; use durable command receipts where the API defines them.
+See [API v1](../architecture/API-V1.md) and the synchronization browser scenarios.
 
 ## Language and region
 
-The client uses locally bundled **i18next 26.5.2** with complete English and
-Norwegian Bokmål catalogs in `server/web/src/locales/{en,nb}.json`. No CDN or
-translation service is used. `npm run vendor:i18n` validates matching keys and
-interpolation variables, then generates the native-module resources and copies
-the pinned upstream ESM distribution and license. `npm test` verifies these
-assets as well as pluralization, formatting, literal user text and stable import
-fingerprints.
+Edit both `server/web/src/locales/en.json` and `server/web/src/locales/nb.json`,
+then run:
 
-`i18n.js` selects the first supported browser language (Norwegian `nb`, `no` and
-`nn` use Bokmål; English keeps its browser region), with `en-GB` as fallback.
-**My Account → Profile → Language and region** can override this with `en-GB`,
-`en-US`, or `nb-NO`, or restore the browser default. The optional nullable
-`locale` field on `/me` persists account-wide; omission preserves it, while
-`null` removes the override. Existing timezone-only clients remain compatible.
-Schema 6 adds `tk_locale`; older owners have no override. `/auth/session` returns
-the same owner-scoped preference so `bootstrap.js` loads it before evaluating
-UI modules. Signing into an account with another language or saving a language
-reloads the page after confirmation. Other account drafts require explicit
-confirmation before a language change discards them.
+```sh
+npm run vendor:i18n --prefix server/web
+```
 
-Only marked UI text and attributes are translated. User records, identifiers,
-CSV headers, timestamps and import fingerprints remain literal. `Intl` applies
-the region to display dates, numbers and sorting; account time zones remain
-independent. Worker requests carry the UI locale for consistent diagnostics.
-New messages belong in both catalogs, use interpolation for values and i18next
-plural forms for counts, and render through text nodes or attributes.
-
-![Norwegian account preferences on a narrow screen](../assets/screenshots/locale-norwegian-account.png)
-
-![Norwegian administration on a narrow screen](../assets/screenshots/locale-norwegian-administration.png)
+The generator validates keys/interpolation and writes `resources.js`; do not edit
+that output manually. Bundled i18next resolves the account preference or browser
+fallback before UI initialization. `Intl` handles display formatting; the account
+time zone is independent. Translate marked UI text and attributes, never user
+records, identifiers, import fingerprints or CSV headers. Render values as text.
 
 ## Passkey sign-in and account management
 
-The sign-in page offers an explicit **Sign in with a passkey** button when the
-server has a configured HTTPS hostname. Password sign-in remains available;
-canceling a native credential prompt leaves the form usable. **Remember me**
-applies to either method. No credential is requested automatically on page load.
-
-**My Account → Password** accepts a current password or fresh registered-passkey
-verification. **Confirm with → Existing passkey** lets an administrator or ordinary
-account holder replace a forgotten password. Canceling leaves the password draft
-and session usable. Success signs out existing sessions and API tokens and retains
-registered passkeys. Token-derived sessions cannot use passkey proof.
-
-**My Account → Passkeys** lists user-named keys and creation/last-used times in
-the account time zone. Adding or removing a key requires fresh password or
-passkey proof. Removing the key used for the current session signs the user out.
-The passkey name is a label, separate from the password-confirmation form so it
-is not presented as a login username. Its required-name validation, Enter to
-submit, and unsaved-change protection still apply; the password field keeps its
-normal current-password completion.
-Keys enrolled for an earlier hostname are marked unavailable at the current RP;
-they remain visible until their owner removes them after testing a replacement.
-Token-derived sessions direct the user to account sign-in before enrollment.
-See [account operations](../operations/ACCOUNTS.md#passkeys) for configuration,
-recovery, hostname changes and protected backup behavior.
-
-![Passkey management on desktop](../assets/screenshots/passkeys-desktop.png)
-
-![Passkey management on a narrow screen](../assets/screenshots/passkeys-mobile.png)
-
-Bootstrap Icons 1.13.2 supplies locally bundled icons for navigation, tree
-controls, action buttons and projects. Buttons retain accessible names and hover
-titles; CSS, fonts and the MIT license are included in the server distribution.
-Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
-project catalog and API allow-list. `npm run check:assets` verifies them.
-
-Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
-Tasks and Notes. Clients, Projects and Labels are configured on separate pages under **My Account**.
-
-Configure **My Account → Focus areas** with a name and a set of clients, then
-select an area in the account menu. **No focus** shows all clients and unassigned
-work; an empty area shows no client-related records. Today, Calendar, Week,
-Workweek, Activities and Tasks use the same client filter, including
-totals and subscribed calendar events/to-dos. Journal notes, day labels and the
-notes vault are independent of clients and remain available. Focus changes only
-presentation, never stored work or API permissions. Editors retain all client
-choices. A running timer outside the focus remains stoppable through the timer
-controls, with an outside-focus hint in place of its details. Finish an inline
-work-session edit before switching focus. Signing in starts with **No focus**;
-focus definitions are saved privately on the server.
-The active view has `aria-current="page"`; compact screens show icons with
-accessible names, and wide screens also show labels. Safe-area padding keeps the
-bar and page content clear of each other. Standard action buttons use Bootstrap
-`btn` variants, including the manual status refresh and calendar actions. The
-clickable sync indicator sits immediately beside the Timekeeper title in the
-header, remains available in My Account and is hidden when signed out.
+The browser restores an HttpOnly Secure session cookie. CSRF and owner binding
+remain memory-only. New tokens never enter browser storage; legacy saved tokens
+are exchanged and removed. Token-derived sessions cannot perform protected
+account/administrator operations. Reuse the account/settings view lifecycle so
+late replies cannot repopulate a signed-out page. See [account operations](../operations/ACCOUNTS.md)
+and the authoritative [API contract](../architecture/API-V1.md).
 
 ## Tasks
 
-Tasks combines native Dagsverk and Eclipse/Mylyn task records with read-only
-to-dos actually published by visible calendar subscriptions with **To-do items**
-enabled. All includes completed, cancelled, undated and distant calendar tasks;
-recurrence definitions and detached instances retain their published identities.
-It does not manufacture an unbounded list of virtual occurrences.
-
-The standard left sidebar provides Today, All and Time critical, followed by
-clients and categories. Categories include task metadata, calendar categories
-and project names, preserving the Eclipse/Mylyn project/category mapping.
-Focus areas apply to native and calendar tasks. Today selects unfinished tasks
-scheduled, starting or due on the current account day. Time critical selects
-unfinished tasks overdue, due today or explicitly urgent. Civil dates retain
-their day; timed dates use the account zone. Unknown zones or ambiguous times
-that cannot be projected across zones retain their original values in details
-and show a date-review hint. No UTC instant is invented.
-
-Native tasks can be created or edited through the existing conditional editor,
-including direct client assignment without a project, priority and civil or timed
-deadlines. The editor retains unedited start values, flags and deadline precision.
-The task toolbar groups **New task**, **Refresh tasks**, and **Hide completed
-tasks**, which starts enabled and applies to all sidebar filters and sources.
-**Main actions** contains the left-sidebar toggle and **Task actions → Complete
-all visible tasks**. The latter reviews a count before completing only the
-rendered, unfinished native tasks in the current filter. Completed/cancelled and
-read-only calendar tasks are skipped; **Show more tasks** controls which rows
-are included. Each conditional write retains its own validator; a conflict or
-uncertain reply stops the batch and refreshes current records without replaying
-writes.
-Each row has a completion checkbox; native tasks use conditional planning writes
-and update linked note checkboxes, while calendar tasks remain read-only.
-Uncertain replies are reconciled by refreshing rather than replaying a write.
-The navigator resizes by dragging its separator or using Left/Right and Home/End;
-its width and desktop collapse state survive tab and filter changes during the session.
-The mobile drawer uses the same sidebar control and closes with Escape or a
-filter selection. Task rows link directly to their current source note using
-the shared note icon. Running tasks have a tracking marker and an advancing
-elapsed duration, also shown below the work-session tracker. Stopping records
-the activity independently of the work session. Details
-include guarded deletion and a type-specific link to the current source note
-for Markdown checklist tasks, plus **Start tracking** / **Stop tracking** through
-the existing reviewed activity commands. Titles and native task text render the
-shared Markdown inline styles, including `==highlight==`, and emoji shortcodes.
-Authored HTML stays literal in Markdown, image references never fetch resources,
-and only safe web/mail links become active. Prose `@Client_Name` annotations use
-the same accent and underline as hashtags without rewriting source text.
-Calendar tasks remain in their source collection and cannot be edited or
-converted to worked time from Tasks. Read-only sessions retain browsing and
-details. Catalog paging restarts if a source snapshot changes, and the list
-renders 50 rows at a time with **Show more tasks**. Source refreshes every 30
-seconds while visible; session changes clear records, filters, details and
-in-flight reads. The sidebar becomes a keyboard-accessible drawer on phones.
+Native tasks and read-only calendar to-dos share filtering and presentation, not
+write authority. Bulk completion is limited to rendered, unfinished native tasks
+and retains each validator. Civil dates remain civil; ambiguous or unknown zones
+must not acquire invented UTC instants. Provider imports and outbound changes
+use their review/receipt flows. See [task synchronization](../architecture/TASK-SYNC-PROTOCOL.md),
+[provider capabilities](../architecture/TASK-SYNC-CAPABILITIES.md) and
+[operator setup](../operations/TASK-PROVIDERS.md).
 
 ## Shared Markdown component
 
-Popups stay within the viewport and scroll overflowing content. The account menu
-uses the space below its trigger and recalculates it after viewport or header
-resizing. Note dialogs retain a usable content area beneath wrapping headings;
-when the full layout cannot fit, the dialog itself also scrolls. Account and note
-popup scrolling stays within the popup; keyboard users can reach its content and actions.
-
-Today, Notes and the daily, weekly and event dialogs use `MarkdownField` with
-one Milkdown schema and the same toolbar. Markdown source is a plain textarea.
-Code blocks lazy-load syntax highlighting; the retired enhanced-source and split
-preview implementations are removed. Component/browser tests mount this product
-component through test-only Playwright routes. No prototype page is shipped or
-linked from About. See the [editor development contract](MARKDOWN-EDITOR.md).
+Use the shared MarkdownField rather than another editor implementation. Preserve
+canonical source, selection, undo history, attachment identity and pending-save
+behavior across Today, Notes and dialogs. The [component guide](MARKDOWN-EDITOR.md)
+and [journal integration](JOURNAL-EDITOR.md) own the detailed editor contracts.
 
 ## Today and Calendar views
 
-The shared date-navigation component reuses each view's date input and period
-handlers. Today, Calendar, Week, Workweek and Activities use the same grouped
-picker and previous/current/next controls; the monthly picker retains its month
-and year popover. Date labels remain available to assistive technology, while
-redundant visible month, work-session and date/time-zone captions are omitted.
-
-**Today** is the default workspace tab. It opens a selected day with its Markdown
-journal in the main column. The date field and adjacent buttons move between
-days. The mini calendar selects any visible date, marks dates containing day
-notes, and opens a weekly Markdown note from each ISO week number. Weekly notes
-sync and export as `YYYY-Www.md`, using the ISO week-based year. The sidebar
-groups work sessions by client and lists all-day and timed calendar events plus
-tasks scheduled for the selected date. Selecting a work session opens its editor.
-The inline journal uses the same saved day note and conflict handling as
-Calendar and Week. Pending changes are autosaved before selecting
-another date. On narrow screens the day overview follows the journal.
-
-Today uses three desktop columns: the existing day overview on the left, the
-journal in the main area and a generated **Table of contents** on the right.
-The date navigator, day title and **Main actions** span the left/main area;
-**Note revisions**, **Associate with client** and **Delete note** are available
-there. Left/right sidebar buttons appear in Main actions for the sidebars present.
-Each toggles its sidebar independently and gives the journal the freed space.
-Notes uses the same **Main actions** controls for sidebar visibility, revisions,
-client association, deletion, renaming/moving and reloading. Its left sidebar
-contains the folder navigator; its right sidebar places Recent notes below
-Today's shared live outline in source and formatted modes. Outline links use text
-1px smaller than the body, compact line spacing with no gaps between rows, and at
-least 24px row targets. Long headings wrap without clipping. Dialog editors retain
-note actions in **Note tools**.
-
-Drag either desktop sidebar separator to resize that panel, or use Left/Right,
-Home and End while the separator has keyboard focus. This also applies to
-Notes. Left/Right moves the separator; Home and End select the minimum and
-maximum width. Collapsing a sidebar retains its width and draft. Both
-sidebars scroll independently and the journal stays above the fixed view selector.
-On narrow screens the contents sidebar starts hidden and can be expanded from
-Main actions above the journal; the overview follows the journal. Sidebar choices
-are retained separately for wide/narrow layouts while signed in, including when
-switching views or dates. Collapsing the overview also hides its resize handle;
-expanding it restores its width.
-
-The contents list follows actual Markdown headings, including Setext headings
-and repeated titles, and updates during formatted or source editing. Selecting a
-heading moves the editor caret without navigating, rewriting the note or adding a
-revision. Code examples and opaque frontmatter do not become contents entries.
-
-Today’s work-session cards use Calendar’s font sizes. Calendar event cards show
-the title, time, and client name with a client-coloured edge. Select an event to
-open its full date/time, calendar, location, and description in a dialog.
-
-![Today view with journal and day overview](../assets/screenshots/today-desktop.png)
-
-![Today view on a narrow screen](../assets/screenshots/today-mobile.png)
-
-**Calendar** has a Monday-to-Sunday month grid that shows
-one client-coloured summary per client and day, with recorded session hours per
-client above it. Only clients with logged time in the selected month are shown.
-Multiple sessions for the same client are combined. Use the controls on the left
-to move between months or return to the current month. The calendar button inside
-the Month selector opens a month/year picker; a month can also be entered as `YYYY-MM`.
-On mobile, swipe left across the month to go forward or right to go back.
-Workweek, Activities and Week also support swiping between weeks on their
-headings or other non-scrolling areas. Wide tables and the calendar grid keep
-their normal scrolling and editing gestures. Date controls remain available.
-Right-click a day or **press and hold** it on a touch screen, then choose
-**Add day note** / **Edit day note**. A short label such as “Ferie” or “Avspasering”
-appears beside the date in blue, distinct from red national holidays. Select the
-label to edit it, or use the small note icon shown on hover or keyboard focus beside
-an empty date. Empty-day icons are hidden by default on touch screens;
-press and hold a day to create its note. Keyboard users can
-focus that button and press **Shift+F10** for the same menu. Movement cancels a
-long press, preserving scrolling and month swipes.
-
-Labels accept up to 80 characters. The API independently stores a Markdown body
-(up to 200,000 UTF-8 bytes), with a lightweight body-presence marker in calendar
-summaries. Label-only edits preserve that body, and clearing a label leaves a
-body-only note discoverable. The shared day editor edits independent label and note resources, each with
-its own version. Saves send only changed fields; if both change, the editor
-command commits both or neither. **Delete note** preserves the day label and
-keeps an unsaved label draft open. A concurrent label change still requires
-review before that draft can be saved.
-The expanded day-note dialog edits the short label and Markdown body independently. **Formatted** provides paragraphs, headings,
-bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
-links, quotations, tables and keyboard undo/redo. Link addresses are validated.
-Ordinary clicks follow regular web/local links and safe HTML anchors; rendering
-and navigation preserve the draft. A daily
-wiki link such as `[[2026-10-26]]` opens **Today** on that date with one click,
-including from day, week, event and vault notes. Command/Ctrl-click opens the
-requested date in another tab, and `/web/?day=2026-10-26` is a direct link.
-Daily links work in read-only notes too. Notes save pending changes before changing the day or closing their dialog; a
-failed save keeps the editor and its draft open. Rich edits preserve the `[[YYYY-MM-DD]]` syntax. Code examples
-and escaped brackets stay literal. Ordinary vault wikilinks support aliases,
-heading targets, completion and authenticated raster embeds with sizing.
-Unknown extensions remain inert editable source fragments, allowing surrounding
-Markdown to stay formatted. **Markdown source** retains the complete body. Opaque YAML
-frontmatter is shown separately and preserved in saves. The Formatted and Markdown
-source mode buttons share the editor toolbar with formatting actions, separated
-by a vertical divider. Mode buttons use icons with localized tooltips. Editing
-help and the separate clear/download actions are omitted. Safe angle-bracket
-autolinks remain renderable, rich edits retain resource-link syntax, and
-new or edited horizontal rules are saved as `---`.
-Unchanged top-level blocks reuse their authored source during a rich edit, retaining
-setext headings, list markers, table spelling, fence choices, blank-line spacing
-and mixed line endings. The serializer checks the resulting Markdown against its
-canonical semantic projection. Edits within a list/table/quotation serialize that
-whole block; ambiguous mappings or incompatible boundaries retain the canonical
-whole-document fallback. Unchanged documents still return their original bytes,
-and frontmatter stays separate. Authored HTML is never removed as a load-time
-repair: unsupported HTML remains in inert editable source fragments. Empty paragraphs generated by
-the rich editor serialize as blank lines. See [Markdown fidelity verification](../verification/MARKDOWN-FIDELITY.md) and
-the [shared editor guide](../operations/MARKDOWN-EDITOR.md).
-Fenced `mermaid` blocks show only their diagram in Formatted mode; the complete
-fenced source remains editable in Markdown source. The renderer is loaded only when a diagram is present, runs
-without third-party requests, and displays its SVG as an inert image. Invalid
-diagrams leave their Markdown source intact.
-
-![Mermaid diagram in the formatted Markdown editor](../assets/screenshots/mermaid-editor.png)
-The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
-Calendar navigation rather than introducing a separate Journal tab.
-Clear the text and save to remove a label;
-Documents autosave after a one-second pause and at least every five seconds
-while typing. Navigation and closing wait for the newest draft; there are no
-document Save or Cancel buttons. Today places Delete note beside the main title; other editors keep it below Note revisions in Note tools. Each note belongs to its calendar date
-and account, including days without work. It follows the account across web
-sessions and devices, and remains on the same date after time-zone changes.
-Narrow screens wrap the label when needed. Day notes never affect timed work,
-reports or the Eclipse UI. A separate `journal-text` icon is always visible for
-populated bodies, including body-only notes; `journal-plus` offers creation when
-there is no body. Clearing only the label retains the body indicator; clearing
-the body retains an existing badge. Empty-day add actions keep the existing
-hover/keyboard/long-press behavior. Read-only sessions can open saved bodies,
-switch modes; editing and task toggles remain disabled.
-
-Dismissal flushes both fields through their independent version guards. Failed
-saves keep the editor open with its draft. A stale version stops autosave and offers **Reload saved note**, with confirmation before replacing the draft. An
-unconfirmed write offers **Check saved result**: it reads the server and accepts
-a matching saved value without issuing another write. A differing saved value
-requires explicit reload/review. No source or draft is stored in browser storage,
-and logout clears both editor modes and their private content.
-
-Week has a right-aligned daily-note button in each day heading, including
-weekends. It edits the same dated note as the month view and retains the same
-conflict, read-only, source-preservation and logout protections. Empty note
-buttons stay visible in Week and are disabled for read-only sessions. Failed
-note reads expose retry controls without blocking timed work.
-
-![Day notes beside dates and holidays](../assets/screenshots/day-notes-desktop.png)
-
-![Editing a day note](../assets/screenshots/day-notes-editor.png)
-
-![Formatted journal on a narrow screen](../assets/screenshots/journal-editor-mobile.png)
-
-![Plain text and H1–H6 in the journal heading menu](../assets/screenshots/journal-heading-menu-mobile.png)
-
-![Editing a day note from Week on a narrow screen](../assets/screenshots/week-day-note-editor-mobile.png)
-
-Hover over a daily client total to see its sessions, summaries, projects,
-local start/end times and durations in a tooltip. These details are also available
-when viewing the account with read-only access.
-Month boundaries and daily slices follow the account's time zone, including DST;
-running sessions use the server's report time. Activity/task time is independent
-of these totals. Month navigation does not alter recorded sessions. Click a daily client total to edit its work session. When several sessions
-contribute to the total, choose one by its summary, project and local times.
-Optional project icons appear to the right of each daily duration. The same icon
-is shown once when several contributing projects use it; hover details retain
-all project names. Sessions without an icon add no placeholder.
-The same editor is available in Week and Workweek. Daily summaries remain
-readable in read-only sessions, where editing is unavailable.
-
-These views use synthetic records from `tests/track.spec.js`; the browser uses
-Los Angeles time while the account uses Oslo time.
-
-![Calendar month view on desktop](../assets/screenshots/track-month-desktop.png)
-
-![Calendar month view on a narrow screen](../assets/screenshots/track-month-narrow.png)
-
-![Calendar month and year picker](../assets/screenshots/track-month-picker.png)
+Civil-day boundaries, timer displays and navigation use the account's zone.
+Preserve Today cards when their content is unchanged, and retain the journal's
+editor instance during refresh. Layout changes must cover narrow screens, event
+warnings, empty days and running timers. See the [user guide](../operations/WEB-CLIENT.md#today-week-and-calendar)
+and the Today/Calendar browser scenarios.
 
 ## Public holidays
 
-Calendar marks national public holidays for the country selected under
-**My Account → Profile → National holidays**. This choice is independent of
-**Language and region**: Norwegian holidays can use an English interface.
-The default uses the browser region; choose a country explicitly to share it
-across devices, or **Do not show national holidays** to hide the calendar.
-Changing the interface language preserves an explicit holiday country. The
-account time zone still controls recorded work; it never moves a holiday to a
-different civil date.
-
-The optional `holidayCountry` field on `/me` stores the owner-scoped choice.
-A supported country code selects its national calendar, `none` hides holidays,
-and `null` uses the browser region. Omission preserves the current choice.
-Preference writes use the profile ETag and change feed. Internal `PROFILE_PREF`
-rows share the existing owner-scoped JSON storage; no schema upgrade is needed.
-
-![Independent national holiday preference](../assets/screenshots/holiday-preferences-mobile.png)
-
-Holiday names appear directly beside the date, with both highlighted in red and
-no icon or underline. Select the date or holiday name to read the full date and all names
-for that day. This also works with read-only access. On narrow screens the names
-are shortened visually; the dialog, hover title and accessible name retain them.
-Holiday information does not change sessions, totals or editing permissions.
-Holiday dates have a faint red background in Calendar and Week in every theme,
-including weekend holidays. Week headers show the holiday name and preserve
-today’s marker.
-
-The locally bundled [date-holidays](https://github.com/commenthol/date-holidays)
-3.37.0 dataset (2026-09-20) supplies national defaults. Regional and municipal
-holidays can differ; subdivision calendars, optional holidays and observances are
-not included. Unsupported regions and years before 0100 show an explicit message.
-The engine loads when either view needs it, without requesting an external calendar.
-A failed load offers Retry and preserves open session drafts. Data attribution
-and the complete upstream license are available in **About**.
-Run `npm run vendor:holidays` in `server/web` to regenerate the pinned engine,
-country list and licenses; `npm run check:assets` verifies every generated file.
-
-These previews use a Norwegian account with a browser in Pacific/Kiritimati:
-
-![National public holidays in Calendar](../assets/screenshots/public-holidays-desktop.png)
-
-![Public holiday details on mobile](../assets/screenshots/public-holidays-details-mobile.png)
-
-The monthly view omits its time-zone caption and normal holiday attribution
-footer. **About** shows the selected holiday country and the local date-holidays
-data license; loading failures and Retry remain available in the monthly view.
+The locally bundled holiday engine uses the selected country independently of
+UI language and account zone. Keep displayed civil dates stable. After an
+intentional engine/data update, run `npm run vendor:holidays --prefix server/web`.
+Asset checks verify the pinned version, catalog and licenses.
 
 ## Themes
 
-Choose **Theme** under **My Account → Profile** to switch between **Dagsverk**
-(the default) and **Nattverk** (dark). Their saved IDs remain `timekeeper` and
-`timekeeper-dark`, and the storage key remains `timekeeper.theme`. Saved choices
-for removed themes fall back to Dagsverk.
-
-The selection is saved on this browser and shared with other open Dagsverk tabs,
-including Administration. A saved theme also applies to sign-in and loads before
-the stylesheets to avoid flashing a light page. If browser storage is unavailable,
-theme selection still works for the current page.
-
-Theme tokens cover forms, tables, calendar surfaces, dialogs and account pages.
-Client colors remain the colors chosen for those clients. All styles and
-checkbox/radio assets are bundled locally. `tests/themes.spec.js` checks WCAG
-A/AA contrast in every view, editors and account settings, the two theme choices
-in English and Norwegian, persistence, cross-tab updates, removed-theme fallback
-and unavailable storage. It captures desktop and mobile previews under
-`server/web/test-results/`, including the logo on the main, administration and
-project-report headers. Headers display the logo without a version number;
-build details remain available in About.
+Use existing theme variables, Bootstrap 5.3.8 and locally bundled icons. Preserve
+`timekeeper` theme IDs and storage keys. Test changed surfaces in both light and
+dark themes. Regenerate intentional asset changes with their existing `vendor:*`
+commands; verify with `npm run check:assets --prefix server/web`.
 
 ## Font sizes
 
-Open **My Account → Font sizes** to edit the font properties from
-`server/web/src/typography.css`. Every property has a descriptive name and a
-comment explaining where it is used. This stylesheet is the source of the
-application defaults; components reference its properties instead of repeating
-font-size values.
-
-The CSS editor fills the available account-card width and colors selectors,
-properties, values and comments using the shared highlight.js bundle and theme
-palette. Its native text area owns the caret, selection, clipboard and Undo/Redo;
-syntax is a literal, non-interactive display excluded from assistive technology.
-Scrolling, wrapping and resizing follow the native control. Coloring never
-changes the source or applies unsaved CSS. Loading failures and forced-color
-modes retain a readable native text field.
-
-![Full-width account CSS editor with syntax colors](../assets/screenshots/font-sizes.png)
-
-The application defaults to `--font-base: 14px` throughout its web entry pages.
-Set it to `100%` to follow the browser's default, or another percentage/pixel value
-to change the size of **1rem**.
-Other `rem` sizes and rem-based spacing scale with it. `em` sizes remain relative
-to their surrounding text. Separate properties cover desktop/mobile variants,
-Calendar and Week labels, Today cards, tables, forms, tooltips, Notes and
-formatted Markdown heading levels. CSS math expressions such as `clamp()` and
-`calc()` are supported for these other sizes.
-
-Changes apply after **Save font sizes** is confirmed by the server. The editor
-accepts one `:root` block with the named font properties and CSS comments; it
-reports invalid properties or values without replacing the draft or saved
-settings. Omitting a property uses its application default. **Reset font sizes**
-saves a null preference and restores the commented defaults.
-
-The CSS fragment is stored in the signed-in user's profile as `typographyCss`,
-using `GET /me` and versioned `PUT /me` updates. It follows the account across
-browsers and devices, and applies to tracking, Administration, reports and the
-shared Markdown editor. Signed-out pages use application defaults. Signing out or switching
-accounts clears the previous user's sizes; old responses cannot restore them.
-Old browser-wide typography values are ignored. Read-only sessions can view the
-preference but cannot change it.
-
-The existing profile change feed updates other tracking tabs. Returning to a tab
-also reloads the owned profile. Clean editors follow confirmed peer changes;
-unsaved drafts retain their original version so stale saves preserve the draft
-and offer **Reload current values**. Failed or uncertain writes retain the draft
-and never silently retry the save. Other profile edits and holiday resets
-preserve typography, and resetting typography preserves other preferences. As
-with language and holiday preferences, account archives do not currently carry
-this preference; full instance backups retain the account's profile records.
-
-The early `typography.js` script validates and applies only declared font
-properties through the CSS object model, preserving the existing Content
-Security Policy. Stored CSS is bounded inert text, never an HTML or stylesheet
-injection. `tests/typography.spec.js` checks persistence across browser contexts,
-account isolation, reset, rem scaling, failed/stale writes, read-only sessions,
-Norwegian labels, keyboard navigation and accessible desktop/mobile layouts
-across both themes.
+Reuse the typography settings and semantic CSS variables. Changes to appearance
+must not rewrite stored Markdown. Exercise restored account preferences,
+responsive controls and editor content separately.
 
 ## Design baseline
 
-The main views share a fixed bottom navigation bar, with an icon for each view.
-Labels remain visible on wide screens and hide when space is limited; every
-button retains its accessible name and hover title. The bar stays within the
-device's safe area, and content and Undo notifications leave room above it.
-Account settings and sign-in use their own navigation.
-Open **About** in the account menu for Timekeeper copyright, the Eclipse Public
-License, project website, source and issue tracker. Server version, SPK version,
-commit and build, deployment and start times remain available. Expand **Web
-components and licenses** for the exact bundled Bootstrap, Bootstrap Icons,
-i18next, highlight.js, Mermaid and date-holidays versions, upstream copyright and complete local license
-texts, including date-holidays data and dependency notices. External project
-links open separately; viewing About and its license texts needs no third-party
-requests. Close the dialog with its button or Escape.
-
-`npm run vendor:notices` regenerates the About metadata and local license copies
-from pinned dependencies and bundled upstream notices. Asset checks reject stale
-metadata or missing license texts. After updating a dependency, regenerate its
-assets first and then the notices.
-
-Existing browser sessions show a loading status during restoration rather than
-flashing the sign-in form. My Account and Tracking use the same session; leaving
-the page clears private data and returning rechecks the session. Expired sessions
-and explicit sign-out still show sign-in.
-
-**Edit work session** includes **Delete**. A separate confirmation defaults to
-Cancel and leaves the draft intact when canceled or dismissed with Escape.
-Confirmed deletion uses the version originally opened in the editor, rejects
-concurrent changes, and offers Undo for ten minutes. An uncertain reply disables
-further writes until the records have been reviewed.
-
-![About with project references and library licenses](../assets/screenshots/about-references-desktop.png)
-
-![Work-session deletion confirmation on a narrow screen](../assets/screenshots/work-session-editor-delete-confirm.png)
-
-Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
-Shared action buttons use Bootstrap's default padding and content-based sizing,
-including its small and large variants. Icon buttons use the same sizing rather
-than a fixed square. Standard button text still follows the account's font setting.
-The small application theme in `style.css` defines the green palette, typography,
-spacing and visible keyboard focus. The work-session card establishes the baseline:
-a client-color accent, summary, explicit running/stopped status, local times,
-duration and consistently sized icon actions. Historical records and detailed
-totals are available in Workweek, Activities and Week. Client color is always accompanied
-by text.
-The same controls apply to sign-in/setup/recovery, account management, activities,
-clients, projects, tasks and labels. Record tables become labelled cards on narrow
-screens so actions stay in view; Workweek, Activities and Week retain their specialized
-scrollable layouts. Week geometry is isolated in `calendar.css`.
-
-These screenshots use synthetic records from `tests/design.spec.js` at 1440 and
-390 pixels wide. The design tests also capture all workspace views and account,
-sign-in and validation states under `server/web/test-results/design-*.png`.
-Review those images after layout changes; automated accessibility checks cannot
-replace visual review or keyboard testing.
-
-![Desktop work-session baseline](../assets/screenshots/bootstrap-work-session-desktop.png)
-
-![Narrow-screen work-session baseline](../assets/screenshots/bootstrap-work-session-narrow.png)
-
-Bootstrap's exact npm version and integrity are pinned in `package-lock.json`.
-Its compiled CSS and MIT license are committed under `src/assets/bootstrap`,
-alongside the SVGs extracted from its data URLs. The locally bundled Bootstrap
-Tooltip component and Popper provide hover and keyboard hints; native modal
-dialogs and the existing application navigation handle other interactions.
-The deployed client uses only same-origin files, including icon fonts, and retains
-its `img-src 'self'` security policy. Maven packages these assets directly; it does
-not require npm or an external CDN at runtime or when building the server.
-
-After deliberately updating the pinned dependency, run:
-
-```sh
-cd server/web
-npm ci --ignore-scripts
-npm run vendor:bootstrap
-npm run check:assets
-```
-
-Commit the regenerated CSS, SVGs and license together. CI checks that the bundled
-assets match the pinned dependency, then runs real-server browser tests with axe
-WCAG A/AA checks for all views at desktop and narrow widths. Those tests verify
-that no design asset triggers a third-party request or is blocked by CSP, and exercise
-keyboard focus, required fields and error recovery. Native browser validation and
-the API's existing concurrency and authorization rules remain in use.
-
-`tooltips.js` is the single tooltip lifecycle and presentation entry point. It
-enhances UI `title` hints with Bootstrap's HTML variant, using text nodes for
-translations, titles and other API fields. Calendar descriptions alone accept
-HTML through `tooltip-description.js`: the pinned, locally bundled DOMPurify
-sanitizes an inert template before any content enters the live document. The
-allowlist preserves prose, lists, tables and links; it excludes scripts, styles,
-images, embedded resources, forms, custom attributes and non-HTML namespaces.
-Links allow only absolute HTTP(S), mailto and tel URLs and open with
-`noopener noreferrer`. Plain descriptions retain line breaks and linked web
-URLs. Event dialogs use the same renderer. Teams, Google Meet and Zoom links
-include a local icon and provider label. Unknown location links use a generic
-video icon. Provider recognition compares the actual URL hostname, so lookalike
-domains do not receive provider branding. No remote description resources are fetched. Authored link/image titles inside the Markdown editor
-are left untouched so hint enhancement cannot change saved notes.
-`tooltip-content.js` provides shared decorated session
-and calendar-event details. Each composite card owns one tooltip containing its
-individual sessions, project icons, times and durations; its child icons, title
-and duration do not create separate hints. The same builders serve Today, the
-monthly Calendar, Week and Workweek. Read-only summary cards are keyboard-focusable.
-Tooltips support hover, keyboard descriptions, Escape dismissal, hovering over
-the tooltip itself and scrolling long details. Hints open after 800 ms. Keeping
-the mouse inside a hint for three continuous seconds focuses it as a nonmodal
-details dialog, allowing selection, links and native scrolling. Leaving before
-three seconds resets the countdown. Keyboard users can press F2 from the focused
-hint source to enter details immediately; Escape closes details and restores
-focus. A focused popup stays open until focus leaves, it is dismissed, or its
-source disappears. Its content remains stable through live data refreshes;
-reopening uses current data. Passive hints leave underlying calendar controls
-and drags available. The geometry check precedes underlying control detection
-so moving over an overlapping hint cannot replace it. They use the active dialog as a
-container when necessary and are disposed on removal, hidden views and logout.
-No note contents are copied to browser storage. Bootstrap and Popper's complete
-licenses, and DOMPurify's license, ship with the bundle and are linked from About. See the upstream
-[Bootstrap 5.3 tooltip documentation](https://getbootstrap.com/docs/5.3/components/tooltips/).
-
-macOS WebKit reports inline-style CSP diagnostics for native select controls even
-on a plain page without application styles/scripts; Playwright screenshots also
-add inline-style diagnostics. The WebKit asset check excludes those inline reports
-while continuing to reject blocked design assets. Chromium checks every CSP event.
-The production security policy is unchanged. The macOS WebKit keyboard check uses
-Option-Shift-Tab to include buttons, matching
-[Safari's native keyboard navigation](https://support.apple.com/guide/safari/cpsh003/mac).
-
-Projects, tasks, labels, activities and work sessions use API v1. Start/stop uses durable
-idempotency keys. Editors/deletion retain the original opaque ETag, including
-across full resynchronization, rather than upgrading a stale draft. Validation,
-permission, network and concurrency failures preserve drafts. Loss of authorization
-or a changed owner clears the account view and its drafts. An uncertain
-ordinary write requires cancel, refresh and review; uncertain start/stop offers
-explicit retry of the same frozen payload/key. Acknowledged saves remain
-successful when a subsequent refresh fails.
+Reuse account cards, dialogs, focus behavior, confirmations and navigation.
+Do not expose implementation details in user workflows. Use Dagsverk in visible
+copy while preserving [compatibility identifiers](BRANDING.md). Illustrations
+belong with the [user guide](../operations/WEB-CLIENT.md), rather than test commands.
 
 ## Workweek and Activities
 
-Both views share Week's toolbar layout: date and previous/Today/next navigation
-on the left, the view title and week details centered, and Activities' Add time,
-Hide activities and Show activities icon actions on the right. On narrow screens,
-the centered title sits above the controls.
-
-Reports use the account's IANA time zone and the server's exact daily/weekly
-totals. At sign-in, an untouched UTC profile (version zero) adopts the browser's
-local IANA time zone. This is saved to the account so work sessions, activities,
-calendar boundaries and other clients use the same zone. An explicitly selected
-zone, including UTC, is retained when signing in from another device. Read-only
-tokens retain the existing account zone. Use **Account menu → My Account → Profile → Time zone** to change it explicitly.
-Workweek shows overlapping sessions in a compact **Work sessions** grid grouped
-by client and project. Each daily cell contains a start/end pair for every
-session; edit a time and press Enter or leave the pair to save, or Escape to
-cancel. The details menu shows summaries and provides the full editor
-and delete action. Running sessions remain marked. Edits preserve unchanged
-endpoint precision and metadata; stale or uncertain saves keep the proposal for
-review instead of repeating the write.
-
-Times use the account time zone. Sessions crossing midnight appear on each day;
-edit each endpoint on its actual day. An end of **24:00** means the next midnight.
-For repeated daylight-saving times, include an explicit offset such as
-**02:30+01:00**. Daily/client/project totals are clipped at local-day and week
-boundaries and follow the selected clock/decimal format. The grid hides when no sessions overlap the
-selected week. Session time is separate from activity report totals.
-
-![Compact Workweek sessions on desktop](../assets/screenshots/compact-workweek-desktop.png)
-
-![Compact Workweek sessions on a narrow screen](../assets/screenshots/compact-workweek-mobile.png)
-
-The **Activities** tab groups projects, tasks, subtasks and activities,
-with seven daily duration columns, a weekly total column and expandable rows
-like the Eclipse view. Its daily and weekly summaries report activity time.
-Workweek and Activities share the selected week and duration format. Selecting
-a day filters Activities without hiding work sessions in Workweek. Task totals include their subtasks. **Hide activities**
-keeps the project/task outline visible; **Show activities** restores its rows.
-**Duration format** in **My Account → Profile** chooses conventional time or decimal hours for this browser
-session. Decimal hours use two places, rounded from each exact aggregate rather
-than adding rounded daily cells. Display options do not change recorded times.
-Daily and weekly summaries show whole seconds; stored times and calculations
-retain nanoseconds. Linked task titles include their external ID (the Jira browse
-key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue
-URL in a separate tab. Native task UUIDs are not display IDs.
-![Activities and daily totals on a narrow screen](../assets/screenshots/activities-mobile.png)
-
-Activity fields show and accept local dates and times in the account’s configured
-time zone, retaining up to nine fractional digits. Intervals across
-midnight are stored as separate activities in the account's time zone, including
-manual entries. Live tracking continues into the next day with the same active
-identity and labels. Each day's activity is edited or deleted separately; a
-rollover invalidates the earlier editor version. Day boundaries preserve exact
-time through daylight-saving changes.
-Start cannot be in the future, for either an ongoing or completed interval.
-The server rejects invalid creates, edits and imports without changing records.
-First click
-selects an activity; another click or Enter while selected opens its editor.
-Long polling loads consistent owner-scoped snapshots without replacing drafts.
-Label choices in open activity and tracking dialogs receive additions and
-renames from other clients while retaining their checked IDs and draft fields.
-A selected label deleted by another client stays visible as deleted until the
-user reviews it; saving cannot silently drop that reference.
-Offline reads reconnect with backoff and never replay writes. Sessions bind to
-the authenticated owner and reject live token owner reassignment.
+Workweek edits work sessions; Activities records task time. Preserve unchanged
+endpoint precision and metadata. A session spanning midnight is displayed across
+account days without creating duplicate stored sessions. Conditional or uncertain
+writes keep the proposal for review. See [the data model](../architecture/DATA-MODEL.md).
 
 ## Personal settings and independent user accounts
 
-**My Account** includes separate Clients and Projects pages alongside Profile, Password, API tokens, Labels and Import. Client and project settings show the complete owned catalog independently of the workspace focus filter.
-Open it from the header’s **Account menu**, which also contains **Sign out** and,
-for administrators with write access, **Users**. Time-zone settings are in Profile.
-The menu keeps the header on one row at phone widths and supports normal Tab
-navigation, Enter/Space, Escape and outside-click dismissal.
-
-![Account menu on a phone-width screen](../assets/screenshots/account-menu-mobile.png)
-
-Safari’s **Add to Home Screen** uses the bundled Timekeeper clock icon through
-[`apple-touch-icon` metadata](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html).
-The icon is served before sign-in and matches the web favicon and Synology icon.
-Adding the shortcut does not add offline access or change session behavior.
-
-Navigation validation uses the checksum-verified server archive. On `f119288`,
-70 Chromium tests passed (the SMTP-only case runs separately), and 69 HTTPS WebKit
-tests passed with a loopback SMTP fixture. The two native touch-injection tests
-require Chromium CDP and are skipped in WebKit; pointer/keyboard calendar checks
-still run there. Coverage includes menu keyboard focus, 320px layouts, role-based
-Users visibility, sign-out and opening an editor while a saved-zone report refresh
-is deliberately held pending. Web unit tests: 50 passed.
-It uses a side navigation on desktop and wrapping navigation on narrow screens.
-Profile includes an optional display name and an explicit time-zone preference;
-the device-zone shortcut never overwrites a saved choice without a save action.
-New passwords require confirmation. Token lists show access, expiry, last use
-and revocation state, with one-time secret copy and named revocation confirmation.
-
-Administrators use the separate **Users** page to list, create and edit account
-identities. Editing opens a full page, with Back to users; the last enabled
-administrator is protected in the UI and by the server. This does not grant
-access to another account's work data or introduce workspaces, members or
-invitations. Personal settings remain separate from other-user administration.
-
-**Import** supports Toggl Track Detailed Report and Legacy CSV as work sessions (default)
-or activities, with explicit source-user and
-time-zone selection, explicit catalog mappings, duplicate review, durable
-bounded commits and whole-job Undo. A cancellable module worker handles parsing
-and batch planning. Navigation/sign-out disposes the worker and source preview;
-resuming uses server history and reselecting the unchanged file. No raw CSV or
-credentials are persisted in browser storage. See the
-[import and Undo guide](../operations/TOGGL-IMPORT.md) for limits and conflict handling.
-
-Routes are bookmarkable fragments (`#account/profile`, `#account/password`,
-`#account/tokens`, `#account/import`, `#users`, `#users/new` and `#users/<encoded-owner>`). Direct
-access still requires the authenticated account and server-side permissions.
-Browser Back and explicit return links share the draft guard. Writes reserve
-the page until their result is known; uncertain writes require record review,
-and stale edits keep their captured ETag and draft until explicitly reloaded.
-Changing pages never stops timers. Sign-out invalidates pending account-page
-loads and clears forms and token secrets. Passwords and bearer credentials are
-never placed in routes or browser storage.
+Account switching must clear previous-owner records and asynchronous work.
+Administrators manage access, not other accounts' business data. Keep personal
+settings and installation settings distinct; use the existing session/CSRF proof
+and ETag paths. The [account guide](../operations/ACCOUNTS.md) owns user instructions.
 
 ## Work sessions
 
-The compact **Work Session** card stays visible on every tracking tab. It shows
-the running session, or the most recent completed session, with its summary, client,
-local times and duration. Its timing/recording buttons sit beside the session
-tools, separated by a divider; on narrow screens the tools wrap below a horizontal
-divider. Tools target the session shown in the card and are disabled when no
-session exists or access is read-only. Workweek provides historical edit/delete
-actions, and Week provides historical editing. Opening a historical editor
-does not change the shared panel's target. Start/stop controls remain independent
-of activity timers. Counters use server timestamps and elapsed browser time;
-when offline they freeze. The card contains no history selector, duplicate totals
-or activity list; historical records and detailed reports remain in Workweek,
-Activities and Week.
-
-A work session is an independent interval for one client. Its tools are **Edit**
-and **Delete**. Create or edit activities in Activities; task timers
-run independently. There are no session selectors or manual activity links.
-
-Work-session forms, cards, tooltips and details do not offer or display labels.
-Client and optional project classify a work session. Labels belong to Activities
-and are managed under **My Account → Labels**, rather than a tracking tab. The
-account page reuses the existing label editor, deletion safeguards, read-only
-permissions and live catalog updates.
-
-![Labels configured in My Account on a narrow screen](../assets/screenshots/account-labels-mobile.png)
-
-Legacy session labels remain in stored records and portable transfers. Session
-edits omit `labelIds`, preserving existing metadata. Moving, resizing, stopping,
-copying and Undo preserve it without changing Activity labels. New work-session
-imports retain source tags in the import audit without creating session labels;
-older resumable import plans keep their original mapping behavior.
-
-Reports derive context from that account's activities overlapping the session,
-including running timers. Tracked time sums clipped intervals; covered time is
-their union. Unallocated time subtracts that union from session duration.
-Moving, resizing, stopping or deleting a session leaves activities unchanged.
-Sessions and activities can span midnight independently; activity day parts
-remain independent records. Work-session editors use native date/time pickers in
-the account's time zone. Unchanged endpoints retain their exact stored precision;
-choosing a different time uses whole-second precision. Repeated clock times offer a
-first/second occurrence choice. Activity editor fields preserve nanoseconds and reject
-nonexistent or ambiguous local input. Open drafts retain their original time zone;
-stale saves preserve drafts and uncertain commands retry the same durable key.
-
-Portable domain-v3 JSON/CSV includes clients and independent sessions. Imports
-still accept v1/v2/v3 snapshots, ignoring retired activity `workSessionId` fields,
-including references to sessions absent from an older export. Exports omit those
-links. Native Eclipse CSV and portable server CSV remain distinct formats.
+A work session is independent of activity timers and is classified by client and
+optional project. Labels belong to activities. Historical session edits must not
+change the shared card's current target. Session edits omit legacy `labelIds`
+rather than erasing older metadata. See [API v1](../architecture/API-V1.md).
 
 ## Automated verification
 
-```sh
-npm ci --ignore-scripts --prefix server/web
-npm test --prefix server/web
-cd server/web && npx playwright install --with-deps chromium && cd ../..
-./mvnw -B -ntp -f server/pom.xml clean verify
-python3 server/scripts/package_server.py --output server/target/distribution --commit "$(git rev-parse HEAD)"
-python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
-```
-
-For WebKit, install its browser and use the existing HTTPS fixture so Secure
-session cookies work. Run from the repository root after packaging the server:
-
-```sh
-cd server/web && npx playwright install --with-deps webkit && cd ../..
-python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --browser webkit --https
-```
-
-Calendar boundary searches and timer displays reuse native date/number formatters
-through caches bounded to 32 entries each, keyed by locale and formatting options.
-The running-calendar regression advances a minute of timer updates without
-repeated formatter allocation, checks that My Account stops hidden timer paints,
-and verifies that returning to the workspace catches up the displayed elapsed time.
-Timer paints also stop while the browser document is hidden.
-
-The HTTPS fixture requires `openssl` on `PATH` to create a temporary test
-certificate. It uses a loopback reverse proxy and accepts that certificate only
-in the test browser. To reproduce CI's actual email-delivery checks with
-Chromium, run:
-
-```sh
-python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
-```
-
-`--mail` requires `--https` and captures messages through a temporary loopback
-SMTP fixture. Safari's native macOS Password AutoFill UI still needs a manual
-check.
-
-For virtual WebAuthn registration, sign-in and fresh-proof tests, use Chromium
-with the isolated HTTPS `localhost` RP:
-
-```sh
-python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --passkeys
-```
-
-Signed protocol tests also run across two independent server containers sharing
-PostgreSQL. They cover cross-replica completion, one-use races, removal/recovery,
-protected restore and changes to backend addresses, public ports and RP hostnames:
-
-```sh
-python3 server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test
-python3 server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test --postgres-image postgres:17.11-bookworm --output server/target/passkey-pg17-acceptance.json
-```
-
-These fixtures use synthetic keys; they do not establish Safari/Touch ID,
-security-key or cross-device interoperability. Record those checks separately
-over HTTPS, including a hostname/port cutover. Fixture receipts contain only
-scenario results; private keys and database dumps are temporary and never uploaded.
-
-Packaging requires a clean committed tree. Browser acceptance launches the
-checksum-verified distribution with temporary file storage and synthetic tokens,
-then stops the JVM and removes private fixtures. Reports, screenshots and source
-provenance go under `server/web/test-results`. Traces/videos are off because they could
-retain authorization headers. CI's Web job uses the same Server artifact as
-Remote-Eclipse.
-
-Use `captureScreenshot` from `server/web/tests/screenshots.js` for browser
-screenshots. When the bottom navigation is visible, it captures the viewport so
-the bar stays at the bottom of the image. A full-page capture includes content
-below the viewport but leaves fixed navigation at its original viewport position,
-which makes the resulting image misleading. Pages without the workspace bar can
-still use full-page captures.
-
-Browser tests cover core tracking, authorization/validation, peer synchronization,
-stale drafts, lost committed replies, exact nanoseconds, autumn DST, mobile
-layout, expandable project/task hierarchy, external issue links and remembered
-credentials. The `remote-client-tests` Eclipse profile
-also launches a real browser peer against its installed runtime's server;
-[WEB-ECLIPSE.md](../verification/WEB-ECLIPSE.md) records that bidirectional verification.
-Final release installation remains a separate gate.
+Use [browser acceptance](WEB-ACCEPTANCE.md) for prerequisites, clean-source
+packaging, HTTPS/SMTP/passkey fixtures, scenario selection and evidence handling.
+`npm test --prefix server/web` runs unit/asset checks; it does not establish browser acceptance.
 
 ## Week
 
-Week follows Calendar's toolbar layout: date and navigation controls on the
-left, the month title and week details centered, and work-session actions on
-the right. On narrow screens, the centered title sits above the controls.
-
-The **Week** tab shows all seven days. Week, Workweek and Activities share the
-chosen week and the account's time zone. Use the arrows, **Today**, or the date
-field to navigate. On smaller screens, scroll inside the calendar to see the
-remaining days and hours.
-
-Drag across empty calendar space to preview a new work-session interval, in either
-direction and across days. Release opens the normal editor with the selected times;
-optionally enter a summary, review the interval and client, then save. The client from the last
-saved work-session editor is preselected during this sign-in. Before that, the
-selected, running or latest session supplies a valid client. Cancelled edits do
-not change this choice, and signing out or switching accounts clears it.
-Nothing is written until
-that save succeeds. Escape cancels an in-progress range, and cancelling the editor
-also leaves records unchanged. Selection follows the calendar's 15-minute slots;
-a short drag covers at least one slot. Repeated clock times resolve to their
-separate instants, and shaded/nonexistent endpoint times cannot create a session.
-
-On touchscreens, enable **Select time range** before dragging empty space. This
-explicit mode leaves ordinary touch scrolling available when it is off. It turns
-off when the range opens for review, when leaving Week, on disconnect and at
-sign-out. Existing work-session move/resize gestures continue to work. Keyboard
-users can select a day/time with the arrow keys and press Enter, or use **Record
-work session**, then enter the desired end time in the editor.
-
-Strips represent work sessions, using the associated client’s color, session
-summary and elapsed duration. Small resize grips appear when hovering over a strip
-or focusing its controls with the keyboard; on touchscreens, select the strip to
-reveal them. Select a strip to see its full interval;
-double-click it or use **Edit selected work session** to edit. Drag the strip
-to move it between times or days, and drag its top or bottom handle to resize.
-Moves and resizes save directly without opening a dialog. A failed or uncertain
-save opens the editor with the proposed times for review; it never silently
-overwrites another client's change.
-With a strip focused, Up/Down moves it by 15 minutes and Left/Right by one local
-day. On a resize handle, arrow keys adjust that endpoint. Moving preserves exact
-elapsed duration and fractional seconds. Sessions spanning midnight retain one
-identity while appearing in each affected day.
-
-Use **Copy work session** and **Paste work session**, or Ctrl/Cmd+C and Ctrl/Cmd+V,
-to create a separate session. Select a day heading to retain the copied start
-clock time, or select a calendar slot to choose a new time. The paste editor
-lets you review the interval before saving. The client, interval and summary are
-copied; activities and task references are not. The copy buffer is private to
-the signed-in browser session and is cleared on sign-out. A running source keeps
-its blank end in the copy; finish the copy's interval if another session is
-still running. Starts in the future remain invalid.
-
-Week shows work sessions and subscribed calendar plans. Recorded activities
-appear in **Activities**, keeping the Week display focused. Editing a work
-session never changes its activities. Task rows in Activities offer **Start**
-and **Edit task**. There is no separate task-management section.
-
-Repeated clock times have separate rows; shaded slots do not occur on a given
-day. A drag retains the original session snapshot and saves with its opaque
-version precondition. Peer edits, rejected changes and unknown save outcomes
-preserve the proposed interval for review instead of silently overwriting data
-or repeating an ordinary write.
+Keep planned calendar events distinct from recorded work. Time-zone projection,
+recurrence, all-day items, overlap and drag/resize edits need targeted scenarios.
+Use the same conditional editors and retain drafts on conflict.
 
 ### Calendar subscriptions
 
-Refresh failures identify the calendar name and source in Today, Calendar and
-account settings. Recognized Google, Microsoft and iCloud sources offer their
-fixed official service-status page. Other sources show only the published host;
-private feed URLs and credentials are never linked or displayed. Status pages
-are opened only by the user, without background third-party requests.
-
-Open **My Account → Weeks** to manage read-only iCalendar subscriptions.
-Planned events remain visible in Week.
-Choose **Add calendar**, enter a descriptive name and subscription URL, and select
-its client. HTTPS and `webcal://` subscription links are supported; provider login
-and two-way calendar editing are outside this first version. The saved URL is
-kept private: editing shows an empty replacement field, and leaving it blank
-preserves the existing link. The list shows the last successful refresh
-and any specific refresh error. Each account may have up to 20 subscriptions.
-
-Weeks refresh automatically about every 15 minutes. **Refresh calendar**
-requests an update immediately, with a 30-second cooldown between attempts.
-Failed refreshes keep the last successful events and explain whether the problem
-is the address, connection, certificate, provider access or file contents.
-Changing a name, client or visibility reuses the cached feed. Replacing a URL
-clears its old cache and starts a new refresh. Hidden calendars continue refreshing;
-removing a subscription removes its external events and leaves recorded activities
-and their source history intact. Clients with subscriptions cannot be deleted
-until those subscriptions are removed or reassigned.
-
-Calendar events use neutral backgrounds and the same narrow, solid client-coloured
-indicator on the left as monthly Calendar entries. Events awaiting import use a
-dotted outline and a **Planned** label; imported events use a solid outline and a
-**Recorded** label. Event cards have no icons; the client and
-calendar name remain available in their text and accessible name. They appear
-beside recorded work without contributing to reports. Select
-an event with the pointer, touch or keyboard to see its full interval, source,
-location and plain-text description. Read-only sessions can view details.
-All-day plans appear above the time grid, with their exclusive iCalendar end date
-shown as an inclusive human-readable range. Timed events without an end are
-shown as zero-duration markers. All presentation follows the account time zone;
-floating calendar times use that zone. Recurrences retain local wall-clock times
-across DST, including moved/cancelled occurrences and THISANDFUTURE changes.
-
-Each subscription independently selects calendar events (`includeEvents`) and/or
-to-do items (`includeTodos`). At least one must be enabled. Existing subscriptions
-and omitted creation options default to events enabled and to-dos disabled.
-Omitting these optional fields on an update preserves the stored selection,
-including when an older client changes visibility. Selection changes reuse the
-cached feed and take effect without another provider download.
-
-Feeds can also contain **to-dos (`VTODO`)**. Today and Week show them with a
-**To-do** label and their completion state. A due date/time determines their
-calendar position; without one, the scheduled start is used. A date-only item
-stays on that civil date, and an item with only a timed due date is a marker,
-not a booked interval. Recurring to-dos support exclusions and moved occurrences.
-Open undated to-dos appear as **No date**; completed/cancelled undated items are
-omitted. Open the details for the full description or an associated note.
-Changes and completion stay in the source calendar; to-dos have no **Create
-activity** action and do not affect worked-time totals.
-
-Only items the provider includes in the subscribed ICS feed can appear here.
-A Google Tasks or Microsoft To Do item absent from that feed needs a separate
-task-provider connector; subscribing to a calendar does not provide access to
-the provider's task API. Today reloads results every 30 seconds while open,
-without disturbing the note draft, and displays subscription failures. This
-reloads the server cache; upstream downloads retain the 15-minute interval and
-providers may additionally cache their published feeds.
-
-**Create activity** opens a review editor with the event title/description and
-interval. Choose an optional project/task belonging to the subscription's client.
-All-day plans require explicitly chosen actual start/end times; they never create
-24 hours of work automatically. Future plans are visible, but saving a future
-activity start is rejected and preserves the draft. A completed interval is
-required. Summaries are limited to 2,000 characters; if shortened, the editor
-explains that full details remain in the source history.
-
-Nothing is recorded before confirmation. The activity, any local-day fragments,
-source reference and retry receipt commit together. An uncertain save retries
-its exact original command. Repeated refreshes or new conversion commands cannot
-silently create a second activity for the same subscription/occurrence, even
-when the first activity has been deleted. Later source changes never overwrite
-recorded work. Activity edits retain the source reference, including newly split
-daily fragments. Private account archives include source history as inert audit
-records in the existing archive format; feed URLs and cached feeds are excluded.
-Subscriptions must be configured separately after importing an account archive.
-
-The engine is the pinned [iCal4j 4.4.0](https://github.com/ical4j/ical4j/tree/ical4j-4.4.0).
-Its BSD license is included in the server JAR. Calendar downloads and recurrence
-expansion are bounded; no attachment or timezone-definition URLs are fetched.
-Feeds are limited to 2 MiB, 5,000 VEVENT/VTODO revisions and 2,000 visible occurrences
-per calendar. The API accepts windows of at most 31 civil days.
-
-![Planned and recorded time in Week](../assets/screenshots/calendar-subscriptions-desktop.png)
-
-![All-day calendar details on mobile](../assets/screenshots/calendar-subscriptions-details-mobile.png)
+Server fetching and provider credentials stay behind API v1. Feed subscriptions
+can expose read-only events/to-dos without OAuth. Subscription URLs may contain
+secrets; never place them in logs, account archives or displayed DTOs. Conversion
+into recorded work requires review. See [server feed access](../operations/SERVER.md#calendar-feed-access).
 
 ## Clients, projects and work sessions
 
-**My Account → Projects** groups projects beneath their client, with its color and
-project count. Client groups start collapsed. Use the client chevron to expand
-or collapse its projects. Choices survive refreshes and tab changes within the
-current session; reloading the page starts collapsed again. The session-report
-button beside Edit opens all of the project's work sessions in a new browser
-tab, newest first, with exact duration totals, running sessions, the account's
-time zone, and Refresh and Print actions. Reports also work for read-only
-sessions and follow the account language and selected theme.
-
-Create or edit a project to
-select an optional icon from the bundled picker, or choose **None** to remove it.
-Icons also appear beside project names in Workweek and beside daily durations
-in Calendar. They are retained in account downloads and JSON/CSV transfers.
-
-The project icon picker offers 2,078 bundled Bootstrap Icons. Choose one of
-Bootstrap's 29 categories, such as **Communications**, **Files & Folders** or
-**Weather**, and filter by **Filled** or **Unfilled** style. Search by name,
-keyword or category across the entire catalog, including icons not yet shown,
-or choose **More icons** to browse. Category counts cover the full bundled set;
-the results count reflects the combined filters. Filtering preserves the
-current selection; **None** removes an icon. Icons work offline.
-
-![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
-
-![Project icons beside Calendar durations](../assets/screenshots/track-project-icons.png)
-
-![Project icons in Calendar on a narrow screen](../assets/screenshots/track-project-icons-mobile.png)
-
-![Projects grouped by client](../assets/screenshots/projects-grouped-mobile.png)
-
-![Project work-session report in a separate browser tab](../assets/screenshots/project-report-desktop.png)
-
-Use **My Account → Clients** to create, rename, recolor or delete a client. A client has a
-required name and hex color. Each project belongs to exactly one client; choose
-it in the project editor. A client may have many projects. Each work session also
-belongs to exactly one client and has an optional summary, with no separate
-title. Choose the client and optionally enter a summary when starting or recording
-a session. Summaries support multiple lines and up to 4,000 characters. The
-calendar uses the summary (or “Work session” when empty) and client color; light colors receive dark text and dark colors receive light
-text. Changing a client’s color updates all its sessions without editing them.
-
-Create a client before creating your first project or work session. Clients in
-use by projects or sessions cannot be deleted; reassign or remove those records
-first. A project’s client and a session’s client can be changed independently.
-Existing activities and their times are retained when these associations change.
-
-On server upgrade, projects and sessions without a client are assigned to
-**General**. Existing session titles move into Summary. If a title contains text
-not already at the start of the summary, it is placed before the existing notes,
-separated by a blank line. Existing descriptions, exact times, clients, projects
-and labels are retained; the migration is repeatable. General can be renamed and
-recolored like any other client. Import/export v3 preserves clients, project
-ownership, summaries and colors, and older archives with titles remain importable.
-Older v1/v2 imports receive General automatically.
-
-Client management is a server/web feature. Eclipse project
-creation receives General on the server, and Eclipse project edits preserve its
-client. No client selection fields are added to Eclipse.
+A client is a customer record, not a login account. Client/project mappings,
+project icons, grouping and reports use owned records and the shared account
+zone. Keep report windows owner-bound and reject late results after sign-out.
 
 ## Toggl Track import
 
-Prefer **Legacy (User/End) CSV** exports because they retain source client names
-independently of projects. Detailed Report (Member/Stop) exports are also
-supported and use the same review flow. A newer export without a Client column
-uses project-based suggestions instead; review and correct each client mapping
-before importing.
-
-Each CSV row defaults to one continuous work session with a reviewed client and
-optional description in Summary. Activity import is an explicit alternative. Both modes
-share durable progress, duplicate review and whole-job Undo; sessions create no
-companion task/activity records and contribute to Calendar’s client totals.
-Source tags are retained in the import audit for work-session imports. Activity imports map tags to labels. Resuming an older import keeps
-its original mappings, and repeat imports preserve existing session edits.
-
-Open **My Account → Import** for the source preview, catalog mappings and duplicate
-review. Import history supports resume, audit download and a single whole-job
-Undo with explicit edited-record decisions. See the
-[user guide](../operations/TOGGL-IMPORT.md) and
-[verification report](../verification/TOGGL-IMPORT-ACCEPTANCE.md).
-
-![Reviewed Toggl Track import on desktop](../assets/screenshots/toggl-import-review.png)
-
-![Import history on a narrow screen](../assets/screenshots/toggl-import-history-narrow.png)
-
-Work sessions support an optional project in start, record and edit dialogs.
-Selecting a project selects its client; changing to a different client clears the
-project. Week movement, resizing and copying retain the project. Toggl work-session imports review projects under their client without creating task activities.
-
-Service administration uses `/admin/` and `/api/v1/admin/`. General settings show
-saved versus effective configuration; versioned saves require a real account
-session and the administrator password. SMTP passwords are never prefilled or
-returned, and administrator proof and SMTP credentials use separate browser
-autocomplete sections. Changes activate on a coordinated restart; a stale replica
-leaves readiness and cannot continue using its old policy.
-
+Preview, apply and Undo use bounded, owner-bound operations and durable receipts.
+Keep uncertain outcomes visible rather than resubmitting automatically. User
+steps belong in [Toggl import](../operations/TOGGL-IMPORT.md); wire semantics belong
+in [API v1](../architecture/API-V1.md).
 
 ## Account data portability
 
-**My Account → Your data** separates **Prepare archive** from **Download archive**.
-Preparation fetches a private ZIP with JSON and CSV for the signed-in account; only
-the explicit download action saves it, using the server’s dated filename. A new
-preparation or leaving the page releases the previous browser copy. A reviewed restore shows record and link counts, then adds work with remapped
-relationships and an optional time-zone change; it preserves the target account’s identity,
-permissions and credentials. Interrupted uploads resume after file reselection,
-and an uncertain restore can be reconciled without duplicating records.
-
-See the [user guide](../operations/ACCOUNT-DATA.md) for scope and limits, and
-the [acceptance report](../verification/ACCOUNT-DATA.md) for validation.
-
-![Account archive review on desktop](../assets/screenshots/account-data-review-desktop.png)
-
-![Account archive review on a narrow screen](../assets/screenshots/account-data-review-mobile.png)
-
+Account archives and full-instance backups have different authority and contents.
+Reuse archive review and fresh-ID import; never accept source IDs as current local
+authority. See [personal archives](../operations/ACCOUNT-DATA.md) and
+[instance backup implementation](../architecture/INSTANCE-BACKUP.md).
 
 ## Undo work-session changes
 
-After editing or deleting a work session, choose **Undo** in the notification.
-It fades after ten seconds; hovering over it or focusing its buttons keeps it
-visible, up to the ten-minute Undo limit. Pending or unconfirmed Undo requests
-stay visible until resolved. This includes calendar moves/resizes and Workweek time-cell
-edits. Undo restores exact times, client, project, labels and summary; activities
-remain independent. Only the latest acknowledged change is offered in the current
-browser session. Creation, timer start/stop and other record types are outside
-this first version.
-
-If another edit or a removed destination makes restoration unsafe, Undo reports
-that conflict without overwriting current records. A lost response offers
-**Retry undo**, which checks the same command safely. Signing out clears the
-notification. No work snapshots are stored in browser storage.
-
-
-Bottom navigation uses the shared `--workspace-nav-bottom-inset` in both its
-height and padding. Fine-pointer desktop layouts use a compact 4rem bar even
-when a macOS browser reports a bottom safe-area inset. Devices with any coarse
-pointer retain `env(safe-area-inset-bottom)` at every viewport width, including
-wide touch/hybrid layouts. Horizontal safe-area protection remains independent.
-Today/Week sizing and workspace/scroll padding derive from the same navigation
-height. The navigation browser regression uses native Chromium safe-area
-emulation to check a 34px inset with desktop and touch input at narrow/wide
-widths; other engines check their naturally reported inset.
+Undo is a conditional operation against recorded history, not an inverse ordinary
+write. Retain receipts and report conflicts or pending previews without replay.
+See the API contract and session editor/import scenarios.
 
 ## Notes collections
 
-Notes navigation, editor headings and Today’s Recent notes use the API’s display
-title: event titles for event notes and the filename minus its `.md` suffix for
-ordinary notes, including existing Obsidian imports. Headings stay in the body. Folder names and
-other file extensions retain their literal names. Name sorting follows the displayed title.
-Collection paths remain available for identification and keep their existing
-synchronization and link semantics.
-
-Recent-note titles use regular font weight. Selecting one opens the shared
-Markdown editor in a dialog while retaining the current workspace. **Open in
-workspace**, beside Close, flushes pending edits before opening a daily journal
-in Today or another document in Notes, with keyboard focus in the destination.
-Failed or conflicting saves retain the
-dialog and draft. Daily, weekly and event-note dialogs expose the same window
-action for saved notes.
-
-Today’s Recent notes includes ordinary, event and daily/weekly journal notes,
-excluding today's daily journal note in the account time zone. Entries use a
-single borderless title row without a path below it. The editable typography
-constant `--font-today-recent-note` controls their text size (default `.875rem`).
-Each title starts with a locally bundled file, calendar-event or journal icon;
-localized type text is available to screen readers and in the tooltip. Selection
-still uses the shared draft guard and opens the canonical document in Notes.
-
-The Notes tab uses the shared MarkdownField beside a lazy, searchable folder
-tree. Folder and document names default to 2px smaller than the base text; the
-navigation and document headings share the Notes heading font setting. The
-document title sits above the editor card.
-
-Recent notes appears in the right sidebar of Today and Notes, below the table
-of contents. Both views move the same section between their right sidebars,
-retaining its loaded pages and guarded popup navigation. Each right sidebar has
-one scrolling area for its outline and Recent notes; cards and lists do not add
-nested scrollbars. On phones, Main actions expands the right sidebar. Opening a
-recent note in the Notes workspace closes the narrow sidebar to expose the editor. Leaving both views stops polling and fences pending replies.
-
-Notes navigation and editor content scroll independently within the available
-viewport. Its flex layout fills the space above navigation after the old view's
-toolbar is hidden and adapts to visual viewport changes; nested scrolling does
-not chain to the page at its boundaries.
-Ordinary writable document rows can be dragged to folders or the navigation background
-(the collection root). Moves flush the current draft and use the existing
-conditional path endpoint, preserving identities and bytes. Read-only, stale,
-deleted and foreign-session drags cannot write. Daily/weekly journal and event
-notes retain their configured folder associations. The Move dialog remains the
-keyboard alternative. A conflicting destination is never overwritten.
-
-The navigation toggle stays to the left of the Notes title at every screen
-size, including when navigation is collapsed or the phone drawer is open.
-On desktop, collapse
-it to give the editor the full workspace width; expanding restores its resized
-width without replacing the document, draft or editing mode. On phones it opens
-the folder drawer; selecting a document closes the drawer. The toggle reports
-its current state to assistive technology and retains focus when a viewport
-change hides the focused navigation control.
-
-An ordinary Markdown document has an editable title above its content. Press
-Enter or leave the field to save; Escape cancels a draft. Saving the title
-renames the file in its existing folder, retaining the extension and canonical
-Markdown bytes. The chosen title survives reloads and account archives. A name
-collision or stale save retains the draft; read-only clients cannot change it.
-Journal and event titles retain their existing date/event association.
-
-The footer shows the selected item's saved creation/addition and last-change timestamps
-beside its save state, using the account's time zone and locale. The document's
-full collection-relative path follows the last-change timestamp, updates after
-renaming or moving, and wraps on narrow screens. Wikilinks first match paths and
-filenames. A bare link such as `[[CVE-2026-111943]]` also matches a unique display
-title or legacy document-heading alias when no filename matches. Duplicate aliases require an explicit path, such
-as `[[Notes/Imported investigation]]`; headings still do not rename files.
-Unsaved edits
-and rejected saves retain the saved timestamps; a successful save updates the
-last-change time. The creation label distinguishes original creation, addition to Dagsverk and unknown legacy provenance. Dates wrap on narrow screens. Formatted web, local, daily and
-wiki links show the hand pointer in both writable and read-only notes.
-In short phone windows the formatting actions scroll horizontally, retaining
-space for the document and keyboard access to every action.
-
-![Notes workspace with a compact, resizable folder tree](../assets/screenshots/notes-workspace-expanded.png)
-
-![Notes editor using the full workspace width](../assets/screenshots/notes-workspace-collapsed.png)
-
-The tree supports desktop resizing, keyboard tree navigation, a mobile drawer,
-file/folder creation, guarded rename/deletion/recovery and collection settings.
-Drafts remain in memory across tab changes and are discarded only after review.
-Account/session generations fence async responses; read-only clients cannot edit.
-The editor fills the active area above navigation. Source preserves unknown
-metadata/wiki syntax; relative images are authenticated raster previews, never
-executable SVG/HTML. See [Notes manual and user guide](../operations/NOTES-WEBDAV.md)
-for supported external workflows and Markdown preservation limits.
+Use the owner-bound Notes API, canonical entry IDs and shared MarkdownField.
+Folder/document drafts, uploads and navigation guards must survive catalog
+updates. Virtual journal/event folders are projections, not a second copy of a
+note. See [Notes storage](../architecture/NOTES-VAULT.md) and [journal integration](JOURNAL-EDITOR.md).
 
 ### Account storage and administrator Notes quotas
 
-**My Account → Storage** is available with read permission. It reads
-`/notes/storage`, showing overall byte/count meters, category meters sharing the
-account allowance, and the largest file sizes against their file limits. Trash
-is included. Progress values clamp to 100% when a quota is reduced below usage;
-accessible value text retains actual usage. Refresh reads new metadata without
-initializing a collection or fetching file bodies. Labels and numbers are localized.
-
-**Administration → Notes** edits the four installation-wide quotas using a current
-administrator password and conditional PUT. Values use decimal GB/MB units. Saves
-apply immediately without authentication/SMTP activation. API-token sessions see
-current values but cannot edit. Failed/stale saves preserve the form draft.
+User storage views report owned usage; administrator quotas are installation
+policy. Validate limits and current authority on the server. Notes quota changes
+are independent of pending authentication/SMTP settings.
 
 ### Markdown presentation and note actions (#548)
 
-Notes initially open formatted, retaining an explicitly selected mode and position
-when revisiting a document during the session. A shared Note tools popover contains
-resource and document actions in all editor sizes; binary files expose their
-applicable actions in the same menu. Formatting remains visible and wraps on
-narrow screens. Undo/Redo use their platform keyboard shortcuts.
-
-The code badge groups language selection and copy at the top right. Pinned local
-highlight.js grammars produce validated inline decoration ranges rather than
-replacing editable DOM. UTF-16 offsets, escaped HTML and CRLF are preserved.
-Unknown languages and fences over 200,000 characters remain plain. Token colors
-use existing theme foregrounds, preserving code/background surfaces. About and
-the bundled dependency/license inventory include highlight.js.
-
-Mermaid uses an atomic presentation node backed by the original fenced Markdown.
-Formatted mode shows the diagram only; Markdown source edits its text. There is
-no hidden editable code region. Normal links and inertly parsed safe HTML anchors
-follow the owner-aware link adapter; wiki links retain their existing resolution,
-draft checks and private attachment handling.
-
-Notes and Today expose a page bookmark in the editor’s upper-right corner. On
-pointer devices the add icon appears on hover or keyboard focus; a saved
-bookmark remains visible and shows the remove icon on hover/focus. Touch devices
-always expose the control. Read-only clients display saved bookmarks disabled.
-Calendar uses `journal-bookmark` for bookmarked dates and Notes navigation uses
-`bookmark`. Empty dates can be bookmarked without creating a Markdown document.
-
-Bookmarks use the owner-private `/notes/bookmark?sourceType=…&sourceKey=…`
-GET/PUT resource and an independent ETag. They follow canonical note identity
-through edits, moves and trash recovery. A toggle never changes document bytes,
-creation/modification times, body validators or edit history. Failed/stale bookmark
-writes reload metadata and require a new explicit decision; body drafts stay in
-memory. Optional `bookmarks` metadata is included in account ZIP archives and in
-the normal full database backup. A plain folder import/export carries document
-files and dates; it does not carry these application bookmarks.
+Presentation settings do not change source text. Open-in-workspace actions flush
+pending edits before navigation; failed or conflicting saves keep the original
+dialog and draft. See the shared editor guides for fidelity and popup behavior.
 
 ## Note search panel
 
-The title-bar search and right-side results panel use the owner-bound Notes
-search API. Unqualified queries search all note types and published event details; `event:`, `journal:` and
-`note:` filters narrow them. Pure `file:` queries use the existing filename
-catalog to retain folder and attachment results. Search generations reject late
-queries and account changes, while signed cursors detect stale paging. The panel
-is modeless so users can keep editing or open guarded note popups without losing
-results. Maximizing a popup closes the panel; ordinary Close returns focus to the
-result that opened it.
-
-Calendar results include description and location from visible event-enabled
-subscriptions, even without saved notes. Opening details does not create a note.
-Where a saved event note exists, the same guarded Markdown editor edits its real
-canonical entry alongside current event details. Recurring series are labelled
-as definitions rather than expanded into unlimited occurrences.
-
-Opening or maximizing a calendar result retries `NOTES_SEARCH_INDEXING` within
-one 15-second budget when a recent save is ahead of the derived index. The
-selected action shows preparation status and rejects repeat clicks; other
-results, editing and Close remain available. Closing the source, changing the
-selection/query or ending the session prevents the pending result from opening.
-Other failures return immediately, and an exhausted index wait leaves the draft
-and a recoverable error in place.
+Search generations reject late queries/account changes; signed cursors reject
+stale paging. `note:`, `journal:` and `event:` use Notes search, while `file:` uses
+the filename catalog. Details alone must not create a note. Opening a recently
+indexed event retries `NOTES_SEARCH_INDEXING` within one 15-second budget and is
+cancelled by closing, changing selection/query or ending the session. Other
+failures remain recoverable without losing the draft. See [Notes architecture](../architecture/NOTES-VAULT.md).

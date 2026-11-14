@@ -5,9 +5,11 @@ attachments and captured server configuration. They are encrypted with a separat
 administrator-supplied passphrase. Keep that passphrase separately from the archive;
 the server cannot recover it. Personal account export is a separate feature.
 
-This workflow is being delivered in [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
-The public JVM workflow is implemented. Native package migration acceptance and
-the final security-material coverage audit remain release requirements.
+Administration provides encrypted backup, upload/review, private preparation
+and explicit restore confirmation. Recovery runs exclusively before server startup.
+For the archive format and implementation boundaries, see
+[instance backup architecture](../architecture/INSTANCE-BACKUP.md).
+Platform acceptance remains specific to the exact package and environment tested.
 
 ## Prepare storage and the destination
 
