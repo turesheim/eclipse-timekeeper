@@ -5,6 +5,7 @@ import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
 import {emojiText} from './emoji.js';
 import {hashtagKey,tagNavigation} from './hashtags.js';
+import {splitMarkdown} from './markdown-document.js';
 
 export const vaultNoteNavigation='timekeeper:vault-note-navigation';
 const fold=value=>value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
@@ -91,6 +92,15 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     searchTag:(value,source)=>{const tag=hashtagKey(value);if(!tag||!session()||source&&!source.isConnected)return;(source||document).dispatchEvent(new CustomEvent(tagNavigation,{bubbles:true,cancelable:true,detail:{tag,guards:[],leave:[]}}));},
     resolveOrigin:async()=>{const current=currentSession(),value=origin(),collection=await collectionInfo();let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);if(!path)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;},
     invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
+    bannerFrontmatter:async()=>{
+      const value=origin();if(typeof value!=='object'||!['DAY_NOTE','EVENT_NOTE'].includes(value?.sourceType))return '';
+      const current=currentSession(),cycle=generation,collection=await collectionInfo(),path=originPath([],value,collection.settings);if(!path)return '';
+      const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;
+      if(current!==session()||cycle!==generation)return '';
+      const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});
+      if(current!==session()||cycle!==generation)return '';
+      return splitMarkdown(await reply.data.text()).frontmatter;
+    },
     image:(reference,alt)=>previewImage(()=>resolveRelative(reference),alt),
     canonicalAsset:async reference=>(await resolveRelative(reference)).path,
     assetReference:async entry=>{const value=origin(),collection=typeof value==='string'?null:await collectionInfo();let path=originPath([],value,collection?.settings);if(!path)path=originPath(await catalog(),value,collection?.settings);return relativeReference(path,entry.path);},

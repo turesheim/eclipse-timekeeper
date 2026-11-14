@@ -15,6 +15,12 @@ the separate About prototype and its scratchpad controls have been retired.
 - `src/markdown-field.js` manages modes and the in-memory document. YAML
   frontmatter stays separate, opaque and read-only in the formatted projection.
   Unchanged source, BOM and mixed line endings survive a round trip exactly.
+- `src/markdown-banner.js` reads supported top-level Obsidian Banners properties
+  for a decorative image outside the rich document. Native daily/event bodies
+  omit file metadata, so their vault resources read the original header through
+  the existing Notes API without adding it to the saved body. Previews use the
+  same authenticated resolver/raster checks and are disposed on mode, note or
+  account changes. No banner metadata is serialized or edited.
 - `editor/milkdown.js` provides the shared Milkdown/ProseMirror schema, history,
   keyboard behavior and semantic admission guard. `tracked-document.js` reuses
   unchanged top-level Markdown spans after a rich edit. Unfamiliar blocks remain

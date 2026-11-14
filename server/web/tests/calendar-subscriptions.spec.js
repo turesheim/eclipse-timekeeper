@@ -4,6 +4,7 @@ import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {tooltipFor} from './tooltips.js';
@@ -293,12 +294,23 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     const add=details.getByRole('button',{name:'Add event note',exact:true});await expect(add.locator('.bi-journal-plus')).toHaveCount(1);await add.click();
     const editor=page.locator('#week-event-note-editor');await expect(editor).toBeVisible();await expect(editor).toContainText('Planned meeting');
     await editor.getByRole('button',{name:'Markdown source',exact:true}).click();
-    const markdown='# Minutes\n\n- [ ] Follow up\n\n<https://example.org/a?q=1>\n\n---\n';
+    let markdown='# Minutes\n\n- [ ] Follow up\n\n<https://example.org/a?q=1>\n\n---\n';
     await editor.locator('textarea').fill(markdown);await saveMarkdown(editor);await expect(editor).toContainText('Saved');
     const events=await(await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-11')).json(),event=events.items.find(value=>value.subscriptionId===subscription.id);
     expect(event.hasNote).toBe(true);const path='/event-notes/'+subscription.id+'/'+event.key;
     expect((await(await api('GET',path)).json()).body).toBe(markdown);
     const download=await api('GET',path+'/markdown');expect(download.headers()['content-disposition']).toMatch(/filename="event-[a-f0-9-]{36}-[a-f0-9]{64}\.md"/);expect((await download.text()).endsWith(markdown)).toBe(true);
+    // A synced event stores its banner in the file header, outside the native
+    // event-note body's API. Display it without copying YAML into that body.
+    await api('GET','/notes');const folder='Event-banner-'+randomUUID();await api('POST','/notes/folders',{path:folder});
+    await api('PUT','/notes/files?'+new URLSearchParams({path:folder+'/cover.png'}),await readFile(new URL('./fixtures/banner.png',import.meta.url)),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+    const eventFile='events/event-'+subscription.id+'-'+event.key+'.md',entry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:eventFile}))).json();
+    const synced=(await download.text()).replace('\n---\n','\n# Obsidian banner\nbanner: "![[ '+folder+'/cover.png ]]"\nbanner_x: 0.25\nbanner_y: 0.75\n---\n');
+    await api('PUT','/notes/files?'+new URLSearchParams({path:eventFile}),Buffer.from(synced),{'Content-Type':'application/octet-stream','If-Match':entry.etag});
+    await editor.getByRole('button',{name:'Close',exact:true}).click();await details.getByRole('button',{name:/^(Open|Add) event note$/}).click();
+    await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(editor.locator('.markdown-banner')).toBeVisible();await expect(editor.locator('.markdown-banner img')).toHaveCSS('object-position','25% 75%');
+    await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');await saveMarkdown(editor);markdown=markdown.replace('# Minutes','# Minutes Reviewed.');
+    expect(await(await api('GET',path+'/markdown')).text()).toBe(synced.replace('# Minutes','# Minutes Reviewed.'));expect((await(await api('GET',path)).json()).body).toBe(markdown);
     await expect(editor.getByRole('button',{name:'Download Markdown'})).toHaveCount(0);
     expect((await new AxeBuilder({page}).include('#week-event-note-editor').analyze()).violations).toEqual([]);
     await editor.getByRole('button',{name:'Close',exact:true}).click();await details.getByRole('button',{name:'Close',exact:true}).click();
@@ -306,7 +318,7 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
     const today=page.locator('#today-events [data-today-event="'+event.key+'"]');await expect(today.locator('.bi-journal-text')).toHaveCount(1);await today.click();
     await page.locator('#today-event-details').getByRole('button',{name:'Open event note',exact:true}).click();
-    const todayEditor=page.locator('#today-event-note-editor');await expect(todayEditor).toBeVisible();await todayEditor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(todayEditor.locator('textarea')).toHaveValue(markdown);
+    const todayEditor=page.locator('#today-event-note-editor');await expect(todayEditor).toBeVisible();await expect(todayEditor.locator('.markdown-banner')).toBeVisible();await todayEditor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(todayEditor.locator('.markdown-banner')).toBeHidden();await expect(todayEditor.locator('textarea')).toHaveValue(markdown);
     await captureScreenshot(page,{path:'test-results/calendar-event-note-editor.png',fullPage:false});
     page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,todayEditor,'Delete note');await expect(todayEditor).toBeHidden();
     expect((await(await api('GET',path)).json()).deleted).toBe(true);

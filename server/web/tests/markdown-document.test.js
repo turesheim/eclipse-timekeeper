@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {splitMarkdown,needsSource,normalizeEditorMarkdown} from '../src/markdown-document.js';
 import {hashtagKey,hashtagRanges} from '../src/hashtags.js';
+import {bannerMetadata} from '../src/markdown-banner.js';
 test('hashtags use exact bounded Unicode keys and ignore word, URL and wikilink fragments',()=>{
   assert.equal(hashtagKey('#Cafe\u0301'),'#café');assert.equal(hashtagKey('#Straße'),'#strasse');assert.equal(hashtagKey('#work/OpenShift'),'#work/openshift');
   for(const value of ['#','#a*','#a//b','#'+'a'.repeat(128)])assert.equal(hashtagKey(value),null);
@@ -14,6 +15,23 @@ test('frontmatter is kept byte-for-byte outside the body, including BOM and CRLF
   }
   assert.deepEqual(splitMarkdown('# Day\n\n---\n'),{frontmatter:'',body:'# Day\n\n---\n',unterminated:false});
   assert.deepEqual(splitMarkdown('---\ntags: [unfinished]'),{frontmatter:'',body:'---\ntags: [unfinished]',unterminated:true});
+});
+test('Obsidian banners read quoted top-level local links without changing opaque YAML',()=>{
+  for(const value of ['"![[Images/Project cover.jpg]]"',"'[[Images/Project cover.jpg]]'"]){
+    const source='\uFEFF---\r\n# Keep this comment\r\ntags: [one, two]\r\ncustom:\r\n  banner: ignored\r\nbanner: '+value+' # keep\r\nbanner_x: 0.25\r\nbanner_y: 1e-1\r\n...\r\n';
+    assert.deepEqual(bannerMetadata(source),{reference:'Images/Project cover.jpg',x:.25,y:.1});
+    assert.equal(splitMarkdown(source+'Body\r\n').frontmatter,source);
+  }
+  assert.deepEqual(bannerMetadata("---\n'banner': '[[Images/O''Brien.webp]]'\n---\n"),{reference:"Images/O'Brien.webp",x:.5,y:.5});
+});
+test('banner coordinates default independently and ambiguous axes do not override a valid axis',()=>{
+  for(const x of ['-0.1','1.1','.nan','Infinity','"0.2"','true','[0.2]','null'])assert.deepEqual(bannerMetadata('---\nbanner: "[[cover.png]]"\nbanner_x: '+x+'\nbanner_y: 0\n---\n'),{reference:'cover.png',x:.5,y:0},x);
+  assert.deepEqual(bannerMetadata('---\nbanner: "[[cover.gif]]"\nbanner_x: 1 # right\nbanner_y: .25\nbanner_y: .75\n---\n'),{reference:'cover.gif',x:1,y:.5});
+});
+test('unsupported, external, nested and ambiguous banner metadata stays inert',()=>{
+  const bodies=['banner: "[[https://example.invalid/a.png]]"','banner: "https://example.invalid/a.png"','banner: "[[/private/a.png]]"','banner: "[[../a.png]]"','banner: "[[cover.svg]]"','banner: "[[cover.pdf]]"','banner: "[[cover.png#part]]"','banner: ![[cover.png]]','banner: ["[[cover.png]]"]','banner: |\n  ![[cover.png]]','banner: "[[one.png]]"\n"banner": "[[two.png]]"','nested:\n  banner: "[[cover.png]]"','banner: *image','banner: "[[cover.png]]"\n<<: *defaults','description: "multiline\nbanner: \'[[cover.png]]\'\n"','description: [multiline,\nbanner: "[[cover.png]]"\n]'];
+  for(const body of bodies)assert.equal(bannerMetadata('---\n'+body+'\n---\n'),null,body);
+  for(const value of [undefined,'','banner: "[[cover.png]]"','---\nbanner: "[[cover.png]]"'])assert.equal(bannerMetadata(value),null);
 });
 test('Obsidian extensions and unsupported constructs use exact source mode',()=>{
   for(const value of ['[[Project|alias]]','![[diagram.png]]','> [!note] Callout','%%private%%','$a+b$','text ^block-id','<div>HTML</div>','![image](https://example.org/pixel)','Footnote[^one]','[reference]: /somewhere',':::custom\ncontent'])assert.equal(needsSource(value),true,value);
