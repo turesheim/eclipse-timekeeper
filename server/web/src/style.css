@@ -179,11 +179,11 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-client-action { display: contents; }
 .today-contents { display: flex; flex-direction: column; gap: .75rem; min-width: 0; overscroll-behavior: contain; position: absolute; inset-block-start: 0; inset-inline-end: 0; width: var(--today-contents-width,16rem); grid-column: auto; grid-row: auto; }
 .today-contents > *, .notes-contents > * { flex-shrink: 0; }
-.note-contents { min-width: 0; min-height: 0; padding: .85rem; }
+.note-contents { min-width: 0; min-height: 0; padding: .65rem; }
 .note-contents :is(h2,h3) { font-size: var(--font-today-sidebar-heading); font-weight: 650; margin: 0; }
-.note-contents ol { list-style: none; margin: .35rem 0 0; padding: 0; }
+.note-contents ol { list-style: none; margin: .25rem 0 0; padding: 0; }
 .note-contents li { padding-inline-start: calc(var(--contents-depth) * .65rem); }
-.note-contents .btn-link { width: 100%; min-height: 24px; padding: .1rem .25rem; line-height: 1.25; text-align: start; color: var(--bs-body-color); text-decoration: none; overflow-wrap: anywhere; font-family: var(--bs-body-font-family); font-size: var(--font-body); font-weight: 400; }
+.note-contents .btn-link { display: block; width: 100%; min-height: 24px; padding: .05rem .25rem; line-height: 1.2; text-align: start; color: var(--bs-body-color); text-decoration: none; overflow-wrap: anywhere; font-family: var(--bs-body-font-family); font-size: calc(var(--font-body) - 1px); font-weight: 400; }
 .note-contents .btn-link:hover, .note-contents [aria-current] { color: var(--accent); background: var(--bs-tertiary-bg); }
 @media(min-width: 1051px) { .today-contents { height: calc(var(--today-contents-height,100dvh) - var(--workspace-content-gap)); overflow-y: auto; } }
 .today-calendar { min-width: 0; align-content: start; }
