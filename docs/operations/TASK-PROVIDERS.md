@@ -24,8 +24,7 @@ See [the mode comparison and setup steps](SHARED-SIGN-IN.md#choose-the-oauth-mod
 
 ## Connect and select what to import
 
-1. Open **My Account → Internet accounts → Add Google account** or **Add Microsoft
-   account**. Select Calendars, Tasks or both, then connect and approve access.
+1. Open **My Account → Internet accounts → Add account** and choose Google or Microsoft. Select Calendars, Tasks or both, then connect and approve access.
 2. Select calendars and their Dagsverk clients, then choose **Save calendars**.
    Events appear read-only alongside subscriptions; they do not create worked time.
 3. Select task lists and optional projects, then choose **Save task lists**.
@@ -43,7 +42,7 @@ while existing tasks keep theirs and children inherit their parent's project.
 | Microsoft To Do | Import-only; local edits stay in Dagsverk |
 | Google Tasks | Import-only by default; optional **Two-way · review outgoing changes** |
 
-To enable Google task editing, open **Connection settings**, select two-way task
+To enable Google task editing, open the account’s **Details → More options**, select two-way task
 access and **Reconnect** to approve it. Under **Changes to Google Tasks → Prepare
 a Google change**, review supported edits, creation or deletion before sending.
 Title, plain text notes, completion and scheduled day are supported; other values
@@ -53,7 +52,8 @@ remain local. An ordinary local edit is not sent automatically.
 
 Selected lists normally refresh every 15 minutes. **Refresh from provider** also
 discovers new calendars and lists. **Pause synchronization** and resume retain
-selections. **Connection settings** contains permissions, reconnect and disconnect.
+selections. Each account’s **Details** contains service switches and list choices. **More
+options** contains task access, reconnect and disconnect.
 Deselecting a task list or disconnecting keeps its imported tasks.
 
 Reconnect after revoked permission, an expired client secret or an account-archive
