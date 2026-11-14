@@ -273,7 +273,7 @@ browser-bound PKCE flow for `google` or `microsoft`; `POST
 /task-providers/cancel` cancels an attempt. Credentials remain private and are
 excluded from these responses and account archives. The callback is
 `/web/task-provider-callback.html` at the public origin; see
-[operator setup](../operations/TASK-PROVIDERS.md).
+[operator setup](../operations/SHARED-SIGN-IN.md).
 
 The managed OAuth service is the default: authorize accepts the selected `services`
 (`tasks`, `calendars`) and `language` (`en`, `nb`), and returns a validated

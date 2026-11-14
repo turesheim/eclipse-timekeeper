@@ -239,7 +239,7 @@ For Internet accounts, choose a managed OAuth service or register Google and
 Microsoft applications for this NAS. See [OAuth setup](SHARED-SIGN-IN.md). Existing
 `secrets/task_providers.properties` files stay outside generated runtime settings
 and are included in native and Hyper Backup application archives; see
-[retained settings](TASK-PROVIDERS.md#retain-operator-settings).
+[retained settings](CONFIGURATION.md#retain-operator-settings).
 
 Back up before upgrades. A failed application upgrade leaves native data and
 retained configuration intact; retain the previous `.spk` for recovery. Real DSM

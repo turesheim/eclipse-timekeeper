@@ -15,7 +15,8 @@ separate references.
 | Use the browser client | [Web client guide](operations/WEB-CLIENT.md) |
 | Connect Eclipse | [Eclipse backend selection](operations/ECLIPSE-CLIENT.md) |
 | Create accounts, passkeys or API tokens | [Accounts and recovery](operations/ACCOUNTS.md) |
-| Set up Google or Microsoft | [OAuth app registration](operations/SHARED-SIGN-IN.md) and [Internet accounts](operations/TASK-PROVIDERS.md) |
+| Enable Google/Microsoft access as an administrator | [App registration and direct/managed OAuth modes](operations/SHARED-SIGN-IN.md) |
+| Connect your own Google/Microsoft account or a calendar feed | [Internet accounts and subscriptions](operations/TASK-PROVIDERS.md) |
 | Back up or restore an installation | [Full-instance backup and restore](operations/INSTANCE-BACKUP.md) |
 | Transfer one account | [Personal account archives](operations/ACCOUNT-DATA.md) |
 
