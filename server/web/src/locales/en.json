@@ -1869,5 +1869,6 @@
   "internet_admin.registration_saved": "{{provider}} client ID and secret are saved. Use Verify with {{provider}} to test access.",
   "internet_admin.registration_missing_secret": "{{provider}} client ID is saved. Add a client secret to complete the registration.",
   "internet_admin.registration_missing_id": "{{provider}} client secret is saved. Add the client ID to complete the registration.",
-  "internet_admin.registration_optional": "{{provider}} is not configured. Add it only if you want to offer this provider."
+  "internet_admin.registration_optional": "{{provider}} is not configured. Add it only if you want to offer this provider.",
+  "internet_accounts.reconnect_help": "Reconnect to apply service or permission changes."
 }

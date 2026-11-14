@@ -1869,5 +1869,6 @@
   "internet_admin.registration_saved": "Klient-ID og hemmelighet for {{provider}} er lagret. Bruk Bekreft med {{provider}} for å teste tilgang.",
   "internet_admin.registration_missing_secret": "Klient-ID for {{provider}} er lagret. Legg til en klienthemmelighet for å fullføre registreringen.",
   "internet_admin.registration_missing_id": "Klienthemmeligheten for {{provider}} er lagret. Legg til klient-ID for å fullføre registreringen.",
-  "internet_admin.registration_optional": "{{provider}} er ikke konfigurert. Legg det til bare hvis du vil tilby denne leverandøren."
+  "internet_admin.registration_optional": "{{provider}} er ikke konfigurert. Legg det til bare hvis du vil tilby denne leverandøren.",
+  "internet_accounts.reconnect_help": "Koble til på nytt for å ta i bruk endrede tjenester eller tillatelser."
 }
