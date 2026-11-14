@@ -42,19 +42,32 @@ throughout these steps:
    and [Audience](https://console.cloud.google.com/auth/audience). Choose
    **External** for personal Google accounts or users outside your organization.
    While publishing status is **Testing**, add the intended accounts as test users.
-3. In [Data Access](https://console.cloud.google.com/auth/scopes), configure the
-   scopes below for the services you offer. Google's verification requirements
-   apply when publishing the app.
+3. In [Data Access](https://console.cloud.google.com/auth/scopes), select
+   **Add or remove scopes** and check the rows below for the services you offer.
+   Click **Update**, then **Save**. Google's verification requirements apply when
+   publishing the app.
 4. In [Clients](https://console.cloud.google.com/auth/clients), select
    **Create client → Web application**. Add the Dagsverk URI under
    **Authorized redirect URIs**, then copy the **Client ID** and **Client secret**.
 
-| Access | Google scopes |
+Select the three identity rows, plus the calendar/task rows you need. The labels
+below match Google's **Scope** column; `…` abbreviates `https://www.googleapis.com`.
+The identity rows may have a blank **API** column.
+
+| Scope shown in Google's table | Access |
 | --- | --- |
-| Identity | `openid email profile` |
-| Calendars | `https://www.googleapis.com/auth/calendar.readonly` |
-| Tasks, import-only | `https://www.googleapis.com/auth/tasks.readonly` |
-| Tasks, two-way | `https://www.googleapis.com/auth/tasks` |
+| `…/auth/userinfo.email` | Account email address |
+| `…/auth/userinfo.profile` | Basic account profile |
+| `openid` | Account identity |
+| `…/auth/calendar.readonly` | Calendars |
+| `…/auth/tasks.readonly` | Tasks, import-only |
+| `…/auth/tasks` | Tasks, optional two-way access |
+
+For calendar and task import, select the identity rows, `…/auth/calendar.readonly`
+and `…/auth/tasks.readonly`. Two-way tasks additionally need `…/auth/tasks`;
+keep `…/auth/tasks.readonly` for import-only connections.
+Google lists the identity scopes separately; Dagsverk requests them as
+`openid email profile`. See Google's [scope reference](https://developers.google.com/identity/protocols/oauth2/scopes#oauth2).
 
 Dagsverk requests only the selected services, with offline access for background
 refresh. See Google's [consent setup](https://developers.google.com/workspace/guides/configure-oauth-consent)
