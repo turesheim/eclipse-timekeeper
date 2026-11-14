@@ -1,4 +1,5 @@
 import {focusIncludes} from './focus-model.js';
+import {calendarSourceFailure} from './calendar-source-status.js';
 import {calendarDescription,calendarLocation} from './tooltip-description.js';
 import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.js';
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
@@ -49,7 +50,8 @@ export class CalendarSubscriptions {
     this.message=node('p',undefined,'hint');this.message.id='calendar-subscriptions-message';this.message.setAttribute('role','status');
     this.content=node('div',undefined,'calendar-subscriptions-content');this.content.id='calendar-subscriptions-content';this.content.append(node('p',t('calendar.explanation'),'hint'),node('p',t('calendar.sharing.setup')),this.list,calendarSharingGuide());this.panel.append(heading,this.content,this.message);
     this.allDay=node('section',undefined,'calendar-all-day-plans');this.allDay.hidden=true;this.allDay.setAttribute('aria-labelledby','calendar-all-day-title');
-    root.querySelector('.calendar-scroll').before(this.allDay);
+    this.sourceWarnings=node('div',undefined,'alert alert-warning');this.sourceWarnings.id='calendar-source-warnings';this.sourceWarnings.setAttribute('role','status');this.sourceWarnings.hidden=true;
+    root.querySelector('.calendar-scroll').before(this.sourceWarnings,this.allDay);
     this.dialog=node('dialog',undefined,'app-dialog shadow-lg');this.dialog.id='calendar-subscription-editor';this.dialog.setAttribute('aria-labelledby','calendar-subscription-editor-title');
     this.form=node('form');
     for(const event of ['input','change'])this.form.addEventListener(event,()=>this.managementView?.dirty.add(this.form));
@@ -90,7 +92,7 @@ export class CalendarSubscriptions {
   show(){if(!this.scope||!this.data)return;this.poll();void this.load();}
   hide(){if(!this.managementView){clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);}this.details.close();}
   reset(){
-    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.reset();this.scope=null;this.data=null;this.key=null;this.allDayKey=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
+    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.eventNoteEditor.reset();this.scope=null;this.data=null;this.key=null;this.allDayKey=null;this.rows=[];this.events=[];this.sources={};this.sourceWarnings.hidden=true;this.sourceWarnings.replaceChildren();this.busy.clear();this.draft=null;this.selected=null;
     this.dialog.close();this.details.close();this.fields.replaceChildren();this.details.replaceChildren();this.list.replaceChildren();this.allDay.replaceChildren();this.allDay.hidden=true;this.message.textContent='';
   }
   async load() {
@@ -111,6 +113,7 @@ export class CalendarSubscriptions {
   date(value){return value?dateTimeFormat(getLocale(),{dateStyle:'medium',timeStyle:'short',timeZone:this.data.profile.data.zoneId}).format(new Date(value)):t('calendar.never');}
   paint() {
     if(!this.data)return;
+    const failures=this.rows.filter(value=>value.visible&&focusIncludes(this.data,value.clientId)&&(value.lastError||this.errors?.[value.id]));this.sourceWarnings.hidden=!failures.length;this.sourceWarnings.replaceChildren(...failures.map(value=>calendarSourceFailure(value,calendarFailure(value.lastError||this.errors[value.id]))));
     this.title.textContent=this.rows.length?t('calendar.subscriptions_count',{count:this.rows.length}):t('calendar.subscriptions');
     const active=document.activeElement,focus=this.panel.contains(active)?active.dataset.calendarAction:null;
     this.add.disabled=!this.writable||!(this.data.allClients||this.data.clients).length;this.list.replaceChildren();
@@ -120,7 +123,7 @@ export class CalendarSubscriptions {
       input.addEventListener('change',()=>void this.visibility(value,input.checked));
       const text=node('span');text.append(node('strong',value.name),node('small',(this.data.allClients||this.data.clients).find(client=>client.id===value.clientId)?.name||t('ui.client')));label.append(input,text);
       const status=node('div',undefined,'calendar-subscription-status hint');status.append(node('span',t('calendar.last_success',{date:this.date(value.lastSuccess)})));
-      const error=value.lastError||this.errors?.[value.id];if(error)status.append(node('span',calendarFailure(error),'error'));
+      const error=value.lastError||this.errors?.[value.id];if(error)status.append(calendarSourceFailure(value,calendarFailure(error)));
       else if(value.lastAttempt&&(!value.lastSuccess||Date.parse(value.lastAttempt)>Date.parse(value.lastSuccess))&&Date.now()-Date.parse(value.lastAttempt)<90000)status.append(node('span',t('calendar.refreshing')));
       const actions=node('div',undefined,'calendar-subscription-actions');
       for(const [action,glyph,key,operation]of [['refresh','arrow-clockwise','calendar.refresh_name',()=>this.refresh(value)],['edit','pencil-square','calendar.edit_name',()=>this.edit(value.id)],['delete','trash','calendar.remove_name',()=>this.edit(value.id,true)]]) {

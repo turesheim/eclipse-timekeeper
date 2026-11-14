@@ -1,3 +1,4 @@
+import {configureSnippets} from './snippets.js';
 import {updateNoteClientDirectory} from './note-client.js';
 import {editorPreferences} from './editor-preferences.js';
 import {RecentNotes} from './recent-notes.js';
@@ -225,7 +226,7 @@ async function tab(name) {
   if(name==='tasks')tasks.show();else tasks.hide();
   if (name === 'track') track.show();else track.hide();
   if (name === 'today') today.show();else today.hide();
-  if(name==='today')recentNotes.show(today.sidebar,'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
+  if(name==='today')recentNotes.show($('today-contents'),'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
   if (name === 'week') weekSessions.show();else weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
@@ -273,7 +274,7 @@ const auth = authentication({
     editorPreferences.reset();
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshController?.abort();refreshController = null;refreshing = null;reloadAgain = false;
-    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
+    ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);configureSnippets(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
     ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
     $('period-announcement').textContent = '';
@@ -444,7 +445,7 @@ $('focus-select').addEventListener('change',()=>{
   focusId=$('focus-select').value;selectedDay=null;render();
 });
 function render() {
-  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision);
+  updateNoteClientDirectory(api,snapshot.clients,snapshot.revision,snapshot.projects);configureSnippets(snapshot.profile.data);
   paintFocus();
   const s = focusedSnapshot(snapshot,currentFocus()),zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;

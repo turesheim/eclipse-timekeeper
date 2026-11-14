@@ -1233,17 +1233,25 @@ through this operation. Explicit titles survive account archives and subsequent
 content edits; a later path rename updates the chosen title to its filename stem.
 
 `GET /notes/client?sourceType=...&sourceKey=...` reads an account-private
-note-to-client association with its own strong ETag. `PUT` accepts exactly
-`{clientId: <owned client UUID or null>}` and requires that association's current
+note association with its own strong ETag. `PUT` accepts
+`{clientId: <owned client UUID or null>, projectId?: <owned project UUID or null>}`
+and requires that association's current
 `If-Match` (428 when absent, 412 when stale). Clearing an unchanged association
 is a no-op. Valid sources are ordinary Markdown, saved event notes, and daily or
 weekly pages, including empty daily/weekly pages. Foreign notes/clients return
 404; read-only tokens cannot write. Responses are private, no-store.
 
+A project supplies its client; a conflicting explicit client is rejected.
+Omitting `projectId` preserves it when the client is unchanged; changing the
+client clears it. Association changes update all existing linked checklist tasks
+atomically through the canonical task service. New tasks inherit the note
+association; inline `@` assignments remain available on unassociated notes.
+Normal task hierarchy conflicts roll back the entire association change.
+
 Association writes retain canonical note bytes, dates, content validators and
-edit history. A client relation protects the associated client from deletion
+edit history. Client and project relations protect the associated client and project from deletion
 until its notes are detached. Account archives include optional `noteClients`
-metadata and remap client IDs with the imported work graph. Review rolls back
+metadata and remap client and optional project IDs with the imported work graph. Review rolls back
 these associations; an existing different association is an import conflict.
 Note-only ZIPs do not contain business-client records or these associations.
 
@@ -1491,3 +1499,17 @@ read-only, and Google task writes require explicit TWO_WAY consent. Existing gra
 retain their original refresh path through mode changes. Initialization failures
 are retryable connection errors, not uncertain business-record writes. Genuine
 persistent-write uncertainty still requires review of current values.
+
+### Account text snippets
+
+`GET /me` includes nullable `textSnippets`. `PUT /me` accepts the same optional
+field under the existing profile ETag and write permission. Omission preserves
+the preference, `null` restores the built-in defaults, and `[]` disables snippet
+expansion. An override contains at most 50 objects with exactly `keyword` and
+`content`. Keywords match `;[A-Za-z][A-Za-z0-9_-]{0,31}` and must be unique ignoring
+case. Expansion templates are nonempty, limited to 8,192 Unicode code points
+each and 64 KiB combined UTF-8 keyword/content bytes. Invalid input is 422 and
+does not change the profile version. This private preference is separate from
+note bodies and never executes template code. It follows the existing profile
+preference policy for portable account archives (selected preferences only);
+full instance backups retain it.

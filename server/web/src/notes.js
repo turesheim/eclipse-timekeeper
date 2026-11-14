@@ -67,7 +67,7 @@ export class NotesView {
     this.tree=node('div',undefined,'notes-tree');this.tree.setAttribute('role','tree');this.tree.setAttribute('aria-label',t('notes.navigation'));this.tree.addEventListener('keydown',event=>this.treeKey(event));
     const navigator=node('div',undefined,'notes-navigation-browser');navigator.append(tools,this.tree,this.sortMenu);
     const navigatorTitle=node('h3',t('notes.navigation'),'notes-navigation-title');this.navigation.append(navigatorTitle,navigator);
-    this.recentHost=node('div',undefined,'notes-recent');this.sidebar.append(this.navigation,this.recentHost);
+    this.recentHost=node('div',undefined,'notes-recent');this.sidebar.append(this.navigation);
     this.resize=new SidebarResize(root,this.sidebar,{variable:'--notes-nav-width',label:t('notes.resize'),width:260,breakpoint:760,focusFallback:()=>this.toggle,className:'notes-resize'}).element;
     this.editor=node('section',undefined,'notes-editor card');this.editor.setAttribute('aria-labelledby','notes-document-title');
     const fileTools=this.fileTools=node('div',undefined,'notes-file-tools');this.rename=action(t('notes.move'),()=>this.pathDialog('move'),'edit');this.remove=action(t('notes.delete'),()=>void this.delete(),'delete');this.recover=action(t('notes.restore'),()=>void this.restore(),'arrow-counterclockwise');this.reloadNote=action(t('notes.reload'),()=>void this.reloadDocument(),'refresh');this.download=action(t('notes.download_attachment'),()=>void this.downloadAttachment(),'download');this.documentTools=node('div',undefined,'btn-group markdown-document-tools');this.documentTools.setAttribute('role','group');this.documentTools.setAttribute('aria-label',t('notes.document_actions'));this.documentTools.append(this.recover,this.download);
@@ -81,8 +81,9 @@ export class NotesView {
     this.remove.classList.replace('btn-outline-secondary','btn-outline-danger');this.markdown.client.group.className='notes-client-action';
     this.mainActions.append(this.markdown.historyButton,this.markdown.client.group,this.remove,this.rename,this.reloadNote);
     this.mainActions.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
-    this.contentsRoot=node('aside',undefined,'card notes-contents');this.contentsRoot.id='notes-contents';
-    this.contents=new NoteContents(this.contentsRoot,this.markdown,{available:()=>!!this.note&&!this.binary&&!this.note.deleted});
+    this.contentsRoot=node('aside',undefined,'notes-contents');this.contentsRoot.id='notes-contents';this.contentsRoot.setAttribute('aria-label',t('layout.right_sidebar'));
+    const outline=node('section',undefined,'card');outline.id='notes-outline';this.contentsRoot.append(outline,this.recentHost);
+    this.contents=new NoteContents(outline,this.markdown,{available:()=>!!this.note&&!this.binary&&!this.note.deleted});
     this.contentsResize=new SidebarResize(root,this.contentsRoot,{side:'right',variable:'--notes-contents-width',label:t('notes.resize_contents'),focusFallback:()=>this.sidebarActions?.items.find(item=>item.side==='right')?.button,className:'notes-contents-resize'}).element;
     this.preview=node('div',undefined,'notes-image-preview');this.preview.hidden=true;
     this.empty=node('p',t('notes.select'),'hint');this.status=node('p','','hint');this.status.setAttribute('role','status');
@@ -327,7 +328,7 @@ export class NotesView {
         if(['MARKDOWN','DAY','WEEK','EVENT'].includes(metadata.kind))text=textDecoder.decode(await content.data.arrayBuffer());else{this.binary=true;if(rasterType(new Uint8Array(await content.data.slice(0,12).arrayBuffer())))imageBlob=content.data;}}
       if(session!==this.session||current!==this.generation)return;this.note=metadata;this.original=text;this.updateTitle(true);this.markdown.setValue(text);this.error.hidden=true;
       if(imageBlob){this.selectedImage=imagePreview({alt:metadata.path.split('/').at(-1),load:async()=>imageBlob,active:()=>session===this.session&&current===this.generation});this.preview.append(this.selectedImage.dom);}
-      this.empty.textContent=metadata.deleted?t('notes.deleted'):this.binary?t('notes.binary'):t('notes.select');this.binary||=metadata.kind==='FOLDER';if(this.narrow.matches)this.sidebarActions.setExpanded('left',false);this.controls();this.paint();if(this.positions.has(id))await this.markdown.restorePosition(this.positions.get(id));else if(!this.binary&&!metadata.deleted)await this.markdown.showFormatted(false);
+      this.empty.textContent=metadata.deleted?t('notes.deleted'):this.binary?t('notes.binary'):t('notes.select');this.binary||=metadata.kind==='FOLDER';if(this.narrow.matches)this.sidebarActions.setExpanded('left',false);if(this.sidebarActions.narrow.matches)this.sidebarActions.setExpanded('right',false);this.controls();this.paint();if(this.positions.has(id))await this.markdown.restorePosition(this.positions.get(id));else if(!this.binary&&!metadata.deleted)await this.markdown.showFormatted(false);
     }catch(error){if(session===this.session&&current===this.generation)this.fail(error);}
   }
   async commit({keepalive=false}={}){

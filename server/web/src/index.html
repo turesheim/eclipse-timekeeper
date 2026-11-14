@@ -101,15 +101,17 @@
             <section class="card today-summary" aria-labelledby="today-sessions-title"><h3 id="today-sessions-title" data-i18n="ui.work_sessions">Work sessions</h3><div id="today-sessions"></div></section>
             <section class="card today-summary" aria-labelledby="today-events-title"><h3 id="today-events-title" data-i18n="today.events">Calendar events</h3><div id="today-events"></div></section>
             <section class="card today-summary" aria-labelledby="today-planned-tasks-title"><h3 id="today-planned-tasks-title" data-i18n="today.planned_tasks">Planned tasks</h3><div id="today-planned-tasks"></div></section>
-            <section class="card today-summary recent-notes" aria-labelledby="today-recent-notes-title"><h3 id="today-recent-notes-title" data-i18n="today.recent_notes">Recent notes</h3><div id="today-recent-notes"></div></section>
           </aside>
           <div class="today-main">
             <div id="today-journal" class="today-journal"><span id="today-note-status-anchor" hidden></span></div>
           </div>
-          <aside id="today-contents" class="card today-contents" aria-labelledby="today-contents-title">
-            <h2 id="today-contents-title" data-i18n="today.contents">Table of contents</h2>
-            <nav aria-labelledby="today-contents-title"><ol id="today-contents-list"></ol></nav>
-            <p id="today-contents-empty" class="hint" data-i18n="today.no_headings">No headings in this note yet.</p>
+          <aside id="today-contents" class="today-contents" aria-label="Right sidebar" data-i18n-aria-label="layout.right_sidebar">
+            <section id="today-outline" class="card" aria-labelledby="today-contents-title">
+              <h2 id="today-contents-title" data-i18n="today.contents">Table of contents</h2>
+              <nav aria-labelledby="today-contents-title"><ol id="today-contents-list"></ol></nav>
+              <p id="today-contents-empty" class="hint" data-i18n="today.no_headings">No headings in this note yet.</p>
+            </section>
+            <section class="card today-summary recent-notes" aria-labelledby="today-recent-notes-title"><h3 id="today-recent-notes-title" data-i18n="today.recent_notes">Recent notes</h3><div id="today-recent-notes"></div></section>
           </aside>
         </div>
       </section>

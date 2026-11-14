@@ -1,3 +1,4 @@
+import {snippetAt,sourceSnippetAt} from './snippets.js';
 import {NoteBookmark} from './note-bookmark.js';
 import {NoteClient} from './note-client.js';
 import {MarkdownCaret} from './markdown-caret.js';
@@ -98,11 +99,42 @@ export class MarkdownField {
       this.controls();
     }));
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
-    this.text.addEventListener('keydown',event=>{if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
+    this.text.addEventListener('keydown',event=>{if(this.expandSourceSnippet(event))return;if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     if(resources?.bookmark)this.bookmark=new NoteBookmark(root,resources.bookmark);
     buildExperience(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
+  }
+  closeSourceTyping(){
+    // WebKit coalesces execCommand replacements with the preceding typed word.
+    // Restoring the native typing step closes that group while retaining its
+    // Undo/Redo history. Intermediate history events must not publish drafts.
+    if(!document.queryCommandEnabled('undo'))return;
+    const value=this.text.value,start=this.text.selectionStart,end=this.text.selectionEnd,direction=this.text.selectionDirection,top=this.text.scrollTop,left=this.text.scrollLeft;
+    let undone=false;
+    const history=event=>{
+      if(!['historyUndo','historyRedo'].includes(event.inputType))return;
+      if(event.target!==this.text){if(event.type==='beforeinput')event.preventDefault();return;}
+      event.stopImmediatePropagation();
+      if(event.type==='input'&&event.inputType==='historyUndo')undone=true;
+    };
+    document.addEventListener('beforeinput',history,true);document.addEventListener('input',history,true);
+    try{document.execCommand('undo');if(undone)document.execCommand('redo');}
+    finally{
+      document.removeEventListener('beforeinput',history,true);document.removeEventListener('input',history,true);
+      // A programmatically loaded value may supersede the browser's old step.
+      if(this.text.value!==value)this.text.value=value;
+      this.text.setSelectionRange(start,end,direction);this.text.scrollTop=top;this.text.scrollLeft=left;
+    }
+  }
+  expandSourceSnippet(event){
+    if(event.key!==' '||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||this.readOnly||this.text.selectionStart!==this.text.selectionEnd)return false;
+    const end=this.text.selectionStart,result=sourceSnippetAt(this.text.value.slice(0,end));if(!result)return false;
+    event.preventDefault();this.closeSourceTyping();this.text.setSelectionRange(end-result.length,end);
+    const inserted=result.text+' ';
+    if(!document.execCommand('insertText',false,inserted)){this.text.setRangeText(inserted,end-result.length,end,'end');this.text.dispatchEvent(new Event('input'));}
+    if(result.cursor!==null)this.text.setSelectionRange(end-result.length+result.cursor,end-result.length+result.cursor);
+    return true;
   }
   focus(){if(this.rich.hidden)this.text.focus({preventScroll:true});else this.editor?.focus();}
   historyShortcut(event){
@@ -235,7 +267,7 @@ export class MarkdownField {
     const host=node('div');host.inert=true;this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
-      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
+      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,expandSnippet:snippetAt,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;host.inert=false;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}

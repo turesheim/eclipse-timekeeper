@@ -60,8 +60,8 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await field.getByRole('button',{name:locale==='nb-NO'?'Markdown-kilde':'Markdown source',exact:true}).click();
     const source=page.locator('#today-journal-body');await choices.first().click();await expect(source).toBeFocused();await expect.poll(()=>source.evaluate(node=>node.selectionStart)).toBe(0);await choices.last().click();
-    expect(await source.evaluate(node=>node.selectionStart)).toBe((await source.inputValue()).lastIndexOf('## Next steps'));
-    expect(await source.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+    await expect.poll(()=>source.evaluate(node=>node.selectionStart)).toBe((await source.inputValue()).lastIndexOf('## Next steps'));
+    await expect.poll(()=>source.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await source.fill(markdown+'\n## Live update\n');await expect(choices.last()).toHaveText('Live update');
     await field.getByRole('button',{name:locale==='nb-NO'?'Formatert':'Formatted',exact:true}).click();await choices.first().click();await expect(field.locator('.ProseMirror h1').first()).toBeInViewport();
@@ -94,9 +94,9 @@ test('Today main actions reuse revisions, client association and confirmed delet
   try{
     await signIn(page);await page.locator('#today-date').fill(date);const actions=page.getByRole('group',{name:'Main actions',exact:true});
     await expect(actions.getByRole('button')).toHaveCount(5);
-    for(const name of ['Note revisions','Associate with client','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
+    for(const name of ['Note revisions','Associate with client or project','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
     const history=actions.getByRole('button',{name:'Note revisions',exact:true});await history.focus();await history.press('Enter');await expect(page.getByRole('dialog',{name:'Note revisions',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(history).toBeFocused();
-    const associate=actions.getByRole('button',{name:'Associate with client',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await dialog.locator('select').selectOption(client.id);
+    const associate=actions.getByRole('button',{name:'Associate with client or project',exact:true});await expect(associate).toBeEnabled();await associate.click();const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await dialog.getByLabel('Note client',{exact:true}).selectOption(client.id);
     let held=false,release;const pending=new Promise(resolve=>{release=resolve;});
     await page.route('**/api/v1/notes/client?**',async route=>{
       const url=new URL(route.request().url());if(route.request().method()==='GET'&&url.searchParams.get('sourceType')==='DAY_NOTE'&&url.searchParams.get('sourceKey')===date&&!held){held=true;await pending;}await route.continue();
@@ -114,14 +114,14 @@ test('Today main actions reuse revisions, client association and confirmed delet
     try{
       const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await reader.locator('#today-date').fill(date);
       await reader.locator('#today-contents-list button').click();await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
-      for(const name of ['Associate with client','Delete note'])await expect(reader.locator('#today-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
+      for(const name of ['Associate with client or project','Delete note'])await expect(reader.locator('#today-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
       await expect(reader.locator('#today-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeEnabled();
       for(const side of ['left','right']){const toggle=reader.locator('#today-main-actions-toggle-'+side+'-sidebar');await expect(toggle).toBeEnabled();await toggle.click();}
       await expect(reader.locator('#today-sidebar')).toBeHidden();await expect(reader.locator('#today-contents')).toBeHidden();
     }finally{await readerContext.close();}
     await navigateView(page,'track');await page.locator('#track-month').fill('2026-07');await page.locator('[data-track-note-date="'+date+'"]').click();
     await page.locator('#track-note-editor').getByRole('button',{name:'Note tools',exact:true}).click();
-    for(const name of ['Note revisions','Associate with client','Delete note'])await expect(page.getByRole('menuitem',{name,exact:true})).toBeVisible();
+    for(const name of ['Note revisions','Associate with client or project','Delete note'])await expect(page.getByRole('menuitem',{name,exact:true})).toBeVisible();
     await page.keyboard.press('Escape');await page.keyboard.press('Escape');await navigateView(page,'today');
     await appendEditorText(page.locator('#today-note-editor .ProseMirror p').first(),' Draft before deletion.');
     page.once('dialog',dialog=>dialog.accept());await actions.getByRole('button',{name:'Delete note',exact:true}).click();await expect(page.locator('#today-contents-list button')).toHaveCount(0);await expect(page.locator('#today-contents-empty')).toBeVisible();expect((await(await api(request,'GET',path)).json()).body).toBe('');

@@ -8,6 +8,8 @@ import java.util.*;
 import io.quarkus.test.junit.*;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
+import net.resheim.eclipse.timekeeper.domain.*;
+import net.resheim.eclipse.timekeeper.service.Commands.*;
 
 @QuarkusTest @TestProfile(NoteClientsTest.Profile.class)
 class NoteClientsTest {
@@ -20,6 +22,27 @@ class NoteClientsTest {
     private UUID client(String name){
         UUID id=UUID.randomUUID();var value=object().put("id",id.toString()).put("ownerId",store.owner()).put("version",1).put("name",name).put("color","#305070");
         store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,'CLIENT',?,1,?)",store.owner(),id,value.toString());return id;
+    }
+    private UUID project(String name,UUID client){var project=store.service().createProject(new CreateProject(name));store.clientDetails("PROJECT",project.id().value(),object().put("clientId",client.toString()));return project.id().value();}
+    @Test void projectAndClientAssignmentsPropagateToExistingAndFutureChecklistTasksWithoutEditingTheNote(){
+        store.transaction("note-project-tasks",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();byte[] body="- [ ] First\r\n- [x] Second\r\n".getBytes(StandardCharsets.UTF_8);var entry=vault.put(new VaultPath("Assigned.md"),null,true,body);var ref=VaultSources.fromEntry(entry);var clients=new NoteClients(store);UUID first=client("First client"),second=client("Second client"),project=project("First project",first);String contentTag=vault.tag(entry);
+            var assigned=clients.save(ref,clients.tag(ref),null,project);assertEquals(first.toString(),assigned.path("clientId").asText());assertEquals(project.toString(),assigned.path("projectId").asText());assertTrue(store.service().tasks().stream().allMatch(task->task.projectId().equals(Optional.of(new ProjectId(project)))));assertEquals(contentTag,vault.tag(vault.get(VaultCollection.id(entry))));assertArrayEquals(body,vault.read(vault.get(VaultCollection.id(entry))));
+            entry=vault.put(new VaultPath("Assigned.md"),contentTag,false,"- [ ] First\r\n- [x] Second\r\n- [ ] Third @Second_client\r\n".getBytes(StandardCharsets.UTF_8));assertTrue(store.service().tasks().stream().allMatch(task->task.projectId().equals(Optional.of(new ProjectId(project)))));
+            store.clientDetails("PROJECT",project,object().put("clientId",second.toString()));assertEquals(second.toString(),clients.get(ref).path("clientId").asText());assertFalse(store.related("client","CLIENT",first));
+            clients.save(ref,clients.tag(ref),second,null);assertTrue(clients.get(ref).path("projectId").isNull());for(var task:store.list("TASK")){assertTrue(task.path("projectId").isNull());assertEquals(second.toString(),task.path("clientId").asText());}
+            clients.save(ref,clients.tag(ref),null,null);for(var task:store.list("TASK")){assertTrue(task.path("projectId").isNull());assertFalse(task.hasNonNull("clientId"));}assertEquals(3,store.service().tasks().size());assertTrue(store.service().tasks().stream().anyMatch(task->task.planning().status()==TaskStatus.COMPLETED));return null;
+        });
+    }
+    @Test void projectAssociationRequiresOwnedMatchingClientsAndProtectsProjectDeletion(){
+        UUID foreign=store.transaction("note-project-foreign",()->project("Foreign",client("Foreign")));
+        store.transaction("note-project-owner",()->{var choices=new NoteClients(store);var ref=choices.reference(DayNotes.TYPE,"2026-11-20");UUID client=client("Owned"),other=client("Other"),project=project("Owned",client);String before=choices.tag(ref);
+            assertEquals(404,assertThrows(ApiFailure.class,()->choices.save(ref,before,null,foreign)).status);assertEquals(422,assertThrows(ApiFailure.class,()->choices.save(ref,before,other,project)).status);assertEquals(before,choices.tag(ref));choices.save(ref,before,client,project);assertTrue(store.related("project","PROJECT",project));assertEquals(project.toString(),choices.save(ref,choices.tag(ref),client).path("projectId").asText());assertTrue(store.find(DayNotes.TYPE,ref.id()).isEmpty());return null;});
+    }
+    @Test void aTaskHierarchyConflictRollsBackTheEntireAssociationChange(){
+        UUID[] task={null};store.transaction("note-project-conflict",()->{var vault=new VaultCollection(store,limits);vault.initialize();var entry=vault.put(new VaultPath("Conflict.md"),null,true,"- [ ] Parent\n- [ ] Other\n".getBytes(StandardCharsets.UTF_8));var parent=store.service().tasks().stream().filter(value->value.summary().equals("Parent")).findFirst().orElseThrow();task[0]=parent.id().value();store.service().createTask(new CreateTask(Optional.empty(),Optional.of(parent.id()),"Independent child",Optional.empty()));return null;});
+        assertThrows(RuntimeException.class,()->store.transaction("note-project-conflict",()->{var choices=new NoteClients(store);var ref=VaultSources.fromEntry(new VaultCollection(store,limits).get(new VaultPath("Conflict.md")));UUID project=project("Destination",client("Destination"));choices.save(ref,choices.tag(ref),null,project);return null;}));
+        store.transaction("note-project-conflict",()->{var choices=new NoteClients(store);var ref=VaultSources.fromEntry(new VaultCollection(store,limits).get(new VaultPath("Conflict.md")));assertTrue(choices.get(ref).path("clientId").isNull());assertTrue(choices.get(ref).path("projectId").isNull());assertTrue(store.service().tasks().stream().allMatch(value->value.projectId().isEmpty()));return null;});
     }
     @Test void associationChangesAreConditionalAndDoNotRewriteTheSource(){
         store.transaction("note-client-own",()->{
@@ -47,6 +70,13 @@ class NoteClientsTest {
         store.transaction("note-client-other",()->{var clients=new NoteClients(store);var ref=clients.reference(DayNotes.TYPE,"2026-11-09");assertNotEquals(alice,clients.tag(ref));assertTrue(clients.get(ref).path("clientId").isNull());return null;});
     }
     private io.restassured.response.Response read(String token,String type,String key){return given().header("Authorization","Bearer "+token).queryParam("sourceType",type).queryParam("sourceKey",key).get("/api/v1/notes/client");}
+    @Test void httpProjectAssociationChecksPermissionsOwnershipValidatorsAndDeletionDependencies(){
+        UUID client=store.transaction("a",()->client("HTTP project client")),project=store.transaction("a",()->project("HTTP project",client)),foreign=store.transaction("b",()->project("Foreign project",client("Foreign project client")));String type=DayNotes.TYPE,day="2026-11-23",tag=read("test-a",type,day).header("ETag");
+        var body=object().putNull("clientId").put("projectId",project.toString());assertEquals(403,save("test-read",type,day,tag,body).statusCode());assertEquals(404,save("test-a",type,day,tag,object().putNull("clientId").put("projectId",foreign.toString())).statusCode());
+        var saved=save("test-a",type,day,tag,body);assertEquals(200,saved.statusCode());assertEquals(client.toString(),saved.jsonPath().getString("clientId"));assertEquals(project.toString(),saved.jsonPath().getString("projectId"));assertEquals(412,save("test-a",type,day,tag,body).statusCode());
+        var loaded=given().header("Authorization","Bearer test-a").get("/api/v1/projects/"+project);assertEquals(409,given().header("Authorization","Bearer test-a").header("If-Match",loaded.header("ETag")).delete("/api/v1/projects/"+project).statusCode());
+        assertEquals(200,save("test-a",type,day,saved.header("ETag"),object().put("clientId",client.toString()).putNull("projectId")).statusCode());assertEquals(204,given().header("Authorization","Bearer test-a").header("If-Match",loaded.header("ETag")).delete("/api/v1/projects/"+project).statusCode());
+    }
     @Test void savedEventAndEmptyWeekHaveDistinctPrivateAssociations(){
         var event=new EventNotes.Key(UUID.randomUUID(),"a".repeat(64));
         store.transaction("note-client-event",()->{

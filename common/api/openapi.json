@@ -22338,6 +22338,21 @@
           },
           "typographyCss": {
             "$ref": "#/components/schemas/TypographyCss"
+          },
+          "textSnippets": {
+            "oneOf": [
+              {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "$ref": "#/components/schemas/TextSnippet"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owner-private plain-text snippets. Null restores built-in shortcuts; an empty list disables expansion. Keywords are unique ignoring case; the combined UTF-8 limit is 64 KiB. Omission on a profile write preserves this preference."
           }
         },
         "required": [
@@ -22768,6 +22783,21 @@
           },
           "typographyCss": {
             "$ref": "#/components/schemas/TypographyCss"
+          },
+          "textSnippets": {
+            "oneOf": [
+              {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "$ref": "#/components/schemas/TextSnippet"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owner-private plain-text snippets. Null restores built-in shortcuts; an empty list disables expansion. Keywords are unique ignoring case; the combined UTF-8 limit is 64 KiB. Omission on a profile write preserves this preference."
           }
         },
         "required": [
@@ -37624,6 +37654,17 @@
                 "type": "null"
               }
             ]
+          },
+          "projectId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owned project; its client is inherited. Omission preserves the project when the client is unchanged; a client change clears it."
           }
         }
       },
@@ -37643,6 +37684,17 @@
                 "type": "null"
               }
             ]
+          },
+          "projectId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owned project; its client is inherited. Omission preserves the project when the client is unchanged; a client change clears it."
           }
         }
       },
@@ -37671,6 +37723,17 @@
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
+          },
+          "projectId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owned project; its client is inherited. Omission preserves the project when the client is unchanged; a client change clears it."
           }
         }
       },
@@ -39620,6 +39683,25 @@
           "microsoftSecretAction": [
             "microsoftClientId"
           ]
+        }
+      },
+      "TextSnippet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyword",
+          "content"
+        ],
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "pattern": ";[A-Za-z][A-Za-z0-9_-]{0,31}"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
         }
       }
     },

@@ -47,9 +47,9 @@ final class NoteTasks {
         var next=NoteTaskMarkup.items(source);if(next.size()>1000)throw ApiFailure.validation();
         int[] matches=NoteTaskMatches.previous(old,next);var result=previous.deepCopy();var items=result.putArray("items");var retained=new HashSet<UUID>();String normalized=source;
         var assignments=next.stream().anyMatch(value->!value.assignments().isEmpty())?new NoteTaskAssignments(store):null;
+        var association=new NoteClients(store).get(ref);
         for(int i=0;i<next.size();i++){
             var current=next.get(i);var before=matches[i]<0?null:previous.path("items").get(matches[i]);UUID taskId=before==null?null:uuid(before.path("taskId"));Task task=taskId==null?null:task(taskId);
-            long initialVersion=task==null?-1:task.version();
             boolean edited=before==null||!current.summary().equals(before.path("summary").asText())||current.checked()!=before.path("checked").asBoolean();
             // Deleting a normal task is deliberate. Unrelated prose edits must
             // not resurrect it; editing its checkbox/title can create a new task.
@@ -63,15 +63,10 @@ final class NoteTasks {
             // An ignored item has the same durable suppression as a deliberately
             // deleted task. Maintenance and prose-only edits cannot enroll it.
             if(taskId==null)taskId=UUID.randomUUID();
-            if(task!=null&&assignments!=null&&(before==null||!previous.has("contentTag")||!current.summary().equals(before.path("summary").asText()))) {
+            if(task!=null&&association.hasNonNull("clientId"))task=assign(task,uuid(association.get("clientId")),association.hasNonNull("projectId")?uuid(association.get("projectId")):null);
+            else if(task!=null&&assignments!=null&&(before==null||!previous.has("contentTag")||!current.summary().equals(before.path("summary").asText()))) {
                 var assignment=assignments.resolve(current.assignments()).orElse(null);
-                if(assignment!=null){
-                    if(!task.projectId().equals(assignment.project()))task=store.service().updateTask(new UpdateTask(task.id(),task.version(),assignment.project(),task.parentTaskId(),task.summary(),task.url()));
-                    var priorClient=store.find("TASK",task.id().value()).orElseThrow().get("clientId");
-                    if(before!=null&&task.version()==initialVersion&&!Objects.equals(priorClient==null||priorClient.isNull()?null:uuid(priorClient),assignment.client()))
-                        task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),task.summary(),task.url()));
-                    var fields=object();if(assignment.client()==null)fields.putNull("clientId");else fields.put("clientId",assignment.client().toString());store.clientDetails("TASK",task.id().value(),fields);
-                }
+                if(assignment!=null)task=assign(task,assignment.client(),assignment.project().map(ProjectId::value).orElse(null));
             }
             retained.add(taskId);boolean checked=task==null?current.checked():completed(task);
             items.add(object().put("taskId",taskId.toString()).put("marker",current.marker()).put("summary",current.summary()).put("checked",checked).put("depth",current.depth()));
@@ -87,6 +82,16 @@ final class NoteTasks {
         // current completion without reformatting the restored document.
         if(!normalized.equals(source))write(ref,normalized);
         result.put("contentTag",new VaultSources(store,store.vaultLimits(),ref).snapshot().tag()).put("sourceVersion",store.resourceVersion(ref.type(),ref.id()));save(DOCUMENT,id(ref),result);
+    }
+    private Task assign(Task task,UUID client,UUID project){
+        var desired=Optional.ofNullable(project).map(ProjectId::new);var stored=store.find("TASK",task.id().value()).orElseThrow();UUID previous=stored.hasNonNull("clientId")?uuid(stored.get("clientId")):null;
+        if(task.projectId().equals(desired)&&Objects.equals(previous,project==null?client:null))return task;
+        task=store.service().updateTask(new UpdateTask(task.id(),task.version(),desired,task.parentTaskId(),task.summary(),task.url()));
+        var fields=object();if(project!=null||client==null)fields.putNull("clientId");else fields.put("clientId",client.toString());store.clientDetails("TASK",task.id().value(),fields);return task;
+    }
+    /** Reassign only still-existing linked tasks; never recreate deliberately removed tasks. */
+    void assign(VaultSources.Ref ref,UUID client,UUID project){
+        store.withNoteTaskSync(()->{for(var item:record(ref).path("items")){var task=task(uuid(item.path("taskId")));if(task!=null)assign(task,client,project);}return null;});
     }
     /** Bounded maintenance enrolls older files without needing a browser read or edit. */
     void existing(String type,UUID sourceId){

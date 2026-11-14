@@ -19,6 +19,7 @@ import {commonmark,docSchema,paragraphSchema,linkSchema,codeBlockSchema,toggleSt
 import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,toggleStrikethroughCommand,remarkGFMPlugin,strikethroughInputRule,strikethroughSchema} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
+import {Fragment,Slice} from '@milkdown/kit/prose/model';
 import {Plugin,TextSelection,NodeSelection} from '@milkdown/kit/prose/state';
 import {isInTable} from '@milkdown/kit/prose/tables';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
@@ -140,7 +141,7 @@ function mermaidBlock(node){
   schedule(node.attrs.value);
   return {dom,update(value){if(value.type!==node.type)return false;schedule(value.attrs.value);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:()=>true};
 }
-export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles}){
+export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles,expandSnippet}){
   let emptyMarker;do{emptyMarker='<!-- timekeeper-empty-'+crypto.randomUUID()+' -->';}while(value.includes(emptyMarker));
   const cleanGenerated=value=>value.replaceAll(emptyMarker,'');
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
@@ -169,7 +170,24 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     ctx.set(editorViewOptionsCtx,{
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
-      handleTextInput:(view,from,to,text)=>brackets.input(view,from,to,text),
+      handleTextInput:(view,from,to,text)=>{
+        if(text===' '&&from===to&&!readOnly&&!view.composing&&expandSnippet){
+          const position=view.state.doc.resolve(from),marks=position.marks();
+          if(!position.parent.type.spec.code&&!marks.some(mark=>['inlineCode','inline_code','code','link'].includes(mark.type.name))){
+            const result=expandSnippet(position.parent.textBetween(0,position.parentOffset,'','\ufffc'));
+            if(result){
+              const start=from-result.length,content=result.text+' ',lines=content.split('\n');
+              const tr=closeHistory(view.state.tr);
+              if(lines.length===1)tr.insertText(content,start,to);
+              else tr.replaceRange(start,to,new Slice(Fragment.fromArray(lines.map(line=>view.state.schema.nodes.paragraph.create(null,line?view.state.schema.text(line):null))),1,1));
+              const offset=result.cursor??content.length,before=content.slice(0,offset);
+              tr.setSelection(TextSelection.near(tr.doc.resolve(start+offset+(before.match(/\n/g)||[]).length)));
+              view.dispatch(tr.scrollIntoView());return true;
+            }
+          }
+        }
+        return brackets.input(view,from,to,text);
+      },
       handleKeyDown:(_view,event)=>{
         // DOM reconciliation also calls this with an undispatched key event.
         // Its DOM already contains the edit; keep the model's pre-edit selection.

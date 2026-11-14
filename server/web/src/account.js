@@ -1,3 +1,4 @@
+import {renderSnippets} from './snippets-account.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import {countries,selectedHolidayCountry} from './holidays.js';
@@ -14,6 +15,7 @@ import {renderStorage} from './storage-account.js';
 import {renderTaskProviders} from './task-providers-account.js';
 
 export async function renderAccount(view, part) {
+  if(part==='snippets'){await renderSnippets(view);return;}
   if(part==='task-providers'){await renderTaskProviders(view);return;}
   if(part==='storage'){await renderStorage(view);return;}
   if (part === 'typography') {await renderTypography(view);return;}

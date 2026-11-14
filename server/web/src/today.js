@@ -1,4 +1,5 @@
 import {NoteContents} from './note-contents.js';
+import {calendarSourceFailure} from './calendar-source-status.js';
 import {SidebarActions} from './sidebar-actions.js';
 import {SidebarResize} from './sidebar-resize.js';
 import {dateNavigation} from './date-navigation.js';
@@ -30,7 +31,7 @@ export class TodayView {
     this.sidebarResize=new SidebarResize(root,this.sidebar,{variable:'--today-sidebar-width',label:t('today.resize_sidebar'),width:196,changed:()=>this.sizeEditor(),focusFallback:()=>this.dateInput,className:'today-resize'}).element;
     this.sidebar.after(this.sidebarResize);
     this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions:byId('today-main-actions'),inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
-    this.contents=new NoteContents(byId('today-contents'),this.journal.markdown);
+    this.contents=new NoteContents(byId('today-outline'),this.journal.markdown);
     this.contentsResize=new SidebarResize(root,byId('today-contents'),{side:'right',variable:'--today-contents-width',label:t('today.resize_contents'),changed:()=>this.sizeEditor(),focusFallback:()=>byId('today-main-actions-toggle-right-sidebar'),className:'today-contents-resize'}).element;
     byId('today-contents').before(this.contentsResize);
     this.sidebarActions=new SidebarActions(byId('today-main-actions'),root.querySelector('.today-layout'),{left:{panel:this.sidebar,separator:this.sidebarResize},right:{panel:byId('today-contents'),separator:this.contentsResize,collapseOnNarrow:true}},()=>this.sizeEditor());
@@ -60,7 +61,7 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
@@ -74,7 +75,7 @@ export class TodayView {
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date){this.dateInput.value=this.date;return false;}
     if(date===this.date){this.dateInput.value=this.date;return true;}
     if(!confirmed&&!await this.journal.canLeaveInline()){this.dateInput.value=this.date;return false;}
-    this.closePicker();this.closeEvent();this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;this.eventWarning=false;this.eventsLoaded=false;this.events=[];this.eventKey=null;++this.generation;
+    this.closePicker();this.closeEvent();this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.events=[];this.eventKey=null;++this.generation;
     this.paint();void this.loadEvents();if(dailyNoteDateFromSearch(location.search))history.replaceState(history.state,'',dailyNoteHref(date));return true;
   }
   paint(){
@@ -183,11 +184,13 @@ export class TodayView {
     const zone=this.data.profile.data.zoneId,visible=this.events.filter(value=>focusIncludes(this.data,value.clientId));
     // Revisions and feed fetch timestamps change independently of these cards.
     // Keep their DOM (and focused/pressed buttons) while their content is unchanged.
-    const key=JSON.stringify([this.date,zone,getLocale(),this.eventWarning,visible.map(event=>{const client=this.data.clients.find(value=>value.id===event.clientId);return [event,client?.name,client?.color];})]);
+    const failures=(this.eventFailures||[]).filter(value=>focusIncludes(this.data,value.clientId));
+    const key=JSON.stringify([this.date,zone,getLocale(),this.eventWarning,failures,visible.map(event=>{const client=this.data.clients.find(value=>value.id===event.clientId);return [event,client?.name,client?.color];})]);
     if(key===this.eventRenderKey)return;
     this.eventRenderKey=key;
     const root=byId('today-events'),focused=root.contains(document.activeElement)?document.activeElement.closest('[data-today-event]')?.dataset.todayEvent:null;root.replaceChildren();
-    if(this.eventWarning)root.append(node('p',t('calendar.refresh_errors'),'alert alert-warning'));
+    if(failures.length){const warning=node('div',undefined,'alert alert-warning');warning.setAttribute('role','status');warning.append(...failures.map(value=>calendarSourceFailure(value,t('calendar.error.'+value.lastError))));root.append(warning);}
+    else if(this.eventWarning)root.append(node('p',t('calendar.refresh_errors'),'alert alert-warning'));
     const day=monthCalendar(this.date.slice(0,7),zone).days.find(value=>value.date===this.date);
     const events=visible.filter(value=>value.allDay?value.firstDate<=this.date&&this.date<value.endDate:instantNanos(value.start)<day.to&&instantNanos(value.end)>=day.from)
       .sort((a,b)=>Number(b.allDay)-Number(a.allDay)||(a.start||'').localeCompare(b.start||''));
@@ -234,7 +237,7 @@ export class TodayView {
     try{
       const [reply,subscriptions]=await Promise.all([scope.request('/calendar-events?'+new URLSearchParams({fromDate:date,toDate:addDays(date,1)})),scope.request('/calendar-subscriptions')]);
       if(generation!==this.generation||scope!==this.scope||date!==this.date)return;
-      this.eventsLoaded=true;this.events=reply.data.items;this.eventWarning=Object.keys(reply.data.errors||{}).length>0||subscriptions.data.items.some(item=>item.visible&&item.lastError);this.paintEvents();
+      this.eventsLoaded=true;this.events=reply.data.items;this.eventFailures=subscriptions.data.items.filter(item=>item.visible&&(item.lastError||reply.data.errors?.[item.id])).map(item=>({...item,lastError:item.lastError||reply.data.errors[item.id]}));this.eventWarning=Object.keys(reply.data.errors||{}).length>0||this.eventFailures.length>0;this.paintEvents();
     }catch(error){
       if(generation!==this.generation||scope!==this.scope)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}

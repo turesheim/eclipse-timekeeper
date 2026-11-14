@@ -13,6 +13,7 @@ async function api(request,method,path,data,headers={}) {
 async function signIn(page,credential=token) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(credential);
   await page.locator('#login-form button[type=submit]').click();
+  await expect(page.locator('#status')).toHaveAttribute('data-state','ready');
   await expect(page.locator('#status')).toHaveText((await page.locator('html').getAttribute('lang'))==='nb-NO'?'Oppdatert':'Up to date');
 }
 test('Track shows exact client session hours, local dates and independent activities',async({browser,request})=> {
@@ -95,7 +96,8 @@ test('Track shows exact client session hours, local dates and independent activi
     const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
   }
 });
-test('Track month picker supports year selection, keyboard dismissal and a centered localized heading',async({browser})=>{
+test('Track month picker supports year selection, keyboard dismissal and a centered localized heading',async({browser,request})=>{
+  const profile=await api(request,'GET','/me'),original=await profile.json();await api(request,'PUT','/me',{zoneId:original.zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,locale:'nb-NO',viewport:{width:1280,height:900},ignoreHTTPSErrors:true}),page=await context.newPage();
   try {
     await signIn(page);await page.locator('[data-tab=track]').click();
@@ -127,7 +129,7 @@ test('Track month picker supports year selection, keyboard dismissal and a cente
     await choose.click();await popup.getByRole('button',{name:'desember',exact:true}).click();await page.getByRole('button',{name:'Neste måned',exact:true}).click();await expect(month).toHaveValue('2025-01');
     await page.getByRole('button',{name:'Gjeldende måned',exact:true}).click();await expect(month).not.toHaveValue('2025-01');
     await choose.click();await page.locator('#account-menu > summary').click();await page.getByRole('button',{name:'Logg ut',exact:true}).click();await expect(popup).not.toBeVisible();
-  } finally {await context.close();}
+  } finally {await context.close();const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId,locale:original.locale},{'If-Match':current.headers().etag});}
 });
 test('Track updates running session hours without stealing focus and reconciles peer edits',async({page,request})=> {
   await page.addInitScript(()=>{

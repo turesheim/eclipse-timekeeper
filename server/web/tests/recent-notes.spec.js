@@ -21,14 +21,14 @@ async function setup(page,request){
   return api;
 }
 
-test('Notes sidebar keeps Recent notes below the navigator and restores its own popup focus',async({page,request})=>{
+test('Notes right sidebar keeps Recent notes below the contents and restores its own popup focus',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const put=async(path,body)=>await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
   const current=await put('Notes/Current.md','# Current\n\nCurrent body.\n'),other=await put('Notes/Other.md','# Other\n\nOther body.\n');
   await page.reload();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(2);
   await page.evaluate(()=>{window.sharedRecentSection=document.querySelector('#today-recent-notes').closest('section');});await page.locator('[data-tab=notes]').click();
   const recent=page.locator('#notes-recent-notes'),section=page.getByRole('region',{name:'Recent notes',exact:true});await expect(section).toBeVisible();await expect(recent.locator('[data-recent-note]')).toHaveCount(2);
-  expect(await section.evaluate(node=>node===window.sharedRecentSection)).toBe(true);expect(await section.evaluate(node=>node.parentElement.parentElement.id==='notes-sidebar'&&node.parentElement.previousElementSibling.id==='notes-navigation')).toBe(true);await expect(recent.locator(`[data-recent-note="${other.id}"] .today-recent-note-label`)).toHaveText('Other');
+  expect(await section.evaluate(node=>node===window.sharedRecentSection)).toBe(true);expect(await section.evaluate(node=>node.parentElement.parentElement.id==='notes-contents'&&node.parentElement.previousElementSibling.id==='notes-outline')).toBe(true);await expect(recent.locator(`[data-recent-note="${other.id}"] .today-recent-note-label`)).toHaveText('Other');
   const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,current.path).click();
   const pick=recent.locator(`[data-recent-note="${other.id}"]`);await pick.focus();await pick.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(page.locator('#notes-document-title .notes-title-input')).toHaveValue('Current');
   let refreshed=false;await page.route('**/api/v1/notes/recent?*',async route=>{await route.continue();refreshed=true;});await page.evaluate(()=>document.dispatchEvent(new Event('timekeeper:notes-changed')));await expect.poll(()=>refreshed).toBe(true);await expect(recent).toHaveAttribute('aria-busy','false');
@@ -36,24 +36,38 @@ test('Notes sidebar keeps Recent notes below the navigator and restores its own 
   refreshed=false;await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>refreshed).toBe(true);await expect(recent).toHaveAttribute('aria-busy','false');
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#notes-body').fill('# Current\n\nPrivate unsaved draft.\n');await pick.click();await expect(popup).toBeVisible();expect(await(await api('GET','/notes/entries/'+current.id+'/content')).text()).toContain('Private unsaved draft.');
   await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(page.locator('#notes-document-title .notes-title-input')).toHaveValue('Other');
-  await page.locator('#notes-main-actions-toggle-left-sidebar').click();await expect(section).toBeHidden();await page.locator('#notes-main-actions-toggle-left-sidebar').click();await expect(section).toBeVisible();
+  await page.locator('#notes-main-actions-toggle-right-sidebar').click();await expect(section).toBeHidden();await page.locator('#notes-main-actions-toggle-right-sidebar').click();await expect(section).toBeVisible();
 });
 
-test('Notes Recent notes scrolls independently and fits the drawer in every theme',async({page,request})=>{
+test('Today and Notes stack Recent notes below the outline with one scrollbar per right sidebar',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
-  for(let index=0;index<23;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Sidebar'+String(index).padStart(2,'0')+'.md'}),Buffer.from('# Sidebar note '+index+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
-  await page.reload();await page.locator('[data-tab=notes]').click();const navigation=page.locator('#notes-navigation'),recent=page.locator('#notes-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
+  const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC'},{'If-Match':profile.headers().etag});
+  const text=Array.from({length:12},(_,index)=>'#'.repeat(2+index%4)+' '+(index<2?'Section '+index:'A long heading that wraps across lines in a narrow sidebar: section '+index)+'\n\nText.\n').join('\n'),date=new Date().toISOString().slice(0,10),daily=await api('GET','/day-notes/'+date+'/content');
+  await api('PUT','/day-notes/'+date+'/content',{body:text},{'If-Match':daily.headers().etag});
+  for(let index=0;index<23;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Sidebar'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===0?text:'# Sidebar note '+index+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.reload();await page.locator('[data-tab=notes]').click();const recent=page.locator('#notes-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
+  const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Sidebar00.md').click();
   const requests=[];page.on('request',request=>{if(request.url().includes('/notes/recent?'))requests.push(request.url());});
-  await page.locator('[data-tab=today]').click();await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(23);await expect(page.locator('#notes-recent-notes')).toHaveCount(0);
-  await page.locator('[data-tab=notes]').click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);expect(requests).toEqual([]);
-  for(const width of [1280,390]){
-    await page.setViewportSize({width,height:844});if(width===390)await page.locator('#notes-main-actions-toggle-left-sidebar').click();
-    for(const theme of ['timekeeper','timekeeper-dark']){
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);await expect(recent).toBeVisible();expect(await recent.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);expect(await navigation.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
-      expect((await new AxeBuilder({page}).include('#notes-sidebar').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/notes-recent-${theme}-${width}.png`,fullPage:false});
+  for(const view of ['today','notes']){
+    await page.setViewportSize({width:1280,height:844});await page.locator('[data-tab='+view+']').click();const right=page.locator('#'+view+'-contents'),list=page.locator('#'+view+'-recent-notes'),outline=page.locator('#'+view+'-outline'),toggle=page.locator('#'+view+'-main-actions-toggle-right-sidebar');
+    await expect(list.locator('[data-recent-note]')).toHaveCount(23);await expect(outline.locator('ol button')).toHaveCount(12);expect(requests).toEqual([]);
+    await expect(page.locator(view==='today'?'.today-sidebar .recent-notes':'#notes-sidebar .recent-notes')).toHaveCount(0);
+    for(const width of [1280,390,320]){
+      await page.setViewportSize({width,height:844});if(width===390)await expect(toggle).toHaveAttribute('aria-expanded','false');if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
+      for(const theme of ['timekeeper','timekeeper-dark']){
+        await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
+        await expect(right).toBeVisible();const rows=await outline.locator('ol button').evaluateAll(buttons=>buttons.map(button=>{const {top,bottom,height}=button.getBoundingClientRect();return {top,bottom,height,clipped:button.scrollWidth>button.clientWidth+1};}));expect(rows[0].height).toBeGreaterThanOrEqual(24);expect(rows[1].top-rows[0].top).toBeLessThanOrEqual(24.1);expect(rows.some(row=>row.height>24)).toBe(true);for(const [index,row]of rows.entries()){expect(row.clipped).toBe(false);if(index)expect(Math.abs(row.top-rows[index-1].bottom)).toBeLessThanOrEqual(.1);}await expect.poll(()=>right.evaluate(root=>[root,...root.querySelectorAll('*')].filter(node=>node.clientHeight>0&&node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).map(node=>node.id))).toEqual([view+'-contents']);
+        const outlineBox=await outline.boundingBox(),recentBox=await list.boundingBox();expect(recentBox.y).toBeGreaterThanOrEqual(outlineBox.y+outlineBox.height);
+        const last=list.locator('[data-recent-note]').last();await last.focus();await expect(last).toBeInViewport();expect(await right.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+        await outline.locator('button').first().focus();await expect(outline.locator('button').first()).toBeInViewport();
+        expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+        expect((await new AxeBuilder({page}).include('#'+view+'-contents').analyze()).violations).toEqual([]);
+        await list.locator('[data-recent-note]').first().scrollIntoViewIfNeeded();await captureScreenshot(page,{path:`test-results/${view}-recent-${theme}-${width}.png`,fullPage:false});
+      }
+      await toggle.click();await expect(list).toBeHidden();await toggle.click();await expect(list).toBeVisible();
     }
   }
-  await recent.locator('[data-recent-note]').last().focus();await page.keyboard.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(navigation).toBeHidden();await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();
+  await recent.locator('[data-recent-note]').last().focus();await page.keyboard.press('Enter');const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(popup).toBeHidden();await expect(page.locator('#notes-contents')).toBeHidden();await expect(page.locator('#notes-formatted .ProseMirror')).toBeFocused();
 });
 
 test('a loading note popup keeps keyboard actions outside its unloaded editor',async({page,request})=>{
@@ -79,7 +93,7 @@ test('Recent notes uses account days, includes journals and protects drafts when
   await upload('Notes/Five days ago.md',ago(5));await upload('Notes/Too old.md',ago(10));const todayJournal=await upload('journal/'+today+'.md');await upload('journal/Private.md');
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
   const recent=page.locator('#today-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);
-  expect(await page.locator('#today-planned-tasks').evaluate(node=>node.closest('section').nextElementSibling.id||node.closest('section').nextElementSibling.getAttribute('aria-labelledby'))).toBe('today-recent-notes-title');
+  expect(await recent.evaluate(node=>node.parentElement.parentElement.id)).toBe('today-contents');
   await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);await expect(recent).not.toContainText('Too old');await expect(recent).toContainText('Private');await expect(recent.locator(`[data-recent-note="${todayJournal.id}"]`)).toHaveCount(0);await expect(recent.locator('.hint')).toHaveCount(0);
   await page.locator('#today-date').fill('2020-01-02');await expect(page.locator('#today-title')).toContainText('2020');await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
   expect((await new AxeBuilder({page}).include('.today-sidebar').analyze()).violations).toEqual([]);
@@ -106,7 +120,7 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
     await expect(button.locator('.today-recent-note-label')).toHaveText(title.split('/').at(-1));await button.click();await expect(page.locator('#note-popup-title')).toHaveText(title);await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();if(entry.kind==='DAY'){await expect(page.locator('#today-date')).toHaveValue(entry.sourceKey);await expect(page.locator('#today-journal-formatted')).toContainText('Daily journal body');}else await expect(page.locator('#notes-document-title')).toHaveText(title);await page.locator('[data-tab=today]').click();
   }
   for(const [width,height] of [[1440,1000],[320,900]]){
-    await page.setViewportSize({width,height});await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
+    await page.setViewportSize({width,height});const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');if(width===320)await expect(sidebar).toHaveAttribute('aria-expanded','false');if(await sidebar.getAttribute('aria-expanded')==='false')await sidebar.click();await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
     for(const theme of ['timekeeper','timekeeper-dark']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       for(const [entry] of cases){
@@ -124,6 +138,10 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   expect(await recent.locator('[data-recent-note]').first().evaluate(node=>parseFloat(getComputedStyle(node).fontSize)/parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(1.1,2);
   await page.evaluate(()=>document.documentElement.style.removeProperty('--font-today-recent-note'));
   const current=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',locale:'nb-NO'},{'If-Match':current.headers().etag});await page.reload();
+  // The first account snapshot resets sidebar state. Interact after that reset,
+  // rather than mistaking the constructor's collapsed state for readiness.
+  await expect(page.locator('#status')).toHaveAttribute('data-state','ready');await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+  const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');await expect(sidebar).toHaveAttribute('aria-expanded','false');await sidebar.click();await expect(sidebar).toHaveAttribute('aria-expanded','true');await expect(recent).toBeVisible();
   for(const [entry,,,label] of cases)await expect(recent.locator(`[data-recent-note="${entry.id}"]`)).toHaveAccessibleName(new RegExp('^'+label+': '));
 });
 

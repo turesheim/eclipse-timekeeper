@@ -53,7 +53,7 @@ test('note popup content and close controls stay reachable beneath long headings
       await captureScreenshot(page,{path:`test-results/popup-note-${theme}-${viewport.width}.png`,fullPage:false});
       await content.evaluate(node=>{node.scrollTop=0;});await wheel(page,content,-10000);await expect.poll(()=>popup.evaluate(node=>node.scrollTop)).toBe(0);
     }
-    const close=popup.getByRole('button',{name:'Close',exact:true});await close.focus();await expect(close).toBeInViewport();await close.press('Enter');await expect(popup).toBeHidden();await expect(origin).toBeFocused();
+    const close=popup.getByRole('button',{name:'Close',exact:true}),returnFocus=page.locator('#today-main-actions-toggle-right-sidebar');await expect(returnFocus).toHaveAttribute('aria-expanded','false');await close.focus();await expect(close).toBeInViewport();await close.press('Enter');await expect(popup).toBeHidden();await expect(returnFocus).toBeFocused();await expect(returnFocus).toBeInViewport();
   }
   expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(body);
 });

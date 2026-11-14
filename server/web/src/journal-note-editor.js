@@ -35,7 +35,15 @@ export class JournalNoteEditor {
     this.dialog.append(heading,this.error,host,actions);root.append(this.dialog);this.dialog.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
     guardDayNoteNavigation(this.dialog,()=>!this.busy&&this.autosave.flush(),()=>this.close(true));
-    this.dialog.addEventListener('close',()=>{if(!root.closest('[hidden]')){const origin=this.context?.originSelector?root.querySelector(this.context.originSelector)||this.origin:this.origin;if(origin?.isConnected)origin.focus();}});
+    this.dialog.addEventListener('close',()=>{
+      if(root.closest('[hidden]'))return;
+      let origin=this.context?.originSelector?root.querySelector(this.context.originSelector)||this.origin:this.origin;
+      if(!origin?.isConnected)return;
+      // Resizing a popup to a phone layout may collapse its source sidebar.
+      // Return to that sidebar's visible control when the source is hidden.
+      if(!origin.getClientRects().length){const pane=origin.closest('[hidden][id]');origin=pane?root.querySelector('.sidebar-actions button[aria-controls="'+CSS.escape(pane.id)+'"]'):null;}
+      if(origin?.getClientRects().length)origin.focus();
+    });
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
   }
   source(){

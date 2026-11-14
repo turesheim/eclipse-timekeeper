@@ -27,9 +27,26 @@ async function openNote(page,path='Notes/Client.md'){
   const folder=noteEntry(navigation,'Notes');if(await folder.locator('..').getAttribute('aria-expanded')!=='true')await folder.click();await noteEntry(navigation,path).click();await expect(page.locator('#notes-document-title')).toBeVisible();
 }
 async function choose(page,scope,client){
-  await clickNoteAction(page,scope,'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeEnabled();await dialog.locator('select').selectOption(client||'');await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();
+  await clickNoteAction(page,scope,'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();await dialog.getByLabel('Note client',{exact:true}).selectOption(client||'');await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();
 }
 const association=entry=>'/notes/client?'+new URLSearchParams({sourceType:entry.sourceType,sourceKey:entry.sourceKey});
+
+test('an optional note project is inherited by existing and new tasks and client changes update them together',async({page,request})=>{
+  const {api,alpha,beta,entry}=await setup(page,request),project=await(await api('POST','/projects',{name:'Shared note project',clientId:alpha.id,icon:null})).json(),path='/notes/entries/'+entry.id+'/content',before=await api('GET',path);
+  await api('PUT',path,Buffer.from('- [ ] Existing checklist task\r\n'),{'If-Match':before.headers().etag,'Content-Type':'application/octet-stream'});await page.locator('#refresh').click();await openNote(page);const scope=page.locator('#notes-panel');
+  await clickNoteAction(page,scope,'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await dialog.getByLabel('Note project',{exact:true}).selectOption(project.id);await expect(dialog.getByLabel('Note client',{exact:true})).toHaveValue(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();await expect(scope.locator('.note-client-label')).toHaveText(alpha.name+' · '+project.name);
+  let tasks=(await(await api('GET','/tasks?limit=500')).json()).items;expect(tasks[0].projectId).toBe(project.id);let content=await api('GET',path);await api('PUT',path,Buffer.from('- [ ] Existing checklist task\r\n- [ ] New checklist task\r\n'),{'If-Match':content.headers().etag,'Content-Type':'application/octet-stream'});tasks=(await(await api('GET','/tasks?limit=500')).json()).items;expect(tasks).toHaveLength(2);expect(tasks.every(task=>task.projectId===project.id)).toBe(true);
+  await choose(page,scope,beta.id);tasks=(await(await api('GET','/tasks?limit=500')).json()).items;expect(tasks.every(task=>task.projectId===null&&task.clientId===beta.id)).toBe(true);expect((await(await api('GET',association(entry))).json()).projectId).toBeNull();await expect(scope.locator('.note-client-label')).toHaveText(beta.name);
+});
+
+test('No client clears a selected project and its inherited client',async({page,request})=>{
+  const {api,alpha,entry}=await setup(page,request),project=await(await api('POST','/projects',{name:'Temporary project',clientId:alpha.id})).json();
+  await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await openNote(page);
+  const scope=page.locator('#notes-panel');await clickNoteAction(page,scope,'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});
+  await dialog.getByLabel('Note project',{exact:true}).selectOption(project.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();
+  await clickNoteAction(page,scope,'Associate with client or project');await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();await dialog.getByLabel('Note client',{exact:true}).selectOption('');await expect(dialog.getByLabel('Note project',{exact:true})).toHaveValue('');
+  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();const value=await(await api('GET',association(entry))).json();expect(value.clientId).toBeNull();expect(value.projectId).toBeNull();await expect(scope.locator('.note-client-label')).toBeHidden();
+});
 
 test('client choice includes clients outside the focus filter and preserves note bytes, dates and a failed body draft',async({page,request})=>{
   const {api,alpha,beta,entry,source}=await setup(page,request),focusId=randomUUID();const focus=await api('GET','/focus-areas');await api('PUT','/focus-areas',{areas:[{id:focusId,name:'Only Alpha',clientIds:[alpha.id]}]},{'If-Match':focus.headers().etag});
@@ -51,15 +68,15 @@ test('empty daily and weekly pages and an ordinary note popup share independent 
 });
 
 test('a stale client choice reloads actual metadata and requires an explicit second decision',async({page,request})=>{
-  const {api,alpha,beta,entry}=await setup(page,request);await openNote(page);const scope=page.locator('#notes-panel');await clickNoteAction(page,scope,'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeEnabled();await dialog.locator('select').selectOption(alpha.id);
+  const {api,alpha,beta,entry}=await setup(page,request);await openNote(page);const scope=page.locator('#notes-panel');await clickNoteAction(page,scope,'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();await dialog.getByLabel('Note client',{exact:true}).selectOption(alpha.id);
   const current=await api('GET',association(entry));await api('PUT',association(entry),{clientId:beta.id},{'If-Match':current.headers().etag});let writes=0;page.on('request',request=>{if(request.method()==='PUT'&&new URL(request.url()).pathname==='/api/v1/notes/client')writes++;});
-  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.locator('select')).toHaveValue(beta.id);await expect(scope.locator('.note-client-label')).toHaveText(beta.name);expect(writes).toBe(1);
-  await dialog.locator('select').selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);expect(writes).toBe(2);
+  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.getByLabel('Note client',{exact:true})).toHaveValue(beta.id);await expect(scope.locator('.note-client-label')).toHaveText(beta.name);expect(writes).toBe(1);
+  await dialog.getByLabel('Note client',{exact:true}).selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);expect(writes).toBe(2);
 });
 
 test('an uncertain client save reads its outcome without repeating the command',async({page,request})=>{
   const {api,alpha,entry}=await setup(page,request);await openNote(page);let writes=0;await page.route('**/api/v1/notes/client?*',async route=>{if(route.request().method()!=='PUT')return route.continue();writes++;await route.fetch();await route.abort('internetdisconnected');});
-  await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeEnabled();await dialog.locator('select').selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.locator('select')).toHaveValue(alpha.id);await expect(dialog.locator('select')).toBeEnabled();expect(writes).toBe(1);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
+  await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();await dialog.getByLabel('Note client',{exact:true}).selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.getByLabel('Note client',{exact:true})).toHaveValue(alpha.id);await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();expect(writes).toBe(1);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
   await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();expect(writes).toBe(1);
 });
 
@@ -71,7 +88,7 @@ test('client labels and the keyboard selector fit all themes at desktop and phon
       await expect(scope.locator('.note-client-label')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       const swatch=scope.locator('.note-client-swatch');await expect(swatch).toHaveCSS('background-color','rgb(176, 48, 96)');
       const label=await scope.locator('.note-client-label').boundingBox(),card=await scope.locator('.notes-editor').boundingBox(),toolbar=await scope.locator('.markdown-toolbar').boundingBox();expect(label.y+label.height).toBeLessThanOrEqual(toolbar.y+1);expect(label.x+label.width).toBeGreaterThan(card.x+card.width/2);expect(label.y-card.y).toBeLessThan(40);
-      await clickNoteAction(page,scope,'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeFocused();expect((await new AxeBuilder({page}).include('.note-client-dialog[open]').analyze()).violations).toEqual([]);await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Associate with client',exact:true})).toBeFocused();
+      await clickNoteAction(page,scope,'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await expect(dialog.getByLabel('Note client',{exact:true})).toBeFocused();expect((await new AxeBuilder({page}).include('.note-client-dialog[open]').analyze()).violations).toEqual([]);await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Associate with client or project',exact:true})).toBeFocused();
     }
     await captureScreenshot(page,{path:`test-results/note-client-label-${width}.png`});
   }
@@ -92,7 +109,7 @@ test('a read-only session sees the client label and cannot change the associatio
   try{
     const reader=await context.newPage();let writes=0;reader.on('request',request=>{if(request.method()==='PUT'&&new URL(request.url()).pathname==='/api/v1/notes/client')writes++;});
     await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#workspace')).toBeVisible();await openNote(reader);
-    const scope=reader.locator('#notes-panel');await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);await expect(reader.locator('#notes-main-actions').getByRole('button',{name:'Associate with client',exact:true})).toBeDisabled();expect(writes).toBe(0);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
+    const scope=reader.locator('#notes-panel');await expect(scope.locator('.note-client-label')).toHaveText(alpha.name);await expect(reader.locator('#notes-main-actions').getByRole('button',{name:'Associate with client or project',exact:true})).toBeDisabled();expect(writes).toBe(0);expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
   }finally{await context.close();}
 });
 
@@ -103,8 +120,8 @@ test('a failed metadata read can be retried and the loading selector remains can
     if(++reads===1)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'UNAVAILABLE'})});const response=await route.fetch();held=true;await pending;await route.fulfill({response});
   });
   try{
-    await openNote(page);await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client');await expect.poll(()=>held).toBe(true);
-    const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeDisabled();await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeEnabled();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();release();await page.unrouteAll({behavior:'wait'});expect(writes).toBe(0);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
+    await openNote(page);await expect(page.locator('#notes-panel > [role=alert]')).toBeVisible();await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client or project');await expect.poll(()=>held).toBe(true);
+    const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await expect(dialog.getByLabel('Note client',{exact:true})).toBeDisabled();await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeEnabled();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();release();await page.unrouteAll({behavior:'wait'});expect(writes).toBe(0);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
   }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
 
@@ -115,9 +132,9 @@ test('signing out clears client labels and the private chooser contents',async({
 });
 
 test('a client deleted while the chooser is open reports the conflict and permits a fresh choice',async({page,request})=>{
-  const {api,alpha,beta,entry}=await setup(page,request);await openNote(page);await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client');const dialog=page.getByRole('dialog',{name:'Associate with client',exact:true});await expect(dialog.locator('select')).toBeEnabled();await dialog.locator('select').selectOption(beta.id);
+  const {api,alpha,beta,entry}=await setup(page,request);await openNote(page);await clickNoteAction(page,page.locator('#notes-panel'),'Associate with client or project');const dialog=page.getByRole('dialog',{name:'Associate with client or project',exact:true});await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();await dialog.getByLabel('Note client',{exact:true}).selectOption(beta.id);
   const refreshed=page.waitForResponse(async response=>response.request().method()==='GET'&&new URL(response.url()).pathname==='/api/v1/clients'&&!(await response.json()).items.some(client=>client.id===beta.id));
   const client=await api('GET','/clients/'+beta.id);await api('DELETE','/clients/'+beta.id,undefined,{'If-Match':client.headers().etag});await page.evaluate(()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')));await refreshed;await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
-  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.locator(`option[value="${beta.id}"]`)).toHaveCount(0);await expect(dialog.locator('select')).toBeEnabled();
-  await dialog.locator('select').selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
+  await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.locator(`option[value="${beta.id}"]`)).toHaveCount(0);await expect(dialog.getByLabel('Note client',{exact:true})).toBeEnabled();
+  await dialog.getByLabel('Note client',{exact:true}).selectOption(alpha.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();expect((await(await api('GET',association(entry))).json()).clientId).toBe(alpha.id);
 });
