@@ -170,9 +170,7 @@ app connection null; both isolated server processes stop on runtime exit. The
 bootstrap honors persisted backend settings after its first initialization.
 See [backend-switch acceptance](../verification/REMOTE-BACKEND-SWITCH.md).
 
-Still required in #220: remaining native label/report/CSV preference flows, and form preservation
-through authentication/offline/timeout/cancellation/conflict failures, including
-uncertain-command and failed-deletion outcomes. The Eclipse portion of #219 is
-covered by the synchronization checkpoint; web synchronization and #221 web UI
-remain required before 2.0. See [the checkpoint](../verification/REMOTE-SYNCHRONIZATION.md)
-for full-resynchronization tests and evidence limits.
+The [client/server acceptance checkpoint](../verification/CLIENT-SERVER-ACCEPTANCE.md)
+records the integrated implementation and its evidence. Earlier synchronization
+reports retain dated limitations. Run the applicable installed scenarios for the
+current source; use [release procedures](RELEASING.md) for publication requirements.

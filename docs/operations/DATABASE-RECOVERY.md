@@ -1,14 +1,14 @@
 # Database baseline, backups and future migrations
 
-Timekeeper 2.0 establishes **H2 2.4.240, schema version 3** as the
+The embedded Eclipse backend uses **H2 2.4.240, schema version 3** as the
 supported baseline. Historical H2 databases, unversioned databases, and Mylyn
 attribute storage are not migration inputs. The maintainer removed historical
 migration support because there are no users depending on those formats.
 
-The October 25 durability follow-up selects H2 2.4.240 because released H2
-2.5.250 and 2.5.252 can lose acknowledged writes after crash recovery and chunk
-reuse ([upstream #4446](https://github.com/h2database/h2database/issues/4446)).
-The upstream fix is not in a published release. Existing supported schema-2/3
+H2 2.4.240 is pinned after acknowledged-write loss was reproduced with
+2.5.250 and 2.5.252 during crash recovery and chunk reuse. See the
+[dated durability report](../verification/H2-CRASH-DURABILITY.md) for the tested
+versions and upstream issue. Existing supported schema-2/3
 files retain their layout; this change does not authorize historical migrations.
 Stop all users of shared storage and make a closed-file backup before replacing
 the runtime. Use the same engine version in every client and H2 server sharing it.
@@ -22,7 +22,7 @@ reports under `docs/verification/` describe superseded work, not supported proce
 
 Use **Preferences > Timekeeper > Database** to select new, separate storage.
 An empty database is initialized with the current schema and a durable
-`DAGSVERK_SCHEMA` marker. Restart reopens only a recognized, versioned,
+`TIMEKEEPER_SCHEMA` marker. Restart reopens only a recognized, versioned,
 `READY` database. Unknown versions/layouts, unversioned databases and unfinished
 initialization or migration targets are refused without schema changes.
 
@@ -76,38 +76,11 @@ acceptance remains in the upgrade plan.
 
 ## Infrastructure retained for future migrations
 
-`DatabaseVersion` records a singleton schema `VERSION`, `STATE` and `ORIGIN`.
-Version 3 is the current baseline. Earlier
-experimental version-1 files are unsupported and are not upgraded automatically.
+The [data model](../architecture/DATA-MODEL.md#timekeeper_schema) describes the
+schema marker. Future migrations need an explicit supported source/target,
+verified backup, interruption tests and data-equivalence checks before activation.
+Normal startup does not infer a migration from an unknown layout. The existing
+version-2 extension above is the only supported embedded upgrade.
 
-- New database: `CREATING / NEW` → `READY / NEW` after schema verification.
-- Future migration target: `CREATING / MIGRATION` → `MIGRATING / MIGRATION`
-  → `READY / MIGRATION` only after explicit validation.
-- `DatabaseStartup.openMigrationTarget` is package-private infrastructure. It
-  creates only an empty target and rejects existing or interrupted attempts.
-  Normal startup never opens a pending target. The sole registered upgrade is the verified version-2 Work Session extension described above.
-- `DatabaseVersion.migrationValidated` checks the prior state, full current
-  table/column layout and an idle writable connection before advancing the
-  marker. The caller must validate the **data** first; the marker method cannot
-  establish data equivalence itself.
-- Unknown schema versions fail closed. Only the exact version-2 table/column layout and a valid READY marker are accepted for upgrade.
-
-When a future schema change is needed:
-
-1. Define the supported source version and a new target version explicitly.
-   Add a version-specific source reader/recipe rather than accepting arbitrary
-   older layouts. Keep normal startup separate from migration execution.
-2. Back up and preserve the source. Build in separate new storage, with no
-   automatic preference change. DDL can commit independently, so interrupted
-   attempts stay blocked; do not retry them in place.
-3. Apply changes transactionally where possible, close/reopen and compare every
-   relevant value, relationship, count, timestamp precision and duration using
-   read-only verification connections. Only then mark the target ready.
-4. Test interruption, malformed/unsupported versions, failed validation,
-   rollback, restart and incompatible clients using synthetic fixtures from the
-   actual supported baseline. Document the explicit switch and rollback steps.
-
-The retained hooks and tests cover target lifecycle and refusal safeguards.
-Backup orchestration, source/target version dispatch, data transformation,
-validation and user-facing migration actions must be implemented for the first
-real future migration; they are not supplied by these hooks alone.
+This guide covers embedded Eclipse storage. For the independent server database,
+use [server operations](SERVER.md) and [full-instance recovery](INSTANCE-BACKUP.md).

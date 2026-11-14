@@ -364,7 +364,7 @@ link text is an ambiguity requiring review, not an implicit selection.
 ## Deployment, quotas and recovery
 
 Schema **10** is a logical compatibility gate using the existing H2 2.4.240 or
-PostgreSQL tables. Stop older replicas before authorizing a schema-9 upgrade;
+PostgreSQL tables. Stop older replicas before authorizing the upgrade to schema 10;
 older binaries must not write canonical notes without the new namespace hooks.
 Use the documented offline/native/Compose upgrade and rollback procedures.
 No Cassandra, CouchDB or extra service is introduced.

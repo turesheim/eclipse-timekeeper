@@ -35,7 +35,7 @@ Run from the repository root after preparing a packaged server ZIP and sidecar:
   -Dtimekeeper.remote.distribution=/absolute/path/timekeeper-server.zip
 ```
 
-CI's `Remote-Eclipse` job downloads the verified distribution from the Server
+CI's **Installed client tests** job (`Remote-Eclipse`) downloads the verified distribution from the Server
 job and runs these phases plus the optional Mylyn module's seven phases under Xvfb. It uploads reports, server/runtime logs and
 the credential-free `proof.properties`; secure storage, the password file and
 token registry are excluded from uploaded evidence.
@@ -44,7 +44,8 @@ The optional Mylyn module covers installed activation, restart, account-token
 switching, server/embedded switches, task-editor failure preservation and selected uncertain-update
 outcomes. It also verifies automatic peer-change refresh and reconnect; see
 [its README](REMOTE-MYLYN.md).
-Still required before #220 is complete: remaining native preference flows,
-other form failures and uncertain-command/
-deletion outcomes. #219 web synchronization and #221 web UI remain required
-before the 2.0 release.
+The [client/server acceptance checkpoint](../verification/CLIENT-SERVER-ACCEPTANCE.md)
+records the integrated #187/#219/#220/#221 evidence. Earlier reports retain their
+original gaps and test totals; they are not the current implementation checklist.
+Run the relevant installed scenarios for the source being changed. Final release
+certification follows [the release process](RELEASING.md).

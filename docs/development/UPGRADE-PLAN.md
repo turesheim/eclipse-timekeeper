@@ -1,6 +1,11 @@
-# Timekeeper upgrade plan
+# Historical Eclipse upgrade plan
 
 Created: September 21, 2026.
+
+This is a dated plan and decision record. Use [repository development](REPOSITORY.md),
+[release procedures](RELEASING.md) and the [operations index](../operations/README.md)
+for current commands and requirements; older unchecked items below are not a
+current release-status checklist.
 
 Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving records in the new versioned database baseline.
@@ -36,7 +41,7 @@ final 2.0 build or current publication. Use the checkpoint below for remaining
 release gates and [DATABASE-RECOVERY.md](../operations/DATABASE-RECOVERY.md) for current storage
 and backup policy.
 See the [scope-change report](../verification/MIGRATION-SIMPLIFICATION.md).
-See the [original baseline](../verification/README.md),
+See the [original baseline](../verification/BASELINE-2026-09-21.md),
 [step 2 results](../verification/BUILD-UPGRADE.md) and
 [test-enablement results](../verification/TEST-UPGRADE.md) and
 [Mylyn/UI results](../verification/MYLYN-UI-UPGRADE.md) and
@@ -171,7 +176,7 @@ Results and deviations, September 21, 2026:
   model; the historical fixture is migration input only. See the baseline report for details.
 - Full SQL restore fails on a duplicate index even with H2 1.4.194 on both sides.
   This is documented for step 4; the historical migrations have not been changed.
-- See [baseline/README.md](../verification/README.md) for commands, expected values and limitations.
+- See [baseline/README.md](../verification/BASELINE-2026-09-21.md) for commands, expected values and limitations.
   Follow up on the remaining checks above as later steps progress.
 
 ## 2. Upgrade the build and consolidate the target platform

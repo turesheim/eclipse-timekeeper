@@ -1,218 +1,89 @@
-# Timekeeper Quarkus server
+# Dagsverk standalone server
 
-The server implements the [owner-scoped v1 API](../architecture/API-V1.md) for #218.
-It uses Quarkus **3.40.1 LTS**, Java **21**, H2 **2.4.240**, and its own schema
-version **2**. The same ordinary Java domain/application-service sources are
-compiled by the standalone Maven reactor and the Eclipse build. The server has
-no Eclipse Platform, workspace, SWT, Mylyn, OSGi or JPA dependency.
+The Java 21 server provides API v1 and the bundled browser client at `/web/`.
+It uses Quarkus 3.40.1, H2 2.4.240 or PostgreSQL, and **server schema 10**.
+Embedded Eclipse storage uses its own schema 3; it is not a server database.
+Switching backends does not copy or merge records.
 
-The bundled web client is available at `/web/`; see [web client documentation](../development/WEB-CLIENT.md) for usage and browser tests.
+## Choose a deployment
 
-See [client/server acceptance](../verification/CLIENT-SERVER-ACCEPTANCE.md) for
-the inspected merged-main Eclipse, browser and synchronization receipts. Final
-tagged artifacts and public p2 installation remain separate release gates.
+| Deployment | Guide |
+| --- | --- |
+| Synology Package Center | [Installation, updates and recovery](SYNOLOGY-PACKAGE.md) |
+| Local Docker | [Local setup](LOCAL-DOCKER.md) |
+| PostgreSQL with two API replicas | [Compose deployment](DEPLOYMENT.md) |
+| Java process | Configure and run below |
 
-## Build and automatic acceptance
-
-```sh
-./mvnw -B -ntp -f server/pom.xml clean verify
-python -m pip install -r common/api/tests/requirements.txt
-python server/scripts/acceptance.py
-```
-
-JUnit checks the shared core, real Quarkus/HTTP/H2 bootstrap, protocol limits,
-and refusal of damaged/unknown schemas. The process suite runs the black-box
-API contract cases against a fresh file database, then restarts in new
-JVMs and verifies IDs, provider links, assigned labels, an open interval, durable
-command replay, immediate forced termination after stop, token revocation,
-long-poll delivery, import rollback, hierarchy conflicts, nanoseconds and both
-DST transitions. Fixtures include paths with spaces and supplementary Unicode.
-The runner uses generated test tokens and removes its own database/configuration
-when finished. Logs and a credential-free receipt are under
-`server/target/acceptance/` and uploaded by CI.
+The [web guide](WEB-CLIENT.md) covers user workflows. [Accounts](ACCOUNTS.md)
+covers first setup, recovery and personal Eclipse API tokens.
 
 ## Configure and run
 
-For Docker on your own computer, follow the [local Docker setup guide](LOCAL-DOCKER.md).
-It covers a source build, persistent storage, credentials and Eclipse connection settings.
+Extract `timekeeper-server.zip` and verify its adjacent SHA-256 checksum. From
+the extracted `timekeeper-server` directory, use existing private directories
+writable by the service account:
 
-For Synology Container Manager, use the complete [Docker Compose deployment](DEPLOYMENT.md).
-It supplies two PostgreSQL-backed server replicas, one PostgreSQL instance using
-its official image, and HAProxy. Data lives in a separate host directory. The
-updater drains and replaces one server at a time, verifies readiness and restores
-the previous images on failure. Database upgrades are separate maintenance work.
+```sh
+export DAGSVERK_SERVER_DB_URL=jdbc:h2:/absolute/path/dagsverk/data/server
+export DAGSVERK_SERVER_SETUP_FILE=/absolute/path/dagsverk/config/account-setup.json
+python3 configure_accounts.py --output "$DAGSVERK_SERVER_SETUP_FILE"
+java -jar quarkus-run.jar
+```
 
-Use a separate empty server database; the embedded Eclipse schema 3 and
-historical databases are unsupported. The server never copies or merges embedded
-data automatically. Follow [account setup and migration](ACCOUNTS.md) to create
-the first administrator, claim existing owners explicitly, and issue personal
-Eclipse API tokens. The same guide describes password recovery and session
-lifetimes. Configure an explicit JDBC URL before starting the JVM.
+The setup tool prints a one-time code. Open `http://127.0.0.1:8080/web/`, choose
+**First administrator setup** and complete the [account setup](ACCOUNTS.md#first-administrator).
+Use a new, separate database; preserve unsupported or historical storage intact.
+Keep setup files and database credentials private and record the deployment's
+source commit and distribution checksum.
 
-The authenticated `GET /api/v1/server` reports this server's build identity and
-timestamps, which the web client displays in its footer. For a direct JVM
-deployment, set `DAGSVERK_DEPLOYED_AT` to the actual UTC deployment timestamp
-(for example, `2026-10-13T08:30:00Z`) and retain that value in the service's
-environment across restarts. Without a recorded deployment timestamp, the web
-client shows **Not recorded**; process-start time remains available separately.
+| Setting | Purpose |
+| --- | --- |
+| `DAGSVERK_SERVER_DB_URL` | Explicit persistent JDBC URL |
+| `DAGSVERK_SERVER_DB_USER`, `DAGSVERK_SERVER_DB_PASSWORD` | Database credentials; H2 user defaults to `sa` |
+| `QUARKUS_HTTP_HOST`, `QUARKUS_HTTP_PORT` | Listener; defaults to `127.0.0.1:8080` |
+| `DAGSVERK_PUBLIC_ORIGIN` | Exact external HTTPS origin when using a reverse proxy |
+| `DAGSVERK_DEPLOYED_AT` | Actual UTC deployment time, retained across restarts |
 
-Each account has a stable owner ID; usernames and display names can change.
-All business data is private to that owner, including for administrators. New
-owners receive a UTC profile and can set their IANA reporting zone through
-`PUT /api/v1/me` with its ETag. API requests never select another owner.
+The standard standalone ZIP uses H2. The [Compose deployment](DEPLOYMENT.md)
+supplies the PostgreSQL build.
 
-Each account starts with the same eight labels as embedded Eclipse:
-Production issue, Testing, Prototyping, Planning, Programming, Debugging,
-Communication and Meeting, with their standard colors. Labels have separate
-UUIDs for each owner. Server startup initializes an existing account only when
-its label set is empty; any nonempty set, including customized labels, is kept
-unchanged. Deleting all labels leaves the running account empty; restarting
-restores the defaults, matching embedded initialization. New owners added while
-running are initialized atomically on their first successful operation. Both
-deployments use the shared catalog in `common/timekeeper-domain`.
+Use HTTPS outside loopback. **About** and `GET /api/v1/server` distinguish build,
+deployment and process-start time; an unset deployment time is shown as
+**Not recorded**. Environment defaults seed central service settings on first
+startup; later environment changes do not overwrite saved administration values.
+Follow [configuration names and recovery](CONFIGURATION.md) for precedence and
+legacy aliases, and [Accounts](ACCOUNTS.md) for origin/RP/SMTP cutovers.
 
-The legacy token registry remains available during migration; new personal API
-tokens are managed under **Account** in the web client. An unset registry or an
-empty array is valid. A configured missing/malformed registry fails startup or
-readiness and private API requests return 503.
-
-By default the server binds `127.0.0.1:8080`. `QUARKUS_HTTP_PORT` changes the port;
-`QUARKUS_HTTP_HOST` changes the bind address. Use TLS outside loopback and set
-`DAGSVERK_PUBLIC_ORIGIN` when terminating HTTPS at a reverse proxy. There is no
-cross-account sharing or anonymous local-owner fallback.
-
-Optional JDBC credentials use `DAGSVERK_SERVER_DB_USER` (default `sa`) and
-`DAGSVERK_SERVER_DB_PASSWORD`. The server database account requires schema
-initialization and H2 database-administration rights. Permitted URL settings are
-`IFEXISTS`, `DB_CLOSE_ON_EXIT`, `AUTO_SERVER`, `AUTO_SERVER_PORT` and
-`LOCK_TIMEOUT`; arbitrary startup SQL, credentials in URLs, read-only mode and
-persistent JDBC settings are rejected before opening storage. Named memory
-storage is suitable for tests; production uses durable file/server storage.
-
-## Notes synchronization
-
-Markdown notes, journal entries and attachments are available at `/dav/notes/`. Follow
-the [WebDAV guide](NOTES-WEBDAV.md) for authentication, conditional writes,
-deletion and tested client compatibility. Users find the collection URL under
-**My Account → Notes** and create personal API tokens under **My account → API tokens**.
-The [journal storage policy](JOURNAL-STORAGE.md) covers encryption and backup-key
-custody; the server processes readable Markdown.
-
-## Calendar feed access
-
-Calendar subscriptions fetch public HTTPS iCalendar feeds on the server. URLs
-may contain private access tokens and are never returned through subscription
-responses or included in account archives. Database backups include the private
-configuration and cached data, as they do other owned server storage.
-
-By default, private, loopback, link-local, reserved and metadata destinations are
-blocked. DNS answers are validated and pinned for each connection; redirects
-are limited and revalidated. TLS hostname/certificate verification stays enabled.
-No Timekeeper bearer token, browser cookie or recovery credential is forwarded.
-A request has a bounded lifetime, a 2 MiB body limit, and no automatic HTTP retries.
-At most four downloads run per server, with database leases coordinating replicas.
-
-For a trusted internal calendar server, set
-`DAGSVERK_CALENDAR_TRUSTED_ORIGINS` to a comma-separated list of exact origins,
-for example `https://calendar.internal.example:8443`. Only those specific origins
-may resolve to internal addresses. An explicitly listed `http://` origin may use
-HTTP; HTTPS-to-HTTP redirects remain rejected. This is operator configuration,
-not a setting calendar users can override. The supplied Compose file forwards
-this variable. An empty value keeps the public-HTTPS-only policy.
-`DAGSVERK_CALENDAR_AUTOMATIC=false` disables scheduled refresh; manual refresh
-remains available. No database schema upgrade is required for subscriptions.
+The database account needs schema initialization and H2 administration rights.
+Allowed JDBC URL settings are `IFEXISTS`, `DB_CLOSE_ON_EXIT`, `AUTO_SERVER`,
+`AUTO_SERVER_PORT` and `LOCK_TIMEOUT`. Credentials in URLs, arbitrary startup SQL,
+read-only mode and persistent JDBC settings are rejected. Named memory storage
+is for tests, not durable deployment.
 
 ## Data and operational behavior
 
-`GET /api/v1/openapi.json` serves the canonical public contract. All data routes
-require the session or token's read/write permission and bind repository operations to its
-owner. Database foreign keys include owner/type/UUID; external identities are
-unique per owner and only one interval may be open per owner. Resource updates
-use both strong opaque ETags and SQL version predicates. An owner row lock
-serializes compound tracking operations; different owners have separate locks.
-Start, stop, events and command receipt commit together. Receipts and committed
-changes currently remain indefinitely (at least the contract's seven-day retry
-window); no maintenance task silently removes history.
+Every account has one immutable owner ID. Administrators do not gain access to
+other owners' business data. The API enforces permissions, owner-bound foreign
+keys, optimistic ETags and atomic tracking/receipt commits. See
+[API v1](../architecture/API-V1.md) for payload bounds, pagination, interchange
+and synchronization contracts.
 
-The server validates table/column/key/index/check definitions and the READY
-version marker before accepting existing storage. Unknown tables/views,
-non-public schemas, user sequences/domains, incomplete initialization and missing
-ownership constraints fail without schema/data repair. H2 DDL commits during
-initialization, so interrupted creation retains `INITIALIZING` and requires an
-operator to select new storage or restore a known valid backup. The canonical
-server schema 1, 2 or 3 upgrades to schema 4 as described in the [account guide](ACCOUNTS.md);
-no historical or embedded-schema migration is provided.
+New accounts receive the shared default label catalog. A nonempty customized
+catalog is retained; restarting the server restores defaults for accounts with an
+empty catalog. Each account can set its IANA reporting zone. API requests cannot select
+another owner or fall back to anonymous local storage.
 
-After schema validation, the server sets
-[`WRITE_DELAY=0`](https://h2database.com/html/commands.html#set_write_delay)
-so acknowledged commits survive the tested immediate JVM termination. Startup
-settings cannot weaken this. The forced-restart acceptance preserves the exact
-stopped interval and the original response/ETag, not a newly executed stop.
+Startup validates the canonical schema before accepting storage. Unknown or
+incomplete layouts fail without repair. Current builds can explicitly upgrade
+canonical server schemas 1–9 to 10; follow [the account upgrade procedure](ACCOUNTS.md#existing-data-and-accounts)
+and stop older replicas first. Historical and embedded databases are not supported
+upgrade inputs. H2 uses `WRITE_DELAY=0` so the tested acknowledged commits survive
+immediate process termination; startup settings cannot weaken this.
 
-Readiness is `/q/health/ready`; it checks connections, schema and registry.
-Liveness is `/q/health/live`. Monitoring responses expose no tokens/owner data.
-API errors are stable problem responses; they do not expose SQL or configuration
-contents. HTTP requests are limited to 20 MiB, with typed 413 responses before
-JSON processing. Portable import/export also allows at most 10,000 records per
-type. Provider lookup URLs allow the percent-encoded forms of the declared Unicode
-identifier bounds. Larger exports fail as a whole, and failed imports roll back
-all records, events and receipts. Imports always allocate fresh UUIDs and never
-change the owner's zone or overwrite records.
-
-For a file backup, stop the server, copy its H2 file, and restart. To restore,
-stop it, preserve the current file, replace it with a verified server-schema-1
-backup, and reopen the same configuration. A JSON export is current-model
-interchange, not a physical backup or legacy migration. Protect the registry
-separately; tokens are never included in data export. Keep the server version,
-source commit and distribution checksum with operational records.
-
-Work Sessions use the server's existing generic SQL schema 1, while portable
-JSON/CSV export uses domain-v2 to retain sessions and optional activity links.
-Older exports remain readable. Older server binaries do not preserve this new
-domain model during writes or export, even though the SQL tables are unchanged.
-The [first-upgrade procedure](DEPLOYMENT.md#automatic-server-image-updates)
-therefore requires pausing writes until every replica supports Work Sessions.
-Keep compatible server builds for subsequent image rollback; a downgrade to the
-previous domain model requires a matching pre-upgrade backup.
-
-## Internet accounts
-
-Sign in to Google or Microsoft under **Account → Internet accounts** for separate
-calendar and task synchronization. Administrators can use a configured managed
-OAuth service or register their own Google and Microsoft applications. Ordinary calendar subscriptions remain available
-without provider login. See
-[task-provider setup and recovery](TASK-PROVIDERS.md) for configuration,
-supported import behavior and verification limits.
-
-## Distribution
-
-The Build workflow's `server-standalone` artifact contains the Java 21 server
-distribution `timekeeper-server.zip` and its SHA-256 checksum. The ZIP includes
-the bundled web client and source provenance. It is separate from the Eclipse
-p2 repository and the DSM installer. For Synology, download `synology-installer`
-from the Server containers workflow instead; that artifact contains the `.spk`,
-its checksum and installation metadata.
-CI runs the process suite from the extracted ZIP, verifying its checksum and
-actual runtime layout. Packaging requires the exact clean committed source.
-Package the built source with:
-
-```sh
-python server/scripts/package_server.py --output server/target/distribution \
-  --commit <full-source-commit>
-```
-
-For release packaging, additionally supply `--tag <actual-tag>`; the tool verifies
-that the tag resolves to the recorded source commit. Untagged CI builds are
-explicitly marked as candidates.
-
-Release publication must build this from the accepted tag and publish the server
-archive alongside the tested Eclipse/web deliverables. A CI artifact is a
-candidate, not a published 2.0 release. See the repository's release checkpoint.
-
-## Full-instance recovery
-
-[Full-instance backup and restore](INSTANCE-BACKUP.md) describes encrypted administrator backups, private preparation, explicit confirmation, exclusive startup recovery and interrupted-operation cancellation. Keep the active restore material as part of the deployment after a successful restore.
-
+Readiness is `/q/health/ready` and checks storage/schema and configured token
+registry. Liveness is `/q/health/live`. A missing or malformed configured legacy
+registry makes readiness/private requests unavailable; an unset or empty registry
+is valid. New personal tokens are managed through My Account.
 
 ### H2 schema-session lifetime
 
@@ -232,6 +103,87 @@ retires every pooled connection repeatedly against a real H2 file with a
 one-slot pool and nondefault database credentials, then verifies authenticated
 reads/writes and rejection of invalid enum values.
 
-External environment names use `DAGSVERK_*`; existing `TIMEKEEPER_*` settings
-remain temporary aliases. See [configuration migration](CONFIGURATION.md) for
-precedence, saved settings and secret preservation.
+## Notes synchronization
+
+Notes, journals and attachments are available through `/dav/notes/`. Users find
+the collection URL under **My Account → Notes** and create separate API tokens
+for external clients. See [WebDAV](NOTES-WEBDAV.md) for conditional writes and
+conflicts, and [journal storage](JOURNAL-STORAGE.md) for encryption/key custody.
+
+## Calendar feed access
+
+Calendar subscriptions fetch public HTTPS iCalendar feeds on the server. URLs
+may contain private access tokens and are never returned through subscription
+responses or included in account archives. Database backups include the private
+configuration and cached data, as they do other owned server storage.
+
+By default, private, loopback, link-local, reserved and metadata destinations are
+blocked. DNS answers are validated and pinned for each connection; redirects
+are limited and revalidated. TLS hostname/certificate verification stays enabled.
+No Dagsverk bearer token, browser cookie or recovery credential is forwarded.
+A request has a bounded lifetime, a 2 MiB body limit, and no automatic HTTP retries.
+At most four downloads run per server, with database leases coordinating replicas.
+
+For a trusted internal calendar server, set
+`DAGSVERK_CALENDAR_TRUSTED_ORIGINS` to a comma-separated list of exact origins,
+for example `https://calendar.internal.example:8443`. Only those specific origins
+may resolve to internal addresses. An explicitly listed `http://` origin may use
+HTTP; HTTPS-to-HTTP redirects remain rejected. This is operator configuration,
+not a setting calendar users can override. The supplied Compose file forwards
+this variable. An empty value keeps the public-HTTPS-only policy.
+`DAGSVERK_CALENDAR_AUTOMATIC=false` disables scheduled refresh; manual refresh
+remains available. No database schema upgrade is required for subscriptions.
+
+## Internet accounts
+
+Users connect Google or Microsoft under **My Account → Internet accounts**.
+Administrators choose a managed OAuth service or direct app registrations;
+[OAuth setup](SHARED-SIGN-IN.md) links the provider consoles and required scopes.
+[Task providers](TASK-PROVIDERS.md) describes import, review and reconnect.
+Calendar feed subscriptions remain available without provider sign-in.
+
+## Full-instance recovery
+
+Use [encrypted full-instance backup and restore](INSTANCE-BACKUP.md) to preserve
+accounts, credentials, work, Notes and installation security material. Follow its
+private preparation, explicit confirmation and exclusive startup procedure.
+Retain the active recovered material for subsequent restarts and disaster recovery.
+
+A closed H2 file copy is only a database copy: stop every process using the file
+before copying, preserve companion configuration/security material and verify
+recovery in separate storage with a compatible server. Never copy an open file.
+Personal JSON/CSV exports are interchange, not installation backups or downgrade
+procedures. A binary rollback across an incompatible schema requires its matching
+pre-upgrade backup and separate preservation of later work.
+
+## Build and automatic acceptance
+
+Prepare [developer prerequisites](../development/REPOSITORY.md), then run:
+
+```sh
+./mvnw -B -ntp -f server/pom.xml clean verify
+python3 server/scripts/acceptance.py
+```
+
+The server suite covers the shared core and real HTTP/database behavior.
+The process runner uses fresh storage and synthetic tokens to check the packaged
+server, restart, durable receipts, ownership and interrupted writes. Its reports
+are under `server/target/acceptance`. [Browser acceptance](../development/WEB-ACCEPTANCE.md)
+uses the same clean-source distribution; dated results belong in
+[verification](../verification/README.md).
+
+## Distribution
+
+The Build workflow's `server-standalone` artifact contains the server ZIP,
+bundled web client, user guides, source provenance and checksum. It is separate
+from the Eclipse p2 repository and Synology installer. Package a clean committed
+build with:
+
+```sh
+python3 server/scripts/package_server.py --output server/target/distribution --commit <full-source-commit>
+```
+
+For release packaging, also supply `--tag <actual-tag>`; it must resolve to that
+commit. See [release procedures](../development/RELEASING.md) for publication.
+For a DSM installation use `synology-installer` from **Server containers**, rather
+than the standalone Java ZIP.

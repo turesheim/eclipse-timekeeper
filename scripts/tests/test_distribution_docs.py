@@ -111,6 +111,9 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
                 self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
                 web = archive.read('timekeeper-server/WEB-CLIENT.md').decode()
+                self.assertIn('# Dagsverk web client', web)
+                self.assertIn('[Accounts](ACCOUNTS.md)', web)
+                self.assertNotIn('## Automated verification', web)
                 for url in re.findall(r'!\[[^\]]*\]\(([^\s)]+)\)', web):
                     parts = urlsplit(url)
                     self.assertFalse(parts.scheme or parts.netloc, url)

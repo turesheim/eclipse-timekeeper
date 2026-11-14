@@ -85,7 +85,7 @@ def package(output, tag, commit):
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/operations/NOTES-WEBDAV.md': 'NOTES-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
-              'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
+              'docs/operations/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
         'docs/assets/screenshots/day-notes-desktop.png': 'images/day-notes-desktop.png',
         'docs/assets/screenshots/day-notes-editor.png': 'images/day-notes-editor.png',
