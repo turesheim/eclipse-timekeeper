@@ -292,7 +292,11 @@ subscriptions remain independent and require no provider sign-in.
 `GET /task-providers/{id}` reads owned status. `PUT /task-providers/{id}/lists`
 replaces selected remote list IDs with `If-Match`; `DELETE /task-providers/{id}`
 disconnects with `If-Match`, retaining tasks. `POST /task-providers/{id}/refresh`
-queues a bounded background scan and returns 202. Private leases fence results
+queues a bounded background scan and returns 202. Selected lists synchronize
+existing tasks and new additions automatically after a complete scan; no initial
+import approval is required. The deprecated `reviewAdditions` field is accepted
+for compatibility, ignored on input and always false on output. The legacy
+first-import preview/approval endpoints remain available to older clients. Private leases fence results
 after disconnect, reselection, reconnect or account disablement. These adapters
 advertise import-only capabilities and do not perform provider writes.
 

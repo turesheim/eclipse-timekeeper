@@ -100,7 +100,7 @@ final class TaskProviderConnections {
         value.put("configurationVersion",value.path("configurationVersion").asLong()+1);
         var scopes=value.putArray("scopes");tokens.scopes().stream().sorted().forEach(scopes::add);if(catalog!=null||!value.has("catalog"))value.set("catalog",lists);
         if(!value.has("selected"))value.putArray("selected");
-        if(!value.has("reviewAdditions"))value.put("reviewAdditions",grant.provider()==TaskCloudProvider.Provider.GOOGLE);
+        value.put("reviewAdditions",false);
         value.putNull("lastError").putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().toString());
         value.put("roundActive",false).put("roundIndex",0).put("blocked",false).put("requested",!value.path("selected").isEmpty()).put("pendingCount",0);value.putArray("pending");value.putObject("listErrors");
         value=previous.isEmpty()?insert(AUTH,id,value):save(AUTH,value);
@@ -127,7 +127,7 @@ final class TaskProviderConnections {
     ObjectNode visible(JsonNode value){
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
-        result.set("version",value.path("version"));result.put("reviewAdditions",connection.path("providerId").asText().equals("google")&&value.path("reviewAdditions").asBoolean(true));
+        result.set("version",value.path("version"));result.put("reviewAdditions",false);
         result.set("services",services(value));
         InternetCalendars.visible(value,result);
         result.put("configurationVersion",value.path("configurationVersion").asLong()).put("direction",value.path("direction").asText("IMPORT")).put("paused",value.path("paused").asBoolean());
@@ -148,7 +148,7 @@ final class TaskProviderConnections {
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match){return select(id,selected,projects,match,null);}
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match,Boolean reviewAdditions){
         var value=required(id);ApiReplies.match(visible(value),match);
-        if(reviewAdditions!=null){if(!store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound).path("providerId").asText().equals("google"))throw ApiFailure.validation();value.put("reviewAdditions",reviewAdditions);}
+        value.put("reviewAdditions",false);
         if(selected.size()>20||new HashSet<>(selected).size()!=selected.size())throw ApiFailure.validation();
         var chosen=new HashSet<>(selected);var known=new HashSet<String>();
         var mappings=projects==null?(value.path("projects").isObject()?((ObjectNode)value.get("projects")).deepCopy():object()):((ObjectNode)projects).deepCopy();

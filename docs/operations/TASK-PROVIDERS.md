@@ -29,8 +29,7 @@ See [the mode comparison and setup steps](SHARED-SIGN-IN.md#choose-the-oauth-mod
 2. Select calendars and their Dagsverk clients, then choose **Save calendars**.
    Events appear read-only alongside subscriptions; they do not create worked time.
 3. Select task lists and optional projects, then choose **Save task lists**.
-   Open **Review import**, check the preview, then choose **Import this list**.
-   Selecting a list alone does not import its tasks.
+   Synchronization starts automatically, including existing tasks and later additions.
 
 Calendar and task selections save separately. Mappings appear for selected items;
 status refreshes retain unsaved choices. New root tasks use the selected project,
@@ -49,10 +48,6 @@ access and **Reconnect** to approve it. Under **Changes to Google Tasks → Prep
 a Google change**, review supported edits, creation or deletion before sending.
 Title, plain text notes, completion and scheduled day are supported; other values
 remain local. An ordinary local edit is not sent automatically.
-
-Google defaults to **Review newly found Google tasks before importing** after the
-first import. Review new tasks when prompted, or uncheck that option and save the
-task lists to allow automatic additions.
 
 ## Refresh, pause and reconnect
 

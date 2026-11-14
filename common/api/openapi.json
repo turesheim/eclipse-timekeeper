@@ -19964,7 +19964,9 @@
           "429": {
             "$ref": "#/components/responses/429"
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Legacy compatibility endpoint. Complete scans of selected lists are synchronized automatically; user approval is no longer required."
       },
       "post": {
         "operationId": "approveTaskProviderImport",
@@ -20055,7 +20057,8 @@
             }
           }
         },
-        "description": "One selected list is fetched per cross-replica lease, with at most four workers per server. Source identity and the connection generation are checked before applying observations. Manual attempts within 30 seconds return 429; an already-running refresh returns 202. Missing or failed source reads do not delete tasks."
+        "description": "Legacy compatibility endpoint. Complete scans of selected lists are synchronized automatically; user approval is no longer required.",
+        "deprecated": true
       }
     },
     "/task-providers/{id}/state": {
@@ -38026,7 +38029,9 @@
             "description": "Map selected remote list IDs to owned projects for new imports only. Existing task projects never change."
           },
           "reviewAdditions": {
-            "type": "boolean"
+            "type": "boolean",
+            "deprecated": true,
+            "description": "Compatibility field. Selected lists and new tasks synchronize automatically; this value is ignored on input and always false on output."
           }
         },
         "required": [
@@ -38233,7 +38238,8 @@
           },
           "reviewAdditions": {
             "type": "boolean",
-            "description": "Google additions wait for explicit import or identity replacement after first approval. Defaults to true; existing linked tasks still update automatically."
+            "description": "Compatibility field. Selected lists and new tasks synchronize automatically; this value is ignored on input and always false on output.",
+            "deprecated": true
           },
           "identityReviews": {
             "type": "array",

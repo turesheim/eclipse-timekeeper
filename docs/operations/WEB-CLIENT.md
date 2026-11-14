@@ -43,8 +43,9 @@ use a separate country preference.
 
 Calendar feeds can supply events and read-only to-dos without provider sign-in.
 Google and Microsoft accounts can provide calendars and tasks through
-[Internet accounts](TASK-PROVIDERS.md). Review a proposed import or conversion
-before confirming it; a calendar event is not automatically recorded work time.
+[Internet accounts](TASK-PROVIDERS.md). Selected calendars and task lists
+synchronize automatically. Converting a calendar event to worked time still
+requires confirmation.
 
 <details>
 <summary>Calendar screenshots</summary>

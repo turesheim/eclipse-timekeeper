@@ -158,8 +158,8 @@ Google, enable Calendar API and Tasks API for the services selected; use the sco
 listed above. For Microsoft, check the delegated permissions and tenant policy.
 
 In **My Account → Internet accounts**, connect a test Google or Microsoft account.
-Test calendars, tasks and combined access as applicable; save selections, review
-the first task import, and verify refresh, disconnect and reconnect. Test personal
+Test calendars, tasks and combined access as applicable; save selections, verify automatic
+synchronization of existing and newly added tasks, then test refresh, disconnect and reconnect. Test personal
 Microsoft and Microsoft 365 accounts if both will be used. Switching modes requires
 explicit reauthorization; existing connections keep their original refresh path.
 

@@ -66,8 +66,15 @@ final class TaskProviderScans {
     ObjectNode reconcile(TaskProviderConnections.Claim claim){
         var auth=connections().active(claim);if(auth==null)return null;
         var value=required(claim.list());if(!value.path("generation").asText().equals(claim.generation())||!value.path("state").asText().equals("READY"))throw ApiFailure.conflict();
-        if(!approved(auth,claim.remoteList()))return object().put("awaitingImport",true);
-        return apply(value,auth);
+        return synchronize(value,auth);
+    }
+    private ObjectNode synchronize(ObjectNode value,ObjectNode auth){
+        var result=apply(value,auth);
+        if(!approved(auth,value.path("remoteListId").asText())){
+            auth.withArray("approved").add(value.path("remoteListId").asText());
+            connections().save(TaskProviderConnections.AUTH,auth);
+        }
+        return result;
     }
     ObjectNode review(UUID connection,UUID list){
         var auth=connections().required(connection);var value=required(list);check(connection,value,auth);
@@ -129,8 +136,7 @@ final class TaskProviderScans {
     }
     ObjectNode applyReviewed(ObjectNode value){
         var auth=connections().required(uuid(value.get("connectionId")));
-        if(!approved(auth,value.path("remoteListId").asText()))return object().put("awaitingImport",true);
-        return apply(value,auth);
+        return synchronize(value,auth);
     }
     private void check(UUID connection,ObjectNode scan,ObjectNode auth){
         var metadata=store.find("TASK_CONNECTION",connection).orElseThrow(ApiFailure::notFound);var list=store.find("TASK_LIST",uuid(scan.get("id"))).orElseThrow(ApiFailure::notFound);

@@ -351,7 +351,6 @@ final class TaskSync {
             if(item.path("deleted").asBoolean()) row.put("status","IGNORE_DELETED");
             else if(tombstoned(key)) {row.put("status","CONFLICT");row.put("reason","LOCAL_DELETED");}
             else if(TaskProviderWrites.holdsImport(store,key)){row.put("status","DEFERRED");row.put("reason","CREATE_IDENTITY_REQUIRED");}
-            else if(TaskProviderIdentities.holdsImport(store,connection,list,key)){row.put("status","DEFERRED");row.put("reason","NEW_IDENTITY_REVIEW");}
             else if(!connection.path("capabilities").path("fields").path("summary").path("readable").asBoolean()) {
                 row.put("status","UNSUPPORTED");row.put("reason","SUMMARY_UNSUPPORTED");
             } else if(item.path("fields").hasNonNull("summary")) {

@@ -49,20 +49,27 @@ class TaskProviderScansTest {
         tx(f,()->{var value=connections().required(f.connection());value.putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().toString());connections().save(TaskProviderConnections.AUTH,value);return null;});return claim(f);
     }
     private JsonNode stored(Fixture f,String id){return tx(f,()->store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("account","remote-list"),id)).orElseThrow());}
-    @Test void savedPagesSurviveInterruptionAndFirstImportRequiresAnOwnedConditionalPreview(){
+    @Test void savedPagesResumeAndCompleteSelectedListsSynchronizeWithoutApproval(){
         var f=fixture();var claim=claim(f);var start=tx(f,()->scans().begin(claim));
         var first=tx(f,()->scans().acknowledge(claim,start,page("opaque-next",task("child","parent","001","Child"))));
-        assertEquals("opaque-next",first.path("next").asText());assertTrue(tx(f,()->store.list("TASK").isEmpty()));assertTrue(tx(f,()->store.list("TASK_SYNC_CURSOR").isEmpty()));
-        var resumed=reclaim(f);var same=tx(f,()->new TaskProviderScans(store,receipts,inputs).begin(resumed));assertEquals(etag(first),etag(same));
-        var ready=tx(f,()->scans().acknowledge(resumed,same,page(null,task("parent",null,"002","Parent"))));assertEquals("READY",ready.path("state").asText());
-        assertTrue(tx(f,()->scans().reconcile(resumed)).path("awaitingImport").asBoolean());assertTrue(tx(f,()->store.list("TASK").isEmpty()));
-        var preview=tx(f,()->scans().review(f.connection(),f.list()));inputs.validate("TaskProviderImportPreview",preview);assertEquals(2,preview.path("createCount").asInt());assertEquals(f.project().toString(),preview.path("projectId").asText());
-        assertThrows(ApiFailure.class,()->tx(f,()->scans().approve(f.connection(),f.list(),"\"stale\"")));
-        assertThrows(ApiFailure.class,()->store.transaction("other-"+UUID.randomUUID(),()->scans().review(f.connection(),f.list())));
-        var result=tx(f,()->scans().approve(f.connection(),f.list(),etag(preview)));assertTrue(result.path("complete").asBoolean());assertEquals(2,result.path("created").asInt());
+        assertTrue(tx(f,()->store.list("TASK").isEmpty()));assertTrue(tx(f,()->store.list("TASK_SYNC_CURSOR").isEmpty()));
+        var resumed=reclaim(f);var same=tx(f,()->scans().begin(resumed));assertEquals(etag(first),etag(same));
+        tx(f,()->scans().acknowledge(resumed,same,page(null,task("parent",null,"002","Parent"))));
+        var result=tx(f,()->scans().reconcile(resumed));assertTrue(result.path("complete").asBoolean());assertEquals(2,result.path("created").asInt());
         assertEquals(f.project().toString(),stored(f,"parent").path("projectId").asText());assertEquals(f.project().toString(),stored(f,"child").path("projectId").asText());assertEquals(stored(f,"parent").path("id"),stored(f,"child").path("parentTaskId"));
-        assertThrows(ApiFailure.class,()->tx(f,()->scans().approve(f.connection(),f.list(),etag(preview))));assertEquals(2,tx(f,()->store.list("TASK").size()));
-        assertNull(tx(f,()->connections().active(resumed)));
+        tx(f,()->{connections().finish(resumed,result,null,0);return null;});
+        var visible=tx(f,()->connections().view(f.connection()));assertTrue(visible.path("imports").isEmpty());assertTrue(visible.path("identityReviews").isEmpty());assertTrue(visible.path("lastSuccess").isTextual());
+        assertEquals(2,tx(f,()->store.list("TASK").size()));assertNull(tx(f,()->connections().active(resumed)));
+        assertThrows(ApiFailure.class,()->store.transaction("other-"+UUID.randomUUID(),()->connections().view(f.connection())));
+    }
+    @Test void legacyReviewFlagsAndReadyFirstImportsDoNotBlockAutomaticSynchronization(){
+        var f=fixture();tx(f,()->{var auth=connections().required(f.connection());auth.put("reviewAdditions",true);connections().save(TaskProviderConnections.AUTH,auth);return null;});
+        var first=claim(f);var start=tx(f,()->scans().begin(first));tx(f,()->scans().acknowledge(first,start,page(null,task("one",null,"001","One"))));
+        var resumed=reclaim(f);assertEquals("READY",tx(f,()->scans().begin(resumed)).path("state").asText());
+        var initial=tx(f,()->scans().reconcile(resumed));assertEquals(1,initial.path("created").asInt());tx(f,()->{connections().finish(resumed,initial,null,0);return null;});
+        var next=reclaim(f);var scan=tx(f,()->scans().begin(next));tx(f,()->scans().acknowledge(next,scan,page(null,task("two",null,"002","Two"))));
+        var added=tx(f,()->scans().reconcile(next));assertTrue(added.path("complete").asBoolean());assertEquals(1,added.path("created").asInt());
+        assertEquals(2,tx(f,()->store.list("TASK").size()));var visible=tx(f,()->connections().view(f.connection()));assertTrue(visible.path("identityReviews").isEmpty());assertFalse(visible.path("reviewAdditions").asBoolean());
     }
     @Test void duplicatePagesAndCyclesRollbackWithoutAdvancingTheSavedCursor(){
         var f=fixture();var claim=claim(f);var start=tx(f,()->scans().begin(claim));

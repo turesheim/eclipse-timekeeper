@@ -47,26 +47,20 @@ can prevent deletion. Lost access and absent records never imply deletion.
 Read-only Dagsverk sessions can inspect comparisons but cannot resolve them.
 
 Polling preserves open comparisons. A changed task, list selection or scan
-requires reopening the review. Comparisons and first-import previews expire
-after 15 minutes; refresh from the provider for a fresh scan. Manual refresh
-replaces ready first-import previews for all selected lists.
+requires reopening the review. Comparisons expire after 15 minutes; refresh from the provider for a fresh scan.
 
-## Newly found or moved Google tasks
+## Task identities
 
-After the approved first import, **Review new tasks** offers **Import as a new
-task** or **Use the existing Dagsverk task**. For replacement, choose the exact
-existing task/source link from the same provider account, compare values and
-acknowledge the choice. A provider ID change may represent a moved task; titles
-and missing records are insufficient to decide that two records are the same.
+Existing tasks and later additions synchronize automatically for selected lists.
+Tasks are identified by provider account, list and task ID; matching titles do
+not establish that a task was moved. A genuinely new ID creates a separate task.
 
-The target list must be selected and readable. An old link can be retired even
-when its list is unselected or unavailable, without fetching or changing that
-list. Replacement retains the Dagsverk task ID, project, local hierarchy and
-unrelated references. Conflicting local values stay local; independent remote
-changes are accepted. The retired identity remains an alias. Its later deletion
-cannot delete the retained task, and a live retired identity can be explicitly
-made current again. Deliberate local deletions and uncertain outgoing creations
-still require their own review. These choices send no provider writes.
+**Task links needing attention** is shown only when an observed identity aliases an
+existing source link. Review its values and choose the exact Dagsverk task/link
+before replacement. This retains the task ID, project, local hierarchy and
+unrelated references. Retired identities remain aliases; their later deletion
+cannot delete the retained task. Local deletions and uncertain outgoing creations
+still need their own decisions. Identity resolution sends no provider writes.
 
 ## Google editing restrictions
 

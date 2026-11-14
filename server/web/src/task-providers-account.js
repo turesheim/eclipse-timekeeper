@@ -30,14 +30,11 @@ export async function renderTaskProviders(view){
     for(const card of cards.values()){
       card.services.controls();
       for(const input of card.form.querySelectorAll('input,select'))input.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled||input.tagName==='SELECT'&&!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(input.dataset.projectFor)}"]`)?.checked;
-      card.additions.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       for(const select of card.form.querySelectorAll('[data-project-for]')){const checked=!!card.form.querySelector(`input[name=selectedLists][value="${CSS.escape(select.dataset.projectFor)}"]`)?.checked;select.closest('label').hidden=!checked;select.closest('.internet-selection-row').classList.toggle('is-selected',checked);}
       card.save.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
       card.refresh.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused||card.data.syncing||!card.data.enabled;
       card.disconnect.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;card.reconnect.disabled=!configured[card.data.providerId]||!view.canWrite||view.busy||view.uncertain||!Object.values(card.services.read()).some(Boolean);
       card.pause.disabled=!view.canWrite||view.busy||view.uncertain||!card.data.enabled;
-      for(const input of card.imports.querySelectorAll('button'))input.disabled=view.busy||view.uncertain||card.data.paused;
-      if(card.approve)card.approve.disabled=!view.canWrite||view.busy||view.uncertain||card.data.paused;
       if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!card.services.choices.tasks.checked;card.calendars.controls();card.writes.controls();card.incoming.controls();card.identities.controls();
     }
   };
@@ -67,10 +64,9 @@ export async function renderTaskProviders(view){
   const subscriptions=section(view,t('internet_accounts.subscription_title'));subscriptions.append(node('p',t('internet_accounts.subscription_help'),'hint'),link(t('internet_accounts.subscription_action'),'#account/calendars'));
   function cardFor(data){
     const card={data},panel=section(view,t('task_providers.account',{provider:providerName(data.providerId),name:data.name}));card.panel=panel;panel.dataset.taskProviderId=data.id;card.heading=node('h3',t('task_providers.account',{provider:providerName(data.providerId),name:data.name}),'h5 text-break mb-1');card.heading.id='internet-account-'+data.id;panel.firstElementChild.replaceWith(card.heading);panel.classList.remove('card','account-card');panel.classList.add('internet-connection');panel.setAttribute('aria-labelledby',card.heading.id);providerPanels.get(data.providerId)?.append(panel);
-    card.status=node('p','','hint small mb-0');card.status.setAttribute('role','status');card.direction=node('p','','hint');card.error=node('p','','alert alert-warning');card.error.hidden=true;card.retry=node('p','','hint');card.retry.hidden=true;
+    card.status=node('p','','hint small mb-0');card.status.setAttribute('role','status');card.direction=node('p','','hint');card.error=node('div','','alert alert-warning');card.error.setAttribute('role','alert');card.error.hidden=true;card.retry=node('p','','hint');card.retry.hidden=true;
     card.form=node('form');card.form.addEventListener('change',()=>{view.dirty.add(card.form);controls();});
-    const additions=node('label',undefined,'d-flex gap-2 align-items-start mb-3');card.additions=node('input',undefined,'form-check-input');card.additions.type='checkbox';card.additions.checked=data.reviewAdditions!==false;additions.hidden=data.providerId!=='google';additions.append(card.additions,node('span',t('task_identities.review_additions')));card.additionsLabel=additions;
-    const fields=node('div',undefined,'internet-selection-list');fields.setAttribute('role','group');fields.setAttribute('aria-label',t('task_providers.lists'));card.choices=node('div');fields.append(card.choices);card.form.append(fields,additions);
+    const fields=node('div',undefined,'internet-selection-list');fields.setAttribute('role','group');fields.setAttribute('aria-label',t('task_providers.lists'));card.choices=node('div');fields.append(card.choices);card.form.append(fields);
     card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('task_providers.save_lists'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
     card.form.append(card.save);card.form.addEventListener('submit',event=>{
       event.preventDefault();run(async()=>{
@@ -78,7 +74,7 @@ export async function renderTaskProviders(view){
         const projectMappings=Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null]));
         const latest=await view.session.request('/task-providers/'+data.id);if(!view.valid())return;
         if((latest.data.configurationVersion??latest.data.version)!==card.draftVersion)throw new ApiError('STALE_VERSION',412);
-        await view.session.request('/task-providers/'+data.id+'/lists',{method:'PUT',etag:latest.etag,body:{selectedLists,projectMappings,...(data.providerId==='google'?{reviewAdditions:card.additions.checked}:{})}});if(!view.valid())return;
+        await view.session.request('/task-providers/'+data.id+'/lists',{method:'PUT',etag:latest.etag,body:{selectedLists,projectMappings}});if(!view.valid())return;
         view.clean(card.form);card.feedback.textContent=t('task_providers.selection_saved');await load();
       },card.save,card.feedback);
     });
@@ -99,41 +95,16 @@ export async function renderTaskProviders(view){
       await view.session.request('/task-providers/'+data.id,{method:'DELETE',etag:latest.etag});if(!view.valid())return;
       view.clean(card.form);await load();feedback.textContent=t('task_providers.disconnected');
     },card.disconnect,card.feedback));
-    card.imports=node('div',undefined,'mt-3');card.reviewPanel=node('div',undefined,'mt-3');card.reviewPanel.hidden=true;
     const identities=node('div',undefined,'mt-3');card.identities=taskProviderIdentities(view,identities,{reload:load,controls,projects});
     const incoming=node('div',undefined,'mt-3');card.incoming=taskProviderReviews(view,incoming,{reload:load,controls});
     const writes=node('div',undefined,'mt-3');card.writes=taskProviderWrites(view,writes,{reload:load,controls});
     const header=node('div',undefined,'internet-connection-header'),identity=node('div');identity.append(card.heading,card.status);header.append(identity,card.refresh);
     const columns=node('div',undefined,'internet-connection-columns');card.calendars=internetCalendarAccount(view,columns,{reload:load,clients,zone:()=>zone,controls});
     card.taskSection=node('section',undefined,'internet-connection-section');card.taskHeading=node('h4',t('internet_accounts.tasks'),'h5');card.taskHeading.id='internet-tasks-'+data.id;card.taskSection.setAttribute('aria-labelledby',card.taskHeading.id);
-    card.reviewRoots=[identities,incoming,writes];card.taskSection.append(card.taskHeading,card.direction,card.form,card.imports,card.reviewPanel,identities,incoming,writes);columns.append(card.taskSection);
+    card.reviewRoots=[identities,incoming,writes];card.taskSection.append(card.taskHeading,card.direction,card.form,identities,incoming,writes);columns.append(card.taskSection);
     const settings=node('details',undefined,'internet-connection-settings');settings.dataset.connectionSettings=data.id;settings.append(node('summary',t('internet_accounts.connection_settings')),card.services.fieldset,accessLabel,node('p',t('internet_accounts.reconnect_help'),'hint'));
     const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.pause,card.reconnect,card.disconnect);settings.append(actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));
     panel.append(header,card.feedback,card.error,card.retry,columns,settings);cards.set(data.id,card);return card;
-  }
-  function paintImports(card){
-    const values=card.data.imports||[],signature=JSON.stringify(values);if(signature===card.importSignature)return;
-    card.importSignature=signature;card.imports.replaceChildren();
-    for(const value of values){
-      const name=card.data.availableLists.find(list=>list.id===value.remoteListId)?.name||value.remoteListId;
-      if(value.state!=='READY'){card.imports.append(node('p',t('task_providers.preparing_import',{name,count:value.count}),'hint'));continue;}
-      const review=button(t('task_providers.review_import',{name}),()=>void view.run(async()=>{
-        const reply=await view.session.request('/task-providers/'+card.data.id+'/imports/'+value.id);if(!view.valid())return;
-        card.reviewPanel.replaceChildren();card.reviewPanel.hidden=false;
-        const heading=node('h3',t('task_providers.import_preview',{name}),'h5');heading.tabIndex=-1;
-        const summary=node('p',t('task_providers.import_counts',{created:reply.data.createCount,existing:reply.data.existingCount,deleted:reply.data.deletedCount}));
-        const samples=node('ul');for(const sample of reply.data.samples)samples.append(node('li',sample.deleted?t('task_providers.deleted_item'):sample.title,'text-break'));
-        const project=projects.find(project=>project.id===reply.data.projectId);
-        const mapping=node('p',t('task_providers.import_project',{name:project?.label||t('task_providers.no_project')}),'hint');
-        card.approve=button(t('task_providers.approve_import'),()=>run(async()=>{
-          await view.session.request('/task-providers/'+card.data.id+'/imports/'+value.id,{method:'POST',etag:reply.etag});if(!view.valid())return;
-          card.reviewPanel.hidden=true;card.reviewPanel.replaceChildren();card.approve=null;await load();card.heading.tabIndex=-1;card.heading.focus();
-        },card.approve,card.feedback),'btn btn-primary');
-        const close=button(t('ui.cancel'),()=>{card.reviewPanel.hidden=true;card.reviewPanel.replaceChildren();card.approve=null;review.focus();});
-        const actions=node('div',undefined,'d-flex flex-wrap gap-2');actions.append(card.approve,close);
-        card.reviewPanel.append(heading,summary,mapping,samples,node('p',t('task_providers.import_preview_help'),'hint'),actions);controls();heading.focus();
-      },{submit:review,feedback:card.feedback}));card.imports.append(review);
-    }
   }
   function paint(data){
     calendarSynchronization=data.calendarSynchronization!==false;
@@ -141,14 +112,18 @@ export async function renderTaskProviders(view){
     const present=new Set();for(const value of data.items){
       if(value.ownerId!==view.session.owner)throw new ApiError('OWNER_CHANGED',401);present.add(value.id);const card=cards.get(value.id)||cardFor(value);card.data=value;
       card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('internet_accounts.tasks_last_refresh',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});
-      card.direction.textContent=t(value.direction==='TWO_WAY'?'task_providers.mode_two_way':'task_providers.mode_import');card.pause.textContent=t(value.paused?'task_providers.resume':'task_providers.pause');paintImports(card);
-      const tasks=value.services?.tasks!==false;card.status.hidden=!tasks&&value.enabled&&!value.paused&&!value.syncing;card.form.hidden=!tasks;card.additionsLabel.hidden=value.providerId!=='google'||!tasks;card.direction.hidden=!tasks;card.imports.hidden=!tasks;card.calendars.update(value);
+      card.direction.textContent=t(value.direction==='TWO_WAY'?'task_providers.mode_two_way':'task_providers.mode_import');card.pause.textContent=t(value.paused?'task_providers.resume':'task_providers.pause');
+      const tasks=value.services?.tasks!==false;card.status.hidden=!tasks&&value.enabled&&!value.paused&&!value.syncing;card.form.hidden=!tasks;card.direction.hidden=!tasks;card.calendars.update(value);
       if(!card.servicesDirty)for(const [key,input]of Object.entries(card.services.choices))input.checked=value.services?!!value.services[key]:key==='tasks';
-      if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);card.taskSection.hidden=!tasks&&!card.reviewRoots.some(root=>!root.hidden)&&card.reviewPanel.hidden;
-      card.error.hidden=!value.lastError;card.error.textContent=value.lastError?providerError(value.lastError)+(value.pendingCount?' '+t('task_providers.pending',{count:value.pendingCount}):''):'';
+      if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);card.taskSection.hidden=!tasks&&!card.reviewRoots.some(root=>!root.hidden);
+      const failures=Object.entries(value.listErrors||{}),syncFailure=code=>['CONFLICT','STALE_VERSION'].includes(code)?t('task_providers.sync_conflict'):providerError(code);
+      card.error.hidden=!value.lastError&&!failures.length;card.error.replaceChildren();
+      if(failures.length)for(const [id,code]of failures)card.error.append(node('p',t('task_providers.list_error',{name:value.availableLists.find(list=>list.id===id)?.name||id,message:syncFailure(code)}),'mb-0'));
+      else if(value.lastError)card.error.append(node('p',syncFailure(value.lastError),'mb-0'));
+      if(value.pendingCount)card.error.append(node('p',t('task_providers.pending',{count:value.pendingCount}),'mb-0'));
       card.retry.hidden=!value.lastError||!value.nextRefresh;card.retry.textContent=card.retry.hidden?'':t('task_providers.next_attempt',{date:instantText(value.nextRefresh,zone)});
       if(!view.dirty.has(card.form)){
-        card.draftVersion=value.configurationVersion??value.version;card.additions.checked=value.reviewAdditions!==false;
+        card.draftVersion=value.configurationVersion??value.version;
         const signature=JSON.stringify([value.availableLists,value.selectedLists,value.projectMappings]);if(signature!==card.signature){
           card.signature=signature;card.choices.replaceChildren();
           for(const list of value.availableLists){

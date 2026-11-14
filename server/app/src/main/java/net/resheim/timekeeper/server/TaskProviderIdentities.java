@@ -14,12 +14,8 @@ final class TaskProviderIdentities {
     private final ServerStore store;private final CommandReceipts receipts;private final ContractInputs inputs;
     TaskProviderIdentities(ServerStore store,CommandReceipts receipts,ContractInputs inputs){this.store=store;this.receipts=receipts;this.inputs=inputs;}
     private TaskProviderScans scans(){return new TaskProviderScans(store,receipts,inputs);}
-    static boolean holdsImport(ServerStore store,JsonNode connection,JsonNode list,ExternalTaskReferenceKey key){
-        if(!key.providerId().equals("google")||!key.repositoryId().equals(TaskCloudPull.repository(connection.path("remoteAccountId").asText(),list.path("remoteListId").asText())))return false;
-        var auth=store.find(TaskProviderConnections.AUTH,uuid(connection.get("id")));return auth.isPresent()&&auth.get().path("reviewAdditions").asBoolean(true)&&TaskProviderScans.approved(auth.get(),list.path("remoteListId").asText());
-    }
     static JsonNode descriptors(ServerStore store,JsonNode auth){
-        var result=array();for(var scan:store.list(TaskProviderScans.SCAN))if(scan.path("connectionId").equals(auth.path("id"))&&scan.path("generation").equals(auth.path("generation"))&&scan.path("providerId").asText().equals("google")&&scan.path("state").asText().equals("READY")&&(!TaskProviderScans.approved(auth,scan.path("remoteListId").asText())||scan.path("identityCount").asInt()>0))result.add(object().put("listId",scan.path("id").asText()).put("remoteListId",scan.path("remoteListId").asText()).put("version",scan.path("version").asLong()));return result;
+        var result=array();for(var scan:store.list(TaskProviderScans.SCAN))if(scan.path("connectionId").equals(auth.path("id"))&&scan.path("generation").equals(auth.path("generation"))&&scan.path("providerId").asText().equals("google")&&scan.path("state").asText().equals("READY")&&scan.path("identityCount").asInt()>0)result.add(object().put("listId",scan.path("id").asText()).put("remoteListId",scan.path("remoteListId").asText()).put("version",scan.path("version").asLong()));return result;
     }
     private ExternalTaskReferenceKey key(JsonNode scan,String id){return new ExternalTaskReferenceKey("google",TaskCloudPull.repository(scan.path("accountId").asText(),scan.path("remoteListId").asText()),id);}
     private boolean tombstoned(ExternalTaskReferenceKey key){for(var row:store.list("TASK_TOMBSTONE"))for(var ref:row.path("externalReferences"))if(alias(ref).equals(key))return true;return false;}
