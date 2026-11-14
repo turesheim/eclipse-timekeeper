@@ -126,7 +126,7 @@ The application uses a separate, non-superuser database role.
 
 For Internet accounts, choose a managed OAuth service or register Google and
 Microsoft applications for this installation. See [OAuth setup](SHARED-SIGN-IN.md)
-for both modes and [retained settings](TASK-PROVIDERS.md#retain-operator-settings).
+for both modes and [retained settings](CONFIGURATION.md#retain-operator-settings).
 
 The server database is separate from Eclipse's embedded H2 database. Existing
 H2 files cannot be mounted as PostgreSQL storage. Move user data through the

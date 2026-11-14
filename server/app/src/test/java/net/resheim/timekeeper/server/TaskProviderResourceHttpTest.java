@@ -47,15 +47,10 @@ class TaskProviderResourceHttpTest {
         var value=json(call("POST","/complete",object().put("state",state).put("code","write-fixture-"+UUID.randomUUID()),null),200);created.add(value.path("id").asText());assertEquals("TWO_WAY",value.path("direction").asText());return value;
     }
     private ObjectNode current(String id){return json(call("GET","/"+id,null,null),200);}
-    private ObjectNode selectAndImport(ObjectNode value,String...lists)throws InterruptedException{
+    private ObjectNode selectAndSynchronize(ObjectNode value,String...lists)throws InterruptedException{
         var input=object();var selected=input.putArray("selectedLists");Arrays.stream(lists).forEach(selected::add);String id=value.path("id").asText();
         json(call("PUT","/"+id+"/lists",input,etag(value)),200);var staged=idle(id);
-        assertEquals(lists.length,staged.path("imports").size());
-        for(var preview:staged.path("imports")){
-            String path="/"+id+"/imports/"+preview.path("id").asText();var reviewed=call("GET",path,null,null);assertEquals(200,reviewed.statusCode(),reviewed.asString());
-            inputs.validate("TaskProviderImportPreview",parse(reviewed.asString()));assertEquals(428,call("POST",path,null,null).statusCode());
-            json(call("POST",path,null,reviewed.header("ETag")),200);
-        }
+        assertTrue(staged.path("imports").isEmpty());assertTrue(staged.path("identityReviews").isEmpty());
         return idle(id);
     }
     private ObjectNode idle(String id)throws InterruptedException{
@@ -66,7 +61,7 @@ class TaskProviderResourceHttpTest {
     @AfterEach void disconnect(){for(String id:created)for(int attempt=0;attempt<3;attempt++){var before=call("GET","/"+id,null,null);if(before.statusCode()==404)break;var reply=call("DELETE","/"+id,null,before.header("ETag"));if(reply.statusCode()==204)break;assertEquals(412,reply.statusCode(),reply.asString());}}
     @Test void googleAndMicrosoftSignInSelectionAndBackgroundPullCreateOwnedNativeTasks()throws Exception{
         for(String provider:List.of("google","microsoft")){
-            var connection=connect(provider);String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1","list-2");
+            var connection=connect(provider);String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1","list-2");
             var complete=idle(id);inputs.validate("TaskProviderConnection",complete);assertTrue(complete.path("lastError").isNull());assertTrue(complete.path("lastSuccess").isTextual());
             assertTrue(TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).reads.get()>=2);
             store.transaction(owner,()->{var lists=store.list("TASK_LIST").stream().filter(list->list.path("connectionId").asText().equals(id)).toList();assertEquals(2,lists.size());
@@ -111,7 +106,7 @@ class TaskProviderResourceHttpTest {
         assertEquals(400,call("PUT","/"+id+"/lists",object().put("accessToken","private"),etag(connection)).statusCode());
     }
     @Test void failedProviderReadKeepsImportedTasksAndSurfacesStatus()throws Exception{
-        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");var first=idle(id);
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");var first=idle(id);
         var state=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());state.failure=503;
         store.transaction(owner,()->{var c=new TaskProviderConnections(store);var value=c.required(UUID.fromString(id));value.put("lastAttempt",store.now().minusSeconds(31).toString());c.save(TaskProviderConnections.AUTH,value);return null;});
         assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());var result=idle(id);
@@ -125,20 +120,19 @@ class TaskProviderResourceHttpTest {
         assertEquals("Updated work list",result.path("availableLists").get(0).path("name").asText());assertTrue(result.path("selectedLists").isEmpty());
         assertEquals(0,TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).reads.get());
     }
-    @Test void manualRefreshReplacesAReadyPreviewWithFreshProviderObservations()throws Exception{
+    @Test void manualRefreshSynchronizesNewProviderValuesWithoutAnotherImportStep()throws Exception{
         var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();
-        var input=object();input.putArray("selectedLists").add("list-1").add("list-2");json(call("PUT","/"+id+"/lists",input,etag(connection)),200);var ready=idle(id);
-        assertTrue(ready.path("lastSuccess").isNull());var paths=new LinkedHashMap<String,String>();var etags=new HashMap<String,String>();
-        for(var preview:ready.path("imports")){String path="/"+id+"/imports/"+preview.path("id").asText();var before=call("GET",path,null,null);assertEquals(200,before.statusCode());paths.put(preview.path("remoteListId").asText(),path);etags.put(path,before.header("ETag"));}assertEquals(2,paths.size());
+        var ready=selectAndSynchronize(connection,"list-1","list-2");assertTrue(ready.path("lastSuccess").isTextual());
         TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText()).title="Fresh provider title";
         store.transaction(owner,()->{var c=new TaskProviderConnections(store);var value=c.required(UUID.fromString(id));value.put("lastAttempt",store.now().minusSeconds(31).toString());c.save(TaskProviderConnections.AUTH,value);return null;});
-        assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());idle(id);
-        for(var entry:paths.entrySet()){var after=call("GET",entry.getValue(),null,null);assertEquals(200,after.statusCode());assertEquals("Fresh provider title "+entry.getKey(),after.jsonPath().getString("samples[0].title"));
-            assertEquals(412,call("POST",entry.getValue(),null,etags.get(entry.getValue())).statusCode());}
-        assertTrue(store.transaction(owner,()->store.list("TASK").stream().noneMatch(task->task.path("externalReferences").toString().contains(connection.path("remoteAccountId").asText()))));
+        assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());var result=idle(id);assertTrue(result.path("imports").isEmpty());assertTrue(result.path("lastError").isNull());
+        store.transaction(owner,()->{for(String list:List.of("list-1","list-2")){
+            var key=new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),list),"task-"+list);
+            assertEquals("Fresh provider title "+list,store.byReference(key).orElseThrow().path("summary").asText());
+        }return null;});
     }
     @Test void expiredTokensRefreshAndListRenamesDoNotRewriteUnchangedTasks()throws Exception{
-        var connection=connect("microsoft");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");idle(id);
+        var connection=connect("microsoft");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");idle(id);
         var key=new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("microsoft",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1");
         var before=store.transaction(owner,()->store.byReference(key).orElseThrow());
         var state=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());state.listName="Renamed list";
@@ -161,7 +155,7 @@ class TaskProviderResourceHttpTest {
         refresh.sweep();var result=idle(id);assertEquals("Recovered catalog",result.path("availableLists").get(0).path("name").asText());assertTrue(result.path("lastError").isNull());
     }
     @Test void reviewedGoogleWritesUseRealHttpOwnershipScopesAndConditionalApprovals()throws Exception{
-        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");
         var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
         var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
         store.transaction(owner,()->{var current=(net.resheim.eclipse.timekeeper.domain.Task)decode("TASK",store.find("TASK",uuid(task.get("id"))).orElseThrow());store.service().updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(current.id(),current.version(),current.projectId(),current.parentTaskId(),"Reviewed title",current.url()));return null;});
@@ -178,7 +172,7 @@ class TaskProviderResourceHttpTest {
         var archive=given().header("Authorization","Bearer test-a").get("/api/v1/data/export");assertEquals(200,archive.statusCode());assertFalse(archive.asString().contains("TASK_WRITE"));
     }
     @Test void googleCompletionAndReviewedReopeningRetainTheOriginalNoteChecklistTask()throws Exception{
-        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");
         var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
         String title="Note Google "+UUID.randomUUID(),source="- [ ] "+title+"\r\n",path="Google checklist "+UUID.randomUUID()+".md";
         var note=given().header("Authorization","Bearer test-a").queryParam("path",path).header("If-None-Match","*").contentType("application/octet-stream").body(source.getBytes(StandardCharsets.UTF_8)).put("/api/v1/notes/files");assertEquals(201,note.statusCode(),note.asString());String entry=note.jsonPath().getString("id");
@@ -197,7 +191,7 @@ class TaskProviderResourceHttpTest {
 
     @Test void googleCreationLinksTheOriginalNativeTaskAndUncertainIdentityRecoveryUsesOwnedConditionalRoutes()throws Exception{
         for(boolean uncertain:List.of(false,true)){
-            var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+            var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");
             var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
             var task=store.transaction(owner,()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(Optional.empty(),"HTTP native task",Optional.empty())));
             var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());provider.loseCreationReply=uncertain;
@@ -215,7 +209,7 @@ class TaskProviderResourceHttpTest {
     }
 
     @Test void incomingReviewHttpChecksOwnerPermissionComparisonAndDoesNotSendToGoogle()throws Exception{
-        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");
         var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
         store.transaction(owner,()->{var changed=((ObjectNode)task).deepCopy();changed.put("summary","Local draft").put("version",task.path("version").asLong()+1);store.save("TASK",(net.resheim.eclipse.timekeeper.domain.Task)decode("TASK",changed));var auth=new TaskProviderConnections(store).required(UUID.fromString(id));auth.put("lastAttempt",store.now().minusSeconds(31).toString());new TaskProviderConnections(store).save(TaskProviderConnections.AUTH,auth);return null;});
         var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());provider.title="Changed Google title";assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());var after=idle(id);assertEquals(1,after.path("reviews").size());
@@ -226,19 +220,20 @@ class TaskProviderResourceHttpTest {
     }
 
     @Test void leavingUnidentifiedCreationUnlinkedUsesOwnedConditionalHttpWithoutAnotherProviderMutation()throws Exception{
-        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1");var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());var task=store.transaction(owner,()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(Optional.empty(),"HTTP task kept unlinked",Optional.empty())));var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());provider.loseCreationReply=true;
+        var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());var task=store.transaction(owner,()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(Optional.empty(),"HTTP task kept unlinked",Optional.empty())));var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());provider.loseCreationReply=true;
         var prepared=call("POST","/"+id+"/writes",object().put("listId",list.path("id").asText()).put("taskId",task.id().value().toString()).put("action","CREATE"),null);var preview=json(prepared,201);String path="/"+id+"/writes/"+preview.path("id").asText();json(call("POST",path+"/confirm",null,prepared.header("ETag")),202);idle(id);var current=call("GET",path,null,null);assertEquals("UNKNOWN",json(current,200).path("state").asText());var input=object().put("acknowledgePossibleSeparateImport",true);
         assertEquals(404,call("b",BROWSER,"POST",path+"/leave-unresolved",input,current.header("ETag")).statusCode());assertEquals(403,call("read",BROWSER,"POST",path+"/leave-unresolved",input,current.header("ETag")).statusCode());assertEquals(428,call("POST",path+"/leave-unresolved",input,null).statusCode());assertEquals(422,call("POST",path+"/leave-unresolved",object().put("acknowledgePossibleSeparateImport",false),current.header("ETag")).statusCode());
         var connected=current(id);assertEquals(204,call("DELETE","/"+id,null,etag(connected)).statusCode());var disconnected=current(id);inputs.validate("TaskProviderConnection",disconnected);assertFalse(disconnected.path("enabled").asBoolean());assertEquals(1,disconnected.path("pendingWrites").asInt());assertEquals(404,call("b",BROWSER,"GET","/"+id,null,null).statusCode());assertTrue(store.transaction(owner,()->store.find(TaskProviderConnections.AUTH,UUID.fromString(id)).isEmpty()));
         var result=json(call("POST",path+"/leave-unresolved",input,current.header("ETag")),200);inputs.validate("TaskProviderWrite",result);assertEquals("UNRESOLVED",result.path("state").asText());assertEquals(result,json(call("POST",path+"/leave-unresolved",input,current.header("ETag")),200));assertEquals(1,provider.writes.get());var saved=store.transaction(owner,()->store.find("TASK",task.id().value()).orElseThrow());assertEquals("HTTP task kept unlinked",saved.path("summary").asText());assertTrue(saved.path("externalReferences").isEmpty());
     }
 
-    @Test void sourceIdentityReviewReplacesOnlyAnOwnedSameAccountReferenceWithoutProviderWrites()throws Exception{
-        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndImport(connection,"list-1","list-2");var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());
-        var original=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());var target=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(list->list.path("connectionId").asText().equals(id)&&list.path("remoteListId").asText().equals("list-2")).findFirst().orElseThrow());
-        provider.created.put("list-2/moved-id",object().put("id","moved-id").put("title","Moved provider task").put("status","needsAction").put("position","002").put("etag","\"moved-1\""));store.transaction(owner,()->{var auth=new TaskProviderConnections(store).required(UUID.fromString(id));auth.put("lastAttempt",store.now().minusSeconds(31).toString());new TaskProviderConnections(store).save(TaskProviderConnections.AUTH,auth);return null;});assertEquals(202,call("POST","/"+id+"/refresh",null,null).statusCode());idle(id);
-        String path="/"+id+"/identities/"+target.path("id").asText();var page=json(call("GET",path,null,null),200);inputs.validate("TaskProviderIdentityReviews",page);var row=page.path("items").get(0);assertEquals("moved-id",row.path("externalId").asText());var task=store.transaction(owner,()->store.find("TASK",uuid(original.get("id"))).orElseThrow());var input=object().put("externalId","moved-id").put("decision","REPLACE").put("taskId",task.path("id").asText()).put("taskEtag",etag(task));input.set("previous",object().put("providerId","google").put("repositoryId",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1")).put("externalId","task-list-1"));
-        assertEquals(404,call("b",BROWSER,"GET",path,null,null).statusCode());assertEquals(403,call("read",BROWSER,"POST",path,input,row.path("reviewEtag").asText()).statusCode());assertEquals(428,call("POST",path,input,null).statusCode());assertEquals(412,call("POST",path,input,"\"stale\"").statusCode());var result=json(call("POST",path,input,row.path("reviewEtag").asText()),200);inputs.validate("Task",result);assertEquals(task.path("id"),result.path("id"));assertEquals("Moved provider task",result.path("summary").asText());assertEquals(result,json(call("POST",path,input,row.path("reviewEtag").asText()),200));assertEquals(0,provider.writes.get());assertEquals(2,store.transaction(owner,()->store.list("TASK").stream().filter(value->value.path("externalReferences").toString().contains(TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-2"))).toList()).size());
+    @Test void newProviderIdentitiesSynchronizeAsSeparateOwnedTasksWithoutGuessingAMove()throws Exception{
+        var connection=connect("google");String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1","list-2");var provider=TaskProviderHttpTestFixture.STATES.get(connection.path("remoteAccountId").asText());
+        var original=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
+        provider.created.put("list-2/new-id",object().put("id","new-id").put("title",original.path("summary").asText()).put("status","needsAction").put("position","002").put("etag","\"new-1\""));
+        selectAndSynchronize(current(id),"list-1","list-2");var result=current(id);assertTrue(result.path("identityReviews").isEmpty());assertFalse(result.path("reviewAdditions").asBoolean());
+        store.transaction(owner,()->{var added=store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-2"),"new-id")).orElseThrow();assertNotEquals(original.path("id"),added.path("id"));assertEquals(original,store.find("TASK",uuid(original.get("id"))).orElseThrow());return null;});
+        assertEquals(404,call("b",BROWSER,"GET","/"+id,null,null).statusCode());assertEquals(0,provider.writes.get());
     }
 
 }

@@ -21,6 +21,11 @@ export async function renderInternetAccounts(view){
     return t('internet_admin.registration_'+state,{provider:t('internet_accounts.'+provider)});
   }
   const configured=value=>t(value===null?'internet_admin.not_checked':value?'ui.configured':'ui.not_configured');
+  function paintRegistration(provider,fields){
+    fields.status.textContent=fields.clear?t('internet_admin.provider_remove_pending',{provider:t('internet_accounts.'+provider)}):registrationStatus(provider);
+    fields.remove.hidden=!fields.clear&&(!loaded.data.saved[provider+'ClientSecretConfigured']||!!fields.secret.value);
+    fields.remove.textContent=t(fields.clear?'internet_admin.provider_keep_secret':'internet_admin.provider_clear_secret',{provider:t('internet_accounts.'+provider)});
+  }
   function paint(){
     const data=loaded.data;feedback.textContent=t('internet_admin.status_'+data.status.toLowerCase());feedback.className=['PUBLIC_ORIGIN_REQUIRED','CALLBACK_INVALID','REGISTRATION_REQUIRED','UNAVAILABLE'].includes(data.status)?'alert alert-warning':'hint';
     pending.textContent=t(data.restartRequired?'internet_admin.restart_required':'internet_admin.active');
@@ -34,7 +39,7 @@ export async function renderInternetAccounts(view){
       [t('internet_admin.google_registration'),configured(data.googleConfigured)],
       [t('internet_admin.microsoft_registration'),configured(data.microsoftConfigured)]
     ]));
-    for(const [provider,fields]of registrations)fields.status.textContent=registrationStatus(provider);
+    for(const [provider,fields]of registrations)paintRegistration(provider,fields);
   }
   paint();
   if(loaded.data.canEdit){
@@ -42,13 +47,14 @@ export async function renderInternetAccounts(view){
     const editor=form(view,t('internet_admin.edit'),t('ui.save_settings'),async({value,feedback})=>{
       const body={mode:mode.value,serviceUrl:service.value.trim()||null,currentPassword:proof.value};
       for(const [provider,fields]of registrations){
-        if(fields.clear.checked&&fields.secret.value)throw new Error(t('internet_admin.secret_choice'));
-        body[provider+'ClientId']=fields.id.value.trim();body[provider+'SecretAction']=fields.clear.checked?'CLEAR':fields.secret.value?'REPLACE':'PRESERVE';
+        body[provider+'ClientId']=fields.id.value.trim();body[provider+'SecretAction']=fields.secret.value?'REPLACE':fields.clear?'CLEAR':'PRESERVE';
         if(fields.secret.value)body[provider+'ClientSecret']=fields.secret.value;
       }
-      const reply=await view.session.request('/admin/internet-accounts',{method:'PUT',etag:formEtag,body});if(!view.valid())return;
+      for(const fields of registrations.values())fields.remove.disabled=true;
+      let reply;try{reply=await view.session.request('/admin/internet-accounts',{method:'PUT',etag:formEtag,body});}finally{if(view.valid())for(const fields of registrations.values())fields.remove.disabled=false;}
+      if(!view.valid())return;
       loaded=reply;formEtag=reply.etag;proof.value='';
-      for(const [provider,fields]of registrations){fields.secret.value='';fields.clear.checked=false;}
+      for(const fields of registrations.values()){fields.secret.value='';fields.clear=false;}
       view.clean(value);savedDraft=draft();paint();feedback.textContent=t(loaded.data.restartRequired?'internet_admin.restart_required':'internet_admin.active');
     });
     editor.value.append(node('p',t('internet_admin.edit_help'),'hint'));
@@ -62,13 +68,14 @@ export async function renderInternetAccounts(view){
       const callback=field(group,t('internet_admin.direct_callback'),loaded.data.callbackUrl,{required:false});callback.readOnly=true;
       const status=node('p',registrationStatus(provider),'hint');status.setAttribute('role','status');status.dataset.oauthRegistration=provider;group.append(status);
       const secret=field(group,t('internet_admin.provider_new_secret',{provider:t('internet_accounts.'+provider)}),'',{type:'password',required:false,autocomplete:'section-'+provider+' new-password',maxLength:16384});
-      const clear=field(group,t('internet_admin.provider_clear_secret',{provider:t('internet_accounts.'+provider)}),false,{type:'checkbox'});registrations.set(provider,{id,secret,clear,status});
+      const fields={id,secret,status,clear:false};fields.remove=button('',()=>{fields.clear=!fields.clear;view.dirty.add(editor.value);paintRegistration(provider,fields);},'btn btn-outline-secondary btn-sm mb-3');group.append(fields.remove);
+      secret.addEventListener('input',()=>{fields.clear=false;paintRegistration(provider,fields);});registrations.set(provider,fields);paintRegistration(provider,fields);
       view.cleanup.add(()=>{secret.value='';});
     }
     const updateMode=()=>{const shared=mode.value==='SHARED';help.textContent=t('internet_admin.managed_help');help.hidden=!shared;managed.hidden=!shared;direct.hidden=shared;};mode.addEventListener('change',updateMode);updateMode();
     const proof=passwordField(editor.value,t('ui.current_administrator_password'),true);proof.autocomplete='section-internet-accounts current-password';
     view.cleanup.add(()=>{proof.value='';});editor.finish();
-    function draft(){return JSON.stringify([mode.value,service.value,...[...registrations.values()].flatMap(fields=>[fields.id.value,fields.secret.value,fields.clear.checked])]);}
+    function draft(){return JSON.stringify([mode.value,service.value,...[...registrations.values()].flatMap(fields=>[fields.id.value,fields.secret.value,fields.clear])]);}
     savedDraft=draft();
     const verification=section(view,t('internet_admin.verify_title'));
     verification.append(node('p',t('internet_admin.verify_help'),'hint'));

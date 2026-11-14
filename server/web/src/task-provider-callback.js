@@ -25,7 +25,7 @@ try{
         return [t('internet_admin.verify_check_'+name),detail];
       });
       back.before(table([t('internet_admin.verify_check'),t('internet_admin.verify_result')],rows));
-    }else{result.textContent=t('task_providers.connected');location.replace('/web/#account/task-providers');}
+    }else{result.textContent=t('task_providers.connected');location.replace('/web/#account/task-providers'+(typeof reply.data.id==='string'?'/'+encodeURIComponent(reply.data.id):''));}
   }
 }catch{result.textContent=t('task_providers.not_confirmed');result.setAttribute('role','alert');}
 finally{parameters.delete('code');parameters.delete('state');session?.close();}

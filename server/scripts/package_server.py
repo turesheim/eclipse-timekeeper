@@ -76,6 +76,7 @@ def package(output, tag, commit):
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/operations/TASK-PROVIDERS.md': 'TASK-PROVIDERS.md',
+              'docs/operations/TASK-PROVIDER-REFERENCE.md': 'TASK-PROVIDER-REFERENCE.md',
               'docs/operations/SHARED-SIGN-IN.md': 'SHARED-SIGN-IN.md',
               'docs/operations/CONNECT-SERVICE.md': 'CONNECT-SERVICE.md',
               'docs/operations/CONFIGURATION.md': 'CONFIGURATION.md',

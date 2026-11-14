@@ -44,3 +44,59 @@ verification records retain their original names; they are not operator settings
 
 For direct OAuth setup see [direct registration](SHARED-SIGN-IN.md#direct).
 For managed service deployment see [OAuth service operations](CONNECT-SERVICE.md).
+
+## Retain operator settings
+
+
+For environment-based first setup, use `DAGSVERK_CONNECT_SHARED=false`,
+`DAGSVERK_PUBLIC_ORIGIN`, `DAGSVERK_GOOGLE_TASKS_CLIENT_ID`,
+`DAGSVERK_GOOGLE_TASKS_CLIENT_SECRET`, `DAGSVERK_MICROSOFT_TASKS_CLIENT_ID`
+and `DAGSVERK_MICROSOFT_TASKS_CLIENT_SECRET`. Settings saved in Administration
+take precedence over these first-boot defaults.
+
+Existing operator setups can use a Java properties file with only the configured
+providers:
+
+```properties
+timekeeper.tasks.google.client-id=REPLACE_WITH_CLIENT_ID
+timekeeper.tasks.google.client-secret=REPLACE_WITH_CLIENT_SECRET
+timekeeper.tasks.microsoft.client-id=REPLACE_WITH_CLIENT_ID
+timekeeper.tasks.microsoft.client-secret=REPLACE_WITH_CLIENT_SECRET
+```
+
+These server app registrations are separate from each account's OAuth grant.
+Preserve Java properties escaping for any backslashes in values. Keep filled
+settings outside source control, browser code and Compose environment fields.
+
+For the **Synology package**, edit the retained
+`/var/packages/timekeeper/var/server/secrets/task_providers.properties` as an
+operator, then restart Dagsverk in Package Center. Startup copies it into the
+protected, read-only container mount. Edit the retained file, rather than its
+generated copy under `target/private`. Upgrades preserve it. Native and Hyper
+Backup application archives include it with a verified checksum. Restoring an
+older archive without it clears destination app registrations; configure them
+and reconnect as needed. Actual Package Center and Hyper Backup repository
+restore still require [NAS acceptance](SYNOLOGY-PACKAGE.md).
+
+For the **Compose distribution**, run `python3 setup.py` from `server/deploy`
+after updating deployment files. It preserves existing credentials and creates
+a comment-only `<state>/secrets/task-providers/application.properties`. Edit it,
+retain the enclosing `secrets` directory's private permissions, and acquire the
+updated mount:
+
+```sh
+docker compose up -d --force-recreate --wait api-1 api-2
+```
+
+Only the task-provider directory is mounted into the API replicas. Logical
+`backup.sh`/`restore.sh` retains it; older backups restore without app
+registrations. The host `secrets` parent remains private; mounted files are
+readable by the container's application user.
+
+For a **standalone Java server**, load the properties file through
+`QUARKUS_CONFIG_LOCATIONS=file:/absolute/path/to/task-providers.properties`, or
+set `DAGSVERK_GOOGLE_TASKS_CLIENT_ID`, `DAGSVERK_GOOGLE_TASKS_CLIENT_SECRET`,
+`DAGSVERK_MICROSOFT_TASKS_CLIENT_ID` and
+`DAGSVERK_MICROSOFT_TASKS_CLIENT_SECRET` in its protected service environment.
+Restart after changes. Set `DAGSVERK_PUBLIC_ORIGIN` to the external HTTPS
+origin unless central service settings already provide it.

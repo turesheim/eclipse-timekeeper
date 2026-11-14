@@ -586,3 +586,31 @@ code, pre { font-size: var(--font-code); }
   .internet-selection-row { grid-template-columns: minmax(0, 1fr); }
   .internet-selection-mapping { padding-inline-start: 1.75rem; }
 }
+
+.internet-accounts-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+.internet-account-list { display: grid; gap: .75rem; }
+.internet-account-item { padding: 1rem; margin: 0; border: 1px solid var(--line); }
+.internet-account-item .internet-connection-header { align-items: center; margin-bottom: 0; }
+.internet-account-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; flex: 1 1 12rem; }
+.internet-account-identity > div { min-width: 0; }
+.internet-account-identity > .icon { color: var(--accent); font-size: 1.75rem; width: 2rem; }
+.internet-account-details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); min-width: 0; }
+.internet-account-item > .alert { margin-block: 1rem 0; }
+.internet-account-item > .form-feedback:not(:empty) { margin-block: 1rem 0; }
+.internet-service-list { padding: 0; margin: 0 0 1rem; overflow: hidden; }
+.internet-service-list .form-check { display: flex; flex-direction: row-reverse; justify-content: space-between; padding: .75rem 1rem; margin: 0; }
+.internet-service-list .form-check + .form-check { border-top: 1px solid var(--line); }
+.internet-service-list .form-check-input { float: none; margin: 0; flex-shrink: 0; }
+.internet-service-list .form-check-label { font-weight: 600; }
+.internet-service-changes { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+.internet-service-changes > p { flex: 1 1 12rem; }
+.internet-provider-choices { border: 1px solid var(--line); border-radius: var(--bs-border-radius); overflow: hidden; }
+.internet-provider-choice { display: flex; align-items: center; width: 100%; gap: .75rem; padding: .85rem 1rem; border: 0; border-radius: 0; color: var(--bs-body-color); text-align: start; }
+.internet-provider-choice + .internet-provider-choice { border-top: 1px solid var(--line); }
+.internet-provider-choice:hover, .internet-provider-choice:focus-visible { color: var(--bs-body-color); background: var(--bs-tertiary-bg); }
+.internet-provider-choice > span:not(.icon) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.internet-provider-choice > .icon:first-child { color: var(--accent); font-size: 1.5rem; width: 1.75rem; }
+.internet-provider-choice > .icon:last-child { margin-inline-start: auto; color: var(--muted); }
+.internet-provider-status { margin-top: 1rem; }
+.internet-provider-status > summary { cursor: pointer; font-size: .875rem; }
+.internet-provider-status[open] > summary { margin-bottom: .75rem; }

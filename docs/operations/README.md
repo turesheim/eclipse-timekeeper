@@ -7,7 +7,7 @@ Choose the deployment guide first, then the account or feature guide you need.
 | Install and run | [Synology Package Center](SYNOLOGY-PACKAGE.md), [local Docker](LOCAL-DOCKER.md), [standalone Java server](SERVER.md), [Compose deployment](DEPLOYMENT.md) |
 | Connect clients | [Browser client](WEB-CLIENT.md), [Eclipse client](ECLIPSE-CLIENT.md), [Tailscale HTTPS](TAILSCALE.md) |
 | Accounts and configuration | [Accounts, passkeys and API tokens](ACCOUNTS.md), [configuration names and upgrades](CONFIGURATION.md) |
-| Google and Microsoft | [OAuth app registration](SHARED-SIGN-IN.md), [Internet accounts and tasks](TASK-PROVIDERS.md), [hosting an OAuth service](CONNECT-SERVICE.md) |
+| Google and Microsoft | [Administrator app registration and OAuth modes](SHARED-SIGN-IN.md), [connect your account or calendar feed](TASK-PROVIDERS.md), [advanced task recovery](TASK-PROVIDER-REFERENCE.md), [hosting an OAuth service](CONNECT-SERVICE.md) |
 | Notes and editing | [Markdown editor](MARKDOWN-EDITOR.md), [WebDAV clients](NOTES-WEBDAV.md), [journal storage and encryption](JOURNAL-STORAGE.md) |
 | Import and export | [Personal account archives](ACCOUNT-DATA.md), [Toggl import and Undo](TOGGL-IMPORT.md) |
 | Backup and recovery | [Full-instance backup and restore](INSTANCE-BACKUP.md), [embedded Eclipse database recovery](DATABASE-RECOVERY.md) |

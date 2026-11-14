@@ -88,6 +88,25 @@ security-key or cross-device interoperability. Record those checks separately
 against the relevant HTTPS hostname/port. Installed Eclipse/browser interaction
 uses the [remote-client acceptance](REMOTE-ECLIPSE.md) profile.
 
+## Provider restart acceptance
+
+With Java 21, Python 3.13 and Docker available:
+
+```sh
+python3 server/scripts/task_provider_restart.py --output server/target/verification/task-provider-restart.json
+```
+
+This starts disposable PostgreSQL 17 and two successive server test JVMs. It
+checks page continuation without duplicates, an expired SENDING lease becoming
+UNKNOWN without another provider request, and durable acknowledgements updating
+the baseline without resending. The fixture advances stored expiry deadlines;
+it does not establish immediate recovery after a real crash. Providers are
+synthetic and no deployment or live Google account is contacted.
+
+Use `--postgres-image postgres:18.6-bookworm` for PostgreSQL 18 and
+`--expected-commit` to require an exact clean checkout. CI records results for
+both PostgreSQL versions. The ordinary Maven suite skips this opt-in test.
+
 ## Layout and evidence
 
 For changed surfaces, check keyboard operation, accessible names, mobile widths,

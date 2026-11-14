@@ -57,7 +57,7 @@ and retains each validator. Civil dates remain civil; ambiguous or unknown zones
 must not acquire invented UTC instants. Provider imports and outbound changes
 use their review/receipt flows. See [task synchronization](../architecture/TASK-SYNC-PROTOCOL.md),
 [provider capabilities](../architecture/TASK-SYNC-CAPABILITIES.md) and
-[operator setup](../operations/TASK-PROVIDERS.md).
+[operator setup](../operations/SHARED-SIGN-IN.md).
 
 ## Shared Markdown component
 

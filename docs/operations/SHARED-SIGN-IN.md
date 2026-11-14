@@ -5,14 +5,35 @@ Microsoft To Do under **My Account → Internet accounts**. Users authorize thei
 own accounts, then save calendar and task-list selections separately. Dagsverk
 sign-in remains separate; email is not synchronized.
 
-Administrators choose how the application is registered under
-**Administration → Internet accounts → OAuth application settings**:
+## App registration and a connected account
 
-- **Direct registration**: you create the Google OAuth client and/or Microsoft
-  app registration for your Dagsverk installation. Use this for self-hosting.
-- **Managed OAuth service**: a service operator maintains the registrations for
-  several installations. The app registrations are shared; user accounts and
-  permissions remain individual. This requires an available, configured service.
+These are two separate setup steps:
+
+| What | Who sets it up | Where | Purpose |
+| --- | --- | --- | --- |
+| **OAuth app registration** | Administrator or OAuth-service operator | Google Auth Platform / Microsoft Entra, then **Administration → Internet accounts** | Identifies the Dagsverk application using a client ID, secret and registered redirect URI. |
+| **Internet account** | Each Dagsverk user | **My Account → Internet accounts** | Authorizes access to that user's Google/Microsoft calendars and tasks and selects what to synchronize. |
+
+One app registration can serve many users. Saving its credentials does not
+connect anyone's personal account. Each user still signs in with Google or
+Microsoft and approves their own access.
+
+## Choose the OAuth mode
+
+The mode decides who maintains the app registration:
+
+| | **Direct registration** | **Managed OAuth service** |
+| --- | --- | --- |
+| Registration owner | Your installation's administrator | A service operator serving several Dagsverk installations |
+| Client ID and secret | Saved in your Dagsverk installation | Saved in the operator's OAuth service |
+| Provider redirect URI | Your installation's callback URL | The OAuth service's callback URL |
+| What you need | Your own Google OAuth client and/or Microsoft Entra app | A deployed, configured service supplied by an operator |
+
+**For self-hosting, choose Direct registration** unless an operator has provided
+a working OAuth service. For example, Google credentials entered on your NAS use
+direct registration. Managed mode lets multiple installations use an operator's
+app registration; each user's account, consent and permissions remain individual.
+The user connects their own account in either mode.
 
 Both modes support calendars, tasks or both. Calendars and Microsoft To Do are
 read-only. Google Tasks defaults to import-only; two-way access requires explicit
@@ -26,7 +47,7 @@ write consent and review of outgoing changes.
    displayed redirect URI, for example
    `https://nas.example-tailnet.ts.net:8443/web/task-provider-callback.html`.
 3. Complete the Google and/or Microsoft setup below with that URI. Enter each
-   client ID and client secret in Dagsverk, save with your administrator password,
+   client ID and client secret in Dagsverk and save with your administrator password
    to apply them immediately on every instance. A blank secret field keeps the saved secret.
 4. Select **Refresh setup status**, then [test the connection](#verify-the-connection).
 
@@ -137,8 +158,8 @@ Google, enable Calendar API and Tasks API for the services selected; use the sco
 listed above. For Microsoft, check the delegated permissions and tenant policy.
 
 In **My Account → Internet accounts**, connect a test Google or Microsoft account.
-Test calendars, tasks and combined access as applicable; save selections, review
-the first task import, and verify refresh, disconnect and reconnect. Test personal
+Test calendars, tasks and combined access as applicable; save selections, verify automatic
+synchronization of existing and newly added tasks, then test refresh, disconnect and reconnect. Test personal
 Microsoft and Microsoft 365 accounts if both will be used. Switching modes requires
 explicit reauthorization; existing connections keep their original refresh path.
 
@@ -154,7 +175,7 @@ See [Google's redirect rules](https://developers.google.com/identity/protocols/o
 and [Microsoft's redirect rules](https://learn.microsoft.com/en-us/entra/identity-platform/reply-url).
 
 For first-boot environment settings and retained registration files, see
-[task-provider configuration](TASK-PROVIDERS.md#retain-operator-settings) and
+[retained OAuth settings](CONFIGURATION.md#retain-operator-settings) and
 [configuration upgrades](CONFIGURATION.md). Settings saved in Administration
 take precedence over environment defaults and are retained by protected instance
 backups, but excluded from portable account archives. Authentication recovery
