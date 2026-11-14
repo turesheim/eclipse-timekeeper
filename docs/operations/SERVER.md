@@ -39,11 +39,13 @@ source commit and distribution checksum.
 | Setting | Purpose |
 | --- | --- |
 | `DAGSVERK_SERVER_DB_URL` | Explicit persistent JDBC URL |
-| `QUARKUS_PROFILE=postgresql` | Select PostgreSQL instead of the default H2 backend |
 | `DAGSVERK_SERVER_DB_USER`, `DAGSVERK_SERVER_DB_PASSWORD` | Database credentials; H2 user defaults to `sa` |
 | `QUARKUS_HTTP_HOST`, `QUARKUS_HTTP_PORT` | Listener; defaults to `127.0.0.1:8080` |
 | `DAGSVERK_PUBLIC_ORIGIN` | Exact external HTTPS origin when using a reverse proxy |
 | `DAGSVERK_DEPLOYED_AT` | Actual UTC deployment time, retained across restarts |
+
+The standard standalone ZIP uses H2. The [Compose deployment](DEPLOYMENT.md)
+supplies the PostgreSQL build.
 
 Use HTTPS outside loopback. **About** and `GET /api/v1/server` distinguish build,
 deployment and process-start time; an unset deployment time is shown as
