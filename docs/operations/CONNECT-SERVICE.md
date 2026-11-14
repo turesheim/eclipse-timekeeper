@@ -62,7 +62,7 @@ Publish only a project-controlled hostname. No placeholder discovery file is
 included. Installations can override discovery with `DAGSVERK_CONNECT_SERVICE_URL`
 and restart; users do not configure it.
 
-On a test installation, use **Administration → Internet accounts → Check setup**.
+On a test installation, use **Administration → Internet accounts → Refresh setup status**.
 This resolves discovery and reads `/v1/providers` for database health and provider
 configuration. Then [verify live connections](SHARED-SIGN-IN.md#verify-the-connection)
 with existing non-production Google, personal Microsoft and Microsoft 365 accounts.

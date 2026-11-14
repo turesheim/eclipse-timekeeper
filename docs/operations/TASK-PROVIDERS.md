@@ -153,7 +153,7 @@ administrator save client IDs and replace or clear write-only secrets. Blank
 secret fields keep the saved values. Saving requires your administrator password
 and the current settings version; restart every instance to activate changes.
 
-**Check setup** validates active local settings or contacts the managed service.
+**Refresh setup status** validates active local settings or contacts the managed service.
 It does not start provider consent or read personal calendars/tasks. Verify a
 real connection after setup; configured credentials alone do not prove API access.
 

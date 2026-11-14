@@ -28,7 +28,7 @@ write consent and review of outgoing changes.
 3. Complete the Google and/or Microsoft setup below with that URI. Enter each
    client ID and client secret in Dagsverk, save with your administrator password,
    to apply them immediately on every instance. A blank secret field keeps the saved secret.
-4. Select **Check setup**, then [test the connection](#verify-the-connection).
+4. Select **Refresh setup status**, then [test the connection](#verify-the-connection).
 
 ### Google
 
@@ -103,7 +103,7 @@ deploy it and configure its Google and Microsoft registrations. Use direct
 registration until a working service is available. This repository does not
 deploy the service automatically.
 
-Set the installation's HTTPS address as above. Select **Check setup** to find the
+Set the installation's HTTPS address as above. Select **Refresh setup status** to find the
 service and its provider redirect URIs. The operator follows the same
 [Google](#google) and [Microsoft](#microsoft) steps with these service URIs:
 
@@ -119,7 +119,7 @@ See [OAuth service operations](CONNECT-SERVICE.md) for hosting, discovery and ba
 
 ## Verify the connection
 
-**Check setup** checks active local settings or service availability and configured
+**Refresh setup status** checks active local settings or service availability and configured
 registrations. OAuth settings apply immediately on every instance; changing the
 public HTTPS address still requires a coordinated restart.
 
