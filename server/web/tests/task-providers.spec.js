@@ -212,7 +212,7 @@ test('read-only sessions can inspect but cannot approve imports',async({page,req
 
 test('task connections and failure states are localized in Norwegian',async({page,request})=>{
   const owner=await signIn(page,request,{language:'nb-NO'}),row=connection(owner,{lastError:'TASK_PROVIDER_CONFLICTS',pendingCount:2});await providerFixture(page,owner,{rows:[row]});await open(page);
-  await expect(page.getByRole('heading',{name:'Internettkontoer',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Koble til Google',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes. Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Google',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Koble til Google',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes. Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
 });
 
 test('Google access defaults to import-only and write consent is an explicit choice',async({page,request})=>{
