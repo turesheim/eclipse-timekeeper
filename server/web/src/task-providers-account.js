@@ -22,9 +22,9 @@ export async function renderTaskProviders(view){
   const back=button(t('internet_accounts.back'),()=>choose(null)),cancel=button(t('ui.cancel'),()=>chooser.close()),chooserActions=node('div',undefined,'dialog-actions');chooserActions.append(back,cancel);back.hidden=true;
   const add=button(t('internet_accounts.add'),()=>{if(!view.valid()||view.busy||document.querySelector('dialog[open]'))return;choose(null);chooser.showModal();choices.querySelector('button')?.focus();},'btn btn-primary');add.prepend(icon('add'),' ');add.disabled=true;
   toolbar.append(node('h2',t('task_providers.title'),'h4 mb-0'),add);view.root.append(toolbar,empty,accounts,chooser);chooser.append(chooserTitle,choices,chooserActions);
-  let authorizationController=null;
+  let authorizationController=null,restoreChooserFocus=false;
   function choose(provider){choices.hidden=!!provider;back.hidden=!provider;for(const [id,panel]of providerPanels)panel.hidden=id!==provider;if(provider)providerPanels.get(provider).querySelector('h3')?.focus();else if(chooser.open)choices.querySelector('button')?.focus();}
-  chooser.addEventListener('close',()=>{authorizationController?.abort();for(const status of providerFeedback.values())status.textContent='';if(view.valid())add.focus();});
+  chooser.addEventListener('close',()=>{authorizationController?.abort();for(const status of providerFeedback.values())status.textContent='';if(view.valid()){restoreChooserFocus=view.busy;if(!restoreChooserFocus)add.focus();}});
   const accessLabel=node('label',t('task_providers.google_access'),'form-label'),access=node('select',undefined,'form-select');
   for(const direction of ['IMPORT','TWO_WAY'])access.append(new Option(t('task_providers.access_'+direction),direction));accessLabel.append(access);
   let generation=0,timer=null,controller=null,zone='UTC',configured={},projects=[],clients=[],calendarSynchronization=true;
@@ -50,7 +50,7 @@ export async function renderTaskProviders(view){
       if(card.access)card.access.disabled=!view.canWrite||view.busy||view.uncertain||!card.services.choices.tasks.checked;card.calendars.controls();card.writes.controls();card.incoming.controls();card.identities.controls();
     }
   };
-  const run=(work,submit,target=feedback,authorization=false)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true,authorization}).finally(()=>{if(view.valid()){controls();if(!chooser.open&&(document.activeElement===document.body||chooser.contains(document.activeElement)))add.focus();}});
+  const run=(work,submit,target=feedback,authorization=false)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true,authorization}).finally(()=>{if(view.valid()){controls();if(!chooser.open&&(restoreChooserFocus||document.activeElement===document.body||chooser.contains(document.activeElement))){restoreChooserFocus=false;add.focus();}}});
   const connect=(provider,direction=access.value,services=providerServices.get(provider).read(),targetFeedback=providerFeedback.get(provider))=>{
     const pick=connectButtons.get(provider);
     run(async()=>{
