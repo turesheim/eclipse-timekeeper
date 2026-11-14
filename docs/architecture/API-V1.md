@@ -265,12 +265,12 @@ excluded from these responses and account archives. The callback is
 `/web/task-provider-callback.html` at the public origin; see
 [operator setup](../operations/TASK-PROVIDERS.md).
 
-Shared sign-in is the default: authorize accepts the selected `services`
+The managed OAuth service is the default: authorize accepts the selected `services`
 (`tasks`, `calendars`) and `language` (`en`, `nb`), and returns a validated
 `authorizationOrigin` with its authorization URL. The NAS retains owner/browser
-state and PKCE; the shared service holds provider registrations and refresh
-tokens. A one-use handoff returns only to the initiating installation. Legacy
-direct task registration remains an explicit operator opt-out.
+state and PKCE; the managed service holds provider registrations and refresh
+tokens. A one-use handoff returns only to the initiating installation. Direct
+registration is an explicit operator choice and supports both tasks and calendars.
 
 `PUT /task-providers/{id}/calendars` saves selected calendar IDs and optional
 owned-client mappings with `If-Match`. Its `calendarConfigurationVersion` is

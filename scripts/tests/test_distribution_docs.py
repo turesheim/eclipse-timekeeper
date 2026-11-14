@@ -51,7 +51,7 @@ class DistributionDocumentationTest(unittest.TestCase):
             package(output, COMMIT)
             with tarfile.open(output) as archive:
                 names = set(archive.getnames())
-                self.assertTrue({'migration/notes-v10.sql','migration/schema-v10-postgresql.shape','NOTES-WEBDAV.md','TASK-PROVIDERS.md','SHARED-SIGN-IN.md','CONFIGURATION.md','environment.sh','webdav_sync.py'}.issubset(names))
+                self.assertTrue({'migration/notes-v10.sql','migration/schema-v10-postgresql.shape','NOTES-WEBDAV.md','TASK-PROVIDERS.md','SHARED-SIGN-IN.md','CONNECT-SERVICE.md','CONFIGURATION.md','environment.sh','webdav_sync.py'}.issubset(names))
                 self.assertNotIn('.env', names)
                 self.assertFalse(any(name.startswith(('state/', 'secrets/')) for name in names))
                 local = archive.extractfile('LOCAL.md').read().decode()
@@ -60,7 +60,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('[deployment guide](README.md)', local)
                 self.assertIn('[shared Tailscale access guide](TAILSCALE.md)', local)
                 self.assertIn('[shared Tailscale guide](TAILSCALE.md)', archive.extractfile('README.md').read().decode())
-                for name in ('README.md', 'LOCAL.md', 'SERVER.md', 'API-POLICY.md', 'TAILSCALE.md', 'TASK-PROVIDERS.md'):
+                for name in ('README.md', 'LOCAL.md', 'SERVER.md', 'API-POLICY.md', 'TAILSCALE.md', 'TASK-PROVIDERS.md', 'SHARED-SIGN-IN.md', 'CONNECT-SERVICE.md'):
                     text = archive.extractfile(name).read().decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)', text):
                         parts = urlsplit(url)
@@ -128,7 +128,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                 for name in ('images/toggl-import-review.png','images/toggl-import-history-narrow.png'):
                     self.assertIn(']('+name+')',web)
                     self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
-                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md','TOGGL-IMPORT.md','ACCOUNT-DATA.md'):
+                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md','TOGGL-IMPORT.md','ACCOUNT-DATA.md','SHARED-SIGN-IN.md','CONNECT-SERVICE.md'):
                     text=archive.read('timekeeper-server/'+name).decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)',text):
                         parts=urlsplit(url)

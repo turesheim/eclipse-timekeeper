@@ -140,7 +140,7 @@ test('administration never repeats a service-setting write after a lost reply',a
 });
 
 
-test('Internet accounts administration checks registrations, explains Google setup and fits all themes',async({page,request})=>{
+test('Internet accounts administration checks registrations, links provider setup and fits all themes',async({page,request})=>{
   test.setTimeout(120000);const admin=await settingsAdministrator(page,request),client=browserRequest(page);
   const actual=await client.get('/api/v1/admin/internet-accounts');expect(actual.status()).toBe(200);expect(actual.headers()['cache-control']).toBe('no-store');
   const local=await actual.json();expect(Object.keys(local).sort()).toEqual(['mode','status','publicOrigin','callbackUrl','serviceUrl','discoveryUrl','googleRedirectUrl','googleConfigured','microsoftConfigured','version','effectiveVersion','restartRequired','canEdit','saved','effective'].sort());
@@ -154,7 +154,13 @@ test('Internet accounts administration checks registrations, explains Google set
     await page.getByRole('link',{name:'Internet accounts',exact:true}).click();await expect(page.getByRole('heading',{name:'OAuth setup guidance',exact:true})).toBeVisible();expect(checks).toBe(0);
     const check=page.getByRole('button',{name:'Check setup',exact:true});await check.focus();await check.press('Enter');await expect(page.locator('#account-content')).toContainText('Setup checks passed.');expect(checks).toBe(1);
     await expect(page.locator('#account-content tr').filter({hasText:'Google registration'})).toContainText('Configured');await expect(page.locator('#account-content tr').filter({hasText:'Microsoft registration'})).toContainText('Not configured');
-    await expect(page.locator('#account-content')).toContainText('https://connect.example.test/oauth/google/callback');await expect(page.locator('#account-content')).toContainText('They do not provide SSO');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');
+    await expect(page.locator('#account-content')).toContainText('https://connect.example.test/oauth/google/callback');await expect(page.locator('#account-content')).toContainText('Dagsverk sign-in is separate');await expect(page.getByLabel('New Google client secret',{exact:true})).toHaveValue('');
+    for(const [name,url]of [
+      ['Google Auth Platform → Clients','https://console.cloud.google.com/auth/clients'],
+      ['Google Calendar API','https://console.cloud.google.com/apis/library/calendar-json.googleapis.com'],
+      ['Google Tasks API','https://console.cloud.google.com/apis/library/tasks.googleapis.com'],
+      ['Microsoft Entra → App registrations','https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade']
+    ])await expect(page.getByRole('link',{name,exact:true})).toHaveAttribute('href',url);
     for(const width of [1440,390]){
       await page.setViewportSize({width,height:900});for(const theme of ['timekeeper','timekeeper-dark']){
         await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);

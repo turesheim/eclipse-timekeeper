@@ -178,8 +178,8 @@ previous domain model requires a matching pre-upgrade backup.
 ## Internet accounts
 
 Sign in to Google or Microsoft under **Account → Internet accounts** for separate
-calendar and task synchronization through shared sign-in. No per-server provider
-registration is required. Ordinary calendar subscriptions remain available
+calendar and task synchronization. Administrators can use a configured managed
+OAuth service or register their own Google and Microsoft applications. Ordinary calendar subscriptions remain available
 without provider login. See
 [task-provider setup and recovery](TASK-PROVIDERS.md) for configuration,
 supported import behavior and verification limits.

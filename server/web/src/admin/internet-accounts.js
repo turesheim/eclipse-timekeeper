@@ -62,5 +62,12 @@ export async function renderInternetAccounts(view){
     guide.append(node('h3',t(mode==='managed'?'internet_admin.shared':'internet_admin.direct'),'h5'),node('p',t('internet_admin.'+(mode==='managed'?'managed_help':'self_managed_help')),'hint'));
     guide.append(link(t('internet_admin.guide'),`https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/SHARED-SIGN-IN.md#${mode}`));
   }
+  guide.append(node('h3',t('internet_accounts.google'),'h5'),node('p',t('internet_admin.step_google_project'),'hint'));
+  const googleLinks=node('p');
+  googleLinks.append(link(t('internet_admin.google_console'),'https://console.cloud.google.com/auth/clients'),' · ',
+    link('Google Calendar API','https://console.cloud.google.com/apis/library/calendar-json.googleapis.com'),' · ',
+    link('Google Tasks API','https://console.cloud.google.com/apis/library/tasks.googleapis.com'));
+  guide.append(googleLinks,node('h3',t('internet_accounts.microsoft'),'h5'),
+    link(t('internet_admin.microsoft_console'),'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade'));
   guide.append(node('p',t('internet_admin.microsoft_accounts'),'hint'),node('p',t('internet_admin.live_check'),'hint'));
 }
