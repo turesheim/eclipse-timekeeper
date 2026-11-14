@@ -17,16 +17,21 @@ class SharedConnectConfiguration {
     @ConfigProperty(name="timekeeper.connect.shared",defaultValue="true") boolean enabled;
     @ConfigProperty(name="timekeeper.connect.service-url") Optional<String> configured;
     @Inject BrowserOrigins origins;
+    @Inject TaskProviderConfiguration providers;
     private URI cached;
     private Instant expires=Instant.EPOCH;
     private Instant failedUntil=Instant.EPOCH;
-    boolean enabled(){return enabled;}
-    Optional<URI> configuredEndpoint(){return configured.map(SharedConnectConfiguration::validate);}
-    synchronized void configure(boolean shared,String address){enabled=shared;configured=Optional.ofNullable(address);cached=null;expires=Instant.EPOCH;failedUntil=Instant.EPOCH;}
+    private String route;
+    boolean enabled(){var state=providers==null?null:providers.current();return state==null?enabled:state.shared();}
+    private Optional<String> address(){var state=providers==null?null:providers.current();return state==null?configured:Optional.ofNullable(state.serviceUrl());}
+    String configurationKey(){return enabled()+"\n"+address();}
+    Optional<URI> configuredEndpoint(){return address().map(SharedConnectConfiguration::validate);}
     String callback(){return origins.currentOrigin()+"/web/task-provider-callback.html";}
     synchronized void recheck(){failedUntil=Instant.EPOCH;expires=Instant.EPOCH;}
     synchronized URI endpoint(){
-        if(configured.isPresent())return validate(configured.get());
+        var address=address();String current=address.orElse("");
+        if(!current.equals(route)){cached=null;expires=Instant.EPOCH;failedUntil=Instant.EPOCH;route=current;}
+        if(address.isPresent())return validate(address.get());
         if(cached!=null&&expires.isAfter(Instant.now()))return cached;
         if(failedUntil.isAfter(Instant.now()))throw new ApiFailure(503,"TASK_PROVIDER_UNAVAILABLE");
         try{

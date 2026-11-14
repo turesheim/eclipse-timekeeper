@@ -1,5 +1,6 @@
 import {Api} from './api.js';
 import {t,setLocale} from './i18n.js';
+import {node,table} from './account-ui.js';
 
 // Remove the authorization code before making requests or allowing navigation.
 const parameters=new URLSearchParams(location.search);history.replaceState(null,'',location.pathname);
@@ -13,7 +14,19 @@ try{
   const anonymous=new Api();let restored;
   try{restored=await anonymous.request('/auth/session');}finally{anonymous.close();}
   session=new Api(null,undefined,restored.data);const profile=await session.request('/me');setLocale(profile.data.locale);translate();
-  if(cancelled){await session.request('/task-providers/cancel',{method:'POST',body:{state}});result.textContent=t(parameters.get('error')==='access_denied'?'task_providers.cancelled':'task_providers.sign_in_failed');}
-  else{await session.request('/task-providers/complete',{method:'POST',body:{state,code},timeout:240000});result.textContent=t('task_providers.connected');location.replace('/web/#account/task-providers');}
+  if(cancelled){const reply=await session.request('/task-providers/cancel',{method:'POST',body:{state}});if(reply.data?.verification)verificationReturn();result.textContent=t(parameters.get('error')==='access_denied'?'task_providers.cancelled':'task_providers.sign_in_failed');}
+  else{
+    const reply=await session.request('/task-providers/complete',{method:'POST',body:{state,code},timeout:240000});
+    if(reply.data.verification){
+      verificationReturn();result.textContent=t(reply.data.status==='PASSED'?'internet_admin.verify_passed':'internet_admin.verify_failed');
+      const rows=Object.entries(reply.data.checks).map(([name,check])=>{
+        const detail=node('div');detail.append(node('span',t('internet_admin.verify_'+(['PASSED','FAILED'].includes(check.status)?'status_':'')+check.status.toLowerCase())));
+        if(check.status==='FAILED')detail.append(node('p',t('internet_admin.verify_fix_'+name),'hint'));
+        return [t('internet_admin.verify_check_'+name),detail];
+      });
+      back.before(table([t('internet_admin.verify_check'),t('internet_admin.verify_result')],rows));
+    }else{result.textContent=t('task_providers.connected');location.replace('/web/#account/task-providers');}
+  }
 }catch{result.textContent=t('task_providers.not_confirmed');result.setAttribute('role','alert');}
 finally{parameters.delete('code');parameters.delete('state');session?.close();}
+function verificationReturn(){title.textContent=t('internet_admin.verify_title');document.title=t('internet_admin.verify_title')+' · Dagsverk';back.href='/admin/#internet-accounts';back.textContent=t('internet_admin.verify_return');}

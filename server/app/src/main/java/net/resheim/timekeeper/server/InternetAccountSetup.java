@@ -20,7 +20,7 @@ class InternetAccountSetup {
 
     /** Public account status contains no infrastructure addresses or registration details. */
     synchronized ObjectNode readiness(boolean check){
-        String current=JsonValues.hash(origins.currentOrigin()+"\n"+shared.enabled()+"\n"+shared.configured+"\n"+providers.googleId+"\n"+providers.googleSecret+"\n"+providers.microsoftId+"\n"+providers.microsoftSecret);
+        String current=JsonValues.hash(origins.currentOrigin()+"\n"+shared.configurationKey()+"\n"+providers.fingerprint());
         if(!check&&cached!=null&&current.equals(configuration)&&expires.isAfter(java.time.Instant.now()))return cached.deepCopy();
         if(check)shared.recheck();
         var setup=inspect(true);var result=object();

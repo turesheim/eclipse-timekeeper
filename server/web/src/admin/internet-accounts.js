@@ -1,5 +1,6 @@
-import {t} from '/web/i18n.js';
+import {t,getLocale} from '/web/i18n.js';
 import {node,section,table,button,link,form,field,passwordField} from '/web/account-ui.js';
+import {authorizationTarget} from '/web/task-provider-authorization.js';
 
 export async function renderInternetAccounts(view){
   let loaded=await view.session.request('/admin/internet-accounts');if(!view.valid())return;
@@ -27,6 +28,7 @@ export async function renderInternetAccounts(view){
   paint();
   if(loaded.data.canEdit){
     const registrations=new Map();
+    let savedDraft;
     const editor=form(view,t('internet_admin.edit'),t('ui.save_settings'),async({value,feedback})=>{
       const body={mode:mode.value,serviceUrl:service.value.trim()||null,currentPassword:proof.value};
       for(const [provider,fields]of registrations){
@@ -37,7 +39,7 @@ export async function renderInternetAccounts(view){
       const reply=await view.session.request('/admin/internet-accounts',{method:'PUT',etag:formEtag,body});if(!view.valid())return;
       loaded=reply;formEtag=reply.etag;proof.value='';
       for(const [provider,fields]of registrations){fields.secret.value='';fields.clear.checked=false;fields.status.textContent=t(loaded.data.saved[provider+'ClientSecretConfigured']?'internet_admin.secret_saved':'internet_admin.secret_missing');}
-      view.clean(value);paint();feedback.textContent=t(loaded.data.restartRequired?'internet_admin.restart_required':'internet_admin.active');
+      view.clean(value);savedDraft=draft();paint();feedback.textContent=t(loaded.data.restartRequired?'internet_admin.restart_required':'internet_admin.active');
     });
     editor.value.append(node('p',t('internet_admin.edit_help'),'hint'));
     const saved=loaded.data.saved,mode=field(editor.value,t('internet_admin.mode'),saved.mode,{choices:[['SHARED',t('internet_admin.shared')],['DIRECT',t('internet_admin.direct')]]});
@@ -56,6 +58,23 @@ export async function renderInternetAccounts(view){
     const updateMode=()=>{const shared=mode.value==='SHARED';help.textContent=t(shared?'internet_admin.managed_help':'internet_admin.self_managed_help');managed.hidden=!shared;direct.hidden=shared;};mode.addEventListener('change',updateMode);updateMode();
     const proof=passwordField(editor.value,t('ui.current_administrator_password'),true);proof.autocomplete='section-internet-accounts current-password';
     view.cleanup.add(()=>{proof.value='';});editor.finish();
+    function draft(){return JSON.stringify([mode.value,service.value,...[...registrations.values()].flatMap(fields=>[fields.id.value,fields.secret.value,fields.clear.checked])]);}
+    savedDraft=draft();
+    const verification=section(view,t('internet_admin.verify_title'));
+    verification.append(node('p',t('internet_admin.verify_help'),'hint'));
+    const calendars=field(verification,t('internet_admin.verify_calendars'),true,{type:'checkbox'}),tasks=field(verification,t('internet_admin.verify_tasks'),true,{type:'checkbox'}),writes=field(verification,t('internet_admin.verify_writes'),false,{type:'checkbox'});
+    const updateWrites=()=>{writes.disabled=!tasks.checked;if(!tasks.checked)writes.checked=false;};tasks.addEventListener('change',updateWrites);
+    const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');verification.append(feedback);
+    for(const provider of ['google','microsoft']){
+      const verify=button(t('internet_admin.verify_provider',{provider:t('internet_accounts.'+provider)}),()=>void view.run(async()=>{
+        if(draft()!==savedDraft)throw new Error(t('internet_admin.verify_save_first'));
+        if(!calendars.checked&&!tasks.checked)throw new Error(t('internet_admin.verify_choose_service'));
+        const reply=await view.session.request('/task-providers/'+provider+'/authorize',{method:'POST',timeout:60000,body:{verification:true,services:{calendars:calendars.checked,tasks:tasks.checked},language:getLocale().startsWith('nb')?'nb':'en',...(provider==='google'?{direction:writes.checked?'TWO_WAY':'IMPORT'}:{})}});
+        if(!view.valid())return;
+        if(draft()!==savedDraft)throw new Error(t('internet_admin.verify_save_first'));
+        const target=authorizationTarget(provider,reply.data.authorizationUrl,reply.data.authorizationOrigin);proof.value='';view.clean(editor.value);location.assign(target);
+      },{submit:verify,feedback,write:true,authorization:true}));verification.append(verify,' ');
+    }
   }else status.append(node('p',t('ui.sign_in_with_your_account_password_or_a_passkey_to_change_service_settings_an_api_tok'),'alert alert-info'));
   const guide=section(view,t('internet_admin.google_setup'));
   for(const mode of ['managed','direct']){

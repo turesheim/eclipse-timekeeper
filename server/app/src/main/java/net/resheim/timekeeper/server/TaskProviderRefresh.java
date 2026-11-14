@@ -25,6 +25,7 @@ class TaskProviderRefresh {
     @Inject InstanceRestoreFence restoreFence;
     @Inject TaskProviderConfiguration configuration;
     @Inject TaskProviderClients clients;
+    @Inject ServiceSettings settings;
     @ConfigProperty(name="timekeeper.tasks.automatic",defaultValue="true") boolean automatic;
     private final Semaphore capacity=new Semaphore(4);
     private final ExecutorService workers=Executors.newVirtualThreadPerTaskExecutor();
@@ -55,6 +56,7 @@ class TaskProviderRefresh {
     void execute(TaskProviderConnections.Claim claim){
         ObjectNode outcome=null;String error=null;int retry=0;
         try{
+            if(settings!=null&&!settings.available())return;
             if(!store.transaction(claim.owner(),()->connections().active(claim)!=null))return;
             var tokens=claim.tokens();
             if(claim.broker()!=null){
@@ -128,6 +130,7 @@ class TaskProviderRefresh {
     }
     void sweep(){
         if(closed||capacity.availablePermits()==0)return;
+        if(settings!=null&&!settings.available())return;
         revokeSharedGrants();
         try{
             var due=new ArrayList<Due>();Instant now=clock.now();

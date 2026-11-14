@@ -12,7 +12,7 @@ import net.resheim.eclipse.timekeeper.domain.*;
 /** Private, owner-scoped provider grants. Neither resource kind is part of portable account data. */
 final class TaskProviderConnections {
     static final String AUTH="TASK_AUTH",FLOW="TASK_OAUTH";
-    record Grant(String owner,TaskCloudProvider.Provider provider,String verifier,String settingsHash,boolean writable,String broker,JsonNode services) {
+    record Grant(String owner,TaskCloudProvider.Provider provider,String verifier,String settingsHash,boolean writable,String broker,JsonNode services,boolean verification) {
         @Override public String toString(){return "Consumed task-provider authorization grant";}
     }
     record Claim(String owner,UUID id,String lease,TaskCloudProvider.Provider provider,String account,String remoteList,UUID list,boolean discover,boolean catalogOnly,
@@ -23,12 +23,16 @@ final class TaskProviderConnections {
     TaskProviderConnections(ServerStore store){this.store=store;}
     record SharedAttempt(String state,String challenge){@Override public String toString(){return "Shared sign-in attempt";}}
     SharedAttempt beginShared(TaskCloudProvider.Provider provider,java.net.URI broker,String browser,JsonNode services){
+        return beginShared(provider,broker,browser,services,false);
+    }
+    SharedAttempt beginShared(TaskCloudProvider.Provider provider,java.net.URI broker,String browser,JsonNode services,boolean verification){
         String binding=binding(browser);Instant now=store.now();
         for(var flow:store.list(FLOW))if(!Instant.parse(flow.path("expires").asText()).isAfter(now))remove(FLOW,flow);
         if(store.list(FLOW).size()>=5)throw new ApiFailure(429,"TASK_PROVIDER_AUTHORIZATION_LIMIT");
         byte[] bytes=new byte[32];var random=new java.security.SecureRandom();random.nextBytes(bytes);String state=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);random.nextBytes(bytes);String verifier=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         var value=object().put("provider",provider.name()).put("stateHash",hash(state)).put("browserHash",binding).put("verifier",verifier)
                 .put("brokerEndpoint",broker.toString()).put("settingsHash",sharedHash(broker.toString())).put("writable",services.path("writableTasks").asBoolean()).put("expires",now.plusSeconds(600).toString());value.set("services",services.deepCopy());
+        if(verification)value.put("verification",true);
         insert(FLOW,flowId(state),value);return new SharedAttempt(state,TaskProviderOAuth.challenge(verifier));
     }
     static String sharedHash(String broker){return hash("shared-sign-in\n"+broker);}
@@ -36,6 +40,9 @@ final class TaskProviderConnections {
     ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser){return begin(provider,settings,browser,false);}
     ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,boolean writable){return begin(provider,settings,browser,object().put("tasks",true).put("calendars",false).put("writableTasks",writable));}
     ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,JsonNode services){
+        return begin(provider,settings,browser,services,false);
+    }
+    ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,JsonNode services,boolean verification){
         boolean writable=services.path("writableTasks").asBoolean();SharedConnectClient.services(services);
         if(writable&&provider!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
         String binding=binding(browser);Instant now=store.now();
@@ -44,7 +51,7 @@ final class TaskProviderConnections {
         var attempt=new TaskProviderOAuth(provider).begin(settings,services);
         var value=object().put("provider",provider.name()).put("stateHash",hash(attempt.state())).put("browserHash",binding)
                 .put("verifier",attempt.verifier()).put("settingsHash",settingsHash(settings)).put("writable",writable).put("expires",now.plusSeconds(600).toString());
-        value.set("services",services.deepCopy());insert(FLOW,flowId(attempt.state()),value);
+        value.set("services",services.deepCopy());if(verification)value.put("verification",true);insert(FLOW,flowId(attempt.state()),value);
         return object().put("authorizationUrl",attempt.address()).put("expiresAt",value.path("expires").asText());
     }
     Grant consume(String state,String browser){
@@ -53,7 +60,7 @@ final class TaskProviderConnections {
         if(!equal(value.path("stateHash").asText(),hash(state))||!equal(value.path("browserHash").asText(),binding(browser)))throw new ApiFailure(403,"TASK_PROVIDER_BROWSER_CHANGED");
         if(!Instant.parse(value.path("expires").asText()).isAfter(store.now()))throw new ApiFailure(409,"TASK_PROVIDER_AUTHORIZATION_EXPIRED");
         remove(FLOW,value);
-        return new Grant(store.owner(),TaskCloudProvider.Provider.valueOf(value.path("provider").asText()),value.path("verifier").asText(),value.path("settingsHash").asText(),value.path("writable").asBoolean(),optionalText(value.get("brokerEndpoint")).orElse(null),value.has("services")?value.get("services").deepCopy():object().put("tasks",true).put("calendars",false).put("writableTasks",value.path("writable").asBoolean()));
+        return new Grant(store.owner(),TaskCloudProvider.Provider.valueOf(value.path("provider").asText()),value.path("verifier").asText(),value.path("settingsHash").asText(),value.path("writable").asBoolean(),optionalText(value.get("brokerEndpoint")).orElse(null),value.has("services")?value.get("services").deepCopy():object().put("tasks",true).put("calendars",false).put("writableTasks",value.path("writable").asBoolean()),value.path("verification").asBoolean());
     }
     ObjectNode connect(Grant grant,TaskProviderOAuth.Settings settings,TaskCloudProvider.Account account,TaskProviderOAuth.Tokens tokens,List<TaskCloudProvider.RemoteList> catalog){
         return connect(grant,settingsHash(settings),account,tokens,catalog);
@@ -62,6 +69,7 @@ final class TaskProviderConnections {
         if(grant.broker()==null)throw ApiFailure.conflict();return connect(grant,sharedHash(grant.broker()),account,tokens,catalog);
     }
     private ObjectNode connect(Grant grant,String expectedHash,TaskCloudProvider.Account account,TaskProviderOAuth.Tokens tokens,List<TaskCloudProvider.RemoteList> catalog){
+        if(grant.verification())throw ApiFailure.conflict();
         if(!grant.owner().equals(store.owner()))throw ApiFailure.notFound();
         if(!equal(grant.settingsHash(),expectedHash))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
         if(grant.writable()&&(grant.provider()!=TaskCloudProvider.Provider.GOOGLE||!new TaskProviderOAuth(grant.provider()).canWrite(tokens.scopes())))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");

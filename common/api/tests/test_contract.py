@@ -22,6 +22,25 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_temporary_oauth_verification_has_bounded_redacted_results(self):
+        validator('TaskProviderAuthorizeInput').validate({'verification': True, 'services': {'tasks': True, 'calendars': False}})
+        self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid({'verification': 'true'}))
+        checks = {name: {'status': 'PASSED', 'code': None} for name in
+                  ['configuration', 'authorization', 'offlineAccess', 'calendars', 'tasks', 'taskWrites']}
+        result = {'verification': True, 'provider': 'google', 'checkedAt': '2026-11-14T12:00:00Z',
+                  'status': 'PASSED', 'checks': checks}
+        validator('InternetAccountVerification').validate(result)
+        for secret in ['accessToken', 'refreshToken', 'grantCredential', 'clientSecret', 'remoteAccountId']:
+            self.assertFalse(validator('InternetAccountVerification').is_valid({**result, secret: 'private'}))
+        for invalid in [{'status': 'FAILED', 'code': 'private provider response'},
+                        {'status': 'FAILED', 'code': None, 'message': 'private provider response'}]:
+            self.assertFalse(validator('InternetAccountVerification').is_valid(
+                {**result, 'checks': {**checks, 'authorization': invalid}}))
+        validator('InternetAccountVerificationCancellation').validate({'verification': True, 'cancelled': True})
+        cancellation = CONTRACT['paths']['/task-providers/cancel']['post']['responses']
+        self.assertIn('200', cancellation)
+        self.assertIn('204', cancellation)
+
     def test_password_change_accepts_exactly_one_scoped_proof_without_owner_injection(self):
         password='a sufficiently long new password'
         proof='p'*43

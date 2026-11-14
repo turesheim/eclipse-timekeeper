@@ -267,8 +267,9 @@ References: [Synology projects](https://kb.synology.com/en-global/DSM/help/Conta
 [PostgreSQL backup](https://www.postgresql.org/docs/18/backup-dump.html).
 
 Service settings are seeded from deployment configuration on first schema-5
-startup, then edited centrally in [Administration](ACCOUNTS.md). Saved changes
-require restarting both API instances. Set `DAGSVERK_SETTINGS_RECOVERY=true`
+startup, then edited centrally in [Administration](ACCOUNTS.md). Authentication
+and SMTP changes require restarting both API instances. OAuth application settings
+apply immediately across instances. Set `DAGSVERK_SETTINGS_RECOVERY=true`
 only for the documented offline recovery with a strictly newer epoch; remove it
 before starting the other instance. Ordinary `.env` changes do not overwrite
 saved service settings.

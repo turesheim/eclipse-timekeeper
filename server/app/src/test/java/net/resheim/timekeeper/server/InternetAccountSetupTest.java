@@ -11,7 +11,7 @@ class InternetAccountSetupTest {
     private InternetAccountSetup setup(String response,AtomicInteger requests){
         var setup=new InternetAccountSetup();setup.origins=new BrowserOrigins();setup.origins.configure("https://dagsverk.example.test:8443");
         setup.shared=new SharedConnectConfiguration();setup.shared.enabled=true;setup.shared.configured=Optional.of("https://connect.example.test");
-        setup.providers=new TaskProviderConfiguration();setup.providers.origins=setup.origins;setup.providers.shared=setup.shared;
+        setup.providers=new TaskProviderConfiguration();setup.providers.origins=setup.origins;
         setup.providers.googleId=Optional.of("private-google-id");setup.providers.googleSecret=Optional.of("private-google-secret");setup.providers.microsoftId=setup.providers.microsoftSecret=Optional.empty();
         setup.clients=new TaskProviderClients(){@Override SharedConnectClient shared(URI endpoint){
             return new SharedConnectClient(endpoint,new TaskProviderHttp(Set.of(endpoint.getHost()),request->{

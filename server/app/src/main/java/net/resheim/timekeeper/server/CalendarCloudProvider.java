@@ -17,6 +17,11 @@ final class CalendarCloudProvider {
     CalendarCloudProvider(TaskCloudProvider.Provider provider){this(provider,new TaskProviderHttp(Set.of("www.googleapis.com","graph.microsoft.com")));}
     CalendarCloudProvider(TaskCloudProvider.Provider provider,TaskProviderHttp http){this.provider=provider;this.http=http;}
     private boolean google(){return provider==TaskCloudProvider.Provider.GOOGLE;}
+    void verifyAccess(String token){
+        String address=google()?"https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1":"https://graph.microsoft.com/v1.0/me/calendars?$top=1";
+        var page=request(address,token);String field=google()?"items":"value";
+        if(page.has("error")||page.has(field)&&!page.path(field).isArray()||!page.has(field)&&(!google()||!page.path("kind").asText().equals("calendar#calendarList")))throw invalid();
+    }
     List<RemoteCalendar> catalog(String token){
         String base=google()?"https://www.googleapis.com/calendar/v3/users/me/calendarList":"https://graph.microsoft.com/v1.0/me/calendars";
         String address=base+(google()?"?maxResults=250&showDeleted=false":"?$top=200");var result=new ArrayList<RemoteCalendar>();var ids=new HashSet<String>();var pages=new HashSet<String>();long bytes=0;

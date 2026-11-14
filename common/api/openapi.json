@@ -19417,6 +19417,31 @@
           },
           "429": {
             "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Temporary configuration verification cancelled.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternetAccountVerificationCancellation"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -19465,7 +19490,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskProviderConnection"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskProviderConnection"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InternetAccountVerification"
+                    }
+                  ]
                 }
               }
             }
@@ -19516,7 +19548,8 @@
               }
             }
           }
-        }
+        },
+        "description": " Temporary administrator verification returns per-check results and discards provider credentials instead of connecting an account. Failed provider checks are reported in the result; authentication and owner/browser binding failures remain HTTP errors."
       }
     },
     "/task-providers/{id}": {
@@ -21717,7 +21750,7 @@
       },
       "put": {
         "operationId": "updateAdministrationInternetAccounts",
-        "summary": "Save installation Google credentials and sign-in settings for coordinated restart",
+        "summary": "Apply installation Google/Microsoft app registrations and OAuth mode immediately",
         "tags": [
           "Accounts"
         ],
@@ -21793,7 +21826,7 @@
           }
         ],
         "x-required-permission": "write",
-        "description": "Requires a browser administrator session, CSRF, If-Match and current administrator password. Google client secret is write-only with explicit preserve, replace and clear actions; shared-service registrations remain managed centrally.",
+        "description": "Requires a browser administrator session, CSRF, If-Match and current administrator password. Google client secret is write-only with explicit preserve, replace and clear actions; shared-service registrations remain managed centrally. OAuth mode, service address and provider credentials apply live on every replica without activating pending authentication or SMTP settings. Existing connections can require reconnection after a registration changes.",
         "requestBody": {
           "required": true,
           "content": {
@@ -37893,6 +37926,11 @@
               "nb"
             ],
             "default": "en"
+          },
+          "verification": {
+            "type": "boolean",
+            "default": false,
+            "description": "Administrator browser sessions can request a temporary configuration verification. No account connection or calendar/task import is created."
           }
         },
         "required": [],
@@ -39701,6 +39739,113 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 8192
+          }
+        }
+      },
+      "InternetAccountVerificationCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "code"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "PASSED",
+              "FAILED",
+              "NOT_CHECKED",
+              "NOT_REQUESTED"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^TASK_PROVIDER_[A-Z_]{1,64}$",
+            "maxLength": 78
+          }
+        }
+      },
+      "InternetAccountVerification": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "verification",
+          "provider",
+          "checkedAt",
+          "status",
+          "checks"
+        ],
+        "properties": {
+          "verification": {
+            "const": true
+          },
+          "provider": {
+            "enum": [
+              "google",
+              "microsoft"
+            ]
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "maxLength": 50
+          },
+          "status": {
+            "enum": [
+              "PASSED",
+              "FAILED"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "configuration",
+              "authorization",
+              "offlineAccess",
+              "calendars",
+              "tasks",
+              "taskWrites"
+            ],
+            "properties": {
+              "configuration": {
+                "$ref": "#/components/schemas/InternetAccountVerificationCheck"
+              },
+              "authorization": {
+                "$ref": "#/components/schemas/InternetAccountVerificationCheck"
+              },
+              "offlineAccess": {
+                "$ref": "#/components/schemas/InternetAccountVerificationCheck"
+              },
+              "calendars": {
+                "$ref": "#/components/schemas/InternetAccountVerificationCheck"
+              },
+              "tasks": {
+                "$ref": "#/components/schemas/InternetAccountVerificationCheck"
+              },
+              "taskWrites": {
+                "$ref": "#/components/schemas/InternetAccountVerificationCheck"
+              }
+            }
+          }
+        }
+      },
+      "InternetAccountVerificationCancellation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "verification",
+          "cancelled"
+        ],
+        "properties": {
+          "verification": {
+            "const": true
+          },
+          "cancelled": {
+            "const": true
           }
         }
       }
