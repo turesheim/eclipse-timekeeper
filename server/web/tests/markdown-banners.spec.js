@@ -39,7 +39,7 @@ test('Obsidian banners stay outside prose and preserve YAML through mode changes
   for(const width of [1440,320])for(const theme of ['timekeeper','timekeeper-dark']){
     await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
     await expectBanner(root);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    expect((await root.locator('.ProseMirror').boundingBox()).height).toBeGreaterThan(150);
+    await expect.poll(async()=>(await root.locator('.ProseMirror').boundingBox()).height).toBeGreaterThan(150);
     expect((await new AxeBuilder({page}).include('#notes-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/obsidian-banner-'+theme+'-'+width+'.png',fullPage:true});
   }
