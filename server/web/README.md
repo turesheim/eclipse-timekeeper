@@ -47,6 +47,12 @@ needs a manual check.
 
 See [web client development and acceptance](../../docs/development/WEB-CLIENT.md).
 
+Mermaid Markdown fences are rendered by pinned Pele 1.13.0. `npm run
+vendor:mermaid` bundles the adapter and complete license under the existing
+`src/assets/mermaid` URL. The renderer loads on demand, has no runtime network
+dependencies, and displays inert SVG images with embedded Dagsverk theme colors.
+`npm run check:assets` verifies the bundle and About's Pele attribution.
+
 PlantUML 1.2026.9 is the pinned official MIT distribution. `npm run
 vendor:plantuml` copies its unchanged engine and complete license and bundles
 the worker's inert SVG/font-metric adapter. The adapter supports SVG construction

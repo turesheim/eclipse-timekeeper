@@ -59,12 +59,12 @@ export const thirdPartyNotices=[
     "licenseUrl": "/web/assets/notices/milkdown-LICENSE.txt"
   },
   {
-    "name": "Mermaid",
-    "homepage": "https://mermaid.js.org/",
+    "name": "Pele",
+    "homepage": "https://pele.run/",
     "license": "MIT",
     "notices": "/web/assets/mermaid/THIRD-PARTY-LICENSES.txt",
-    "version": "12.2.0",
-    "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
+    "version": "1.13.0",
+    "copyright": "Copyright (c) 2026 kepano",
     "licenseUrl": "/web/assets/notices/mermaid-LICENSE.txt"
   },
   {

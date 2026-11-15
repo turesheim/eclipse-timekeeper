@@ -49,9 +49,12 @@ the separate About prototype and its scratchpad controls have been retired.
   authored resource links keep their normal Markdown syntax. Plain paste and
   code remain literal, and URL-over-selection retains the selected label.
   Link marks end at their boundary, so following prose does not extend the label.
-- Mermaid fences use an atomic presentation node and lazy-load the local
-  renderer. Formatted mode shows only an inert SVG image; Markdown source edits
-  its complete fenced text. Script and external-resource requests are rejected.
+- Mermaid fences use an atomic presentation node and lazy-load the locally
+  bundled Pele renderer. Formatted mode shows only an inert SVG image; Markdown
+  source edits its complete fenced text. Theme colors are embedded in the image,
+  and theme/container-width changes redraw it. Links and images are disabled;
+  the 10,000-byte source bound and 300-edge limit remain in place. Pele also
+  bounds SVG output to 2,000,000 characters. External-resource requests are rejected.
   Safe HTML anchors project through the normal link schema; authored HTML is
   never inserted as executable document content.
 
@@ -74,6 +77,7 @@ Install the pinned dependencies, then regenerate editor assets and attribution:
 ```sh
 npm ci --ignore-scripts --prefix server/web
 npm run vendor:editor --prefix server/web
+npm run vendor:mermaid --prefix server/web
 npm run vendor:notices --prefix server/web
 npm test --prefix server/web
 ```
@@ -81,6 +85,11 @@ npm test --prefix server/web
 The build-time entries are `editor/milkdown.js` and `editor/code-highlight.js`.
 Maven packages their generated local ESM/CSS under `src/assets/milkdown`.
 There is no runtime bundler, Node service or external editor CDN.
+`editor/mermaid.js` adapts Pele to the existing Mermaid fence and asset URLs;
+`vendor:mermaid` regenerates its local bundle and complete upstream license.
+Pele uses its own layout and CSS theme variables, so Mermaid theme directives
+do not reproduce Mermaid.js styling. Math labels retain TeX source; no external
+math or icon resolver is installed.
 `vendor-editor.mjs` follows the actual bundle graph and records complete licenses
 and dependency versions. Unknown or missing licenses fail generation. About's
 highlight.js attribution includes its pinned version and complete BSD-3-Clause
