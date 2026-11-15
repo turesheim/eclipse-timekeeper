@@ -108,7 +108,7 @@ class TaskProviderRestartTest {
         store.transaction(saved.path("owner").asText(),()->{
             var task=store.find("TASK",automaticTask).orElseThrow();assertEquals("Automatic after restart",task.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());
             var nativeTask=store.find("TASK",uuid(fixture.get("nativeTask"))).orElseThrow();assertEquals("created-native",nativeTask.path("externalReferences").get(0).path("externalId").asText());assertEquals(fixture.path("list"),nativeTask.path("syncListId"));
-            var deleted=store.find("TASK",uuid(fixture.get("deletedTask"))).orElseThrow();assertTrue(deleted.path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",uuid(deleted.get("id"))).isPresent());assertEquals(7,store.list("TASK").size());assertTrue(store.list(TaskProviderIntents.KIND).isEmpty());return null;
+            var deleted=store.find("TASK",uuid(fixture.get("deletedTask"))).orElseThrow();assertTrue(deleted.path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",uuid(deleted.get("id"))).isPresent());assertEquals(7,store.list("TASK").size());assertTrue(store.list(TaskProviderIntents.KIND).stream().noneMatch(intent->intent.path("connectionId").asText().equals(automaticConnection.toString())),"Completed automatic work has no pending intent; uncertain writes in other connections retain theirs");return null;
         });
         saved.put("verifyPid",ProcessHandle.current().pid()).put("passed",true);Files.writeString(proof,saved.toString(),StandardCharsets.UTF_8);
     }

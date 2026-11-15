@@ -63,6 +63,12 @@ class TaskProviderWritesTest {
         tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(claim);return null;});
         return claim;
     }
+    @Test void legacySubscriptionsRetainPausedEditsAndResumeAutomaticallyWithoutResaving(){
+        var f=fixture();tx(f,()->{var legacy=connections().required(f.connection());legacy.remove("automatic");connections().save(TaskProviderConnections.AUTH,legacy);connections().pause(f.connection(),true,etag(connections().view(f.connection())));assertTrue(new TaskProviderHomes(store).lists().stream().anyMatch(list->list.id().equals(f.list())));return null;});
+        rename(f,"Edited while paused before upgrade");
+        tx(f,()->{assertEquals("Edited while paused before upgrade",store.list(TaskProviderIntents.KIND).getFirst().path("desired").path("summary").asText());connections().pause(f.connection(),false,etag(connections().view(f.connection())));return null;});
+        var claim=claim(f);assertNotNull(claim);tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(claim);writes().queueAutomatic(claim);var job=writes().next(claim);assertNotNull(job);assertTrue(job.path("automatic").asBoolean());assertEquals("Edited while paused before upgrade",job.path("writeFields").path("summary").asText());return null;});
+    }
     @Test void automaticEditsCoalesceWithoutConfirmingAnAbandonedManualDraft(){
         var f=fixture();rename(f,"Abandoned draft");var manual=preview(f,TaskProviderWrites.Action.UPDATE);var claim=automatic(f);
         rename(f,"First edit");rename(f,"Latest edit");

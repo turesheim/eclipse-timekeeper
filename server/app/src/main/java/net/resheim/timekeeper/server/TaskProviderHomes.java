@@ -22,7 +22,7 @@ final class TaskProviderHomes {
         var connection=store.find("TASK_CONNECTION",uuid(list.get("connectionId")));if(connection.isEmpty())return false;
         var auth=store.find(TaskProviderConnections.AUTH,uuid(connection.get().get("id")));if(auth.isEmpty())return false;
         return connection.get().path("enabled").asBoolean()&&TaskProviderConnections.writable(auth.get(),connection.get())
-                &&list.path("present").asBoolean()&&list.path("writable").asBoolean()&&auth.get().path("automatic").asBoolean()
+                &&list.path("present").asBoolean()&&list.path("writable").asBoolean()
                 &&java.util.stream.StreamSupport.stream(auth.get().path("selected").spliterator(),false).anyMatch(id->id.equals(list.path("remoteListId")));
     }
     /** Only the assigned home (or one unambiguous source while moving) may drive a task. */

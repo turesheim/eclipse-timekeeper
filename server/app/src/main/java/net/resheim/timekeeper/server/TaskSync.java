@@ -109,7 +109,7 @@ final class TaskSync {
 
     /** Apply non-conflicting remote fields after an ETag-guarded three-way comparison. */
     ApiReplies apply(JsonNode input,String match) {return reconcile(input,match,null);}
-    ApiReplies mergeIndependent(JsonNode input,String match){return reconcile(input,match,null,true);}
+    ApiReplies mergeIndependent(JsonNode input,String match){return store.providerObservation(()->reconcile(input,match,null,true));}
     /** Connector-owned, explicitly reviewed conflict resolution; ordinary apply retains its strict conflict guard. */
     ApiReplies resolve(JsonNode input,String match,boolean takeRemote){return reconcile(input,match,takeRemote);}
     private ApiReplies reconcile(JsonNode input,String match,Boolean takeRemote){return reconcile(input,match,takeRemote,false);}

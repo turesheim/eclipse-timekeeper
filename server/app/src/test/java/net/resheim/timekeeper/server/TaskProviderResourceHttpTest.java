@@ -56,7 +56,7 @@ class TaskProviderResourceHttpTest {
     private ObjectNode idle(String id)throws InterruptedException{
         long deadline=System.nanoTime()+java.time.Duration.ofSeconds(15).toNanos();
         do{var value=current(id);if(!value.path("syncing").asBoolean())return value;Thread.sleep(25);}while(System.nanoTime()<deadline);
-        fail("Provider refresh did not finish");return null;
+        fail("Provider refresh did not finish: "+current(id));return null;
     }
     @AfterEach void disconnect(){for(String id:created)for(int attempt=0;attempt<3;attempt++){var before=call("GET","/"+id,null,null);if(before.statusCode()==404)break;var reply=call("DELETE","/"+id,null,before.header("ETag"));if(reply.statusCode()==204)break;assertEquals(412,reply.statusCode(),reply.asString());}}
     private Response domain(String owner,String method,String path,ObjectNode body,String match){
@@ -223,7 +223,8 @@ class TaskProviderResourceHttpTest {
         var connection=connectWritable();String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1");
         var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connection.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
         var list=store.transaction(owner,()->store.list("TASK_LIST").stream().filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow());
-        store.transaction(owner,()->{var current=(net.resheim.eclipse.timekeeper.domain.Task)decode("TASK",store.find("TASK",uuid(task.get("id"))).orElseThrow());store.service().updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(current.id(),current.version(),current.projectId(),current.parentTaskId(),"Reviewed title",current.url()));return null;});
+        // Seed an edit predating automatic intent scheduling to exercise the legacy approval endpoint.
+        store.transaction(owner,()->{var legacy=((ObjectNode)task).deepCopy();legacy.put("summary","Reviewed title").put("version",task.path("version").asLong()+1);store.save("TASK",(net.resheim.eclipse.timekeeper.domain.Task)decode("TASK",legacy));return null;});
         var input=object().put("taskId",task.path("id").asText()).put("listId",list.path("id").asText()).put("action","UPDATE");
         assertEquals(403,call("read",BROWSER,"POST","/"+id+"/writes",input,null).statusCode());assertEquals(404,call("b",BROWSER,"POST","/"+id+"/writes",input,null).statusCode());
         var response=call("POST","/"+id+"/writes",input,null);var preview=json(response,201);inputs.validate("TaskProviderWrite",preview);String path="/"+id+"/writes/"+preview.path("id").asText();

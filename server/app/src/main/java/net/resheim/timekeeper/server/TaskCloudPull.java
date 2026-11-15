@@ -176,7 +176,7 @@ final class TaskCloudPull {
         source.setAll(remote.source());
         if(candidate.equals(task)&&reference.path("source").equals(source)&&reference.path("providerData").equals(envelope))return;
         reference.set("source",source);reference.set("providerData",envelope);
-        candidate.put("version",task.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",candidate));store.change("TASK","UPDATED",task.path("id").asText());
+        candidate.put("version",task.path("version").asLong()+1);store.providerObservation(()->{store.save("TASK",(Task)decode("TASK",candidate));store.change("TASK","UPDATED",task.path("id").asText());return null;});
     }
     private static void referenceUrl(ObjectNode task,String provider,String repository,String external,String url){
         for(var ref:task.path("externalReferences"))if(ref.path("providerId").asText().equals(provider)&&ref.path("repositoryId").asText().equals(repository)&&ref.path("externalId").asText().equals(external))((ObjectNode)ref).put("externalUrl",url);

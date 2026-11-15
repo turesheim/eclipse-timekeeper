@@ -274,6 +274,9 @@ final class TaskProviderWrites {
         if(remote!=null){row.set("result",remote.original().deepCopy());if(row.path("action").asText().equals("CREATE"))row.put("externalId",remote.id()).put("providerEtag",remote.source().path("remoteEtag").asText());}row.put("state","ACK").put("acknowledgedAt",store.now().toString()).putNull("lastError");connections().save(KIND,row);return true;
     }
     void reconcile(TaskProviderConnections.Claim claim,UUID id){
+        store.providerObservation(()->{reconcileObserved(claim,id);return null;});
+    }
+    private void reconcileObserved(TaskProviderConnections.Claim claim,UUID id){
         var row=owned(claim.id(),id);if(!row.path("state").asText().equals("ACK"))return;
         if(connections().active(claim)==null||!row.path("generation").asText().equals(claim.generation())){
             row.put("state","ACK_REVIEW").put("lastError","TASK_PROVIDER_WRITE_CHANGED");connections().save(KIND,row);return;
