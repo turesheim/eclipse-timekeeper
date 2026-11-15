@@ -54,6 +54,7 @@ business clients are distinct from the Eclipse and browser applications.
 
 - [Notes vault](NOTES-VAULT.md): canonical documents, attachments, search and journal projections.
 - [Task synchronization](TASK-SYNC-PROTOCOL.md) and [provider capabilities](TASK-SYNC-CAPABILITIES.md): review, identity and write boundaries.
+- [Automatic task-list synchronization](AUTOMATIC-TASK-SYNC.md): proposed two-way subscriptions, conflict handling and recovery.
 - [Instance backup implementation](INSTANCE-BACKUP.md): archive, authority and exclusive recovery phases.
 
 User procedures are indexed in [operations](../operations/README.md); implementation
