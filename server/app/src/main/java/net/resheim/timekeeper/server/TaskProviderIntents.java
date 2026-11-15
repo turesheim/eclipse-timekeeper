@@ -15,7 +15,7 @@ final class TaskProviderIntents {
     static void changed(ServerStore store,String taskId){
         var found=store.find("TASK",UUID.fromString(taskId));if(found.isEmpty())return;var task=found.get();
         var homes=new LinkedHashSet<UUID>();if(task.hasNonNull("syncListId"))homes.add(uuid(task.get("syncListId")));
-        for(var reference:task.path("externalReferences"))if(reference.hasNonNull("taskListId"))homes.add(uuid(reference.get("taskListId")));
+        var active=new TaskProviderHomes(store).reference(task);if(active!=null&&active.hasNonNull("taskListId"))homes.add(uuid(active.get("taskListId")));
         for(UUID home:homes){
             var list=store.find("TASK_LIST",home);if(list.isEmpty())continue;
             UUID connectionId=uuid(list.get().get("connectionId"));var auth=store.find(TaskProviderConnections.AUTH,connectionId);if(auth.isEmpty()||!auth.get().path("automatic").asBoolean())continue;

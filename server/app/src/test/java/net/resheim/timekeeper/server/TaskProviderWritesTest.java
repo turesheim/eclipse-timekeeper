@@ -246,6 +246,26 @@ class TaskProviderWritesTest {
         tx(f,()->{store.providerObservation(()->store.service().createTask(new CreateTask(Optional.empty(),Optional.of(new TaskId(f.task())),"New dependent child",Optional.empty())));return null;});automatic(f);
         assertFalse(task(f).path("deleted").asBoolean());var row=job(f,uuid(approved.get("id")));assertEquals("CONFLICT",row.path("state").asText());assertEquals("TASK_DEPENDENCY",row.path("lastError").asText());
     }
+    @Test void anUnrelatedReferenceCannotImportChangesOrReceiveTheHomesDeletion(){
+        var f=fixture();
+        UUID second=tx(f,()->{
+            var auth=connections().required(f.connection());auth.withArray("catalog").add(object().put("id","second-list").put("name","Second").put("kind","STANDARD").put("shared",false).put("owner",true).set("observation",object().put("id","second-list").put("title","Second")));connections().save(TaskProviderConnections.AUTH,auth);connections().select(f.connection(),List.of("remote-list","second-list"),null,etag(connections().view(f.connection())),null,true);
+            return store.list("TASK_LIST").stream().filter(list->list.path("remoteListId").asText().equals("second-list")).map(list->uuid(list.get("id"))).findFirst().orElseThrow();
+        });var claim=reclaim(f);
+        var other=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Original","\"other-1\"").put("id","unrelated"));
+        tx(f,()->{
+            var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(claim);
+            var task=(Task)decode("TASK",store.find("TASK",f.task()).orElseThrow());
+            var ref=new ExternalTaskReference("google",TaskCloudPull.repository("account","second-list"),"unrelated",Optional.empty(),source(other.source()),Optional.of(second),Optional.empty(),Optional.empty(),Optional.empty(),Optional.of(new ExternalTaskBaseline(1,store.now(),other.fields().toString())));
+            store.service().linkExternalReference(new LinkExternalReference(task.id(),task.version(),ref));
+            var changed=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Must stay at the unrelated source","\"other-2\"").put("id","unrelated"));
+            assertTrue(new TaskCloudPull(store,receipts,inputs).apply(f.connection(),second,new TaskCloudPull.Scan("google","account","second-list",List.of(changed),store.now()),null,true).path("complete").asBoolean());return null;
+        });assertEquals("Original",task(f).path("summary").asText());delete(f);
+        var deletions=new AtomicInteger();writes().drain(claim,"token",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Original","\"g1\""));assertEquals("DELETE",request.method());assertTrue(request.uri().getPath().endsWith("/remote-task"));deletions.incrementAndGet();return reply(204,null);}));assertEquals(1,deletions.get());
+        var otherClaim=tx(f,()->{var auth=connections().required(f.connection());auth.putNull("lease").putNull("leaseUntil").put("roundIndex",1).put("nextRefresh",store.now().toString());connections().save(TaskProviderConnections.AUTH,auth);return connections().claim(f.connection(),false);});
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(otherClaim);scans.acknowledge(otherClaim,scan,new TaskCloudProvider.Page<>(List.of(other),null,null));scans.reconcile(otherClaim);return null;});
+        writes().drain(otherClaim,"token",writer(request->{throw new AssertionError("An unrelated reference must not receive a provider request");}));assertEquals(2,task(f).path("externalReferences").size());
+    }
     private TaskProviderHttp.Reply reply(int status,JsonNode body){return new TaskProviderHttp.Reply(status,Map.of(),body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8));}
     private GoogleTasksWriter writer(TaskProviderHttp.Transport transport){return new GoogleTasksWriter(new TaskProviderHttp(Set.of("tasks.googleapis.com"),request->{assertThrows(IllegalStateException.class,()->store.owner());return transport.send(request);}));}
     private static JsonNode body(HttpRequest request){

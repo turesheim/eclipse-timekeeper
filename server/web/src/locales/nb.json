@@ -1915,5 +1915,6 @@
   "task_writes.field_priority": "Prioritet",
   "task_writes.field_metadata": "Kategorier",
   "task_writes.state_MOVE": "Flytter",
-  "task_writes.warning_TASK_DEPENDENCY": "Oppgavens overordnede oppgave eller prosjekt hindrer endringen fra leverandøren. Endre dette i oppgaveredigereren. Andre oppgaver synkroniseres videre."
+  "task_writes.warning_TASK_DEPENDENCY": "Oppgavens overordnede oppgave eller prosjekt hindrer endringen fra leverandøren. Endre dette i oppgaveredigereren. Andre oppgaver synkroniseres videre.",
+  "error.TASK_PROVIDER_IDENTITY_REQUIRED": "Oppgaven har flere leverandørkoblinger i denne kontoen. Avklar kildeidentiteten før du flytter den til en annen synkronisert liste."
 }

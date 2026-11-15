@@ -31,8 +31,9 @@ final class TaskProviderWrites {
         int queued=0;var list=required("TASK_LIST",claim.list());
         for(var task:store.list("TASK")){
             if(queued>=10)break;UUID taskId=uuid(task.get("id"));
-            JsonNode reference=null;try{reference=reference(claim.id(),list,task);}catch(ApiFailure unrelated){}
+            JsonNode reference=new TaskProviderHomes(store).reference(task);
             boolean home=task.path("syncListId").asText().equals(claim.list().toString());
+            if(reference!=null&&!reference.path("taskListId").asText().equals(claim.list().toString()))continue;
             if(reference==null&&!home||!task.hasNonNull("syncListId")||blocked.contains(taskId.toString()))continue;
             boolean active=false;
             for(var job:store.list(KIND))if(job.path("connectionId").asText().equals(claim.id().toString())&&job.path("taskId").equals(task.path("id"))&&!DONE.contains(job.path("state").asText())&&!job.path("state").asText().equals("PREVIEW")){
@@ -40,7 +41,7 @@ final class TaskProviderWrites {
             }
             if(active)continue;
             // A different existing list reference authorizes a move, never another insert.
-            if(reference==null){boolean linked=false;for(var ref:task.path("externalReferences"))if(ref.path("providerId").asText().equals(new TaskCloudProvider(claim.provider()).id())&&ref.hasNonNull("taskListId"))linked=true;if(linked||task.path("deleted").asBoolean())continue;}
+            if(reference==null){boolean linked=false;for(var ref:task.path("externalReferences"))if(Set.of("google","microsoft").contains(ref.path("providerId").asText())&&ref.hasNonNull("taskListId"))linked=true;if(linked||task.path("deleted").asBoolean())continue;}
             if(reference!=null&&task.path("deleted").asBoolean()&&(reference.path("providerData").path("payload").path("observation").path("deleted").asBoolean()||reference.path("providerData").path("payload").path("observation").has("@removed")))continue;
             Action action=reference==null?Action.CREATE:task.path("deleted").asBoolean()?Action.DELETE:!home?Action.MOVE:Action.UPDATE;
             if(action==Action.UPDATE&&!differs(task,reference)){TaskProviderIntents.clear(store,taskId,claim.list());TaskProviderIntents.warnings(store,claim.id(),claim.list(),task,array());continue;}

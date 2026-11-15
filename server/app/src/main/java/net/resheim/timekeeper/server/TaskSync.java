@@ -378,6 +378,10 @@ final class TaskSync {
             row.put("status","CONFLICT");row.put("reason","OTHER_LIST");return row;
         }
         if(task.has("syncListId")&&!task.hasNonNull("syncListId")){row.put("status","IGNORE_DELETED");row.put("reason","UNLINKED");return row;}
+        if(task.has("syncListId")&&store.find(TaskProviderConnections.AUTH,uuid(connection.get("id"))).isPresent()){
+            var active=new TaskProviderHomes(store).reference(task);
+            if(active==null||!alias(active).equals(key)){row.put("status","IGNORE_DELETED").put("reason","OTHER_HOME");return row;}
+        }
         if(task.path("deleted").asBoolean()&&!item.path("deleted").asBoolean()){
             boolean changed=false;var common=baselineFields(reference.path("baseline").path("fields"));var remote=fields(item.path("fields"));
             for(var values=remote.fields();values.hasNext();){var field=values.next();if(common.has(field.getKey())&&!common.get(field.getKey()).equals(field.getValue()))changed=true;}

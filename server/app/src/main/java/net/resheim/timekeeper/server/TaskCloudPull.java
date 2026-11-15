@@ -89,7 +89,7 @@ final class TaskCloudPull {
                 var preview=object().put("connectionId",connectionId.toString()).put("listId",listId.toString()).put("sourceState","HEALTHY").put("scanComplete",acknowledgedScan);
                 preview.putArray("items").add(item);inputs.validate("TaskSyncPreviewInput",preview);
                 var decision=sync.preview(preview,acknowledgedScan).body().path("items").get(0);String status=decision.path("status").asText();
-                if(automatic&&status.equals("DELETE_REVIEW")&&existing.isPresent()&&existing.get().path("externalReferences").size()==1){
+                if(automatic&&status.equals("DELETE_REVIEW")&&existing.isPresent()){
                     var task=(Task)decode("TASK",existing.get());boolean dependents=store.list("TASK").stream().anyMatch(child->!child.path("deleted").asBoolean()&&child.path("parentTaskId").asText().equals(task.id().value().toString()));
                     if(!dependents){store.providerObservation(()->{store.service().deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(task.id(),task.version()));return null;});remember(store.find("TASK",task.id().value()).orElseThrow(),scan.provider(),repository,remote);iterator.remove();progressed=true;result.put("updated",result.path("updated").asInt()+1);continue;}
                 }
