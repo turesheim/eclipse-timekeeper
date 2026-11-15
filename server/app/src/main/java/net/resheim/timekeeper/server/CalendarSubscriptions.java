@@ -88,14 +88,17 @@ final class CalendarSubscriptions {
         if(previous.isEmpty()&&store.list(SUB).size()>=20)throw new ApiFailure(422,"CALENDAR_SUBSCRIPTION_LIMIT");
         if(previous.isPresent()&&!previous.get().path("managedConnectionId").asText().equals(connection.toString()))throw ApiFailure.conflict();
         var value=previous.map(node->((ObjectNode)node).deepCopy()).orElseGet(()->object().put("createdAt",store.now().toString()).put("visible",true).putNull("lastAttempt").putNull("lastSuccess").putNull("lastError"));
-        boolean changed=previous.isEmpty()||!value.path("name").asText().equals(name)||!value.path("clientId").asText().equals(client.toString());
-        value.put("name",name).put("clientId",client.toString()).put("url",source).put("includeEvents",true).put("includeTodos",false).put("managedConnectionId",connection.toString()).put("remoteCalendarId",remote).put("nextRefresh",store.now().toString());
+        boolean changed=previous.isEmpty()||!value.path("visible").asBoolean()||!value.path("name").asText().equals(name)||!value.path("clientId").asText().equals(client.toString());
+        value.put("name",name).put("clientId",client.toString()).put("url",source).put("visible",true).put("includeEvents",true).put("includeTodos",false).put("managedConnectionId",connection.toString()).put("remoteCalendarId",remote).put("nextRefresh",store.now().toString());
         if(!changed)return value;
         value=previous.isEmpty()?insert(SUB,id,value):save(SUB,value);store.update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='CAL_SUB' AND from_id=?",store.owner(),id);clientRelation(id,client);new CalendarSearchState(store).changed();return value;
     }
     void managedAttempt(UUID id,UUID connection){
         var found=store.find(SUB,id);if(found.isEmpty()||!found.get().path("managedConnectionId").asText().equals(connection.toString()))return;
-        var value=((ObjectNode)found.get()).deepCopy();value.put("lastAttempt",store.now().toString()).put("nextRefresh",store.now().plusSeconds(900).toString());save(SUB,value);
+        var value=((ObjectNode)found.get()).deepCopy();
+        // Account selection is the visibility control for managed calendars.
+        if(!value.path("visible").asBoolean()){value.put("visible",true);new CalendarSearchState(store).changed();}
+        value.put("lastAttempt",store.now().toString()).put("nextRefresh",store.now().plusSeconds(900).toString());save(SUB,value);
     }
     void managedFinish(UUID id,UUID connection,String body,String error){
         var found=store.find(SUB,id);if(found.isEmpty()||!found.get().path("managedConnectionId").asText().equals(connection.toString()))return;

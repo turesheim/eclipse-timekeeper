@@ -36,6 +36,19 @@ class TaskProviderConnectionsTest {
     private List<TaskCloudProvider.RemoteList> catalog(){return List.of(new TaskCloudProvider.RemoteList("remote-list","Work","STANDARD",false,true,parse("{\"id\":\"remote-list\",\"title\":\"Work\",\"unknown\":\"private-provider-detail\"}")));}
     private ObjectNode connect(String owner,TaskProviderConnections.Grant grant){return tx(owner,()->connections().connect(grant,settings(),new TaskCloudProvider.Account("stable-account","Account name"),tokens(),catalog()));}
 
+    @Test void subscriptionsAreAlwaysAutomaticAndExistingConnectionsUpgradeWithoutSaving(){
+        String owner=owner();var connected=connect(owner,grant(owner));UUID id=uuid(connected.get("id"));assertTrue(connected.path("automatic").asBoolean());
+        tx(owner,()->{
+            var selected=connections().select(id,List.of("remote-list"),null,etag(connections().view(id)),null,false);
+            assertTrue(selected.path("automatic").asBoolean());
+            var legacy=connections().required(id);legacy.remove("automatic");legacy.putArray("approved");legacy.put("nextRefresh",store.now().plusSeconds(900).toString());
+            connections().save(TaskProviderConnections.AUTH,legacy);String generation=legacy.path("generation").asText();
+            var claim=connections().claim(id,false);assertNotNull(claim);assertNotEquals(generation,claim.generation());assertFalse(claim.writable());
+            var upgraded=connections().required(id);assertTrue(upgraded.path("automatic").asBoolean());assertTrue(TaskProviderScans.approved(upgraded,"remote-list"));
+            assertEquals(1,upgraded.path("selected").size());assertEquals("remote-list",upgraded.path("selected").get(0).asText());
+            return null;
+        });
+    }
     @Test void stateIsOwnerAndBrowserBoundAndCanOnlyBeConsumedOnce(){
         String owner=owner(),state=begin(owner,"browser-a"),other=owner();
         assertThrows(ApiFailure.class,()->tx(other,()->connections().consume(state,"browser-a")));

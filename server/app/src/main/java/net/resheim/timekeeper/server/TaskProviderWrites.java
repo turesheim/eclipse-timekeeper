@@ -513,7 +513,7 @@ final class TaskProviderWrites {
             }
             boolean recover=auth.isPresent()&&auth.get().path("automatic").asBoolean()&&row.hasNonNull("confirmedAt")&&row.hasNonNull("externalId")&&Set.of("SENDING","UNKNOWN","ACK","ACK_REVIEW").contains(old);
             if(recover){
-                // Consent to automatic sync recovers transmitted outcomes, never old prepared payloads.
+                // Subscription upgrades recover transmitted outcomes, never old prepared payloads.
                 row.put("automatic",true).put("checkRequested",true).put("checkRequestedAt",store.now().toString());
                 if(!row.has("sentFields"))row.set("sentFields",row.path("writeFields").deepCopy());
                 if(old.equals("ACK_REVIEW"))row.put("lastError","TASK_PROVIDER_WRITE_CHANGED");

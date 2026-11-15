@@ -38260,7 +38260,8 @@
           },
           "automatic": {
             "type": "boolean",
-            "description": "Explicitly subscribe selected lists to automatic import and supported writes. Omission preserves the prior mode; legacy manual drafts remain unconfirmed."
+            "deprecated": true,
+            "description": "Compatibility field. Selected lists always import and reconcile supported edits automatically. This value is ignored on input; legacy unconfirmed drafts are never sent."
           }
         },
         "required": [

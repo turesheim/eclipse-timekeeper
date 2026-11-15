@@ -136,8 +136,9 @@ export function taskPresentation(task) {
     catch {return null;}
   };
   const url = webUrl(reference?.externalUrl) || webUrl(task.url);
-  let id = reference?.externalId;
-  if (reference && url) {
+  const issueReference = reference && !['google', 'microsoft'].includes(reference.providerId.toLowerCase());
+  let id = issueReference ? reference.externalId : null;
+  if (issueReference && url) {
     const path = new URL(url).pathname;
     const jira = /\/browse\/([^/]+)\/?$/.exec(path);
     const github = /\/(?:issues|pull)\/(\d+)\/?$/.exec(path);

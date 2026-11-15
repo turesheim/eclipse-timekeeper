@@ -47,7 +47,7 @@ class TaskProviderRestartTest {
     private void expiredLease(UUID connection){var auth=connections().required(connection);auth.put("leaseUntil",store.now().minusSeconds(1).toString()).put("nextRefresh",store.now().minusSeconds(1).toString()).put("lastAttempt",store.now().minusSeconds(601).toString());connections().save(TaskProviderConnections.AUTH,auth);}
     private ObjectNode stageWrite(String name,boolean acknowledged){
         var fixture=connection(name,true);UUID connection=uuid(fixture.get("connection")),list=uuid(fixture.get("list"));var first=connections().claim(connection,false);var start=scans().begin(first);var original=remote("task","Original","\"g1\"","001");
-        scans().acknowledge(first,start,new TaskCloudProvider.Page<>(List.of(original),null,null));var review=scans().review(connection,list);scans().approve(connection,list,etag(review));
+        scans().acknowledge(first,start,new TaskCloudProvider.Page<>(List.of(original),null,null));var imported=scans().reconcile(first);connections().finish(first,imported,null,0);
         var key=new ExternalTaskReferenceKey("google",TaskCloudPull.repository(fixture.path("account").asText(),"list"),"task");var task=(Task)decode("TASK",store.byReference(key).orElseThrow());
         String title=acknowledged?"Acknowledged update":"Uncertain update";task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),title,task.url()));
         fixture.put("task",task.id().value().toString());var preview=writes().prepare(connection,list,task.id().value(),TaskProviderWrites.Action.UPDATE);UUID write=uuid(preview.get("id"));writes().confirm(connection,write,etag(preview));

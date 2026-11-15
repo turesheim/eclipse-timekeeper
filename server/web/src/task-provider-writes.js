@@ -9,51 +9,18 @@ const valueText=(field,value)=>value===null||value===undefined?t('task_writes.em
 
 /** Owner-bound proposals; polling never replaces the comparison the user is reviewing. */
 export function taskProviderWrites(view,root,{reload,controls:parentControls}){
-  let connection=null,generation=0,catalogGeneration=0,disposed=false,loaded=false,signature='',selected=[],catalog=[],reviewGeneration=0;
+  let connection=null,generation=0,disposed=false,signature='',reviewGeneration=0;
   const valid=()=>!disposed&&view.valid(),base=()=>'/task-providers/'+connection.id+'/writes';
-  const heading=node('h3',t('task_writes.title'),'h5'),help=node('p',t('task_writes.help'),'hint');
+  const heading=node('h3',t('task_writes.title_automatic'),'h5');
   const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
-  const details=node('details'),summary=node('summary',t('task_writes.prepare'),'mb-2'),form=node('form');details.append(summary,help,form);
-  const taskLabel=node('label',t('task_writes.task'),'form-label'),task=node('select',undefined,'form-select mb-2');task.required=true;taskLabel.append(task);
-  const actionLabel=node('label',t('task_writes.action'),'form-label'),action=node('select',undefined,'form-select mb-2');
-  for(const kind of ['UPDATE','DELETE','CREATE'])action.append(new Option(t('task_writes.action_'+kind),kind));actionLabel.append(action);
-  const prepare=node('button',t('task_writes.review'),'btn btn-primary');prepare.type='submit';form.append(taskLabel,actionLabel,prepare);
-  const candidateFeedback=node('p','','hint');candidateFeedback.setAttribute('role','status');details.append(candidateFeedback);
-  const history=node('div'),comparison=node('div',undefined,'mt-3');comparison.hidden=true;root.append(heading,details,feedback,history,comparison);
+  const history=node('div'),comparison=node('div',undefined,'mt-3');comparison.hidden=true;root.append(heading,feedback,history,comparison);
   function controls(){
     const write=valid()&&view.canWrite&&!view.busy&&!view.uncertain&&!connection?.paused&&connection?.enabled;
-    for(const input of form.querySelectorAll('select,button'))input.disabled=!write||connection?.direction!=='TWO_WAY'||!loaded;
     for(const input of root.querySelectorAll('[data-write-action]'))input.disabled=!write||input.dataset.allowed!=='true';
     for(const input of root.querySelectorAll('[data-write-local]'))input.disabled=!valid()||!view.canWrite||view.busy||view.uncertain||input.type!=='checkbox'&&input.dataset.allowed!=='true';
     for(const input of root.querySelectorAll('[data-write-review]'))input.disabled=!valid()||view.busy;
   }
   const run=(work,submit,write=true)=>void view.run(async()=>{parentControls();controls();await work();},{submit,feedback,write}).finally(()=>{if(valid()){parentControls();controls();}});
-  async function candidates(){
-    const current=++catalogGeneration;const [tasks,lists]=await Promise.all([view.session.page('/tasks'),view.session.page('/task-lists')]);if(!valid()||current!==catalogGeneration)return;
-    catalog=tasks.items;
-    selected=lists.items.filter(list=>list.connectionId===connection.id&&connection.selectedLists.includes(list.remoteListId)&&list.present);
-    loaded=true;taskOptions();controls();
-  }
-  function taskOptions(){
-    const previous=task.value,options=[];
-    for(const item of catalog){
-      if(action.value==='CREATE'){
-        if(!item.parentTaskId)for(const list of selected)if(!(item.externalReferences||[]).some(ref=>ref.providerId==='google'&&ref.taskListId===list.id))options.push({taskId:item.id,listId:list.id,title:list.name+' / '+item.summary});
-      }else for(const ref of item.externalReferences||[]){const list=selected.find(list=>list.id===ref.taskListId);if(ref.providerId==='google'&&list)options.push({taskId:item.id,listId:list.id,title:list.name+' / '+item.summary});}
-    }
-    task.replaceChildren(new Option(t('task_writes.choose_task'),''));for(const item of options)task.append(new Option(item.title,JSON.stringify({taskId:item.taskId,listId:item.listId})));
-    if([...task.options].some(option=>option.value===previous))task.value=previous;
-    candidateFeedback.textContent=options.length?'':t('task_writes.no_tasks');
-  }
-  const refreshTasks=button(t('task_writes.refresh_tasks'),()=>run(candidates,refreshTasks,false));refreshTasks.dataset.writeReview='tasks';details.append(refreshTasks);
-  details.addEventListener('toggle',()=>{if(details.open&&(!loaded||!view.dirty.has(form)))run(candidates,prepare,false);});
-  form.addEventListener('change',()=>view.dirty.add(form));
-  action.addEventListener('change',()=>{taskOptions();controls();});
-  form.addEventListener('submit',event=>{event.preventDefault();run(async()=>{
-    if(!task.value)return;const identity=JSON.parse(task.value);
-    const reply=await view.session.request(base(),{method:'POST',body:{...identity,action:action.value}});if(!valid())return;
-    view.clean(form);show(reply);await reload();
-  },prepare);});
   function changeValues(parent,values,title,conflicts=[]){
     if(!values)return;parent.append(node('h4',title,'h6 mt-3'));
     for(const field of fields)if(Object.hasOwn(values,field)){
@@ -78,7 +45,6 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     if(row.state==='UNRESOLVED')comparison.append(node('p',t('task_writes.unresolved_help'),'hint'));
     const actions=node('div',undefined,'d-flex flex-wrap gap-2');
     const add=(label,work,allowed,local=false)=>{const pick=button(t(label),()=>run(work,pick));if(local)pick.dataset.writeLocal='decision';else pick.dataset.writeAction='true';pick.dataset.allowed=String(allowed);actions.append(pick);};
-    if(row.state==='PREVIEW')add(row.action==='DELETE'?'task_writes.confirm_delete':'task_writes.confirm',async()=>{await view.session.request(path+'/confirm',{method:'POST',etag:reply.etag});if(!valid())return;comparison.hidden=true;await reload();},row.canConfirm&&connection.direction==='TWO_WAY');
     if(['UNKNOWN','ACK_REVIEW'].includes(row.state))add('task_writes.check',async()=>{await view.session.request(path+'/check',{method:'POST',etag:reply.etag});if(valid())await reload();},true);
     if(row.canResolve){
       const resolve=decision=>async()=>{await view.session.request(path+'/resolve',{method:'POST',etag:reply.etag,body:{decision,taskEtag:row.currentTaskEtag}});if(!valid())return;comparison.hidden=true;await reload();};
@@ -114,7 +80,7 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
   }
   async function refresh(){
     if(!valid()||root.hidden)return;const current=++generation,reply=await view.session.request(base());if(!valid()||current!==generation)return;
-    const rows=connection.automatic?reply.data.items.filter(row=>['UNKNOWN','ACK_REVIEW','CONFLICT'].includes(row.state)):reply.data.items;
+    const rows=reply.data.items.filter(row=>['UNKNOWN','ACK_REVIEW','CONFLICT'].includes(row.state));
     const next=JSON.stringify(rows);if(next===signature)return;signature=next;
     const focused=history.contains(document.activeElement)?document.activeElement?.dataset.writeReview:null;history.replaceChildren();
     for(const row of rows){
@@ -123,5 +89,5 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
     }
     if(focused)[...history.querySelectorAll('[data-write-review]')].find(pick=>pick.dataset.writeReview===focused)?.focus();controls();
   }
-  return {controls,refresh,update(value){connection=value;heading.textContent=t(value.automatic?'task_writes.title_automatic':'task_writes.title');root.hidden=value.automatic?!(value.writeExceptions??value.pendingWrites):!value.pendingWrites&&(value.direction!=='TWO_WAY'||!value.selectedLists.length);details.hidden=!!value.automatic||value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;++reviewGeneration;view.clean(form);}};
+  return {controls,refresh,update(value){connection=value;root.hidden=!(value.writeExceptions??value.pendingWrites);controls();},dispose(){disposed=true;++generation;++reviewGeneration;}};
 }

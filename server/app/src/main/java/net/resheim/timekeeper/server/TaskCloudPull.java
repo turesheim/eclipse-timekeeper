@@ -93,7 +93,7 @@ final class TaskCloudPull {
                     var task=(Task)decode("TASK",existing.get());boolean dependents=store.list("TASK").stream().anyMatch(child->!child.path("deleted").asBoolean()&&child.path("parentTaskId").asText().equals(task.id().value().toString()));
                     if(!dependents){store.providerObservation(()->{store.service().deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(task.id(),task.version()));return null;});remember(store.find("TASK",task.id().value()).orElseThrow(),scan.provider(),repository,remote);iterator.remove();progressed=true;result.put("updated",result.path("updated").asInt()+1);continue;}
                 }
-                if(Set.of("CREATE","UPDATE","KEEP_LOCAL","UNCHANGED").contains(status)||automatic&&status.equals("CONFLICT")){
+                if(Set.of("CREATE","UPDATE","KEEP_LOCAL","UNCHANGED").contains(status)||automatic&&status.equals("CONFLICT")&&existing.isPresent()){
                     var input=object().put("connectionId",connectionId.toString()).put("listId",listId.toString()).put("sourceState","HEALTHY");input.set("item",item);
                     if(status.equals("CREATE")&&project!=null&&!fields.hasNonNull("parentTaskId"))input.put("projectId",project.toString());
                     inputs.validate(status.equals("CREATE")?"TaskSyncImportInput":"TaskSyncApplyInput",input);

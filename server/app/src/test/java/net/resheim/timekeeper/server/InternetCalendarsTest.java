@@ -42,13 +42,21 @@ class InternetCalendarsTest {
         var input=object();input.putArray("selectedCalendars").add("work");input.putObject("calendarMappings").put("work",account.client().toString());var before=connections().view(account.connection());return new InternetCalendars(store).select(account.connection(),input,etag(before));
     });}
     private TaskProviderConnections.Claim claim(Account account){return tx(account,()->connections().claim(account.connection(),false));}
+    @Test void selectedCalendarsRecoverLegacyHiddenStateOnSaveAndBackgroundRefresh(){
+        var account=account(false);select(account);UUID id=InternetCalendars.id(account.connection(),"work");
+        Runnable hide=()->tx(account,()->{store.update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=?",new CalendarSubscriptions(store).required(id).put("visible",false).toString(),store.owner(),CalendarSubscriptions.SUB,id);return null;});
+        hide.run();select(account);tx(account,()->{assertTrue(new CalendarSubscriptions(store).required(id).path("visible").asBoolean());return null;});
+        hide.run();var claim=claim(account);var provider=new CalendarCloudProvider(TaskCloudProvider.Provider.GOOGLE,new TaskProviderHttp(Set.of("www.googleapis.com"),request->{var page=object().put("nextSyncToken","restored");page.putArray("items").add(event("visible","Selected event"));return reply(200,page);}));
+        new InternetCalendars(store).synchronize(claim,provider,"private-access");
+        tx(account,()->{assertTrue(new CalendarSubscriptions(store).required(id).path("visible").asBoolean());assertEquals("Selected event",new CalendarSubscriptions(store).events("2026-11-09","2026-11-16").path("items").get(0).path("title").asText());return null;});
+    }
     private static ObjectNode event(String id,String title){return (ObjectNode)parse("{\"id\":\""+id+"\",\"summary\":\""+title+"\",\"start\":{\"date\":\"2026-11-10\"},\"end\":{\"date\":\"2026-11-11\"}}");}
     private static TaskProviderHttp.Reply reply(int status,ObjectNode value){return new TaskProviderHttp.Reply(status,Map.of(),value.toString().getBytes(StandardCharsets.UTF_8));}
     @Test void connectingAndDiscoveringCalendarsDoesNotSubscribeAndRepeatedSelectionRetainsTheSameRecord(){
         var account=account(false);tx(account,()->{assertTrue(store.list(CalendarSubscriptions.SUB).isEmpty());return null;});
         select(account);UUID id=InternetCalendars.id(account.connection(),"work");
         tx(account,()->{var calendar=new CalendarSubscriptions(store);var before=calendar.required(id);calendar.edit(id,etag(calendar.visible(before)),object().put("name","Work").put("clientId",account.client().toString()).put("visible",false),null);return null;});
-        select(account);tx(account,()->{assertEquals(1,store.list(CalendarSubscriptions.SUB).size());assertEquals(id.toString(),store.list(CalendarSubscriptions.SUB).getFirst().path("id").asText());assertFalse(new CalendarSubscriptions(store).required(id).path("visible").asBoolean());return null;});
+        select(account);tx(account,()->{assertEquals(1,store.list(CalendarSubscriptions.SUB).size());assertEquals(id.toString(),store.list(CalendarSubscriptions.SUB).getFirst().path("id").asText());assertTrue(new CalendarSubscriptions(store).required(id).path("visible").asBoolean());return null;});
     }
     @Test void calendarOnlySelectionDoesNotCreateTasksAndDoesNotChangeTaskDraftVersions(){
         var account=account(false);long taskVersion=tx(account,()->connections().view(account.connection()).path("configurationVersion").asLong());var chosen=select(account);

@@ -46,7 +46,7 @@ class TaskProviderWritesTest {
             var original=raw("Original","\"g1\"");if(assigned)original.putObject("assignmentInfo").put("surfaceType","DOCUMENT").put("linkToTask","https://docs.google.com/document/d/source/edit");
             var claim=connections().claim(id,false);var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);
             scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(original)),null,null));
-            var preview=scans.review(id,list);scans.approve(id,list,etag(preview));return new Fixture(owner,id,list,uuid(store.list("TASK").getFirst().get("id")));
+            var imported=scans.reconcile(claim);connections().finish(claim,imported,null,0);return new Fixture(owner,id,list,uuid(store.list("TASK").getFirst().get("id")));
         });
     }
     private ObjectNode task(Fixture f){return tx(f,()->((ObjectNode)store.find("TASK",f.task()).orElseThrow()).deepCopy());}
@@ -58,8 +58,8 @@ class TaskProviderWritesTest {
     private ObjectNode job(Fixture f,UUID id){return tx(f,()->writes().get(f.connection(),id));}
     private String baseline(Fixture f){return task(f).path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText();}
     private TaskProviderConnections.Claim automatic(Fixture f){
-        tx(f,()->{var current=connections().view(f.connection());connections().select(f.connection(),List.of("remote-list"),null,etag(current),null,true);return null;});
-        var claim=reclaim(f);
+        tx(f,()->{var legacy=connections().required(f.connection());legacy.remove("automatic");legacy.putArray("approved");legacy.putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().plusSeconds(900).toString());connections().save(TaskProviderConnections.AUTH,legacy);return null;});
+        var claim=claim(f);
         tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(claim);return null;});
         return claim;
     }
@@ -293,7 +293,7 @@ class TaskProviderWritesTest {
         var f=nativeTask();var before=task(f);var preview=preview(f,TaskProviderWrites.Action.CREATE);assertTrue(preview.path("canConfirm").asBoolean());assertTrue(preview.path("externalId").isNull());assertTrue(preview.path("providerEtag").isNull());
         assertEquals(object().put("summary","Native task"),preview.path("writeFields"));assertTrue(preview.path("warnings").toString().contains("TEXT_ONLY"));
         UUID id=uuid(confirm(f,preview).get("id"));var claim=claim(f);var calls=new AtomicInteger();
-        writes().drain(claim,"private-access",writer(request->{calls.incrementAndGet();assertEquals("POST",request.method());assertTrue(request.headers().firstValue("If-Match").isEmpty());assertEquals(object().put("title","Native task"),body(request));assertEquals("SENDING",job(f,id).path("state").asText());return reply(200,raw("Native task","\"created\"").put("id","new-id"));}));
+        writes().drain(claim,"private-access",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Native task","\"created\"").put("id","new-id").put("notes","").putNull("due"));if(!request.uri().getPath().endsWith("/move")){calls.incrementAndGet();assertEquals("POST",request.method());assertTrue(request.headers().firstValue("If-Match").isEmpty());assertEquals(object().put("title","Native task"),body(request));assertEquals("SENDING",job(f,id).path("state").asText());}return reply(200,raw("Native task","\"created\"").put("id","new-id").put("notes","").putNull("due"));}));
         assertEquals(1,calls.get());assertEquals("DONE",job(f,id).path("state").asText());var linked=task(f);assertEquals(before.path("id"),linked.path("id"));assertEquals(before.path("projectId"),linked.path("projectId"));assertEquals(before.path("body"),linked.path("body"));assertEquals(7,linked.path("siblingOrder").asInt());
         assertEquals("new-id",linked.path("externalReferences").get(0).path("externalId").asText());assertEquals("Native task",baseline(f));pull(f,"new-id");assertEquals(7,task(f).path("siblingOrder").asInt());assertEquals(2,tx(f,()->store.list("TASK").size()));
     }
@@ -359,10 +359,10 @@ class TaskProviderWritesTest {
         tx(f,()->{var auth=connections().required(f.connection());connections().disconnect(f.connection(),etag(connections().visible(auth)));return null;});assertEquals("UNKNOWN",tx(f,()->store.find(TaskProviderWrites.KIND,id).orElseThrow()).path("state").asText());
         assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->{store.delete("TASK_CONNECTION",f.connection());return null;})).status);
     }
-    @Test void anAcknowledgedInsertReconcilesOnceAfterLeaseRecoveryWithoutContactingGoogle(){
+    @Test void anAcknowledgedInsertReconcilesOnceAfterLeaseRecoveryWithoutRepeatingCreation(){
         var f=nativeTask();UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));var first=claim(f);tx(f,()->writes().next(first));var sending=tx(f,()->writes().creating(first,id));
-        tx(f,()->writes().acknowledge(id,sending.path("attempt").asText(),new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Native task","\"created\"").put("id","new-id"))));
-        assertEquals("ACK",job(f,id).path("state").asText());var resumed=reclaim(f);writes().drain(resumed,"private-access",writer(request->{throw new AssertionError("Known insert result needs no repeated provider request");}));assertEquals("DONE",job(f,id).path("state").asText());assertEquals("new-id",task(f).path("externalReferences").get(0).path("externalId").asText());
+        tx(f,()->writes().acknowledge(id,sending.path("attempt").asText(),new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Native task","\"created\"").put("id","new-id").put("notes","").putNull("due"))));
+        assertEquals("ACK",job(f,id).path("state").asText());var resumed=reclaim(f);writes().drain(resumed,"private-access",writer(request->{assertTrue(request.method().equals("GET")||request.uri().getPath().endsWith("/move"),"Known insert result cannot create another task");return reply(200,raw("Native task","\"created\"").put("id","new-id").put("notes","").putNull("due"));}));assertEquals("DONE",job(f,id).path("state").asText());assertEquals("new-id",task(f).path("externalReferences").get(0).path("externalId").asText());
         writes().drain(resumed,"private-access",writer(request->{throw new AssertionError("Completed insert cannot repeat");}));assertEquals(1,task(f).path("externalReferences").size());
     }
     @Test void importOnlyAndAnotherOwnerCannotPrepareOrSendGoogleWrites(){
