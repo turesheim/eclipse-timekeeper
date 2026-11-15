@@ -21916,6 +21916,100 @@
           }
         }
       }
+    },
+    "/task-providers/{id}/settings": {
+      "put": {
+        "operationId": "saveTaskProviderSettings",
+        "summary": "Save Internet account subscriptions atomically",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskProviderConnection"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskProviderSettingsInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -38032,6 +38126,10 @@
             "type": "boolean",
             "deprecated": true,
             "description": "Compatibility field. Selected lists and new tasks synchronize automatically; this value is ignored on input and always false on output."
+          },
+          "automatic": {
+            "type": "boolean",
+            "description": "Explicitly subscribe selected lists to automatic import and supported writes. Omission preserves the prior mode; legacy manual drafts remain unconfirmed."
           }
         },
         "required": [
@@ -38334,6 +38432,60 @@
               "string",
               "null"
             ]
+          },
+          "automatic": {
+            "type": "boolean",
+            "description": "Selected lists import and reconcile supported edits automatically."
+          },
+          "syncStatus": {
+            "type": "string",
+            "enum": [
+              "UP_TO_DATE",
+              "SYNCHRONIZING",
+              "PAUSED",
+              "RECONNECT_REQUIRED",
+              "NEEDS_ATTENTION",
+              "READ_ONLY"
+            ]
+          },
+          "syncIssues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "taskId",
+                "title",
+                "warnings"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -39854,6 +40006,20 @@
             "const": true
           }
         }
+      },
+      "TaskProviderSettingsInput": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "$ref": "#/components/schemas/TaskProviderSelectionInput"
+          },
+          "calendars": {
+            "$ref": "#/components/schemas/InternetCalendarSelectionInput"
+          }
+        },
+        "minProperties": 1,
+        "additionalProperties": false,
+        "description": "Atomically save calendar and task subscriptions for one Internet account. A validation or version failure leaves both selections unchanged."
       }
     },
     "parameters": {

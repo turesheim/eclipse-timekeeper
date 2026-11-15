@@ -16,7 +16,12 @@ export function internetCalendarAccount(view,panel,{reload,clients,zone,controls
     save.disabled=!enabled||!clients.length;
   };
   form.addEventListener('change',()=>{view.dirty.add(form);controls();});
+  const selection=()=>{
+    const selectedCalendars=[...form.querySelectorAll('input[name=selectedCalendars]:checked')].map(input=>input.value);
+    return {selectedCalendars,calendarMappings:Object.fromEntries([...form.querySelectorAll('select')].filter(input=>selectedCalendars.includes(input.dataset.calendarClient)).map(input=>[input.dataset.calendarClient,input.value]))};
+  };
   form.addEventListener('submit',event=>{
+    if(onSave){event.preventDefault();onSave();return;}
     event.preventDefault();void view.run(async()=>{
       const selectedCalendars=[...form.querySelectorAll('input[name=selectedCalendars]:checked')].map(input=>input.value);
       const calendarMappings=Object.fromEntries([...form.querySelectorAll('select')].filter(input=>selectedCalendars.includes(input.dataset.calendarClient)).map(input=>[input.dataset.calendarClient,input.value]));
@@ -27,6 +32,9 @@ export function internetCalendarAccount(view,panel,{reload,clients,zone,controls
     },{submit:save,feedback,write:true}).finally(()=>{if(view.valid()){controls();allControls();}});
   });
   return {
+    selection,
+    check(value){if((value.calendarConfigurationVersion??0)!==draftVersion)throw new ApiError('STALE_VERSION',412);},
+    clean(){view.clean(form);},
     update(value){
       data=value;root.hidden=!value.services?.calendars;heading.id='internet-calendars-'+value.id;root.setAttribute('aria-labelledby',heading.id);
       status.textContent=t('internet_accounts.last_refresh',{date:value.calendarLastSuccess?instantText(value.calendarLastSuccess,zone()):t('task_providers.never')});error.hidden=!value.calendarLastError;error.replaceChildren(...(value.calendarLastError?[calendarSourceFailure(value,t('internet_accounts.calendar_refresh_failed'))]:[]));

@@ -56,6 +56,7 @@ public class ServerStore {
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.diagnostics.slow-transaction-ms",defaultValue="1000") long slowTransactionMillis;
     private static final org.jboss.logging.Logger TIMINGS=org.jboss.logging.Logger.getLogger(ServerStore.class);
     private final ThreadLocal<Context> context = new ThreadLocal<>();
+    private final ThreadLocal<Set<String>> changedTasks = new ThreadLocal<>();
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
@@ -174,6 +175,7 @@ public class ServerStore {
                 }
                 locked=System.nanoTime();phase="work";
                 context.set(new Context(owner,connection,clock.now(),false));
+                changedTasks.set(new HashSet<>());
                 AccountStore.ensureAccount(connection,owner);
                 try(var initialized=statement("SELECT initialized FROM tk_account WHERE owner_id=?",owner);var rows=initialized.executeQuery()) {
                     if(!rows.next()) throw new SQLException("Missing account identity");
@@ -181,13 +183,15 @@ public class ServerStore {
                 }
                 String date=partitionDate(profile().get("zoneId").asText(),now());
                 if(!date.equals(partitionDates.get(owner))) service().rolloverActivities(new OwnerId(owner));
-                T result = work.get();worked=System.nanoTime();phase="commit";
+                T result = work.get();
+                for(String task:changedTasks.get())TaskProviderIntents.changed(this,task);
+                worked=System.nanoTime();phase="commit";
                 connection.commit();outcome="committed";partitionDates.put(owner,date);return result;
             } catch (Throwable e) {
                 if(e instanceof ApiFailure failure && failure.status>=500)outcome="server-error";
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw e;
-            } finally { context.remove(); }
+            } finally { changedTasks.remove();context.remove(); }
         } catch (SQLException e) {outcome="database-error";throw databaseFailure(e);}
         finally {
             long ended=System.nanoTime(),elapsed=(ended-started)/1_000_000;
@@ -626,6 +630,7 @@ public class ServerStore {
         if (sequence>9007199254740991L) throw new IllegalStateException("Sequence exhausted");
         update("UPDATE tk_owner SET revision=? WHERE id=?",sequence,owner());
         update("INSERT INTO tk_change(owner_id,sequence,entity_type,entity_id,change_type,occurred_at) VALUES(?,?,?,?,?,?)",owner(),sequence,type,id,change,timestamp(now()));
+        if(type.equals("TASK")&&!change.equals("DELETED"))changedTasks.get().add(id);
     }
     private boolean postgres() { return DatabaseConfiguration.postgres(jdbcUrl); }
     private String referenceKey(String provider, String repository, String external) {

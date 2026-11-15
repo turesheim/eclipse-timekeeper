@@ -21,6 +21,43 @@ final class TaskProviderWrites {
     private final ContractInputs inputs;
     TaskProviderWrites(ServerStore store,CommandReceipts receipts,ContractInputs inputs){this.store=store;this.receipts=receipts;this.inputs=inputs;}
     private TaskProviderConnections connections(){return new TaskProviderConnections(store);}
+    /** Build a fresh delta only after the provider scan has reconciled its common baseline. */
+    void queueAutomatic(TaskProviderConnections.Claim claim){
+        var auth=connections().active(claim);
+        if(auth==null||!auth.path("automatic").asBoolean()||!claim.writable())return;
+        var scan=store.find(TaskProviderScans.SCAN,claim.list());
+        if(scan.isEmpty()||!scan.get().path("generation").asText().equals(claim.generation())||!Set.of("READY","APPLIED").contains(scan.get().path("state").asText()))return;
+        var blocked=new HashSet<String>();
+        // A task with a conflicting observation cannot be exported using an obsolete provider revision.
+        for(var item:scan.get().path("pending"))if(item.hasNonNull("taskId"))blocked.add(item.path("taskId").asText());
+        int queued=0;
+        for(var before:store.list("TASK")){
+            if(queued>=10)break;
+            UUID taskId=uuid(before.get("id"));JsonNode reference;
+            try{reference=reference(claim.id(),required("TASK_LIST",claim.list()),before);}catch(ApiFailure unrelated){continue;}
+            if(blocked.contains(taskId.toString()))continue;
+            boolean active=false;
+            for(var job:store.list(KIND))if(job.path("connectionId").asText().equals(claim.id().toString())&&job.path("taskId").equals(before.path("id"))&&!DONE.contains(job.path("state").asText())&&!job.path("state").asText().equals("PREVIEW")){
+                if(job.path("automatic").asBoolean()&&Set.of("QUEUED","CHECKING").contains(job.path("state").asText())&&!job.path("taskEtag").asText().equals(etag(before))){
+                    var stale=((ObjectNode)job).deepCopy();stale.put("state","STALE");connections().save(KIND,stale);
+                }else active=true;
+            }
+            if(active)continue;
+            boolean differs=false;var baseline=reference.path("baseline").path("fields");for(String field:FIELDS)if(baseline.has(field)&&!before.path(field).equals(baseline.get(field)))differs=true;
+            if(!differs){TaskProviderIntents.clear(store,taskId,claim.list());TaskProviderIntents.warnings(store,claim.id(),claim.list(),before,array());continue;}
+            // Source state is refreshed by the pull, never by the Dagsverk task ETag.
+            if(!reference.path("source").hasNonNull("remoteEtag"))continue;
+            ObjectNode preview;try{preview=prepare(claim.id(),claim.list(),taskId,Action.UPDATE);}catch(ApiFailure failure){if(failure.code.equals("TASK_PROVIDER_WRITE_LIMIT"))break;throw failure;}UUID id=uuid(preview.get("id"));
+            TaskProviderIntents.warnings(store,claim.id(),claim.list(),before,preview.path("warnings"));
+            if(!preview.path("canConfirm").asBoolean()){
+                remove(required(KIND,id));TaskProviderIntents.clear(store,taskId,claim.list());continue;
+            }
+            var row=required(KIND,id);row.put("automatic",true);var snapshot=row.putObject("sentFields");
+            for(String field:FIELDS)snapshot.set(field,before.path(field).deepCopy());
+            row.put("state","QUEUED").put("confirmedAt",store.now().toString());connections().save(KIND,row);
+            queued++;
+        }
+    }
     ObjectNode prepare(UUID connection,UUID listId,UUID taskId,Action action){
         var auth=access(connection,listId);var list=required("TASK_LIST",listId);var task=required("TASK",taskId);boolean creating=action==Action.CREATE;
         JsonNode reference=creating?null:reference(connection,list,task);String revision=creating?null:reference.path("source").path("remoteEtag").asText();
@@ -158,8 +195,9 @@ final class TaskProviderWrites {
         var rows=new ArrayList<JsonNode>();for(var row:store.list(KIND))if(row.path("connectionId").asText().equals(claim.id().toString())&&row.path("listId").asText().equals(claim.list().toString()))rows.add(row);
         rows.sort(Comparator.comparing(row->row.path("createdAt").asText()));
         for(var before:rows){var row=((ObjectNode)before).deepCopy();String state=row.path("state").asText();
-            if(state.equals("SENDING")&&!row.path("lease").asText().equals(claim.lease())){row.put("state","UNKNOWN").put("lastError","TASK_PROVIDER_OUTCOME_UNKNOWN");connections().save(KIND,row);continue;}
+            if(state.equals("SENDING")&&!row.path("lease").asText().equals(claim.lease())){row.put("state","UNKNOWN").put("lastError","TASK_PROVIDER_OUTCOME_UNKNOWN");if(row.path("automatic").asBoolean()&&row.hasNonNull("externalId"))row.put("checkRequested",true).put("checkRequestedAt",store.now().toString());connections().save(KIND,row);continue;}
             if(state.equals("ACK"))return row;
+            if(state.equals("ACK_REVIEW")&&row.path("automatic").asBoolean()&&row.path("lastError").asText().equals("TASK_PROVIDER_WRITE_CHANGED")&&row.hasNonNull("externalId"))row.put("checkRequested",true).put("checkRequestedAt",store.now().toString());
             if(Set.of("UNKNOWN","ACK_REVIEW").contains(state)&&row.path("checkRequested").asBoolean()){
                 if(state.equals("UNKNOWN")&&row.path("action").asText().equals("CREATE")&&!row.hasNonNull("externalId")){
                     if(freshScan(claim,row)){row.put("checkRequested",false);connections().save(KIND,row);}continue;
@@ -180,7 +218,7 @@ final class TaskProviderWrites {
         if(!row.path("state").asText().equals("CHECKING")||!row.path("lease").asText().equals(claim.lease()))return null;
         try{validate(row,auth);}catch(ApiFailure stale){row.put("state","STALE").put("lastError","TASK_PROVIDER_WRITE_CHANGED");connections().save(KIND,row);return null;}
         if(remote.deleted()||!remote.id().equals(row.path("externalId").asText())||!row.path("providerEtag").asText().equals(remote.source().path("remoteEtag").asText())){
-            row.put("state","CONFLICT").put("lastError","TASK_PROVIDER_CHANGED");connections().save(KIND,row);return null;
+            row.put("state",row.path("automatic").asBoolean()?"STALE":"CONFLICT").put("lastError","TASK_PROVIDER_CHANGED");connections().save(KIND,row);return null;
         }
         if(remote.original().hasNonNull("assignmentInfo")&&(row.path("action").asText().equals("DELETE")||row.path("writeFields").has("body"))){
             row.put("state","STALE").put("lastError","TASK_PROVIDER_WRITE_CHANGED");connections().save(KIND,row);return null;
@@ -214,6 +252,10 @@ final class TaskProviderWrites {
             if(task==null){row.put("state","DONE").putNull("lastError");connections().save(KIND,row);return;}
             var remote=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(row.path("result"));
             if(remote.deleted()||!remote.id().equals(row.path("externalId").asText()))throw ApiFailure.conflict();
+            if(row.path("automatic").asBoolean()){
+                acknowledgeFields(row,task,remote);
+                task=required("TASK",uuid(row.get("taskId")));
+            }
             var item=object().put("providerId","google").put("repositoryId",row.path("repositoryId").asText()).put("externalId",remote.id()).put("deleted",false);item.set("fields",remote.fields().deepCopy());
             item.put("operationId",UUID.nameUUIDFromBytes(("dagsverk-google-ack:"+id+":"+etag(task)+":"+canonical(item)).getBytes(StandardCharsets.UTF_8)).toString());
             var input=object().put("connectionId",claim.id().toString()).put("listId",claim.list().toString()).put("sourceState","HEALTHY");input.set("item",item);
@@ -226,6 +268,22 @@ final class TaskProviderWrites {
             new TaskCloudPull(store,receipts,inputs).remember(applied.body(),"google",row.path("repositoryId").asText(),remote);
         }
         row.put("state","DONE").putNull("lastError");connections().save(KIND,row);
+    }
+    /** The sent payload is immutable. A newer local value is a new delta, never an acknowledgement conflict. */
+    private void acknowledgeFields(JsonNode row,JsonNode current,TaskCloudProvider.RemoteTask remote){
+        var candidate=((ObjectNode)current).deepCopy();var list=required("TASK_LIST",uuid(row.get("listId")));
+        var key=reference(uuid(row.get("connectionId")),list,candidate);var reference=(ObjectNode)key;
+        var baseline=reference.path("baseline").path("fields").isObject()?((ObjectNode)reference.path("baseline").path("fields")).deepCopy():object();
+        boolean completion=row.path("writeFields").has("status")||row.path("writeFields").has("completedAt");
+        boolean sameCompletion=current.path("status").equals(row.path("sentFields").path("status"))&&current.path("completedAt").equals(row.path("sentFields").path("completedAt"));
+        for(var names=row.path("writeFields").fieldNames();names.hasNext();){
+            String field=names.next();if(!FIELDS.contains(field)||!remote.fields().has(field))continue;
+            var accepted=remote.fields().get(field);baseline.set(field,accepted.deepCopy());
+            boolean same=completion&&Set.of("status","completedAt").contains(field)?sameCompletion:current.path(field).equals(row.path("sentFields").path(field));
+            if(same)candidate.set(field,accepted.deepCopy());
+        }
+        var snapshot=object().put("version",1).put("capturedAt",store.now().toString());snapshot.set("fields",baseline);reference.set("baseline",snapshot);
+        candidate.put("version",current.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",candidate));store.change("TASK","UPDATED",current.path("id").asText());
     }
     /** Link the acknowledged identity without replacing any native task fields, including concurrent edits. */
     private void linkCreated(ObjectNode row){
@@ -268,12 +326,14 @@ final class TaskProviderWrites {
     void failure(UUID id,String lease,String attempt,String error,boolean uncertain){
         var found=store.find(KIND,id);if(found.isEmpty())return;var row=((ObjectNode)found.get()).deepCopy();String state=row.path("state").asText();
         if(!Set.of("CHECKING","SENDING").contains(state)||!row.path("lease").asText().equals(lease)||state.equals("SENDING")&&!row.path("attempt").asText().equals(attempt))return;
-        row.put("state",uncertain&&state.equals("SENDING")?"UNKNOWN":"FAILED").put("lastError",uncertain&&state.equals("SENDING")?"TASK_PROVIDER_OUTCOME_UNKNOWN":error);connections().save(KIND,row);
+        row.put("state",uncertain&&state.equals("SENDING")?"UNKNOWN":"FAILED").put("lastError",uncertain&&state.equals("SENDING")?"TASK_PROVIDER_OUTCOME_UNKNOWN":error);
+        if(row.path("automatic").asBoolean()&&row.path("state").asText().equals("UNKNOWN")&&row.hasNonNull("externalId"))row.put("checkRequested",true).put("checkRequestedAt",store.now().toString());
+        connections().save(KIND,row);
     }
     /** Every HTTP request runs outside the account transaction. UNKNOWN writes are never sent again. */
     void drain(TaskProviderConnections.Claim claim,String token,GoogleTasksWriter writer){
         for(int count=0;count<5;count++){
-            var next=store.transaction(claim.owner(),()->next(claim));if(next==null)return;UUID id=uuid(next.get("id"));
+            var next=store.transaction(claim.owner(),()->{queueAutomatic(claim);return next(claim);});if(next==null)return;UUID id=uuid(next.get("id"));
             if(next.path("state").asText().equals("ACK")){store.transaction(claim.owner(),()->{reconcile(claim,id);return null;});continue;}
             ObjectNode sending=null;
             try{
@@ -363,9 +423,18 @@ final class TaskProviderWrites {
         connections().save(KIND,row);
     }
     static void retire(ServerStore store,UUID connection,String generation){
-        var state=new TaskProviderConnections(store);for(var before:store.list(KIND))if(before.path("connectionId").asText().equals(connection.toString())&&!before.path("generation").asText().equals(generation)){
+        var state=new TaskProviderConnections(store);var auth=store.find(TaskProviderConnections.AUTH,connection);
+        for(var before:store.list(KIND))if(before.path("connectionId").asText().equals(connection.toString())&&!before.path("generation").asText().equals(generation)){
             var row=((ObjectNode)before).deepCopy();String old=row.path("state").asText();String next=switch(old){case "PREVIEW","QUEUED","CHECKING"->"STALE";case "SENDING"->"UNKNOWN";case "ACK"->"ACK_REVIEW";default->null;};
-            if(next!=null){row.put("state",next).put("lastError",next.equals("UNKNOWN")?"TASK_PROVIDER_OUTCOME_UNKNOWN":"TASK_PROVIDER_WRITE_CHANGED");state.save(KIND,row);}
+            boolean recover=auth.isPresent()&&auth.get().path("automatic").asBoolean()&&row.hasNonNull("confirmedAt")&&row.hasNonNull("externalId")&&Set.of("SENDING","UNKNOWN","ACK","ACK_REVIEW").contains(old);
+            if(recover){
+                // Consent to automatic sync recovers transmitted outcomes, never old prepared payloads.
+                row.put("automatic",true).put("checkRequested",true).put("checkRequestedAt",store.now().toString());
+                if(!row.has("sentFields"))row.set("sentFields",row.path("writeFields").deepCopy());
+                if(old.equals("ACK_REVIEW"))row.put("lastError","TASK_PROVIDER_WRITE_CHANGED");
+            }
+            if(next!=null){row.put("state",next).put("lastError",next.equals("UNKNOWN")?"TASK_PROVIDER_OUTCOME_UNKNOWN":"TASK_PROVIDER_WRITE_CHANGED");if(next.equals("UNKNOWN")&&row.path("automatic").asBoolean()&&row.hasNonNull("externalId"))row.put("checkRequested",true).put("checkRequestedAt",store.now().toString());state.save(KIND,row);}
+            else if(recover)state.save(KIND,row);
         }
     }
     private void validate(JsonNode row,JsonNode auth){

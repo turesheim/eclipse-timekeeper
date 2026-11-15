@@ -59,6 +59,34 @@ class TaskProviderResourceHttpTest {
         fail("Provider refresh did not finish");return null;
     }
     @AfterEach void disconnect(){for(String id:created)for(int attempt=0;attempt<3;attempt++){var before=call("GET","/"+id,null,null);if(before.statusCode()==404)break;var reply=call("DELETE","/"+id,null,before.header("ETag"));if(reply.statusCode()==204)break;assertEquals(412,reply.statusCode(),reply.asString());}}
+    @Test void accountSettingsSaveBothSubscriptionsAtomicallyAndCheckOwnerAndWritePermission(){
+        var authorize=object();authorize.set("services",object().put("tasks",true).put("calendars",true));
+        var attempt=json(call("POST","/google/authorize",authorize,null),200);
+        String state=Arrays.stream(URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(item->item.startsWith("state=")).map(item->URLDecoder.decode(item.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
+        var connected=json(call("POST","/complete",object().put("state",state).put("code","combined-fixture-"+UUID.randomUUID()),null),200);String id=connected.path("id").asText();created.add(id);
+        var paused=json(call("PUT","/"+id+"/state",object().put("paused",true),etag(connected)),200);
+        var settings=object();settings.putObject("tasks").put("automatic",true).putArray("selectedLists").add("list-1");
+        var calendars=settings.putObject("calendars");calendars.putArray("selectedCalendars").add("calendar");calendars.putObject("calendarMappings").put("calendar",UUID.randomUUID().toString());
+        assertEquals(404,call("PUT","/"+id+"/settings",settings,etag(paused)).statusCode());
+        var unchanged=current(id);assertEquals(paused,unchanged);assertTrue(unchanged.path("selectedLists").isEmpty());assertTrue(unchanged.path("selectedCalendars").isEmpty());
+        var client=store.transaction(connected.path("ownerId").asText(),()->store.createClient(object().put("name","Combined settings")));
+        ((ObjectNode)calendars.get("calendarMappings")).put("calendar",client.path("id").asText());
+        assertEquals(404,call("b",BROWSER,"PUT","/"+id+"/settings",settings,etag(paused)).statusCode());assertEquals(403,call("read",BROWSER,"PUT","/"+id+"/settings",settings,etag(paused)).statusCode());
+        assertEquals(428,call("PUT","/"+id+"/settings",settings,null).statusCode());assertEquals(412,call("PUT","/"+id+"/settings",settings,"\"stale\"").statusCode());
+        var saved=json(call("PUT","/"+id+"/settings",settings,etag(paused)),200);inputs.validate("TaskProviderConnection",saved);assertTrue(saved.path("automatic").asBoolean());assertEquals("list-1",saved.path("selectedLists").get(0).asText());assertEquals("calendar",saved.path("selectedCalendars").get(0).asText());
+    }
+    @Test void ordinaryTaskSaveSynchronizesAutomaticallyWithoutAnyProviderPreparationOrSendRequest()throws Exception{
+        var connected=connectWritable();String id=connected.path("id").asText(),owner=connected.path("ownerId").asText();
+        var input=object().put("automatic",true);input.putArray("selectedLists").add("list-1");json(call("PUT","/"+id+"/lists",input,etag(connected)),200);var imported=idle(id);assertTrue(imported.path("imports").isEmpty());
+        var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connected.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
+        var edit=object().put("summary","Ordinary API edit").putNull("projectId").putNull("parentTaskId").putNull("url");
+        var saved=given().header("Authorization","Bearer test-a").header("If-Match",etag(task)).contentType("application/json").body(edit.toString()).put("/api/v1/tasks/"+task.path("id").asText());assertEquals(200,saved.statusCode(),saved.asString());
+        var provider=TaskProviderHttpTestFixture.STATES.get(connected.path("remoteAccountId").asText());long deadline=System.nanoTime()+java.time.Duration.ofSeconds(5).toNanos();
+        while(provider.writes.get()==0&&System.nanoTime()<deadline)Thread.sleep(25);
+        assertEquals(1,provider.writes.get(),"A committed ordinary task save must start background provider work within five seconds");idle(id);
+        var current=store.transaction(owner,()->store.find("TASK",uuid(task.get("id"))).orElseThrow());assertEquals("Ordinary API edit",current.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());
+        var jobs=store.transaction(owner,()->store.list(TaskProviderWrites.KIND).stream().filter(row->row.path("connectionId").asText().equals(id)).toList());assertEquals(1,jobs.size());assertEquals("DONE",jobs.getFirst().path("state").asText());
+    }
     @Test void googleAndMicrosoftSignInSelectionAndBackgroundPullCreateOwnedNativeTasks()throws Exception{
         for(String provider:List.of("google","microsoft")){
             var connection=connect(provider);String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1","list-2");

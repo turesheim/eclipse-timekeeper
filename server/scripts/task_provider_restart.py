@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--existing-database', action='store_true',
                         help='Use the caller-provisioned TIMEKEEPER_TEST_TASK_DB_URL prefix and PostgreSQL credentials.')
     parser.add_argument('--postgres-image', default='postgres:17.11-bookworm')
+    parser.add_argument('--h2', action='store_true', help='Use an isolated file-backed H2 database instead of PostgreSQL.')
     args = parser.parse_args()
     commit = run('git', 'rev-parse', 'HEAD', cwd=ROOT, capture_output=True).stdout.strip()
     if args.expected_commit and args.expected_commit != commit:
@@ -33,8 +34,14 @@ def main():
     env = os.environ.copy()
     name = 'dagsverk-task-restart-' + uuid.uuid4().hex[:12]
     owned = False
+    database_temporary = None
     try:
-        if args.existing_database:
+        if args.h2:
+            if args.existing_database:
+                parser.error('--h2 cannot be combined with --existing-database')
+            database_temporary = tempfile.TemporaryDirectory(prefix='dagsverk-task-restart-h2-')
+            env['TIMEKEEPER_TEST_TASK_DB_URL'] = 'jdbc:h2:file:' + str(Path(database_temporary.name) / 'tasks')
+        elif args.existing_database:
             for key in ('TIMEKEEPER_TEST_TASK_DB_URL', 'TIMEKEEPER_TEST_PG_USER', 'TIMEKEEPER_TEST_PG_PASSWORD'):
                 if not env.get(key):
                     parser.error('Missing isolated fixture variable: ' + key)
@@ -66,10 +73,11 @@ def main():
             proof = json.loads(Path(env['TIMEKEEPER_TEST_TASK_RESTART_PROOF']).read_text())
             if not proof.get('passed') or proof['preparePid'] == proof['verifyPid']:
                 raise RuntimeError('Two distinct successful server JVMs were not observed')
-            result = {'passed': True, 'commit': commit, 'sourceDirty': dirty,
+            result = {'passed': True, 'commit': commit, 'sourceDirty': dirty, 'database': 'h2' if args.h2 else 'postgresql',
                       'preparePid': proof['preparePid'], 'verifyPid': proof['verifyPid'],
                       'checks': ['acknowledged-page-resume', 'repeated-sync-without-duplicates',
-                                 'expired-sending-to-unknown-without-resend', 'durable-ack-without-provider-request']}
+                                 'expired-sending-to-unknown-without-resend', 'durable-ack-without-provider-request',
+                                 'automatic-task-edit-outbox-resume']}
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result), flush=True)
@@ -77,6 +85,8 @@ def main():
     finally:
         if owned:
             subprocess.run(['docker', 'rm', '-f', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if database_temporary:
+            database_temporary.cleanup()
 
 
 if __name__ == '__main__':

@@ -26,7 +26,7 @@ export async function renderTaskProviders(view){
   function choose(provider){choices.hidden=!!provider;back.hidden=!provider;for(const [id,panel]of providerPanels)panel.hidden=id!==provider;if(provider)providerPanels.get(provider).querySelector('h3')?.focus();else if(chooser.open)choices.querySelector('button')?.focus();}
   chooser.addEventListener('close',()=>{authorizationController?.abort();for(const status of providerFeedback.values())status.textContent='';if(view.valid()){restoreChooserFocus=view.busy;if(!restoreChooserFocus)add.focus();}});
   const accessLabel=node('label',t('task_providers.google_access'),'form-label'),access=node('select',undefined,'form-select');
-  for(const direction of ['IMPORT','TWO_WAY'])access.append(new Option(t('task_providers.access_'+direction),direction));accessLabel.append(access);
+  for(const direction of ['TWO_WAY','IMPORT'])access.append(new Option(t('task_providers.access_'+direction),direction));accessLabel.append(access);
   let generation=0,timer=null,controller=null,zone='UTC',configured={},projects=[],clients=[],calendarSynchronization=true;
   function serviceChoices(initial={tasks:true,calendars:true},switches=false){
     const fieldset=node('fieldset',undefined,switches?'internet-service-list':'mb-3');fieldset.append(node('legend',t('internet_accounts.choose_services'),switches?'visually-hidden':'h6'));const choices={};
@@ -86,12 +86,11 @@ export async function renderTaskProviders(view){
       event.preventDefault();run(async()=>{
         const selectedLists=[...card.form.querySelectorAll('input[name=selectedLists]:checked')].map(input=>input.value);
         const projectMappings=Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null]));
-        const latest=await view.session.request('/task-providers/'+data.id);if(!view.valid())return;
         if((latest.data.configurationVersion??latest.data.version)!==card.draftVersion)throw new ApiError('STALE_VERSION',412);
         await view.session.request('/task-providers/'+data.id+'/lists',{method:'PUT',etag:latest.etag,body:{selectedLists,projectMappings}});if(!view.valid())return;
         view.clean(card.form);card.feedback.textContent=t('task_providers.selection_saved');await load();
       },card.save,card.feedback);
-    });
+    card.save.addEventListener('click',saveSelections);card.form.addEventListener('submit',event=>{event.preventDefault();saveSelections();});
     card.refresh=button(t('task_providers.refresh_now'),()=>run(async()=>{await view.session.request('/task-providers/'+data.id+'/refresh',{method:'POST'});if(view.valid())await load();},card.refresh,card.feedback));
     card.services=serviceChoices(data.services||{tasks:true,calendars:false},true);card.services.fieldset.addEventListener('change',()=>{card.servicesDirty=true;controls();});
     card.reconnect=button(t('task_providers.reconnect'),()=>connect(data.providerId,card.access?.value||'IMPORT',card.services.read(),card.feedback));

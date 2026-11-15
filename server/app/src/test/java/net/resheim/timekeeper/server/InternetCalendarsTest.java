@@ -44,6 +44,12 @@ class InternetCalendarsTest {
     private TaskProviderConnections.Claim claim(Account account){return tx(account,()->connections().claim(account.connection(),false));}
     private static ObjectNode event(String id,String title){return (ObjectNode)parse("{\"id\":\""+id+"\",\"summary\":\""+title+"\",\"start\":{\"date\":\"2026-11-10\"},\"end\":{\"date\":\"2026-11-11\"}}");}
     private static TaskProviderHttp.Reply reply(int status,ObjectNode value){return new TaskProviderHttp.Reply(status,Map.of(),value.toString().getBytes(StandardCharsets.UTF_8));}
+    @Test void connectingAndDiscoveringCalendarsDoesNotSubscribeAndRepeatedSelectionRetainsTheSameRecord(){
+        var account=account(false);tx(account,()->{assertTrue(store.list(CalendarSubscriptions.SUB).isEmpty());return null;});
+        select(account);UUID id=InternetCalendars.id(account.connection(),"work");
+        tx(account,()->{var calendar=new CalendarSubscriptions(store);var before=calendar.required(id);calendar.edit(id,etag(calendar.visible(before)),object().put("name","Work").put("clientId",account.client().toString()).put("visible",false),null);return null;});
+        select(account);tx(account,()->{assertEquals(1,store.list(CalendarSubscriptions.SUB).size());assertEquals(id.toString(),store.list(CalendarSubscriptions.SUB).getFirst().path("id").asText());assertFalse(new CalendarSubscriptions(store).required(id).path("visible").asBoolean());return null;});
+    }
     @Test void calendarOnlySelectionDoesNotCreateTasksAndDoesNotChangeTaskDraftVersions(){
         var account=account(false);long taskVersion=tx(account,()->connections().view(account.connection()).path("configurationVersion").asLong());var chosen=select(account);
         assertEquals(taskVersion,chosen.path("configurationVersion").asLong());assertEquals(1,chosen.path("selectedCalendars").size());assertEquals(0,chosen.path("selectedLists").size());

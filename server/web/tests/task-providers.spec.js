@@ -23,7 +23,7 @@ function connection(owner,overrides={}){
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
 async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},calendarSynchronization=true,readiness={},authorizationFailure=null,authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
-  const model={rows,providers,readiness,authorizationFailure,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
+  const model={rows,providers,readiness,authorizationFailure,settingsFailure:null,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
   for(const [path,items]of [['clients',clients],['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
     const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
@@ -77,6 +77,13 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
       }
     }
     if(method==='GET')return reply(row);
+    if(method==='PUT'&&path.endsWith('/settings')){
+      if(model.settingsFailure)return reply({code:model.settingsFailure,status:409},409);
+      expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);
+      if(input.tasks){row.selectedLists=input.tasks.selectedLists;row.projectMappings=input.tasks.projectMappings;row.automatic=input.tasks.automatic;row.imports=[];row.configurationVersion++;row.syncing=true;}
+      if(input.calendars){row.selectedCalendars=input.calendars.selectedCalendars;row.calendarMappings=input.calendars.calendarMappings;row.calendarConfigurationVersion=(row.calendarConfigurationVersion??0)+1;}
+      row.version++;return reply(row);
+    }
     if(method==='PUT'&&path.endsWith('/calendars')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedCalendars=input.selectedCalendars;row.calendarMappings=input.calendarMappings;row.version++;row.calendarConfigurationVersion=(row.calendarConfigurationVersion??0)+1;return reply(row);}
     if(method==='PUT'&&path.endsWith('/lists')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedLists=input.selectedLists;row.projectMappings=input.projectMappings;if(Object.hasOwn(input,'reviewAdditions'))row.reviewAdditions=input.reviewAdditions;row.version++;row.configurationVersion++;row.syncing=true;return reply(row);}
     if(method==='PUT'&&path.endsWith('/state')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.paused=input.paused;row.version++;return reply(row);}
@@ -131,7 +138,7 @@ test('direct connections offer calendar and task choices without infrastructure 
   const google=await openProvider(page);await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeChecked();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('dialog').getByRole('button',{name:'Back',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:true},language:'en',direction:'IMPORT'});
 });
 
-test('calendar and task drafts save independently on one connected account',async({page,request})=>{
+test('one save commits calendar and task subscriptions together and a failure retains both drafts',async({page,request})=>{
   const owner=await signIn(page,request),client={id:randomUUID(),name:'Client'},row=connection(owner,{services:{tasks:true,calendars:true,writableTasks:false},availableCalendars:[{id:'team',name:'Team calendar',readable:true},{id:'personal',name:'Personal calendar',readable:true}],selectedCalendars:['team'],calendarMappings:{team:client.id},calendarConfigurationVersion:1});
   const model=await providerFixture(page,owner,{rows:[row],clients:[client]});await open(page);const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true}),personal=panel.getByRole('checkbox',{name:'Personal calendar',exact:true});
   await home.check();await personal.check();await refreshStatus(page);await expect(home).toBeChecked();await expect(personal).toBeChecked();
@@ -213,7 +220,7 @@ test('task connections and failure states are localized in Norwegian',async({pag
   await expect(page.getByRole('heading',{name:'Google · Fixture account',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Legg til konto',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes.',{exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
 });
 
-test('Google access defaults to import-only and write consent is an explicit choice',async({page,request})=>{
+test('Google task connections request write consent during account setup',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
   await openProvider(page);const access=page.getByRole('combobox',{name:'Task synchronization',exact:true});await expect(access).toHaveValue('IMPORT');
   await access.selectOption('TWO_WAY');await page.getByRole('button',{name:'Connect Google',exact:true}).click();
@@ -378,6 +385,7 @@ test('legacy identity conflicts remain resolvable without an ordinary-addition r
   const owner=await signIn(page,request),row=connection(owner),listId=randomUUID();row.identityReviews=[{listId,remoteListId:'work',version:1}];const model=await providerFixture(page,owner,{rows:[row],identities:[identityReview()]});await open(page);const panel=card(page,row.id);
   await expect(panel.getByRole('checkbox',{name:/Review newly/})).toHaveCount(0);await panel.getByRole('button',{name:'Resolve task link: Work',exact:true}).click();await panel.getByRole('button',{name:'Import as a new task',exact:true}).click();expect(model.writes.at(-1).input).toEqual({decision:'IMPORT',externalId:'new-source-id'});await expect(panel.getByRole('button',{name:'Resolve task link: Work',exact:true})).not.toBeVisible();expect(model.providerWrites).toBe(0);
 });
+
 test('read-only native sessions can inspect new identities but cannot import or replace them',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{selectedLists:['work','home']}),fixture=identityTasks(row.id);row.identityReviews=[{listId:fixture.newList,remoteListId:'home',version:1}];await providerFixture(page,owner,{rows:[row],tasks:[fixture.task],lists:fixture.lists,identities:[identityReview()]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Resolve task link: Home',exact:true}).click();await expect(panel.getByRole('button',{name:'Import as a new task',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:'Use the existing Dagsverk task',exact:true})).toBeDisabled();await expect(panel.getByRole('checkbox',{name:'Retain this Dagsverk task and replace only the selected source link.',exact:true})).toBeDisabled();
 });

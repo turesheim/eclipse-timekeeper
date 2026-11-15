@@ -32,7 +32,7 @@ class TaskProviderRefresh {
     private final ScheduledExecutorService scheduler=Executors.newSingleThreadScheduledExecutor(run->{var thread=new Thread(run,"task-provider-refresh");thread.setDaemon(true);return thread;});
     private volatile boolean closed;
     private final java.util.concurrent.atomic.AtomicBoolean revoking=new java.util.concurrent.atomic.AtomicBoolean();
-    void start(@Observes StartupEvent event){scheduler.scheduleWithFixedDelay(this::sweep,1,60,TimeUnit.SECONDS);}
+    void start(@Observes StartupEvent event){scheduler.scheduleWithFixedDelay(this::sweep,1,1,TimeUnit.SECONDS);}
     @PreDestroy void close(){closed=true;scheduler.shutdownNow();workers.shutdownNow();}
     void wake(){if(!closed)try{scheduler.execute(this::sweep);}catch(RejectedExecutionException ignored){}}
     private TaskProviderConnections connections(){return new TaskProviderConnections(store);}
@@ -99,7 +99,11 @@ class TaskProviderRefresh {
                 }
                 if(scan==null)return;
                 outcome=store.transaction(claim.owner(),()->scans.reconcile(claim));
-                if(claim.provider()==TaskCloudProvider.Provider.GOOGLE)new TaskProviderWrites(store,receipts,inputs).drain(claim,tokens.access(),clients.googleWriter());
+                if(claim.provider()==TaskCloudProvider.Provider.GOOGLE){
+                    var writes=new TaskProviderWrites(store,receipts,inputs);
+                    store.transaction(claim.owner(),()->{writes.queueAutomatic(claim);return null;});
+                    writes.drain(claim,tokens.access(),clients.googleWriter());
+                }
             }
         }catch(TaskProviderHttp.Failure failure){error=failure.getMessage();retry=failure.retryAfterSeconds;}
         catch(ApiFailure failure){error=failure.code;}

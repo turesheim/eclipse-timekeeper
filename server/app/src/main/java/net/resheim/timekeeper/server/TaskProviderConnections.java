@@ -127,7 +127,7 @@ final class TaskProviderConnections {
     ObjectNode visible(JsonNode value){
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
-        result.set("version",value.path("version"));result.put("reviewAdditions",false);
+        result.set("version",value.path("version"));result.put("automatic",value.path("automatic").asBoolean());result.put("reviewAdditions",false);
         result.set("services",services(value));
         InternetCalendars.visible(value,result);
         result.put("configurationVersion",value.path("configurationVersion").asLong()).put("direction",value.path("direction").asText("IMPORT")).put("paused",value.path("paused").asBoolean());
@@ -141,20 +141,32 @@ final class TaskProviderConnections {
         var reviews=result.putArray("reviews");for(var scan:store.list(TaskProviderScans.SCAN))if(scan.path("connectionId").equals(value.path("id"))&&scan.path("generation").equals(value.path("generation"))&&scan.path("state").asText().equals("READY")&&TaskProviderScans.approved(value,scan.path("remoteListId").asText()))reviews.add(object().put("listId",scan.path("id").asText()).put("remoteListId",scan.path("remoteListId").asText()));
         result.set("identityReviews",TaskProviderIdentities.descriptors(store,value));
         result.put("pendingWrites",TaskProviderWrites.pending(store,uuid(value.get("id"))));
+        result.set("syncIssues",TaskProviderIntents.issues(store,value));
+        String status=!connection.path("enabled").asBoolean()||value.path("blocked").asBoolean()?"RECONNECT_REQUIRED":value.path("paused").asBoolean()?"PAUSED"
+                :result.path("pendingCount").asInt()>0||!result.path("syncIssues").isEmpty()||value.hasNonNull("lastError")?"NEEDS_ATTENTION":result.path("syncing").asBoolean()?"SYNCHRONIZING":result.path("pendingWrites").asInt()>0?"NEEDS_ATTENTION"
+                :!writable(value,connection)?"READ_ONLY":value.path("selected").isEmpty()||value.hasNonNull("lastSuccess")?"UP_TO_DATE":"SYNCHRONIZING";
+        result.put("syncStatus",status);
         for(var list:value.path("catalog")){var item=object();for(String field:List.of("id","name","kind","shared","owner"))item.set(field,list.path(field));catalog.add(item);}
         return result;
     }
     ObjectNode select(UUID id,List<String> selected,String match){return select(id,selected,null,match);}
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match){return select(id,selected,projects,match,null);}
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match,Boolean reviewAdditions){
+        return select(id,selected,projects,match,reviewAdditions,null);
+    }
+    ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match,Boolean reviewAdditions,Boolean automatic){
         var value=required(id);ApiReplies.match(visible(value),match);
+        if(automatic!=null)value.put("automatic",automatic);
         value.put("reviewAdditions",false);
         if(selected.size()>20||new HashSet<>(selected).size()!=selected.size())throw ApiFailure.validation();
         var chosen=new HashSet<>(selected);var known=new HashSet<String>();
         var mappings=projects==null?(value.path("projects").isObject()?((ObjectNode)value.get("projects")).deepCopy():object()):((ObjectNode)projects).deepCopy();
         if(projects!=null)for(var names=projects.fieldNames();names.hasNext();)if(!chosen.contains(names.next()))throw ApiFailure.validation();
         mappings.retain(selected);for(var project:mappings)if(!project.isNull())store.find("PROJECT",uuid(project)).orElseThrow(ApiFailure::notFound);
-        value.set("projects",mappings);var approved=array();for(var remote:value.path("approved"))if(chosen.contains(remote.asText()))approved.add(remote);value.set("approved",approved);
+        value.set("projects",mappings);var approved=array();
+        if(value.path("automatic").asBoolean())selected.forEach(approved::add);
+        else for(var remote:value.path("approved"))if(chosen.contains(remote.asText()))approved.add(remote);
+        value.set("approved",approved);
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
         String provider=connection.path("providerId").asText();int position=0;var existingLists=ownedLists(id);
@@ -195,6 +207,7 @@ final class TaskProviderConnections {
             value.put("roundActive",false).put("requested",true);
         }else if(value.hasNonNull("nextRefresh")&&Instant.parse(value.path("nextRefresh").asText()).isAfter(now))return null;
         if(!value.path("roundActive").asBoolean()){
+            value.put("roundIntentRevision",value.path("intentRevision").asLong());
             value.put("roundActive",true).put("forceRound",force||value.path("forceRequested").asBoolean()).put("forceRequested",false).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         }
         int index=value.path("roundIndex").asInt();if(index<0||!catalogOnly&&index>=value.path("selected").size())throw ApiFailure.conflict();
@@ -247,13 +260,13 @@ final class TaskProviderConnections {
         boolean blocked=error!=null&&Set.of("TASK_PROVIDER_RECONNECT_REQUIRED","TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED","TASK_PROVIDER_PERMISSION_REQUIRED","TASK_PROVIDER_ACCOUNT_CHANGED","TASK_PROVIDER_CONFIGURATION_CHANGED").contains(error);
         int next=value.path("roundIndex").asInt()+1;boolean more=!blocked&&!claim.catalogOnly()&&next<value.path("selected").size();
         value.put("roundIndex",more?next:0).put("roundActive",more).put("blocked",blocked).putNull("lease").putNull("leaseUntil");
-        boolean queued=TaskProviderWrites.queued(store,claim.id())||services(value).path("calendars").asBoolean()&&value.path("calendarPending").asBoolean();if(!more)value.put("requested",!blocked&&queued);
+        boolean queued=TaskProviderWrites.queued(store,claim.id())||value.path("intentRevision").asLong()>value.path("roundIntentRevision").asLong()||services(value).path("calendars").asBoolean()&&value.path("calendarPending").asBoolean();if(!more)value.put("requested",!blocked&&queued);
         if(outcome!=null&&outcome.path("awaitingImport").asBoolean())value.put("roundPreview",true);
-        if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean())value.put("lastSuccess",store.now().toString());
+        if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean()&&(!value.path("automatic").asBoolean()||TaskProviderWrites.pending(store,claim.id())==0))value.put("lastSuccess",store.now().toString());
         String first=errors.isEmpty()?null:errors.elements().next().asText();if(first==null)value.putNull("lastError");else value.put("lastError",first);
         if(retryAfter>0)value.put("retryUntil",store.now().plusSeconds(retryAfter).toString());else if(errors.isEmpty())value.remove("retryUntil");
         if(blocked)value.putNull("nextRefresh");
-        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,retryAfter),more?0:!errors.isEmpty()?60:queued?0:900)).toString());
+        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,retryAfter),more?0:!errors.isEmpty()?60:queued?0:value.path("automatic").asBoolean()?45+Math.floorMod(claim.id().hashCode(),15):900)).toString());
         if(!blocked&&!more&&services(value).path("calendars").asBoolean()&&value.hasNonNull("calendarRetryUntil")&&Instant.parse(value.path("calendarRetryUntil").asText()).isBefore(Instant.parse(value.path("nextRefresh").asText())))value.set("nextRefresh",value.get("calendarRetryUntil"));
         save(AUTH,value);return more;
     }

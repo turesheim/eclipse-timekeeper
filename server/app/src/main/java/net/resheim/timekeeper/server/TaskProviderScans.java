@@ -22,7 +22,7 @@ final class TaskProviderScans {
         if(before.isPresent()){
             var old=before.get();boolean same=old.path("generation").asText().equals(claim.generation());
             if(same&&old.path("state").asText().equals("FETCHING")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(86400).isAfter(now))return ((ObjectNode)old).deepCopy();
-            if(same&&!claim.forced()&&old.path("state").asText().equals("READY")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(900).isAfter(now))return ((ObjectNode)old).deepCopy();
+            if(same&&!auth.path("automatic").asBoolean()&&!claim.forced()&&old.path("state").asText().equals("READY")&&Instant.parse(old.path("startedAt").asText()).plusSeconds(900).isAfter(now))return ((ObjectNode)old).deepCopy();
         }
         boolean full=TaskProviderWrites.needsFullScan(store,claim.id(),claim.list())||claim.provider()!=TaskCloudProvider.Provider.GOOGLE||!approved(auth,claim.remoteList())||before.isEmpty()
                 ||!before.get().hasNonNull("lastFullAt")||!Instant.parse(before.get().path("lastFullAt").asText()).plusSeconds(86400).isAfter(now);
@@ -105,12 +105,13 @@ final class TaskProviderScans {
         UUID project=optionalText(auth.path("projects").get(value.path("remoteListId").asText())).map(UUID::fromString).orElse(null);
         var scan=new TaskCloudPull.Scan(value.path("providerId").asText(),value.path("accountId").asText(),value.path("remoteListId").asText(),tasks(value),Instant.parse(value.path("startedAt").asText()),value.path("full").asBoolean());
         var result=new TaskCloudPull(store,receipts,inputs).apply(connection,list,scan,project,true);
+        if(auth.path("automatic").asBoolean())value.set("pending",result.path("pending").deepCopy());
         int identities=0;for(var row:result.path("pending"))if(Set.of("NEW_IDENTITY_REVIEW","IDENTITY_ALIAS").contains(row.path("reason").asText()))identities++;
         boolean countChanged=value.path("identityCount").asInt(-1)!=identities;value.put("identityCount",identities);
         if(result.path("complete").asBoolean()){
             value.put("state","APPLIED").put("lastAppliedAt",value.path("startedAt").asText());if(value.path("full").asBoolean())value.put("lastFullAt",value.path("startedAt").asText());
             connections().save(SCAN,value);
-        }else if(countChanged)connections().save(SCAN,value);
+        }else if(countChanged||auth.path("automatic").asBoolean())connections().save(SCAN,value);
         return result;
     }
     static boolean approved(JsonNode auth,String remote){for(var item:auth.path("approved"))if(item.asText().equals(remote))return true;return false;}
