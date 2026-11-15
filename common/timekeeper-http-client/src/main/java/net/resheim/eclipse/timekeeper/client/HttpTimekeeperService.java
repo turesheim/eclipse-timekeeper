@@ -195,7 +195,7 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
     @Override public Task updateTask(UpdateTask command) {var body=taskBody(command.projectId(),command.parentTaskId(),command.summary(),command.url());command.syncHome().ifPresent(home->optional(body,"syncListId",home));return WireValues.task(put("/tasks/"+command.id().value(),command.expectedVersion(),body));}
     @Override public Task updateTaskDetails(UpdateTaskDetails command){
         var task=command.task();var body=taskBody(task.projectId(),task.parentTaskId(),task.summary(),task.url());task.syncHome().ifPresent(home->optional(body,"syncListId",home));
-        planning(body,command.planning());WireValues.body(body,command.body());WireValues.timing(body,command.timing());body.addProperty("priority",command.importance().priority().name());body.addProperty("siblingOrder",command.siblingOrder());body.add("metadata",WireValues.metadata(command.metadata()));
+        planning(body,command.planning());WireValues.body(body,command.body());WireValues.timing(body,command.timing());WireValues.importance(body,command.importance());body.addProperty("siblingOrder",command.siblingOrder());body.add("metadata",WireValues.metadata(command.metadata()));
         return WireValues.task(put("/tasks/"+task.id().value(),task.expectedVersion(),body));
     }
     @Override public Task updateTaskPlanning(UpdateTaskPlanning command) {var body=object();planning(body,command.planning());return putTaskSection(command.id(),"planning",command.expectedVersion(),body);}

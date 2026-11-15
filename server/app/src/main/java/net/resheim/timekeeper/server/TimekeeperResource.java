@@ -326,8 +326,10 @@ public class TimekeeperResource {
     private JsonNode stored(String type,Object value,JsonNode input) {
         if(type.equals("TASK")) {
             var task=(Task)value;
-            if(input.has("priority")&&!task.importance().priority().name().equals(input.path("priority").asText()))
-                task=store.service().updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),new TaskImportance(TaskPriority.valueOf(input.path("priority").asText()),task.importance().flagged(),task.importance().urgent())));
+            if(input.has("priority")||input.has("flagged")||input.has("urgent")){
+                var next=new TaskImportance(input.has("priority")?TaskPriority.valueOf(input.path("priority").asText()):task.importance().priority(),input.has("flagged")?input.path("flagged").asBoolean():task.importance().flagged(),input.has("urgent")?input.path("urgent").asBoolean():task.importance().urgent());
+                if(!task.importance().equals(next))task=store.service().updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),next));
+            }
             if(input.has("start")||input.has("due")) {
                 var proposed=resourceSnapshot(task).deepCopy();if(input.has("start"))proposed.set("start",input.get("start"));if(input.has("due"))proposed.set("due",input.get("due"));var next=timing(proposed);
                 if(!task.timing().equals(next))task=store.service().updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),next));

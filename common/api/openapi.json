@@ -22319,6 +22319,12 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/TaskMetadata"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
           }
         },
         "required": [
