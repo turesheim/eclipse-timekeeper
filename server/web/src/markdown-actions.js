@@ -24,7 +24,7 @@ export function buildActionsMenu(field){
     trigger.disabled=f.loading||!choices().length;if(trigger.disabled)f.closeActions();
   };
   f.addActionsGroup=group=>{group.className='markdown-actions-group';menu.append(group);f.syncActions();};
-  const open=(last=false)=>{f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
+  const open=(last=false)=>{f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
   trigger.addEventListener('mousedown',event=>event.preventDefault());trigger.addEventListener('click',()=>menu.matches(':popover-open')?f.closeActions():open());
   trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
   menu.addEventListener('beforetoggle',event=>{const opened=event.newState==='open';trigger.setAttribute('aria-expanded',String(opened));for(const [target,type,options]of [[window,'resize',false],[document,'scroll',true]])target[opened?'addEventListener':'removeEventListener'](type,position,options);});

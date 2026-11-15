@@ -17,7 +17,7 @@ const relativeReference=(origin,target)=>{
 // resolved note origin before an authenticated collection lookup.
 const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',reference,{legacyAssets:false});
 /** All lookups use the current API session. No credentials enter resource URLs. */
-export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true}={}){
+export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true,afterBannerChange=async()=>{},dailyBannerContext=()=>origin()?.sourceType==='DAY_NOTE'}={}){
   let cachedSession,cache,allCache,info,infoRequest,generation=0,opening=false;
   const invalidate=()=>{cache=null;allCache=null;info=null;infoRequest=null;generation++;};
   const currentSession=()=>{const current=session();if(!current)throw new Error(t('notes.invalid_link'));if(current!==cachedSession){cachedSession=current;invalidate();}return current;};
@@ -89,6 +89,28 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
   };
   const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
   return {
+    dailyBannerContext,
+    bannerChanged:afterBannerChange,
+    readBanner:async()=>{
+      if(!canCreate()||!await beforeCreate())throw new Error(t('notes.invalid_link'));
+      const current=currentSession(),source=JSON.stringify(origin()),collection=await collectionInfo();let path=originPath([],origin(),collection.settings);
+      if(!path)path=originPath(await catalog(),origin(),collection.settings);if(!path)throw new Error(t('notes.invalid_link'));
+      let entry,reply,text='';try{entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;if(entry.deleted)throw new Error(t('notes.invalid_link'));reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());}catch(error){if(error.status!==404)throw error;}
+      const date=entry?.kind==='DAY'?entry.sourceKey:typeof origin()==='object'&&origin()?.sourceType==='DAY_NOTE'?origin().sourceKey:null;
+      if(!date||!/^\d{4}-\d\d-\d\d$/.test(date)||current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
+      return {session:current,source,path,date,text,etag:reply?.etag||null,assetsFolder:collection.settings.assetsFolder};
+    },
+    writeBanner:async(context,text)=>{
+      const current=currentSession(),active=()=>canCreate()&&current===context.session&&context.source===JSON.stringify(origin());if(!active())throw new Error(t('notes.invalid_link'));
+      if(!await ensureParents(context.path,current,active))throw new Error(t('notes.invalid_link'));
+      await current.request('/notes/files?'+new URLSearchParams({path:context.path}),{method:'PUT',...(context.etag?{etag:context.etag}:{noneMatch:'*'}),rawBody:new TextEncoder().encode(text)});
+      if(!active())return;invalidate();document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));
+    },
+    uploadBanner:async(context,bytes,extension)=>{
+      const current=currentSession(),active=()=>canCreate()&&current===context.session&&context.source===JSON.stringify(origin());if(!active()||!['png','jpg','gif','webp'].includes(extension)||bytes.length>5_000_000)throw new Error(t('markdown.upload_failed'));
+      const path=context.assetsFolder+'/'+crypto.randomUUID()+'.'+extension;if(!await ensureParents(path,current,active))throw new Error(t('notes.invalid_link'));
+      const reply=await current.request('/notes/files?'+new URLSearchParams({path}),{method:'PUT',noneMatch:'*',rawBody:bytes});if(!active())throw new Error(t('notes.invalid_link'));invalidate();return reply.data.path;
+    },
     searchTag:(value,source)=>{const tag=hashtagKey(value);if(!tag||!session()||source&&!source.isConnected)return;(source||document).dispatchEvent(new CustomEvent(tagNavigation,{bubbles:true,cancelable:true,detail:{tag,guards:[],leave:[]}}));},
     resolveOrigin:async()=>{const current=currentSession(),value=origin(),collection=await collectionInfo();let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);if(!path)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;},
     invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,

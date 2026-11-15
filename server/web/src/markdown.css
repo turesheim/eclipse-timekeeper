@@ -1,8 +1,7 @@
-.markdown-toolbar { overflow-x: auto; margin-block: .75rem; padding: .2rem; }
-.markdown-banner { flex: none; width: 100%; height: clamp(8rem, 20vw, 16rem); overflow: hidden; border-radius: .5rem; margin-bottom: .75rem; }
+.markdown-toolbar { overflow-x: auto; margin-block: .25rem; padding: 0; }
+.markdown-banner { flex: none; width: 100%; height: 112px; overflow: hidden; border-radius: 0; margin-bottom: .25rem; }
 .markdown-banner > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 @media(max-width:760px) {
-  .markdown-banner { height: clamp(5rem, 22vw, 8rem); }
   .markdown-editor:has(> .markdown-banner:not([hidden])) .markdown-tools { flex-wrap: nowrap; min-width: 0; overflow-x: auto; }
 }
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
@@ -10,7 +9,7 @@
 .markdown-editor .markdown-tools { flex-wrap: wrap; max-width: 100%; }
 .markdown-editor .markdown-tools > button { flex: none; }
 .markdown-editor pre, .markdown-editor textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
-.markdown-editor .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; font-size: var(--font-markdown-body); }
+.markdown-editor .ProseMirror { padding: .5rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; font-size: var(--font-markdown-body); }
 .markdown-editor .journal-formatted { background: var(--bs-body-bg); color: var(--bs-body-color); }
 .journal-formatted:not([hidden]), .journal-formatted > div, .journal-formatted .milkdown { display: flex; flex-direction: column; }
 .journal-formatted :is(.ProseMirror,.milkdown), .journal-formatted > div { flex: 1; min-width: 0; }
@@ -47,7 +46,7 @@
 .markdown-block-menu .dropdown-item { display: flex; align-items: center; gap: .5rem; min-height: 2.75rem; }
 .markdown-block-menu [aria-checked="true"] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); font-weight: 700; }
 
-.journal-dialog { --journal-padding: clamp(.75rem, 2vw, 1.5rem); width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }
+.journal-dialog { --journal-padding: .5rem; width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }
 dialog.journal-dialog { overflow: auto; }
 .journal-dialog form { display: flex; flex-direction: column; gap: .25rem; height: min(calc(94dvh - var(--journal-padding) - var(--journal-padding) - 2px), 54rem); }
 .journal-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: .25rem; }
@@ -66,7 +65,7 @@ dialog.journal-dialog { overflow: auto; }
 .journal-dialog > form > .dialog-actions { flex: none; flex-wrap: wrap; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); padding-block: .75rem 0; margin: 0; }
 .journal-dialog > form > .dialog-actions [role="status"] { margin-inline-end: auto; text-align: start; }
 @media(max-width: 480px) { .journal-dialog > form > .dialog-actions [role="status"] { flex-basis: 100%; margin: 0; } }
-.journal-inline { display: flex; flex: 1; padding: clamp(.75rem,2vw,1.25rem); }
+.journal-inline { display: flex; flex: 1; padding: .5rem; }
 .journal-inline form { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .journal-inline .journal-content { display: flex; flex-direction: column; flex: 1; overflow: visible; }
 .journal-inline .markdown-editor { display: flex; flex: 1; flex-direction: column; min-height: 0; }
@@ -199,3 +198,20 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .note-client-dialog {width:min(26rem,calc(100vw - 2rem));}
 
 .journal-formatted mark { color:var(--bs-emphasis-color); background:var(--bs-warning-bg-subtle); padding:.05em .15em; }
+
+/* Banners bleed to card edges; prose and the compact toolbar retain a small inset. */
+.notes-editor > .markdown-banner,.journal-dialog > .markdown-banner,.journal-inline > form > .markdown-banner,.journal-dialog > form > .markdown-banner { width:calc(100% + 1rem); margin:-.5rem -.5rem .25rem; border-radius:var(--bs-border-radius) var(--bs-border-radius) 0 0; }
+
+.markdown-banner {position:relative;flex-shrink:0}
+.banner-forecast {position:absolute;inset:.35rem .35rem 1.25rem auto;display:flex;align-items:stretch;gap:.25rem;max-width:calc(100% - .7rem);list-style:none;margin:0;padding:0;color:#fff;font-size:.75rem;line-height:1.15}
+.banner-forecast li {display:grid;grid-template-columns:auto auto;align-content:center;align-items:center;gap:.1rem .3rem;min-width:0;max-width:8rem;padding:.25rem .4rem;border-radius:.25rem;background:rgb(15 30 32 / 88%)}
+.banner-forecast time {font-variant-numeric:tabular-nums}
+.banner-weather-symbol {font-size:1.2rem;text-align:right}
+.banner-weather-label {grid-column:1 / -1;overflow-wrap:anywhere}
+.banner-forecast strong {grid-column:1 / -1;font-size:.9rem}
+.banner-weather-credit {position:absolute;bottom:.15rem;right:.35rem;padding:.05rem .2rem;border-radius:.15rem;background:rgb(15 30 32 / 88%);color:#fff;font-size:.625rem;line-height:1.2}
+.banner-weather-credit:hover,.banner-weather-credit:focus {color:#fff;text-decoration:underline}
+.banner-image-dialog {max-width:34rem}
+.banner-image-dialog label {display:block;margin:.5rem 0}
+.banner-image-preview {width:100%;margin:.5rem 0;height:112px}
+@media(max-width:400px) {.banner-forecast {inset-inline:.25rem;justify-content:flex-end;gap:.2rem}.banner-forecast li {flex:1;padding:.2rem .3rem;font-size:.7rem}.banner-forecast strong {font-size:.8rem}}

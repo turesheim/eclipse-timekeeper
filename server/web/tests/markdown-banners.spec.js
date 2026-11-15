@@ -29,7 +29,7 @@ async function openNote(page,path){
   await entry.click();await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror')).toBeVisible();return root;
 }
 async function expectBanner(root,position='25% 75%'){
-  await expect(banner(root)).toBeVisible();await expect(banner(root).locator('img')).toHaveCSS('object-position',position);await expect(banner(root).locator('img')).toHaveCSS('object-fit','cover');await expect(banner(root).locator('img')).toHaveAttribute('alt','');await expect(banner(root)).toHaveAttribute('aria-hidden','true');
+  await expect(banner(root)).toBeVisible();await expect(banner(root)).toHaveCSS('height','112px');await expect(banner(root).locator('img')).toHaveCSS('object-position',position);await expect(banner(root).locator('img')).toHaveCSS('object-fit','cover');await expect(banner(root).locator('img')).toHaveAttribute('alt','');await expect(banner(root)).toHaveAttribute('aria-hidden','true');
   await expect.poll(()=>banner(root).locator('img').evaluate(img=>img.naturalWidth)).toBe(800);expect(await root.locator('.ProseMirror .markdown-banner').count()).toBe(0);
 }
 
@@ -108,6 +108,32 @@ test('shared daily and weekly journals show banners in writable and read-only se
   try{
     const read=await context.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');
     const writes=[];read.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&new URL(r.url()).pathname.startsWith('/api/v1/notes'))writes.push(r.url());});
-    await check(read,true);const root=await openNote(read,'journal/2026-11-02.md');await expectBanner(root);await expect(root.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
+    await check(read,true);await read.locator('#today-note-editor').getByRole('button',{name:'Note tools',exact:true}).click();for(const name of ['Add seasonal banner','Change banner image','Restore seasonal image'])await expect(read.getByRole('menuitem',{name,exact:true})).toHaveCount(0);await read.keyboard.press('Escape');const root=await openNote(read,'journal/2026-11-02.md');await expectBanner(root);await expect(root.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
   }finally{await context.close();}
+});
+
+async function dailyTool(root,name){await root.getByRole('button',{name:'Note tools',exact:true}).click();await root.getByRole('menuitem',{name,exact:true}).click();}
+
+test('daily seasonal snapshots keep their forecast across custom upload, reload, location changes and restore',async({page,request})=>{
+  test.setTimeout(90000);
+  const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);
+  let previews=0;await page.route('**/api/v1/daily-banners/*/preview',route=>{previews++;return route.fulfill({json:{version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',weather:'snow',provider:'MET Norway',capturedAt:'2026-11-15T10:00:00Z',forecast:[9,12,15].map((hour,index)=>({time:String(hour).padStart(2,'0')+':00',instant:'2026-11-16T'+String(hour-1).padStart(2,'0')+':00:00Z',symbol:'lightsnow',condition:'snow',temperatureCelsius:index-2}))}});});
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toBeVisible();
+  await dailyTool(root,'Add seasonal banner');await expect(banner(root)).toBeVisible();await expect(root.locator('.banner-forecast li')).toHaveCount(3);
+  await expect(root.locator('.banner-forecast time')).toHaveText(['09:00','12:00','15:00']);await expect(root.locator('.banner-weather-label')).toHaveText(['Snow','Snow','Snow']);const forecast=await root.locator('.banner-forecast').innerText();
+  const entry=await(await api('GET','/notes/resolve?path=journal%2F2026-11-16.md')).json(),original=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();
+  await dailyTool(root,'Change banner image');const dialog=page.locator('.banner-image-dialog');await expect(dialog).toBeVisible();await dialog.getByLabel('Upload a local image').setInputFiles({name:'custom.png',mimeType:'image/png',buffer:image});await dialog.getByLabel('Horizontal crop').fill('0.1');await dialog.getByLabel('Vertical crop').fill('0.8');await dialog.getByRole('button',{name:'Save banner',exact:true}).click();
+  await expect(banner(root).locator('img')).toHaveCSS('object-position','10% 80%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);
+  const custom=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(custom).not.toBe(original);expect(custom.match(/^dagsverk_seasonal_banner:.*$/m)[0]).toBe(original.match(/^dagsverk_seasonal_banner:.*$/m)[0]);
+  const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Pacific/Auckland',weatherLocation:{latitude:-36.8,longitude:174.7}},{'If-Match':profile.headers().etag});
+  await page.unroute('**/api/v1/daily-banners/*/preview');await page.route('**/api/v1/daily-banners/*/preview',()=>{throw new Error('Saved banners must not refetch weather');});
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');await expect(banner(root).locator('img')).toHaveCSS('object-position','10% 80%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);
+  await page.locator('#today-date').fill('2026-11-17');await expect(banner(root)).toBeHidden();await expect(root.locator('.banner-forecast')).toHaveCount(0);await page.locator('#today-date').fill('2026-11-16');await expect(banner(root)).toBeVisible();
+  for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width:320,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);await expect(banner(root)).toHaveCSS('height','112px');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/seasonal-banner-'+theme+'-320.png',fullPage:true});}
+  await dailyTool(root,'Restore seasonal image');await expect(banner(root).locator('img')).toHaveCSS('object-position','50% 50%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original);expect(previews).toBe(1);
+});
+
+test('a daily image can come from the vault without changing another day',async({page,request})=>{
+  const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);const other=await put('journal/2026-11-17.md','# Other day\n');await put('journal/2026-11-16.md','# This day\n');
+  const root=await openNote(page,'journal/2026-11-16.md');await dailyTool(root,'Change banner image');const dialog=page.locator('.banner-image-dialog');await dialog.getByLabel('Existing vault image').selectOption('Images/Project cover.png');await dialog.getByRole('button',{name:'Save banner',exact:true}).click();await expect(banner(root)).toBeVisible();expect(await(await api('GET','/notes/entries/'+other.id+'/content')).text()).toBe('# Other day\n');
 });

@@ -301,6 +301,7 @@ public class ServerStore {
             if (!rows.next()) throw new IllegalStateException("Missing owner");
             var value = object(); value.put("ownerId",owner()); value.put("zoneId",rows.getString(1)); value.put("version",rows.getLong(2));value.put("locale",rows.getString(3));
             var preferences=find("PROFILE_PREF",PROFILE_PREFERENCES);
+            value.putNull("weatherLocation");preferences.filter(saved->saved.hasNonNull("weatherLocation")).ifPresent(saved->value.set("weatherLocation",saved.get("weatherLocation").deepCopy()));
             value.put("holidayCountry",preferences.map(saved->saved.path("holidayCountry").asText(null)).orElse(null));
             value.put("typographyCss",preferences.map(saved->saved.path("typographyCss").asText(null)).orElse(null));value.putNull("textSnippets");preferences.filter(saved->saved.hasNonNull("textSnippets")).ifPresent(saved->value.set("textSnippets",saved.get("textSnippets").deepCopy()));return value;
         } catch (SQLException e) { throw databaseFailure(e); }
@@ -318,6 +319,9 @@ public class ServerStore {
         return updateProfile(zone,updateLocale,locale,updateHolidays,holidayCountry,updateTypography,typographyCss,false,null);
     }
     public ObjectNode updateProfile(String zone,boolean updateLocale,String locale,boolean updateHolidays,String holidayCountry,boolean updateTypography,String typographyCss,boolean updateSnippets,JsonNode snippets) {
+        return updateProfile(zone,updateLocale,locale,updateHolidays,holidayCountry,updateTypography,typographyCss,updateSnippets,snippets,false,null);
+    }
+    public ObjectNode updateProfile(String zone,boolean updateLocale,String locale,boolean updateHolidays,String holidayCountry,boolean updateTypography,String typographyCss,boolean updateSnippets,JsonNode snippets,boolean updateWeather,JsonNode weatherLocation) {
         if(updateSnippets)snippets=TextSnippets.checked(snippets);
         var profile = profile(); long version = profile.get("version").asLong();
         if (update("UPDATE tk_owner SET zone_id=?,version=? WHERE id=? AND version=?",zone,version+1,owner(),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
@@ -325,16 +329,17 @@ public class ServerStore {
             if(locale==null) update("DELETE FROM tk_locale WHERE owner_id=?",owner());
             else if(update("UPDATE tk_locale SET locale=? WHERE owner_id=?",locale,owner())==0) update("INSERT INTO tk_locale(owner_id,locale) VALUES(?,?)",owner(),locale);
         }
-        if(updateHolidays || updateTypography || updateSnippets) {
+        if(updateHolidays || updateTypography || updateSnippets || updateWeather) {
             // Merge independent account preferences under the profile version
             // check. Resetting one preference must preserve the others.
             var preferences=(ObjectNode)find("PROFILE_PREF",PROFILE_PREFERENCES).map(JsonNode::deepCopy).orElseGet(JsonValues::object);
             preferences.put("id",PROFILE_PREFERENCES.toString()).put("ownerId",owner()).put("version",0);
+            if(updateWeather) {if(weatherLocation==null||weatherLocation.isNull())preferences.remove("weatherLocation");else preferences.set("weatherLocation",weatherLocation.deepCopy());}
             if(updateHolidays) {if(holidayCountry==null) preferences.remove("holidayCountry");else preferences.put("holidayCountry",holidayCountry);}
             if(updateTypography) {if(typographyCss==null) preferences.remove("typographyCss");else preferences.put("typographyCss",typographyCss);}
             if(updateSnippets) {if(snippets==null)preferences.remove("textSnippets");else preferences.set("textSnippets",snippets);}
             update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type='PROFILE_PREF' AND id=?",owner(),PROFILE_PREFERENCES);
-            if(preferences.has("holidayCountry") || preferences.has("typographyCss") || preferences.has("textSnippets"))
+            if(preferences.has("holidayCountry") || preferences.has("typographyCss") || preferences.has("textSnippets") || preferences.has("weatherLocation"))
                 update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,'PROFILE_PREF',?,0,?)",owner(),PROFILE_PREFERENCES,preferences.toString());
         }
         change("PROFILE","UPDATED",owner()); return profile();
