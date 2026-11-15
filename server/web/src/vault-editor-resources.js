@@ -98,12 +98,12 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
       let entry,reply,text='';try{entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;if(entry.deleted)throw new Error(t('notes.invalid_link'));reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());}catch(error){if(error.status!==404)throw error;}
       const date=entry?.kind==='DAY'?entry.sourceKey:typeof origin()==='object'&&origin()?.sourceType==='DAY_NOTE'?origin().sourceKey:null;
       if(!date||!/^\d{4}-\d\d-\d\d$/.test(date)||current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
-      return {session:current,source,path,date,text,etag:reply?.etag||null,assetsFolder:collection.settings.assetsFolder};
+      return {session:current,source,path,id:entry?.id,date,text,etag:reply?.etag||null,assetsFolder:collection.settings.assetsFolder};
     },
     writeBanner:async(context,text)=>{
       const current=currentSession(),active=()=>canCreate()&&current===context.session&&context.source===JSON.stringify(origin());if(!active())throw new Error(t('notes.invalid_link'));
       if(!await ensureParents(context.path,current,active))throw new Error(t('notes.invalid_link'));
-      await current.request('/notes/files?'+new URLSearchParams({path:context.path}),{method:'PUT',...(context.etag?{etag:context.etag}:{noneMatch:'*'}),rawBody:new TextEncoder().encode(text)});
+      await current.request(context.etag?'/notes/entries/'+context.id+'/content':'/notes/files?'+new URLSearchParams({path:context.path}),{method:'PUT',...(context.etag?{etag:context.etag}:{noneMatch:'*'}),rawBody:new TextEncoder().encode(text)});
       if(!active())return;invalidate();document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));
     },
     uploadBanner:async(context,bytes,extension)=>{
