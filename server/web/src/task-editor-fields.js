@@ -31,8 +31,9 @@ export function taskEditorFields(field,value,data,id,homes=[]){
   const order=field(t('tasks.sibling_order'),'siblingOrder',value.siblingOrder||0,{type:'number'});order.min='0';order.step='1';
   const categories=field(t('tasks.categories'),'categories',(value.metadata?.categories||[]).join('\n'),{multiline:true,hint:t('tasks.categories_help')});
   function moment(prefix,initial){
+    const clockPrefix=prefix==='start'?'start':'deadline';
     const kind=field(t('tasks.'+prefix+'_type'),prefix+'Kind',initial?.kind||'',{choices:[['',t('tasks.no_date')],['DATE',t('tasks.deadline_date')],['DATE_TIME',t('tasks.deadline_time')]]});
-    const date=field(t('tasks.'+prefix+'_label'),prefix+'Date',initial?.date||'',{type:'date'}),time=field(t('tasks.deadline_clock'),prefix+'Time',(initial?.time||'').split('.')[0],{type:'time'}),zone=field(t('tasks.deadline_zone'),prefix+'Zone',initial?.timeZone||data().profile.data.zoneId,{max:255});time.step='any';
+    const date=field(t('tasks.'+prefix+'_label'),prefix+'Date',initial?.date||'',{type:'date'}),time=field(t('tasks.'+clockPrefix+'_clock'),prefix+'Time',(initial?.time||'').split('.')[0],{type:'time'}),zone=field(t('tasks.'+clockPrefix+'_zone'),prefix+'Zone',initial?.timeZone||data().profile.data.zoneId,{max:255});time.step='any';
     const visibility=()=>{date.closest('label').hidden=!kind.value;date.required=!!kind.value;for(const input of [time,zone]){input.closest('label').hidden=kind.value!=='DATE_TIME';input.required=kind.value==='DATE_TIME';}};
     kind.addEventListener('change',visibility);visibility();const original=[kind.value,date.value,time.value,zone.value];
     return ()=>{

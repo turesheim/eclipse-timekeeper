@@ -1900,6 +1900,8 @@
   "tasks.categories_help": "Én kategori per linje.",
   "tasks.start_type": "Type startdato",
   "tasks.start_label": "Startdato",
+  "tasks.start_clock": "Klokkeslett for start",
+  "tasks.start_zone": "Tidssone for start",
   "tasks.due_type": "Type frist",
   "tasks.no_date": "Ingen dato",
   "task_writes.warning_HTML_ONLY": "Microsoft godtar HTML-notater. Denne verdien beholdes i Dagsverk.",

@@ -1900,6 +1900,8 @@
   "tasks.categories_help": "One category per line.",
   "tasks.start_type": "Start type",
   "tasks.start_label": "Start date",
+  "tasks.start_clock": "Start time",
+  "tasks.start_zone": "Start time zone",
   "tasks.due_type": "Deadline type",
   "tasks.no_date": "No date",
   "task_writes.warning_HTML_ONLY": "Microsoft accepts HTML notes; this value stays in Dagsverk.",
