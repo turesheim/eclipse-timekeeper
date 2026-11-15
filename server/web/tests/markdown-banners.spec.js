@@ -75,7 +75,7 @@ test('missing, ambiguous, invalid and remote banner sources leave notes usable w
 for(const destination of ['another note','another account'])test('a late banner image cannot survive navigation to '+destination,async({page,request})=>{
   const {put}=await fresh(page,request),asset=await put('Images/Project cover.png',image);await put('Notes/A.md',header+'\n# First account\n');await put('Notes/B.md','# Another note\n');
   let release,arrived,completed;const started=new Promise(resolve=>{arrived=resolve;}),done=new Promise(resolve=>{completed=resolve;});
-  await page.route('**/api/v1/notes/entries/'+asset.id+'/content',async route=>{arrived();await new Promise(resolve=>{release=resolve;});try{await route.fulfill({status:200,contentType:'application/octet-stream',body:image});}catch{}finally{completed();}});
+  await page.route('**/api/v1/notes/entries/'+asset.id+'/content',async route=>{const response=await route.fetch();expect(response.headers()['x-timekeeper-owner']).toBeTruthy();arrived();await new Promise(resolve=>{release=resolve;});try{await route.fulfill({response});}catch{}finally{completed();}});
   try{
     await openNote(page,'Notes/A.md');await started;await expect(banner(page.locator('#notes-panel'))).toBeHidden();
     if(destination==='another note')await openNote(page,'Notes/B.md');
