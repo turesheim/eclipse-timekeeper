@@ -87,7 +87,16 @@ test('portability: read-only sessions can download repeatedly while restore stay
   expect(await page.getByRole('link',{name:'Download archive',exact:true}).getAttribute('href')).not.toBe(previous);
   expect(await page.evaluate(async url=>{try{await fetch(url);return true;}catch{return false;}},previous)).toBe(false);
 });
-test('portability: concurrent session refreshes do not interrupt private archive downloads',async({page,request})=>{
+test('portability: busy archive preparation can be retried from the account page',async({page,request})=>{
+  await account(page,request);
+  await page.route('**/api/v1/data/account/export',route=>route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({status:503,code:'ACCOUNT_ARCHIVE_BUSY'})}));
+  await page.getByRole('button',{name:'Prepare archive',exact:true}).click();
+  await expect(page.getByText('The server is preparing another archive. Try again after it finishes.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Prepare archive',exact:true})).toBeEnabled();
+  await expect(page.getByRole('link',{name:'Download archive',exact:true})).toHaveCount(0);
+  await page.unroute('**/api/v1/data/account/export');await download(page);
+});
+test('portability: concurrent session refreshes stay available while overlapping archives return busy',async({page,request})=>{
   await account(page,request);
   for(let round=0;round<3;round++) {
     const replies=await page.evaluate(async()=>Promise.all(Array.from({length:12},async(_,index)=>{
@@ -95,6 +104,11 @@ test('portability: concurrent session refreshes do not interrupt private archive
       const bytes=new Uint8Array(await response.arrayBuffer());
       return {status:response.status,archive,type:response.headers.get('Content-Type'),zip:bytes[0]===0x50&&bytes[1]===0x4b};
     })));
-    for(const reply of replies) {expect(reply.status).toBe(200);if(reply.archive){expect(reply.type).toBe('application/zip');expect(reply.zip).toBe(true);}}
+    expect(replies.some(reply=>reply.archive&&reply.status===200)).toBe(true);
+    for(const reply of replies) {
+      if(!reply.archive)expect(reply.status).toBe(200);
+      else if(reply.status===200){expect(reply.type).toBe('application/zip');expect(reply.zip).toBe(true);}
+      else{expect(reply.status).toBe(503);expect(reply.zip).toBe(false);}
+    }
   }
 });
