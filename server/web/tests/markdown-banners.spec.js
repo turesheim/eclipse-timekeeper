@@ -24,7 +24,8 @@ async function fresh(page,request){
 }
 async function openNote(page,path){
   await page.locator('[data-tab=notes]').click();const root=page.locator('#notes-panel'),expand=root.getByRole('button',{name:'Expand left sidebar',exact:true});if(await expand.isVisible())await expand.click();await root.getByRole('button',{name:'Refresh',exact:true}).first().click();
-  const entry=noteEntry(page.locator('#notes-navigation'),path);if(!await entry.isVisible())await noteEntry(page.locator('#notes-navigation'),path.split('/')[0]).click();
+  const tree=page.locator('#notes-navigation [role=tree]');await expect(tree).toHaveAttribute('aria-busy','false');
+  const entry=noteEntry(page.locator('#notes-navigation'),path);if(!await entry.isVisible()){await noteEntry(page.locator('#notes-navigation'),path.split('/')[0]).click();await expect(tree).toHaveAttribute('aria-busy','false');}
   await entry.click();await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror')).toBeVisible();return root;
 }
 async function expectBanner(root,position='25% 75%'){
@@ -60,9 +61,10 @@ test('missing, ambiguous, invalid and remote banner sources leave notes usable w
     ['Broken image','banner: "[[Images/broken.png]]"','decode'],
     ['No banner','custom: retained','none']
   ];
+  for(const [name,metadata]of cases)await put('Notes/'+name+'.md','---\n'+metadata+'\n---\n\n# '+name+'\n\nUsable prose.\n');
   const external=[];page.on('request',r=>{if(!r.url().startsWith(new URL(process.env.TIMEKEEPER_WEB_URL).origin)&&!r.url().startsWith('blob:'))external.push(r.url());});
   for(const [name,metadata,kind]of cases){
-    const path='Notes/'+name+'.md';await put(path,'---\n'+metadata+'\n---\n\n# '+name+'\n\nUsable prose.\n');const root=await openNote(page,path);
+    const root=await openNote(page,'Notes/'+name+'.md');
     if(kind==='lookup')await expect(banner(root).locator('img')).toHaveAttribute('alt',/ · .+/);
     else await expect(banner(root).locator('img')).toHaveCount(0);
     await expect(banner(root)).toBeHidden();await expect(root.locator('.ProseMirror')).toContainText('Usable prose.');
