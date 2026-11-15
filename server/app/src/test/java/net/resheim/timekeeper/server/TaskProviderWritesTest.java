@@ -232,6 +232,20 @@ class TaskProviderWritesTest {
             var task=store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("account","remote-list"),"parent")).orElseThrow();assertEquals("Parent updated",task.path("summary").asText());return null;});
         assertTrue(task(f).path("parentTaskId").isNull());
     }
+    @Test void enablingAutomaticSyncRetainsAConfirmedUnsentCreationAndItsNewestNativeEdit(){
+        var f=nativeTask();UUID id=uuid(confirm(f,preview(f,TaskProviderWrites.Action.CREATE)).get("id"));rename(f,"Latest confirmed creation");var claim=automatic(f);var posts=new AtomicInteger();
+        writes().drain(claim,"token",writer(request->{assertEquals("POST",request.method());posts.incrementAndGet();assertEquals("Latest confirmed creation",body(request).path("title").asText());return reply(201,raw("Latest confirmed creation","\"created\"").put("id","confirmed-created").put("notes","").putNull("due"));}));
+        assertEquals(1,posts.get());assertEquals(f.list().toString(),task(f).path("syncListId").asText());assertEquals("confirmed-created",task(f).path("externalReferences").get(0).path("externalId").asText());assertEquals("STALE",job(f,id).path("state").asText());
+    }
+    @Test void enablingAutomaticSyncRetainsAConfirmedUnsentDeletion(){
+        var f=fixture();confirm(f,preview(f,TaskProviderWrites.Action.DELETE));var claim=automatic(f);assertTrue(task(f).path("deleted").asBoolean());var deletes=new AtomicInteger();
+        writes().drain(claim,"token",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Original","\"g1\""));assertEquals("DELETE",request.method());deletes.incrementAndGet();return reply(204,null);}));assertEquals(1,deletes.get());assertTrue(task(f).path("deleted").asBoolean());
+    }
+    @Test void aDependencyAddedAfterLegacyDeletionConfirmationBecomesAnException(){
+        var f=fixture();var approved=confirm(f,preview(f,TaskProviderWrites.Action.DELETE));
+        tx(f,()->{store.providerObservation(()->store.service().createTask(new CreateTask(Optional.empty(),Optional.of(new TaskId(f.task())),"New dependent child",Optional.empty())));return null;});automatic(f);
+        assertFalse(task(f).path("deleted").asBoolean());var row=job(f,uuid(approved.get("id")));assertEquals("CONFLICT",row.path("state").asText());assertEquals("TASK_DEPENDENCY",row.path("lastError").asText());
+    }
     private TaskProviderHttp.Reply reply(int status,JsonNode body){return new TaskProviderHttp.Reply(status,Map.of(),body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8));}
     private GoogleTasksWriter writer(TaskProviderHttp.Transport transport){return new GoogleTasksWriter(new TaskProviderHttp(Set.of("tasks.googleapis.com"),request->{assertThrows(IllegalStateException.class,()->store.owner());return transport.send(request);}));}
     private static JsonNode body(HttpRequest request){

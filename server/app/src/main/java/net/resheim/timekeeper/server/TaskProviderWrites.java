@@ -97,6 +97,9 @@ final class TaskProviderWrites {
             if(reference!=null&&(reference.path("providerData").path("payload").path("observation").hasNonNull("assignmentInfo")||reference.path("providerData").path("payload").path("observation").path("hidden").asBoolean())){allowed=false;warnings.add(object().put("field","parentTaskId").put("reason","SPECIAL_TASK_MOVE"));}
             if(!creating&&action!=Action.MOVE){action=Action.MOVE;fields=object();allowed=true;}
         }
+        if((action==Action.DELETE||action==Action.MOVE&&!task.path("syncListId").equals(list.path("id")))&&store.list("TASK").stream().anyMatch(child->!child.path("deleted").asBoolean()&&child.path("parentTaskId").equals(task.path("id")))){
+            allowed=false;warnings.add(object().put("field","parentTaskId").put("reason","TASK_DEPENDENCY"));
+        }
         int active=0;
         for(var row:store.list(KIND))if(row.path("connectionId").asText().equals(connection.toString())){
             if(row.path("state").asText().equals("PREVIEW")&&!Instant.parse(row.path("expiresAt").asText()).isAfter(store.now()))remove(row);
@@ -485,9 +488,24 @@ final class TaskProviderWrites {
         var state=new TaskProviderConnections(store);var auth=store.find(TaskProviderConnections.AUTH,connection);
         for(var before:store.list(KIND))if(before.path("connectionId").asText().equals(connection.toString())&&!before.path("generation").asText().equals(generation)){
             var row=((ObjectNode)before).deepCopy();String old=row.path("state").asText();String next=switch(old){case "PREVIEW","QUEUED","CHECKING"->"STALE";case "SENDING"->"UNKNOWN";case "ACK"->"ACK_REVIEW";default->null;};
-            if(auth.isPresent()&&auth.get().path("automatic").asBoolean()&&row.hasNonNull("confirmedAt")&&Set.of("QUEUED","CHECKING").contains(old)){
+            if(auth.isPresent()&&auth.get().path("automatic").asBoolean()&&row.hasNonNull("confirmedAt")&&(Set.of("QUEUED","CHECKING").contains(old)||old.equals("STALE")&&!row.hasNonNull("startedAt"))){
                 boolean selected=false;for(var id:auth.get().path("selected"))if(id.equals(row.path("remoteListId")))selected=true;
-                if(selected){row.put("generation",generation).put("automatic",true).put("state","QUEUED").putNull("lease").putNull("lastError");if(!row.has("sentFields"))row.set("sentFields",store.find("TASK",uuid(row.get("taskId"))).orElse(row.path("writeFields")).deepCopy());state.save(KIND,row);continue;}
+                if(selected){
+                    var current=store.find("TASK",uuid(row.get("taskId")));
+                    if(current.isPresent()&&!row.path("automatic").asBoolean()){
+                        var task=(Task)decode("TASK",current.get());
+                        if(row.path("action").asText().equals("CREATE")&&task.syncListId().isEmpty()){
+                            task=task.withSyncList(Optional.of(uuid(row.get("listId"))));store.save("TASK",task);store.change("TASK","UPDATED",task.id().value().toString());
+                        }else if(row.path("action").asText().equals("DELETE")&&!task.deleted()&&task.syncListId().map(list->list.equals(uuid(row.get("listId")))).orElse(false)){
+                            if(store.list("TASK").stream().anyMatch(child->!child.path("deleted").asBoolean()&&child.path("parentTaskId").asText().equals(row.path("taskId").asText()))){
+                                row.put("state","CONFLICT").put("generation",generation).put("automatic",true).put("lastError","TASK_DEPENDENCY");
+                                TaskProviderIntents.warnings(store,connection,uuid(row.get("listId")),current.get(),array().add(object().put("field","parentTaskId").put("reason","TASK_DEPENDENCY")));state.save(KIND,row);continue;
+                            }
+                            // Retain the deliberate operation while the fresh scan checks delete/edit races.
+                            store.save("TASK",task.withDeleted(true));store.change("TASK","DELETED",task.id().value().toString());
+                        }
+                    }
+                    row.put("generation",generation).put("automatic",true).put("state","QUEUED").putNull("lease").putNull("lastError");if(!row.has("sentFields"))row.set("sentFields",store.find("TASK",uuid(row.get("taskId"))).orElse(row.path("writeFields")).deepCopy());state.save(KIND,row);continue;}
             }
             boolean recover=auth.isPresent()&&auth.get().path("automatic").asBoolean()&&row.hasNonNull("confirmedAt")&&row.hasNonNull("externalId")&&Set.of("SENDING","UNKNOWN","ACK","ACK_REVIEW").contains(old);
             if(recover){
