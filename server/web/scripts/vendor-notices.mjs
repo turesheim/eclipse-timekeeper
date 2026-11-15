@@ -10,7 +10,7 @@ const components=[
   {id:'highlight.js',name:'highlight.js',homepage:'https://highlightjs.org/',license:'BSD-3-Clause',directory:'milkdown',licenseFile:'HIGHLIGHT-LICENSE',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
   {id:'@noble/hashes',name:'noble-hashes',homepage:'https://github.com/paulmillr/noble-hashes',license:'MIT',directory:'noble-hashes'},
   {id:'@milkdown/kit',name:'Milkdown',homepage:'https://milkdown.dev/',license:'MIT',directory:'milkdown',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
-  {id:'mermaid',name:'Mermaid',homepage:'https://mermaid.js.org/',license:'MIT',directory:'mermaid',notices:'/web/assets/mermaid/THIRD-PARTY-LICENSES.txt'},
+  {id:'pele',name:'Pele',homepage:'https://pele.run/',license:'MIT',directory:'mermaid',notices:'/web/assets/mermaid/THIRD-PARTY-LICENSES.txt'},
   {id:'bootstrap',name:'Bootstrap',homepage:'https://getbootstrap.com/',license:'MIT',directory:'bootstrap',notices:'/web/assets/bootstrap/THIRD-PARTY-LICENSES.txt'},
   {id:'dompurify',name:'DOMPurify',homepage:'https://github.com/cure53/DOMPurify',license:'Apache-2.0',directory:'dompurify',copyright:'(c) Cure53 and other contributors'},
   {id:'bootstrap-icons',name:'Bootstrap Icons',homepage:'https://icons.getbootstrap.com/',license:'MIT',directory:'bootstrap-icons'},

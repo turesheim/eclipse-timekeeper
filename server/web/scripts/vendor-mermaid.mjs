@@ -16,7 +16,7 @@ for(const input of Object.keys(result.metafile.inputs)){
   }
   if(!found)throw new Error('Missing package metadata: '+input);
 }
-let notices='Complete licenses for packages included in the locally bundled Mermaid renderer.\n';
+let notices='Complete licenses for packages included in the locally bundled Pele renderer for Mermaid diagrams.\n';
 const inventory=[];
 for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,'en'))){
   const license=pkg.name==='khroma'&&!pkg.license?'MIT':pkg.name==='dompurify'?'Apache-2.0':pkg.license;
@@ -28,9 +28,9 @@ for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,
 }
 const target=join(root,'src/assets/mermaid'),output=result.outputFiles[0];
 const sizes={file:'mermaid.js',bytes:output.contents.length};
-const files=[[join(target,'mermaid.js'),output.contents],[join(target,'LICENSE'),await readFile(join(root,'node_modules/mermaid/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n'],[join(target,'sizes.json'),JSON.stringify([sizes],null,2)+'\n']];
+const files=[[join(target,'mermaid.js'),output.contents],[join(target,'LICENSE'),await readFile(join(root,'node_modules/pele/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n'],[join(target,'sizes.json'),JSON.stringify([sizes],null,2)+'\n']];
 for(const [path,content] of files){
   if(check){if(!Buffer.from(await readFile(path)).equals(Buffer.from(content)))throw new Error('Regenerate Mermaid renderer: '+path);}
   else{await mkdir(dirname(path),{recursive:true});await writeFile(path,content);}
 }
-console.log(`${check?'Verified':'Bundled'} Mermaid renderer: ${JSON.stringify({...sizes,gzipBytes:gzipSync(output.contents).length})}; ${packages.size} dependency licenses.`);
+console.log(`${check?'Verified':'Bundled'} Pele renderer for Mermaid diagrams: ${JSON.stringify({...sizes,gzipBytes:gzipSync(output.contents).length})}; ${packages.size} dependency licenses.`);

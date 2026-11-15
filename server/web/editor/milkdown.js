@@ -121,9 +121,9 @@ function mermaidBlock(node){
   preview.className='markdown-mermaid-preview';status.setAttribute('role','status');
   image.alt=t('markdown.mermaid_diagram');image.hidden=true;
   preview.append(status,image);dom.append(preview);
-  let timer,generation=0,source;
-  const schedule=value=>{
-    if(value===source)return;source=value;const current=++generation;clearTimeout(timer);image.hidden=true;image.removeAttribute('src');
+  let timer,generation=0,source,width;
+  const schedule=(value,force=false)=>{
+    if(value===source&&!force)return;source=value;const current=++generation;clearTimeout(timer);image.hidden=true;image.removeAttribute('src');
     if(!value.trim()){status.textContent='';return;}
     if(new TextEncoder().encode(value).length>10000){status.textContent=t('markdown.mermaid_too_large');return;}
     if(/(?:https?:\/\/|data:|file:|javascript:)/i.test(value)){status.textContent=t('markdown.mermaid_external');return;}
@@ -131,15 +131,26 @@ function mermaidBlock(node){
     timer=setTimeout(async()=>{
       try{
         diagrams??=import(new URL('../mermaid/mermaid.js',import.meta.url).href);
-        const {renderDiagram}=await diagrams,svg=await renderDiagram(value);
+        const {renderDiagram}=await diagrams,svg=renderDiagram(value,{maxWidth:preview.clientWidth||undefined});
         if(current!==generation)return;
-        image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+        // SVG images cannot inherit page variables. Embed resolved theme colors
+        // while retaining the image boundary used for untrusted diagram text.
+        const xml=new DOMParser().parseFromString(svg,'image/svg+xml'),root=xml.documentElement,style=getComputedStyle(dom);
+        const colors=Object.entries({bg:'--bs-body-bg',fg:'--bs-body-color',muted:'--bs-secondary-color',line:'--bs-body-color',surface:'--bs-tertiary-bg','surface-alt':'--bs-secondary-bg',border:'--bs-border-color',accent:'--bs-primary',critical:'--bs-danger',error:'--bs-danger'}).map(([name,token])=>'--pele-'+name+':'+style.getPropertyValue(token)).join(';');
+        // CSP disables the parsed XML's style declaration. Preserve Pele's
+        // original aliases verbatim instead of replacing them through CSSOM.
+        root.setAttribute('style',root.getAttribute('style')+';'+colors);
+        image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(root));
         image.hidden=false;status.textContent='';
       }catch{if(current===generation)status.textContent=t('markdown.mermaid_invalid');}
     },300);
   };
+  const theme=new MutationObserver(()=>schedule(source,true));
+  theme.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-bs-theme']});
+  const resize=new ResizeObserver(entries=>{const next=Math.round(entries[0].contentRect.width);if(next>0&&next!==width){width=next;schedule(source,true);}});
+  resize.observe(dom);
   schedule(node.attrs.value);
-  return {dom,update(value){if(value.type!==node.type)return false;schedule(value.attrs.value);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:()=>true};
+  return {dom,update(value){if(value.type!==node.type)return false;schedule(value.attrs.value);return true;},destroy(){++generation;clearTimeout(timer);theme.disconnect();resize.disconnect();image.removeAttribute('src');},ignoreMutation:()=>true};
 }
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles,expandSnippet}){
   let emptyMarker;do{emptyMarker='<!-- timekeeper-empty-'+crypto.randomUUID()+' -->';}while(value.includes(emptyMarker));

@@ -135,6 +135,7 @@ test('Mermaid fences render as inert SVG previews and preserve editable Markdown
   await expect(diagram.locator('pre,code,textarea')).toHaveCount(0);
   const image=diagram.getByRole('img',{name:'Mermaid diagram preview'});await expect(image).toBeVisible();
   await expect.poll(()=>image.evaluate(element=>element.complete?element.naturalWidth:0)).toBeGreaterThan(0);
+  expect(await image.evaluate(element=>decodeURIComponent(element.src.split(',')[1]))).toContain('class="pele');
   expect(requested.some(url=>url.includes('/assets/mermaid/mermaid.js'))).toBe(true);
   await captureScreenshot(page,{path:'test-results/mermaid-editor.png',fullPage:true});
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(source);
@@ -145,7 +146,52 @@ test('Mermaid fences render as inert SVG previews and preserve editable Markdown
   await page.locator('#markdown-body').fill(external);await page.locator('#markdown-rich').click();
   await expect(page.locator('.markdown-mermaid-preview')).toContainText('cannot contain external resources');
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(external);
+  const oversized='```mermaid\nflowchart LR\n A["'+'ø'.repeat(5000)+'"]\n```\n';
+  await page.locator('#markdown-body').fill(oversized);await page.locator('#markdown-rich').click();
+  await expect(page.locator('.markdown-mermaid-preview')).toContainText('10,000-byte preview limit');
+  await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(oversized);
   expect(outside).toEqual([]);
+});
+
+test('Pele diagrams follow theme and container width without changing Mermaid source',async({page})=>{
+  await page.setViewportSize({width:1200,height:900});await open(page);
+  const source='Before the diagram.\r\n\r\n```mermaid\r\nflowchart LR\r\n A[Plan] --> B[Implement] --> C[Verify] --> D[Finish]\r\n```\r\n\r\nAfter the diagram.\r\n';
+  await importNote(page,source);await page.locator('#markdown-rich').click();
+  const image=page.locator('.markdown-mermaid-block img');await expect(image).toBeVisible();
+  const snapshot=()=>image.evaluate(element=>{
+    if(!element.complete||!element.naturalWidth||!element.src)return null;
+    const svg=new DOMParser().parseFromString(decodeURIComponent(element.src.split(',')[1]),'image/svg+xml').documentElement;
+    const style=document.createElement('span').style;style.cssText=svg.getAttribute('style');
+    return {background:style.getPropertyValue('--pele-bg').trim(),foreground:style.getPropertyValue('--pele-fg').trim(),bounds:svg.getAttribute('viewBox').split(/\s+/).map(Number),aliases:style.getPropertyValue('--_fg')};
+  });
+  await expect.poll(snapshot).not.toBeNull();const light=await snapshot();
+  expect(light.aliases).toContain('--pele-fg');
+  const darkForeground=await page.evaluate(()=>{document.documentElement.dataset.theme='timekeeper-dark';document.documentElement.dataset.bsTheme='dark';return getComputedStyle(document.documentElement).getPropertyValue('--bs-body-color').trim();});
+  await expect.poll(async()=>(await snapshot())?.foreground).toBe(darkForeground);
+  const dark=await snapshot();expect(dark.background).not.toBe(light.background);
+  await captureScreenshot(page,{path:'test-results/mermaid-pele-dark-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await expect.poll(async()=>(await snapshot())?.bounds[2]??Infinity).toBeLessThan(light.bounds[2]);
+  expect((await snapshot()).bounds[3]).toBeGreaterThan(light.bounds[3]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await captureScreenshot(page,{path:'test-results/mermaid-pele-dark-mobile.png',fullPage:true});
+  await page.evaluate(()=>{document.documentElement.dataset.theme='timekeeper';document.documentElement.dataset.bsTheme='light';});
+  await expect.poll(async()=>(await snapshot())?.foreground).toBe(light.foreground);
+  await captureScreenshot(page,{path:'test-results/mermaid-pele-light-mobile.png',fullPage:true});
+  await expect(page.locator('.markdown-mermaid-block svg, .markdown-mermaid-block a')).toHaveCount(0);
+  expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+  await page.locator('#markdown-source').click();expect(await downloaded(page)).toBe(source);
+});
+
+test('Pele attribution and complete license are bundled with the Mermaid renderer',async({page,request})=>{
+  await open(page);
+  const notices=await page.evaluate(async()=>(await import('/web/third-party-notices.js')).thirdPartyNotices);
+  const pele=notices.find(item=>item.name==='Pele'),manifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+  expect(pele.version).toBe(manifest.devDependencies.pele);expect(pele.homepage).toBe('https://pele.run/');
+  expect(notices.some(item=>item.name==='Mermaid')).toBe(false);
+  const license=await request.get(pele.licenseUrl);expect(license.status()).toBe(200);
+  expect(await license.text()).toBe(await readFile(new URL('../node_modules/pele/LICENSE',import.meta.url),'utf8'));
+  const dependencies=await request.get(pele.notices);expect(dependencies.status()).toBe(200);expect(await dependencies.text()).toContain('pele@'+manifest.devDependencies.pele);
 });
 
 // API requests bypass the test-only page routes: these check the shipped server.

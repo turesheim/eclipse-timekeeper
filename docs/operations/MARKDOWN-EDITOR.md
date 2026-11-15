@@ -179,7 +179,8 @@ pinned highlight.js version and its complete BSD license.
 
 ![Code language and copy badge with theme-aware syntax colors](../assets/screenshots/markdown-code-presentation.png)
 
-In formatted mode, a Mermaid fence shows only its locally generated diagram.
+In formatted mode, a Mermaid fence shows only its diagram, rendered locally by
+Pele in the current Dagsverk theme. Diagrams adapt to the available width.
 Use **Markdown source** to edit the diagram text. The diagram is an atomic editor
 node, so navigation cannot enter hidden code. Its complete original fenced source
 is retained through mode changes and saves. External diagram resources are rejected.
