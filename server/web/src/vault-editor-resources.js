@@ -17,7 +17,7 @@ const relativeReference=(origin,target)=>{
 // resolved note origin before an authenticated collection lookup.
 const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',reference,{legacyAssets:false});
 /** All lookups use the current API session. No credentials enter resource URLs. */
-export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true}={}){
+export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true}={}){
   let cachedSession,cache,allCache,info,infoRequest,generation=0,opening=false;
   const invalidate=()=>{cache=null;allCache=null;info=null;infoRequest=null;generation++;};
   const currentSession=()=>{const current=session();if(!current)throw new Error(t('notes.invalid_link'));if(current!==cachedSession){cachedSession=current;invalidate();}return current;};
@@ -94,6 +94,9 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
     bannerFrontmatter:async()=>{
       const value=origin();if(typeof value!=='object'||!['DAY_NOTE','EVENT_NOTE'].includes(value?.sourceType))return null;
+      // Collection reads initialize default folders. An absent native note has
+      // no file header, so merely viewing its empty editor needs no vault read.
+      if(!hasBannerSource())return '';
       const current=currentSession(),cycle=generation,collection=await collectionInfo(),path=originPath([],value,collection.settings);if(!path)return '';
       const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;
       if(current!==session()||cycle!==generation)return '';

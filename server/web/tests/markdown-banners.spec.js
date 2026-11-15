@@ -101,6 +101,8 @@ test('shared daily and weekly journals show banners in writable and read-only se
   const entry=await(await api('GET','/notes/resolve?path=journal%2F2026-11-03.md')).json(),headerRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/notes/entries/'+entry.id+'/content');
   await page.locator('#today-date').fill('2026-11-03');await headerRead;await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeHidden();
   expect((await(await api('GET','/day-notes/2026-11-03/content')).json()).body).toBe(body);
+  // Existing files may consist of metadata alone; an empty body still has a banner.
+  await put('journal/2026-11-04.md',header);await page.locator('#today-date').fill('2026-11-04');await expectBanner(page.locator('#today-note-editor'));
   const token=(await(await api('POST','/auth/tokens',{name:'Read-only banners',permissions:['read'],expiresAt:null})).json()).token;
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:process.env.TIMEKEEPER_WEB_URL.startsWith('https:')});
   try{
