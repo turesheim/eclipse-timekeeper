@@ -20,6 +20,13 @@ Only one account/Notes archive is prepared per server process at a time; if the
 server is already preparing one, wait for it to finish and try again.
 Authorization is checked before preparation and again before releasing the
 archive. Temporary output is removed after transfer or a failed preparation.
+The container templates place Java temporary files on the private state volume
+(`TMPDIR=/instance/tmp` in Compose, `/state/server/tmp` on Synology), rather than
+the RAM-backed `/tmp` mount. Allow disk space for the prepared ZIP. Standalone
+services should use a private disk directory with `-Djava.io.tmpdir=/path/to/tmp`.
+After an abrupt process termination, temporary archives can remain on disk;
+remove abandoned files only while every API process sharing that directory is
+stopped. These files contain private account data and must not be shared.
 
 The supported server requires at least **2 GiB of Java heap**, plus memory for
 the JVM outside its heap and for the database/OS. See the

@@ -17,4 +17,9 @@ set -f
 # Options are deliberately word-split; no eval or pathname expansion is performed.
 # shellcheck disable=SC2086
 set -- ${JAVA_OPTS:--Xms128m -Xmx2g}
+if [ -n "${TMPDIR:-}" ]; then
+    # Container /tmp is RAM-backed. Keep large private ZIPs on the state volume.
+    (umask 077; mkdir -p "$TMPDIR")
+    set -- "-Djava.io.tmpdir=$TMPDIR" "$@"
+fi
 exec java -XX:+ExitOnOutOfMemoryError "$@" -jar /app/quarkus-run.jar

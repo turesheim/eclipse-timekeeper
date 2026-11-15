@@ -12,3 +12,6 @@ headroom for native JVM memory and thread stacks, and budget separately for the
 database and host. For two API replicas, allocate the heap budget twice.
 The entrypoint exits on JVM heap exhaustion so the container restart policy can
 recover the service instead of leaving a live, unhealthy JVM.
+`TMPDIR=/instance/tmp` puts Java temporary files on the private state volume;
+allow disk space for ZIP preparation. The entrypoint creates the directory with
+private permissions and passes it as `java.io.tmpdir`.

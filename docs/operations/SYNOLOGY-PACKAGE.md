@@ -12,6 +12,9 @@ with `-Xms128m -Xmx2g`. This is not a 2 GiB total-NAS or container requirement:
 the JVM also uses native memory and thread stacks, while DSM and PostgreSQL need
 their own RAM. If you apply a container memory limit, leave headroom above the
 heap. Do not carry forward an older `JAVA_OPTS` override such as `-Xmx384m`.
+Private archive preparation uses `/state/server/tmp` on the persistent state
+volume, with additional disk space required for ZIP output. It does not use the
+container's RAM-backed `/tmp`. See [account-data exports](ACCOUNT-DATA.md).
 
 The current scope of #297 is a downloadable SPK installed through **Package
 Center → Manual Install**, with NAS lifecycle tests and migration/recovery
