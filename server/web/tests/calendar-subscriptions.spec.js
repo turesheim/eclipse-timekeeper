@@ -308,7 +308,10 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     const content=await api('GET','/notes/entries/'+entry.id+'/content');
     const synced=(await download.text()).replace('\n---\n','\n# Obsidian banner\nbanner: "![[ '+folder+'/cover.png ]]"\nbanner_x: 0.25\nbanner_y: 0.75\n---\n');
     await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from(synced),{'Content-Type':'application/octet-stream','If-Match':content.headers().etag});
-    await editor.getByRole('button',{name:'Close',exact:true}).click();await details.getByRole('button',{name:/^(Open|Add) event note$/}).click();
+    // Finish external fixture setup before reopening a writable editor. A
+    // refresh triggered by those writes can temporarily make the view read-only.
+    await editor.getByRole('button',{name:'Close',exact:true}).click();await page.reload();await ready(page);await calendar(page);
+    await planned(page,subscription).click();await details.getByRole('button',{name:/^(Open|Add) event note$/}).click();
     await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(editor.locator('.markdown-banner')).toBeVisible();await expect(editor.locator('.markdown-banner img')).toHaveCSS('object-position','25% 75%');
     await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');await saveMarkdown(editor);markdown=markdown.replace('# Minutes','# Minutes Reviewed.');
     expect(await(await api('GET',path+'/markdown')).text()).toBe(synced.replace('# Minutes','# Minutes Reviewed.'));expect((await(await api('GET',path)).json()).body).toBe(markdown);
