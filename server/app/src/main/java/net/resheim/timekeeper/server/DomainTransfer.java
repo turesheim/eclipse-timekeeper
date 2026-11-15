@@ -227,9 +227,8 @@ final class DomainTransfer {
         for(JsonNode item:input.get("tasks")){
             var id=required(tasks,uuid(item.get("id")));var task=(Task)decode("TASK",store.find("TASK",id.value()).orElseThrow());
             var home=optionalText(item.get("syncListId")).map(UUID::fromString).map(source->required(lists,source));
-            if(item.has("syncListId"))task=task.withSyncList(home);
-            if(item.path("deleted").asBoolean())task=task.withDeleted(true);
-            store.save("TASK",task);store.change("TASK","UPDATED",id.value().toString());
+            if(item.has("syncListId")&&!task.syncListId().equals(home)){task=store.save("TASK",task.withSyncList(home));store.change("TASK","UPDATED",id.value().toString());}
+            if(item.path("deleted").asBoolean()&&!task.deleted()){store.save("TASK",task.withDeleted(true));store.change("TASK","UPDATED",id.value().toString());}
         }
         service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);

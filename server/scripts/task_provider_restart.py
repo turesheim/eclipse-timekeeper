@@ -77,7 +77,8 @@ def main():
                       'preparePid': proof['preparePid'], 'verifyPid': proof['verifyPid'],
                       'checks': ['acknowledged-page-resume', 'repeated-sync-without-duplicates',
                                  'expired-sending-to-unknown-without-resend', 'durable-ack-without-provider-request',
-                                 'automatic-task-edit-outbox-resume']}
+                                 'automatic-task-edit-outbox-resume', 'native-task-creation-outbox-resume',
+                                 'retained-task-deletion-outbox-resume']}
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result), flush=True)

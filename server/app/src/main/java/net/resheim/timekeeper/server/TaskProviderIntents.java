@@ -18,7 +18,7 @@ final class TaskProviderIntents {
         for(var reference:task.path("externalReferences"))if(reference.hasNonNull("taskListId"))homes.add(uuid(reference.get("taskListId")));
         for(UUID home:homes){
             var list=store.find("TASK_LIST",home);if(list.isEmpty())continue;
-            UUID connectionId=uuid(list.get().get("connectionId"));var auth=store.find(TaskProviderConnections.AUTH,connectionId);if(auth.isEmpty())continue;
+            UUID connectionId=uuid(list.get().get("connectionId"));var auth=store.find(TaskProviderConnections.AUTH,connectionId);if(auth.isEmpty()||!auth.get().path("automatic").asBoolean())continue;
             // Record while paused, disconnected or unsubscribed too. Consent controls execution, not durability.
             UUID id=UUID.nameUUIDFromBytes(("dagsverk-task-intent:"+taskId+":"+home).getBytes(StandardCharsets.UTF_8));
             JsonNode linked=null;for(var ref:task.path("externalReferences"))if(ref.path("taskListId").asText().equals(home.toString()))linked=ref;

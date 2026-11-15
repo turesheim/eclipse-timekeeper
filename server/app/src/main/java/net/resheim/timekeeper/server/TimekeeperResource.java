@@ -159,10 +159,6 @@ public class TimekeeperResource {
             JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
         });
     }
-    @GET @Path("/task-sync/lists") public Response synchronizedTaskLists(){
-        ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");
-        return tx(()->{var result=object().put("revision",store.revision());var rows=result.putArray("items");store.service().synchronizedTaskLists().forEach(list->rows.add(snapshot(store.owner(),list)));result.putNull("nextCursor");return json(result);});
-    }
     @PUT @Path("/task-connections/{id}/capabilities") public Response updateTaskConnectionCapabilities(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskCapabilities",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {var before=required("TASK_CONNECTION",key);ApiReplies.match(before,match);
