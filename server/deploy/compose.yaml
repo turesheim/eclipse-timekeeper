@@ -62,7 +62,7 @@ x-api: &api
     TIMEKEEPER_SMTP_PASSWORD_FILE: *dagsverk-smtp-password-file
     QUARKUS_DATASOURCE_JDBC_MAX_SIZE: '16'
     QUARKUS_SHUTDOWN_TIMEOUT: 20s
-    JAVA_OPTS: -Xms64m -Xmx384m
+    JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx2g}
     DAGSVERK_DEPLOYED_AT: &dagsverk-deployed-at ${DAGSVERK_DEPLOYED_AT-${TIMEKEEPER_DEPLOYED_AT:-}}
     TIMEKEEPER_DEPLOYED_AT: *dagsverk-deployed-at
   secrets: [timekeeper_database_password, timekeeper_smtp_password]

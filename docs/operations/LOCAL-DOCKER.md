@@ -8,6 +8,11 @@ Use [Docker Desktop or Docker Engine with the Compose plugin](https://docs.docke
 The commands below use a Bash shell; on Windows, use WSL. You also
 need Git and Python 3. Java and Maven run inside the Docker build.
 
+Allow **at least 2 GiB of Java heap per API instance**. This two-instance setup
+needs 4 GiB of heap capacity together, plus native JVM memory, PostgreSQL and
+host memory. The default `JAVA_OPTS=-Xms128m -Xmx2g` can be overridden, but retain
+at least the supported `-Xmx2g` heap. Any container limit must leave room above it.
+
 ## 1. Get the deployment files
 
 For a new checkout:

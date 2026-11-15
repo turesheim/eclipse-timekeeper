@@ -22,10 +22,16 @@ class AccountArchiveHttpTest {
         String cookie=login.header("Set-Cookie").split(";",2)[0];
         try(var workers=java.util.concurrent.Executors.newFixedThreadPool(12)){
             for(int round=0;round<3;round++){
-                var start=new java.util.concurrent.CountDownLatch(1);var replies=new ArrayList<java.util.concurrent.Future<Integer>>();
+                var start=new java.util.concurrent.CountDownLatch(1);var replies=new ArrayList<java.util.concurrent.Future<Response>>();
                 for(int index=0;index<12;index++){final String route=index%2==0?"/data/account/export":"/auth/session";
-                    replies.add(workers.submit(()->{start.await();return given().header("Cookie",cookie).get("/api/v1"+route).statusCode();}));}
-                start.countDown();for(var reply:replies)assertEquals(200,reply.get());
+                    replies.add(workers.submit(()->{start.await();return given().header("Cookie",cookie).get("/api/v1"+route);}));}
+                start.countDown();int prepared=0;
+                for(int index=0;index<replies.size();index++){
+                    var reply=replies.get(index).get(20,java.util.concurrent.TimeUnit.SECONDS);
+                    if(index%2==0&&reply.statusCode()==503)assertEquals("ACCOUNT_ARCHIVE_BUSY",reply.jsonPath().getString("code"));
+                    else{assertEquals(200,reply.statusCode());if(index%2==0)prepared++;}
+                }
+                assertTrue(prepared>0);
             }
         }
     }

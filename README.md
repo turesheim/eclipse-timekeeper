@@ -57,6 +57,10 @@ Administrators manage account access without access to other users' work records
 ## Run the server
 
 The server exposes API v1 at `/api/v1` and includes the web interface at `/web/`.
+
+Each server process requires **at least 2 GiB of Java heap**, plus native JVM,
+database and operating-system memory. Container defaults use `-Xmx2g`; see the
+[server memory requirements](docs/operations/SERVER.md#configure-and-run).
 The browser client needs no separate frontend service or Node.js process.
 Open **About** in the account menu for the server/SPK version, build identity and
 deployment time.

@@ -22,5 +22,5 @@ USER 10001:10001
 ENV QUARKUS_PROFILE=postgresql QUARKUS_HTTP_HOST=0.0.0.0
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl --fail --silent http://127.0.0.1:8080/q/health/ready > /dev/null || exit 1
+    CMD curl --fail --silent --connect-timeout 2 --max-time 4 http://127.0.0.1:8080/q/health/ready > /dev/null || exit 1
 ENTRYPOINT ["/app/entrypoint.sh"]

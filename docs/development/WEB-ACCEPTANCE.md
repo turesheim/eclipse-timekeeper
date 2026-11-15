@@ -121,3 +121,26 @@ and videos are disabled because they can retain credentials. Keep real tokens,
 passwords, private keys, database dumps and user data out of committed evidence.
 Do not sum overlapping runs or describe skipped/unavailable checks as passing.
 Dated reports belong in [verification](../verification/README.md), not this guide.
+
+## Archive memory and responsiveness
+
+Use a separate clean checkout to build a PostgreSQL-profile distribution, so the
+ordinary H2-backed browser fixture retains its own package. After the normal
+quality checks, build and run:
+
+```sh
+./mvnw -B -ntp -f server/pom.xml clean package -DskipTests -Dquarkus.profile=postgresql
+python3 server/scripts/package_server.py --output server/target/distribution --commit "$(git rev-parse HEAD)"
+python3 server/scripts/archive_memory_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+```
+
+Docker and Java 21 are required. The fixture starts disposable PostgreSQL,
+creates ordinary binary namespace entries through the API and expands only
+synthetic canonical contents in that private database. It exports both account
+and Notes ZIPs, checks every file's length/checksum, and probes readiness and
+same-account reads during preparation. Default data is 80 files of 6 MiB plus
+one 150 MiB file. The 384 MiB fixture heap intentionally tests the old failure
+budget; supported production requires at least 2 GiB. The resulting JSON records
+source/checksum provenance, timings and concurrent-read counts; its private log
+contains only synthetic fixture activity. `--expect-oom` diagnoses an old build
+and requires the known failure instead of reporting it as a passing export.

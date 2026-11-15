@@ -16,5 +16,5 @@ fi
 set -f
 # Options are deliberately word-split; no eval or pathname expansion is performed.
 # shellcheck disable=SC2086
-set -- ${JAVA_OPTS:--Xms64m -Xmx384m}
-exec java "$@" -jar /app/quarkus-run.jar
+set -- ${JAVA_OPTS:--Xms128m -Xmx2g}
+exec java -XX:+ExitOnOutOfMemoryError "$@" -jar /app/quarkus-run.jar

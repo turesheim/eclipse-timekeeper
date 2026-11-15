@@ -26,6 +26,14 @@ class AccountArchive {
     static final String LEGACY_FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
     private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK","DAY_NOTE_HISTORY");
+    private static final org.jboss.logging.Logger LOG=org.jboss.logging.Logger.getLogger(AccountArchive.class);
+    private final java.util.concurrent.Semaphore preparing=new java.util.concurrent.Semaphore(1);
+    private final ThreadLocal<Preparation> preparation=new ThreadLocal<>();
+    private static final class Preparation {
+        final String id=UUID.randomUUID().toString(),kind;final long started=System.nanoTime();String phase="authorization";
+        Preparation(String kind){this.kind=kind;}
+        long elapsed(){return (System.nanoTime()-started)/1_000_000;}
+    }
     @Inject AgroalDataSource datasource;
     @Inject InstanceRestoreFence restoreFence;
     @Inject AccountStore accounts;
@@ -43,8 +51,11 @@ class AccountArchive {
     Download download(TokenRegistry.Principal principal) {return download(principal,"timekeeper-account.zip",this::write);}
     Download notesDownload(TokenRegistry.Principal principal) {return download(principal,"timekeeper-notes.zip",VaultExport::write);}
     private Download download(TokenRegistry.Principal principal,String filename,Writer writer) {
+        if(!preparing.tryAcquire())throw new ApiFailure(503,"ACCOUNT_ARCHIVE_BUSY");
+        var operation=new Preparation(filename.equals("timekeeper-account.zip")?"account":"notes");preparation.set(operation);phase("authorization");
+        try {
         for(int attempt=0;;attempt++) {
-            try {return snapshot(principal,filename,writer);}
+            try {var result=snapshot(principal,filename,writer);LOG.infof("Archive preparation completed operation_id=%s kind=%s elapsed_ms=%d bytes=%d",operation.id,operation.kind,operation.elapsed(),result.length());return result;}
             catch(RuntimeException failure) {
                 if(attempt>=15 || !snapshotConflict(failure)) throw failure;
                 // A concurrent authenticated read can update last-seen metadata
@@ -56,7 +67,14 @@ class AccountArchive {
                 catch(InterruptedException stopped) {Thread.currentThread().interrupt();throw failure;}
             }
         }
+        }catch(Throwable failure){
+            String diagnostic=ProblemMapper.diagnostic("ACCOUNT_ARCHIVE_FAILED",failure);
+            if(failure instanceof ApiFailure rejected&&rejected.status<500)LOG.warnf("Archive preparation rejected operation_id=%s kind=%s phase=%s elapsed_ms=%d %s",operation.id,operation.kind,operation.phase,operation.elapsed(),diagnostic);
+            else LOG.errorf("Archive preparation failed operation_id=%s kind=%s phase=%s elapsed_ms=%d %s",operation.id,operation.kind,operation.phase,operation.elapsed(),diagnostic);
+            throw failure;
+        }finally{preparation.remove();preparing.release();}
     }
+    private void phase(String phase){var operation=preparation.get();if(operation!=null){operation.phase=phase;LOG.infof("Archive preparation running operation_id=%s kind=%s phase=%s elapsed_ms=%d",operation.id,operation.kind,phase,operation.elapsed());}}
     private static boolean snapshotConflict(Throwable failure) {
         for(Throwable cause=failure;cause!=null;cause=cause.getCause())
             if(cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
@@ -67,30 +85,36 @@ class AccountArchive {
         try {
             folder=privateDirectory();file=folder.resolve(filename);
             try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
-                // Account/profile changes do not all acquire the business-owner lock.
-                // MVCC gives every file the same snapshot, including management metadata.
-                connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
-                // Authorization takes row locks so disabling this account waits
-                // for an already-authorized download, just as for other reads.
+                int isolation=connection.getTransactionIsolation();
                 connection.setAutoCommit(false);
                 try {
                     principal=tokens.recheck(principal);
                     if(!principal.permissions().contains("read")) throw new ApiFailure(403,"FORBIDDEN");
                     accounts.guard(connection,principal);
+                    connection.commit();
+                    // Only the data snapshot is long-lived. Holding account or
+                    // session row locks while compressing files would stall normal
+                    // requests and eventually consume every pool connection.
+                    connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setReadOnly(true);phase("snapshot");
                     writer.write(connection,principal.owner(),file);
                     connection.commit();
-                }catch(Throwable failure) {connection.rollback();throw failure;}
+                    connection.setReadOnly(false);connection.setTransactionIsolation(isolation);phase("authorization");
+                    // Do not release an archive prepared while its credentials
+                    // were revoked or the account was disabled.
+                    principal=tokens.recheck(principal);accounts.guard(connection,principal);connection.commit();
+                }catch(Throwable failure) {try{connection.rollback();}catch(SQLException rollback){failure.addSuppressed(rollback);}throw failure;}
             }
             folder.toFile().deleteOnExit();file.toFile().deleteOnExit();
             return new Download(file,Files.size(file));
         }catch(SQLException | IOException failure) {
             if(file!=null) new Download(file,0).close();else if(folder!=null) try {Files.deleteIfExists(folder);}catch(IOException ignored) {}
             throw new ApiFailure(503,"UNAVAILABLE",failure);
-        }catch(RuntimeException failure) {
+        }catch(RuntimeException|Error failure) {
             if(file!=null) new Download(file,0).close();throw failure;
         }
     }
     private void write(Connection c,String owner,Path target) throws SQLException,IOException {
+        phase("manifest");
         String archiveId=UUID.randomUUID().toString(),generatedAt=Instant.now().toString();
         ObjectNode counts=object();for(var entry:WORK.entrySet()) counts.put(entry.getKey(),count(c,owner,entry.getValue()));
         long auditCount=0;for(var type:HISTORY) auditCount+=count(c,owner,type);counts.put("importAuditRecords",auditCount);
@@ -107,8 +131,7 @@ class AccountArchive {
         if(eventCount[0]>0)counts.put("eventNotes",eventCount[0]);
         final long[] assetCount={0};records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())assetCount[0]++;});
         if(assetCount[0]>0)counts.put("journalAssets",assetCount[0]);
-        final long[] vaultCounts={0,0};records(c,owner,VaultIndex.ENTRY,value->vaultCounts[0]++);VaultArchive.files(c,owner,(path,bytes)->vaultCounts[1]++);
-        counts.put("notesEntries",vaultCounts[0]);counts.put("notesFiles",vaultCounts[1]);
+        counts.put("notesEntries",count(c,owner,VaultIndex.ENTRY));counts.put("notesFiles",count(c,owner,VaultContent.TYPE)+count(c,owner,VaultRecycle.TYPE));
         counts.put("bookmarks",NoteBookmarks.archive(c,owner,value->{}));
         counts.put("noteClients",NoteClients.archive(c,owner,value->{}));
         counts.put("noteTasks",NoteTaskArchive.archive(c,owner,value->{}));
@@ -153,10 +176,11 @@ class AccountArchive {
                 json.writeStartObject();json.writeStringField("entityType",(type.equals("CAL_LINK")||type.equals(DayNoteHistory.TYPE))?"ARCHIVE_AUDIT":type);json.writeObjectField("data",audit);json.writeEndObject();
             });
             json.writeEndArray();json.writeEndObject();json.close();zip.closeEntry();
-            journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});
-            VaultArchive.files(c,owner,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});
+            phase("journal-files");journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});
+            phase("vault-files");
+            VaultArchive.files(c,owner,(path,source)->{entry(zip,path);source.writeTo(zip);zip.closeEntry();});
             entry(zip,"manifest.json");zip.write(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest));zip.closeEntry();
-            for(String name:new TreeSet<>(WORK.keySet())) {
+            phase("csv");for(String name:new TreeSet<>(WORK.keySet())) {
                 entry(zip,name+".csv");
                 // Include every stored business field, without assuming a fixed frontend schema.
                 var columns=new TreeSet<String>();records(c,owner,WORK.get(name),value->columns.addAll(fieldNames(workRecord(name,value))));
@@ -218,7 +242,9 @@ class AccountArchive {
     @FunctionalInterface interface Row {void accept(ObjectNode value) throws IOException;}
     static void records(Connection c,String owner,String type,Row row) throws SQLException,IOException {
         try(var statement=query(c,"SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner,type)) {
-            statement.setFetchSize(256);
+            // Payload rows can contain multi-megabyte notes or attachments.
+            // A page of 256 such rows can exhaust the deployment's entire heap.
+            statement.setFetchSize(1);
             try(var rows=statement.executeQuery()) {while(rows.next()) {
                 var value=(ObjectNode)parse(rows.getString(3));
                 if(!owner.equals(value.path("ownerId").asText()) || !rows.getObject(1).toString().equals(value.path("id").asText()) || rows.getLong(2)!=value.path("version").asLong(-1)) throw new ApiFailure(503,"UNAVAILABLE");

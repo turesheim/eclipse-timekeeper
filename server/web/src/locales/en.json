@@ -1918,5 +1918,6 @@
   "task_writes.field_metadata": "Categories",
   "task_writes.state_MOVE": "Moving",
   "task_writes.warning_TASK_DEPENDENCY": "This task’s parent or project prevents applying the provider change. Adjust its parent/project in the task editor; other tasks continue synchronizing.",
-  "error.TASK_PROVIDER_IDENTITY_REQUIRED": "This task has several provider links in this account. Resolve its source identity before moving it to another synchronized list."
+  "error.TASK_PROVIDER_IDENTITY_REQUIRED": "This task has several provider links in this account. Resolve its source identity before moving it to another synchronized list.",
+  "account.archive_busy": "The server is preparing another archive. Try again after it finishes."
 }

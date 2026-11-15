@@ -19,6 +19,13 @@ covers first setup, recovery and personal Eclipse API tokens.
 
 ## Configure and run
 
+**A supported server requires at least 2 GiB of Java heap per API process.**
+This is the heap budget, not the total process/container memory: reserve extra
+RAM for native JVM allocations, thread stacks, PostgreSQL and the operating
+system. A container capped at 2 GiB cannot safely host a 2 GiB heap. The packaged
+container defaults to `-Xms128m -Xmx2g`; keep at least `-Xmx2g` when overriding
+`JAVA_OPTS`. Two API replicas need this budget independently.
+
 Extract `timekeeper-server.zip` and verify its adjacent SHA-256 checksum. From
 the extracted `timekeeper-server` directory, use existing private directories
 writable by the service account:
@@ -27,7 +34,7 @@ writable by the service account:
 export DAGSVERK_SERVER_DB_URL=jdbc:h2:/absolute/path/dagsverk/data/server
 export DAGSVERK_SERVER_SETUP_FILE=/absolute/path/dagsverk/config/account-setup.json
 python3 configure_accounts.py --output "$DAGSVERK_SERVER_SETUP_FILE"
-java -jar quarkus-run.jar
+java -Xms128m -Xmx2g -XX:+ExitOnOutOfMemoryError -jar quarkus-run.jar
 ```
 
 The setup tool prints a one-time code. Open `http://127.0.0.1:8080/web/`, choose

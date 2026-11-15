@@ -24,6 +24,7 @@ class AccountArchiveTest {
     @Inject ContractInputs inputs;
     @Inject AccountStore accounts;
     @Inject io.agroal.api.AgroalDataSource datasource;
+    @io.quarkus.test.common.http.TestHTTPResource java.net.URI server;
 
     /** Commit an authentication change after the archive's MVCC snapshot starts. */
     private AccountArchive racingArchive(String owner,Runnable change,java.util.concurrent.atomic.AtomicInteger attempts) {
@@ -37,7 +38,7 @@ class AccountArchiveTest {
                     return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{java.sql.Connection.class},(ignored,operation,values)->{
                         try {
                             Object value=operation.invoke(connection,values);
-                            if(operation.getName().equals("setAutoCommit") && Boolean.FALSE.equals(values[0]) && attempts.incrementAndGet()==1) {
+                            if(operation.getName().equals("setReadOnly") && Boolean.TRUE.equals(values[0]) && attempts.incrementAndGet()==1) {
                                 try(var query=AccountStore.query(connection,"SELECT revision FROM tk_owner WHERE id=?",owner);var rows=query.executeQuery()) {assertTrue(rows.next());}
                                 change.run();
                             }
@@ -48,20 +49,50 @@ class AccountArchiveTest {
             });
         return archive;
     }
-    @Test void concurrentAuthenticationTouchRestartsTheSnapshotBeforeReturningAnArchive() throws Exception {
+    @Test void concurrentAuthenticationTouchDoesNotBlockOrRestartTheSnapshot() throws Exception {
         var principal=tokens.authenticate("Bearer test-read");var attempts=new java.util.concurrent.atomic.AtomicInteger();
         var archive=racingArchive(principal.owner(),()->accounts.tx(c->{accounts.guard(c,principal);return null;}),attempts);
         try(var download=archive.download(principal)) {
-            assertEquals(2,attempts.get());
+            assertEquals(1,attempts.get());
             assertEquals(principal.owner(),AccountArchiveInput.read(download.file(),"application/zip").path("account").path("ownerId").asText());
         }
     }
-    @Test void snapshotRetryMustRecheckRevocationInsteadOfReturningPrivateData() {
+    @Test void revocationDuringPreparationMustNotReturnPrivateData() {
         var principal=tokens.authenticate("Bearer test-b");var attempts=new java.util.concurrent.atomic.AtomicInteger();
         var archive=racingArchive(principal.owner(),()->accounts.tx(c->{AccountStore.execute(c,"UPDATE tk_api_token SET revoked=TRUE WHERE digest=?",principal.digest());return null;}),attempts);
         try {
-            assertEquals(401,assertThrows(ApiFailure.class,()->archive.download(principal)).status);assertEquals(2,attempts.get());
+            assertEquals(401,assertThrows(ApiFailure.class,()->archive.download(principal)).status);assertEquals(1,attempts.get());
         } finally {accounts.tx(c->{AccountStore.execute(c,"UPDATE tk_api_token SET revoked=FALSE WHERE digest=?",principal.digest());return null;});}
+    }
+
+    @Test void aLongPreparationLeavesAccountReadsAndReadinessAvailableAndRejectsAnotherPreparation()throws Exception {
+        var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
+        var principal=tokens.authenticate("Bearer test-read");
+        var archive=racingArchive(principal.owner(),()->{
+            entered.countDown();try{assertTrue(release.await(15,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException stopped){Thread.currentThread().interrupt();throw new AssertionError(stopped);}
+        },new java.util.concurrent.atomic.AtomicInteger());
+        try(var worker=java.util.concurrent.Executors.newSingleThreadExecutor()){
+            var pending=worker.submit(()->archive.download(principal));
+            try{
+                assertTrue(entered.await(10,java.util.concurrent.TimeUnit.SECONDS));
+                var http=java.net.http.HttpClient.newHttpClient();
+                for(String path:List.of("/api/v1/me","/q/health/ready")){
+                    var request=java.net.http.HttpRequest.newBuilder(server.resolve(path)).timeout(java.time.Duration.ofSeconds(3)).header("Authorization","Bearer test-read").GET().build();
+                    assertEquals(200,http.send(request,java.net.http.HttpResponse.BodyHandlers.discarding()).statusCode());
+                }
+                var busy=assertThrows(ApiFailure.class,()->archive.notesDownload(principal));assertEquals(503,busy.status);assertEquals("ACCOUNT_ARCHIVE_BUSY",busy.code);
+            }finally{release.countDown();}
+            try(var result=pending.get(15,java.util.concurrent.TimeUnit.SECONDS)){assertTrue(result.length()>0);}
+            try(var result=archive.download(principal)){assertTrue(result.length()>0);}
+        }
+    }
+    @Test void aFailedPreparationCleansPrivateOutputAndReleasesCapacity()throws Exception {
+        var principal=tokens.authenticate("Bearer test-read");var archive=racingArchive(principal.owner(),()->{throw new AssertionError("Synthetic interrupted preparation");},new java.util.concurrent.atomic.AtomicInteger());
+        var root=java.nio.file.Path.of(System.getProperty("java.io.tmpdir"));Set<java.nio.file.Path> before;
+        try(var files=Files.list(root)){before=files.filter(path->path.getFileName().toString().startsWith("timekeeper-account-download-")).collect(java.util.stream.Collectors.toSet());}
+        assertThrows(AssertionError.class,()->archive.download(principal));
+        try(var files=Files.list(root)){assertEquals(before,files.filter(path->path.getFileName().toString().startsWith("timekeeper-account-download-")).collect(java.util.stream.Collectors.toSet()));}
+        try(var result=archive.download(principal)){assertTrue(result.length()>0);}
     }
 
     @Test void administratorDownloadIsPrivateAndManagementMetadataContainsNoCredentials() throws Exception {

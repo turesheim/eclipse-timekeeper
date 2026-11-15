@@ -7,6 +7,13 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 
 class MaintenanceEntrypointTest(unittest.TestCase):
+    def test_default_heap_and_oom_exit_are_explicit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            java=Path(temp)/'java';java.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n');java.chmod(0o755)
+            environment={key:value for key,value in os.environ.items() if not key.startswith(('TIMEKEEPER_', 'DAGSVERK_')) and key!='JAVA_OPTS'}
+            result=subprocess.run(['sh',str(ROOT/'server/deploy/server-entrypoint.sh')],env={**environment,'PATH':temp+os.pathsep+os.environ['PATH']},capture_output=True,text=True)
+            self.assertEqual(0,result.returncode)
+            self.assertEqual(['-XX:+ExitOnOutOfMemoryError','-Xms128m','-Xmx2g','-jar','/app/quarkus-run.jar'],result.stdout.splitlines())
     def test_pending_maintenance_prevents_java_start_even_without_database_password(self):
         with tempfile.TemporaryDirectory() as temp:
             pending=Path(temp)/'pending';pending.write_text('{}')
@@ -25,4 +32,4 @@ class MaintenanceEntrypointTest(unittest.TestCase):
                 env={**environment,'PATH':temp+os.pathsep+os.environ['PATH'],
                      'TIMEKEEPER_MAINTENANCE_FILE':str(Path(temp)/'completed'), 'JAVA_OPTS':'-Xmx384m'},capture_output=True,text=True)
             self.assertEqual(0,result.returncode)
-            self.assertEqual(['-Xmx384m','-jar','/app/quarkus-run.jar'],result.stdout.splitlines())
+            self.assertEqual(['-XX:+ExitOnOutOfMemoryError','-Xmx384m','-jar','/app/quarkus-run.jar'],result.stdout.splitlines())

@@ -200,3 +200,23 @@ deadline. Google Tasks and Microsoft To Do items omitted from the published ICS
 feed cannot be recovered by refreshing that subscription. Their separate APIs
 require provider connectors. These reads do not disclose credential-bearing
 subscription URLs and do not alter or refresh the user's data.
+
+## Archive preparation and memory
+
+Archive preparation logs an `operation_id`, archive kind, phase and elapsed time.
+Completion records compressed output size; failures record a safe category and
+compiled source location. These messages omit account IDs, filenames, query
+parameters and file contents. A long preparation can remain in a file phase
+while it streams a large attachment; it does not imply that the service is down.
+Readiness failures now log a scrubbed diagnostic at most once per minute and
+report recovery when checks become healthy again.
+
+On a supported installation, give each API JVM at least **2 GiB of heap** and
+additional RAM for native allocations, thread stacks and the database/OS.
+Startup logs include the actual maximum heap and warn about undersized explicit
+overrides. Containers exit on JVM heap exhaustion so their restart policy can
+recover them. Inspect the container's logs (for example,
+`sudo /usr/local/bin/docker logs --since 30m timekeeper-server` on a default
+Synology installation); an out-of-memory message may precede the recent health
+failures. Never share full logs or diagnostic dumps without reviewing them for
+private information. See [server memory requirements](SERVER.md#configure-and-run).

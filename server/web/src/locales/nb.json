@@ -1918,5 +1918,6 @@
   "task_writes.field_metadata": "Kategorier",
   "task_writes.state_MOVE": "Flytter",
   "task_writes.warning_TASK_DEPENDENCY": "Oppgavens overordnede oppgave eller prosjekt hindrer endringen fra leverandøren. Endre dette i oppgaveredigereren. Andre oppgaver synkroniseres videre.",
-  "error.TASK_PROVIDER_IDENTITY_REQUIRED": "Oppgaven har flere leverandørkoblinger i denne kontoen. Avklar kildeidentiteten før du flytter den til en annen synkronisert liste."
+  "error.TASK_PROVIDER_IDENTITY_REQUIRED": "Oppgaven har flere leverandørkoblinger i denne kontoen. Avklar kildeidentiteten før du flytter den til en annen synkronisert liste.",
+  "account.archive_busy": "Serveren klargjør et annet arkiv. Prøv igjen når det er ferdig."
 }

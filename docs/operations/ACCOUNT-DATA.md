@@ -12,6 +12,20 @@ server's UTC preparation date. Preparing again replaces the previous browser
 copy. Leaving the page releases that copy; prepare again if you return later.
 Read-only sessions can also prepare and download archives.
 
+Preparation favors bounded memory over speed: the server builds the ZIP in a
+private temporary file, reading large attachment content in chunks. A large
+archive can take time; the browser allows up to 30 minutes for preparation and
+transfer. Normal requests and health checks remain available while it runs.
+Only one account/Notes archive is prepared per server process at a time; if the
+server is already preparing one, wait for it to finish and try again.
+Authorization is checked before preparation and again before releasing the
+archive. Temporary output is removed after transfer or a failed preparation.
+
+The supported server requires at least **2 GiB of Java heap**, plus memory for
+the JVM outside its heap and for the database/OS. See the
+[server memory requirements](SERVER.md#configure-and-run). Raising heap size does
+not replace streaming: total archive size can be larger than the available heap.
+
 The private ZIP contains:
 
 - `archive.json`: a versioned snapshot for restoring work and preferences, with a checksummed file index.
