@@ -93,7 +93,7 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     resolveOrigin:async()=>{const current=currentSession(),value=origin(),collection=await collectionInfo();let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);if(!path)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;},
     invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
     bannerFrontmatter:async()=>{
-      const value=origin();if(typeof value!=='object'||!['DAY_NOTE','EVENT_NOTE'].includes(value?.sourceType))return '';
+      const value=origin();if(typeof value!=='object'||!['DAY_NOTE','EVENT_NOTE'].includes(value?.sourceType))return null;
       const current=currentSession(),cycle=generation,collection=await collectionInfo(),path=originPath([],value,collection.settings);if(!path)return '';
       const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;
       if(current!==session()||cycle!==generation)return '';

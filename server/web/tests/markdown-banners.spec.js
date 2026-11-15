@@ -94,6 +94,13 @@ test('shared daily and weekly journals show banners in writable and read-only se
     await target.locator('#today-month-grid [data-week="2026-W45"]').click();const weekly=target.locator('#today-week-note-editor');await expectBanner(weekly);await expect(weekly.locator('.ProseMirror')).toHaveAttribute('aria-readonly',String(readOnly));await weekly.getByRole('button',{name:'Close',exact:true}).click();
   };
   await check(page);
+  // A native body can start with YAML-looking prose. Only the actual outer
+  // file header defines its Obsidian banner, not this embedded body fragment.
+  const body=header+'\n# Body fragment\n',before=await api('GET','/day-notes/2026-11-03/content');
+  await api('PUT','/day-notes/2026-11-03/content',{body},{'If-Match':before.headers().etag});
+  const entry=await(await api('GET','/notes/resolve?path=journal%2F2026-11-03.md')).json(),headerRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/notes/entries/'+entry.id+'/content');
+  await page.locator('#today-date').fill('2026-11-03');await headerRead;await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeHidden();
+  expect((await(await api('GET','/day-notes/2026-11-03/content')).json()).body).toBe(body);
   const token=(await(await api('POST','/auth/tokens',{name:'Read-only banners',permissions:['read'],expiresAt:null})).json()).token;
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:process.env.TIMEKEEPER_WEB_URL.startsWith('https:')});
   try{

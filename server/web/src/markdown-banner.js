@@ -49,8 +49,8 @@ export class MarkdownBanner{
   }
   update(frontmatter,resources){
     this.clear();const current=this.generation;
-    if(!frontmatter&&resources?.bannerFrontmatter){
-      void resources.bannerFrontmatter().then(value=>{if(current===this.generation)this.show(value,resources);}).catch(()=>{});
+    if(resources?.bannerFrontmatter){
+      void resources.bannerFrontmatter().then(value=>{if(current===this.generation)this.show(value===null?frontmatter:value,resources);}).catch(()=>{});
     }else this.show(frontmatter,resources);
   }
   show(frontmatter,resources){
