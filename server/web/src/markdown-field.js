@@ -223,7 +223,7 @@ export class MarkdownField {
   positionListMenu(){if(!this.listMenu.matches(':popover-open'))return;const rect=this.listTrigger.getBoundingClientRect(),height=this.listMenu.offsetHeight;this.listMenu.style.left=Math.max(8,Math.min(rect.left,innerWidth-this.listMenu.offsetWidth-8))+'px';this.listMenu.style.top=Math.max(8,Math.min(rect.bottom+4+height<=innerHeight-8?rect.bottom+4:rect.top-height-4,innerHeight-height-8))+'px';}
   closeListMenu(){if(this.listMenu.matches(':popover-open'))this.listMenu.hidePopover();}
   controls(){
-    this.editor?.setReadOnly(this.readOnly||this.loading);this.syncDailyBanner?.();
+    this.editor?.setReadOnly(this.readOnly||this.bannerBusy);this.syncDailyBanner?.();
     this.caret?.update();this.bookmark?.sync();this.client?.sync();
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
@@ -252,7 +252,7 @@ export class MarkdownField {
     this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();
     this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.text.hidden=false;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
-    this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
+    this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.bannerBusy=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
   setValue(value){
     this.resources?.invalidate?.();this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.text.setSelectionRange(0,0);this.text.scrollTop=0;

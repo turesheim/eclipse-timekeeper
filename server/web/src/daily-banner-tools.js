@@ -26,11 +26,11 @@ export function dailyBannerTools(f){
     try{
       // Flush before locking: autosave refuses to save a loading editor.
       const context=await resources.readBanner();if(!active())return;
-      f.loading=true;f.controls();f.status.textContent='';
+      f.loading=true;f.bannerBusy=true;f.controls();f.status.textContent='';
       const result=await operation(context,active);if(!result||!active())return;
       await resources.writeBanner(context,result);saved=true;
     }catch(error){if(active())f.status.textContent=error.message||t('daily_banner.failed');}
-    finally{if(generation===f.generation){f.loading=false;f.controls();if(saved)await resources.bannerChanged();}}
+    finally{if(generation===f.generation){f.loading=false;f.bannerBusy=false;f.controls();if(saved)await resources.bannerChanged();}}
   };
   add.addEventListener('click',()=>void run(async(context,active)=>{
     const header=splitMarkdown(context.text).frontmatter;if(dailyBannerSnapshot(header))return;
