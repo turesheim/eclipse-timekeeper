@@ -147,6 +147,21 @@ Journal image references also resolve companions imported through vault synchron
 including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
 
+Obsidian [Banners](https://github.com/noatpad/obsidian-banners#advanced) appear above formatted notes, including daily, weekly and event
+notes. Use the plugin's default YAML properties:
+
+```yaml
+banner: "![[Images/Project cover.jpg]]"
+banner_x: 0.5
+banner_y: 0.25
+```
+
+Quoted `"[[…]]"` links also work. Local PNG, JPEG, GIF and WebP images use the
+same private vault previews as inline images. Crop coordinates range from 0 to 1;
+each missing or invalid coordinate defaults to the center. Missing, ambiguous,
+unsupported or remote images leave no banner. YAML remains unchanged; set or
+reposition banners in Obsidian. Custom field names and banner icons are not supported.
+
 ## Searching note contents
 
 The title-bar **Search notes** field searches active ordinary Markdown, daily,

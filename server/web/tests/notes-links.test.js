@@ -9,6 +9,15 @@ import {vaultEditorResources} from '../src/vault-editor-resources.js';
 
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 const collection=(journalFolder='journal',assetsFolder='journal/assets')=>({settings:{journalFolder,assetsFolder,eventsFolder:'events'},limits:{pageSize:200},snapshot:'snapshot'});
+test('missing native notes do not initialize the vault for a banner lookup',async()=>{
+  for(const sourceType of ['DAY_NOTE','EVENT_NOTE']){
+    let present=false;const requests=[],header='---\nbanner: "[[cover.png]]"\n---\n';
+    const session={request:async path=>{requests.push(path);if(path==='/notes')return {data:collection()};if(path.startsWith('/notes/resolve?'))return {data:{id:'existing'}};return {data:new Blob([header])};}};
+    const resources=vaultEditorResources(()=>session,()=>({sourceType,sourceKey:'2026-11-08'}),undefined,{hasBannerSource:()=>present});
+    assert.equal(await resources.bannerFrontmatter(),'');assert.deepEqual(requests,[]);
+    present=true;assert.equal(await resources.bannerFrontmatter(),header);assert.equal(requests.length,3);
+  }
+});
 test('concurrent native image lookups share settings while later lookups see changed folders',async()=>{
   const first=deferred(),requests=[];let settings=collection(),infos=0;
   const session={request:async path=>{requests.push(path);if(path==='/notes')return {data:++infos===1?await first.promise:settings};

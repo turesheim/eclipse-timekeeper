@@ -5,6 +5,7 @@ import {MarkdownCaret} from './markdown-caret.js';
 import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
 import {splitMarkdown} from './markdown-document.js';
+import {MarkdownBanner} from './markdown-banner.js';
 import {icon,iconButton} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -91,7 +92,7 @@ export class MarkdownField {
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-description',t('markdown.tab_help'));this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.toolbar.append(this.modes,this.tools);
-    root.append(this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
+    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.toolbar.addEventListener('keydown',event=>this.historyShortcut(event));
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>{
@@ -213,6 +214,7 @@ export class MarkdownField {
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
+    if(formatted)this.banner.update(this.frontmatter,this.resources);else this.banner.clear();
     this.resetCompletions?.();
     if(!formatted)this.closeBlockMenu();
     this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.plain.hidden=formatted;
@@ -220,6 +222,7 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.banner.clear();
     this.resetCompletions?.();
     this.closeActions?.();
     this.caret?.clear();

@@ -5,6 +5,7 @@ import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
 import {emojiText} from './emoji.js';
 import {hashtagKey,tagNavigation} from './hashtags.js';
+import {splitMarkdown} from './markdown-document.js';
 
 export const vaultNoteNavigation='timekeeper:vault-note-navigation';
 const fold=value=>value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
@@ -16,7 +17,7 @@ const relativeReference=(origin,target)=>{
 // resolved note origin before an authenticated collection lookup.
 const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',reference,{legacyAssets:false});
 /** All lookups use the current API session. No credentials enter resource URLs. */
-export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true}={}){
+export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true}={}){
   let cachedSession,cache,allCache,info,infoRequest,generation=0,opening=false;
   const invalidate=()=>{cache=null;allCache=null;info=null;infoRequest=null;generation++;};
   const currentSession=()=>{const current=session();if(!current)throw new Error(t('notes.invalid_link'));if(current!==cachedSession){cachedSession=current;invalidate();}return current;};
@@ -91,6 +92,18 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     searchTag:(value,source)=>{const tag=hashtagKey(value);if(!tag||!session()||source&&!source.isConnected)return;(source||document).dispatchEvent(new CustomEvent(tagNavigation,{bubbles:true,cancelable:true,detail:{tag,guards:[],leave:[]}}));},
     resolveOrigin:async()=>{const current=currentSession(),value=origin(),collection=await collectionInfo();let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);if(!path)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;},
     invalidate,resolveWiki,allowsAsset:relativeSyntax,allowsLink:relativeSyntax,
+    bannerFrontmatter:async()=>{
+      const value=origin();if(typeof value!=='object'||!['DAY_NOTE','EVENT_NOTE'].includes(value?.sourceType))return null;
+      // Collection reads initialize default folders. An absent native note has
+      // no file header, so merely viewing its empty editor needs no vault read.
+      if(!hasBannerSource())return '';
+      const current=currentSession(),cycle=generation,collection=await collectionInfo(),path=originPath([],value,collection.settings);if(!path)return '';
+      const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;
+      if(current!==session()||cycle!==generation)return '';
+      const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});
+      if(current!==session()||cycle!==generation)return '';
+      return splitMarkdown(await reply.data.text()).frontmatter;
+    },
     image:(reference,alt)=>previewImage(()=>resolveRelative(reference),alt),
     canonicalAsset:async reference=>(await resolveRelative(reference)).path,
     assetReference:async entry=>{const value=origin(),collection=typeof value==='string'?null:await collectionInfo();let path=originPath([],value,collection?.settings);if(!path)path=originPath(await catalog(),value,collection?.settings);return relativeReference(path,entry.path);},
