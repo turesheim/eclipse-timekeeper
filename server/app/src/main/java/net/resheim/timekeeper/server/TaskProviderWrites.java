@@ -87,7 +87,7 @@ final class TaskProviderWrites {
             if(creating&&!automatic){fields.remove(List.of("parentTaskId","siblingOrder"));warnings.add(object().put("field","siblingOrder").put("reason","LOCAL_HIERARCHY"));}
             if(creating&&!fields.hasNonNull("summary"))allowed=false;
             if(creating&&!automatic&&task.hasNonNull("parentTaskId")){allowed=false;warnings.add(object().put("field","parentTaskId").put("reason","CREATE_PARENT_UNSUPPORTED"));}
-        }else if(reference.path("providerData").path("payload").path("observation").hasNonNull("assignmentInfo")){
+        }else if(action==Action.DELETE&&reference.path("providerData").path("payload").path("observation").hasNonNull("assignmentInfo")){
             allowed=false;warnings.add(object().put("field","assignment").put("reason","DELETE_AT_ASSIGNMENT_SOURCE"));
         }
         if(action==Action.MOVE&&!provider(connection).equals("google")){allowed=false;warnings.add(object().put("field","syncListId").put("reason","MOVE_UNSUPPORTED"));}
@@ -95,8 +95,11 @@ final class TaskProviderWrites {
             var destination=action==Action.MOVE?required("TASK_LIST",uuid(task.get("syncListId"))):list;
             if(!destination.path("connectionId").asText().equals(connection.toString()))throw new ApiFailure(422,"TASK_PROVIDER_ACCOUNT_TRANSFER_UNSUPPORTED");
             access(connection,uuid(destination.get("id")));
-            if(reference!=null&&(reference.path("providerData").path("payload").path("observation").hasNonNull("assignmentInfo")||reference.path("providerData").path("payload").path("observation").path("hidden").asBoolean())){allowed=false;warnings.add(object().put("field","parentTaskId").put("reason","SPECIAL_TASK_MOVE"));}
-            if(!creating&&action!=Action.MOVE){action=Action.MOVE;fields=object();allowed=true;}
+            boolean restricted=reference!=null&&(reference.path("providerData").path("payload").path("observation").hasNonNull("assignmentInfo")||reference.path("providerData").path("payload").path("observation").path("hidden").asBoolean());
+            if(restricted){
+                warnings.add(object().put("field",action==Action.MOVE?"syncListId":"parentTaskId").put("reason","SPECIAL_TASK_MOVE"));
+                if(action==Action.UPDATE){fields.remove(List.of("parentTaskId","siblingOrder"));allowed=!fields.isEmpty();}else allowed=false;
+            }else if(!creating&&action!=Action.MOVE){action=Action.MOVE;fields=object();allowed=true;}
         }
         if((action==Action.DELETE||action==Action.MOVE&&!task.path("syncListId").equals(list.path("id")))&&store.list("TASK").stream().anyMatch(child->!child.path("deleted").asBoolean()&&child.path("parentTaskId").equals(task.path("id")))){
             allowed=false;warnings.add(object().put("field","parentTaskId").put("reason","TASK_DEPENDENCY"));

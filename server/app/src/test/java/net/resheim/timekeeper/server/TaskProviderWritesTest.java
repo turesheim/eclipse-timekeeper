@@ -113,6 +113,15 @@ class TaskProviderWritesTest {
         var resumed=reclaim(f);writes().drain(resumed,"private-access",writer(request->{assertEquals("GET",request.method());return reply(200,raw("Applied but response lost","\"g2\""));}));
         assertEquals(1,patches.get());assertEquals("Applied but response lost",baseline(f));assertEquals("DONE",tx(f,()->store.list(TaskProviderWrites.KIND).getFirst()).path("state").asText());
     }
+    @Test void restrictedGooglePlacementStaysLocalWhileAnIndependentTitleSynchronizes(){
+        var f=fixture();var claim=automatic(f);
+        var original=raw("Original","\"g1\"");original.putObject("assignmentInfo").put("surfaceType","DOCUMENT");
+        tx(f,()->{new TaskCloudPull(store,receipts,inputs).remember(task(f),"google",TaskCloudPull.repository("account","remote-list"),new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(original));
+            var task=(Task)decode("TASK",store.find("TASK",f.task()).orElseThrow());store.service().updateTaskOrder(new UpdateTaskOrder(task.id(),task.version(),7));return null;});rename(f,"Independent title");
+        var patches=new AtomicInteger();writes().drain(claim,"token",writer(request->{if(request.method().equals("GET"))return reply(200,original);assertEquals("PATCH",request.method());assertEquals(object().put("title","Independent title"),body(request));patches.incrementAndGet();return reply(200,original.deepCopy().put("title","Independent title").put("etag","\"g2\""));}));
+        assertEquals(1,patches.get());assertEquals(7,task(f).path("siblingOrder").asInt());assertEquals("Independent title",baseline(f));
+        assertTrue(tx(f,()->connections().view(f.connection())).path("syncIssues").toString().contains("SPECIAL_TASK_MOVE"));
+    }
     @Test void anAutomaticAcknowledgementReceivedWhilePausedReconcilesOnResumeWithoutAReviewStep(){
         var f=fixture();var claim=automatic(f);rename(f,"Accepted during pause");
         var sending=tx(f,()->{writes().queueAutomatic(claim);var next=writes().next(claim);return writes().sending(claim,uuid(next.get("id")),remote("Original","\"g1\""));});UUID id=uuid(sending.get("id"));
