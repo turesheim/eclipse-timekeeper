@@ -94,7 +94,7 @@ class TaskProviderConnectionsTest {
         tx(owner,()->connections().select(id,List.of("remote-list"),etag(result)));
         var claim=tx(owner,()->connections().claim(id,false));assertTrue(claim.writable());
         tx(owner,()->{var row=store.find("TASK_CONNECTION",id).orElseThrow();assertTrue(row.path("writable").asBoolean());
-            var fields=row.path("capabilities").path("fields");assertTrue(fields.path("summary").path("writable").asBoolean());assertFalse(fields.path("parentTaskId").path("writable").asBoolean());
+            var fields=row.path("capabilities").path("fields");assertTrue(fields.path("summary").path("writable").asBoolean());assertTrue(fields.path("parentTaskId").path("writable").asBoolean());
             assertTrue(store.list("TASK_LIST").getFirst().path("writable").asBoolean());return null;});
         // A Google grant may include scopes from earlier consent. An import-only flow still stays import-only.
         var readGrant=grant(owner);var readonly=tx(owner,()->connections().connect(readGrant,settings(),new TaskCloudProvider.Account("stable-account","Name"),broad,catalog()));
@@ -111,9 +111,11 @@ class TaskProviderConnectionsTest {
         tx(owner,()->{assertNull(connections().active(claim));assertNotEquals(claim.generation(),connections().required(id).path("generation").asText());return null;});
         assertThrows(ApiFailure.class,()->tx(owner(),()->connections().required(id)));
     }
-    @Test void unsupportedProviderCannotAcquireATwoWayFlow(){
-        String owner=owner();assertThrows(ApiFailure.class,()->tx(owner,()->connections().begin(TaskCloudProvider.Provider.MICROSOFT,settings(),"browser-a",true)));
-        assertTrue(tx(owner,()->store.list(TaskProviderConnections.FLOW).isEmpty()));
+    @Test void microsoftTwoWayConsentRequestsItsActualWriteScope(){
+        String owner=owner();var flow=tx(owner,()->connections().begin(TaskCloudProvider.Provider.MICROSOFT,settings(),"browser-a",true));
+        assertTrue(flow.path("authorizationUrl").asText().contains("Tasks.ReadWrite"));
+        assertFalse(ProviderScopes.granted("microsoft",Set.of("User.Read","Tasks.Read"),true,false,true));
+        assertTrue(ProviderScopes.granted("microsoft",Set.of("User.Read","Tasks.ReadWrite"),true,false,true));
     }
     @Test void listSelectionChecksEtagAndCatalogAndRollsBackUnknownSelections(){
         String owner=owner();var result=connect(owner,grant(owner));UUID id=uuid(result.get("id"));

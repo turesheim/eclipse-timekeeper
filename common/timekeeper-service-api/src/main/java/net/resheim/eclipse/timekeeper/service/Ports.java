@@ -37,6 +37,10 @@ public final class Ports {
 		boolean existsByProject(ProjectId projectId);
 		boolean existsByParent(TaskId taskId);
 		Task save(Task task);
+        default void validateSyncHome(Optional<Task> current, Optional<java.util.UUID> list) {
+            if(list.isPresent())throw ServiceException.conflict("syncListId","This backend does not synchronize provider task lists");
+        }
+        default List<net.resheim.eclipse.timekeeper.domain.TaskList> synchronizedTaskLists(){return List.of();}
 		void delete(TaskId id);
 	}
 

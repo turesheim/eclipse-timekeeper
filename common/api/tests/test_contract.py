@@ -623,7 +623,8 @@ class ContractTest(unittest.TestCase):
         tombstone={'id':ID,'taskId':ID,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
                    'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
         validator('TransferTaskTombstone').validate(tombstone)
-        self.assertFalse(validator('TransferTaskTombstone').is_valid({**tombstone,'externalReferences':[]}))
+        # A native task can be deleted before creation supplies a provider identity.
+        validator('TransferTaskTombstone').validate({**tombstone,'externalReferences':[]})
         self.assertIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
         self.assertNotIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
@@ -886,7 +887,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'listCalendarTasks', 'convertCalendarEvent',
             'listTaskProviderConnections', 'getTaskProviderConnection', 'authorizeTaskProvider', 'cancelTaskProviderAuthorization',
-            'selectInternetAccountCalendars',
+            'selectInternetAccountCalendars', 'saveTaskProviderSettings',
             'completeTaskProviderAuthorization', 'selectTaskProviderLists', 'disconnectTaskProvider', 'refreshTaskProvider', 'previewTaskProviderImport', 'approveTaskProviderImport', 'pauseTaskProvider', 'listTaskProviderWrites', 'prepareTaskProviderWrite', 'getTaskProviderWrite', 'confirmTaskProviderWrite', 'cancelTaskProviderWrite', 'checkTaskProviderWrite', 'resolveTaskProviderWrite', 'leaveTaskProviderCreationUnresolved', 'listTaskProviderCreationCandidates', 'identifyTaskProviderCreation', 'listTaskProviderReviews', 'resolveTaskProviderReview', 'listTaskProviderIdentityReviews', 'decideTaskProviderIdentity',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
@@ -911,7 +912,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
-            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
+            'synchronizedTaskLists', 'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
             'getAdministrationSettings', 'getAdministrationInternetAccounts', 'updateAdministrationInternetAccounts', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation', 'getTaskSourceNote',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

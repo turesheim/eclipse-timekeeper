@@ -23,7 +23,7 @@ function connection(owner,overrides={}){
     selectedLists:['work'],availableLists:[{id:'work',name:'Work',kind:'STANDARD',shared:false,owner:true},{id:'home',name:'Home',kind:'STANDARD',shared:false,owner:true}],...overrides};
 }
 async function providerFixture(page,owner,{rows=[connection(owner)],providers={google:true,microsoft:true},calendarSynchronization=true,readiness={},authorizationFailure=null,authorization=null,authorizationOrigin=null,clients=[],projects=[],tasks=[],lists=[],jobs=[],candidates=[],reviews=[],identities=[]}={}){
-  const model={rows,providers,readiness,authorizationFailure,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
+  const model={rows,providers,readiness,authorizationFailure,settingsFailure:null,writes:[],reads:0,completed:0,cancelled:0,previewVersion:3,jobs,candidates,candidateVersion:1,providerWrites:0,reviews,reviewVersion:1,identities,identityVersion:1,nativeVersion:1,tasks};
   for(const [path,items]of [['clients',clients],['projects',projects],['tasks',tasks],['task-lists',lists]])if(items.length)await page.route('**/api/v1/'+path+'?*',async route=>{
     const response=await route.fetch();if(!response.ok())return route.fulfill({response});
     const current=await response.json();return route.fulfill({response,body:JSON.stringify({...current,items:items.map(item=>({ownerId:owner,version:0,...item})),nextCursor:null})});
@@ -77,6 +77,13 @@ async function providerFixture(page,owner,{rows=[connection(owner)],providers={g
       }
     }
     if(method==='GET')return reply(row);
+    if(method==='PUT'&&path.endsWith('/settings')){
+      if(model.settingsFailure)return reply({code:model.settingsFailure,status:409},409);
+      expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);
+      if(input.tasks){row.selectedLists=input.tasks.selectedLists;row.projectMappings=input.tasks.projectMappings;row.automatic=input.tasks.automatic;row.imports=[];row.configurationVersion++;row.syncing=true;}
+      if(input.calendars){row.selectedCalendars=input.calendars.selectedCalendars;row.calendarMappings=input.calendars.calendarMappings;row.calendarConfigurationVersion=(row.calendarConfigurationVersion??0)+1;}
+      row.version++;return reply(row);
+    }
     if(method==='PUT'&&path.endsWith('/calendars')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedCalendars=input.selectedCalendars;row.calendarMappings=input.calendarMappings;row.version++;row.calendarConfigurationVersion=(row.calendarConfigurationVersion??0)+1;return reply(row);}
     if(method==='PUT'&&path.endsWith('/lists')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.selectedLists=input.selectedLists;row.projectMappings=input.projectMappings;if(Object.hasOwn(input,'reviewAdditions'))row.reviewAdditions=input.reviewAdditions;row.version++;row.configurationVersion++;row.syncing=true;return reply(row);}
     if(method==='PUT'&&path.endsWith('/state')){expect(request.headers()['if-match']).toBe(`"provider-${row.version}"`);row.paused=input.paused;row.version++;return reply(row);}
@@ -128,43 +135,46 @@ test('calendar-only connection actions keep errors visible outside hidden task c
 
 test('direct connections offer calendar and task choices without infrastructure controls',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[]});await page.route('https://accounts.google.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Google consent fixture</title>'}));await open(page);
-  const google=await openProvider(page);await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeChecked();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('dialog').getByRole('button',{name:'Back',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:true},language:'en',direction:'IMPORT'});
+  const google=await openProvider(page);await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeChecked();await expect(google.getByRole('checkbox',{name:'Tasks',exact:true})).toBeChecked();await expect(page.getByRole('dialog').getByRole('button',{name:'Back',exact:true})).toBeVisible();await google.getByRole('button',{name:'Connect Google',exact:true}).click();await expect(page).toHaveURL(/^https:\/\/accounts\.google\.com\//);expect(model.writes.find(item=>item.path==='/google/authorize').input).toEqual({services:{tasks:true,calendars:true},language:'en',direction:'TWO_WAY'});
 });
 
-test('calendar and task drafts save independently on one connected account',async({page,request})=>{
+test('one save commits calendar and task subscriptions together and a failure retains both drafts',async({page,request})=>{
   const owner=await signIn(page,request),client={id:randomUUID(),name:'Client'},row=connection(owner,{services:{tasks:true,calendars:true,writableTasks:false},availableCalendars:[{id:'team',name:'Team calendar',readable:true},{id:'personal',name:'Personal calendar',readable:true}],selectedCalendars:['team'],calendarMappings:{team:client.id},calendarConfigurationVersion:1});
   const model=await providerFixture(page,owner,{rows:[row],clients:[client]});await open(page);const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true}),personal=panel.getByRole('checkbox',{name:'Personal calendar',exact:true});
   await home.check();await personal.check();await refreshStatus(page);await expect(home).toBeChecked();await expect(personal).toBeChecked();
-  await panel.getByRole('button',{name:'Save calendars',exact:true}).click();await expect(panel.getByText('Calendar selection saved. Synchronization will start shortly.',{exact:true})).toBeVisible();await expect(home).toBeChecked();expect(row.selectedLists).toEqual(['work']);expect(row.selectedCalendars).toEqual(['team','personal']);
-  await panel.getByRole('button',{name:'Save task lists',exact:true}).click();await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();await expect(personal).toBeChecked();expect(row.selectedLists).toEqual(['work','home']);
-  expect(model.writes.find(item=>item.path.endsWith('/calendars')).input).toEqual({selectedCalendars:['team','personal'],calendarMappings:{team:client.id,personal:client.id}});expect(model.writes.find(item=>item.path.endsWith('/lists')).input).not.toHaveProperty('selectedCalendars');
+  await expect(panel.getByRole('button',{name:'Save',exact:true})).toHaveCount(1);
+  model.settingsFailure='CONFLICT';await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(home).toBeChecked();await expect(personal).toBeChecked();expect(row.selectedLists).toEqual(['work']);expect(row.selectedCalendars).toEqual(['team']);
+  model.settingsFailure=null;await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('Account subscriptions saved.',{exact:true})).toBeVisible();
+  expect(row.selectedLists).toEqual(['work','home']);expect(row.selectedCalendars).toEqual(['team','personal']);
+  expect(model.writes.filter(item=>item.path.endsWith('/settings')).at(-1).input).toEqual({tasks:{selectedLists:['work','home'],projectMappings:{work:null,home:null},automatic:true},calendars:{selectedCalendars:['team','personal'],calendarMappings:{team:client.id,personal:client.id}}});
+
 });
 
 for(const language of ['en-GB','nb-NO'])test('Internet accounts and both synchronization controls fit every theme in '+language,async({page,request})=>{
   test.setTimeout(120000);const owner=await signIn(page,request,{language}),client={id:randomUUID(),name:'Client'},row=connection(owner,{services:{tasks:true,calendars:true,writableTasks:false},availableCalendars:[{id:'team',name:'Team calendar',readable:true}],selectedCalendars:['team'],calendarMappings:{team:client.id},calendarConfigurationVersion:1});await providerFixture(page,owner,{rows:[row],clients:[client]});await open(page);const nb=language==='nb-NO';
   for(const theme of ['timekeeper','timekeeper-dark']){
     await openThemeSettings(page);await page.locator('#theme').selectOption(theme);await page.getByRole('link',{name:nb?'Internettkontoer':'Internet accounts',exact:true}).click();await expandAccounts(page);
-    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(card(page,row.id).getByRole('button',{name:nb?'Lagre kalendere':'Save calendars',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(width!==320)await captureScreenshot(page,{path:`test-results/internet-accounts-${language}-${theme}-${width}.png`,fullPage:true});}
+    for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await expect(card(page,row.id).getByRole('button',{name:nb?'Lagre':'Save',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(width!==320)await captureScreenshot(page,{path:`test-results/internet-accounts-${language}-${theme}-${width}.png`,fullPage:true});}
   }
   const accessibility=await new AxeBuilder({page}).include('#account-content').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);await captureScreenshot(page,{path:'test-results/internet-accounts-'+language+'-320.png',fullPage:true});
 });
 
 test('read-only accounts can view details but cannot add or change connections',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],providers:{google:true,microsoft:false}});await open(page);
-  await expect(page.getByRole('button',{name:'Add account',exact:true})).toBeDisabled();for(const name of ['Save task lists','Refresh from provider','Pause synchronization','Reconnect','Disconnect'])await expect(card(page,row.id).getByRole('button',{name,exact:true})).toBeDisabled();await expect(card(page,row.id).getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);
+  await expect(page.getByRole('button',{name:'Add account',exact:true})).toBeDisabled();for(const name of ['Save','Refresh from provider','Pause synchronization','Reconnect','Disconnect'])await expect(card(page,row.id).getByRole('button',{name,exact:true})).toBeDisabled();await expect(card(page,row.id).getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);
 });
 
 test('list drafts survive status updates and stale saves keep the captured selection',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row]});await open(page);
   const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();row.version++;row.configurationVersion++;row.syncing=true;
   await refreshStatus(page);await expect(home).toBeChecked();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toBeVisible();
-  await panel.getByRole('button',{name:'Save task lists',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(home).toBeChecked();expect(model.writes.filter(value=>value.method==='PUT')).toEqual([]);
+  await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(home).toBeChecked();expect(model.writes.filter(value=>value.method==='PUT')).toEqual([]);
 });
 
 test('saved selections refresh in the background without replacing focused controls',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row]});await open(page);
-  const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();await panel.getByRole('button',{name:'Save task lists',exact:true}).click();
-  await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();expect(model.writes.find(value=>value.method==='PUT').input).toEqual({selectedLists:['work','home'],projectMappings:{work:null,home:null}});
+  const panel=card(page,row.id),home=panel.getByRole('checkbox',{name:'Home',exact:true});await home.check();await panel.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(panel.getByText('Account subscriptions saved.',{exact:true})).toBeVisible();expect(model.writes.find(value=>value.method==='PUT').input.tasks).toEqual({automatic:true,selectedLists:['work','home'],projectMappings:{work:null,home:null}});
   row.version++;row.syncing=false;row.lastSuccess='2026-11-09T12:01:00Z';await home.focus();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toHaveCount(0,{timeout:10000});
   await expect(home).toBeFocused();await expect(home).toBeChecked();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toHaveCount(0);
   await panel.getByRole('button',{name:'Disconnect',exact:true}).click();await expect(panel).toHaveCount(0);await expect(page.getByText('Disconnected. Imported tasks remain in Dagsverk.',{exact:true})).toBeVisible();expect(model.writes.filter(value=>value.method==='DELETE')).toHaveLength(1);
@@ -183,8 +193,8 @@ test('provider status errors are actionable and remain text in all themes and na
 test('selected lists synchronize without import or new-task approval controls',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner,{reviewAdditions:true,imports:[{id:randomUUID(),remoteListId:'work',state:'READY',count:76}]});const model=await providerFixture(page,owner,{rows:[row]});await open(page);const panel=card(page,row.id);
   await expect(panel.getByRole('button',{name:/Review import|Import this list/})).toHaveCount(0);await expect(panel.getByRole('checkbox',{name:/Review newly/})).toHaveCount(0);await expect(panel.getByText('Import automatically',{exact:true})).toBeVisible();
-  await panel.getByRole('checkbox',{name:'Home',exact:true}).check();await panel.getByRole('button',{name:'Save task lists',exact:true}).click();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toBeVisible();
-  expect(model.writes).toHaveLength(1);expect(model.writes[0].input).toEqual({selectedLists:['work','home'],projectMappings:{work:null,home:null}});expect(model.writes[0].path).toBe('/'+row.id+'/lists');
+  await panel.getByRole('checkbox',{name:'Home',exact:true}).check();await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('Refreshing selected lists…',{exact:true})).toBeVisible();
+  expect(model.writes).toHaveLength(1);expect(model.writes[0].input.tasks).toEqual({automatic:true,selectedLists:['work','home'],projectMappings:{work:null,home:null}});expect(model.writes[0].path).toBe('/'+row.id+'/settings');
 });
 
 test('project mappings and list drafts survive pause, resume and status polling',async({page,request})=>{
@@ -192,20 +202,20 @@ test('project mappings and list drafts survive pause, resume and status polling'
   const mapping=panel.getByRole('combobox',{name:'Project for Work',exact:true});await mapping.selectOption(project);await panel.getByRole('checkbox',{name:'Home',exact:true}).check();
   await panel.getByRole('button',{name:'Pause synchronization',exact:true}).click();await expect(panel.getByRole('button',{name:'Resume synchronization',exact:true})).toBeVisible();await expect(panel.getByRole('button',{name:'Refresh from provider',exact:true})).toBeDisabled();await expect(mapping).toHaveValue(project);await expect(panel.getByRole('checkbox',{name:'Home',exact:true})).toBeChecked();
   await panel.getByRole('button',{name:'Resume synchronization',exact:true}).click();await expect(panel.getByRole('button',{name:'Pause synchronization',exact:true})).toBeVisible();await expect(mapping).toHaveValue(project);expect(model.writes.map(value=>value.input)).toEqual([{paused:true},{paused:false}]);
-  await panel.getByRole('button',{name:'Save task lists',exact:true}).click();await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();await expect(mapping).toHaveValue(project);
-  expect(model.writes.find(value=>value.path.endsWith('/lists')).input).toEqual({selectedLists:['work','home'],projectMappings:{work:project,home:null}});
+  await panel.getByRole('button',{name:'Save',exact:true}).click();await expect(panel.getByText('Account subscriptions saved.',{exact:true})).toBeVisible();await expect(mapping).toHaveValue(project);
+  expect(model.writes.find(value=>value.path.endsWith('/settings')).input.tasks).toEqual({automatic:true,selectedLists:['work','home'],projectMappings:{work:project,home:null}});
 });
 
 test('project choice is sent with selected lists',async({page,request})=>{
   const owner=await signIn(page,request),project=randomUUID(),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],projects:[{id:project,name:'Imported work'}]});await open(page);const panel=card(page,row.id);
-  await panel.getByRole('combobox',{name:'Project for Work',exact:true}).selectOption(project);await panel.getByRole('button',{name:'Save task lists',exact:true}).click();
-  await expect(panel.getByText('List selection saved.',{exact:true})).toBeVisible();
-  expect(model.writes.find(value=>value.path.endsWith('/lists')).input).toEqual({selectedLists:['work'],projectMappings:{work:project}});
+  await panel.getByRole('combobox',{name:'Project for Work',exact:true}).selectOption(project);await panel.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(panel.getByText('Account subscriptions saved.',{exact:true})).toBeVisible();
+  expect(model.writes.find(value=>value.path.endsWith('/settings')).input.tasks).toEqual({automatic:true,selectedLists:['work'],projectMappings:{work:project}});
 });
 
 test('read-only sessions can inspect synchronized lists without acquiring write controls',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{imports:[{id:randomUUID(),remoteListId:'work',state:'READY',count:3}]});const model=await providerFixture(page,owner,{rows:[row]});await open(page);const panel=card(page,row.id);
-  await expect(panel.getByRole('checkbox',{name:'Work',exact:true})).toBeChecked();await expect(panel.getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:'Save task lists',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:/Review import|Import this list/})).toHaveCount(0);expect(model.writes).toEqual([]);
+  await expect(panel.getByRole('checkbox',{name:'Work',exact:true})).toBeChecked();await expect(panel.getByRole('checkbox',{name:'Work',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:'Save',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:/Review import|Import this list/})).toHaveCount(0);expect(model.writes).toEqual([]);
 });
 
 test('task connections and failure states are localized in Norwegian',async({page,request})=>{
@@ -213,9 +223,9 @@ test('task connections and failure states are localized in Norwegian',async({pag
   await expect(page.getByRole('heading',{name:'Google · Fixture account',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Legg til konto',exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Noen oppgaver må gjennomgås. Lokale endringer og tidligere importerte oppgaver beholdes.',{exact:true})).toBeVisible();await expect(card(page,row.id).getByText('Oppgaver som må gjennomgås: 2.',{exact:true})).toBeVisible();
 });
 
-test('Google access defaults to import-only and write consent is an explicit choice',async({page,request})=>{
+test('Google task connections request write consent during account setup',async({page,request})=>{
   const owner=await signIn(page,request),model=await providerFixture(page,owner,{rows:[],authorization:'https://untrusted.example.invalid/collect'});await open(page);
-  await openProvider(page);const access=page.getByRole('combobox',{name:'Task synchronization',exact:true});await expect(access).toHaveValue('IMPORT');
+  await openProvider(page);const access=page.getByRole('combobox',{name:'Task synchronization',exact:true});await expect(access).toHaveValue('TWO_WAY');
   await access.selectOption('TWO_WAY');await page.getByRole('button',{name:'Connect Google',exact:true}).click();
   await expect(page.getByText('Reload current values',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY',services:{tasks:true,calendars:true},language:'en'});
 });
@@ -378,6 +388,7 @@ test('legacy identity conflicts remain resolvable without an ordinary-addition r
   const owner=await signIn(page,request),row=connection(owner),listId=randomUUID();row.identityReviews=[{listId,remoteListId:'work',version:1}];const model=await providerFixture(page,owner,{rows:[row],identities:[identityReview()]});await open(page);const panel=card(page,row.id);
   await expect(panel.getByRole('checkbox',{name:/Review newly/})).toHaveCount(0);await panel.getByRole('button',{name:'Resolve task link: Work',exact:true}).click();await panel.getByRole('button',{name:'Import as a new task',exact:true}).click();expect(model.writes.at(-1).input).toEqual({decision:'IMPORT',externalId:'new-source-id'});await expect(panel.getByRole('button',{name:'Resolve task link: Work',exact:true})).not.toBeVisible();expect(model.providerWrites).toBe(0);
 });
+
 test('read-only native sessions can inspect new identities but cannot import or replace them',async({page,request})=>{
   const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{selectedLists:['work','home']}),fixture=identityTasks(row.id);row.identityReviews=[{listId:fixture.newList,remoteListId:'home',version:1}];await providerFixture(page,owner,{rows:[row],tasks:[fixture.task],lists:fixture.lists,identities:[identityReview()]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Resolve task link: Home',exact:true}).click();await expect(panel.getByRole('button',{name:'Import as a new task',exact:true})).toBeDisabled();await expect(panel.getByRole('button',{name:'Use the existing Dagsverk task',exact:true})).toBeDisabled();await expect(panel.getByRole('checkbox',{name:'Retain this Dagsverk task and replace only the selected source link.',exact:true})).toBeDisabled();
 });
@@ -391,15 +402,15 @@ for(const language of ['en-GB','nb-NO'])test('identity reconciliation fits all t
 test('provider readiness is checked in the chooser without blocking connected account settings',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],providers:{google:false,microsoft:false},readiness:{google:'TASK_PROVIDER_CONNECTION_UNAVAILABLE',microsoft:'TASK_PROVIDER_NOT_CONFIGURED'}});await open(page);
   const google=await openProvider(page);await expect(google.getByRole('button',{name:'Connect Google',exact:true})).toBeDisabled();await expect(google).toContainText('connection service is unavailable');model.providers.google=true;model.readiness.google='READY';await google.getByRole('button',{name:'Refresh Google status',exact:true}).click();await expect(google.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();await closeChooser(page);
-  const microsoft=await openProvider(page,'microsoft');await expect(microsoft.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeDisabled();await closeChooser(page);await expect(card(page,row.id).getByRole('button',{name:'Save task lists',exact:true})).toBeEnabled();await expect(card(page,row.id).getByRole('button',{name:'Refresh from provider',exact:true})).toBeEnabled();expect(model.writes).toEqual([]);
+  const microsoft=await openProvider(page,'microsoft');await expect(microsoft.getByRole('button',{name:'Connect Microsoft',exact:true})).toBeDisabled();await closeChooser(page);await expect(card(page,row.id).getByRole('button',{name:'Save',exact:true})).toBeEnabled();await expect(card(page,row.id).getByRole('button',{name:'Refresh from provider',exact:true})).toBeEnabled();expect(model.writes).toEqual([]);
 });
 
 test('OAuth initialization failures keep chooser choices and connected account writes usable',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner),model=await providerFixture(page,owner,{rows:[row],authorizationFailure:{status:503,code:'TASK_PROVIDER_CONNECTION_UNAVAILABLE'}});await open(page);
   for(const code of ['TASK_PROVIDER_CONNECTION_UNAVAILABLE','TASK_PROVIDER_NOT_CONFIGURED','TASK_PROVIDER_PUBLIC_ORIGIN_REQUIRED']){
-    model.authorizationFailure.code=code;const google=await openProvider(page),connect=google.getByRole('button',{name:'Connect Google',exact:true});await connect.click();await expect(connect).toBeEnabled();await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeEnabled();await closeChooser(page);await expect(page.getByRole('button',{name:'Reload current values',exact:true})).toHaveCount(0);await expect(card(page,row.id).getByRole('button',{name:'Save task lists',exact:true})).toBeEnabled();
+    model.authorizationFailure.code=code;const google=await openProvider(page),connect=google.getByRole('button',{name:'Connect Google',exact:true});await connect.click();await expect(connect).toBeEnabled();await expect(google.getByRole('checkbox',{name:'Calendars',exact:true})).toBeEnabled();await closeChooser(page);await expect(page.getByRole('button',{name:'Reload current values',exact:true})).toHaveCount(0);await expect(card(page,row.id).getByRole('button',{name:'Save',exact:true})).toBeEnabled();
   }
-  await card(page,row.id).getByRole('checkbox',{name:'Home',exact:true}).check();await card(page,row.id).getByRole('button',{name:'Save task lists',exact:true}).click();await expect(card(page,row.id)).toContainText('List selection saved.');
+  await card(page,row.id).getByRole('checkbox',{name:'Home',exact:true}).check();await card(page,row.id).getByRole('button',{name:'Save',exact:true}).click();await expect(card(page,row.id)).toContainText('Account subscriptions saved.');
 });
 
 for(const language of ['en-GB','nb-NO'])test(`connected Internet accounts show compact selections and optional connection settings in ${language}`,async({page,request})=>{
@@ -418,8 +429,7 @@ for(const language of ['en-GB','nb-NO'])test(`connected Internet accounts show c
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:`test-results/internet-accounts-compact-${language}-${theme}-${width}.png`,fullPage:true});
   }}
-  await panel.getByRole('button',{name:nb?'Lagre kalendere':'Save calendars',exact:true}).click();await expect.poll(()=>row.selectedCalendars).toEqual(['team']);await expect(projectChoice).toHaveValue(project.id);
-  await panel.getByRole('button',{name:nb?'Lagre oppgavelister':'Save task lists',exact:true}).click();await expect.poll(()=>row.selectedLists).toEqual(['work']);expect(row.calendarMappings.team).toBe(clients[1].id);expect(row.projectMappings.work).toBe(project.id);expect(model.providerWrites).toBe(0);
+  await expect(panel.getByRole('button',{name:nb?'Lagre':'Save',exact:true})).toHaveCount(1);await panel.getByRole('button',{name:nb?'Lagre':'Save',exact:true}).click();await expect.poll(()=>row.selectedCalendars).toEqual(['team']);await expect(projectChoice).toHaveValue(project.id);await expect.poll(()=>row.selectedLists).toEqual(['work']);expect(row.calendarMappings.team).toBe(clients[1].id);expect(row.projectMappings.work).toBe(project.id);expect(model.providerWrites).toBe(0);
 });
 
 for(const language of ['en-GB','nb-NO'])test(`synchronization conflicts name the list and explain the retry action (${language})`,async({page,request})=>{
@@ -447,4 +457,11 @@ test('service switches require explicit reconnection before changing provider ac
 test('closing the provider chooser cancels pending authorization without a late redirect',async({page,request})=>{
   const owner=await signIn(page,request);await providerFixture(page,owner,{rows:[]});let release,started;const ready=new Promise(resolve=>{started=resolve;});await page.route('**/api/v1/task-providers/google/authorize',async route=>{started();await new Promise(resolve=>{release=resolve;});await route.fulfill({status:200,headers:{'Content-Type':'application/json','X-Timekeeper-Owner':Buffer.from(owner).toString('base64url')},json:{authorizationUrl:'https://accounts.google.com/o/oauth2/v2/auth?state='+state}}).catch(()=>{});});
   try{await open(page);const google=await openProvider(page);await google.getByRole('button',{name:'Connect Google',exact:true}).click();await ready;await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toBeHidden();await expect(page.getByRole('button',{name:'Add account',exact:true})).toBeEnabled();release();await expect(page).toHaveURL(/#account\/task-providers$/);await expect(page.getByRole('button',{name:'Add account',exact:true})).toBeFocused();}finally{release?.();}
+});
+
+for(const language of ['en-GB','nb-NO'])test('automatic subscriptions show progress and only exceptional decisions in '+language,async({page,request})=>{
+  const owner=await signIn(page,request,{language}),nb=language==='nb-NO',row=connection(owner,{automatic:true,direction:'TWO_WAY',syncStatus:'SYNCHRONIZING',pendingWrites:1,writeExceptions:0}),job=writeJob({connectionId:row.id,state:'QUEUED'});await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
+  for(const name of [nb?'Klargjør en Google-endring':'Prepare a Google change',nb?'Gjennomgå resultat':'Review result'])await expect(panel.getByText(name,{exact:true})).toBeHidden();
+  await expect(panel.getByRole('button',{name:nb?'Lagre':'Save',exact:true})).toHaveCount(1);await expect(panel).toContainText(nb?'Synkroniserer':'Synchronizing');
+  await page.setViewportSize({width:320,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

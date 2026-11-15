@@ -1,6 +1,6 @@
 # Automatic task-list synchronization
 
-Status: proposal, 15 November 2026.
+Status: implementation under verification, 15 November 2026.
 
 Selecting a Google Tasks or Microsoft To Do list subscribes it to automatic,
 two-way synchronization. Existing tasks, new tasks and subsequent edits flow in
@@ -15,7 +15,7 @@ a separate backend.
 ## User experience
 
 1. Connect an Internet account and authorize task read/write access once.
-2. Check a task list. Persist that subscription immediately and show
+2. Select task lists and calendars, then use the account’s single **Save** button. Persist both selections atomically and show
    **Synchronizing**. If saving fails, retain the previous selection and explain
    the failure beside the list.
 3. Import existing tasks automatically. An optional project mapping supplies the
@@ -199,12 +199,28 @@ manual drafts. Preserve confirmed queued operations and receipts, reconcile
 unknown outcomes, and leave unconfirmed prepared changes unsent. Start automatic
 work from current task/baseline differences after subscription is enabled.
 
-The existing Google coordinator is a starting point. Its five-field writer,
-manual confirmations and acknowledgement-review states do not satisfy this
-proposal merely by hiding the UI. Microsoft currently imports tasks and needs
-a tested write adapter/capability declarations. Automatic deletion changes the
-protocol's current explicit deletion-review boundary. Implement and test these
-changes before removing the old workflow.
+The server now uses its durable coordinator for automatic creation, updates,
+Google placement/list moves, and retained deletion. Microsoft has a separate
+Graph writer; HTML notes, timed start/deadline values, importance and categories
+retain their distinct mappings. Microsoft list moves and hierarchy remain
+unsupported, with task-specific exceptions. Legacy manual receipts remain
+recoverable; unconfirmed previews never become automatic payloads.
+
+`Task.syncListId` is explicit membership. A nullable home on update unlinks;
+omitting it preserves membership. `GET /task-sync/lists` supplies owned writable
+subscription choices to the browser and remote Eclipse editors. Deleted linked
+tasks retain their row, activity relations and tombstone. Transfer/CSV preserves
+that state and remaps the home; importing data never supplies provider credentials.
+
+Both writers send the exact provider `If-Match` revision for updates and deletion;
+Google moves also carry it. Synthetic tests verify the request and 412 handling.
+The Microsoft To Do and Google move method documentation does not establish that
+every live operation enforces these headers. Controlled account tests must verify
+that behavior before rollout. Read-before-write alone still has an intervening
+write window if a provider ignores its header; no lossless guarantee is claimed
+for such an operation. Lost move responses require an explicit identity decision
+from a fresh complete destination scan, unless a successful move receipt was
+already persisted. This work must not be released on synthetic evidence alone.
 
 ## Acceptance criteria
 

@@ -44,7 +44,6 @@ final class TaskProviderConnections {
     }
     ObjectNode begin(TaskCloudProvider.Provider provider,TaskProviderOAuth.Settings settings,String browser,JsonNode services,boolean verification){
         boolean writable=services.path("writableTasks").asBoolean();SharedConnectClient.services(services);
-        if(writable&&provider!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
         String binding=binding(browser);Instant now=store.now();
         for(var flow:store.list(FLOW))if(!Instant.parse(flow.path("expires").asText()).isAfter(now))remove(FLOW,flow);
         if(store.list(FLOW).size()>=5)throw new ApiFailure(429,"TASK_PROVIDER_AUTHORIZATION_LIMIT");
@@ -72,7 +71,7 @@ final class TaskProviderConnections {
         if(grant.verification())throw ApiFailure.conflict();
         if(!grant.owner().equals(store.owner()))throw ApiFailure.notFound();
         if(!equal(grant.settingsHash(),expectedHash))throw new ApiFailure(409,"TASK_PROVIDER_CONFIGURATION_CHANGED");
-        if(grant.writable()&&(grant.provider()!=TaskCloudProvider.Provider.GOOGLE||!new TaskProviderOAuth(grant.provider()).canWrite(tokens.scopes())))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");
+        if(grant.writable()&&!new TaskProviderOAuth(grant.provider()).canWrite(tokens.scopes()))throw new ApiFailure(409,"TASK_PROVIDER_PERMISSION_REQUIRED");
         var provider=new TaskCloudProvider(grant.provider());var seen=new HashSet<String>();var lists=array();
         if(catalog!=null&&catalog.size()>1000)throw new ApiFailure(422,"TASK_PROVIDER_LIST_LIMIT");
         for(var list:catalog==null?List.<TaskCloudProvider.RemoteList>of():catalog){
@@ -127,7 +126,7 @@ final class TaskProviderConnections {
     ObjectNode visible(JsonNode value){
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
-        result.set("version",value.path("version"));result.put("reviewAdditions",false);
+        result.set("version",value.path("version"));result.put("automatic",value.path("automatic").asBoolean());result.put("reviewAdditions",false);
         result.set("services",services(value));
         InternetCalendars.visible(value,result);
         result.put("configurationVersion",value.path("configurationVersion").asLong()).put("direction",value.path("direction").asText("IMPORT")).put("paused",value.path("paused").asBoolean());
@@ -140,21 +139,33 @@ final class TaskProviderConnections {
         result.set("projectMappings",value.path("projects").isObject()?value.path("projects").deepCopy():object());result.set("imports",TaskProviderScans.previews(store,value));
         var reviews=result.putArray("reviews");for(var scan:store.list(TaskProviderScans.SCAN))if(scan.path("connectionId").equals(value.path("id"))&&scan.path("generation").equals(value.path("generation"))&&scan.path("state").asText().equals("READY")&&TaskProviderScans.approved(value,scan.path("remoteListId").asText()))reviews.add(object().put("listId",scan.path("id").asText()).put("remoteListId",scan.path("remoteListId").asText()));
         result.set("identityReviews",TaskProviderIdentities.descriptors(store,value));
-        result.put("pendingWrites",TaskProviderWrites.pending(store,uuid(value.get("id"))));
+        result.put("pendingWrites",TaskProviderWrites.pending(store,uuid(value.get("id")))).put("writeExceptions",TaskProviderWrites.exceptions(store,uuid(value.get("id"))));
+        result.set("syncIssues",TaskProviderIntents.issues(store,value));
+        String status=!connection.path("enabled").asBoolean()||value.path("blocked").asBoolean()?"RECONNECT_REQUIRED":value.path("paused").asBoolean()?"PAUSED"
+                :result.path("pendingCount").asInt()>0||!result.path("syncIssues").isEmpty()||value.hasNonNull("lastError")?"NEEDS_ATTENTION":result.path("syncing").asBoolean()?"SYNCHRONIZING":result.path("writeExceptions").asInt()>0?"NEEDS_ATTENTION":result.path("pendingWrites").asInt()>0?"SYNCHRONIZING"
+                :!writable(value,connection)?"READ_ONLY":value.path("selected").isEmpty()||value.hasNonNull("lastSuccess")?"UP_TO_DATE":"SYNCHRONIZING";
+        result.put("syncStatus",status);
         for(var list:value.path("catalog")){var item=object();for(String field:List.of("id","name","kind","shared","owner"))item.set(field,list.path(field));catalog.add(item);}
         return result;
     }
     ObjectNode select(UUID id,List<String> selected,String match){return select(id,selected,null,match);}
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match){return select(id,selected,projects,match,null);}
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match,Boolean reviewAdditions){
+        return select(id,selected,projects,match,reviewAdditions,null);
+    }
+    ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match,Boolean reviewAdditions,Boolean automatic){
         var value=required(id);ApiReplies.match(visible(value),match);
+        if(automatic!=null)value.put("automatic",automatic);
         value.put("reviewAdditions",false);
         if(selected.size()>20||new HashSet<>(selected).size()!=selected.size())throw ApiFailure.validation();
         var chosen=new HashSet<>(selected);var known=new HashSet<String>();
         var mappings=projects==null?(value.path("projects").isObject()?((ObjectNode)value.get("projects")).deepCopy():object()):((ObjectNode)projects).deepCopy();
         if(projects!=null)for(var names=projects.fieldNames();names.hasNext();)if(!chosen.contains(names.next()))throw ApiFailure.validation();
         mappings.retain(selected);for(var project:mappings)if(!project.isNull())store.find("PROJECT",uuid(project)).orElseThrow(ApiFailure::notFound);
-        value.set("projects",mappings);var approved=array();for(var remote:value.path("approved"))if(chosen.contains(remote.asText()))approved.add(remote);value.set("approved",approved);
+        value.set("projects",mappings);var approved=array();
+        if(value.path("automatic").asBoolean())selected.forEach(approved::add);
+        else for(var remote:value.path("approved"))if(chosen.contains(remote.asText()))approved.add(remote);
+        value.set("approved",approved);
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
         String provider=connection.path("providerId").asText();int position=0;var existingLists=ownedLists(id);
@@ -195,6 +206,7 @@ final class TaskProviderConnections {
             value.put("roundActive",false).put("requested",true);
         }else if(value.hasNonNull("nextRefresh")&&Instant.parse(value.path("nextRefresh").asText()).isAfter(now))return null;
         if(!value.path("roundActive").asBoolean()){
+            value.put("roundIntentRevision",value.path("intentRevision").asLong());
             value.put("roundActive",true).put("forceRound",force||value.path("forceRequested").asBoolean()).put("forceRequested",false).put("roundPreview",false).put("roundIndex",0).put("pendingCount",0).putNull("lastError");value.putArray("pending");value.putObject("listErrors");
         }
         int index=value.path("roundIndex").asInt();if(index<0||!catalogOnly&&index>=value.path("selected").size())throw ApiFailure.conflict();
@@ -247,13 +259,13 @@ final class TaskProviderConnections {
         boolean blocked=error!=null&&Set.of("TASK_PROVIDER_RECONNECT_REQUIRED","TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED","TASK_PROVIDER_PERMISSION_REQUIRED","TASK_PROVIDER_ACCOUNT_CHANGED","TASK_PROVIDER_CONFIGURATION_CHANGED").contains(error);
         int next=value.path("roundIndex").asInt()+1;boolean more=!blocked&&!claim.catalogOnly()&&next<value.path("selected").size();
         value.put("roundIndex",more?next:0).put("roundActive",more).put("blocked",blocked).putNull("lease").putNull("leaseUntil");
-        boolean queued=TaskProviderWrites.queued(store,claim.id())||services(value).path("calendars").asBoolean()&&value.path("calendarPending").asBoolean();if(!more)value.put("requested",!blocked&&queued);
+        boolean queued=TaskProviderWrites.queued(store,claim.id())||value.path("intentRevision").asLong()>value.path("roundIntentRevision").asLong()||services(value).path("calendars").asBoolean()&&value.path("calendarPending").asBoolean();if(!more)value.put("requested",!blocked&&queued);
         if(outcome!=null&&outcome.path("awaitingImport").asBoolean())value.put("roundPreview",true);
-        if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean())value.put("lastSuccess",store.now().toString());
+        if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean()&&(!value.path("automatic").asBoolean()||TaskProviderWrites.pending(store,claim.id())==0))value.put("lastSuccess",store.now().toString());
         String first=errors.isEmpty()?null:errors.elements().next().asText();if(first==null)value.putNull("lastError");else value.put("lastError",first);
         if(retryAfter>0)value.put("retryUntil",store.now().plusSeconds(retryAfter).toString());else if(errors.isEmpty())value.remove("retryUntil");
         if(blocked)value.putNull("nextRefresh");
-        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,retryAfter),more?0:!errors.isEmpty()?60:queued?0:900)).toString());
+        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,retryAfter),more?0:!errors.isEmpty()?60:queued?0:value.path("automatic").asBoolean()?45+Math.floorMod(claim.id().hashCode(),15):900)).toString());
         if(!blocked&&!more&&services(value).path("calendars").asBoolean()&&value.hasNonNull("calendarRetryUntil")&&Instant.parse(value.path("calendarRetryUntil").asText()).isBefore(Instant.parse(value.path("nextRefresh").asText())))value.set("nextRefresh",value.get("calendarRetryUntil"));
         save(AUTH,value);return more;
     }
@@ -276,8 +288,8 @@ final class TaskProviderConnections {
     }
     static String settingsHash(TaskProviderOAuth.Settings settings){return hash(settings.clientId()+"\n"+settings.redirect()+"\n"+hash(settings.clientSecret()));}
     static boolean writable(JsonNode credentials,JsonNode connection){
-        return services(credentials).path("tasks").asBoolean()&&credentials.path("direction").asText().equals("TWO_WAY")&&connection.path("providerId").asText().equals("google")&&connection.path("writable").asBoolean()
-                &&java.util.stream.StreamSupport.stream(credentials.path("scopes").spliterator(),false).anyMatch(scope->scope.asText().equals("https://www.googleapis.com/auth/tasks"));
+        return services(credentials).path("tasks").asBoolean()&&credentials.path("direction").asText().equals("TWO_WAY")&&connection.path("writable").asBoolean()
+                &&java.util.stream.StreamSupport.stream(credentials.path("scopes").spliterator(),false).anyMatch(scope->connection.path("providerId").asText().equals("google")?scope.asText().equals("https://www.googleapis.com/auth/tasks"):Set.of("Tasks.ReadWrite","https://graph.microsoft.com/Tasks.ReadWrite").contains(scope.asText()));
     }
     static ObjectNode services(JsonNode value){return value.path("services").isObject()?((ObjectNode)value.get("services")).deepCopy():object().put("tasks",true).put("calendars",false).put("writableTasks",value.path("direction").asText().equals("TWO_WAY"));}
     private static UUID flowId(String state){return UUID.nameUUIDFromBytes(("dagsverk-task-flow:"+state).getBytes(StandardCharsets.UTF_8));}

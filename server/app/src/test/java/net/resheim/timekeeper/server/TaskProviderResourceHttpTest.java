@@ -34,7 +34,7 @@ class TaskProviderResourceHttpTest {
     private Response call(String method,String path,ObjectNode value,String match){return call("a",BROWSER,method,path,value,match);}
     private ObjectNode json(Response response,int status){assertEquals(status,response.statusCode(),response.asString());return (ObjectNode)parse(response.asString());}
     private String begin(String provider){
-        var value=json(call("POST","/"+provider+"/authorize",object(),null),200);inputs.validate("TaskProviderAuthorization",value);
+        var value=json(call("POST","/"+provider+"/authorize",object().put("direction","IMPORT"),null),200);inputs.validate("TaskProviderAuthorization",value);
         return Arrays.stream(URI.create(value.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(item->item.startsWith("state=")).map(item->URLDecoder.decode(item.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
     }
     private ObjectNode connect(String provider){
@@ -59,6 +59,71 @@ class TaskProviderResourceHttpTest {
         fail("Provider refresh did not finish");return null;
     }
     @AfterEach void disconnect(){for(String id:created)for(int attempt=0;attempt<3;attempt++){var before=call("GET","/"+id,null,null);if(before.statusCode()==404)break;var reply=call("DELETE","/"+id,null,before.header("ETag"));if(reply.statusCode()==204)break;assertEquals(412,reply.statusCode(),reply.asString());}}
+    private Response domain(String owner,String method,String path,ObjectNode body,String match){
+        var request=given().header("Authorization","Bearer test-"+owner).contentType("application/json");if(method.equals("POST"))request.header("Idempotency-Key",UUID.randomUUID().toString());if(body!=null)request.body(body.toString());if(match!=null)request.header("If-Match",match);return request.request(method,"/api/v1"+path);
+    }
+    @Test void ordinaryTaskEditorSavesOwnedMembershipAndFieldsAtomicallyAndDeletionKeepsReports(){
+        var connected=connectWritable();String id=connected.path("id").asText(),owner=connected.path("ownerId").asText();var paused=json(call("PUT","/"+id+"/state",object().put("paused",true),etag(connected)),200);
+        var settings=object();settings.putObject("tasks").put("automatic",true).putArray("selectedLists").add("list-1");json(call("PUT","/"+id+"/settings",settings,etag(paused)),200);
+        var choices=json(domain("a","GET","/task-sync/lists",null,null),200);inputs.validate("TaskListPage",choices);var list=java.util.stream.StreamSupport.stream(choices.path("items").spliterator(),false).filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow();
+        var input=object().put("summary","Native editor task").putNull("projectId").putNull("parentTaskId").putNull("url").put("syncListId",list.path("id").asText());input.putObject("body").put("format","TEXT").put("content","Notes stay exact");input.put("status","IN_PROGRESS").put("scheduledDate","2026-11-15");
+        var task=json(domain("a","POST","/tasks",input,null),201);inputs.validate("Task",task);String taskId=task.path("id").asText();assertEquals(list.path("id"),task.path("syncListId"));assertEquals("Notes stay exact",task.path("body").path("content").asText());
+        assertEquals(404,domain("b","POST","/tasks",input,null).statusCode());assertEquals(403,domain("read","POST","/tasks",input,null).statusCode());
+        var edit=object().put("summary","Edited normally").putNull("projectId").putNull("parentTaskId").putNull("url").put("status","COMPLETED").putNull("completedAt");edit.putObject("body").put("format","TEXT").put("content","");
+        var changed=json(domain("a","PUT","/tasks/"+taskId,edit,etag(task)),200);assertEquals(list.path("id"),changed.path("syncListId"));assertEquals("COMPLETED",changed.path("status").asText());assertTrue(changed.path("body").path("content").asText().isEmpty());assertTrue(changed.path("completedAt").isNull());assertEquals(412,domain("a","PUT","/tasks/"+taskId,edit,etag(task)).statusCode());
+        var now=java.time.Instant.now();var activity=object().put("taskId",taskId).put("start",now.minusSeconds(120).toString()).put("end",now.minusSeconds(60).toString()).put("summary","Worked before delete");activity.putArray("labelIds");json(domain("a","POST","/activities",activity,null),201);
+        assertEquals(204,domain("a","DELETE","/tasks/"+taskId,null,etag(changed)).statusCode());assertEquals(404,domain("a","GET","/tasks/"+taskId,null,null).statusCode());
+        var report=json(domain("a","GET","/reports/activities?from="+now.minusSeconds(180)+"&to="+now+"&taskId="+taskId,null,null),200);assertEquals("PT1M",report.path("total").asText());
+        store.transaction(owner,()->{assertTrue(store.find("TASK",UUID.fromString(taskId)).orElseThrow().path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",UUID.fromString(taskId)).isPresent());assertTrue(store.list(TaskProviderIntents.KIND).stream().noneMatch(intent->intent.path("taskId").asText().equals(taskId)));return null;});
+        var exported=json(domain("a","GET","/data/export",null,null),200);
+        inputs.validate("TransferSnapshot",exported);
+        var liveCollision=exported.deepCopy();for(var row:liveCollision.path("tasks"))if(row.path("id").asText().equals(taskId))((ObjectNode)row).put("deleted",false);
+        assertEquals(422,domain("b","POST","/data/import",liveCollision,null).statusCode());
+        var foreignCollision=exported.deepCopy();for(var row:foreignCollision.path("taskTombstones"))if(row.path("taskId").asText().equals(taskId))((ObjectNode)row).put("id",list.path("id").asText());
+        assertEquals(422,domain("b","POST","/data/import",foreignCollision,null).statusCode());
+        var imported=json(domain("b","POST","/data/import",exported,null),201);
+        String copiedTask=null,copiedMarker=null;
+        for(var mapping:imported.path("ids"))if(mapping.path("sourceId").asText().equals(taskId)){
+            if(mapping.path("entityType").asText().equals("TASK"))copiedTask=mapping.path("id").asText();
+            if(mapping.path("entityType").asText().equals("TASK_TOMBSTONE"))copiedMarker=mapping.path("id").asText();
+        }
+        assertNotNull(copiedTask);assertEquals(copiedTask,copiedMarker);assertNotEquals(taskId,copiedTask);
+        assertEquals(404,domain("b","GET","/tasks/"+copiedTask,null,null).statusCode());
+        var marker=json(domain("b","GET","/task-tombstones/"+copiedMarker,null,null),200);assertEquals(copiedTask,marker.path("taskId").asText());
+        var copied=json(domain("b","GET","/data/export",null,null),200);String copiedId=copiedTask;
+        var retained=java.util.stream.StreamSupport.stream(copied.path("tasks").spliterator(),false).filter(row->row.path("id").asText().equals(copiedId)).findFirst().orElseThrow();
+        assertTrue(retained.path("deleted").asBoolean());assertNotEquals(list.path("id"),retained.path("syncListId"));
+        assertEquals(1,java.util.stream.StreamSupport.stream(copied.path("taskTombstones").spliterator(),false).filter(row->row.path("taskId").asText().equals(copiedId)).count());
+        var copiedReport=json(domain("b","GET","/reports/activities?from="+now.minusSeconds(180)+"&to="+now+"&taskId="+copiedTask,null,null),200);assertEquals("PT1M",copiedReport.path("total").asText());
+    }
+    @Test void accountSettingsSaveBothSubscriptionsAtomicallyAndCheckOwnerAndWritePermission(){
+        var authorize=object();authorize.set("services",object().put("tasks",true).put("calendars",true));
+        var attempt=json(call("POST","/google/authorize",authorize,null),200);
+        String state=Arrays.stream(URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(item->item.startsWith("state=")).map(item->URLDecoder.decode(item.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
+        var connected=json(call("POST","/complete",object().put("state",state).put("code","write-combined-fixture-"+UUID.randomUUID()),null),200);String id=connected.path("id").asText();created.add(id);
+        var paused=json(call("PUT","/"+id+"/state",object().put("paused",true),etag(connected)),200);
+        var settings=object();settings.putObject("tasks").put("automatic",true).putArray("selectedLists").add("list-1");
+        var calendars=settings.putObject("calendars");calendars.putArray("selectedCalendars").add("calendar");calendars.putObject("calendarMappings").put("calendar",UUID.randomUUID().toString());
+        assertEquals(404,call("PUT","/"+id+"/settings",settings,etag(paused)).statusCode());
+        var unchanged=current(id);assertEquals(paused,unchanged);assertTrue(unchanged.path("selectedLists").isEmpty());assertTrue(unchanged.path("selectedCalendars").isEmpty());
+        var client=store.transaction(connected.path("ownerId").asText(),()->store.createClient(object().put("name","Combined settings").put("color","#123456")));
+        ((ObjectNode)calendars.get("calendarMappings")).put("calendar",client.path("id").asText());
+        assertEquals(404,call("b",BROWSER,"PUT","/"+id+"/settings",settings,etag(paused)).statusCode());assertEquals(403,call("read",BROWSER,"PUT","/"+id+"/settings",settings,etag(paused)).statusCode());
+        assertEquals(428,call("PUT","/"+id+"/settings",settings,null).statusCode());assertEquals(412,call("PUT","/"+id+"/settings",settings,"\"stale\"").statusCode());
+        var saved=json(call("PUT","/"+id+"/settings",settings,etag(paused)),200);inputs.validate("TaskProviderConnection",saved);assertTrue(saved.path("automatic").asBoolean());assertEquals("list-1",saved.path("selectedLists").get(0).asText());assertEquals("calendar",saved.path("selectedCalendars").get(0).asText());
+    }
+    @Test void ordinaryTaskSaveSynchronizesAutomaticallyWithoutAnyProviderPreparationOrSendRequest()throws Exception{
+        var connected=connectWritable();String id=connected.path("id").asText(),owner=connected.path("ownerId").asText();
+        var input=object().put("automatic",true);input.putArray("selectedLists").add("list-1");json(call("PUT","/"+id+"/lists",input,etag(connected)),200);var imported=idle(id);assertTrue(imported.path("imports").isEmpty());
+        var task=store.transaction(owner,()->store.byReference(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey("google",TaskCloudPull.repository(connected.path("remoteAccountId").asText(),"list-1"),"task-list-1")).orElseThrow());
+        var edit=object().put("summary","Ordinary API edit").putNull("projectId").putNull("parentTaskId").putNull("url");
+        var saved=given().header("Authorization","Bearer test-a").header("If-Match",etag(task)).contentType("application/json").body(edit.toString()).put("/api/v1/tasks/"+task.path("id").asText());assertEquals(200,saved.statusCode(),saved.asString());
+        var provider=TaskProviderHttpTestFixture.STATES.get(connected.path("remoteAccountId").asText());long deadline=System.nanoTime()+java.time.Duration.ofSeconds(5).toNanos();
+        while(provider.writes.get()==0&&System.nanoTime()<deadline)Thread.sleep(25);
+        assertEquals(1,provider.writes.get(),"A committed ordinary task save must start background provider work within five seconds");idle(id);
+        var current=store.transaction(owner,()->store.find("TASK",uuid(task.get("id"))).orElseThrow());assertEquals("Ordinary API edit",current.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());
+        var jobs=store.transaction(owner,()->store.list(TaskProviderWrites.KIND).stream().filter(row->row.path("connectionId").asText().equals(id)).toList());assertEquals(1,jobs.size());assertEquals("DONE",jobs.getFirst().path("state").asText());
+    }
     @Test void googleAndMicrosoftSignInSelectionAndBackgroundPullCreateOwnedNativeTasks()throws Exception{
         for(String provider:List.of("google","microsoft")){
             var connection=connect(provider);String id=connection.path("id").asText(),owner=connection.path("ownerId").asText();selectAndSynchronize(connection,"list-1","list-2");
@@ -82,12 +147,12 @@ class TaskProviderResourceHttpTest {
         for(String provider:List.of("google","microsoft"))for(boolean[] selection:List.of(new boolean[]{false,true},new boolean[]{true,false},new boolean[]{true,true})){
             boolean tasks=selection[0],calendars=selection[1];var input=object();input.set("services",object().put("tasks",tasks).put("calendars",calendars));
             var attempt=json(call("POST","/"+provider+"/authorize",input,null),200);var params=new HashMap<String,String>();for(String pair:URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")){var parts=pair.split("=",2);params.put(parts[0],URLDecoder.decode(parts[1],StandardCharsets.UTF_8));}
-            assertEquals(ProviderScopes.requested(provider,tasks,calendars,false),params.get("scope"));
-            String code=(tasks?calendars?"combined-fixture-":"fixture-":"calendar-fixture-")+UUID.randomUUID();
+            assertEquals(ProviderScopes.requested(provider,tasks,calendars,tasks),params.get("scope"));
+            String code=(tasks?calendars?"write-combined-fixture-":"write-fixture-":"calendar-fixture-")+UUID.randomUUID();
             var connected=json(call("POST","/complete",object().put("state",params.get("state")).put("code",code),null),200);created.add(connected.path("id").asText());
             assertEquals(tasks,connected.path("services").path("tasks").asBoolean());assertEquals(calendars,connected.path("services").path("calendars").asBoolean());
             assertEquals(tasks?2:0,connected.path("availableLists").size());assertEquals(calendars?1:0,connected.path("availableCalendars").size());
-            if(calendars){String owner=connected.path("ownerId").asText(),id=connected.path("id").asText();var client=store.transaction(owner,()->store.createClient(object().put("name","Calendar parity")));var selected=object();selected.putArray("selectedCalendars").add("calendar");selected.putObject("calendarMappings").put("calendar",client.path("id").asText());json(call("PUT","/"+id+"/calendars",selected,etag(connected)),200);var synced=idle(id);assertTrue(synced.path("calendarLastError").isNull(),synced.toString());assertTrue(synced.path("calendarLastSuccess").isTextual());}
+            if(calendars){String owner=connected.path("ownerId").asText(),id=connected.path("id").asText();var client=store.transaction(owner,()->store.createClient(object().put("name","Calendar parity").put("color","#123456")));var selected=object();selected.putArray("selectedCalendars").add("calendar");selected.putObject("calendarMappings").put("calendar",client.path("id").asText());json(call("PUT","/"+id+"/calendars",selected,etag(connected)),200);var synced=idle(id);assertTrue(synced.path("calendarLastError").isNull(),synced.toString());assertTrue(synced.path("calendarLastSuccess").isTextual());}
         }
     }
     @Test void revokedProviderAuthorizationDoesNotLogOutTheDagsverkAccount(){

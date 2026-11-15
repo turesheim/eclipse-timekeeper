@@ -629,6 +629,12 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   const loaded = id ? await session.request(`/${collection}/${id}`) : { data: initial, etag: null };
   if (session !== api || !connected) return;
   const value = loaded.data;
+  let taskHomes=[];
+  if(collection==='tasks'){
+    taskHomes=(await session.page('/task-sync/lists')).items;
+    if(value.syncListId&&!taskHomes.some(list=>list.id===value.syncListId))taskHomes.push((await session.request('/task-lists/'+value.syncListId)).data);
+    if(session!==api||!connected)return;
+  }
   let activitySource=collection==='activities'&&id?calendar.subscriptions.sources[id]:null;
   if(collection==='activities'&&id&&!activitySource){
     // Activities remain editable independently of whether Calendar was opened.
@@ -644,7 +650,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   if (collection === 'labels') field(i18nText("ui.color_optional"), 'color', value.color, { hint: i18nText("ui.hex_color_for_example_176653") });
   if (collection === 'tasks') {
     field(i18nText("ui.summary"), 'summary', value.summary, { required: true, max: 1024 });
-    editor.taskFields=taskEditorFields(field,value,()=>snapshot,id);
+    editor.taskFields=taskEditorFields(field,value,()=>snapshot,id,taskHomes);
     field(i18nText('record.url_optional'), 'url', value.url, { type: 'url', max: 4096 });
   }
   if (collection === 'activities') {
@@ -759,7 +765,7 @@ function values() {
     case 'clients':return { name: get('name'), color: get('color') };
     case 'projects':return { name: get('name'), clientId: get('clientId'), icon: $('fields').querySelector('[name=icon]:checked')?.value || null };
     case 'labels':return { name: get('name'), color: get('color') || null };
-    case 'tasks':return { summary: get('summary'), clientId:get('clientId')||null,projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null,priority:get('priority'),due:editor.taskFields.due() };
+    case 'tasks':return { summary: get('summary'), clientId:get('clientId')||null,projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null,...editor.taskFields.values() };
     case 'activities':return { ...(editor.id ? {} : { taskId: get('taskId') || null, projectId: get('taskId') ? null : get('projectId') || null }), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels() };
     case 'work-sessions':return { ...(editor.legacyLabelIds?.length ? { labelIds: [...editor.legacyLabelIds] } : {}), clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
   }

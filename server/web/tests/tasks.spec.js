@@ -230,3 +230,15 @@ for(const locale of ['en-GB','nb-NO'])test('provider source links and assignment
   }
   expect((await(await api('GET','/tasks/'+task.id)).json()).url).toBe(own);await captureScreenshot(page,{path:'test-results/task-context-'+locale+'-320.png'});
 });
+
+for(const locale of ['en-GB','nb-NO'])test('ordinary editor preserves notes, dates and completion in '+locale,async({page,request})=>{
+  const {api,native}=await setup(page,request,{locale,remoteCount:0});const nb=locale==='nb-NO';
+  await page.locator('#tasks-list').getByRole('button',{name:nb?'Åpne oppgaven Local task':'Open task Local task',exact:true}).click();
+  await page.locator('#task-details').getByRole('button',{name:nb?'Rediger oppgave':'Edit task',exact:true}).click();await expect(page.locator('#editor')).toBeVisible();
+  await expect(page.locator('#field-syncListId')).toHaveValue('');await page.locator('#field-bodyContent').fill('Exact notes <keep>');await page.locator('#field-status').selectOption('IN_PROGRESS');await page.locator('#field-scheduledDate').fill('2026-12-01');
+  const editor=page.locator('#editor');
+  await page.locator('#field-startKind').selectOption('DATE_TIME');await page.locator('#field-startDate').fill('2026-12-01');await editor.getByLabel(nb?'Klokkeslett for start':'Start time',{exact:true}).fill('08:30');await editor.getByLabel(nb?'Tidssone for start':'Start time zone',{exact:true}).fill('Europe/Oslo');
+  await page.locator('#field-dueKind').selectOption('DATE_TIME');await page.locator('#field-dueDate').fill('2026-12-01');await editor.getByLabel(nb?'Klokkeslett for tidsfrist':'Deadline time',{exact:true}).fill('17:15');await editor.getByLabel(nb?'Tidssone for tidsfrist':'Deadline time zone',{exact:true}).fill('America/New_York');
+  await page.locator('#field-categories').fill('Work\nReview');await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();
+  const saved=await(await api('GET','/tasks/'+native.local.id)).json();expect(saved.body).toEqual({format:'TEXT',content:'Exact notes <keep>'});expect(saved.status).toBe('IN_PROGRESS');expect(saved.scheduledDate).toBe('2026-12-01');expect(saved.start).toMatchObject({kind:'DATE_TIME',date:'2026-12-01',time:'08:30',timeZone:'Europe/Oslo'});expect(saved.due).toMatchObject({kind:'DATE_TIME',date:'2026-12-01',time:'17:15',timeZone:'America/New_York'});expect(saved.metadata.categories.sort()).toEqual(['Review','Work']);
+});

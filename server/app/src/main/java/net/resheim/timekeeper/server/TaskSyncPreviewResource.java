@@ -21,6 +21,12 @@ public class TaskSyncPreviewResource {
         ContractInputs.queries(uri.getQueryParameters());return inputs.validate(schema,body);
     }
     private TaskSync sync(){return new TaskSync(store,receipts);}
+    @GET @Path("/lists") public Response synchronizedTaskLists(){
+        ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");
+        return store.authenticated(identity,()->{
+            var result=JsonValues.object().put("revision",store.revision());var rows=result.putArray("items");store.service().synchronizedTaskLists().forEach(list->rows.add(JsonValues.snapshot(store.owner(),list)));result.putNull("nextCursor");return new ApiReplies(200,result,null,null).response();
+        });
+    }
     @POST @Path("/import") public Response importTask(JsonNode body){
         var input=input("TaskSyncImportInput",body);
         return store.authenticated(identity,()->sync().importTask(input).response());

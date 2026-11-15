@@ -63,6 +63,24 @@ async function expectClientIndicator(page,item){
 async function convert(page,subscription){await planned(page,subscription).click();await page.locator('#calendar-event-details').getByRole('button',{name:'Create activity',exact:true}).click();}
 async function saveActivity(page){const reply=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname.endsWith('/activity'));await page.locator('#save').click();const response=await reply;expect(response.status()).toBe(201);await expect(page.locator('#editor')).toBeHidden();return response.json();}
 
+test('subscription settings exclude Internet account calendars while Week still presents their events',async({browser,request})=>{
+  const {page,context,api,client}=await setup(browser,request);
+  try{
+    const linkFeed=await provider(request),accountFeed=await provider(request,[meeting.replace('browser-meeting','account-meeting').replace('Planned meeting','Internet account meeting')]);
+    const link=await(await api('POST','/calendar-subscriptions',{name:'Same calendar name',clientId:client.id,url:linkFeed.url,visible:true},{'Idempotency-Key':randomUUID()})).json();
+    const account=await(await api('POST','/calendar-subscriptions',{name:'Same calendar name',clientId:client.id,url:accountFeed.url,visible:true},{'Idempotency-Key':randomUUID()})).json();
+    await page.route('**/api/v1/calendar-subscriptions',async route=>{
+      if(route.request().method()!=='GET')return route.continue();const response=await route.fetch(),data=await response.json();
+      for(const item of data.items)if(item.id===account.id){item.managed=true;item.connectionId=randomUUID();}
+      await route.fulfill({response,json:data});
+    });
+    await page.reload();await ready(page);await manage(page);
+    await expect(page.locator('#calendar-subscriptions-title')).toHaveText('Calendars (1)');await expect(page.locator('#calendar-subscription-list > li')).toHaveCount(1);
+    await expect(page.locator(`[data-calendar-action="visible:${link.id}"]`)).toBeVisible();await expect(page.locator(`[data-calendar-action="visible:${account.id}"]`)).toHaveCount(0);
+    await tracking(page);await calendar(page);await expect(planned(page,link)).toBeVisible();await expect(planned(page,account)).toBeVisible();
+  }finally{await context.close();}
+});
+
 test('calendar sharing guidance explains provider links and task limits with keyboard-accessible help',async({browser,request})=>{
   const {page,context}=await setup(browser,request);
   try{

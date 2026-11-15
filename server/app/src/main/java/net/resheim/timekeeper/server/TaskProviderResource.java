@@ -42,8 +42,7 @@ public class TaskProviderResource {
     }
     @POST @Path("/{provider}/authorize") public Response authorize(@PathParam("provider")String provider,JsonNode body){
         var input=inputs.validate("TaskProviderAuthorizeInput",body);queries();var kind=TaskProviderConfiguration.provider(provider);String browser=browser();
-        boolean writable=input.path("direction").asText("IMPORT").equals("TWO_WAY");
-        if(writable&&kind!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
+        boolean writable=input.path("direction").asText("TWO_WAY").equals("TWO_WAY")&&(!input.path("services").isObject()||input.path("services").path("tasks").asBoolean());
         var services=input.path("services").isObject()?((com.fasterxml.jackson.databind.node.ObjectNode)input.get("services")).deepCopy():object().put("tasks",true).put("calendars",false);services.put("writableTasks",writable);SharedConnectClient.services(services);
         store.authenticated(identity,()->null);boolean verifying=input.path("verification").asBoolean();
         if(verifying)administrators.require(identity.principal());
@@ -95,11 +94,23 @@ public class TaskProviderResource {
     @PUT @Path("/{id}/lists") public Response select(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
         UUID key=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderSelectionInput",body);queries();
         var selected=new ArrayList<String>();input.path("selectedLists").forEach(value->selected.add(value.asText()));
-        var response=tx(()->ApiReplies.resource(200,connections().select(key,selected,input.get("projectMappings"),match,input.has("reviewAdditions")?input.path("reviewAdditions").asBoolean():null),null));refresh.wake();return response;
+        var response=tx(()->ApiReplies.resource(200,connections().select(key,selected,input.get("projectMappings"),match,input.has("reviewAdditions")?input.path("reviewAdditions").asBoolean():null,input.has("automatic")?input.path("automatic").asBoolean():null),null));refresh.wake();return response;
     }
     @PUT @Path("/{id}/calendars") public Response calendars(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
         UUID key=ContractInputs.pathId(id);var input=inputs.validate("InternetCalendarSelectionInput",body);queries();
         var response=tx(()->ApiReplies.resource(200,new InternetCalendars(store).select(key,input,match),null));refresh.wake();return response;
+    }
+    @PUT @Path("/{id}/settings") public Response settings(@PathParam("id")String id,@HeaderParam("If-Match")String match,JsonNode body){
+        UUID key=ContractInputs.pathId(id);var input=inputs.validate("TaskProviderSettingsInput",body);queries();
+        var response=tx(()->{
+            ApiReplies.match(connections().view(key),match);
+            if(input.has("tasks")){
+                var tasks=input.get("tasks");var selected=new ArrayList<String>();tasks.path("selectedLists").forEach(value->selected.add(value.asText()));
+                connections().select(key,selected,tasks.get("projectMappings"),etag(connections().view(key)),tasks.has("reviewAdditions")?tasks.path("reviewAdditions").asBoolean():null,tasks.has("automatic")?tasks.path("automatic").asBoolean():null);
+            }
+            if(input.has("calendars"))new InternetCalendars(store).select(key,input.get("calendars"),etag(connections().view(key)));
+            return ApiReplies.resource(200,connections().view(key),null);
+        });refresh.wake();return response;
     }
     @GET @Path("/{id}/imports/{list}") public Response importPreview(@PathParam("id")String id,@PathParam("list")String list){
         UUID key=ContractInputs.pathId(id),listKey=ContractInputs.pathId(list);queries();return tx(()->ApiReplies.resource(200,new TaskProviderScans(store,receipts,inputs).review(key,listKey),null));

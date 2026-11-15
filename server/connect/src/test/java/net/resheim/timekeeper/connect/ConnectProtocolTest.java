@@ -15,7 +15,8 @@ class ConnectProtocolTest {
         String tasks=ConnectProvider.scopes("google",new Services(true,false,false));assertTrue(tasks.contains("tasks.readonly"));assertFalse(tasks.contains("calendar"));
         String both=ConnectProvider.scopes("google",new Services(true,true,true));assertTrue(both.contains("https://www.googleapis.com/auth/tasks "));assertTrue(both.contains("calendar.readonly"));
         String microsoft=ConnectProvider.scopes("microsoft",new Services(true,true,false));assertTrue(microsoft.contains("Calendars.Read"));assertTrue(microsoft.contains("Tasks.Read"));assertFalse(microsoft.contains("ReadWrite"));
-        assertThrows(ConnectFailure.class,()->new Services(false,false,false));assertThrows(ConnectFailure.class,()->new Services(false,true,true));assertThrows(ConnectFailure.class,()->ConnectProvider.scopes("microsoft",new Services(true,false,true)));
+        String microsoftWrite=ConnectProvider.scopes("microsoft",new Services(true,false,true));assertTrue(microsoftWrite.contains("Tasks.ReadWrite"));assertFalse(microsoftWrite.contains("Calendars"));
+        assertThrows(ConnectFailure.class,()->new Services(false,false,false));assertThrows(ConnectFailure.class,()->new Services(false,true,true));
     }
     @Test void acceptsTheStandardS256ChallengeAndEscapesDisplayedInstallationNames(){
         assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",hash("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"));

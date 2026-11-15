@@ -12,6 +12,8 @@ import io.quarkus.test.junit.*;
 import jakarta.inject.Inject;
 import net.resheim.eclipse.timekeeper.domain.*;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -21,7 +23,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 class TaskProviderRestartTest {
     public static class Profile implements QuarkusTestProfile {
         public Map<String,String> getConfigOverrides(){
-            if(System.getenv("TIMEKEEPER_TEST_TASK_RESTART_PHASE")!=null&&System.getenv("TIMEKEEPER_TEST_TASK_DB_URL")==null)throw new IllegalStateException("Restart acceptance needs its isolated persistent PostgreSQL fixture");
+            if(System.getenv("TIMEKEEPER_TEST_TASK_RESTART_PHASE")!=null&&System.getenv("TIMEKEEPER_TEST_TASK_DB_URL")==null)throw new IllegalStateException("Restart acceptance needs an isolated persistent database fixture");
             var config=TaskProviderTestDatabase.settings("task_provider_restart");config.put("timekeeper.tasks.automatic","false");return config;
         }
     }
@@ -53,11 +55,22 @@ class TaskProviderRestartTest {
         if(acknowledged)assertTrue(writes().acknowledge(write,sending.path("attempt").asText(),remote("task",title,"\"g2\"","001")));
         fixture.put("write",write.toString());fixture.put("taskEtag",etag(store.find("TASK",task.id().value()).orElseThrow()));expiredLease(connection);return fixture;
     }
+    private ObjectNode stageAutomatic(){
+        var fixture=connection("automatic",true);UUID connection=uuid(fixture.get("connection")),list=uuid(fixture.get("list"));
+        connections().select(connection,List.of("list"),null,etag(connections().view(connection)),null,true);
+        var claim=connections().claim(connection,false);var start=scans().begin(claim);scans().acknowledge(claim,start,new TaskCloudProvider.Page<>(List.of(remote("automatic-task","Original","\"a1\"","001"),remote("deleted-task","Delete after restart","\"d1\"","002")),null,null));scans().reconcile(claim);
+        var task=(Task)decode("TASK",store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository(fixture.path("account").asText(),"list"),"automatic-task")).orElseThrow());
+        task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),"Automatic after restart",task.url()));
+        fixture.put("task",task.id().value().toString());
+        var nativeTask=store.service().createTask(new CreateTask(Optional.empty(),Optional.empty(),"Native after restart",Optional.empty(),Optional.of(list)));fixture.put("nativeTask",nativeTask.id().value().toString());
+        var deleted=(Task)decode("TASK",store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository(fixture.path("account").asText(),"list"),"deleted-task")).orElseThrow());store.service().deleteTask(new DeleteTask(deleted.id(),deleted.version()));fixture.put("deletedTask",deleted.id().value().toString());
+        expiredLease(connection);return fixture;
+    }
     private void prepare(Path proof)throws Exception{
         String owner="task-restart-"+UUID.randomUUID();var saved=store.transaction(owner,()->{
             var result=object().put("owner",owner).put("preparePid",ProcessHandle.current().pid());var pages=connection("pages",false);UUID connection=uuid(pages.get("connection"));var claim=connections().claim(connection,false);var start=scans().begin(claim);
             var first=scans().acknowledge(claim,start,new TaskCloudProvider.Page<>(List.of(remote("first","First page","\"p1\"","001")),"second-page",null));pages.put("scanId",first.path("scanId").asText());expiredLease(connection);result.set("pages",pages);
-            result.set("uncertain",stageWrite("uncertain",false));result.set("acknowledged",stageWrite("acknowledged",true));return result;
+            result.set("uncertain",stageWrite("uncertain",false));result.set("acknowledged",stageWrite("acknowledged",true));result.set("automatic",stageAutomatic());return result;
         });
         Files.writeString(proof,saved.toString(),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE);
     }
@@ -67,7 +80,7 @@ class TaskProviderRestartTest {
             var pages=saved.path("pages");UUID connection=uuid(pages.get("connection")),list=uuid(pages.get("list"));var before=store.find(TaskProviderScans.SCAN,list).orElseThrow();assertEquals("FETCHING",before.path("state").asText());assertEquals(1,before.path("pageCount").asInt());assertEquals("second-page",before.path("next").asText());
             var key=new ExternalTaskReferenceKey("google",TaskCloudPull.repository(pages.path("account").asText(),"list"),"first");assertTrue(store.byReference(key).isEmpty());var claim=connections().claim(connection,false);assertNotNull(claim);var resumed=scans().begin(claim);assertEquals(pages.path("scanId"),resumed.path("scanId"));assertEquals("second-page",resumed.path("next").asText());
             var ready=scans().acknowledge(claim,resumed,new TaskCloudProvider.Page<>(List.of(remote("second","Second page","\"p2\"","002")),null,null));var synchronizedTasks=scans().reconcile(claim);assertTrue(synchronizedTasks.path("complete").asBoolean());assertEquals(2,synchronizedTasks.path("created").asInt());assertTrue(store.byReference(key).isPresent());
-            var scan=new TaskCloudPull.Scan("google",pages.path("account").asText(),"list",scans().tasks(ready),store.now());new TaskCloudPull(store,receipts,inputs).apply(connection,list,scan);assertEquals(4,store.list("TASK").size());return null;
+            var scan=new TaskCloudPull.Scan("google",pages.path("account").asText(),"list",scans().tasks(ready),store.now());new TaskCloudPull(store,receipts,inputs).apply(connection,list,scan);assertEquals(7,store.list("TASK").size());return null;
         });
         for(String name:List.of("uncertain","acknowledged")){
             var fixture=saved.path(name);UUID connection=uuid(fixture.get("connection")),write=uuid(fixture.get("write")),task=uuid(fixture.get("task"));
@@ -76,9 +89,27 @@ class TaskProviderRestartTest {
             writes().drain(claim,"synthetic-private-access",writer);writes().drain(claim,"synthetic-private-access",writer);
             store.transaction(saved.path("owner").asText(),()->{
                 var row=writes().get(connection,write);assertEquals(name.equals("uncertain")?"UNKNOWN":"DONE",row.path("state").asText());var current=store.find("TASK",task).orElseThrow();assertEquals(name.equals("uncertain")?"Uncertain update":"Acknowledged update",current.path("summary").asText());
-                assertEquals(name.equals("uncertain")?"Original":"Acknowledged update",current.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());assertEquals(1,current.path("externalReferences").size());assertEquals(4,store.list("TASK").size());return null;
+                assertEquals(name.equals("uncertain")?"Original":"Acknowledged update",current.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());assertEquals(1,current.path("externalReferences").size());assertEquals(7,store.list("TASK").size());return null;
             });
         }
+        var fixture=saved.path("automatic");UUID automaticConnection=uuid(fixture.get("connection")),automaticTask=uuid(fixture.get("task"));
+        var claim=store.transaction(saved.path("owner").asText(),()->{
+            var intent=store.list(TaskProviderIntents.KIND).stream().filter(row->row.path("taskId").asText().equals(automaticTask.toString())).findFirst().orElseThrow();assertEquals("Automatic after restart",intent.path("desired").path("summary").asText());return connections().claim(automaticConnection,false);
+        });assertNotNull(claim);var patches=new java.util.concurrent.atomic.AtomicInteger();
+        var creations=new java.util.concurrent.atomic.AtomicInteger();var deletions=new java.util.concurrent.atomic.AtomicInteger();
+        var writer=new GoogleTasksWriter(new TaskProviderHttp(Set.of("tasks.googleapis.com"),request->{
+            if(request.method().equals("POST")){assertEquals("Native after restart",parse(TaskProviderHttpTestFixture.bytes(request)).path("title").asText());creations.incrementAndGet();return TaskProviderHttpTestFixture.reply(201,remote("created-native","Native after restart","\"n1\"","003").original().toString());}
+            boolean deleted=request.uri().getPath().endsWith("/deleted-task");
+            if(request.method().equals("GET"))return TaskProviderHttpTestFixture.reply(200,remote(deleted?"deleted-task":"automatic-task",deleted?"Delete after restart":"Original",deleted?"\"d1\"":"\"a1\"",deleted?"002":"001").original().toString());
+            if(request.method().equals("DELETE")){assertTrue(deleted);assertEquals("\"d1\"",request.headers().firstValue("If-Match").orElseThrow());deletions.incrementAndGet();return new TaskProviderHttp.Reply(204,Map.of(),new byte[0]);}
+            assertEquals("PATCH",request.method());assertEquals("\"a1\"",request.headers().firstValue("If-Match").orElseThrow());assertEquals("Automatic after restart",parse(TaskProviderHttpTestFixture.bytes(request)).path("title").asText());patches.incrementAndGet();
+            return TaskProviderHttpTestFixture.reply(200,remote("automatic-task","Automatic after restart","\"a2\"","001").original().toString());
+        }));writes().drain(claim,"synthetic-private-access",writer);writes().drain(claim,"synthetic-private-access",writer);assertEquals(1,patches.get());assertEquals(1,creations.get());assertEquals(1,deletions.get());
+        store.transaction(saved.path("owner").asText(),()->{
+            var task=store.find("TASK",automaticTask).orElseThrow();assertEquals("Automatic after restart",task.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());
+            var nativeTask=store.find("TASK",uuid(fixture.get("nativeTask"))).orElseThrow();assertEquals("created-native",nativeTask.path("externalReferences").get(0).path("externalId").asText());assertEquals(fixture.path("list"),nativeTask.path("syncListId"));
+            var deleted=store.find("TASK",uuid(fixture.get("deletedTask"))).orElseThrow();assertTrue(deleted.path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",uuid(deleted.get("id"))).isPresent());assertEquals(7,store.list("TASK").size());assertTrue(store.list(TaskProviderIntents.KIND).isEmpty());return null;
+        });
         saved.put("verifyPid",ProcessHandle.current().pid()).put("passed",true);Files.writeString(proof,saved.toString(),StandardCharsets.UTF_8);
     }
     @Test void savedPagesAndWriteOutcomesSurviveANewServerJvm()throws Exception{

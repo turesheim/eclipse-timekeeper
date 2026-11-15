@@ -136,7 +136,7 @@ final class RemoteTaskFailureScenario {
             assertEquals(draft,editor.textWithLabel("Summary").getText());assertFalse(editor.button("OK").isEnabled());
             if(cancel) {
                 var job=java.util.Arrays.stream(org.eclipse.core.runtime.jobs.Job.getJobManager().find(null))
-                    .filter(candidate->candidate.getName().equals("Save Timekeeper task") && candidate.getState()==org.eclipse.core.runtime.jobs.Job.RUNNING).findFirst().orElseThrow();
+                    .filter(candidate->java.util.Set.of("Save Dagsverk task","Lagre Dagsverk-oppgave").contains(candidate.getName()) && candidate.getState()==org.eclipse.core.runtime.jobs.Job.RUNNING).findFirst().orElseThrow();
                 job.cancel();
                 String message="The request was cancelled. Refresh to confirm whether the server completed it.";
                 rejected(shell,message,message,draft,url);

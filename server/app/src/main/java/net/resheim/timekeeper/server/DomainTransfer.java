@@ -35,8 +35,17 @@ final class DomainTransfer {
         Map<UUID,UUID> sections=new HashMap<>();
         Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Map<UUID,WorkSessionId> sessions=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
         var result=object();var mappings=result.putArray("ids");var service=store.service();
-        // Validate source identity uniqueness before any record is created.
-        TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
+        // A retained task and its deletion marker intentionally share an ID.
+        // Every other source identity remains unique, including marker IDs.
+        Set<UUID> retainedTasks=new HashSet<>(),markerIds=new HashSet<>(),markedTasks=new HashSet<>();
+        input.path("tasks").forEach(item->{if(item.path("deleted").asBoolean())retainedTasks.add(uuid(item.get("id")));});
+        TYPES.forEach((name,type) -> {if(!name.equals("taskTombstones"))for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
+        for(JsonNode item:input.path("taskTombstones")){
+            UUID id=uuid(item.get("id")),taskId=uuid(item.get("taskId"));
+            if(!markerIds.add(id))throw ApiFailure.validation();
+            if(sourceIds.contains(id)&&(!id.equals(taskId)||!retainedTasks.contains(taskId)))throw ApiFailure.validation();
+            if(retainedTasks.contains(taskId)&&!markedTasks.add(taskId))throw ApiFailure.validation();
+        }
         Set<UUID> sourceConnections=new HashSet<>();input.path("taskConnections").forEach(item->sourceConnections.add(uuid(item.get("id"))));
         for(JsonNode item:input.path("taskLists")) if(!sourceConnections.contains(uuid(item.get("connectionId")))) throw ApiFailure.validation();
         Set<UUID> sourceListIds=new HashSet<>();input.path("taskLists").forEach(item -> sourceListIds.add(uuid(item.get("id"))));
@@ -218,11 +227,18 @@ final class DomainTransfer {
             store.save("ACTIVITY",created);store.change("ACTIVITY","CREATED",created.id().value().toString());mapping(mappings,"ACTIVITY",item,created.id().value());
         }
         for(JsonNode item:input.path("taskTombstones")) {
-            UUID tombstoneId=UUID.randomUUID();Set<ExternalTaskReferenceKey> keys=aliases(item.get("externalReferences"));
-            var tombstone=new TaskTombstone(tombstoneId,uuid(item.get("taskId")),Instant.parse(item.get("deletedAt").asText()),
+            UUID sourceTask=uuid(item.get("taskId"));
+            UUID tombstoneId=retainedTasks.contains(sourceTask)?required(tasks,sourceTask).value():UUID.randomUUID();Set<ExternalTaskReferenceKey> keys=aliases(item.get("externalReferences"));
+            var tombstone=new TaskTombstone(tombstoneId,tasks.containsKey(uuid(item.get("taskId")))?tasks.get(uuid(item.get("taskId"))).value():uuid(item.get("taskId")),Instant.parse(item.get("deletedAt").asText()),
                     item.get("taskVersion").asLong(),keys);
             store.save("TASK_TOMBSTONE",tombstone);store.change("TASK_TOMBSTONE","CREATED",tombstoneId.toString());
             mapping(mappings,"TASK_TOMBSTONE",item,tombstoneId);
+        }
+        for(JsonNode item:input.get("tasks")){
+            var id=required(tasks,uuid(item.get("id")));var task=(Task)decode("TASK",store.find("TASK",id.value()).orElseThrow());
+            var home=optionalText(item.get("syncListId")).map(UUID::fromString).map(source->required(lists,source));
+            if(item.has("syncListId")&&!task.syncListId().equals(home)){task=store.save("TASK",task.withSyncList(home));store.change("TASK","UPDATED",id.value().toString());}
+            if(item.path("deleted").asBoolean()&&!task.deleted()){store.save("TASK",task.withDeleted(true));store.change("TASK","UPDATED",id.value().toString());}
         }
         service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);

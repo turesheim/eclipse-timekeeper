@@ -17,6 +17,17 @@ class HttpClientIntegrationTest {
     @TestHTTPResource URI server;
     @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporary;
     @jakarta.inject.Inject TokenRegistry registry;
+    @Test void theOrdinaryRemoteEditorUpdatesItsFieldsInOneVersionedRequest(){
+        try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))){
+            var task=client.createTask(new CreateTask(Optional.empty(),"Editor batch "+UUID.randomUUID(),Optional.empty()));
+            var update=new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),"Edited with details",task.url(),Optional.of(Optional.empty()));
+            var planning=new TaskPlanning(TaskStatus.IN_PROGRESS,Optional.of(LocalDate.of(2026,12,1)),Optional.empty());var body=new TaskBody(TaskBodyFormat.HTML,"<p>Keep exact markup</p>");var timing=new TaskTiming(Optional.of(TaskMoment.zoned(LocalDate.of(2026,12,1),LocalTime.of(8,30),"Europe/Oslo")),Optional.empty());var importance=new TaskImportance(TaskPriority.HIGH,true,true);var metadata=new TaskMetadata(Set.of("local"),Set.of("Work"),List.of());
+            var saved=client.updateTaskDetails(new UpdateTaskDetails(update,planning,body,timing,importance,3,metadata));
+            assertEquals(planning,saved.planning());assertEquals(body,saved.body());assertEquals(timing,saved.timing());assertEquals(importance,saved.importance());assertEquals(metadata,saved.metadata());assertEquals(3,saved.siblingOrder());assertEquals(saved,client.task(task.id()).orElseThrow());
+            assertEquals("STALE_VERSION",assertThrows(RemoteFailure.class,()->client.updateTaskDetails(new UpdateTaskDetails(update,planning,body,timing,importance,3,metadata))).code());
+            assertEquals(saved,client.task(task.id()).orElseThrow());client.deleteTask(new DeleteTask(saved.id(),saved.version()));
+        }
+    }
     @Test void futureCreateUpdateAndImportLeaveOwnedDataAndRevisionUnchanged() {
         try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))) {
             var task=client.createTask(new CreateTask(Optional.empty(),"Future boundary "+UUID.randomUUID(),Optional.empty()));

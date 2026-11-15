@@ -19,6 +19,7 @@ export function taskProviderReviews(view,root,{reload,controls:parentControls}){
     for(const row of snapshot.items){
       const item=node('div',undefined,'border-top py-3');item.dataset.incomingTask=row.taskId||'';
       item.append(node('h5',row.localFields?.summary||row.remoteFields?.summary||row.externalId,'h6 text-break'),node('p',row.externalId,'text-break small'));
+      if(row.localFields?.deleted&&!row.deleted)item.append(node('p',t('task_reviews.local_deleted'),'alert alert-warning'));
       if(row.deleted)item.append(node('p',t('task_reviews.deleted',{provider:source()}),'alert alert-warning'));
       for(const decision of row.decisions||[]){
         if(!['CONFLICT','NO_BASELINE','REMOTE_ONLY'].includes(decision.outcome))continue;

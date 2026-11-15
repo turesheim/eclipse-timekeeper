@@ -94,8 +94,10 @@ public interface TimekeeperService {
 	default Optional<TaskSyncCursor> taskSyncCursor(java.util.UUID id) { throw new UnsupportedOperationException("Task sync cursors are not supported"); }
 	default List<TaskSyncCursor> taskSyncCursors(java.util.UUID connectionId) { throw new UnsupportedOperationException("Task sync cursors are not supported"); }
 
+	default List<TaskList> synchronizedTaskLists(){return List.of();}
 	Task createTask(CreateTask command);
 	Task updateTask(UpdateTask command);
+    default Task updateTaskDetails(Commands.UpdateTaskDetails command){throw new UnsupportedOperationException("Task details are not supported");}
 	default Task updateTaskPlanning(UpdateTaskPlanning command) { throw new UnsupportedOperationException("Task planning is not supported"); }
 	default Task updateTaskChecklist(UpdateTaskChecklist command) { throw new UnsupportedOperationException("Task checklists are not supported"); }
 	default Task updateTaskTiming(UpdateTaskTiming command) { throw new UnsupportedOperationException("Task timing is not supported"); }

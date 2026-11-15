@@ -2,7 +2,7 @@ import {t} from './i18n.js';
 import {ApiError} from './api.js';
 import {node,button} from './account-ui.js';
 
-const fields=['summary','body','status','scheduledDate','completedAt'];
+const fields=['summary','body','status','scheduledDate','completedAt','start','due','priority','metadata'];
 const translated=(key,fallback)=>{const value=t(key);return value===key?t(fallback):value;};
 const fieldName=field=>translated('task_writes.field_'+field,'task_writes.other_fields');
 const valueText=(field,value)=>value===null||value===undefined?t('task_writes.empty'):field==='body'?value.content:field==='status'?t('tasks.status.'+value):String(value);
@@ -85,7 +85,7 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
       add('task_writes.keep_local',resolve('LOCAL'),true);if(row.conflictFields.length)add('task_writes.use_google',resolve('REMOTE'),true);
     }
     if(['PREVIEW','QUEUED','CHECKING','CONFLICT'].includes(row.state))add('task_writes.cancel',async()=>{await view.session.request(path,{method:'DELETE',etag:reply.etag});if(!valid())return;comparison.hidden=true;await reload();},true,true);
-    if(row.action==='CREATE'&&row.state==='UNKNOWN'&&!row.externalId)identityPicker(path,reply,review);
+    if(row.canIdentify||row.action==='CREATE'&&row.state==='UNKNOWN'&&!row.externalId)identityPicker(path,reply,review);
     const close=button(t('ui.close'),()=>{++reviewGeneration;comparison.hidden=true;comparison.replaceChildren();heading.tabIndex=-1;heading.focus();});actions.append(close);comparison.append(actions);controls();title.focus();
   }
   function unresolvedChoice(path,reply){
@@ -114,13 +114,14 @@ export function taskProviderWrites(view,root,{reload,controls:parentControls}){
   }
   async function refresh(){
     if(!valid()||root.hidden)return;const current=++generation,reply=await view.session.request(base());if(!valid()||current!==generation)return;
-    const next=JSON.stringify(reply.data.items);if(next===signature)return;signature=next;
+    const rows=connection.automatic?reply.data.items.filter(row=>['UNKNOWN','ACK_REVIEW','CONFLICT'].includes(row.state)):reply.data.items;
+    const next=JSON.stringify(rows);if(next===signature)return;signature=next;
     const focused=history.contains(document.activeElement)?document.activeElement?.dataset.writeReview:null;history.replaceChildren();
-    for(const row of reply.data.items){
+    for(const row of rows){
       const item=node('div',undefined,'border-top py-2'),status=node('p',row.title+' · '+t('task_writes.state_'+row.state),'text-break mb-1');
       const review=button(t('task_writes.inspect'),()=>run(async()=>{const reply=await view.session.request(base()+'/'+row.id);if(valid())show(reply);},review,false));review.dataset.writeReview=row.id;item.append(status,review);history.append(item);
     }
     if(focused)[...history.querySelectorAll('[data-write-review]')].find(pick=>pick.dataset.writeReview===focused)?.focus();controls();
   }
-  return {controls,refresh,update(value){connection=value;root.hidden=value.providerId!=='google'||!value.pendingWrites&&(value.direction!=='TWO_WAY'||!value.selectedLists.length);details.hidden=value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;++reviewGeneration;view.clean(form);}};
+  return {controls,refresh,update(value){connection=value;heading.textContent=t(value.automatic?'task_writes.title_automatic':'task_writes.title');root.hidden=value.automatic?!(value.writeExceptions??value.pendingWrites):!value.pendingWrites&&(value.direction!=='TWO_WAY'||!value.selectedLists.length);details.hidden=!!value.automatic||value.direction!=='TWO_WAY';controls();},dispose(){disposed=true;++generation;++catalogGeneration;++reviewGeneration;view.clean(form);}};
 }

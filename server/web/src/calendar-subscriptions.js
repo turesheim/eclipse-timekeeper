@@ -103,7 +103,7 @@ export class CalendarSubscriptions {
       const [subscriptions,events]=await Promise.all([session.request('/calendar-subscriptions'),session.request('/calendar-events?'+new URLSearchParams({fromDate:from,toDate:to}))]);
       if(session!==this.scope||generation!==this.generation||key!==this.key)return;
       const plansChanged=JSON.stringify([this.events,this.sources])!==JSON.stringify([events.data.items,events.data.activitySources]);
-      this.rows=subscriptions.data.items;this.events=events.data.items;this.sources=events.data.activitySources;this.errors=events.data.errors;this.message.textContent=this.rows.some(value=>value.lastError||this.errors?.[value.id])?t('calendar.refresh_errors'):'';
+      this.rows=subscriptions.data.items;this.events=events.data.items;this.sources=events.data.activitySources;this.errors=events.data.errors;this.message.textContent=this.rows.some(value=>!value.managed&&(value.lastError||this.errors?.[value.id]))?t('calendar.refresh_errors'):'';
       this.paint();this.paintAllDay();if(plansChanged)this.callbacks.onEvents({items:this.events,sources:this.sources});this.reviewDetails();
       clearTimeout(this.burst);
       if(this.rows.some(value=>!value.lastError&&(!value.lastSuccess&&Date.now()-Date.parse(value.createdAt)<90000||value.lastAttempt&&(!value.lastSuccess||Date.parse(value.lastAttempt)>Date.parse(value.lastSuccess))&&Date.now()-Date.parse(value.lastAttempt)<90000)))this.burst=setTimeout(()=>void this.load(),2000);
@@ -114,11 +114,12 @@ export class CalendarSubscriptions {
   paint() {
     if(!this.data)return;
     const failures=this.rows.filter(value=>value.visible&&focusIncludes(this.data,value.clientId)&&(value.lastError||this.errors?.[value.id]));this.sourceWarnings.hidden=!failures.length;this.sourceWarnings.replaceChildren(...failures.map(value=>calendarSourceFailure(value,calendarFailure(value.lastError||this.errors[value.id]))));
-    this.title.textContent=this.rows.length?t('calendar.subscriptions_count',{count:this.rows.length}):t('calendar.subscriptions');
+    const subscriptions=this.rows.filter(value=>!value.managed);
+    this.title.textContent=subscriptions.length?t('calendar.subscriptions_count',{count:subscriptions.length}):t('calendar.subscriptions');
     const active=document.activeElement,focus=this.panel.contains(active)?active.dataset.calendarAction:null;
     this.add.disabled=!this.writable||!(this.data.allClients||this.data.clients).length;this.list.replaceChildren();
-    if(!this.rows.length)this.list.append(node('li',(this.data.allClients||this.data.clients).length?t('calendar.none'):t('calendar.client_required'),'hint'));
-    for(const value of this.rows) {
+    if(!subscriptions.length)this.list.append(node('li',(this.data.allClients||this.data.clients).length?t('calendar.none'):t('calendar.client_required'),'hint'));
+    for(const value of subscriptions) {
       const row=node('li',undefined,'calendar-subscription-row'),label=node('label',undefined,'calendar-subscription-choice'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.checked=value.visible;input.disabled=!this.writable||this.busy.has(value.id);input.dataset.calendarAction='visible:'+value.id;input.setAttribute('aria-label',t('calendar.show_name',{name:value.name}));
       input.addEventListener('change',()=>void this.visibility(value,input.checked));
       const text=node('span');text.append(node('strong',value.name),node('small',(this.data.allClients||this.data.clients).find(client=>client.id===value.clientId)?.name||t('ui.client')));label.append(input,text);

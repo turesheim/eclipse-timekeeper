@@ -201,7 +201,7 @@ public class RemoteChangeJobTest {
                         summary=name.group(1);writes.incrementAndGet();version++;revision++;
                     }
                     body=task();etag=tag();
-                } else if(Set.of("/api/v1/tasks","/api/v1/projects","/api/v1/labels","/api/v1/work-sessions").contains(path))
+                } else if(Set.of("/api/v1/tasks","/api/v1/projects","/api/v1/labels","/api/v1/work-sessions","/api/v1/task-sync/lists").contains(path))
                     body="{\"items\":["+(path.endsWith("/tasks") ? task() : "")+"],\"revision\":"+revision+",\"nextCursor\":null}";
                 else throw new AssertionError("Unexpected fixture route: "+path);
                 byte[] bytes=body.getBytes(StandardCharsets.UTF_8);
