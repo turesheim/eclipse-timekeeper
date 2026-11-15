@@ -137,3 +137,11 @@ test('a daily image can come from the vault without changing another day',async(
   const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);const other=await put('journal/2026-11-17.md','# Other day\n');await put('journal/2026-11-16.md','# This day\n');
   const root=await openNote(page,'journal/2026-11-16.md');await dailyTool(root,'Change banner image');const dialog=page.locator('.banner-image-dialog');await dialog.getByLabel('Existing vault image').selectOption('Images/Project cover.png');await dialog.getByRole('button',{name:'Save banner',exact:true}).click();await expect(banner(root)).toBeVisible();expect(await(await api('GET','/notes/entries/'+other.id+'/content')).text()).toBe('# Other day\n');
 });
+
+test('a failed custom image leaves the saved seasonal restore action available',async({page,request})=>{
+  const {put}=await fresh(page,request);await put('Images/Project cover.png',image);await put('Images/broken.png',Buffer.concat([image.subarray(0,12),Buffer.from('Incomplete PNG')]));
+  const snapshot={version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/Project cover.png',x:.25,y:.75},forecast:[]};
+  await put('journal/2026-11-16.md','---\nbanner: "[[Images/broken.png]]"\ndagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify(snapshot))+'\n---\n\n# Restore me\n');
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Restore me');await expect(banner(root).locator('img')).toHaveCount(0);await expect(banner(root)).toBeHidden();
+  await dailyTool(root,'Restore seasonal image');await expectBanner(root);
+});

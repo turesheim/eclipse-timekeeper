@@ -65,7 +65,7 @@ export class MarkdownBanner{
     const preview=resources.wikiImage(metadata.reference,'');this.preview=preview;
     const image=preview.dom;image.loading='eager';image.alt='';image.style.objectPosition=metadata.x*100+'% '+metadata.y*100+'%';
     image.addEventListener('load',()=>{if(this.preview===preview&&image.naturalWidth>0)this.dom.hidden=false;});
-    image.addEventListener('error',()=>{if(this.preview===preview)this.clear();});
+    image.addEventListener('error',()=>{if(this.preview===preview)this.clear({keepMetadata:true});});
     this.dom.append(image);
     if(this.snapshot?.forecast.length===3){
       this.dom.removeAttribute('aria-hidden');
