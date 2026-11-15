@@ -331,8 +331,21 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           const {from,to}=view.state.selection,label=payload.label||payload.path;
           view.dispatch(view.state.tr.insertText(label,from,to).addMark(from,from+label.length,view.state.schema.marks.link.create({href:payload.path})));
         }
-      }else if(name==='tasks'){
-        editor.action(callCommand(wrapInBulletListCommand.key));
+      }else if(['list','ordered','tasks'].includes(name)){
+        const {from,to,$from}=view.state.selection,lists=new Map();
+        // Changing the selected type converts a containing list in place;
+        // wrapping an existing list would leave the command unapplied.
+        for(let depth=$from.depth;depth>0;depth--){const node=$from.node(depth);if(['bullet_list','ordered_list'].includes(node.type.name)&&to<=$from.end(depth)){lists.set($from.before(depth),node);break;}}
+        if(!lists.size)view.state.doc.nodesBetween(from,to,(node,pos)=>{if(['bullet_list','ordered_list'].includes(node.type.name)){lists.set(pos,node);return false;}return true;});
+        if(lists.size){
+          let transaction=view.state.tr;const type=view.state.schema.nodes[name==='ordered'?'ordered_list':'bullet_list'];
+          for(const [pos,node]of lists){
+            transaction=transaction.setNodeMarkup(pos,type,node.attrs);
+            node.forEach((item,offset)=>{if(item.type.name==='list_item')transaction=transaction.setNodeMarkup(pos+1+offset,undefined,{...item.attrs,checked:name==='tasks'?item.attrs.checked??false:null});});
+          }
+          view.dispatch(transaction);
+        }else editor.action(callCommand(name==='ordered'?wrapInOrderedListCommand.key:wrapInBulletListCommand.key));
+        if(name==='tasks'){
         const {from,to,$from,empty}=view.state.selection;let transaction=view.state.tr;
         if(empty){
           for(let depth=$from.depth;depth>0;depth--){const item=$from.node(depth);if(item.type.name==='list_item'){transaction=transaction.setNodeMarkup($from.before(depth),undefined,{...item.attrs,checked:item.attrs.checked??false});break;}}
@@ -340,6 +353,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           view.state.doc.nodesBetween(from,to,(item,position)=>{if(item.type.name==='list_item')transaction=transaction.setNodeMarkup(position,undefined,{...item.attrs,checked:item.attrs.checked??false});});
         }
         if(transaction.docChanged)view.dispatch(transaction);
+        }
       }else{
         const action=commands[name];if(!action){const applied=structuredCommand(view,name,{singleCell:!focus});if(applied&&focus)view.focus();return applied;}
         const level=name==='heading'?(payload??2):undefined;
