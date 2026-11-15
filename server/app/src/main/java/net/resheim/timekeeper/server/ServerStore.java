@@ -60,6 +60,13 @@ public class ServerStore {
     private final ThreadLocal<Boolean> providerObservation = new ThreadLocal<>();
     boolean observingProvider(){return Boolean.TRUE.equals(providerObservation.get());}
     <T>T providerObservation(Supplier<T> work){var prior=providerObservation.get();providerObservation.set(true);try{return work.get();}finally{if(prior==null)providerObservation.remove();else providerObservation.set(prior);}}
+    /** Keep one rejected provider item from rolling back unrelated tasks in the same complete scan. */
+    <T>T isolatedProviderItem(Supplier<T> work){
+        java.sql.Savepoint point;
+        try{point=currentConnection().setSavepoint();}catch(SQLException failure){throw databaseFailure(failure);}
+        try{return work.get();}catch(RuntimeException failure){try{currentConnection().rollback(point);}catch(SQLException rollback){failure.addSuppressed(rollback);}throw failure;}
+        finally{try{currentConnection().releaseSavepoint(point);}catch(SQLException failure){throw databaseFailure(failure);}}
+    }
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();

@@ -1914,5 +1914,6 @@
   "task_writes.field_due": "Frist",
   "task_writes.field_priority": "Prioritet",
   "task_writes.field_metadata": "Kategorier",
-  "task_writes.state_MOVE": "Flytter"
+  "task_writes.state_MOVE": "Flytter",
+  "task_writes.warning_TASK_DEPENDENCY": "Oppgavens overordnede oppgave eller prosjekt hindrer endringen fra leverandøren. Endre dette i oppgaveredigereren. Andre oppgaver synkroniseres videre."
 }

@@ -222,6 +222,16 @@ class TaskProviderWritesTest {
         });
         assertEquals(1,requests.get());assertEquals("moved-id",task(f).path("externalReferences").get(0).path("externalId").asText());assertEquals("RECONCILED",job(f,write).path("state").asText());
     }
+    @Test void anInvalidRemoteParentDoesNotRollBackAnUnrelatedTaskUpdate(){
+        var f=fixture();var claim=automatic(f);var parent=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Parent","\"p1\"").put("id","parent").put("position","002"));
+        tx(f,()->{new TaskCloudPull(store,receipts,inputs).apply(f.connection(),f.list(),new TaskCloudPull.Scan("google","account","remote-list",List.of(remote("Original","\"g1\""),parent),store.now()),null,true);
+            var first=store.service().createProject(new CreateProject("First"));var second=store.service().createProject(new CreateProject("Second"));
+            for(var row:store.list("TASK")){var task=(Task)decode("TASK",row);store.service().updateTask(new UpdateTask(task.id(),task.version(),Optional.of(task.id().value().equals(f.task())?first.id():second.id()),task.parentTaskId(),task.summary(),task.url()));}return null;});
+        tx(f,()->{var changedParent=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Parent updated","\"p2\"").put("id","parent").put("position","002"));var movedChild=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Original","\"g2\"").put("parent","parent"));
+            var result=new TaskCloudPull(store,receipts,inputs).apply(f.connection(),f.list(),new TaskCloudPull.Scan("google","account","remote-list",List.of(movedChild,changedParent),store.now()),null,true);assertFalse(result.path("complete").asBoolean());assertEquals("TASK_DEPENDENCY",result.path("pending").get(0).path("reason").asText());
+            var task=store.byReference(new ExternalTaskReferenceKey("google",TaskCloudPull.repository("account","remote-list"),"parent")).orElseThrow();assertEquals("Parent updated",task.path("summary").asText());return null;});
+        assertTrue(task(f).path("parentTaskId").isNull());
+    }
     private TaskProviderHttp.Reply reply(int status,JsonNode body){return new TaskProviderHttp.Reply(status,Map.of(),body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8));}
     private GoogleTasksWriter writer(TaskProviderHttp.Transport transport){return new GoogleTasksWriter(new TaskProviderHttp(Set.of("tasks.googleapis.com"),request->{assertThrows(IllegalStateException.class,()->store.owner());return transport.send(request);}));}
     private static JsonNode body(HttpRequest request){

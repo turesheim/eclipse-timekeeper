@@ -97,9 +97,17 @@ final class TaskCloudPull {
                     var input=object().put("connectionId",connectionId.toString()).put("listId",listId.toString()).put("sourceState","HEALTHY");input.set("item",item);
                     if(status.equals("CREATE")&&project!=null&&!fields.hasNonNull("parentTaskId"))input.put("projectId",project.toString());
                     inputs.validate(status.equals("CREATE")?"TaskSyncImportInput":"TaskSyncApplyInput",input);
-                    var applied=status.equals("CREATE")?sync.importTask(input):automatic?sync.mergeIndependent(input,decision.path("taskEtag").asText()):sync.apply(input,decision.path("taskEtag").asText());
+                    ApiReplies applied;
+                    try{applied=store.isolatedProviderItem(()->status.equals("CREATE")?sync.importTask(input):automatic?sync.mergeIndependent(input,decision.path("taskEtag").asText()):sync.apply(input,decision.path("taskEtag").asText()));}
+                    catch(ApiFailure failure){
+                        if(!automatic||!Set.of(409,422).contains(failure.status))throw failure;
+                        var row=((ObjectNode)decision).deepCopy();row.put("status","DEFERRED").put("reason","TASK_DEPENDENCY");row.set("observation",item.deepCopy());pending.add(row);blocked.add(remote.id());
+                        existing.ifPresent(task->TaskProviderIntents.warnings(store,connectionId,listId,task,array().add(object().put("field","parentTaskId").put("reason","TASK_DEPENDENCY"))));
+                        iterator.remove();progressed=true;continue;
+                    }
                     if(status.equals("CONFLICT")){var row=((ObjectNode)decision).deepCopy();row.set("observation",item.deepCopy());pending.add(row);blocked.add(remote.id());}
                     remember(applied.body(),scan.provider(),repository,remote);
+                    if(automatic&&existing.isPresent())TaskProviderIntents.clearDependency(store,listId,uuid(existing.get().get("id")));
                     String count=status.equals("CREATE")?"created":status.equals("UPDATE")?"updated":"unchanged";result.put(count,result.path(count).asInt()+1);
                 }else if(!status.equals("IGNORE_DELETED")){
                     var row=((ObjectNode)decision).deepCopy();row.set("observation",item.deepCopy());pending.add(row);blocked.add(remote.id());

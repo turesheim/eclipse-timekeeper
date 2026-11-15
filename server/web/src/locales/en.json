@@ -1914,5 +1914,6 @@
   "task_writes.field_due": "Deadline",
   "task_writes.field_priority": "Priority",
   "task_writes.field_metadata": "Categories",
-  "task_writes.state_MOVE": "Moving"
+  "task_writes.state_MOVE": "Moving",
+  "task_writes.warning_TASK_DEPENDENCY": "This task’s parent or project prevents applying the provider change. Adjust its parent/project in the task editor; other tasks continue synchronizing."
 }
