@@ -381,7 +381,14 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       focus:()=>view.focus(),
       setReadOnly,
       command,
-      listType:()=>{const {$from}=view.state.selection;for(let depth=$from.depth;depth>0;depth--){const node=$from.node(depth);if(node.type.name==='list_item'&&node.attrs.checked!==null&&node.attrs.checked!==undefined)return 'tasks';if(node.type.name==='ordered_list')return 'ordered';if(node.type.name==='bullet_list')return 'list';}return '';},
+      listType:()=>{
+        const {from,to,$from}=view.state.selection;
+        const type=node=>node.type.name==='list_item'&&node.attrs.checked!=null?'tasks':node.type.name==='ordered_list'?'ordered':node.type.name==='bullet_list'?'list':'';
+        for(let depth=$from.depth;depth>0;depth--){const value=type($from.node(depth));if(value)return value;}
+        // Select-all remains an AllSelection after a list command. Like text
+        // style, report the first selected block while retaining that selection.
+        let value='';view.state.doc.nodesBetween(from,to,node=>{if(value)return false;const found=type(node);if(found){value=node.firstChild?.attrs.checked!=null?'tasks':found;return false;}return true;});return value;
+      },
       imageDetails:()=>{const node=view.state.selection.node;if(node?.type.name==='image')return {path:node.attrs.src,alt:node.attrs.alt||'',embed:false};if(node?.type.name==='vault_wikilink'&&node.attrs.embed){const ref=wikiReference(node.attrs.value,true);return {...ref,alt:ref?.width?'':ref?.label||'',embed:true};}return null;},
       position:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source);return {anchor:map.source(view.state.selection.anchor),head:map.source(view.state.selection.head,view.state.selection.head>view.state.selection.anchor?-1:1),scrollTop:view.dom.scrollTop};},
       restorePosition:position=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source)),map=cursorMap(tree,view.state.doc,source),anchor=map.rich(position.anchor),head=map.rich(position.head??position.anchor);view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor),view.state.doc.resolve(head))));view.dom.scrollTop=position.scrollTop||0;},
