@@ -75,6 +75,26 @@ class TaskProviderResourceHttpTest {
         assertEquals(204,domain("a","DELETE","/tasks/"+taskId,null,etag(changed)).statusCode());assertEquals(404,domain("a","GET","/tasks/"+taskId,null,null).statusCode());
         var report=json(domain("a","GET","/reports/activities?from="+now.minusSeconds(180)+"&to="+now+"&taskId="+taskId,null,null),200);assertEquals("PT1M",report.path("total").asText());
         store.transaction(owner,()->{assertTrue(store.find("TASK",UUID.fromString(taskId)).orElseThrow().path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",UUID.fromString(taskId)).isPresent());assertTrue(store.list(TaskProviderIntents.KIND).stream().noneMatch(intent->intent.path("taskId").asText().equals(taskId)));return null;});
+        var exported=json(domain("a","GET","/data/export",null,null),200);
+        inputs.validate("TransferSnapshot",exported);
+        var liveCollision=exported.deepCopy();for(var row:liveCollision.path("tasks"))if(row.path("id").asText().equals(taskId))((ObjectNode)row).put("deleted",false);
+        assertEquals(422,domain("b","POST","/data/import",liveCollision,null).statusCode());
+        var foreignCollision=exported.deepCopy();for(var row:foreignCollision.path("taskTombstones"))if(row.path("taskId").asText().equals(taskId))((ObjectNode)row).put("id",list.path("id").asText());
+        assertEquals(422,domain("b","POST","/data/import",foreignCollision,null).statusCode());
+        var imported=json(domain("b","POST","/data/import",exported,null),201);
+        String copiedTask=null,copiedMarker=null;
+        for(var mapping:imported.path("ids"))if(mapping.path("sourceId").asText().equals(taskId)){
+            if(mapping.path("entityType").asText().equals("TASK"))copiedTask=mapping.path("id").asText();
+            if(mapping.path("entityType").asText().equals("TASK_TOMBSTONE"))copiedMarker=mapping.path("id").asText();
+        }
+        assertNotNull(copiedTask);assertEquals(copiedTask,copiedMarker);assertNotEquals(taskId,copiedTask);
+        assertEquals(404,domain("b","GET","/tasks/"+copiedTask,null,null).statusCode());
+        var marker=json(domain("b","GET","/task-tombstones/"+copiedMarker,null,null),200);assertEquals(copiedTask,marker.path("taskId").asText());
+        var copied=json(domain("b","GET","/data/export",null,null),200);String copiedId=copiedTask;
+        var retained=java.util.stream.StreamSupport.stream(copied.path("tasks").spliterator(),false).filter(row->row.path("id").asText().equals(copiedId)).findFirst().orElseThrow();
+        assertTrue(retained.path("deleted").asBoolean());assertNotEquals(list.path("id"),retained.path("syncListId"));
+        assertEquals(1,java.util.stream.StreamSupport.stream(copied.path("taskTombstones").spliterator(),false).filter(row->row.path("taskId").asText().equals(copiedId)).count());
+        var copiedReport=json(domain("b","GET","/reports/activities?from="+now.minusSeconds(180)+"&to="+now+"&taskId="+copiedTask,null,null),200);assertEquals("PT1M",copiedReport.path("total").asText());
     }
     @Test void accountSettingsSaveBothSubscriptionsAtomicallyAndCheckOwnerAndWritePermission(){
         var authorize=object();authorize.set("services",object().put("tasks",true).put("calendars",true));
@@ -86,7 +106,7 @@ class TaskProviderResourceHttpTest {
         var calendars=settings.putObject("calendars");calendars.putArray("selectedCalendars").add("calendar");calendars.putObject("calendarMappings").put("calendar",UUID.randomUUID().toString());
         assertEquals(404,call("PUT","/"+id+"/settings",settings,etag(paused)).statusCode());
         var unchanged=current(id);assertEquals(paused,unchanged);assertTrue(unchanged.path("selectedLists").isEmpty());assertTrue(unchanged.path("selectedCalendars").isEmpty());
-        var client=store.transaction(connected.path("ownerId").asText(),()->store.createClient(object().put("name","Combined settings")));
+        var client=store.transaction(connected.path("ownerId").asText(),()->store.createClient(object().put("name","Combined settings").put("color","#123456")));
         ((ObjectNode)calendars.get("calendarMappings")).put("calendar",client.path("id").asText());
         assertEquals(404,call("b",BROWSER,"PUT","/"+id+"/settings",settings,etag(paused)).statusCode());assertEquals(403,call("read",BROWSER,"PUT","/"+id+"/settings",settings,etag(paused)).statusCode());
         assertEquals(428,call("PUT","/"+id+"/settings",settings,null).statusCode());assertEquals(412,call("PUT","/"+id+"/settings",settings,"\"stale\"").statusCode());
@@ -132,7 +152,7 @@ class TaskProviderResourceHttpTest {
             var connected=json(call("POST","/complete",object().put("state",params.get("state")).put("code",code),null),200);created.add(connected.path("id").asText());
             assertEquals(tasks,connected.path("services").path("tasks").asBoolean());assertEquals(calendars,connected.path("services").path("calendars").asBoolean());
             assertEquals(tasks?2:0,connected.path("availableLists").size());assertEquals(calendars?1:0,connected.path("availableCalendars").size());
-            if(calendars){String owner=connected.path("ownerId").asText(),id=connected.path("id").asText();var client=store.transaction(owner,()->store.createClient(object().put("name","Calendar parity")));var selected=object();selected.putArray("selectedCalendars").add("calendar");selected.putObject("calendarMappings").put("calendar",client.path("id").asText());json(call("PUT","/"+id+"/calendars",selected,etag(connected)),200);var synced=idle(id);assertTrue(synced.path("calendarLastError").isNull(),synced.toString());assertTrue(synced.path("calendarLastSuccess").isTextual());}
+            if(calendars){String owner=connected.path("ownerId").asText(),id=connected.path("id").asText();var client=store.transaction(owner,()->store.createClient(object().put("name","Calendar parity").put("color","#123456")));var selected=object();selected.putArray("selectedCalendars").add("calendar");selected.putObject("calendarMappings").put("calendar",client.path("id").asText());json(call("PUT","/"+id+"/calendars",selected,etag(connected)),200);var synced=idle(id);assertTrue(synced.path("calendarLastError").isNull(),synced.toString());assertTrue(synced.path("calendarLastSuccess").isTextual());}
         }
     }
     @Test void revokedProviderAuthorizationDoesNotLogOutTheDagsverkAccount(){

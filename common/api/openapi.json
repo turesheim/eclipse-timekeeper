@@ -33136,7 +33136,6 @@
             "items": {
               "$ref": "#/components/schemas/ExternalReferenceKey"
             },
-            "minItems": 1,
             "uniqueItems": true
           }
         },

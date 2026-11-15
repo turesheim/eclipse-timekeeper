@@ -1747,6 +1747,7 @@ class HttpAcceptance(unittest.TestCase):
         linked, headers=self.call('PUT',path+'/external-references',body=ref,
                                   headers={'If-Match':headers['ETag']})
         self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        self.assertIsNone(linked['syncListId'], 'A connector reference alone is not an Internet account subscription')
         self.assertEqual(ref['assignment'],linked['externalReferences'][0]['assignment'])
         self.assertIsNone(linked['url'])
         self.call('DELETE','/task-lists/'+task_list['id'],

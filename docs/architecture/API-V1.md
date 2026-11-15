@@ -1545,9 +1545,18 @@ Project mappings never select tasks for export. Cross-account transfers are
 refused. Ordinary task updates may also include notes, planning, start/deadline,
 priority, order and metadata atomically under the task ETag.
 
+Only lists connected through Internet accounts acquire automatic synchronization
+homes during import or reference linking. Legacy connector references keep their
+existing manual synchronization and deletion behavior.
+
 Deleting a task with a synchronization home removes it from active task reads
 and records durable provider deletion intent. Its row, worked time and external
 identity tombstone remain available to history and transfer. The connector
 applies trustworthy remote deletions after a healthy complete scan; delete/edit
 conflicts and dependency restrictions require a specific decision. See
 [AUTOMATIC-TASK-SYNC.md](AUTOMATIC-TASK-SYNC.md) for recovery and rollout limits.
+
+A retained task and its tombstone share their source UUID. Import mappings are
+qualified by `entityType`; both records retain their relationship after remapping.
+A tombstone may have no external identities if creation had not yet been
+acknowledged by the provider.

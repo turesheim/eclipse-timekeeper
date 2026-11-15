@@ -9,6 +9,10 @@ import net.resheim.eclipse.timekeeper.domain.*;
 final class TaskProviderHomes {
     private final ServerStore store;
     TaskProviderHomes(ServerStore store){this.store=store;}
+    /** Generic connector references alone do not establish Internet account membership. */
+    boolean managed(UUID listId){
+        return store.find("TASK_LIST",listId).flatMap(list->store.find(TaskProviderConnections.AUTH,uuid(list.get("connectionId")))).isPresent();
+    }
     List<TaskList> lists(){
         var result=new ArrayList<TaskList>();
         for(var row:store.list("TASK_LIST"))if(eligible(row))result.add((TaskList)decode("TASK_LIST",row));

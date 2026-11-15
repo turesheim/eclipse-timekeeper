@@ -445,7 +445,7 @@ public class ServerStore {
     public <T> T save(String type,T value) {
         if(value instanceof Task task&&task.syncListId().isEmpty()&&task.externalReferences().size()==1){
             var previous=find("TASK",task.id().value());var reference=task.externalReferences().iterator().next();
-            if(previous.isPresent()&&previous.get().path("externalReferences").isEmpty()&&reference.taskListId().isPresent()&&find("TASK_LIST",reference.taskListId().get()).isPresent()){
+            if(previous.isPresent()&&previous.get().path("externalReferences").isEmpty()&&reference.taskListId().filter(new TaskProviderHomes(this)::managed).isPresent()){
                 var locatedNode=snapshot(owner(),task.withSyncList(reference.taskListId()));locatedNode.put("version",task.version());
                 @SuppressWarnings("unchecked") T located=(T)decode("TASK",locatedNode);value=located;
             }

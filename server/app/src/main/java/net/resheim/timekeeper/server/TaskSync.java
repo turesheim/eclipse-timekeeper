@@ -96,10 +96,12 @@ final class TaskSync {
                     optionalText(accepted.get("scheduledDate")).map(LocalDate::parse),
                     optionalText(accepted.get("completedAt")).map(Instant::parse));
             var importProject=projectId;
+            UUID listId=uuid(list.get("id"));
+            var home=new TaskProviderHomes(store).managed(listId)?Optional.of(listId):Optional.<UUID>empty();
             var created=store.providerObservation(()->store.service().createTask(new CreateTask(importProject,parentId.map(TaskId::new),accepted.path("summary").asText(),
                     optionalText(accepted.get("url")),Set.of(ref),planning,checklist(accepted.get("checklistItems")),timing(accepted),
                     importance(accepted),JsonValues.body(accepted),accepted.path("siblingOrder").asInt(0),Set.of(),
-                    recurrence(accepted.get("recurrence")),reminders(reminderArray(accepted.get(REMINDERS))),metadata(accepted.get(METADATA)),Optional.of(uuid(list.get("id"))))));
+                    recurrence(accepted.get("recurrence")),reminders(reminderArray(accepted.get(REMINDERS))),metadata(accepted.get(METADATA)),home)));
             var value=store.taskSnapshot(created);
             return ApiReplies.resource(201,value,"/api/v1/tasks/"+value.path("id").asText());
         });
@@ -377,8 +379,9 @@ final class TaskSync {
         if(!reference.path("taskListId").asText().equals(list.path("id").asText())) {
             row.put("status","CONFLICT");row.put("reason","OTHER_LIST");return row;
         }
-        if(task.has("syncListId")&&!task.hasNonNull("syncListId")){row.put("status","IGNORE_DELETED");row.put("reason","UNLINKED");return row;}
-        if(task.has("syncListId")&&store.find(TaskProviderConnections.AUTH,uuid(connection.get("id"))).isPresent()){
+        boolean managed=store.find(TaskProviderConnections.AUTH,uuid(connection.get("id"))).isPresent();
+        if(managed&&task.has("syncListId")&&!task.hasNonNull("syncListId")){row.put("status","IGNORE_DELETED");row.put("reason","UNLINKED");return row;}
+        if(task.has("syncListId")&&managed){
             var active=new TaskProviderHomes(store).reference(task);
             if(active==null||!alias(active).equals(key)){row.put("status","IGNORE_DELETED").put("reason","OTHER_HOME");return row;}
         }
@@ -522,7 +525,7 @@ final class TaskSync {
             var value=task.path(RECURRENCE).get(field.substring(RECURRENCE_PREFIX.length()));
             return value==null?NullNode.instance:value;
         }
-        if(field.equals("taskListId")&&task.has("syncListId"))return task.get("syncListId");
+        if(field.equals("taskListId")&&task.hasNonNull("syncListId"))return task.get("syncListId");
         var value=field.startsWith(METADATA_PREFIX)?task.path(METADATA).get(field.substring(METADATA_PREFIX.length()))
                 :Set.of("taskListId","sectionId","assignment").contains(field)?reference.get(field):task.get(field);
         return value==null?NullNode.instance:value;

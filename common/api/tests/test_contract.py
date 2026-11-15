@@ -623,7 +623,8 @@ class ContractTest(unittest.TestCase):
         tombstone={'id':ID,'taskId':ID,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
                    'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
         validator('TransferTaskTombstone').validate(tombstone)
-        self.assertFalse(validator('TransferTaskTombstone').is_valid({**tombstone,'externalReferences':[]}))
+        # A native task can be deleted before creation supplies a provider identity.
+        validator('TransferTaskTombstone').validate({**tombstone,'externalReferences':[]})
         self.assertIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
         self.assertNotIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
