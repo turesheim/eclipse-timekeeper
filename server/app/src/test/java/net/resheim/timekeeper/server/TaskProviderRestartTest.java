@@ -47,7 +47,7 @@ class TaskProviderRestartTest {
     private void expiredLease(UUID connection){var auth=connections().required(connection);auth.put("leaseUntil",store.now().minusSeconds(1).toString()).put("nextRefresh",store.now().minusSeconds(1).toString()).put("lastAttempt",store.now().minusSeconds(601).toString());connections().save(TaskProviderConnections.AUTH,auth);}
     private ObjectNode stageWrite(String name,boolean acknowledged){
         var fixture=connection(name,true);UUID connection=uuid(fixture.get("connection")),list=uuid(fixture.get("list"));var first=connections().claim(connection,false);var start=scans().begin(first);var original=remote("task","Original","\"g1\"","001");
-        scans().acknowledge(first,start,new TaskCloudProvider.Page<>(List.of(original),null,null));var review=scans().review(connection,list);scans().approve(connection,list,etag(review));
+        scans().acknowledge(first,start,new TaskCloudProvider.Page<>(List.of(original),null,null));var imported=scans().reconcile(first);connections().finish(first,imported,null,0);
         var key=new ExternalTaskReferenceKey("google",TaskCloudPull.repository(fixture.path("account").asText(),"list"),"task");var task=(Task)decode("TASK",store.byReference(key).orElseThrow());
         String title=acknowledged?"Acknowledged update":"Uncertain update";task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),title,task.url()));
         fixture.put("task",task.id().value().toString());var preview=writes().prepare(connection,list,task.id().value(),TaskProviderWrites.Action.UPDATE);UUID write=uuid(preview.get("id"));writes().confirm(connection,write,etag(preview));
@@ -108,7 +108,7 @@ class TaskProviderRestartTest {
         store.transaction(saved.path("owner").asText(),()->{
             var task=store.find("TASK",automaticTask).orElseThrow();assertEquals("Automatic after restart",task.path("externalReferences").get(0).path("baseline").path("fields").path("summary").asText());
             var nativeTask=store.find("TASK",uuid(fixture.get("nativeTask"))).orElseThrow();assertEquals("created-native",nativeTask.path("externalReferences").get(0).path("externalId").asText());assertEquals(fixture.path("list"),nativeTask.path("syncListId"));
-            var deleted=store.find("TASK",uuid(fixture.get("deletedTask"))).orElseThrow();assertTrue(deleted.path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",uuid(deleted.get("id"))).isPresent());assertEquals(7,store.list("TASK").size());assertTrue(store.list(TaskProviderIntents.KIND).isEmpty());return null;
+            var deleted=store.find("TASK",uuid(fixture.get("deletedTask"))).orElseThrow();assertTrue(deleted.path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",uuid(deleted.get("id"))).isPresent());assertEquals(7,store.list("TASK").size());assertTrue(store.list(TaskProviderIntents.KIND).stream().noneMatch(intent->intent.path("connectionId").asText().equals(automaticConnection.toString())),"Completed automatic work has no pending intent; uncertain writes in other connections retain theirs");return null;
         });
         saved.put("verifyPid",ProcessHandle.current().pid()).put("passed",true);Files.writeString(proof,saved.toString(),StandardCharsets.UTF_8);
     }

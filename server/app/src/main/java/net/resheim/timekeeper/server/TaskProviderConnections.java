@@ -99,7 +99,7 @@ final class TaskProviderConnections {
         value.put("configurationVersion",value.path("configurationVersion").asLong()+1);
         var scopes=value.putArray("scopes");tokens.scopes().stream().sorted().forEach(scopes::add);if(catalog!=null||!value.has("catalog"))value.set("catalog",lists);
         if(!value.has("selected"))value.putArray("selected");
-        value.put("reviewAdditions",false);
+        value.put("automatic",true).put("reviewAdditions",false);value.set("approved",value.path("selected").deepCopy());
         value.putNull("lastError").putNull("lease").putNull("leaseUntil").put("nextRefresh",store.now().toString());
         value.put("roundActive",false).put("roundIndex",0).put("blocked",false).put("requested",!value.path("selected").isEmpty()).put("pendingCount",0);value.putArray("pending");value.putObject("listErrors");
         value=previous.isEmpty()?insert(AUTH,id,value):save(AUTH,value);
@@ -119,14 +119,14 @@ final class TaskProviderConnections {
     /** No credential placeholder is persisted: disconnected decisions remain visible using owned public metadata only. */
     private ObjectNode disconnected(JsonNode metadata){
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","version"))result.set(field,metadata.path(field));
-        result.put("configurationVersion",metadata.path("version").asLong()).put("enabled",false).put("paused",true).put("direction","IMPORT").put("syncing",false).put("pendingCount",0).put("pendingWrites",TaskProviderWrites.pending(store,uuid(metadata.get("id"))));
+        result.put("configurationVersion",metadata.path("version").asLong()).put("automatic",true).put("enabled",false).put("paused",true).put("direction","IMPORT").put("syncing",false).put("pendingCount",0).put("pendingWrites",TaskProviderWrites.pending(store,uuid(metadata.get("id")))).put("writeExceptions",TaskProviderWrites.exceptions(store,uuid(metadata.get("id"))));
         result.putNull("lastAttempt").putNull("lastSuccess").putNull("nextRefresh").put("lastError","TASK_PROVIDER_RECONNECT_REQUIRED");result.putArray("selectedLists");result.putArray("availableLists");result.putArray("imports");result.putArray("reviews");result.putObject("projectMappings");result.putObject("listErrors");return result;
     }
     ObjectNode required(UUID id){return store.find(AUTH,id).map(node->((ObjectNode)node).deepCopy()).orElseThrow(ApiFailure::notFound);}
     ObjectNode visible(JsonNode value){
         var connection=store.find("TASK_CONNECTION",uuid(value.get("id"))).orElseThrow(ApiFailure::notFound);
         var result=object();for(String field:List.of("id","ownerId","providerId","remoteAccountId","name","enabled"))result.set(field,connection.path(field));
-        result.set("version",value.path("version"));result.put("automatic",value.path("automatic").asBoolean());result.put("reviewAdditions",false);
+        result.set("version",value.path("version"));result.put("automatic",true);result.put("reviewAdditions",false);
         result.set("services",services(value));
         InternetCalendars.visible(value,result);
         result.put("configurationVersion",value.path("configurationVersion").asLong()).put("direction",value.path("direction").asText("IMPORT")).put("paused",value.path("paused").asBoolean());
@@ -155,7 +155,7 @@ final class TaskProviderConnections {
     }
     ObjectNode select(UUID id,List<String> selected,JsonNode projects,String match,Boolean reviewAdditions,Boolean automatic){
         var value=required(id);ApiReplies.match(visible(value),match);
-        if(automatic!=null)value.put("automatic",automatic);
+        value.put("automatic",true);
         value.put("reviewAdditions",false);
         if(selected.size()>20||new HashSet<>(selected).size()!=selected.size())throw ApiFailure.validation();
         var chosen=new HashSet<>(selected);var known=new HashSet<String>();
@@ -163,8 +163,7 @@ final class TaskProviderConnections {
         if(projects!=null)for(var names=projects.fieldNames();names.hasNext();)if(!chosen.contains(names.next()))throw ApiFailure.validation();
         mappings.retain(selected);for(var project:mappings)if(!project.isNull())store.find("PROJECT",uuid(project)).orElseThrow(ApiFailure::notFound);
         value.set("projects",mappings);var approved=array();
-        if(value.path("automatic").asBoolean())selected.forEach(approved::add);
-        else for(var remote:value.path("approved"))if(chosen.contains(remote.asText()))approved.add(remote);
+        selected.forEach(approved::add);
         value.set("approved",approved);
         var connection=store.find("TASK_CONNECTION",id).orElseThrow(ApiFailure::notFound);
         if(!connection.path("enabled").asBoolean()||!connection.path("readable").asBoolean())throw new ApiFailure(409,"TASK_PROVIDER_DISABLED");
@@ -201,6 +200,14 @@ final class TaskProviderConnections {
         if(value.hasNonNull("retryUntil")&&Instant.parse(value.path("retryUntil").asText()).isAfter(now)){if(force)throw new ApiFailure(429,"TASK_PROVIDER_RATE_LIMITED");return null;}
         if(value.hasNonNull("leaseUntil")&&Instant.parse(value.path("leaseUntil").asText()).isAfter(now))return null;
         if(value.path("blocked").asBoolean()){if(force)throw new ApiFailure(409,value.path("lastError").asText("TASK_PROVIDER_RECONNECT_REQUIRED"));return null;}
+        if(!value.path("automatic").asBoolean()){
+            // Upgrade existing subscriptions on their next pass, without a browser save.
+            // A new generation retires unconfirmed drafts and recovers confirmed work.
+            value.put("automatic",true).put("generation",UUID.randomUUID().toString()).put("roundActive",false).put("nextRefresh",now.toString());
+            value.set("approved",value.path("selected").deepCopy());
+            value=save(AUTH,value);TaskProviderWrites.retire(store,id,value.path("generation").asText());
+            value=required(id);
+        }
         if(force){
             if(value.hasNonNull("lastAttempt")&&Instant.parse(value.path("lastAttempt").asText()).plusSeconds(30).isAfter(now))throw new ApiFailure(429,"TASK_PROVIDER_REFRESH_LIMIT");
             value.put("roundActive",false).put("requested",true);

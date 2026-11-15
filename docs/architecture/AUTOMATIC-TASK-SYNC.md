@@ -193,11 +193,11 @@ in its [update API](https://learn.microsoft.com/en-us/graph/api/todotask-update?
 Read-only Dagsverk sessions cannot edit tasks or connection settings; background
 work uses only the separately authorized provider grant.
 
-Existing users authorize automatic two-way synchronization once at account/list
-setup. Previously granted write scope alone is not consent to execute abandoned
-manual drafts. Preserve confirmed queued operations and receipts, reconcile
-unknown outcomes, and leave unconfirmed prepared changes unsent. Start automatic
-work from current task/baseline differences after subscription is enabled.
+Connected task subscriptions always synchronize automatically within their granted
+access. Existing subscriptions upgrade during background refresh without a new
+browser save. Preserve confirmed queued operations and receipts, reconcile unknown
+outcomes, and leave unconfirmed prepared changes unsent. Start automatic work from
+current task/baseline differences; old prepared payloads never authorize a write.
 
 The server now uses its durable coordinator for automatic creation, updates,
 Google placement/list moves, and retained deletion. Microsoft has a separate
@@ -211,6 +211,11 @@ omitting it preserves membership. `GET /task-sync/lists` supplies owned writable
 subscription choices to the browser and remote Eclipse editors. Deleted linked
 tasks retain their row, activity relations and tombstone. Transfer/CSV preserves
 that state and remaps the home; importing data never supplies provider credentials.
+
+Internet-account calendar selections also determine their visibility. Previously
+hidden selected calendars become visible when refreshed or saved. Subscription-link
+calendars retain their separate visibility setting. Provider task IDs remain stored
+identities and do not prefix Google or Microsoft task titles in the browser.
 
 Both writers send the exact provider `If-Match` revision for updates and deletion;
 Google moves also carry it. Synthetic tests verify the request and 412 handling.

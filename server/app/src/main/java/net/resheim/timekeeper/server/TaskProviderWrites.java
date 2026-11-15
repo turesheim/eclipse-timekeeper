@@ -274,6 +274,9 @@ final class TaskProviderWrites {
         if(remote!=null){row.set("result",remote.original().deepCopy());if(row.path("action").asText().equals("CREATE"))row.put("externalId",remote.id()).put("providerEtag",remote.source().path("remoteEtag").asText());}row.put("state","ACK").put("acknowledgedAt",store.now().toString()).putNull("lastError");connections().save(KIND,row);return true;
     }
     void reconcile(TaskProviderConnections.Claim claim,UUID id){
+        store.providerObservation(()->{reconcileObserved(claim,id);return null;});
+    }
+    private void reconcileObserved(TaskProviderConnections.Claim claim,UUID id){
         var row=owned(claim.id(),id);if(!row.path("state").asText().equals("ACK"))return;
         if(connections().active(claim)==null||!row.path("generation").asText().equals(claim.generation())){
             row.put("state","ACK_REVIEW").put("lastError","TASK_PROVIDER_WRITE_CHANGED");connections().save(KIND,row);return;
@@ -513,7 +516,7 @@ final class TaskProviderWrites {
             }
             boolean recover=auth.isPresent()&&auth.get().path("automatic").asBoolean()&&row.hasNonNull("confirmedAt")&&row.hasNonNull("externalId")&&Set.of("SENDING","UNKNOWN","ACK","ACK_REVIEW").contains(old);
             if(recover){
-                // Consent to automatic sync recovers transmitted outcomes, never old prepared payloads.
+                // Subscription upgrades recover transmitted outcomes, never old prepared payloads.
                 row.put("automatic",true).put("checkRequested",true).put("checkRequestedAt",store.now().toString());
                 if(!row.has("sentFields"))row.set("sentFields",row.path("writeFields").deepCopy());
                 if(old.equals("ACK_REVIEW"))row.put("lastError","TASK_PROVIDER_WRITE_CHANGED");

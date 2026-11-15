@@ -65,7 +65,7 @@ class TaskProviderScansTest {
     @Test void legacyReviewFlagsAndReadyFirstImportsDoNotBlockAutomaticSynchronization(){
         var f=fixture();tx(f,()->{var auth=connections().required(f.connection());auth.put("reviewAdditions",true);connections().save(TaskProviderConnections.AUTH,auth);return null;});
         var first=claim(f);var start=tx(f,()->scans().begin(first));tx(f,()->scans().acknowledge(first,start,page(null,task("one",null,"001","One"))));
-        var resumed=reclaim(f);assertEquals("READY",tx(f,()->scans().begin(resumed)).path("state").asText());
+        var resumed=reclaim(f);var resumedScan=tx(f,()->scans().begin(resumed));assertEquals("FETCHING",resumedScan.path("state").asText());tx(f,()->scans().acknowledge(resumed,resumedScan,page(null,task("one",null,"001","One"))));
         var initial=tx(f,()->scans().reconcile(resumed));assertEquals(1,initial.path("created").asInt());tx(f,()->{connections().finish(resumed,initial,null,0);return null;});
         var next=reclaim(f);var scan=tx(f,()->scans().begin(next));tx(f,()->scans().acknowledge(next,scan,page(null,task("two",null,"002","Two"))));
         var added=tx(f,()->scans().reconcile(next));assertTrue(added.path("complete").asBoolean());assertEquals(1,added.path("created").asInt());
@@ -105,7 +105,7 @@ class TaskProviderScansTest {
     }
     private void imported(Fixture f,TaskCloudProvider.RemoteTask...items){
         var claim=claim(f);var start=tx(f,()->scans().begin(claim));tx(f,()->scans().acknowledge(claim,start,page(null,items)));
-        var preview=tx(f,()->scans().review(f.connection(),f.list()));tx(f,()->scans().approve(f.connection(),f.list(),etag(preview)));
+        tx(f,()->{var outcome=scans().reconcile(claim);connections().finish(claim,outcome,null,0);return null;});
     }
     @Test void incrementalScansOverlapAndKeepUnchangedSiblingsAndUnsupportedLocalFields(){
         var f=fixture();imported(f,task("one",null,"001","One"),task("two",null,"002","Two"),task("three",null,"003","Three"));
@@ -125,19 +125,19 @@ class TaskProviderScansTest {
         assertTrue(tx(f,()->scans().reconcile(claim)).path("complete").asBoolean());
         assertEquals(original,stored(f,"parent"));assertEquals(f.project().toString(),stored(f,"child").path("projectId").asText());assertEquals(project.toString(),stored(f,"new-root").path("projectId").asText());
     }
-    @Test void firstImportApprovalCannotUseAComparisonFromBeforeAnotherLocalImport(){
+    @Test void legacyImportApprovalRejectsStaleComparisonsAndCannotDuplicateAutomaticImports(){
         var f=fixture();var remote=task("one",null,"001","One");var claim=claim(f);var start=tx(f,()->scans().begin(claim));
         tx(f,()->scans().acknowledge(claim,start,page(null,remote)));var before=tx(f,()->scans().review(f.connection(),f.list()));assertEquals(1,before.path("createCount").asInt());
         tx(f,()->new TaskCloudPull(store,receipts,inputs).apply(f.connection(),f.list(),new TaskCloudPull.Scan("google","account","remote-list",List.of(remote),store.now())));
         assertEquals(412,assertThrows(ApiFailure.class,()->tx(f,()->scans().approve(f.connection(),f.list(),etag(before)))).status);
         var after=tx(f,()->scans().review(f.connection(),f.list()));assertEquals(0,after.path("createCount").asInt());assertEquals(1,after.path("existingCount").asInt());
-        tx(f,()->scans().approve(f.connection(),f.list(),etag(after)));assertEquals(1,tx(f,()->store.list("TASK").size()));
+        assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->scans().approve(f.connection(),f.list(),etag(after)))).status);tx(f,()->scans().reconcile(claim));assertEquals(1,tx(f,()->store.list("TASK").size()));
     }
-    @Test void explicitDeletionRequiresReviewAndDoesNotAdvanceTheLastAcknowledgedTaskCursor(){
+    @Test void explicitProviderDeletionRetainsTheTaskAndAutomaticallyAdvancesTheCursor(){
         var f=fixture();imported(f,task("one",null,"001","One"));var before=stored(f,"one");var cursor=tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst());
         var claim=reclaim(f);var start=tx(f,()->scans().begin(claim));var deleted=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(object().put("id","one").put("deleted",true));
         tx(f,()->scans().acknowledge(claim,start,page(null,deleted)));var outcome=tx(f,()->scans().reconcile(claim));
-        assertFalse(outcome.path("complete").asBoolean());assertEquals("DELETE_REVIEW",outcome.path("pending").get(0).path("status").asText());assertEquals(before,stored(f,"one"));assertEquals(cursor,tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst()));
+        assertTrue(outcome.path("complete").asBoolean());assertTrue(stored(f,"one").path("deleted").asBoolean());assertEquals(before.path("id"),stored(f,"one").path("id"));assertNotEquals(cursor,tx(f,()->store.list("TASK_SYNC_CURSOR").getFirst()));
     }
     private TaskProviderReviews reviews(){return new TaskProviderReviews(store,receipts,inputs);}
     private ObjectNode incoming(Fixture f,TaskCloudProvider.RemoteTask...items){
@@ -164,18 +164,18 @@ class TaskProviderScansTest {
         tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().pause(f.connection(),false,etag(auth));var scan=((ObjectNode)store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).deepCopy();scan.put("startedAt",store.now().minusSeconds(901).toString());connections().save(TaskProviderScans.SCAN,scan);return null;});assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->reviews().list(f.connection(),f.list(),null))).status);
     }
     @Test void keepingALocalCopyAfterProviderDeletionUnlinksWithoutDeletingEitherTask(){
-        var f=fixture();imported(f,task("one",null,"001","Keep this"));var deleted=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(object().put("id","one").put("deleted",true));incoming(f,deleted);
+        var f=fixture();imported(f,task("one",null,"001","Keep this"));localTitle(f,"one","Keep my local edit");var deleted=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(object().put("id","one").put("deleted",true));incoming(f,deleted);
         var row=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);UUID id=uuid(row.get("taskId"));var before=stored(f,"one");
         tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),object().put("decision","LOCAL").put("taskEtag",row.path("taskEtag").asText())));
         assertEquals(before.path("summary"),stored(f,"one").path("summary"));assertTrue(stored(f,"one").path("syncListId").isNull());assertFalse(stored(f,"one").path("deleted").asBoolean());
-        incoming(f,task("one",null,"001","Provider copy changed"));assertEquals("Keep this",stored(f,"one").path("summary").asText());
+        incoming(f,task("one",null,"001","Provider copy changed"));assertEquals("Keep my local edit",stored(f,"one").path("summary").asText());
         assertTrue(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));assertEquals(1,tx(f,()->store.service().tasks().size()));
     }
 
     @Test void incomingReviewLimitRetainsSearchableDecisionsBeyondTheFirstHundred(){
         var f=fixture();var firstClaim=claim(f);var page=tx(f,()->scans().begin(firstClaim));
         for(int offset=0;offset<220;offset+=100){var tasks=new ArrayList<TaskCloudProvider.RemoteTask>();for(int index=offset;index<Math.min(offset+100,220);index++)tasks.add(task("id-"+index,null,String.format("%05d",index),"Original "+index));var before=page;String next=offset+100<220?"page-"+offset:null;page=tx(f,()->scans().acknowledge(firstClaim,before,new TaskCloudProvider.Page<>(tasks,next,null)));}
-        var preview=tx(f,()->scans().review(f.connection(),f.list()));tx(f,()->scans().approve(f.connection(),f.list(),etag(preview)));
+        tx(f,()->{var outcome=scans().reconcile(firstClaim);connections().finish(firstClaim,outcome,null,0);return null;});
         tx(f,()->{for(var stored:store.list("TASK")){var changed=((ObjectNode)stored).deepCopy();changed.put("summary","Local "+stored.path("summary").asText()).put("version",stored.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",changed));}return null;});
         var nextClaim=reclaim(f);var scan=tx(f,()->scans().begin(nextClaim));
         for(int offset=0;offset<220;offset+=100){var tasks=new ArrayList<TaskCloudProvider.RemoteTask>();for(int index=offset;index<Math.min(offset+100,220);index++)tasks.add(task("id-"+index,null,String.format("%05d",index),"Remote "+index));var before=scan;String next=offset+100<220?"changed-"+offset:null;scan=tx(f,()->scans().acknowledge(nextClaim,before,new TaskCloudProvider.Page<>(tasks,next,null)));}

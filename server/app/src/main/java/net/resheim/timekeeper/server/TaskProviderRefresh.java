@@ -146,7 +146,7 @@ class TaskProviderRefresh {
                     if(!metadata.path("enabled").asBoolean()||!metadata.path("readable").asBoolean()||value.path("paused").asBoolean()||value.path("blocked").asBoolean()||!selected&&!value.path("requested").asBoolean()
                             ||!automatic&&!value.path("requested").asBoolean()||!value.hasNonNull("nextRefresh"))continue;
                     var provider=TaskProviderConfiguration.provider(metadata.path("providerId").asText());if(!value.hasNonNull("brokerEndpoint")&&!configuration.available(provider))continue;
-                    Instant next=Instant.parse(value.path("nextRefresh").asText());if(!next.isAfter(now))due.add(new Due(rows.getString(1),rows.getObject(2,UUID.class),next));
+                    Instant next=value.path("automatic").asBoolean()?Instant.parse(value.path("nextRefresh").asText()):now;if(!next.isAfter(now))due.add(new Due(rows.getString(1),rows.getObject(2,UUID.class),next));
                 }
             }
             due.sort(Comparator.comparing(Due::next).thenComparing(Due::owner).thenComparing(Due::id));

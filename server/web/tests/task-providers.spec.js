@@ -230,28 +230,20 @@ test('Google task connections request write consent during account setup',async(
   await expect(page.getByText('Reload current values',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Connect Google',exact:true})).toBeEnabled();expect(model.writes.find(write=>write.path==='/google/authorize').input).toEqual({direction:'TWO_WAY',services:{tasks:true,calendars:true},language:'en'});
 });
 
-test('preparing a change selects a real owned task and retains the selection during status polling',async({page,request})=>{
-  const owner=await signIn(page,request),api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json();
-  const headers={'X-CSRF-Token':identity.csrf,'Idempotency-Key':randomUUID()};
-  const source=await api.post('/api/v1/task-connections',{headers,data:{providerId:'google',remoteAccountId:'fixture-account',name:'Browser Google',readable:true,writable:true,enabled:true}});expect(source.status()).toBe(201);const sourceValue=await source.json();
-  const listReply=await api.post('/api/v1/task-lists',{headers:{...headers,'Idempotency-Key':randomUUID()},data:{connectionId:sourceValue.id,remoteListId:'work',name:'Work',kind:'STANDARD',readable:true,writable:true,shared:false,owner:true,present:true,position:0}});expect(listReply.status()).toBe(201);const list=await listReply.json();
-  const created=await api.post('/api/v1/tasks',{headers:{...headers,'Idempotency-Key':randomUUID()},data:{summary:'Changed locally',projectId:null,parentTaskId:null,url:null}});expect(created.status()).toBe(201);const task=await created.json();
-  const linked=await api.put('/api/v1/tasks/'+task.id+'/external-references',{headers:{...headers,'If-Match':created.headers().etag},data:{providerId:'google',repositoryId:'fixture-account/work',externalId:'task-id',externalUrl:null,taskListId:list.id}});expect(linked.status()).toBe(200);
-  const row=connection(owner,{id:sourceValue.id,direction:'TWO_WAY'}),model=await providerFixture(page,owner,{rows:[row],tasks:[await linked.json()],lists:[list]});await open(page);const panel=card(page,row.id);
-  await panel.getByText('Prepare a Google change',{exact:true}).click();const taskChoice=panel.getByRole('combobox',{name:'Dagsverk task and Google list',exact:true});await taskChoice.selectOption({label:'Work / Changed locally'});const captured=await taskChoice.inputValue();
-  await refreshStatus(page);await expect(taskChoice).toHaveValue(captured);await panel.getByRole('button',{name:'Review change',exact:true}).click();
-  await expect(panel.getByRole('heading',{name:'Review Google change · Changed locally',exact:true})).toBeVisible();expect(model.writes.find(write=>write.path.endsWith('/writes')).input).toEqual({taskId:task.id,listId:list.id,action:'UPDATE'});expect(model.providerWrites).toBe(0);
+for(const language of ['en-GB','nb-NO'])test('existing subscriptions never show manual preparation before resaving in '+language,async({page,request})=>{
+  const owner=await signIn(page,request,{language}),nb=language==='nb-NO',row=connection(owner,{automatic:false,direction:'TWO_WAY',pendingWrites:2,writeExceptions:0}),preview=writeJob({connectionId:row.id}),queued=writeJob({connectionId:row.id,state:'QUEUED',canConfirm:false}),model=await providerFixture(page,owner,{rows:[row],jobs:[preview,queued]});await open(page);const panel=card(page,row.id);
+  await expect(panel.getByText(nb?'Støttede oppgaveendringer synkroniseres automatisk.':'Supported task edits synchronize automatically.',{exact:true})).toBeVisible();
+  for(const name of [nb?'Klargjør en Google-endring':'Prepare a Google change',nb?'Gjennomgå resultat':'Review result',nb?'Send til Google':'Send to Google'])await expect(panel.getByText(name,{exact:true})).toHaveCount(0);
+  await refreshStatus(page);expect(model.writes).toEqual([]);expect(model.providerWrites).toBe(0);
+  await panel.getByRole('button',{name:nb?'Lagre':'Save',exact:true}).click();await expect(panel.getByText(nb?'Kontoens abonnementer er lagret.':'Account subscriptions saved.',{exact:true})).toBeVisible();expect(row.automatic).toBe(true);expect(model.providerWrites).toBe(0);
 });
 
-test('reviewed Google changes retain their comparison during polling and reject stale approval',async({page,request})=>{
-  const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
-  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('heading',{name:'Review Google change · Imported Google task',exact:true})).toBeFocused();
-  await expect(panel.getByText('Changed locally',{exact:true})).toBeVisible();await expect(panel.getByText('Notes: Only plain text notes can be sent. These notes stay in Dagsverk.',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
-  job.version++;job.writeFields={summary:'A newer proposal'};await refreshStatus(page);
-  await expect(panel.getByText('Changed locally',{exact:true})).toBeVisible();await expect(panel.getByText('A newer proposal',{exact:true})).toHaveCount(0);
-  await panel.getByRole('button',{name:'Send to Google',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
-  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText('A newer proposal',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'Send to Google',exact:true}).click();
-  await expect(panel.getByText('Imported Google task · Confirmed',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(1);
+test('exception comparisons survive polling and stale resolutions retain both values',async({page,request})=>{
+  const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id,state:'CONFLICT',canConfirm:false,canResolve:true,conflictFields:['summary'],remoteFields:{summary:'Changed at Google'}}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText('Changed locally',{exact:true}).first()).toBeVisible();await expect(panel.getByText('Changed at Google',{exact:true})).toBeVisible();
+  job.version++;job.remoteFields={summary:'A newer provider value'};await refreshStatus(page);await expect(panel.getByText('Changed at Google',{exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true}).click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText('A newer provider value',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true}).click();await expect(panel.getByRole('button',{name:'Review result',exact:true})).toHaveCount(0);expect(model.providerWrites).toBe(0);
 });
 
 test('read-only Google grants can check and reconcile an uncertain result without resending it',async({page,request})=>{
@@ -260,13 +252,13 @@ test('read-only Google grants can check and reconcile an uncertain result withou
   await expect(panel.getByRole('button',{name:'Send to Google',exact:true})).toHaveCount(0);await panel.getByRole('button',{name:'Check Google result',exact:true}).click();
   await expect.poll(()=>model.writes.filter(write=>write.path.endsWith('/check')).length).toBe(1);expect(model.providerWrites).toBe(0);
   await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText('Changed at Google',{exact:true})).toBeVisible();await expect(panel.getByText('<strong>Local notes</strong>',{exact:true})).toBeVisible();await expect(panel.locator('strong')).toHaveCount(0);
-  await panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true}).click();await expect(panel.getByText('Imported Google task · Observed values reconciled',{exact:true})).toBeVisible();expect(model.providerWrites).toBe(0);
+  await panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true}).click();await expect(panel.getByRole('button',{name:'Review result',exact:true})).toHaveCount(0);expect(model.providerWrites).toBe(0);
   const writes=model.writes.filter(write=>write.path.includes('/writes/'));expect(writes.map(write=>write.path.split('/').at(-1))).toEqual(['check','resolve']);
 });
 
 test('read-only Dagsverk sessions can review Google results without confirming or reconciling them',async({page,request})=>{
-  const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
-  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('button',{name:'Send to Google',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);expect(model.providerWrites).toBe(0);
+  const owner=await signIn(page,request,{readOnly:true}),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id,state:'ACK_REVIEW',canConfirm:false,canResolve:true,conflictFields:['summary']}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);
+  await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('button',{name:'Send to Google',exact:true})).toHaveCount(0);await expect(panel.getByRole('button',{name:'Keep Dagsverk for conflicts',exact:true})).toBeDisabled();expect(model.writes).toEqual([]);expect(model.providerWrites).toBe(0);
 });
 
 for(const language of ['en-GB','nb-NO'])test('Google write comparisons stay readable and accessible across themes in '+language,async({page,request})=>{
@@ -280,21 +272,12 @@ for(const language of ['en-GB','nb-NO'])test('Google write comparisons stay read
   expect(model.providerWrites).toBe(0);await captureScreenshot(page,{path:'test-results/task-writes-320-'+language+'.png',fullPage:true});
 });
 
-test('creating a Google task reviews an existing native task and target list before sending',async({page,request})=>{
-  const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY'}),taskId=randomUUID(),listId=randomUUID();
-  const model=await providerFixture(page,owner,{rows:[row],tasks:[{id:taskId,summary:'Native root',parentTaskId:null,externalReferences:[]}],lists:[{id:listId,connectionId:row.id,remoteListId:'work',name:'Work',present:true}]});await open(page);const panel=card(page,row.id);
-  await panel.getByText('Prepare a Google change',{exact:true}).click();const action=panel.getByRole('combobox',{name:'Change to review',exact:true});await expect(action).toBeEnabled();await action.selectOption('CREATE');
-  await panel.getByRole('combobox',{name:'Dagsverk task and Google list',exact:true}).selectOption({label:'Work / Native root'});await panel.getByRole('button',{name:'Review change',exact:true}).click();
-  await expect(panel.getByRole('heading',{name:'Review Google change · Native root',exact:true})).toBeVisible();await expect(panel.getByText('Create a Google task linked to this existing Dagsverk task.',{exact:false})).toBeVisible();
-  expect(model.writes.find(write=>write.path.endsWith('/writes')).input).toEqual({taskId,listId,action:'CREATE'});expect(model.providerWrites).toBe(0);
-});
-
 test('uncertain creation identity remains an explicit choice and a stale scan preserves the comparison',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner,{direction:'IMPORT',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false}),candidates=[{externalId:'first-id',fields:{summary:'Same title',body:{format:'TEXT',content:'First Google task'}}},{externalId:'second-id',fields:{summary:'Same title',body:{format:'TEXT',content:'Second Google task'}}}];
   const model=await providerFixture(page,owner,{rows:[row],jobs:[job],candidates});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();
   const choice=panel.getByRole('combobox',{name:'Google identity to link',exact:true}),bind=panel.getByRole('button',{name:'Link this identity; keep Dagsverk fields',exact:true});await expect(choice).toHaveValue('');await expect(bind).toBeDisabled();
   await choice.selectOption('second-id');await expect(panel.getByText('Second Google task',{exact:true})).toBeVisible();model.candidateVersion++;await bind.click();await expect(panel.getByText('Reload current values',{exact:true})).toBeVisible();await expect(choice).toHaveValue('second-id');await expect(panel.getByText('Second Google task',{exact:true})).toBeVisible();expect(job.state).toBe('UNKNOWN');expect(model.providerWrites).toBe(0);
-  await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();await expect(choice).toHaveValue('');await choice.selectOption('second-id');await bind.click();await expect(panel.getByText('Imported Google task · Observed values reconciled',{exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'Find unlinked Google tasks',exact:true}).click();await expect(choice).toHaveValue('');await choice.selectOption('second-id');await bind.click();await expect(panel.getByRole('button',{name:'Review result',exact:true})).toHaveCount(0);
   expect(model.writes.filter(write=>write.path.endsWith('/identity')).at(-1).input).toEqual({externalId:'second-id',scanEtag:'"scan-2"',taskEtag:'"task-current"'});expect(model.providerWrites).toBe(0);
 });
 
@@ -365,7 +348,7 @@ for(const language of ['en-GB','nb-NO'])test('incoming review remains readable i
 test('unidentified Google creation needs explicit acknowledgement before releasing imports',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner,{direction:'TWO_WAY',pendingWrites:1}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();
   const release=panel.getByRole('button',{name:'Allow imports without linking',exact:true});await expect(release).toBeDisabled();await expect(panel.getByText(/does not cancel the original Google request/)).toBeVisible();
-  await panel.getByRole('checkbox',{name:'I understand that a Google result may appear as a separate imported task.',exact:true}).check();await expect(release).toBeEnabled();await release.click();expect(model.providerWrites).toBe(0);expect(job.state).toBe('UNRESOLVED');await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByText(/Its outcome remains unknown/)).toBeVisible();await expect(panel.getByRole('button',{name:'Allow imports without linking',exact:true})).toHaveCount(0);
+  await panel.getByRole('checkbox',{name:'I understand that a Google result may appear as a separate imported task.',exact:true}).check();await expect(release).toBeEnabled();await release.click();expect(model.providerWrites).toBe(0);expect(job.state).toBe('UNRESOLVED');await expect(panel.getByRole('button',{name:'Review result',exact:true})).toHaveCount(0);await expect(panel.getByRole('button',{name:'Allow imports without linking',exact:true})).toHaveCount(0);
 });
 test('a paused or disconnected task account can settle unknown creation without provider access',async({page,request})=>{
   const owner=await signIn(page,request),row=connection(owner,{direction:'IMPORT',pendingWrites:1,enabled:false,paused:true,selectedLists:[],availableLists:[]}),job=writeJob({connectionId:row.id,action:'CREATE',state:'UNKNOWN',externalId:null,canConfirm:false,canLeaveUnresolved:true}),model=await providerFixture(page,owner,{rows:[row],jobs:[job]});await open(page);const panel=card(page,row.id);await panel.getByRole('button',{name:'Review result',exact:true}).click();await expect(panel.getByRole('button',{name:'Check Google result',exact:true})).toBeDisabled();await panel.getByRole('checkbox',{name:'I understand that a Google result may appear as a separate imported task.',exact:true}).check();await panel.getByRole('button',{name:'Allow imports without linking',exact:true}).click();expect(job.state).toBe('UNRESOLVED');expect(model.providerWrites).toBe(0);

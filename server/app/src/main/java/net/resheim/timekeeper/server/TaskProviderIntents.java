@@ -18,8 +18,8 @@ final class TaskProviderIntents {
         var active=new TaskProviderHomes(store).reference(task);if(active!=null&&active.hasNonNull("taskListId"))homes.add(uuid(active.get("taskListId")));
         for(UUID home:homes){
             var list=store.find("TASK_LIST",home);if(list.isEmpty())continue;
-            UUID connectionId=uuid(list.get().get("connectionId"));var auth=store.find(TaskProviderConnections.AUTH,connectionId);if(auth.isEmpty()||!auth.get().path("automatic").asBoolean())continue;
-            // Record while paused, disconnected or unsubscribed too. Consent controls execution, not durability.
+            UUID connectionId=uuid(list.get().get("connectionId"));var auth=store.find(TaskProviderConnections.AUTH,connectionId);if(auth.isEmpty())continue;
+            // Retain edits before upgrade and while paused or unsubscribed. Access controls execution.
             UUID id=UUID.nameUUIDFromBytes(("dagsverk-task-intent:"+taskId+":"+home).getBytes(StandardCharsets.UTF_8));
             JsonNode linked=null;for(var ref:task.path("externalReferences"))if(ref.path("taskListId").asText().equals(home.toString()))linked=ref;
             boolean pending=linked==null?task.path("syncListId").asText().equals(home.toString())&&!task.path("deleted").asBoolean():task.path("deleted").asBoolean()?!linked.path("providerData").path("payload").path("observation").path("deleted").asBoolean()&&!linked.path("providerData").path("payload").path("observation").has("@removed"):task.hasNonNull("syncListId")&&(!task.path("syncListId").asText().equals(home.toString())||TaskProviderWrites.differs(task,linked));

@@ -30,6 +30,18 @@ const filter=(page,name)=>page.locator('#tasks-navigation').getByRole('button',{
 const row=(page,title)=>page.locator('#tasks-list').getByRole('button',{name:'Open task '+title,exact:true});
 const taskItem=(page,title)=>page.locator('#tasks-list > li').filter({has:page.getByRole('button',{name:'Open task '+title,exact:true})});
 
+test('Google and Microsoft task names do not display opaque provider IDs',async({page,request})=>{
+  const {api}=await setup(page,request,{remoteCount:0});
+  for(const providerId of ['google','microsoft']){
+    const summary=providerId==='google'?'Oppdater signatur med informasjon om nettbutikk og TicketCo.':'Microsoft task title';
+    const task=await api('POST','/tasks',{summary,projectId:null,parentTaskId:null,url:null}),value=await task.json();
+    await api('PUT','/tasks/'+value.id+'/external-references',{providerId,repositoryId:'private-account/list',externalId:'Z3A1RjR2MzRnUWo0dzVvSA',externalUrl:null},{'If-Match':task.headers().etag});
+    await page.locator('#tasks-panel').getByRole('button',{name:'Refresh tasks',exact:true}).click();await expect(row(page,summary)).toBeVisible();await expect(row(page,summary).locator('.tasks-task-title')).toHaveText(summary);
+    await row(page,summary).click();await expect(page.locator('#task-details-title')).toHaveText(summary);await page.locator('#task-details').getByRole('button',{name:'Close',exact:true}).click();
+    expect((await(await api('GET','/tasks/'+value.id)).json()).externalReferences[0].externalId).toBe('Z3A1RjR2MzRnUWo0dzVvSA');
+  }
+});
+
 test('task tools default to unfinished work and navigation resizes with pointer and keyboard',async({page,request})=>{
   await setup(page,request);const panel=page.locator('#tasks-panel'),tools=panel.getByRole('toolbar',{name:'Task tools',exact:true}),separator=panel.getByRole('separator',{name:'Resize task navigation',exact:true});
   await expect(tools.getByRole('button',{name:'New task',exact:true})).toBeVisible();await expect(tools.getByRole('button',{name:'Refresh tasks',exact:true})).toBeVisible();await expect(tools.getByRole('checkbox',{name:'Hide completed tasks',exact:true})).toBeChecked();await expect(row(page,'Finished task')).toHaveCount(0);

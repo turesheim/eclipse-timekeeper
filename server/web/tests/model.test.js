@@ -89,6 +89,14 @@ test('external task titles use Jira browse keys and GitHub issue numbers with sa
   assert.deepEqual(taskPresentation({summary:'Native task',id:'internal-uuid',url:'javascript:alert(1)'}), {title:'Native task',url:null});
   assert.equal(taskPresentation({summary:'Fix', externalReferences:[{...reference,externalUrl:null}]}).title, '10017: Fix');
 });
+test('Google and Microsoft task titles omit opaque identity prefixes and retain safe links', () => {
+  const summary='Oppdater signatur med informasjon om nettbutikk og TicketCo.';
+  for(const providerId of ['google','microsoft']){
+    const reference={providerId,repositoryId:'private-list',externalId:'Z3A1RjR2MzRnUWo0dzVvSA',externalUrl:'https://tasks.example/task'};
+    assert.deepEqual(taskPresentation({summary,externalReferences:[reference]}),{title:summary,url:reference.externalUrl});
+    assert.deepEqual(taskPresentation({summary,externalReferences:[{...reference,externalUrl:'javascript:alert(1)'}]}),{title:summary,url:null});
+  }
+});
 test('workweek hierarchy retains parents and clips exact activity time across DST and midnight', () => {
   const activity = {taskId:'child',start:'2026-10-24T22:00:00.123456789Z',end:'2026-10-25T23:00:00.123456790Z'};
   const day = activityDayNanos(activity,'2026-10-25','Europe/Oslo',activity.end);
