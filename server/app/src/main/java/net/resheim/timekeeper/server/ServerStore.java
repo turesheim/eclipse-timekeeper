@@ -453,9 +453,16 @@ public class ServerStore {
         var node = snapshot(owner(),value);
         if(value instanceof Task task&&task.deleted()){
             var previous=find("TASK",task.id().value());
-            if(previous.isPresent()&&(!previous.get().path("deleted").asBoolean()||find("TASK_TOMBSTONE",task.id().value()).isEmpty())){
+            if(previous.isPresent()){
                 var keys=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());task.externalReferences().forEach(ref->keys.add(ref.key()));
-                if(!keys.isEmpty()){save("TASK_TOMBSTONE",new TaskTombstone(task.id().value(),now(),previous.get().path("version").asLong(),keys));change("TASK_TOMBSTONE","CREATED",task.id().value().toString());}
+                var marker=find("TASK_TOMBSTONE",task.id().value());
+                if(marker.isEmpty()){save("TASK_TOMBSTONE",new TaskTombstone(task.id().value(),now(),previous.get().path("version").asLong(),keys));change("TASK_TOMBSTONE","CREATED",task.id().value().toString());}
+                else if(!keys.isEmpty()){
+                    var known=aliases(marker.get().path("externalReferences"));if(!known.containsAll(keys)){
+                        var updated=((ObjectNode)marker.get()).deepCopy();var references=updated.withArray("externalReferences");for(var key:keys)if(!known.contains(key))references.add(object().put("providerId",key.providerId()).put("repositoryId",key.repositoryId()).put("externalId",key.externalId()));
+                        long version=marker.get().path("version").asLong()+1;updated.put("version",version);update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=?",version,updated.toString(),owner(),"TASK_TOMBSTONE",task.id().value());change("TASK_TOMBSTONE","UPDATED",task.id().value().toString());
+                    }
+                }
             }
         }
         if(type.equals("TASK")) {

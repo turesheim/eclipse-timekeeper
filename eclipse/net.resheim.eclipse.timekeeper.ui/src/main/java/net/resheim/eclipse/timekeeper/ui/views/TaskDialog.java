@@ -73,20 +73,20 @@ final class TaskDialog extends AsyncRecordDialog {
 	}
 	@Override protected void configureShell(Shell shell) {
 		super.configureShell(shell);
-		shell.setText(original == null ? text("New task","Ny oppgave") : text("Edit task","Rediger oppgave"));
+		shell.setText(original == null ? "New task" : "Edit task");
 	}
 	@Override protected Control createDialogArea(Composite composite) {
 		Composite area = (Composite) super.createDialogArea(composite);
-		setTitle(original == null ? text("Create a Dagsverk task","Opprett en Dagsverk-oppgave") : text("Edit Dagsverk task","Rediger Dagsverk-oppgave"));
-		setMessage(text("Tasks can be used on their own, grouped in a project, or nested under another task.","Oppgaver kan brukes alene, samles i et prosjekt eller legges under en annen oppgave."));
+		setTitle(original == null ? "Create a Dagsverk task" : "Edit Dagsverk task");
+		setMessage("Tasks can be used on their own, grouped in a project, or nested under another task.");
 		Composite body = new Composite(area, SWT.NONE);
 		body.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 		body.setLayout(new GridLayout(2, false));
-		summary = field(body, text("Summary","Tittel"), original == null ? "" : original.summary());
-		url = field(body, text("URL (optional)","Nettadresse (valgfri)"), original == null ? "" : original.url().orElse(""));
-		project = choices(body, text("Project","Prosjekt"));
+		summary = field(body, "Summary", original == null ? "" : original.summary());
+		url = field(body, "URL (optional)", original == null ? "" : original.url().orElse(""));
+		project = choices(body, "Project");
 		List<ProjectChoice> projects = new java.util.ArrayList<>();
-		projects.add(new ProjectChoice(Optional.empty(), text("No project","Uten prosjekt")));
+		projects.add(new ProjectChoice(Optional.empty(), "No project"));
 		service.projects().stream().sorted(Comparator.comparing(value -> value.name()))
 				.forEach(value -> projects.add(new ProjectChoice(Optional.of(value.id()), value.name())));
 		project.setLabelProvider(new LabelProvider() {
@@ -95,7 +95,7 @@ final class TaskDialog extends AsyncRecordDialog {
 		project.setInput(projects);
 		project.setSelection(new StructuredSelection(projects.stream().filter(value -> value.id().equals(initialProject))
 				.findFirst().orElse(projects.get(0))));
-		parentTask = choices(body, text("Parent task","Overordnet oppgave"));
+		parentTask = choices(body, "Parent task");
 		parentTask.setLabelProvider(new LabelProvider() {
 			@Override public String getText(Object value) { return ((ParentChoice) value).name(); }
 		});
@@ -105,12 +105,12 @@ final class TaskDialog extends AsyncRecordDialog {
 			setErrorMessage(null);
 		});
         if(remote)providerFields(body);
-        new Label(body, SWT.NONE).setText(text("External links","Eksterne lenker"));
+        new Label(body, SWT.NONE).setText("External links");
 		Text references = new Text(body, SWT.READ_ONLY | SWT.MULTI | SWT.WRAP);
 		GridData links = new GridData(SWT.FILL, SWT.CENTER, true, false);
 		links.widthHint = 360;
 		references.setLayoutData(links);
-		references.setText(original == null || original.externalReferences().isEmpty() ? text("No external links","Ingen eksterne lenker")
+		references.setText(original == null || original.externalReferences().isEmpty() ? "No external links"
 				: original.externalReferences().stream().map(reference -> reference.providerId() + ": "
 						+ reference.externalId() + " (" + reference.repositoryId() + ")")
 						.sorted().collect(java.util.stream.Collectors.joining("\n")));
@@ -160,8 +160,8 @@ final class TaskDialog extends AsyncRecordDialog {
 		new Label(body, SWT.NONE).setText(caption);
 		ComboViewer viewer = new ComboViewer(body, SWT.READ_ONLY);
 		viewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-		if(caption.equals(text("Project","Prosjekt")))viewer.getCombo().setData("org.eclipse.swtbot.widget.key","task-project");
-        else if(caption.equals(text("Parent task","Overordnet oppgave")))viewer.getCombo().setData("org.eclipse.swtbot.widget.key","task-parent");
+		if(caption.equals("Project"))viewer.getCombo().setData("org.eclipse.swtbot.widget.key","task-project");
+        else if(caption.equals("Parent task"))viewer.getCombo().setData("org.eclipse.swtbot.widget.key","task-parent");
 		viewer.setContentProvider(ArrayContentProvider.getInstance());
 		return viewer;
 	}
@@ -180,7 +180,7 @@ final class TaskDialog extends AsyncRecordDialog {
 			} while (changed);
 		}
 		List<ParentChoice> parents = new java.util.ArrayList<>();
-		parents.add(new ParentChoice(Optional.empty(), text("Top-level task","Oppgave på øverste nivå")));
+		parents.add(new ParentChoice(Optional.empty(), "Top-level task"));
 		tasks.stream().filter(task -> projectId().isPresent() && task.projectId().equals(projectId()) && !excluded.contains(task.id()))
 				.sorted(Comparator.comparing(Task::summary))
 				.forEach(task -> parents.add(new ParentChoice(Optional.of(task.id()), path(task))));

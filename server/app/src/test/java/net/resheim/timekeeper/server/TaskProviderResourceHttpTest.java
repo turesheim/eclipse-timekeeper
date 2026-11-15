@@ -74,7 +74,7 @@ class TaskProviderResourceHttpTest {
         var now=java.time.Instant.now();var activity=object().put("taskId",taskId).put("start",now.minusSeconds(120).toString()).put("end",now.minusSeconds(60).toString()).put("summary","Worked before delete");activity.putArray("labelIds");json(domain("a","POST","/activities",activity,null),201);
         assertEquals(204,domain("a","DELETE","/tasks/"+taskId,null,etag(changed)).statusCode());assertEquals(404,domain("a","GET","/tasks/"+taskId,null,null).statusCode());
         var report=json(domain("a","GET","/reports/activities?from="+now.minusSeconds(180)+"&to="+now+"&taskId="+taskId,null,null),200);assertEquals("PT1M",report.path("total").asText());
-        store.transaction(owner,()->{assertTrue(store.find("TASK",UUID.fromString(taskId)).orElseThrow().path("deleted").asBoolean());assertTrue(store.list(TaskProviderIntents.KIND).stream().anyMatch(intent->intent.path("taskId").asText().equals(taskId)));return null;});
+        store.transaction(owner,()->{assertTrue(store.find("TASK",UUID.fromString(taskId)).orElseThrow().path("deleted").asBoolean());assertTrue(store.find("TASK_TOMBSTONE",UUID.fromString(taskId)).isPresent());assertTrue(store.list(TaskProviderIntents.KIND).stream().noneMatch(intent->intent.path("taskId").asText().equals(taskId)));return null;});
     }
     @Test void accountSettingsSaveBothSubscriptionsAtomicallyAndCheckOwnerAndWritePermission(){
         var authorize=object();authorize.set("services",object().put("tasks",true).put("calendars",true));
