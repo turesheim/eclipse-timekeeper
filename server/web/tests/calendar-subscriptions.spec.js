@@ -305,8 +305,9 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     await api('GET','/notes');const folder='Event-banner-'+randomUUID();await api('POST','/notes/folders',{path:folder});
     await api('PUT','/notes/files?'+new URLSearchParams({path:folder+'/cover.png'}),await readFile(new URL('./fixtures/banner.png',import.meta.url)),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
     const eventFile='events/event-'+subscription.id+'-'+event.key+'.md',entry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:eventFile}))).json();
+    const content=await api('GET','/notes/entries/'+entry.id+'/content');
     const synced=(await download.text()).replace('\n---\n','\n# Obsidian banner\nbanner: "![[ '+folder+'/cover.png ]]"\nbanner_x: 0.25\nbanner_y: 0.75\n---\n');
-    await api('PUT','/notes/files?'+new URLSearchParams({path:eventFile}),Buffer.from(synced),{'Content-Type':'application/octet-stream','If-Match':entry.etag});
+    await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from(synced),{'Content-Type':'application/octet-stream','If-Match':content.headers().etag});
     await editor.getByRole('button',{name:'Close',exact:true}).click();await details.getByRole('button',{name:/^(Open|Add) event note$/}).click();
     await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(editor.locator('.markdown-banner')).toBeVisible();await expect(editor.locator('.markdown-banner img')).toHaveCSS('object-position','25% 75%');
     await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');await saveMarkdown(editor);markdown=markdown.replace('# Minutes','# Minutes Reviewed.');

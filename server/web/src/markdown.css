@@ -1,6 +1,9 @@
 .markdown-toolbar { overflow-x: auto; margin-block: .75rem; padding: .2rem; }
 .markdown-banner { flex: none; width: 100%; height: clamp(8rem, 20vw, 16rem); overflow: hidden; border-radius: .5rem; margin-bottom: .75rem; }
 .markdown-banner > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+@media(max-width:760px) {
+  .markdown-editor:has(> .markdown-banner:not([hidden])) .markdown-tools { flex-wrap: nowrap; min-width: 0; overflow-x: auto; }
+}
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .markdown-editor .markdown-modes, .markdown-editor .markdown-tools { flex: none; flex-wrap: nowrap; gap: 0; margin: 0; }
 .markdown-editor .markdown-tools { flex-wrap: wrap; max-width: 100%; }

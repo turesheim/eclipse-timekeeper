@@ -147,7 +147,7 @@ Journal image references also resolve companions imported through vault synchron
 including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
 
-Obsidian Banners appear above formatted notes, including daily, weekly and event
+Obsidian [Banners](https://github.com/noatpad/obsidian-banners#advanced) appear above formatted notes, including daily, weekly and event
 notes. Use the plugin's default YAML properties:
 
 ```yaml

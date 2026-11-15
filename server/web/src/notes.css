@@ -66,6 +66,10 @@ body:has(#workspace[data-view=notes]:not([hidden])) {
   .notes-contents { grid-column:auto; grid-row:auto; position:absolute; z-index:3; inset:0 0 0 auto; width:min(85%,22rem); box-shadow:0 .25rem 1rem #0003; background:var(--bs-body-bg); }
 }
 @media(max-width:760px) {
+  .notes-editor:has(.markdown-banner:not([hidden])) .notes-footer { flex-wrap:nowrap; min-width:0; }
+  .notes-editor:has(.markdown-banner:not([hidden])) .notes-footer > [role=status] { flex-shrink:0; margin-bottom:0; }
+  .notes-editor:has(.markdown-banner:not([hidden])) .notes-timestamps { flex:1; min-width:0; flex-wrap:nowrap; overflow-x:auto; white-space:nowrap; }
+  .notes-editor:has(.markdown-banner:not([hidden])) .notes-timestamps > span { flex-shrink:0; }
   .notes-heading { grid-template-columns:auto minmax(0,1fr); gap:.5rem; }
   .notes-main-actions { grid-column:1 / -1; }
   .notes-main-actions .icon-button { min-width:2.25rem; min-height:2.25rem; padding:.3rem; }

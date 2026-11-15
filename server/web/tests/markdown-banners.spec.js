@@ -23,7 +23,7 @@ async function fresh(page,request){
   return {api,put};
 }
 async function openNote(page,path){
-  await page.locator('[data-tab=notes]').click();const root=page.locator('#notes-panel');await root.getByRole('button',{name:'Refresh',exact:true}).first().click();
+  await page.locator('[data-tab=notes]').click();const root=page.locator('#notes-panel'),expand=root.getByRole('button',{name:'Expand left sidebar',exact:true});if(await expand.isVisible())await expand.click();await root.getByRole('button',{name:'Refresh',exact:true}).first().click();
   const entry=noteEntry(page.locator('#notes-navigation'),path);if(!await entry.isVisible())await noteEntry(page.locator('#notes-navigation'),path.split('/')[0]).click();
   await entry.click();await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror')).toBeVisible();return root;
 }
@@ -38,13 +38,14 @@ test('Obsidian banners stay outside prose and preserve YAML through mode changes
   for(const width of [1440,320])for(const theme of ['timekeeper','timekeeper-dark']){
     await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
     await expectBanner(root);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect((await root.locator('.ProseMirror').boundingBox()).height).toBeGreaterThan(150);
     expect((await new AxeBuilder({page}).include('#notes-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/obsidian-banner-'+theme+'-'+width+'.png',fullPage:true});
   }
   await root.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(banner(root)).toBeHidden();expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);
   await root.getByRole('button',{name:'Formatted',exact:true}).click();await expectBanner(root);await appendEditorText(root.locator('.ProseMirror > p').last(),' Reviewed.');await saveMarkdown(root);
   const expected=source.replace('Keep this prose.','Keep this prose. Reviewed.');expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(expected);
-  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await openNote(page,'Notes/Banner.md');await expectBanner(root);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(expected);
+  await page.setViewportSize({width:1440,height:900});await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await openNote(page,'Notes/Banner.md');await expectBanner(root);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(expected);
 });
 
 test('missing, ambiguous, invalid and remote banner sources leave notes usable without empty headers',async({page,request})=>{
@@ -62,7 +63,7 @@ test('missing, ambiguous, invalid and remote banner sources leave notes usable w
   const external=[];page.on('request',r=>{if(!r.url().startsWith(new URL(process.env.TIMEKEEPER_WEB_URL).origin)&&!r.url().startsWith('blob:'))external.push(r.url());});
   for(const [name,metadata,kind]of cases){
     const path='Notes/'+name+'.md';await put(path,'---\n'+metadata+'\n---\n\n# '+name+'\n\nUsable prose.\n');const root=await openNote(page,path);
-    if(kind==='lookup')await expect(banner(root).locator('img')).toHaveAttribute('title',/.+/);
+    if(kind==='lookup')await expect(banner(root).locator('img')).toHaveAttribute('alt',/ · .+/);
     else await expect(banner(root).locator('img')).toHaveCount(0);
     await expect(banner(root)).toBeHidden();await expect(root.locator('.ProseMirror')).toContainText('Usable prose.');
   }
