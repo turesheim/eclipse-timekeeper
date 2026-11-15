@@ -11,7 +11,7 @@ import {captureScreenshot} from './screenshots.js';
 const image=await readFile(new URL('./fixtures/banner.png',import.meta.url));
 const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jI1sAAAAASUVORK5CYII=','base64');
 const header='\uFEFF---\r\n# Keep the banner and unrelated metadata exactly\r\nbanner: "![[Images/Project cover.png]]"\r\nbanner_x: 0.25\r\nbanner_y: 0.75\r\ncustom: [one, two]\r\n---\r\n';
-const banner=root=>root.locator('.markdown-banner');
+const banner=root=>root.locator('.markdown-banner:not(.banner-image-preview)');
 async function fresh(page,request){
   const username='banner-'+randomUUID().slice(0,8),password='Private banner acceptance passphrase';
   expect((await request.post('/api/v1/admin/users',{headers:{Authorization:'Bearer '+process.env.TIMEKEEPER_WEB_TOKEN},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}})).status()).toBe(201);
@@ -108,7 +108,7 @@ test('shared daily and weekly journals show banners in writable and read-only se
   try{
     const read=await context.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');
     const writes=[];read.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&new URL(r.url()).pathname.startsWith('/api/v1/notes'))writes.push(r.url());});
-    await check(read,true);await read.locator('#today-note-editor').getByRole('button',{name:'Note tools',exact:true}).click();for(const name of ['Add seasonal banner','Change banner image','Restore seasonal image'])await expect(read.getByRole('menuitem',{name,exact:true})).toHaveCount(0);await read.keyboard.press('Escape');const root=await openNote(read,'journal/2026-11-02.md');await expectBanner(root);await expect(root.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
+    await check(read,true);await expect(read.locator('#today-note-editor .markdown-actions-group').filter({hasText:'Change banner image'})).toHaveAttribute('hidden','');const root=await openNote(read,'journal/2026-11-02.md');await expectBanner(root);await expect(root.locator('.ProseMirror')).toHaveAttribute('aria-readonly','true');expect(writes).toEqual([]);
   }finally{await context.close();}
 });
 
@@ -117,7 +117,7 @@ async function dailyTool(root,name){await root.getByRole('button',{name:'Note to
 test('daily seasonal snapshots keep their forecast across custom upload, reload, location changes and restore',async({page,request})=>{
   test.setTimeout(90000);
   const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);
-  let previews=0;await page.route('**/api/v1/daily-banners/*/preview',route=>{previews++;return route.fulfill({json:{version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',weather:'snow',provider:'MET Norway',capturedAt:'2026-11-15T10:00:00Z',forecast:[9,12,15].map((hour,index)=>({time:String(hour).padStart(2,'0')+':00',instant:'2026-11-16T'+String(hour-1).padStart(2,'0')+':00:00Z',symbol:'lightsnow',condition:'snow',temperatureCelsius:index-2}))}});});
+  const owner=(await api('GET','/me')).headers()['x-timekeeper-owner'];let previews=0;await page.route('**/api/v1/daily-banners/*/preview',route=>{previews++;return route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',weather:'snow',provider:'MET Norway',capturedAt:'2026-11-15T10:00:00Z',forecast:[9,12,15].map((hour,index)=>({time:String(hour).padStart(2,'0')+':00',instant:'2026-11-16T'+String(hour-1).padStart(2,'0')+':00:00Z',symbol:'lightsnow',condition:'snow',temperatureCelsius:index-2}))}});});
   await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toBeVisible();
   await dailyTool(root,'Add seasonal banner');await expect(banner(root)).toBeVisible();await expect(root.locator('.banner-forecast li')).toHaveCount(3);
   await expect(root.locator('.banner-forecast time')).toHaveText(['09:00','12:00','15:00']);await expect(root.locator('.banner-weather-label')).toHaveText(['Snow','Snow','Snow']);const forecast=await root.locator('.banner-forecast').innerText();

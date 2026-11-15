@@ -105,7 +105,7 @@ export class MarkdownField {
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-description',t('markdown.tab_help'));this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.toolbar.append(this.modes,this.tools);
-    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu,this.listMenu);
+    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.toolbar,this.status,this.rich,this.plain,this.metadata,this.imagePicker,this.attachmentPicker,this.blockMenu,this.listMenu);
     this.toolbar.addEventListener('keydown',event=>this.historyShortcut(event));
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>{
