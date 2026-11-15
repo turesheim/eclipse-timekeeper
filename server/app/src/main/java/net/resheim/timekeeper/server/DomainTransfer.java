@@ -219,10 +219,17 @@ final class DomainTransfer {
         }
         for(JsonNode item:input.path("taskTombstones")) {
             UUID tombstoneId=UUID.randomUUID();Set<ExternalTaskReferenceKey> keys=aliases(item.get("externalReferences"));
-            var tombstone=new TaskTombstone(tombstoneId,uuid(item.get("taskId")),Instant.parse(item.get("deletedAt").asText()),
+            var tombstone=new TaskTombstone(tombstoneId,tasks.containsKey(uuid(item.get("taskId")))?tasks.get(uuid(item.get("taskId"))).value():uuid(item.get("taskId")),Instant.parse(item.get("deletedAt").asText()),
                     item.get("taskVersion").asLong(),keys);
             store.save("TASK_TOMBSTONE",tombstone);store.change("TASK_TOMBSTONE","CREATED",tombstoneId.toString());
             mapping(mappings,"TASK_TOMBSTONE",item,tombstoneId);
+        }
+        for(JsonNode item:input.get("tasks")){
+            var id=required(tasks,uuid(item.get("id")));var task=(Task)decode("TASK",store.find("TASK",id.value()).orElseThrow());
+            var home=optionalText(item.get("syncListId")).map(UUID::fromString).map(source->required(lists,source));
+            if(item.has("syncListId"))task=task.withSyncList(home);
+            if(item.path("deleted").asBoolean())task=task.withDeleted(true);
+            store.save("TASK",task);store.change("TASK","UPDATED",id.value().toString());
         }
         service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);

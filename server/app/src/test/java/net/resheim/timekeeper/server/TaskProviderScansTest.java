@@ -163,14 +163,13 @@ class TaskProviderScansTest {
         tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().pause(f.connection(),true,etag(auth));return null;});assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->reviews().list(f.connection(),f.list(),null))).status);
         tx(f,()->{var auth=connections().visible(connections().required(f.connection()));connections().pause(f.connection(),false,etag(auth));var scan=((ObjectNode)store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).deepCopy();scan.put("startedAt",store.now().minusSeconds(901).toString());connections().save(TaskProviderScans.SCAN,scan);return null;});assertEquals(409,assertThrows(ApiFailure.class,()->tx(f,()->reviews().list(f.connection(),f.list(),null))).status);
     }
-    @Test void explicitDeleteCanKeepTheNativeTaskAndLaterLiveObservationRequiresANewDeleteReview(){
+    @Test void keepingALocalCopyAfterProviderDeletionUnlinksWithoutDeletingEitherTask(){
         var f=fixture();imported(f,task("one",null,"001","Keep this"));var deleted=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(object().put("id","one").put("deleted",true));incoming(f,deleted);
         var row=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);UUID id=uuid(row.get("taskId"));var before=stored(f,"one");
         tx(f,()->reviews().resolve(f.connection(),f.list(),id,row.path("reviewEtag").asText(),object().put("decision","LOCAL").put("taskEtag",row.path("taskEtag").asText())));
-        assertEquals(before.path("summary"),stored(f,"one").path("summary"));assertTrue(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));assertEquals("APPLIED",tx(f,()->store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).path("state").asText());
-        incoming(f,deleted);assertEquals("APPLIED",tx(f,()->store.find(TaskProviderScans.SCAN,f.list()).orElseThrow()).path("state").asText());
-        localTitle(f,"one","Local draft after deletion");incoming(f,task("one",null,"001","Live again with a conflicting title"));assertEquals("Local draft after deletion",stored(f,"one").path("summary").asText());assertFalse(stored(f,"one").path("externalReferences").get(0).path("providerData").path("payload").path("deletionReview").asBoolean());incoming(f,deleted);var again=tx(f,()->reviews().list(f.connection(),f.list(),null)).path("items").get(0);assertTrue(again.path("canDelete").asBoolean());
-        var result=tx(f,()->reviews().resolve(f.connection(),f.list(),id,again.path("reviewEtag").asText(),object().put("decision","DELETE").put("taskEtag",again.path("taskEtag").asText())));assertTrue(result.body().path("deleted").asBoolean());assertTrue(tx(f,()->store.find("TASK",id).isEmpty()));assertFalse(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));
+        assertEquals(before.path("summary"),stored(f,"one").path("summary"));assertTrue(stored(f,"one").path("syncListId").isNull());assertFalse(stored(f,"one").path("deleted").asBoolean());
+        incoming(f,task("one",null,"001","Provider copy changed"));assertEquals("Keep this",stored(f,"one").path("summary").asText());
+        assertTrue(tx(f,()->store.list("TASK_TOMBSTONE").isEmpty()));assertEquals(1,tx(f,()->store.service().tasks().size()));
     }
 
     @Test void incomingReviewLimitRetainsSearchableDecisionsBeyondTheFirstHundred(){

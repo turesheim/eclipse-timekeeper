@@ -42,8 +42,7 @@ public class TaskProviderResource {
     }
     @POST @Path("/{provider}/authorize") public Response authorize(@PathParam("provider")String provider,JsonNode body){
         var input=inputs.validate("TaskProviderAuthorizeInput",body);queries();var kind=TaskProviderConfiguration.provider(provider);String browser=browser();
-        boolean writable=input.path("direction").asText("IMPORT").equals("TWO_WAY");
-        if(writable&&kind!=TaskCloudProvider.Provider.GOOGLE)throw new ApiFailure(422,"TASK_PROVIDER_DIRECTION_UNSUPPORTED");
+        boolean writable=input.path("direction").asText("TWO_WAY").equals("TWO_WAY")&&(!input.path("services").isObject()||input.path("services").path("tasks").asBoolean());
         var services=input.path("services").isObject()?((com.fasterxml.jackson.databind.node.ObjectNode)input.get("services")).deepCopy():object().put("tasks",true).put("calendars",false);services.put("writableTasks",writable);SharedConnectClient.services(services);
         store.authenticated(identity,()->null);boolean verifying=input.path("verification").asBoolean();
         if(verifying)administrators.require(identity.principal());

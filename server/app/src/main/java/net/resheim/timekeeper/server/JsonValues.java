@@ -101,7 +101,7 @@ public final class JsonValues {
         if (value instanceof Task task) {
             var node = base(owner,task.id().value(),task.version());
             nullable(node,"projectId",task.projectId().map(ProjectId::value)); nullable(node,"parentTaskId",task.parentTaskId().map(TaskId::value));
-            node.put("summary",task.summary()); nullable(node,"url",task.url());
+            node.put("summary",task.summary()); nullable(node,"url",task.url());nullable(node,"syncListId",task.syncListId());node.put("deleted",task.deleted());
             node.put("status",task.planning().status().name());nullable(node,"scheduledDate",task.planning().scheduledDate());nullable(node,"completedAt",task.planning().completedAt());
             ArrayNode checklist = node.putArray("checklistItems");
             task.checklist().items().forEach(item -> {
@@ -168,13 +168,19 @@ public final class JsonValues {
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
                     optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")),aliases(node.get("externalAliases")),
                     new TaskPlanning(optionalText(node.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),optionalText(node.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(node.get("completedAt")).map(Instant::parse)),
-                    checklist(node.get("checklistItems")),timing(node),importance(node),body(node),recurrence(node.get("recurrence")),reminders(node.get("reminders")),metadata(node.get("metadata")),node.path("siblingOrder").asInt(0),version);
+                    checklist(node.get("checklistItems")),timing(node),importance(node),body(node),recurrence(node.get("recurrence")),reminders(node.get("reminders")),metadata(node.get("metadata")),node.path("siblingOrder").asInt(0),version,optionalText(node.get("syncListId")).map(UUID::fromString),node.path("deleted").asBoolean());
             case "ACTIVITY" -> new Activity(new ActivityId(id), optionalText(node.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null), new OwnerId(node.get("ownerId").asText()),
                     Instant.parse(node.get("start").asText()), optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(), labels(node.get("labelIds")),node.get("manual").asBoolean(),version,Optional.empty(),optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new));
             case "WORK_SESSION" -> new WorkSession(new WorkSessionId(id),new OwnerId(node.get("ownerId").asText()),
                     Instant.parse(node.get("start").asText()),optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(),version);
             default -> throw new IllegalStateException("Unknown stored entity type");
         };
+    }
+    public static ObjectNode reference(ExternalTaskReference reference){
+        var ref=object().put("providerId",reference.providerId()).put("repositoryId",reference.repositoryId()).put("externalId",reference.externalId());nullable(ref,"externalUrl",reference.externalUrl());
+        reference.taskListId().ifPresent(list->ref.put("taskListId",list.toString()));reference.sectionId().ifPresent(section->ref.put("sectionId",section.toString()));
+        reference.assignment().ifPresent(value->ref.set("assignment",assignment(value)));reference.providerData().ifPresent(value->ref.set("providerData",providerData(value)));reference.baseline().ifPresent(value->ref.set("baseline",baseline(value)));
+        var source=ref.putObject("source");nullable(source,"createdAt",reference.source().createdAt());nullable(source,"modifiedAt",reference.source().modifiedAt());nullable(source,"remoteEtag",reference.source().remoteEtag());nullable(source,"remoteRevision",reference.source().remoteRevision());return ref;
     }
     public static ExternalTaskReference reference(JsonNode node) {
         return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),optionalText(node.get("sectionId")).map(UUID::fromString),

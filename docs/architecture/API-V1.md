@@ -1514,8 +1514,9 @@ direct checks validate the effective registration and HTTPS callback. Neither
 starts provider consent. Authorization start revalidates before creating state.
 
 Managed and direct grants support Google/Microsoft calendars and tasks separately
-or together. Scopes match selected services; calendars and Microsoft tasks remain
-read-only, and Google task writes require explicit TWO_WAY consent. Existing grants
+or together. Scopes match selected services; calendars remain read-only; Google and Microsoft task writes require explicit
+TWO_WAY consent. New task grants request write permission by default. Existing
+read-only grants need explicit reauthorization. Existing grants
 retain their original refresh path through mode changes. Initialization failures
 are retryable connection errors, not uncertain business-record writes. Genuine
 persistent-write uncertainty still requires review of current values.
@@ -1533,3 +1534,20 @@ does not change the profile version. This private preference is separate from
 note bodies and never executes template code. It follows the existing profile
 preference policy for portable account archives (selected preferences only);
 full instance backups retain it.
+
+### Automatic task homes and retained deletion
+
+`GET /task-sync/lists` returns the writable, explicitly subscribed list choices
+for the authenticated owner, using the normal page envelope. `TaskCreateInput`
+and `TaskInput` accept nullable `syncListId`; omission on update preserves the
+current home, while null detaches synchronization without deleting either copy.
+Project mappings never select tasks for export. Cross-account transfers are
+refused. Ordinary task updates may also include notes, planning, start/deadline,
+priority, order and metadata atomically under the task ETag.
+
+Deleting a task with a synchronization home removes it from active task reads
+and records durable provider deletion intent. Its row, worked time and external
+identity tombstone remain available to history and transfer. The connector
+applies trustworthy remote deletions after a healthy complete scan; delete/edit
+conflicts and dependency restrictions require a specific decision. See
+[AUTOMATIC-TASK-SYNC.md](AUTOMATIC-TASK-SYNC.md) for recovery and rollout limits.

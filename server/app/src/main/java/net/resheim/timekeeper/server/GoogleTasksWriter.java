@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Narrow Google mutations; the owned coordinator supplies consent, preview and durable write intent. */
-final class GoogleTasksWriter {
+final class GoogleTasksWriter implements TaskWriter {
     private static final String ROOT="https://tasks.googleapis.com/tasks/v1/lists/";
     private static final Set<String> FIELDS=Set.of("summary","body","status","completedAt","scheduledDate");
     static final class Unsupported extends RuntimeException {
@@ -18,16 +18,29 @@ final class GoogleTasksWriter {
     private final TaskCloudProvider reader;
     GoogleTasksWriter(){this(new TaskProviderHttp(Set.of("tasks.googleapis.com")));}
     GoogleTasksWriter(TaskProviderHttp http){this.http=http;reader=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE,http);}
-    TaskCloudProvider.RemoteTask get(String token,String list,String task){return reader.normalize(http.json("GET",address(list,task),token,null,null));}
-    TaskCloudProvider.RemoteTask create(String token,String list,JsonNode fields){
+    public TaskCloudProvider.RemoteTask get(String token,String list,String task){return reader.normalize(http.json("GET",address(list,task),token,null,null));}
+    public TaskCloudProvider.RemoteTask create(String token,String list,JsonNode fields){
         var body=body(fields);if(!body.has("title"))throw new Unsupported("summary","REQUIRED");
         return mutate("POST",address(list,null),token,body,null,null);
     }
-    TaskCloudProvider.RemoteTask update(String token,String list,String task,String revision,JsonNode fields){
+    public TaskCloudProvider.RemoteTask update(String token,String list,String task,String revision,JsonNode fields){
         var body=body(fields);if(body.isEmpty())throw new Unsupported("","EMPTY_WRITE");
         return mutate("PATCH",address(list,task),token,body,revision(revision),task);
     }
-    void delete(String token,String list,String task,String revision){http.json("DELETE",address(list,task),token,null,revision(revision));}
+    public void delete(String token,String list,String task,String revision){http.json("DELETE",address(list,task),token,null,revision(revision));}
+    @Override public TaskCloudProvider.RemoteTask create(String token,String list,JsonNode fields,String parent,String previous){
+        var body=body(fields);if(!body.has("title"))throw new Unsupported("summary","REQUIRED");
+        return mutate("POST",placement(address(list,null),null,parent,previous),token,body,null,null);
+    }
+    @Override public TaskCloudProvider.RemoteTask move(String token,String list,String task,String revision,String destination,String parent,String previous){
+        return mutate("POST",placement(address(list,task)+"/move",destination,parent,previous),token,null,revision(revision),null);
+    }
+    private static String placement(String address,String destination,String parent,String previous){
+        var query=new ArrayList<String>();
+        for(var pair:List.of(new String[]{"destinationTasklist",destination},new String[]{"parent",parent},new String[]{"previous",previous}))
+            if(pair[1]!=null){identifier(pair[1]);query.add(pair[0]+"="+TaskCloudProvider.segment(pair[1]));}
+        return address+(query.isEmpty()?"":"?"+String.join("&",query));
+    }
     private TaskCloudProvider.RemoteTask mutate(String method,String address,String token,ObjectNode body,String revision,String expected){
         var value=http.json(method,address,token,body,revision);
         try{

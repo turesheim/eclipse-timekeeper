@@ -21,7 +21,7 @@ public class TaskProviderHttpTestFixture extends TaskProviderClients {
             var form=form(request);String grant=form.get("grant_type"),key;
             if(grant.equals("authorization_code")){
                 String code=form.get("code");if(code.startsWith("denied-"))return reply(400,"{\"error\":\"invalid_grant\",\"error_description\":\"private-provider-detail\"}");
-                key=JsonValues.hash(code).substring(0,24);STATES.putIfAbsent(key,new State());STATES.get(key).writable=code.startsWith("write-fixture-");STATES.get(key).tasks=!code.startsWith("calendar-fixture-");STATES.get(key).calendars=code.startsWith("calendar-fixture-")||code.startsWith("combined-fixture-");
+                key=JsonValues.hash(code).substring(0,24);STATES.putIfAbsent(key,new State());STATES.get(key).writable=code.startsWith("write-");STATES.get(key).tasks=!code.startsWith("calendar-fixture-");STATES.get(key).calendars=code.startsWith("calendar-fixture-")||code.contains("combined-fixture-");
             }else{key=form.get("refresh_token").substring("fixture-refresh-".length());STATES.get(key).refreshes.incrementAndGet();}
             var selected=STATES.get(key);String scopes=ProviderScopes.requested(provider.name().toLowerCase(Locale.ROOT),selected.tasks,selected.calendars,selected.writable);
             return reply(200,JsonValues.object().put("access_token","fixture-access-"+key).put("refresh_token","fixture-refresh-"+key).put("token_type","Bearer").put("expires_in",3600).put("scope",scopes).toString());

@@ -3,6 +3,7 @@ package net.resheim.eclipse.timekeeper.service;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.List;
 
 import net.resheim.eclipse.timekeeper.domain.ActivityId;
@@ -65,8 +66,9 @@ public final class Commands {
 			Optional<String> cursor, Optional<Instant> lastObservedAt, Optional<Instant> lastCompleteAt) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases, TaskRecurrence recurrence, List<TaskReminder> reminders, TaskMetadata metadata) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases, TaskRecurrence recurrence, List<TaskReminder> reminders, TaskMetadata metadata, Optional<UUID> syncListId) {
 		public CreateTask {
+            syncListId = optional(syncListId);
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
 			url = optional(url);
@@ -81,6 +83,16 @@ public final class Commands {
 			reminders = reminders == null ? List.of() : List.copyOf(reminders);
 			metadata = metadata == null ? TaskMetadata.empty() : metadata;
 		}
+
+        public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+                Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist,
+                TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases,
+                TaskRecurrence recurrence, List<TaskReminder> reminders, TaskMetadata metadata) {
+            this(projectId,parentTaskId,summary,url,externalReferences,planning,checklist,timing,importance,body,siblingOrder,externalAliases,recurrence,reminders,metadata,Optional.empty());
+        }
+        public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary, Optional<String> url, Optional<UUID> syncListId) {
+            this(projectId,parentTaskId,summary,url,Set.of(),TaskPlanning.unplanned(),TaskChecklist.empty(),TaskTiming.empty(),TaskImportance.ordinary(),TaskBody.empty(),0,Set.of(),TaskRecurrence.empty(),List.of(),TaskMetadata.empty(),syncListId);
+        }
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
@@ -152,12 +164,17 @@ public final class Commands {
 
 	public record UpdateTask(TaskId id, long expectedVersion, Optional<ProjectId> projectId,
 			Optional<TaskId> parentTaskId,
-			String summary, Optional<String> url) {
+			String summary, Optional<String> url, Optional<Optional<UUID>> syncHome) {
 		public UpdateTask {
+            syncHome = optional(syncHome);
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
 			url = optional(url);
 		}
+
+        public UpdateTask(TaskId id,long expectedVersion,Optional<ProjectId> projectId,Optional<TaskId> parentTaskId,String summary,Optional<String> url) {
+            this(id,expectedVersion,projectId,parentTaskId,summary,url,Optional.empty());
+        }
 
 		public UpdateTask(TaskId id, long expectedVersion, Optional<ProjectId> projectId,
 				String summary, Optional<String> url) {
@@ -165,6 +182,7 @@ public final class Commands {
 		}
 	}
 
+    public record UpdateTaskDetails(UpdateTask task,TaskPlanning planning,TaskBody body,TaskTiming timing,TaskImportance importance,int siblingOrder,TaskMetadata metadata) { }
 	public record DeleteTask(TaskId id, long expectedVersion) { }
 	public record UpdateTaskPlanning(TaskId id, long expectedVersion, TaskPlanning planning) { }
 	public record UpdateTaskChecklist(TaskId id, long expectedVersion, TaskChecklist checklist) { }

@@ -18,7 +18,13 @@ final class TaskProviderReviews {
     TaskProviderReviews(ServerStore store,CommandReceipts receipts,ContractInputs inputs){this.store=store;this.receipts=receipts;this.inputs=inputs;this.pull=new TaskCloudPull(store,receipts,inputs);}
     private TaskProviderScans scans(){return new TaskProviderScans(store,receipts,inputs);}
     private TaskCloudPull pull(){return pull;}
-    private TaskCloudPull.Scan scan(JsonNode value){return new TaskCloudPull.Scan(value.path("providerId").asText(),value.path("accountId").asText(),value.path("remoteListId").asText(),scans().tasks(value),Instant.parse(value.path("startedAt").asText()),value.path("full").asBoolean());}
+    private TaskCloudPull.Scan scan(JsonNode value){return new TaskCloudPull.Scan(value.path("providerId").asText(),value.path("accountId").asText(),value.path("remoteListId").asText(),reviewTasks(value),Instant.parse(value.path("startedAt").asText()),value.path("full").asBoolean());}
+    private List<TaskCloudProvider.RemoteTask> reviewTasks(JsonNode value){
+        var tasks=new ArrayList<>(scans().tasks(value));var ids=new HashSet<String>();tasks.forEach(task->ids.add(task.id()));
+        var reader=new TaskCloudProvider(TaskProviderConfiguration.provider(value.path("providerId").asText()));
+        for(var pending:value.path("pending"))if(pending.path("observation").path("deleted").asBoolean()&&ids.add(pending.path("externalId").asText())){var raw=object().put("id",pending.path("externalId").asText());if(value.path("providerId").asText().equals("google"))raw.put("deleted",true);else raw.putObject("@removed").put("reason","deleted");tasks.add(reader.normalize(raw));}
+        return tasks;
+    }
     ObjectNode list(UUID connection,UUID list,String query){
         var value=scans().ready(connection,list);var scan=scan(value);String filter=Objects.toString(query,"").strip().toLowerCase(Locale.ROOT);if(filter.length()>1024)throw ApiFailure.badRequest();
         var result=object().put("observedAt",scan.observedAt().toString()).put("count",0);var items=result.putArray("items");
@@ -55,14 +61,22 @@ final class TaskProviderReviews {
             }
             if(row==null)throw ApiFailure.notFound();ApiReplies.match(row,match);if(!row.path("canResolve").asBoolean())throw ApiFailure.conflict();
             var current=store.find("TASK",task).orElseThrow(ApiFailure::notFound);ApiReplies.match(current,input.path("taskEtag").asText());String choice=input.path("decision").asText();
-            if(remote.deleted()){
+            if(current.path("deleted").asBoolean()&&!remote.deleted()){
+                if(!Set.of("LOCAL","REMOTE").contains(choice))throw ApiFailure.conflict();
+                var candidate=((ObjectNode)current).deepCopy();
+                for(var ref:candidate.path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(TaskCloudPull.repository(scan.account(),scan.list()))&&ref.path("externalId").asText().equals(remote.id())){
+                    ((ObjectNode)ref).putObject("baseline").put("version",1).put("capturedAt",store.now().toString()).set("fields",pull().observation(scan,remote).path("fields").deepCopy());
+                    if(choice.equals("REMOTE")){for(var fields=remote.fields().fields();fields.hasNext();){var field=fields.next();if(field.getKey().equals("metadata")){for(var components=field.getValue().fields();components.hasNext();){var component=components.next();candidate.withObject("metadata").set(component.getKey(),component.getValue().deepCopy());}}else candidate.set(field.getKey(),field.getValue().deepCopy());}candidate.put("deleted",false);}
+                }
+                candidate.put("version",current.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",candidate));store.change("TASK","UPDATED",task.toString());pull().remember(store.find("TASK",task).orElseThrow(),scan.provider(),TaskCloudPull.repository(scan.account(),scan.list()),remote);
+            }else if(remote.deleted()){
                 if(choice.equals("DELETE")){
                     if(!row.path("canDelete").asBoolean())throw ApiFailure.conflict();store.service().deleteTask(new DeleteTask(new TaskId(task),current.path("version").asLong()));
                 }else if(choice.equals("LOCAL")){
                     pull().remember(current,scan.provider(),TaskCloudPull.repository(scan.account(),scan.list()),remote);
                     var saved=((ObjectNode)store.find("TASK",task).orElseThrow()).deepCopy();
                     for(var ref:saved.path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(TaskCloudPull.repository(scan.account(),scan.list()))&&ref.path("externalId").asText().equals(remote.id()))((ObjectNode)ref.path("providerData").path("payload")).put("deletionReview",true);
-                    saved.put("version",saved.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",saved));store.change("TASK","UPDATED",task.toString());
+                    saved.putNull("syncListId");saved.put("version",saved.path("version").asLong()+1);store.save("TASK",(Task)decode("TASK",saved));store.change("TASK","UPDATED",task.toString());
                 }else throw ApiFailure.conflict();
             }else{
                 if(!Set.of("LOCAL","REMOTE").contains(choice))throw ApiFailure.conflict();var item=pull().observation(scan,remote);item.put("operationId",UUID.nameUUIDFromBytes((operation+":apply").getBytes(StandardCharsets.UTF_8)).toString());

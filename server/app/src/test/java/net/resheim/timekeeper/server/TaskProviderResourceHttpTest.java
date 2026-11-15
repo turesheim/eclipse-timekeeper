@@ -34,7 +34,7 @@ class TaskProviderResourceHttpTest {
     private Response call(String method,String path,ObjectNode value,String match){return call("a",BROWSER,method,path,value,match);}
     private ObjectNode json(Response response,int status){assertEquals(status,response.statusCode(),response.asString());return (ObjectNode)parse(response.asString());}
     private String begin(String provider){
-        var value=json(call("POST","/"+provider+"/authorize",object(),null),200);inputs.validate("TaskProviderAuthorization",value);
+        var value=json(call("POST","/"+provider+"/authorize",object().put("direction","IMPORT"),null),200);inputs.validate("TaskProviderAuthorization",value);
         return Arrays.stream(URI.create(value.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(item->item.startsWith("state=")).map(item->URLDecoder.decode(item.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
     }
     private ObjectNode connect(String provider){
@@ -59,11 +59,28 @@ class TaskProviderResourceHttpTest {
         fail("Provider refresh did not finish");return null;
     }
     @AfterEach void disconnect(){for(String id:created)for(int attempt=0;attempt<3;attempt++){var before=call("GET","/"+id,null,null);if(before.statusCode()==404)break;var reply=call("DELETE","/"+id,null,before.header("ETag"));if(reply.statusCode()==204)break;assertEquals(412,reply.statusCode(),reply.asString());}}
+    private Response domain(String owner,String method,String path,ObjectNode body,String match){
+        var request=given().header("Authorization","Bearer test-"+owner).contentType("application/json");if(method.equals("POST"))request.header("Idempotency-Key",UUID.randomUUID().toString());if(body!=null)request.body(body.toString());if(match!=null)request.header("If-Match",match);return request.request(method,"/api/v1"+path);
+    }
+    @Test void ordinaryTaskEditorSavesOwnedMembershipAndFieldsAtomicallyAndDeletionKeepsReports(){
+        var connected=connectWritable();String id=connected.path("id").asText(),owner=connected.path("ownerId").asText();var paused=json(call("PUT","/"+id+"/state",object().put("paused",true),etag(connected)),200);
+        var settings=object();settings.putObject("tasks").put("automatic",true).putArray("selectedLists").add("list-1");json(call("PUT","/"+id+"/settings",settings,etag(paused)),200);
+        var choices=json(domain("a","GET","/task-sync/lists",null,null),200);inputs.validate("TaskListPage",choices);var list=java.util.stream.StreamSupport.stream(choices.path("items").spliterator(),false).filter(value->value.path("connectionId").asText().equals(id)).findFirst().orElseThrow();
+        var input=object().put("summary","Native editor task").putNull("projectId").putNull("parentTaskId").putNull("url").put("syncListId",list.path("id").asText());input.putObject("body").put("format","TEXT").put("content","Notes stay exact");input.put("status","IN_PROGRESS").put("scheduledDate","2026-11-15");
+        var task=json(domain("a","POST","/tasks",input,null),201);inputs.validate("Task",task);String taskId=task.path("id").asText();assertEquals(list.path("id"),task.path("syncListId"));assertEquals("Notes stay exact",task.path("body").path("content").asText());
+        assertEquals(404,domain("b","POST","/tasks",input,null).statusCode());assertEquals(403,domain("read","POST","/tasks",input,null).statusCode());
+        var edit=object().put("summary","Edited normally").putNull("projectId").putNull("parentTaskId").putNull("url").put("status","COMPLETED").putNull("completedAt");edit.putObject("body").put("format","TEXT").put("content","");
+        var changed=json(domain("a","PUT","/tasks/"+taskId,edit,etag(task)),200);assertEquals(list.path("id"),changed.path("syncListId"));assertEquals("COMPLETED",changed.path("status").asText());assertTrue(changed.path("body").path("content").asText().isEmpty());assertTrue(changed.path("completedAt").isNull());assertEquals(412,domain("a","PUT","/tasks/"+taskId,edit,etag(task)).statusCode());
+        var now=java.time.Instant.now();var activity=object().put("taskId",taskId).put("start",now.minusSeconds(120).toString()).put("end",now.minusSeconds(60).toString()).put("summary","Worked before delete");activity.putArray("labelIds");json(domain("a","POST","/activities",activity,null),201);
+        assertEquals(204,domain("a","DELETE","/tasks/"+taskId,null,etag(changed)).statusCode());assertEquals(404,domain("a","GET","/tasks/"+taskId,null,null).statusCode());
+        var report=json(domain("a","GET","/reports/activities?from="+now.minusSeconds(180)+"&to="+now+"&taskId="+taskId,null,null),200);assertEquals("PT1M",report.path("total").asText());
+        store.transaction(owner,()->{assertTrue(store.find("TASK",UUID.fromString(taskId)).orElseThrow().path("deleted").asBoolean());assertTrue(store.list(TaskProviderIntents.KIND).stream().anyMatch(intent->intent.path("taskId").asText().equals(taskId)));return null;});
+    }
     @Test void accountSettingsSaveBothSubscriptionsAtomicallyAndCheckOwnerAndWritePermission(){
         var authorize=object();authorize.set("services",object().put("tasks",true).put("calendars",true));
         var attempt=json(call("POST","/google/authorize",authorize,null),200);
         String state=Arrays.stream(URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(item->item.startsWith("state=")).map(item->URLDecoder.decode(item.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
-        var connected=json(call("POST","/complete",object().put("state",state).put("code","combined-fixture-"+UUID.randomUUID()),null),200);String id=connected.path("id").asText();created.add(id);
+        var connected=json(call("POST","/complete",object().put("state",state).put("code","write-combined-fixture-"+UUID.randomUUID()),null),200);String id=connected.path("id").asText();created.add(id);
         var paused=json(call("PUT","/"+id+"/state",object().put("paused",true),etag(connected)),200);
         var settings=object();settings.putObject("tasks").put("automatic",true).putArray("selectedLists").add("list-1");
         var calendars=settings.putObject("calendars");calendars.putArray("selectedCalendars").add("calendar");calendars.putObject("calendarMappings").put("calendar",UUID.randomUUID().toString());
@@ -110,8 +127,8 @@ class TaskProviderResourceHttpTest {
         for(String provider:List.of("google","microsoft"))for(boolean[] selection:List.of(new boolean[]{false,true},new boolean[]{true,false},new boolean[]{true,true})){
             boolean tasks=selection[0],calendars=selection[1];var input=object();input.set("services",object().put("tasks",tasks).put("calendars",calendars));
             var attempt=json(call("POST","/"+provider+"/authorize",input,null),200);var params=new HashMap<String,String>();for(String pair:URI.create(attempt.path("authorizationUrl").asText()).getRawQuery().split("&")){var parts=pair.split("=",2);params.put(parts[0],URLDecoder.decode(parts[1],StandardCharsets.UTF_8));}
-            assertEquals(ProviderScopes.requested(provider,tasks,calendars,false),params.get("scope"));
-            String code=(tasks?calendars?"combined-fixture-":"fixture-":"calendar-fixture-")+UUID.randomUUID();
+            assertEquals(ProviderScopes.requested(provider,tasks,calendars,tasks),params.get("scope"));
+            String code=(tasks?calendars?"write-combined-fixture-":"write-fixture-":"calendar-fixture-")+UUID.randomUUID();
             var connected=json(call("POST","/complete",object().put("state",params.get("state")).put("code",code),null),200);created.add(connected.path("id").asText());
             assertEquals(tasks,connected.path("services").path("tasks").asBoolean());assertEquals(calendars,connected.path("services").path("calendars").asBoolean());
             assertEquals(tasks?2:0,connected.path("availableLists").size());assertEquals(calendars?1:0,connected.path("availableCalendars").size());

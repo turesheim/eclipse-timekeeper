@@ -13,30 +13,25 @@ final class TaskProviderIntents {
     private TaskProviderIntents(){}
 
     static void changed(ServerStore store,String taskId){
-        var task=store.find("TASK",UUID.fromString(taskId));if(task.isEmpty())return;
-        for(var reference:task.get().path("externalReferences")){
-            if(!reference.hasNonNull("taskListId"))continue;
-            var list=store.find("TASK_LIST",uuid(reference.get("taskListId")));if(list.isEmpty())continue;
-            var connection=store.find("TASK_CONNECTION",uuid(list.get().get("connectionId")));if(connection.isEmpty())continue;
-            var auth=store.find(TaskProviderConnections.AUTH,uuid(connection.get().get("id")));
-            if(auth.isEmpty()||!auth.get().path("automatic").asBoolean()||!TaskProviderConnections.writable(auth.get(),connection.get())
-                    ||!reference.path("providerId").equals(connection.get().path("providerId"))
-                    ||!reference.path("repositoryId").asText().equals(TaskCloudPull.repository(connection.get().path("remoteAccountId").asText(),list.get().path("remoteListId").asText())))continue;
-            boolean selected=false;for(var value:auth.get().path("selected"))if(value.equals(list.get().path("remoteListId")))selected=true;if(!selected)continue;
-            // Import/acknowledgement events are not outbound edits. Compare the final committed projection.
-            var baseline=reference.path("baseline").path("fields");boolean differs=false;
-            for(String field:List.of("summary","body","status","completedAt","scheduledDate"))if(baseline.has(field)&&!task.get().path(field).equals(baseline.get(field)))differs=true;
-            if(!differs){clear(store,UUID.fromString(taskId),uuid(list.get().get("id")));continue;}
-            UUID id=UUID.nameUUIDFromBytes(("dagsverk-task-intent:"+taskId+":"+list.get().path("id").asText()).getBytes(StandardCharsets.UTF_8));
+        var found=store.find("TASK",UUID.fromString(taskId));if(found.isEmpty())return;var task=found.get();
+        var homes=new LinkedHashSet<UUID>();if(task.hasNonNull("syncListId"))homes.add(uuid(task.get("syncListId")));
+        for(var reference:task.path("externalReferences"))if(reference.hasNonNull("taskListId"))homes.add(uuid(reference.get("taskListId")));
+        for(UUID home:homes){
+            var list=store.find("TASK_LIST",home);if(list.isEmpty())continue;
+            UUID connectionId=uuid(list.get().get("connectionId"));var auth=store.find(TaskProviderConnections.AUTH,connectionId);if(auth.isEmpty())continue;
+            // Record while paused, disconnected or unsubscribed too. Consent controls execution, not durability.
+            UUID id=UUID.nameUUIDFromBytes(("dagsverk-task-intent:"+taskId+":"+home).getBytes(StandardCharsets.UTF_8));
+            JsonNode linked=null;for(var ref:task.path("externalReferences"))if(ref.path("taskListId").asText().equals(home.toString()))linked=ref;
+            boolean pending=linked==null?task.path("syncListId").asText().equals(home.toString())&&!task.path("deleted").asBoolean():task.path("deleted").asBoolean()?!linked.path("providerData").path("payload").path("observation").path("deleted").asBoolean()&&!linked.path("providerData").path("payload").path("observation").has("@removed"):task.hasNonNull("syncListId")&&(!task.path("syncListId").asText().equals(home.toString())||TaskProviderWrites.differs(task,linked));
+            if(!pending){clear(store,UUID.fromString(taskId),home);continue;}
             var state=new TaskProviderConnections(store);var before=store.find(KIND,id);
             var intent=before.map(value->((ObjectNode)value).deepCopy()).orElseGet(JsonValues::object);
-            intent.put("connectionId",connection.get().path("id").asText()).put("listId",list.get().path("id").asText())
-                    .put("taskId",taskId).put("taskVersion",task.get().path("version").asLong()).put("operationId",UUID.randomUUID().toString())
-                    .put("generation",auth.get().path("generation").asText()).put("changedAt",store.now().toString());
-            var desired=intent.putObject("desired");for(String field:List.of("summary","body","status","completedAt","scheduledDate"))desired.set(field,task.get().path(field).deepCopy());
-            intent.set("reference",reference.deepCopy());
+            intent.put("connectionId",connectionId.toString()).put("listId",home.toString()).put("taskId",taskId)
+                .put("taskVersion",task.path("version").asLong()).put("operationId",UUID.randomUUID().toString())
+                .put("generation",auth.get().path("generation").asText()).put("changedAt",store.now().toString());
+            intent.set("desired",task.deepCopy());
             if(before.isEmpty())state.insert(KIND,id,intent);else state.save(KIND,intent);
-            // A live lease keeps its deadline; finish() notices this durable request.
+            if(store.observingProvider())continue;
             var credentials=((ObjectNode)auth.get()).deepCopy();credentials.put("requested",true).put("intentRevision",credentials.path("intentRevision").asLong()+1);
             if(!credentials.path("paused").asBoolean()&&!credentials.path("blocked").asBoolean()&&!credentials.hasNonNull("lease"))credentials.put("nextRefresh",store.now().toString());
             state.save(TaskProviderConnections.AUTH,credentials);
@@ -48,7 +43,7 @@ final class TaskProviderIntents {
         store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),KIND,id);
     }
     static void warnings(ServerStore store,UUID connection,UUID list,JsonNode task,JsonNode warnings){
-        var relevant=array();for(var warning:warnings)if(Set.of("TEXT_ONLY","FIELD_LIMIT","STATUS_UNSUPPORTED","ASSIGNED_TASK_NOTES","INVALID_DATE","INVALID_TIME").contains(warning.path("reason").asText()))relevant.add(warning.deepCopy());
+        var relevant=array();for(var warning:warnings)if(Set.of("TEXT_ONLY","FIELD_LIMIT","STATUS_UNSUPPORTED","ASSIGNED_TASK_NOTES","INVALID_DATE","INVALID_TIME","HTML_ONLY","TIMED_DATE_REQUIRED","PRIORITY_UNSUPPORTED","MOVE_UNSUPPORTED","SPECIAL_TASK_MOVE","DELETE_AT_ASSIGNMENT_SOURCE").contains(warning.path("reason").asText()))relevant.add(warning.deepCopy());
         UUID id=UUID.nameUUIDFromBytes(("dagsverk-task-issue:"+task.path("id").asText()+":"+list).getBytes(StandardCharsets.UTF_8));var old=store.find(ISSUES,id);
         if(relevant.isEmpty()){if(old.isPresent())store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),ISSUES,id);return;}
         var value=old.map(row->((ObjectNode)row).deepCopy()).orElseGet(JsonValues::object);

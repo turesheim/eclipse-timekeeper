@@ -30,6 +30,7 @@ import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
+import net.resheim.eclipse.timekeeper.domain.TaskList;
 import net.resheim.eclipse.timekeeper.domain.TaskRecurrence;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
@@ -131,6 +132,15 @@ public class DefaultTimekeeperService implements TimekeeperService {
 		return tx(() -> List.copyOf(ports.projects().findAllProjects()));
 	}
 
+    @Override public List<TaskList> synchronizedTaskLists(){return tx(()->List.copyOf(ports.tasks().synchronizedTaskLists()));}
+    private Optional<java.util.UUID> syncHome(Optional<Task> current,Optional<TaskId> parent,Optional<java.util.UUID> selected) {
+        if(parent.isPresent()){
+            var ancestor=requiredTask(parent.get());
+            if(selected.isEmpty()&&current.isEmpty())selected=ancestor.syncListId();
+            if(ancestor.syncListId().isPresent()&&!ancestor.syncListId().equals(selected))throw conflict("syncListId","Parent and child must have the same synchronization list");
+        }
+        ports.tasks().validateSyncHome(current,selected);return selected;
+    }
 	@Override
 	public Task createTask(CreateTask command) {
 		return tx(() -> {
@@ -146,9 +156,10 @@ public class DefaultTimekeeperService implements TimekeeperService {
 				if (ports.tasks().findByExternalReference(alias).isPresent())
 					throw conflict("externalAlias", "alias is linked to another task");
 			}
+			var syncList=syncHome(Optional.empty(),command.parentTaskId(),command.syncListId());
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), command.externalReferences(), command.externalAliases(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.recurrence(), command.reminders(), command.metadata(), command.siblingOrder(), 0));
+					command.summary(), command.url(), command.externalReferences(), command.externalAliases(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.recurrence(), command.reminders(), command.metadata(), command.siblingOrder(), 0,syncList,false));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -279,11 +290,24 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			}
 			validateParent(command.projectId(), command.parentTaskId(), current.id());
 			Task updated = ports.tasks().save(current.update(command.projectId(), command.parentTaskId(),
-					command.summary(), command.url()));
+					command.summary(), command.url(),syncHome(Optional.of(current),command.parentTaskId(),command.syncHome().orElse(current.syncListId()))));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
 		});
 	}
+
+    @Override public Task updateTaskDetails(Commands.UpdateTaskDetails command){
+        return tx(()->{
+            var task=updateTask(command.task());
+            if(!task.planning().equals(command.planning()))task=updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),command.planning()));
+            if(!task.body().equals(command.body()))task=updateTaskBody(new UpdateTaskBody(task.id(),task.version(),command.body()));
+            if(!task.timing().equals(command.timing()))task=updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),command.timing()));
+            if(!task.importance().equals(command.importance()))task=updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),command.importance()));
+            if(task.siblingOrder()!=command.siblingOrder())task=updateTaskOrder(new UpdateTaskOrder(task.id(),task.version(),command.siblingOrder()));
+            if(!task.metadata().equals(command.metadata()))task=updateTaskMetadata(new UpdateTaskMetadata(task.id(),task.version(),command.metadata()));
+            return task;
+        });
+    }
 
 	@Override
 	public void deleteTask(DeleteTask command) {
@@ -291,13 +315,13 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			required(command, "command");
 			Task current = requiredTask(command.id());
 			version(current.version(), command.expectedVersion(), "task");
-			if (ports.activities().existsByTask(current.id())) {
+			if (current.syncListId().isEmpty() && ports.activities().existsByTask(current.id())) {
 				throw conflict("task", "task still contains activities");
 			}
 			if (ports.tasks().existsByParent(current.id())) {
 				throw conflict("task", "task still contains subtasks");
 			}
-			ports.tasks().delete(current.id());
+			if(current.syncListId().isPresent())ports.tasks().save(current.withDeleted(true));else ports.tasks().delete(current.id());
 			publish(TASK, DELETED, current.id().value().toString());
 			return null;
 		});
@@ -322,12 +346,12 @@ public class DefaultTimekeeperService implements TimekeeperService {
 
 	@Override
 	public Optional<Task> task(TaskId id) {
-		return tx(() -> ports.tasks().find(required(id, "taskId")));
+		return tx(() -> ports.tasks().find(required(id, "taskId")).filter(task->!task.deleted()));
 	}
 
 	@Override
 	public List<Task> tasks() {
-		return tx(() -> List.copyOf(ports.tasks().findAllTasks()));
+		return tx(() -> ports.tasks().findAllTasks().stream().filter(task->!task.deleted()).toList());
 	}
 
 	@Override
@@ -449,7 +473,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 
 	@Override
 	public Optional<Task> findTask(ExternalTaskReferenceKey reference) {
-		return tx(() -> ports.tasks().findByExternalReference(required(reference, "externalReference")));
+		return tx(() -> ports.tasks().findByExternalReference(required(reference, "externalReference")).filter(task->!task.deleted()));
 	}
 
 	@Override
@@ -640,7 +664,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	}
 
 	private boolean matchesProject(Activity activity, Optional<ProjectId> projectId) {
-		return projectId.isEmpty() || (activity.taskId() == null ? activity.projectId().equals(projectId) : requiredTask(activity.taskId()).projectId().equals(projectId));
+		return projectId.isEmpty() || (activity.taskId() == null ? activity.projectId().equals(projectId) : ports.tasks().find(activity.taskId()).map(task->task.projectId().equals(projectId)).orElse(false));
 	}
 
     private void validateActivityContext(Task task,Optional<ProjectId> projectId) {
@@ -666,7 +690,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	}
 
 	private Task requiredTask(TaskId id) {
-		return ports.tasks().find(required(id, "taskId"))
+		return ports.tasks().find(required(id, "taskId")).filter(task->!task.deleted())
 				.orElseThrow(() -> ServiceException.notFound("taskId", id));
 	}
 

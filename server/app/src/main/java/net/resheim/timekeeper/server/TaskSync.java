@@ -95,10 +95,11 @@ final class TaskSync {
             var planning=new TaskPlanning(optionalText(accepted.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                     optionalText(accepted.get("scheduledDate")).map(LocalDate::parse),
                     optionalText(accepted.get("completedAt")).map(Instant::parse));
-            var created=store.service().createTask(new CreateTask(projectId,parentId.map(TaskId::new),accepted.path("summary").asText(),
+            var importProject=projectId;
+            var created=store.providerObservation(()->store.service().createTask(new CreateTask(importProject,parentId.map(TaskId::new),accepted.path("summary").asText(),
                     optionalText(accepted.get("url")),Set.of(ref),planning,checklist(accepted.get("checklistItems")),timing(accepted),
                     importance(accepted),JsonValues.body(accepted),accepted.path("siblingOrder").asInt(0),Set.of(),
-                    recurrence(accepted.get("recurrence")),reminders(reminderArray(accepted.get(REMINDERS))),metadata(accepted.get(METADATA))));
+                    recurrence(accepted.get("recurrence")),reminders(reminderArray(accepted.get(REMINDERS))),metadata(accepted.get(METADATA)),Optional.of(uuid(list.get("id"))))));
             var value=store.taskSnapshot(created);
             return ApiReplies.resource(201,value,"/api/v1/tasks/"+value.path("id").asText());
         });
@@ -106,9 +107,11 @@ final class TaskSync {
 
     /** Apply non-conflicting remote fields after an ETag-guarded three-way comparison. */
     ApiReplies apply(JsonNode input,String match) {return reconcile(input,match,null);}
+    ApiReplies mergeIndependent(JsonNode input,String match){return reconcile(input,match,null,true);}
     /** Connector-owned, explicitly reviewed conflict resolution; ordinary apply retains its strict conflict guard. */
     ApiReplies resolve(JsonNode input,String match,boolean takeRemote){return reconcile(input,match,takeRemote);}
-    private ApiReplies reconcile(JsonNode input,String match,Boolean takeRemote){
+    private ApiReplies reconcile(JsonNode input,String match,Boolean takeRemote){return reconcile(input,match,takeRemote,false);}
+    private ApiReplies reconcile(JsonNode input,String match,Boolean takeRemote,boolean independent){
         var observed=input.get("item");String operation=observed.path("operationId").asText();
         var receiptInput=object();receiptInput.set("input",input);if(takeRemote!=null)receiptInput.put("takeRemote",takeRemote);
         return receipts.execute(operation,"POST",takeRemote==null?"/task-sync/apply":"/task-sync/resolve",match,takeRemote==null?input:receiptInput,() -> {
@@ -122,8 +125,9 @@ final class TaskSync {
             if(!key.providerId().equals(connection.path("providerId").asText()) || observed.path("deleted").asBoolean()) throw ApiFailure.validation();
             var current=store.byReference(key).orElseThrow(ApiFailure::notFound);
             ApiReplies.match(current,match);
+            if(current.path("deleted").asBoolean())return ApiReplies.resource(200,current,null);
             var preview=previewItem(observed,key,connection,list,true,false);
-            if(Set.of("RECONCILE_ID","INCOMPLETE","DEFERRED","DELETE_DEFERRED","DELETE_CONFLICT","DELETE_REVIEW").contains(preview.path("status").asText())||preview.path("status").asText().equals("CONFLICT")&&takeRemote==null||preview.path("reason").asText().equals("OTHER_LIST"))throw ApiFailure.conflict();
+            if(Set.of("RECONCILE_ID","INCOMPLETE","DEFERRED","DELETE_DEFERRED","DELETE_CONFLICT","DELETE_REVIEW").contains(preview.path("status").asText())||preview.path("status").asText().equals("CONFLICT")&&takeRemote==null&&!independent||preview.path("reason").asText().equals("OTHER_LIST"))throw ApiFailure.conflict();
             for(var decision:preview.path("decisions"))if(Set.of("INCOMPLETE_GROUP","OTHER_LIST").contains(decision.path("outcome").asText()))throw ApiFailure.conflict();
             var candidate=((ObjectNode)current).deepCopy();
             var refs=(ArrayNode)candidate.get("externalReferences");ObjectNode reference=null;
@@ -373,10 +377,17 @@ final class TaskSync {
         if(!reference.path("taskListId").asText().equals(list.path("id").asText())) {
             row.put("status","CONFLICT");row.put("reason","OTHER_LIST");return row;
         }
+        if(task.has("syncListId")&&!task.hasNonNull("syncListId")){row.put("status","IGNORE_DELETED");row.put("reason","UNLINKED");return row;}
+        if(task.path("deleted").asBoolean()&&!item.path("deleted").asBoolean()){
+            boolean changed=false;var common=baselineFields(reference.path("baseline").path("fields"));var remote=fields(item.path("fields"));
+            for(var values=remote.fields();values.hasNext();){var field=values.next();if(common.has(field.getKey())&&!common.get(field.getKey()).equals(field.getValue()))changed=true;}
+            row.put("status",changed?"DELETE_CONFLICT":"KEEP_LOCAL").put("reason",changed?"REMOTE_CHANGED_AFTER_DELETE":"LOCAL_DELETED");return row;
+        }
         if(item.path("deleted").asBoolean()) {
+            if(task.path("deleted").asBoolean()){row.put("status","IGNORE_DELETED");return row;}
             if(!complete) {row.put("status","DELETE_DEFERRED");row.put("reason","COMPLETE_SCAN_REQUIRED");return row;}
             if(localChanged(task,reference)) {row.put("status","DELETE_CONFLICT");row.put("reason","LOCAL_CHANGES");return row;}
-            row.put("status","DELETE_REVIEW");row.put("reason",task.path("externalReferences").size()>1?"OTHER_PROVIDER_LINKS":"EXPLICIT_REVIEW_REQUIRED");return row;
+            row.put("status","DELETE_REVIEW");row.put("reason",task.path("externalReferences").size()>1?"OTHER_PROVIDER_LINKS":"PROVIDER_DELETED");return row;
         }
         var remote=fields(item.path("fields"));var baseline=baselineFields(reference.path("baseline").path("fields"));
         boolean conflict=false,update=false,unsupported=false,localOnly=false;
@@ -412,6 +423,8 @@ final class TaskSync {
                 first.put("outcome","CONFLICT");second.put("outcome","CONFLICT");conflict=true;
             }
         }
+        for(var group:GROUPS){boolean conflicted=false;for(var decision:decisions)if(java.util.Arrays.asList(group).contains(decision.path("field").asText())&&Set.of("CONFLICT","NO_BASELINE").contains(decision.path("outcome").asText()))conflicted=true;
+            if(conflicted)for(var decision:decisions)if(java.util.Arrays.asList(group).contains(decision.path("field").asText()))((ObjectNode)decision).put("outcome","CONFLICT");}
         var candidate=((ObjectNode)task).deepCopy();
         for(var decision:decisions) if(decision.path("field").asText().startsWith(RECURRENCE_PREFIX)
                 && decision.path("outcome").asText().equals("REMOTE_ONLY"))
@@ -505,6 +518,7 @@ final class TaskSync {
             var value=task.path(RECURRENCE).get(field.substring(RECURRENCE_PREFIX.length()));
             return value==null?NullNode.instance:value;
         }
+        if(field.equals("taskListId")&&task.has("syncListId"))return task.get("syncListId");
         var value=field.startsWith(METADATA_PREFIX)?task.path(METADATA).get(field.substring(METADATA_PREFIX.length()))
                 :Set.of("taskListId","sectionId","assignment").contains(field)?reference.get(field):task.get(field);
         return value==null?NullNode.instance:value;

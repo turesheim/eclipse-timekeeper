@@ -70,13 +70,13 @@ final class TaskCloudProvider {
     }
     ObjectNode capabilities(){return capabilities(false);}
     ObjectNode capabilities(boolean writable){
-        var result=object().put("version",1).put("providerApiVersion",provider==Provider.GOOGLE?"tasks-v1/dagsverk-1":"graph-v1.0/dagsverk-read-1");
+        var result=object().put("version",1).put("providerApiVersion",provider==Provider.GOOGLE?"tasks-v1/dagsverk-1":"graph-v1.0/dagsverk-write-1");
         var fields=result.putObject("fields");
         var names=new ArrayList<>(List.of("summary","body","status","completedAt"));
         if(provider==Provider.GOOGLE)names.addAll(List.of("scheduledDate","parentTaskId","siblingOrder","assignment","metadata.links"));
         else names.addAll(List.of("start","due","priority","metadata.categories"));
         for(String name:names)fields.putObject(name).put("readable",true).put("writable",false).put("deletable",false).putNull("note");
-        if(writable&&provider==Provider.GOOGLE)for(String name:List.of("summary","body","status","completedAt","scheduledDate")){
+        if(writable)for(String name:provider==Provider.GOOGLE?List.of("summary","body","status","completedAt","scheduledDate","parentTaskId","siblingOrder"):List.of("summary","body","status","completedAt","start","due","priority","metadata.categories")){
             ((ObjectNode)fields.get(name)).put("writable",true).put("deletable",!name.equals("summary")&&!name.equals("status"));
         }
         return result;
@@ -161,7 +161,7 @@ final class TaskCloudProvider {
         return object().put("kind","DATE_TIME").put("date",time.toLocalDate().toString()).put("time",time.toLocalTime().toString()).put("timeZone",zone);
     }
     private static Instant instant(JsonNode value){
-        var time=LocalDateTime.parse(required(value,"dateTime",128));var zone=ZoneId.of(required(value,"timeZone",128));
+        var time=LocalDateTime.parse(required(value,"dateTime",128));var zone=InternetCalendarCodec.zone(required(value,"timeZone",128));
         var offsets=zone.getRules().getValidOffsets(time);
         // An ambiguous/nonexistent local completion time cannot establish an Instant baseline.
         if(offsets.size()!=1)throw invalid();return time.atOffset(offsets.getFirst()).toInstant();

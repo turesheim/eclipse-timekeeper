@@ -149,10 +149,10 @@ class TaskCloudPullTest {
         var f=fixture();var deleted=task("deleted","Do not resurrect",null,"001");apply(f,scan(deleted));
         tx(f,()->{var current=stored(f,"deleted");store.service().deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(new TaskId(uuid(current.get("id"))),current.path("version").asLong()));return null;});
         var result=apply(f,scan(deleted,task("new-task","Import this",null,"002")));
-        assertFalse(result.path("complete").asBoolean());assertEquals(1,result.path("created").asInt());assertEquals(1,result.path("pending").size());assertEquals("CONFLICT",result.path("pending").get(0).path("status").asText());
-        assertEquals("LOCAL_DELETED",result.path("pending").get(0).path("reason").asText());
+        assertTrue(result.path("complete").asBoolean());assertEquals(1,result.path("created").asInt());assertTrue(result.path("pending").isEmpty());
+        assertTrue(stored(f,"deleted").path("deleted").asBoolean());
         assertEquals("Import this",stored(f,"new-task").path("summary").asText());
-        tx(f,()->{assertEquals(1,store.list("TASK").size());assertEquals(1,store.list("TASK_TOMBSTONE").size());return null;});
+        tx(f,()->{assertEquals(2,store.list("TASK").size());assertEquals(1,store.service().tasks().size());assertEquals(1,store.list("TASK_TOMBSTONE").size());return null;});
     }
     @Test void unresolvedHierarchyDoesNotFlattenOrInventParents(){
         var f=fixture();var result=apply(f,scan(task("child","Child","missing-parent","001")));

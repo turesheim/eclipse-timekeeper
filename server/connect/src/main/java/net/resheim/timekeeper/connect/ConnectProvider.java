@@ -39,7 +39,7 @@ class ConnectProvider {
         if(name.isBlank()||name.length()>1024)name=id;return object().put("remoteAccountId",id).put("name",name);
     }
     static String scopes(String provider,Services services){
-        provider(provider);if(services.writable()&&!provider.equals("google"))throw new ConnectFailure(400,"TASK_WRITES_UNSUPPORTED");
+        provider(provider);
         return ProviderScopes.requested(provider,services.tasks(),services.calendars(),services.writable());
     }
     private LinkedHashMap<String,String> client(ConnectSettings.App app){var values=new LinkedHashMap<String,String>();values.put("client_id",app.id());values.put("client_secret",app.secret());return values;}

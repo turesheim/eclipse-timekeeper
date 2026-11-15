@@ -51,13 +51,13 @@ export async function renderTaskProviders(view){
     }
   };
   const run=(work,submit,target=feedback,authorization=false)=>void view.run(async()=>{controls();await work();},{submit,feedback:target,write:true,authorization}).finally(()=>{if(view.valid()){controls();if(!chooser.open&&(restoreChooserFocus||document.activeElement===document.body||chooser.contains(document.activeElement))){restoreChooserFocus=false;add.focus();}}});
-  const connect=(provider,direction=access.value,services=providerServices.get(provider).read(),targetFeedback=providerFeedback.get(provider))=>{
+  const connect=(provider,direction=provider==='google'?access.value:'TWO_WAY',services=providerServices.get(provider).read(),targetFeedback=providerFeedback.get(provider))=>{
     const pick=connectButtons.get(provider);
     run(async()=>{
       if(view.dirty.size&&!window.confirm(t('ui.discard_unsaved_account_changes')))return;
       targetFeedback.textContent=t('internet_accounts.opening_sign_in');
       const signal=chooser.open?(authorizationController=new AbortController()).signal:undefined;
-      let reply;try{reply=await view.session.request('/task-providers/'+provider+'/authorize',{method:'POST',timeout:60000,signal,body:{services,language:getLocale().startsWith('nb')?'nb':'en',...(provider==='google'?{direction:services.tasks?direction:'IMPORT'}:{})}});}catch(error){if(signal?.aborted)return;if(!error.status||error.code==='TASK_PROVIDER_UNAVAILABLE'||error.code==='UNAVAILABLE')throw new ApiError('TASK_PROVIDER_CONNECTION_UNAVAILABLE',error.status);throw error;}finally{if(authorizationController?.signal===signal)authorizationController=null;}if(!view.valid()||signal?.aborted)return;
+      let reply;try{reply=await view.session.request('/task-providers/'+provider+'/authorize',{method:'POST',timeout:60000,signal,body:{services,language:getLocale().startsWith('nb')?'nb':'en',direction:services.tasks?direction:'IMPORT'}});}catch(error){if(signal?.aborted)return;if(!error.status||error.code==='TASK_PROVIDER_UNAVAILABLE'||error.code==='UNAVAILABLE')throw new ApiError('TASK_PROVIDER_CONNECTION_UNAVAILABLE',error.status);throw error;}finally{if(authorizationController?.signal===signal)authorizationController=null;}if(!view.valid()||signal?.aborted)return;
       const target=authorizationTarget(provider,reply.data.authorizationUrl,reply.data.authorizationOrigin);view.dirty.clear();location.assign(target);
     },pick,targetFeedback,true);
   };
@@ -82,23 +82,28 @@ export async function renderTaskProviders(view){
     card.form=node('form');card.form.addEventListener('change',()=>{view.dirty.add(card.form);controls();});
     const fields=node('div',undefined,'internet-selection-list');fields.setAttribute('role','group');fields.setAttribute('aria-label',t('task_providers.lists'));card.choices=node('div');fields.append(card.choices);card.form.append(fields);
     card.feedback=node('p','','form-feedback');card.feedback.setAttribute('role','status');card.save=node('button',t('task_providers.save_lists'),'btn btn-primary');card.save.type='submit';card.save.dataset.taskProviderSave=data.id;
-    card.form.append(card.save);card.form.addEventListener('submit',event=>{
-      event.preventDefault();run(async()=>{
-        const selectedLists=[...card.form.querySelectorAll('input[name=selectedLists]:checked')].map(input=>input.value);
-        const projectMappings=Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null]));
+    card.save.textContent=t('ui.save');card.save.type='button';
+    const saveSelections=()=>run(async()=>{
+      const latest=await view.session.request('/task-providers/'+data.id);if(!view.valid())return;
+      const settings={};
+      if(card.data.services?.tasks!==false){
         if((latest.data.configurationVersion??latest.data.version)!==card.draftVersion)throw new ApiError('STALE_VERSION',412);
-        await view.session.request('/task-providers/'+data.id+'/lists',{method:'PUT',etag:latest.etag,body:{selectedLists,projectMappings}});if(!view.valid())return;
-        view.clean(card.form);card.feedback.textContent=t('task_providers.selection_saved');await load();
-      },card.save,card.feedback);
+        const selectedLists=[...card.form.querySelectorAll('input[name=selectedLists]:checked')].map(input=>input.value);
+        settings.tasks={selectedLists,projectMappings:Object.fromEntries([...card.form.querySelectorAll('select')].filter(input=>selectedLists.includes(input.dataset.projectFor)).map(input=>[input.dataset.projectFor,input.value||null])),automatic:true};
+      }
+      if(card.data.services?.calendars){card.calendars.check(latest.data);settings.calendars=card.calendars.selection();}
+      await view.session.request('/task-providers/'+data.id+'/settings',{method:'PUT',etag:latest.etag,body:settings});if(!view.valid())return;
+      view.clean(card.form);card.calendars.clean();card.feedback.textContent=t('task_providers.selection_saved');await load();
+    },card.save,card.feedback);
     card.save.addEventListener('click',saveSelections);card.form.addEventListener('submit',event=>{event.preventDefault();saveSelections();});
     card.refresh=button(t('task_providers.refresh_now'),()=>run(async()=>{await view.session.request('/task-providers/'+data.id+'/refresh',{method:'POST'});if(view.valid())await load();},card.refresh,card.feedback));
     card.services=serviceChoices(data.services||{tasks:true,calendars:false},true);card.services.fieldset.addEventListener('change',()=>{card.servicesDirty=true;controls();});
-    card.reconnect=button(t('task_providers.reconnect'),()=>connect(data.providerId,card.access?.value||'IMPORT',card.services.read(),card.feedback));
+    card.reconnect=button(t('task_providers.reconnect'),()=>connect(data.providerId,card.access?.value||'TWO_WAY',card.services.read(),card.feedback));
     const accessLabel=node('label',t('task_providers.account_access'),'form-label');
-    if(data.providerId==='google'){
+    {
       card.access=node('select',undefined,'form-select');for(const direction of ['IMPORT','TWO_WAY'])card.access.append(new Option(t('task_providers.access_'+direction),direction));
       card.access.addEventListener('change',()=>{card.accessDirty=true;controls();});accessLabel.append(card.access);
-    }else accessLabel.hidden=true;
+    }
     card.pause=button(t('task_providers.pause'),()=>run(async()=>{
       const latest=await view.session.request('/task-providers/'+data.id);if(!view.valid())return;
       await view.session.request('/task-providers/'+data.id+'/state',{method:'PUT',etag:latest.etag,body:{paused:!latest.data.paused}});if(view.valid())await load();
@@ -116,32 +121,33 @@ export async function renderTaskProviders(view){
     card.details=button(t('internet_accounts.details'),()=>card.expand(card.body.hidden),'btn btn-outline-secondary btn-sm');card.details.dataset.accountDetailsTrigger=data.id;card.details.setAttribute('aria-controls',card.body.id);
     card.expand=open=>{card.body.hidden=!open;card.details.setAttribute('aria-expanded',String(open));card.panel.classList.toggle('is-open',open);card.refresh.hidden=!open&&!card.data.lastError&&!Object.keys(card.data.listErrors||{}).length;};card.expand(false);
     const headerActions=node('div',undefined,'d-flex flex-wrap gap-2');headerActions.append(card.refresh,card.details);header.append(identity,headerActions);
-    card.serviceHint=node('p','','hint mb-0');card.serviceApply=button(t('internet_accounts.apply_services'),()=>connect(data.providerId,card.access?.value||'IMPORT',card.services.read(),card.feedback),'btn btn-primary');card.serviceChanges=node('div',undefined,'internet-service-changes');card.serviceChanges.hidden=true;card.serviceChanges.append(card.serviceHint,card.serviceApply);
-    const columns=node('div',undefined,'internet-connection-columns');card.calendars=internetCalendarAccount(view,columns,{reload:load,clients,zone:()=>zone,controls});
+    card.serviceHint=node('p','','hint mb-0');card.serviceApply=button(t('internet_accounts.apply_services'),()=>connect(data.providerId,card.access?.value||'TWO_WAY',card.services.read(),card.feedback),'btn btn-primary');card.serviceChanges=node('div',undefined,'internet-service-changes');card.serviceChanges.hidden=true;card.serviceChanges.append(card.serviceHint,card.serviceApply);
+    const columns=node('div',undefined,'internet-connection-columns');card.calendars=internetCalendarAccount(view,columns,{reload:load,clients,zone:()=>zone,controls,onSave:saveSelections});
     card.taskSection=node('section',undefined,'internet-connection-section');card.taskHeading=node('h4',t('internet_accounts.tasks'),'h5');card.taskHeading.id='internet-tasks-'+data.id;card.taskSection.setAttribute('aria-labelledby',card.taskHeading.id);
     card.reviewRoots=[identities,incoming,writes];card.taskSection.append(card.taskHeading,card.direction,card.form,identities,incoming,writes);columns.append(card.taskSection);
     const settings=node('details',undefined,'internet-connection-settings');settings.dataset.connectionSettings=data.id;settings.append(node('summary',t('internet_accounts.connection_settings')),accessLabel);
     const actions=node('div',undefined,'d-flex flex-wrap gap-2 mt-3');actions.append(card.pause,card.reconnect,card.disconnect);settings.append(actions,node('p',t('task_providers.disconnect_help'),'hint mt-2'));
-    card.body.append(card.status,card.services.fieldset,card.serviceChanges,columns,settings);panel.append(header,card.feedback,card.error,card.retry,card.body);cards.set(data.id,card);return card;
+    card.body.append(card.status,card.services.fieldset,card.serviceChanges,columns,card.save,settings);panel.append(header,card.feedback,card.error,card.retry,card.body);cards.set(data.id,card);return card;
   }
   function paint(data){
     calendarSynchronization=data.calendarSynchronization!==false;
     for(const [provider,status]of providerStatus){const ready=!!data.providers[provider];status.textContent=ready?t('internet_accounts.ready'):providerError(data.readiness?.[provider]||'TASK_PROVIDER_NOT_CONFIGURED');status.className=ready?'hint':'alert alert-warning';const details=status.parentElement;if(!details.dataset.initialized){details.open=!ready;details.dataset.initialized='true';}}
     const present=new Set();for(const value of data.items){
       if(value.ownerId!==view.session.owner)throw new ApiError('OWNER_CHANGED',401);present.add(value.id);const card=cards.get(value.id)||cardFor(value);card.data=value;
-      card.status.textContent=!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('internet_accounts.tasks_last_refresh',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')});
+      card.status.textContent=(value.syncStatus?t('task_providers.status_'+value.syncStatus)+' · ':'')+(!value.enabled?t('task_providers.disabled'):value.paused?t('task_providers.paused'):value.syncing?t('task_providers.syncing'):t('internet_accounts.tasks_last_refresh',{date:value.lastSuccess?instantText(value.lastSuccess,zone):t('task_providers.never')}));
       const activeServices=['calendars','tasks'].filter(key=>value.services?value.services[key]:key==='tasks').map(key=>t('internet_accounts.'+key));card.serviceSummary.textContent=activeServices.join(' · ')+(!value.enabled?' · '+t('task_providers.disabled'):value.paused?' · '+t('task_providers.paused'):value.syncing?' · '+t('task_providers.syncing'):'');
-      const attention=(value.pendingCount||0)+(value.pendingWrites||0)+(value.identityReviews?.length||0)+(value.reviews?.length||0);
+      const attention=(value.pendingCount||0)+(value.syncIssues?.length||0)+(value.syncStatus==='NEEDS_ATTENTION'?1:0)+(value.identityReviews?.length||0)+(value.reviews?.length||0);
       if(attention>0)card.serviceSummary.append(' · '+t('internet_accounts.needs_attention'));
       if(!card.initialized){card.expand(location.hash.split('/')[2]===value.id||attention>0);card.initialized=true;if(location.hash.split('/')[2]===value.id){card.heading.tabIndex=-1;card.heading.focus();}}else if(attention>0&&!card.attention)card.expand(true);card.attention=attention;
-      card.direction.textContent=t(value.direction==='TWO_WAY'?'task_providers.mode_two_way':'task_providers.mode_import');card.pause.textContent=t(value.paused?'task_providers.resume':'task_providers.pause');
+      card.direction.textContent=t(value.automatic&&value.direction==='TWO_WAY'?'task_providers.mode_automatic':value.direction==='TWO_WAY'?'task_providers.mode_two_way':'task_providers.mode_import');card.pause.textContent=t(value.paused?'task_providers.resume':'task_providers.pause');
       const tasks=value.services?.tasks!==false;card.status.hidden=!tasks&&value.enabled&&!value.paused&&!value.syncing;card.form.hidden=!tasks;card.direction.hidden=!tasks;card.calendars.update(value);
       if(!card.servicesDirty)for(const [key,input]of Object.entries(card.services.choices))input.checked=value.services?!!value.services[key]:key==='tasks';
       if(card.access&&!card.accessDirty)card.access.value=value.direction;card.writes.update(value);card.incoming.update(value);card.identities.update(value);card.taskSection.hidden=!tasks&&!card.reviewRoots.some(root=>!root.hidden);
       const failures=Object.entries(value.listErrors||{}),syncFailure=code=>['CONFLICT','STALE_VERSION'].includes(code)?t('task_providers.sync_conflict'):providerError(code);
-      card.error.hidden=!value.lastError&&!failures.length;card.error.replaceChildren();
+      card.error.hidden=!value.lastError&&!failures.length&&!value.syncIssues?.length;card.error.replaceChildren();
       if(value.lastError&&!failures.some(([,code])=>code===value.lastError))card.error.append(node('p',syncFailure(value.lastError),'mb-0 text-break'));
       for(const [id,code]of failures)card.error.append(node('p',t('task_providers.list_error',{name:value.availableLists.find(list=>list.id===id)?.name||id,message:syncFailure(code)}),'mb-0 text-break'));
+      for(const issue of value.syncIssues||[])for(const warning of issue.warnings||[]){const key='task_writes.warning_'+warning.reason;card.error.append(node('p',issue.title+' · '+(t('task_writes.field_'+warning.field)==='task_writes.field_'+warning.field?t('task_writes.other_fields'):t('task_writes.field_'+warning.field))+': '+(t(key)===key?t('task_writes.warning_default'):t(key)),'mb-0 text-break'));}
       if(value.pendingCount)card.error.append(node('p',t('task_providers.pending',{count:value.pendingCount}),'mb-0'));
       card.refresh.hidden=card.body.hidden&&!value.lastError&&!failures.length;card.retry.hidden=!value.lastError||!value.nextRefresh;card.retry.textContent=card.retry.hidden?'':t('task_providers.next_attempt',{date:instantText(value.nextRefresh,zone)});
       if(!view.dirty.has(card.form)){

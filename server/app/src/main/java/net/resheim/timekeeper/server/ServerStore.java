@@ -57,6 +57,9 @@ public class ServerStore {
     private static final org.jboss.logging.Logger TIMINGS=org.jboss.logging.Logger.getLogger(ServerStore.class);
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     private final ThreadLocal<Set<String>> changedTasks = new ThreadLocal<>();
+    private final ThreadLocal<Boolean> providerObservation = new ThreadLocal<>();
+    boolean observingProvider(){return Boolean.TRUE.equals(providerObservation.get());}
+    <T>T providerObservation(Supplier<T> work){var prior=providerObservation.get();providerObservation.set(true);try{return work.get();}finally{if(prior==null)providerObservation.remove();else providerObservation.set(prior);}}
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
@@ -400,6 +403,13 @@ public class ServerStore {
         if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode node) {
             node.remove("workSessionId");
             if(type.equals("TASK")) {
+                if(!node.has("syncListId")){
+                    var homes=new HashSet<String>();for(var ref:node.path("externalReferences"))if(ref.hasNonNull("taskListId")&&Set.of("google","microsoft").contains(ref.path("providerId").asText())){
+                        var list=find("TASK_LIST",uuid(ref.get("taskListId")));if(list.isEmpty())continue;var connection=find("TASK_CONNECTION",uuid(list.get().get("connectionId")));if(connection.isPresent()&&connection.get().path("providerId").equals(ref.path("providerId"))&&ref.path("repositoryId").asText().equals(TaskCloudPull.repository(connection.get().path("remoteAccountId").asText(),list.get().path("remoteListId").asText())))homes.add(ref.path("taskListId").asText());
+                    }
+                    if(homes.size()==1)node.put("syncListId",homes.iterator().next());else node.putNull("syncListId");
+                }
+                if(!node.has("deleted"))node.put("deleted",false);
                 if(!node.has("status"))node.put("status",TaskStatus.NOT_STARTED.name());
                 if(!node.has("scheduledDate"))node.putNull("scheduledDate");
                 if(!node.has("completedAt"))node.putNull("completedAt");
@@ -426,7 +436,21 @@ public class ServerStore {
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='ACTIVITY' AND kind='workSession' AND to_type='WORK_SESSION'",owner());
     }
     public <T> T save(String type,T value) {
+        if(value instanceof Task task&&task.syncListId().isEmpty()&&task.externalReferences().size()==1){
+            var previous=find("TASK",task.id().value());var reference=task.externalReferences().iterator().next();
+            if(previous.isPresent()&&previous.get().path("externalReferences").isEmpty()&&reference.taskListId().isPresent()&&find("TASK_LIST",reference.taskListId().get()).isPresent()){
+                var locatedNode=snapshot(owner(),task.withSyncList(reference.taskListId()));locatedNode.put("version",task.version());
+                @SuppressWarnings("unchecked") T located=(T)decode("TASK",locatedNode);value=located;
+            }
+        }
         var node = snapshot(owner(),value);
+        if(value instanceof Task task&&task.deleted()){
+            var previous=find("TASK",task.id().value());
+            if(previous.isPresent()&&(!previous.get().path("deleted").asBoolean()||find("TASK_TOMBSTONE",task.id().value()).isEmpty())){
+                var keys=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());task.externalReferences().forEach(ref->keys.add(ref.key()));
+                if(!keys.isEmpty()){save("TASK_TOMBSTONE",new TaskTombstone(task.id().value(),now(),previous.get().path("version").asLong(),keys));change("TASK_TOMBSTONE","CREATED",task.id().value().toString());}
+            }
+        }
         if(type.equals("TASK")) {
             var previous=find(type,uuid(node.get("id"))).orElse(null);
             if(!node.hasNonNull("projectId")&&previous!=null&&previous.hasNonNull("clientId"))node.set("clientId",previous.get("clientId").deepCopy());
@@ -450,7 +474,7 @@ public class ServerStore {
         if (value instanceof Task task) {
             task.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));
             task.parentTaskId().ifPresent(parent -> relation(type,id,"parent","TASK",parent.value()));
-            Set<UUID> lists=new HashSet<>();task.externalReferences().forEach(reference -> reference.taskListId().ifPresent(lists::add));
+            Set<UUID> lists=new HashSet<>();task.syncListId().ifPresent(lists::add);task.externalReferences().forEach(reference -> reference.taskListId().ifPresent(lists::add));
             lists.forEach(list -> relation(type,id,"list","TASK_LIST",list));
             Set<UUID> sections=new HashSet<>();task.externalReferences().forEach(reference -> reference.sectionId().ifPresent(sections::add));
             sections.forEach(section -> relation(type,id,"section","TASK_SECTION",section));
@@ -630,7 +654,7 @@ public class ServerStore {
         if (sequence>9007199254740991L) throw new IllegalStateException("Sequence exhausted");
         update("UPDATE tk_owner SET revision=? WHERE id=?",sequence,owner());
         update("INSERT INTO tk_change(owner_id,sequence,entity_type,entity_id,change_type,occurred_at) VALUES(?,?,?,?,?,?)",owner(),sequence,type,id,change,timestamp(now()));
-        if(type.equals("TASK")&&!change.equals("DELETED"))changedTasks.get().add(id);
+        if(type.equals("TASK"))changedTasks.get().add(id);
     }
     private boolean postgres() { return DatabaseConfiguration.postgres(jdbcUrl); }
     private String referenceKey(String provider, String repository, String external) {
@@ -683,7 +707,9 @@ public class ServerStore {
             public Optional<Task> findByExternalReference(ExternalTaskReferenceKey reference) { check(); return byReference(reference).map(node -> (Task)decode("TASK",node)); }
             public List<Task> findAllTasks() { return all("TASK",Task.class); }
             public boolean existsByProject(ProjectId id) { check(); return related("project","PROJECT",id.value()); }
-            public boolean existsByParent(TaskId id) { check(); return related("parent","TASK",id.value()); }
+            public boolean existsByParent(TaskId id) { check(); return list("TASK").stream().anyMatch(task->!task.path("deleted").asBoolean()&&task.path("parentTaskId").asText().equals(id.value().toString())); }
+            public void validateSyncHome(Optional<Task> current,Optional<UUID> list){new TaskProviderHomes(ServerStore.this).validate(current,list);}
+            public List<TaskList> synchronizedTaskLists(){return new TaskProviderHomes(ServerStore.this).lists();}
             public Task save(Task value) { check(); return ServerStore.this.save("TASK",value); }
             public void delete(TaskId id) {
                 check();var task=get("TASK",id.value(),Task.class).orElseThrow(ApiFailure::notFound);

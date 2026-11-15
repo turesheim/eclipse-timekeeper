@@ -51,6 +51,14 @@ final class TaskCloudPull {
         String repository=repository(scan.account(),scan.list());
         var result=object().put("created",0).put("updated",0).put("unchanged",0);var pending=result.putArray("pending");
         var sync=new TaskSync(store,receipts);var remaining=new ArrayList<>(scan.tasks());
+        boolean automatic=store.find(TaskProviderConnections.AUTH,connectionId).map(auth->auth.path("automatic").asBoolean()).orElse(false);
+        if(automatic&&acknowledgedScan&&scan.full()){
+            var observed=new HashSet<String>();for(var remote:scan.tasks())observed.add(remote.id());
+            for(var task:store.list("TASK"))for(var ref:task.path("externalReferences"))if(ref.path("providerId").asText().equals(scan.provider())&&ref.path("repositoryId").asText().equals(repository)&&ref.path("taskListId").asText().equals(listId.toString())&&!observed.contains(ref.path("externalId").asText())&&ref.path("baseline").hasNonNull("capturedAt")&&Instant.parse(ref.path("baseline").path("capturedAt").asText()).isBefore(scan.observedAt())){
+                var evidence=object().put("id",ref.path("externalId").asText());if(scan.provider().equals("google"))evidence.put("deleted",true);else evidence.putObject("@removed").put("reason","deleted");
+                remaining.add(new TaskCloudProvider(TaskProviderConfiguration.provider(scan.provider())).normalize(evidence));
+            }
+        }
         remaining.sort(Comparator.comparing((TaskCloudProvider.RemoteTask task)->Objects.toString(task.position(),"" )).thenComparing(TaskCloudProvider.RemoteTask::id));
         var ordinal=ordinals(scan);
         var blocked=new HashSet<String>();
@@ -81,11 +89,16 @@ final class TaskCloudPull {
                 var preview=object().put("connectionId",connectionId.toString()).put("listId",listId.toString()).put("sourceState","HEALTHY").put("scanComplete",acknowledgedScan);
                 preview.putArray("items").add(item);inputs.validate("TaskSyncPreviewInput",preview);
                 var decision=sync.preview(preview,acknowledgedScan).body().path("items").get(0);String status=decision.path("status").asText();
-                if(Set.of("CREATE","UPDATE","KEEP_LOCAL","UNCHANGED").contains(status)){
+                if(automatic&&status.equals("DELETE_REVIEW")&&existing.isPresent()&&existing.get().path("externalReferences").size()==1){
+                    var task=(Task)decode("TASK",existing.get());boolean dependents=store.list("TASK").stream().anyMatch(child->!child.path("deleted").asBoolean()&&child.path("parentTaskId").asText().equals(task.id().value().toString()));
+                    if(!dependents){store.providerObservation(()->{store.service().deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(task.id(),task.version()));return null;});remember(store.find("TASK",task.id().value()).orElseThrow(),scan.provider(),repository,remote);iterator.remove();progressed=true;result.put("updated",result.path("updated").asInt()+1);continue;}
+                }
+                if(Set.of("CREATE","UPDATE","KEEP_LOCAL","UNCHANGED").contains(status)||automatic&&status.equals("CONFLICT")){
                     var input=object().put("connectionId",connectionId.toString()).put("listId",listId.toString()).put("sourceState","HEALTHY");input.set("item",item);
                     if(status.equals("CREATE")&&project!=null&&!fields.hasNonNull("parentTaskId"))input.put("projectId",project.toString());
                     inputs.validate(status.equals("CREATE")?"TaskSyncImportInput":"TaskSyncApplyInput",input);
-                    var applied=status.equals("CREATE")?sync.importTask(input):sync.apply(input,decision.path("taskEtag").asText());
+                    var applied=status.equals("CREATE")?sync.importTask(input):automatic?sync.mergeIndependent(input,decision.path("taskEtag").asText()):sync.apply(input,decision.path("taskEtag").asText());
+                    if(status.equals("CONFLICT")){var row=((ObjectNode)decision).deepCopy();row.set("observation",item.deepCopy());pending.add(row);blocked.add(remote.id());}
                     remember(applied.body(),scan.provider(),repository,remote);
                     String count=status.equals("CREATE")?"created":status.equals("UPDATE")?"updated":"unchanged";result.put(count,result.path(count).asInt()+1);
                 }else if(!status.equals("IGNORE_DELETED")){

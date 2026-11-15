@@ -275,7 +275,15 @@ counts of timed alerts. The connector must check its effective per-item limits
 before export; it must retain extra alerts locally and report the restriction,
 never silently select one, or convert an unsupported kind to a timed reminder.
 
-## Remote absence and deletion
+## Automatic subscriptions
+
+[Automatic task synchronization](AUTOMATIC-TASK-SYNC.md) supersedes the manual
+review boundary below for explicitly enabled subscriptions. Safe complete-scan
+deletions become retained tombstones automatically; same-field and delete/edit
+conflicts remain specific decisions. The old endpoints remain for compatibility
+and exceptional identity recovery. Unconfirmed previews are never sent.
+
+## Remote absence and deletion (legacy manual mode)
 
 A failed provider request, expired credentials, changed permissions, or a
 missing list must set the corresponding unhealthy source state. Keep tasks,

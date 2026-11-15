@@ -118,7 +118,7 @@ class TaskProviderWritesTest {
         var sending=tx(f,()->{writes().queueAutomatic(claim);var next=writes().next(claim);return writes().sending(claim,uuid(next.get("id")),remote("Original","\"g1\""));});UUID id=uuid(sending.get("id"));
         var paused=tx(f,()->connections().pause(f.connection(),true,etag(connections().view(f.connection()))));
         tx(f,()->{writes().acknowledge(id,sending.path("attempt").asText(),remote("Accepted during pause","\"g2\""));writes().reconcile(claim,id);return null;});assertEquals("ACK_REVIEW",job(f,id).path("state").asText());
-        tx(f,()->connections().pause(f.connection(),false,etag(paused)));var resumed=reclaim(f);
+        tx(f,()->connections().pause(f.connection(),false,etag(connections().view(f.connection()))));var resumed=reclaim(f);
         writes().drain(resumed,"private-access",writer(request->{assertEquals("GET",request.method());return reply(200,raw("Accepted during pause","\"g2\""));}));
         assertEquals("DONE",job(f,id).path("state").asText());assertEquals("Accepted during pause",baseline(f));
     }
@@ -134,6 +134,93 @@ class TaskProviderWritesTest {
         tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(automatic);scans.acknowledge(automatic,scan,new TaskCloudProvider.Page<>(List.of(remote("Previously sent","\"g2\"")),null,null));scans.reconcile(automatic);return null;});
         writes().drain(automatic,"private-access",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Previously sent","\"g2\""));patches.incrementAndGet();return reply(200,raw("Current edit","\"g3\""));}));
         assertEquals(1,patches.get());assertEquals("Current edit",baseline(f));
+    }
+    @Test void nativeListCreationRunsParentsFirstAndNeverExportsProjectNeighbours(){
+        var f=fixture();var claim=automatic(f);
+        var ids=tx(f,()->{
+            var project=store.service().createProject(new CreateProject("Shared local project"));
+            store.service().createTask(new CreateTask(Optional.of(project.id()),"Unrelated neighbour",Optional.empty()));
+            var parent=store.service().createTask(new CreateTask(Optional.of(project.id()),Optional.empty(),"Native parent",Optional.empty(),Optional.of(f.list())));
+            var child=store.service().createTask(new CreateTask(parent.projectId(),Optional.of(parent.id()),"Native child",Optional.empty()));return List.of(parent.id().value(),child.id().value());
+        });
+        var posts=new AtomicInteger();writes().drain(claim,"private-access",writer(request->{
+            assertEquals("POST",request.method());int n=posts.incrementAndGet();assertEquals(n==1?"Native parent":"Native child",body(request).path("title").asText());
+            if(n==2)assertEquals("parent=created-parent",request.uri().getRawQuery());
+            return reply(200,raw(n==1?"Native parent":"Native child","created-etag").put("id",n==1?"created-parent":"created-child").put("notes","").putNull("due"));
+        }));
+        assertEquals(2,posts.get());tx(f,()->{for(UUID id:ids){var task=store.find("TASK",id).orElseThrow();assertEquals(1,task.path("externalReferences").size());assertEquals(f.list().toString(),task.path("syncListId").asText());}assertEquals(4,store.service().tasks().size());return null;});
+    }
+    @Test void deliberateDeletionRetainsWorkedTimeAndSendsOneConditionalDelete(){
+        var f=fixture();var claim=automatic(f);
+        tx(f,()->{var now=store.now();store.service().createActivity(new CreateActivity(new TaskId(f.task()),new OwnerId(f.owner()),now.minusSeconds(120),Optional.of(now.minusSeconds(60)),"Worked before deletion",Set.of()));return null;});delete(f);
+        var deletes=new AtomicInteger();writes().drain(claim,"private-access",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Original","\"g1\""));assertEquals("DELETE",request.method());assertEquals("\"g1\"",request.headers().firstValue("If-Match").orElseThrow());deletes.incrementAndGet();return reply(204,null);}));
+        assertEquals(1,deletes.get());assertTrue(task(f).path("deleted").asBoolean());
+        tx(f,()->{assertTrue(store.service().tasks().isEmpty());assertTrue(store.service().task(new TaskId(f.task())).isEmpty());assertEquals(1,store.list("ACTIVITY").size());assertEquals(1,store.list("TASK_TOMBSTONE").size());return null;});
+        writes().drain(claim,"private-access",writer(request->{throw new AssertionError("Acknowledged deletion cannot be sent twice");}));
+    }
+    @Test void aRemoteEditAfterLocalDeletionConflictsAndAChoiceResumesAutomatically(){
+        var f=fixture();var claim=automatic(f);delete(f);
+        tx(f,()->{
+            var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(remote("Remote edit","\"g2\"")),null,null));var result=scans.reconcile(claim);assertEquals("DELETE_CONFLICT",result.path("pending").get(0).path("status").asText());
+            writes().queueAutomatic(claim);assertTrue(store.list(TaskProviderWrites.KIND).isEmpty());
+            var reviews=new TaskProviderReviews(store,receipts,inputs);var row=reviews.list(f.connection(),f.list(),null).path("items").get(0);assertTrue(row.path("canResolve").asBoolean());
+            reviews.resolve(f.connection(),f.list(),f.task(),row.path("reviewEtag").asText(),object().put("decision","LOCAL").put("taskEtag",row.path("taskEtag").asText()));return null;
+        });
+        var deletes=new AtomicInteger();writes().drain(claim,"private-access",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Remote edit","\"g2\""));assertEquals("DELETE",request.method());assertEquals("\"g2\"",request.headers().firstValue("If-Match").orElseThrow());deletes.incrementAndGet();return reply(204,null);}));assertEquals(1,deletes.get());
+    }
+    @Test void aSameFieldConflictStillMergesIndependentRemoteNotes(){
+        var f=fixture();var claim=automatic(f);rename(f,"Local title");
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);var changed=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Remote title","\"g2\"").put("notes","Independent notes"));
+            scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(changed),null,null));var result=scans.reconcile(claim);assertEquals("CONFLICT",result.path("pending").get(0).path("status").asText());return null;});
+        assertEquals("Local title",task(f).path("summary").asText());assertEquals("Independent notes",task(f).path("body").path("content").asText());
+    }
+    @Test void onlyAFinishedHealthyFullScanCanInferAbsenceAndRetainItsDeletionHistory(){
+        var f=fixture();var claim=automatic(f);
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(),"next-page",null));assertThrows(ApiFailure.class,()->scans.reconcile(claim));assertFalse(store.find("TASK",f.task()).orElseThrow().path("deleted").asBoolean());return null;});
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=(ObjectNode)store.find(TaskProviderScans.SCAN,f.list()).orElseThrow();scan.put("full",true);connections().save(TaskProviderScans.SCAN,scan);scan=(ObjectNode)store.find(TaskProviderScans.SCAN,f.list()).orElseThrow();scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(),null,null));assertTrue(scans.reconcile(claim).path("complete").asBoolean());return null;});
+        assertTrue(task(f).path("deleted").asBoolean());
+    }
+    @Test void microsoftSubscriptionImportsAndAutomaticallyWritesItsDistinctFields(){
+        String owner="microsoft-writes-"+UUID.randomUUID();var original=object().put("id","remote-task").put("title","Original").put("status","notStarted").put("importance","normal").put("@odata.etag","W/\"ms1\"");original.putObject("body").put("contentType","html").put("content","<p>Original</p>");original.putNull("startDateTime").putNull("dueDateTime").putArray("categories");
+        var f=store.transaction(owner,()->{
+            var settings=new TaskProviderOAuth.Settings("client","secret","https://example.invalid/web/task-provider-callback.html");var started=connections().begin(TaskCloudProvider.Provider.MICROSOFT,settings,"browser",true);
+            String state=Arrays.stream(URI.create(started.path("authorizationUrl").asText()).getRawQuery().split("&")).filter(value->value.startsWith("state=")).map(value->URLDecoder.decode(value.substring(6),StandardCharsets.UTF_8)).findFirst().orElseThrow();
+            var connection=connections().connect(connections().consume(state,"browser"),settings,new TaskCloudProvider.Account("account","Microsoft"),new TaskProviderOAuth.Tokens("access","refresh",store.now().plusSeconds(3600),Set.of("User.Read","Tasks.ReadWrite")),List.of(new TaskCloudProvider.RemoteList("remote-list","Work","STANDARD",false,true,object().put("id","remote-list").put("displayName","Work"))));
+            UUID id=uuid(connection.get("id"));connections().select(id,List.of("remote-list"),null,etag(connection),null,true);UUID list=uuid(store.list("TASK_LIST").getFirst().get("id"));var claim=connections().claim(id,false);var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(new TaskCloudProvider(TaskCloudProvider.Provider.MICROSOFT).normalize(original)),null,null));scans.reconcile(claim);var auth=connections().required(id);auth.putNull("lease").putNull("leaseUntil");connections().save(TaskProviderConnections.AUTH,auth);return new Fixture(owner,id,list,uuid(store.list("TASK").getFirst().get("id")));
+        });
+        rename(f,"Microsoft edit");var patches=new AtomicInteger();var claim=claim(f);
+        writes().drain(claim,"access",new MicrosoftTasksWriter(new TaskProviderHttp(Set.of("graph.microsoft.com"),request->{assertThrows(IllegalStateException.class,()->store.owner());if(request.method().equals("GET"))return reply(200,original);patches.incrementAndGet();assertEquals("W/\"ms1\"",request.headers().firstValue("If-Match").orElseThrow());assertEquals(object().put("title","Microsoft edit"),body(request));return reply(200,original.deepCopy().put("title","Microsoft edit").put("@odata.etag","W/\"ms2\""));})));
+        assertEquals(1,patches.get());assertEquals("Microsoft edit",baseline(f));assertEquals("<p>Original</p>",task(f).path("body").path("content").asText());
+    }
+    @Test void aProvenGoogleListMoveRetainsTheNativeIdAndAnAliasForTheOldIdentity(){
+        var f=fixture();var claim=automatic(f);
+        var destination=tx(f,()->{
+            var auth=connections().required(f.connection());auth.withArray("catalog").add(object().put("id","second-list").put("name","Second").put("kind","STANDARD").put("shared",false).put("owner",true).set("observation",object().put("id","second-list").put("title","Second")));connections().save(TaskProviderConnections.AUTH,auth);
+            connections().select(f.connection(),List.of("remote-list","second-list"),null,etag(connections().view(f.connection())),null,true);
+            return store.list("TASK_LIST").stream().filter(list->list.path("remoteListId").asText().equals("second-list")).map(list->uuid(list.get("id"))).findFirst().orElseThrow();
+        });
+        var moving=reclaim(f);
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(moving);scans.acknowledge(moving,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(moving);var task=(Task)decode("TASK",store.find("TASK",f.task()).orElseThrow());store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),task.summary(),task.url(),Optional.of(Optional.of(destination))));return null;});
+        var moves=new AtomicInteger();writes().drain(moving,"token",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Original","\"g1\""));assertEquals("POST",request.method());assertTrue(request.uri().getPath().endsWith("/move"));assertEquals("destinationTasklist=second-list",request.uri().getRawQuery());assertEquals("\"g1\"",request.headers().firstValue("If-Match").orElseThrow());moves.incrementAndGet();return reply(200,raw("Original","\"moved\"").put("id","moved-id"));}));
+        assertEquals(1,moves.get());var task=task(f);assertEquals(f.task().toString(),task.path("id").asText());assertEquals(destination.toString(),task.path("syncListId").asText());assertEquals("moved-id",task.path("externalReferences").get(0).path("externalId").asText());assertEquals("remote-task",task.path("externalAliases").get(0).path("externalId").asText());
+    }
+    @Test void anUnknownGoogleMoveIsNeverRepeatedAndRequiresAnExplicitDestinationIdentity(){
+        var f=fixture();var claim=automatic(f);
+        var destination=tx(f,()->{
+            var auth=connections().required(f.connection());auth.withArray("catalog").add(object().put("id","second-list").put("name","Second").put("kind","STANDARD").put("shared",false).put("owner",true).set("observation",object().put("id","second-list").put("title","Second")));connections().save(TaskProviderConnections.AUTH,auth);
+            connections().select(f.connection(),List.of("remote-list","second-list"),null,etag(connections().view(f.connection())),null,true);
+            return store.list("TASK_LIST").stream().filter(list->list.path("remoteListId").asText().equals("second-list")).map(list->uuid(list.get("id"))).findFirst().orElseThrow();
+        });
+        var moving=reclaim(f);
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(moving);scans.acknowledge(moving,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(moving);var task=(Task)decode("TASK",store.find("TASK",f.task()).orElseThrow());store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),task.summary(),task.url(),Optional.of(Optional.of(destination))));return null;});
+        var requests=new AtomicInteger();assertThrows(TaskProviderHttp.Failure.class,()->writes().drain(moving,"token",writer(request->{if(request.method().equals("GET"))return reply(200,raw("Original","\"g1\""));requests.incrementAndGet();throw new IOException("Lost move reply");})));
+        var job=tx(f,()->store.list(TaskProviderWrites.KIND).getFirst());UUID write=uuid(job.get("id"));assertEquals("UNKNOWN",job.path("state").asText());
+        var destinationClaim=tx(f,()->{var auth=connections().required(f.connection());auth.putNull("lease").putNull("leaseUntil").put("roundIndex",1).put("nextRefresh",store.now().toString());connections().save(TaskProviderConnections.AUTH,auth);return connections().claim(f.connection(),false);});assertEquals(destination,destinationClaim.list());
+        tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(destinationClaim);var remote=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(raw("Original","\"moved\"").put("id","moved-id"));scans.acknowledge(destinationClaim,scan,new TaskCloudProvider.Page<>(List.of(remote),null,null));scans.reconcile(destinationClaim);
+            assertEquals(1,store.list("TASK").size());var choices=writes().candidates(f.connection(),write,null);assertEquals(1,choices.path("count").asInt());var visible=writes().get(f.connection(),write);assertTrue(visible.path("canIdentify").asBoolean());
+            writes().identify(f.connection(),write,etag(visible),object().put("externalId","moved-id").put("scanEtag",choices.path("scanEtag").asText()).put("taskEtag",etag(store.find("TASK",f.task()).orElseThrow())));return null;
+        });
+        assertEquals(1,requests.get());assertEquals("moved-id",task(f).path("externalReferences").get(0).path("externalId").asText());assertEquals("RECONCILED",job(f,write).path("state").asText());
     }
     private TaskProviderHttp.Reply reply(int status,JsonNode body){return new TaskProviderHttp.Reply(status,Map.of(),body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8));}
     private GoogleTasksWriter writer(TaskProviderHttp.Transport transport){return new GoogleTasksWriter(new TaskProviderHttp(Set.of("tasks.googleapis.com"),request->{assertThrows(IllegalStateException.class,()->store.owner());return transport.send(request);}));}

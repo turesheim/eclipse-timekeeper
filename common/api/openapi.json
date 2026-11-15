@@ -22010,6 +22010,45 @@
           }
         }
       }
+    },
+    "/task-sync/lists": {
+      "get": {
+        "operationId": "synchronizedTaskLists",
+        "summary": "List writable subscribed task homes for the ordinary task editor",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owned list choices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        },
+        "x-required-permission": "read",
+        "tags": [
+          "Task synchronization"
+        ]
+      }
     }
   },
   "components": {
@@ -22225,6 +22264,61 @@
                 "type": "null"
               }
             ]
+          },
+          "syncListId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Explicit provider task-list home, independent of project. Omitted on update retains membership; null unlinks both copies without deleting them."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -22731,6 +22825,18 @@
             "$ref": "#/components/schemas/VaultEntry",
             "readOnly": true,
             "description": "Current source note, included only by listTasks with includeNoteSources=true. Absent when the task has no available source note."
+          },
+          "syncListId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Explicit provider task-list home, independent of project. Omitted on update retains membership; null unlinks both copies without deleting them."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Retained historical task, hidden from active task collections."
           }
         },
         "required": [
@@ -23379,6 +23485,18 @@
               }
             ],
             "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
+          },
+          "syncListId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Explicit provider task-list home, independent of project. Omitted on update retains membership; null unlinks both copies without deleting them."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Retained historical task, hidden from active task collections."
           }
         },
         "required": [
@@ -23982,6 +24100,14 @@
               }
             ],
             "description": "Optional direct business client for a task without a project. Project tasks inherit their project client. Omitted on legacy writes to preserve the direct assignment."
+          },
+          "syncListId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Explicit provider task-list home, independent of project. Omitted on update retains membership; null unlinks both copies without deleting them."
           }
         },
         "required": [
@@ -38486,6 +38612,11 @@
               ],
               "additionalProperties": false
             }
+          },
+          "writeExceptions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Task-specific uncertain or conflicting write outcomes; healthy queued work is excluded."
           }
         },
         "required": [
@@ -38774,7 +38905,8 @@
             "enum": [
               "CREATE",
               "UPDATE",
-              "DELETE"
+              "DELETE",
+              "MOVE"
             ]
           },
           "state": {
@@ -38919,6 +39051,10 @@
           },
           "canLeaveUnresolved": {
             "type": "boolean"
+          },
+          "canIdentify": {
+            "type": "boolean",
+            "description": "An uncertain creation or move requires an explicit identity choice from a complete owned destination scan."
           }
         },
         "additionalProperties": false,
@@ -39000,7 +39136,8 @@
             "enum": [
               "CREATE",
               "UPDATE",
-              "DELETE"
+              "DELETE",
+              "MOVE"
             ]
           },
           "state": {

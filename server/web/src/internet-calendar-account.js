@@ -5,9 +5,9 @@ import {node} from './account-ui.js';
 import {calendarSourceFailure} from './calendar-source-status.js';
 
 /** Calendar choices have their own draft and version; task-list saves cannot overwrite them. */
-export function internetCalendarAccount(view,panel,{reload,clients,zone,controls:allControls}){
+export function internetCalendarAccount(view,panel,{reload,clients,zone,controls:allControls,onSave}){
   const root=node('section',undefined,'internet-connection-section'),heading=node('h4',t('internet_accounts.calendars'),'h5'),status=node('p','','hint small'),error=node('p','','alert alert-warning'),form=node('form'),choices=node('div'),feedback=node('p','','form-feedback'),save=node('button',t('internet_accounts.save_calendars'),'btn btn-primary');
-  feedback.setAttribute('role','status');status.setAttribute('role','status');save.type='submit';form.append(choices,feedback,save);root.append(heading,status,error,form);panel.append(root);
+  feedback.setAttribute('role','status');status.setAttribute('role','status');save.type='submit';form.append(choices,feedback);if(!onSave)form.append(save);root.append(heading,status,error,form);panel.append(root);
   let data=null,draftVersion=0,signature='';
   const controls=()=>{
     const enabled=view.canWrite&&!view.busy&&!view.uncertain&&data?.enabled;

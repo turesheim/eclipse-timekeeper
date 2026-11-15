@@ -30,7 +30,7 @@ public class TimekeeperResource {
     private Response tx(Supplier<ApiReplies> work) { return store.authenticated(identity,() -> work.get().response()); }
     private static ApiReplies json(JsonNode value) { return new ApiReplies(200,value,null,null); }
     private static ApiReplies empty() { return new ApiReplies(204,null,null,null); }
-    private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }
+    private JsonNode required(String type,UUID id) { return store.find(type,id).filter(value->!type.equals("TASK")||!value.path("deleted").asBoolean()).orElseThrow(ApiFailure::notFound); }
     private ExternalTaskReference checkedReference(ExternalTaskReference reference) {
         reference.providerData().ifPresent(data -> checkedProviderData(reference.providerId(),data));
         checkedLocation(reference.providerId(),reference.taskListId(),reference.sectionId());
@@ -150,7 +150,7 @@ public class TimekeeperResource {
             }
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
-                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),checkedReferences(input.get("externalReferences")),planning(input),checklist(input.get("checklistItems")),timing(input),importance(input),body(input),input.path("siblingOrder").asInt(0),aliases(input.get("externalAliases")),recurrence(input.get("recurrence")),reminders(input.get("reminders")),metadata(input.get("metadata"))));
+                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),checkedReferences(input.get("externalReferences")),planning(input),checklist(input.get("checklistItems")),timing(input),importance(input),body(input),input.path("siblingOrder").asInt(0),aliases(input.get("externalAliases")),recurrence(input.get("recurrence")),reminders(input.get("reminders")),metadata(input.get("metadata")),optionalText(input.get("syncListId")).map(UUID::fromString)));
                 case "LABEL" -> service.createLabel(new CreateLabel(input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.createActivity(new CreateActivity(optionalText(input.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
                 case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
@@ -158,6 +158,10 @@ public class TimekeeperResource {
             };
             JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
         });
+    }
+    @GET @Path("/task-sync/lists") public Response synchronizedTaskLists(){
+        ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");
+        return tx(()->{var result=object().put("revision",store.revision());var rows=result.putArray("items");store.service().synchronizedTaskLists().forEach(list->rows.add(snapshot(store.owner(),list)));result.putNull("nextCursor");return json(result);});
     }
     @PUT @Path("/task-connections/{id}/capabilities") public Response updateTaskConnectionCapabilities(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskCapabilities",body);ContractInputs.queries(uri.getQueryParameters());
@@ -289,7 +293,7 @@ public class TimekeeperResource {
             }
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.updateProject(new UpdateProject(new ProjectId(key),version,input.get("name").asText()));
-                case "TASK" -> service.updateTask(new UpdateTask(new TaskId(key),version,project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url"))));
+                case "TASK" -> service.updateTask(new UpdateTask(new TaskId(key),version,project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),input.has("syncListId")?Optional.of(optionalText(input.get("syncListId")).map(UUID::fromString)):Optional.empty()));
                 case "LABEL" -> service.updateLabel(new UpdateLabel(new LabelId(key),version,input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.updateActivity(new UpdateActivity(new ActivityId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds"))));
                 case "WORK_SESSION" -> store.workSessionService().updateWorkSession(new UpdateWorkSession(new WorkSessionId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
@@ -324,9 +328,19 @@ public class TimekeeperResource {
             var task=(Task)value;
             if(input.has("priority")&&!task.importance().priority().name().equals(input.path("priority").asText()))
                 task=store.service().updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),new TaskImportance(TaskPriority.valueOf(input.path("priority").asText()),task.importance().flagged(),task.importance().urgent())));
-            if(input.has("due")) {
-                var proposed=object();proposed.set("due",input.get("due"));proposed.set("start",resourceSnapshot(task).get("start"));var next=timing(proposed);
+            if(input.has("start")||input.has("due")) {
+                var proposed=resourceSnapshot(task).deepCopy();if(input.has("start"))proposed.set("start",input.get("start"));if(input.has("due"))proposed.set("due",input.get("due"));var next=timing(proposed);
                 if(!task.timing().equals(next))task=store.service().updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),next));
+            }
+            if(input.has("body")&&!task.body().equals(body(input)))task=store.service().updateTaskBody(new UpdateTaskBody(task.id(),task.version(),body(input)));
+            if(input.has("status")||input.has("scheduledDate")||input.has("completedAt")){
+                var proposed=resourceSnapshot(task).deepCopy();for(String field:List.of("status","scheduledDate","completedAt"))if(input.has(field))proposed.set(field,input.get(field));
+                if(!proposed.path("status").asText().equals("COMPLETED"))proposed.putNull("completedAt");var next=planning(proposed);
+                if(!task.planning().equals(next))task=store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),next));
+            }
+            if(input.has("siblingOrder")&&task.siblingOrder()!=input.path("siblingOrder").asInt())task=store.service().updateTaskOrder(new UpdateTaskOrder(task.id(),task.version(),input.path("siblingOrder").asInt()));
+            if(input.has("metadata")){
+                var proposed=metadata(input.get("metadata"));if(!task.metadata().equals(proposed))task=store.service().updateTaskMetadata(new UpdateTaskMetadata(task.id(),task.version(),proposed));
             }
             return store.clientDetails(type,task.id().value(),input);
         }
@@ -519,7 +533,7 @@ public class TimekeeperResource {
             boolean noteSources=type.equals("TASK")&&query.containsKey("includeNoteSources");
             if(noteSources&&!Set.of("true","false").contains(query.getFirst("includeNoteSources")))throw ApiFailure.badRequest();
             var origins=noteSources&&query.getFirst("includeNoteSources").equals("true")?new NoteTasks(store).origins():Map.<String,ObjectNode>of();
-            validateFilters(query);List<JsonNode> values;
+            validateFilters(query,type.equals("ACTIVITY"));List<JsonNode> values;
             if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)resourceSnapshot(value)).toList();
             else values=store.list(type).stream().filter(value -> {
                 if(type.equals("TASK_TOMBSTONE")) return true;
@@ -531,6 +545,7 @@ public class TimekeeperResource {
                 if(query.containsKey("labelId") && !labels(value.path("labelIds")).contains(new LabelId(ContractInputs.pathId(query.getFirst("labelId"))))) return false;
                 if(type.equals("WORK_SESSION") && query.containsKey("projectId") && !value.path("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;
                 if(type.equals("TASK")) {
+                    if(value.path("deleted").asBoolean())return false;
                     if(query.containsKey("projectId") && !value.get("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;
                     if(query.containsKey("parentTaskId") && !value.get("parentTaskId").asText().equals(ContractInputs.pathId(query.getFirst("parentTaskId")).toString())) return false;
                     if(query.containsKey("unassigned")) {String flag=query.getFirst("unassigned");if(!Set.of("true","false").contains(flag)) throw ApiFailure.badRequest();if(flag.equals("true") && !value.get("projectId").isNull()) return false;}
@@ -547,13 +562,15 @@ public class TimekeeperResource {
             return json(pages.page(type,values,canonical(filters),limit,query.getFirst("cursor")));
         });
     }
-    private void validateFilters(MultivaluedMap<String,String> query) {
-        for(var entry:Map.of("clientId","CLIENT","connectionId","TASK_CONNECTION","listId","TASK_LIST","taskId","TASK","projectId","PROJECT","parentTaskId","TASK","labelId","LABEL").entrySet()) if(query.containsKey(entry.getKey())) required(entry.getValue(),ContractInputs.pathId(query.getFirst(entry.getKey())));
-        if("true".equals(query.getFirst("unassigned")) && query.containsKey("projectId")) throw ApiFailure.validation();
+    private void validateFilters(MultivaluedMap<String,String> query){validateFilters(query,false);}
+    private void validateFilters(MultivaluedMap<String,String> query,boolean history) {
+        for(var entry:Map.of("clientId","CLIENT","connectionId","TASK_CONNECTION","listId","TASK_LIST","taskId","TASK","projectId","PROJECT","parentTaskId","TASK","labelId","LABEL").entrySet())if(query.containsKey(entry.getKey())){
+            UUID id=ContractInputs.pathId(query.getFirst(entry.getKey()));if(history&&entry.getKey().equals("taskId"))store.find("TASK",id).orElseThrow(ApiFailure::notFound);else required(entry.getValue(),id);
+        }
         if(query.containsKey("unassigned") && !Set.of("true","false").contains(query.getFirst("unassigned"))) throw ApiFailure.badRequest();
     }
     private List<Activity> activities(MultivaluedMap<String,String> query) {
-        validateFilters(query);Instant from=ContractInputs.instant(query.getFirst("from")),to=ContractInputs.instant(query.getFirst("to"));if(!to.isAfter(from)) throw ApiFailure.validation();
+        validateFilters(query,true);Instant from=ContractInputs.instant(query.getFirst("from")),to=ContractInputs.instant(query.getFirst("to"));if(!to.isAfter(from)) throw ApiFailure.validation();
         var task=Optional.ofNullable(query.getFirst("taskId")).map(ContractInputs::pathId).map(TaskId::new);
         var project=Optional.ofNullable(query.getFirst("projectId")).map(ContractInputs::pathId).map(ProjectId::new);
         var report=store.service().activities(new ActivityQuery(from,to,Optional.of(new OwnerId(store.owner())),task,project,ZoneId.of("UTC")));

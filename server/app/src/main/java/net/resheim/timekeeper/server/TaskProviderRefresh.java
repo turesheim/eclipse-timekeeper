@@ -99,10 +99,10 @@ class TaskProviderRefresh {
                 }
                 if(scan==null)return;
                 outcome=store.transaction(claim.owner(),()->scans.reconcile(claim));
-                if(claim.provider()==TaskCloudProvider.Provider.GOOGLE){
+                {
                     var writes=new TaskProviderWrites(store,receipts,inputs);
                     store.transaction(claim.owner(),()->{writes.queueAutomatic(claim);return null;});
-                    writes.drain(claim,tokens.access(),clients.googleWriter());
+                    writes.drain(claim,tokens.access(),clients.writer(claim.provider()));
                 }
             }
         }catch(TaskProviderHttp.Failure failure){error=failure.getMessage();retry=failure.retryAfterSeconds;}
