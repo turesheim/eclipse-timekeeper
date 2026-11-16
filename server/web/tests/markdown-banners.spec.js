@@ -310,7 +310,9 @@ test('the selected daily note loads before serialized month metadata reads',asyn
 
 test('returning to a clean daily note refreshes peer edits without changing source mode',async({page,request})=>{
   const {api,put}=await fresh(page,request);const date=followingMonth(await page.locator('#today-date').inputValue()),entry=await put('journal/'+date+'.md','# Before peer edit\n');
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Before peer edit');await root.getByRole('button',{name:'Markdown source',exact:true}).click();
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Before peer edit');
+  // Read the peer validator after the automatic metadata write has settled.
+  await expect(banner(root).locator('img')).toHaveAttribute('src',/^blob:/);await root.getByRole('button',{name:'Markdown source',exact:true}).click();
   const current=await api('GET','/notes/entries/'+entry.id+'/content');await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from('# After peer edit\n'),{'Content-Type':'application/octet-stream','If-Match':current.headers().etag});
   await page.locator('[data-tab=today]').click();await expect(root.locator('textarea')).toHaveValue('# After peer edit\n');await expect(root.getByRole('button',{name:'Markdown source',exact:true})).toHaveAttribute('aria-pressed','true');
 });
