@@ -5,7 +5,7 @@ import {SidebarResize} from './sidebar-resize.js';
 import {iconButton,icon} from './icons.js';
 import {noteIcon} from './note-presentation.js';
 import {noteTitle} from './note-title.js';
-import {vaultNoteNavigation} from './vault-editor-resources.js';
+import {vaultNoteNavigation,vaultEditorResources} from './vault-editor-resources.js';
 import {calendarDescription} from './tooltip-description.js';
 import {renderMarkdown} from './assets/milkdown/markdown-preview.js';
 import {taskRows,taskMatches} from './tasks-model.js';
@@ -50,8 +50,9 @@ export class TasksView {
     this.edit=button(t('ui.edit_task'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onEdit(row.id);}});
     this.track=button(t('ui.start_tracking'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onTrack(row.id);}},'start');
     this.remove=button(t('tasks.delete'),()=>{const row=this.rows?.find(row=>row.key===this.detailKey);if(row?.source==='task'&&this.writable){this.detail.close();callbacks.onDelete(row.id);}},'delete');this.remove.className='btn btn-outline-danger';const detailActions=node('div',undefined,'dialog-actions');detailActions.append(this.track,this.remove,this.edit);
-    this.detail.append(close,this.detailTitle,this.detailBody,detailActions);root.append(this.detail);
-    this.detail.addEventListener('close',()=>{++this.detailGeneration;if(this.visible&&!document.querySelector('dialog[open]'))this.rowElements.get(this.detailKey)?.button.focus();});this.detailGeneration=0;
+    this.detail.append(close,this.detailTitle,this.detailBody,detailActions);(root.closest('#workspace')||root).append(this.detail);
+    this.detailImages=[];
+    this.detail.addEventListener('close',()=>{if(this.detail.open)return;++this.detailGeneration;this.clearDetailImages();const origin=this.detailOrigin;this.detailOrigin=null;if(origin?.isConnected&&!document.querySelector('dialog[open]'))origin.focus({preventScroll:true});});this.detailGeneration=0;
     this.controls();
   }
   buildTaskActions(){
@@ -97,7 +98,7 @@ export class TasksView {
     this.data=data;this.session=session;this.connected=connected;this.writable=connected&&writable;this.controls();if(this.visible){this.paint();if(changed||this.catalogZone!==data.profile.data.zoneId)void this.load();}
   }
   show(){this.visible=true;this.paint();void this.load();this.timer??=setInterval(()=>{this.paint();void this.load();},30000);}
-  hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detail.close();this.closeTaskActions();this.bulkDialog.close();if(this.narrow.matches)this.navigationState(false);this.controls();}
+  hide(){this.visible=false;clearInterval(this.timer);this.timer=null;this.controller?.abort();this.controller=null;this.loading=false;this.reloadRequested=false;++this.generation;this.detailOrigin=null;this.detail.close();this.closeTaskActions();this.bulkDialog.close();if(this.narrow.matches)this.navigationState(false);this.controls();}
   reset(){this.hide();this.bulk=null;this.bulkTargets=null;this.sidebarActions.reset();this.data=null;this.session=null;this.writable=false;this.sourceTasks=[];this.catalogZone=null;this.rows=[];this.selection={kind:'smart',value:'all'};this.hideCompleted.checked=true;this.pending.clear();this.filterButtons.clear();this.rowElements.clear();for(const group of Object.values(this.groups))group.replaceChildren();this.list.replaceChildren();this.detailBody.replaceChildren();this.detailTitle.textContent='';this.detailKey=null;this.error.hidden=this.warning.hidden=true;this.count.textContent='';this.listTitle.textContent=t('tasks.all');this.error.textContent='';this.visibleLimit=50;this.more.hidden=true;this.controls();}
   async load(){
     if(!this.visible||!this.session||!this.root.offsetParent)return;if(this.loading){this.reloadRequested=true;return;}const session=this.session,current=++this.generation,zone=this.data.profile.data.zoneId;this.controller=new AbortController();const signal=this.controller.signal;this.loading=true;this.controls();
@@ -160,8 +161,13 @@ export class TasksView {
     }catch(error){if(session===this.session){this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized?.(error);else await this.callbacks.onChanged();}}
     finally{if(session===this.session){this.pending.delete(key);this.paint();}}
   }
-  async open(key){
-    const row=this.rows.find(value=>value.key===key);if(!row)return;this.detailKey=key;this.detailTitle.replaceChildren(renderMarkdown(row.title,{inline:true,links:false}));this.detailBody.replaceChildren();
+  clearDetailImages(){for(const image of this.detailImages)image.destroy();this.detailImages=[];}
+  openTask(id,origin){if(!this.session||!this.data)return;this.paint();return this.open('task:'+id,origin);}
+  async open(key,origin=this.rowElements.get(key)?.button){
+    const row=this.rows.find(value=>value.key===key);if(!row)return;
+    const session=this.session,current=++this.detailGeneration;this.clearDetailImages();this.detailOrigin=origin;this.detailKey=key;this.detailTitle.replaceChildren(renderMarkdown(row.title,{inline:true,links:false}));this.detailBody.replaceChildren();
+    const resources=vaultEditorResources(()=>session===this.session&&current===this.detailGeneration?session:null,()=>row.record.sourceNote?.path||'task.md');
+    const image=(reference,alt)=>{if(!resources.allowsAsset(reference))return node('span',alt);const preview=resources.image(reference,alt);this.detailImages.push(preview);return preview.dom;};
     const fields=node('dl',undefined,'task-metadata'),add=(label,text)=>{if(text){fields.append(node('dt',t(label)),node('dd',text));}};
     add('tasks.source',row.source==='calendar'?row.record.calendarName:(row.record.externalReferences||[]).map(value=>value.providerId).join(', ')||t('tasks.native'));
     add('ui.client',this.data.clients.find(client=>client.id===row.clientId)?.name||t('ui.unassigned'));add('ui.project',row.projectName);add('tasks.status_label',t('tasks.status.'+row.status));add('tasks.project_categories',row.categories.join(', '));
@@ -177,10 +183,9 @@ export class TasksView {
     else if(row.url){const link=node('a',t('tasks.open_source'));link.href=row.url;link.target='_blank';link.rel='noopener noreferrer';this.detailBody.append(link);}
     if(row.source==='task')this.providerContext(row.record);
     const body=row.source==='calendar'?row.record.description:row.record.body?.content||'';
-    if(body){if(row.source==='calendar'||row.record.body?.format==='HTML')this.detailBody.append(calendarDescription(body));else{const text=node('div',undefined,'task-markdown-body');text.append(renderMarkdown(body));this.detailBody.append(text);}}
+    if(body){const text=node('div',undefined,'task-markdown-body');text.append(row.source==='calendar'?calendarDescription(body):row.record.body?.format==='HTML'?calendarDescription(body,{image}):renderMarkdown(body,{image}));this.detailBody.append(text);}
     this.edit.hidden=this.remove.hidden=row.source!=='task';this.controls();this.detail.showModal();
     if(row.source==='task'){
-      const session=this.session,current=++this.detailGeneration;
       try{
         const reply=await session.request('/tasks/'+row.id+'/note');if(session!==this.session||current!==this.detailGeneration||!this.detail.open)return;
         const entry=reply.data,link=node('a',undefined,'btn btn-outline-secondary task-source-note');link.href='#notes';link.append(icon(noteIcon(entry)),document.createTextNode(t('tasks.source_note',{title:noteTitle(entry)})));

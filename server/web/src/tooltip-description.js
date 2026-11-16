@@ -40,13 +40,16 @@ export function linkedText(text){
   }
   fragment.append(document.createTextNode(text.slice(offset)));return fragment;
 }
-export function calendarDescription(text){
+export function calendarDescription(text,{image}={}){
   const description=document.createElement('div');description.className='tooltip-description';
   // Angle-bracketed plain URLs are not HTML tags.
   if(!/<\/?[a-z][a-z0-9-]*(?:\s[^>]*|\/?)>/i.test(text)){description.append(linkedText(text));return meetingLinks(description);}
   const template=document.createElement('template');template.innerHTML=text;
   const root=template.content.ownerDocument.createElement('div');root.append(template.content);
-  DOMPurify.sanitize(root,options);
+  DOMPurify.sanitize(root,image?{...options,ALLOWED_TAGS:[...options.ALLOWED_TAGS,'img'],ALLOWED_ATTR:[...options.ALLOWED_ATTR,'src','alt']}:options);
+  // The inert document never publishes authored image URLs. Task details can
+  // replace them with authenticated raster previews before entering the page.
+  for(const source of root.querySelectorAll('img')){const alt=source.getAttribute('alt')||'';source.replaceWith(image?.(source.getAttribute('src'),alt)||root.ownerDocument.createTextNode(alt));}
   for(const anchor of root.querySelectorAll('a')){
     const href=anchor.getAttribute('href');let url;
     try{url=new URL(href);}catch{}

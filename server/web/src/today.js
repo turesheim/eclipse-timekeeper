@@ -61,7 +61,7 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){if(this.connected&&this.journal.editor?.date===this.date)void this.journal.refreshClean();this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
@@ -224,13 +224,29 @@ export class TodayView {
     details.showModal();close.focus();
   }
   paintTasks(){
-    const planned=byId('today-planned-tasks');planned.replaceChildren();
+    const planned=byId('today-planned-tasks');
     const tasks=this.data.tasks.filter(task=>task.status!=='COMPLETED');
     this.taskList(planned,tasks.filter(task=>task.scheduledDate===this.date),t('today.no_planned_tasks'));
   }
   taskList(root,tasks,empty){
-    if(!tasks.length){root.append(node('p',empty,'hint'));return;}
-    const list=node('ul',undefined,'today-list');for(const task of tasks){const item=node('li',undefined,'today-task'),presentation=taskPresentation(task),title=node(presentation.url?'a':'span',presentation.title);if(presentation.url){title.href=presentation.url;title.target='_blank';title.rel='noopener noreferrer';}item.append(title);const project=this.data.projects.find(value=>value.id===task.projectId);if(project)item.append(node('span',project.name,'hint'));list.append(item);}root.append(list);
+    this.plannedRows??=new Map();
+    if(!tasks.length){this.plannedRows.clear();root.replaceChildren(node('p',empty,'hint'));return;}
+    let list=root.querySelector(':scope > ul');if(!list){list=node('ul',undefined,'today-list');root.replaceChildren(list);this.plannedRows.clear();}
+    const keys=new Set();
+    tasks.forEach((task,index)=>{
+      keys.add(task.id);let entry=this.plannedRows.get(task.id);
+      if(!entry){
+        const item=node('li',undefined,'today-task'),action=node('button',undefined,'calendar-summary-card today-planned-task'),title=node('strong'),context=node('span');
+        action.type='button';action.dataset.todayTask=task.id;action.append(title,context);item.append(action);
+        action.addEventListener('click',()=>this.callbacks.onOpenTask(task.id,action));entry={item,action,title,context};this.plannedRows.set(task.id,entry);
+      }
+      const presentation=taskPresentation(task),project=this.data.projects.find(value=>value.id===task.projectId),client=this.data.clients.find(value=>value.id===(project?.clientId||task.clientId));
+      if(entry.title.textContent!==presentation.title)entry.title.textContent=presentation.title;
+      entry.action.setAttribute('aria-label',t('tasks.open',{title:presentation.title}));entry.action.style.setProperty('--client-color',clientColors(client?.color).background);
+      const context=[client?.name,project?.name].filter(Boolean).join(' · ');if(entry.context.textContent!==context)entry.context.textContent=context;if(entry.context.hidden!==!context)entry.context.hidden=!context;
+      if(list.children[index]!==entry.item)list.insertBefore(entry.item,list.children[index]||null);
+    });
+    for(const [id,entry]of this.plannedRows)if(!keys.has(id)){entry.item.remove();this.plannedRows.delete(id);}
   }
   async loadEvents(background=false){
     if(!this.visible||!this.scope||!this.date)return;

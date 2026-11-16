@@ -36,6 +36,13 @@ Today combines the daily journal, calendar events and recent notes. Week places
 planned calendar time alongside recorded work. Calendar provides day/month
 navigation and summaries; select a day or item for its details and available actions.
 
+Planned tasks use the same compact cards as the other Today summaries, with the
+client's color along the edge. Select a task to open its details without leaving
+your daily note. The popup includes task links and authenticated attachment images
+from its Markdown or HTML description. Closing it returns focus to the task.
+Read-only sessions can view details and images; editing and tracking require write
+access. Remote image URLs remain text rather than loading external content.
+
 Dates and totals use the account's time zone. Change it under
 **My Account → Profile → Time zone**. An explicitly chosen zone follows the account
 across devices; changing browser language does not change it. Public holidays
