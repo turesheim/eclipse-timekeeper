@@ -82,6 +82,28 @@ test('slow weather and banner writes keep typing editable and preserve newer pro
 
 
 
+for(const destination of ['linked note','another day','another account'])test('a catalog invalidated by capture retries only for the same note: '+destination,async({page,request})=>{
+  test.setTimeout(90000);const {api,put}=await fresh(page,request),date='2026-11-16',target='Capture target';
+  await put('Notes/'+target+'.md','# '+target+'\n\nResolved after metadata capture.\n');const entry=await put('journal/'+date+'.md','Follow [['+target+']].\n');
+  const owner=(await api('GET','/me')).headers()['x-timekeeper-owner'];let releaseWeather,releaseMetadata,releaseLookup,metadataStarted=false,lookupStarted=false,lookups=0;
+  const weatherGate=new Promise(resolve=>releaseWeather=resolve),metadataGate=new Promise(resolve=>releaseMetadata=resolve),lookupGate=new Promise(resolve=>releaseLookup=resolve);
+  await page.route('**/api/v1/daily-banners/*/preview',async route=>{await weatherGate;const day=new URL(route.request().url()).pathname.split('/').at(-2);await route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:day,zoneId:'UTC',season:'late-autumn',weather:'cloudy',forecast:[]}}).catch(()=>{});});
+  await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{if(route.request().method()==='PUT'){metadataStarted=true;await metadataGate;}await route.continue();});
+  const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC',weatherLocation:{latitude:63.43,longitude:10.39}},{'If-Match':profile.headers().etag});
+  try{
+    await page.goto('/web/?day='+date);await expect(page.locator('#status')).toHaveText('Up to date');const root=page.locator('#today-note-editor'),link=root.locator('[data-wiki-reference="'+target+'"]');await expect(link).toHaveAttribute('data-resolved','true');
+    releaseWeather();await expect.poll(()=>metadataStarted).toBe(true);
+    await page.route('**/api/v1/notes/entries?*',async route=>{
+      if(new URL(route.request().url()).searchParams.get('query')!==target)return route.continue();
+      lookups++;if(lookups!==1)return route.continue();const response=await route.fetch();lookupStarted=true;await lookupGate;await route.fulfill({response}).catch(()=>{});
+    });
+    await link.click();await link.dispatchEvent('mouseleave');await link.evaluate(node=>node.blur());await expect.poll(()=>lookupStarted).toBe(true);releaseMetadata();await expect(banner(root).locator('img')).toHaveAttribute('src',/^blob:/);
+    if(destination==='another day')await page.locator('#today-date').fill('2026-11-17');else if(destination==='another account'){await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login-form')).toBeVisible();await fresh(page,request);await page.locator('#today-date').fill(date);}releaseLookup();
+    if(destination==='linked note'){await expect(page.locator('#notes-document-title')).toHaveText(target);await expect(page.locator('#notes-formatted')).toContainText('Resolved after metadata capture.');expect(lookups).toBeGreaterThan(1);}
+    else{await expect(page.locator('#today-date')).toHaveValue(destination==='another account'?date:'2026-11-17');await expect(page.locator('#today-journal-formatted .ProseMirror')).toHaveText('');expect(lookups).toBe(1);await expect(page.locator('#notes-panel')).toBeHidden();}
+  }finally{releaseWeather();releaseMetadata();releaseLookup();await page.unrouteAll({behavior:'wait'});}
+});
+
 test('automatic presentation leaves imported banner properties untouched',async({page,request})=>{
   const {api,put}=await fresh(page,request);await put('Images/Imported.png',image);const sources=[
     'banner: "[[Images/Imported.png]]"\nbanner_x: 0.25\nbanner_y: 0.75',

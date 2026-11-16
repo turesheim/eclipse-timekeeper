@@ -19,25 +19,39 @@ const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',ref
 /** All lookups use the current API session. No credentials enter resource URLs. */
 export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true,bannerFrontmatter=()=>null,afterBannerChange=async()=>{},serializeBanner,bannerCommitted,bannerMatches,bannerFailed,dailyBannerContext=()=>origin()?.sourceType==='DAY_NOTE'}={}){
   let cachedSession,cache,allCache,info,infoRequest,generation=0,opening=false;
-  const invalidate=()=>{cache=null;allCache=null;info=null;infoRequest=null;generation++;};
+  const clearCatalog=()=>{cache=null;allCache=null;info=null;infoRequest=null;};
+  const invalidate=()=>{clearCatalog();generation++;};
+  const catalogChanged=()=>Object.assign(new Error(t('notes.invalid_link')),{code:'NOTE_CATALOG_CHANGED'});
   const currentSession=()=>{const current=session();if(!current)throw new Error(t('notes.invalid_link'));if(current!==cachedSession){cachedSession=current;invalidate();}return current;};
   // Share only in-flight settings reads: each later operation still sees current roots.
   const collectionInfo=()=>{
     const current=currentSession(),cycle=generation;
-    if(!infoRequest){const pending=current.request('/notes').then(reply=>{if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return reply.data;});
+    if(!infoRequest){const pending=current.request('/notes').then(reply=>{if(current!==session())throw new Error(t('notes.invalid_link'));if(cycle!==generation)throw catalogChanged();return reply.data;});
       infoRequest=pending;void pending.finally(()=>{if(infoRequest===pending)infoRequest=null;}).catch(()=>{});}
     return infoRequest;
   };
-  const catalog=async(query='')=>{
+  const catalogSnapshot=async(query='')=>{
     const current=currentSession(),cycle=generation;
     let cached=query===''?allCache:cache;
     if(!cached||cached.query!==query||Date.now()-cached.at>5000){const pending={at:Date.now(),query};pending.promise=(async()=>{
       const collection=await collectionInfo(),rows=[];let offset=0;
       do{const page=(await current.request('/notes/entries?'+new URLSearchParams({query,offset,limit:collection.limits.pageSize}),{etag:collection.snapshot})).data;rows.push(...page.items);offset=page.nextOffset;}while(offset!==undefined);
-      if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));info=collection;return rows;
+      if(current!==session())throw new Error(t('notes.invalid_link'));if(cycle!==generation)throw catalogChanged();info=collection;return rows;
     })();cached=pending;if(query==='')allCache=pending;else cache=pending;
       pending.promise.catch(()=>{if(cache===pending)cache=null;if(allCache===pending)allCache=null;});}
     return cached.promise;
+  };
+  const catalog=async(query='')=>{
+    const current=currentSession(),source=JSON.stringify(origin()),active=()=>current===session()&&source===JSON.stringify(origin());
+    for(let attempt=0;;attempt++){
+      try{const rows=await catalogSnapshot(query);if(!active())throw new Error(t('notes.invalid_link'));return rows;}
+      catch(error){
+        if(!active()||attempt===2||error.status!==412&&error.code!=='NOTE_CATALOG_CHANGED')throw error;
+        // Background metadata can invalidate a lookup without changing its owner
+        // or note. Retry a fresh snapshot; do not invalidate unrelated previews.
+        clearCatalog();
+      }
+    }
   };
   const originPath=(entries,value,settings=info?.settings)=>{
     if(typeof value==='string')return value;

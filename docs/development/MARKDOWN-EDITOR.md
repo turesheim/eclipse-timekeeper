@@ -198,7 +198,9 @@ stale and uncertain results retain the draft and require recovery. Date/account
 generations fence late replies. Captures require the existing note identity and
 never recreate a missing note at its former path. Recent notes rebuilds its
 expanded pages atomically from a fresh snapshot after metadata changes, retaining
-the requested extent and focused entry. A changed date window resets paging.
+the requested extent and focused entry. A changed date window resets paging. Catalog lookups retry at most twice after
+a cache invalidation or stale snapshot while their account and note remain the
+same; changing either cancels the old lookup.
 
 `daily-banner-tools.js` also provides explicit capture, image and restore actions.
 These flush host autosave before reading the complete vault file and perform an
