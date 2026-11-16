@@ -24,6 +24,14 @@ class NoteClientsTest {
         store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,'CLIENT',?,1,?)",store.owner(),id,value.toString());return id;
     }
     private UUID project(String name,UUID client){var project=store.service().createProject(new CreateProject(name));store.clientDetails("PROJECT",project.id().value(),object().put("clientId",client.toString()));return project.id().value();}
+    @Test void explicitTaskAssignmentsSurviveProseEditsUntilTheNoteIsReassigned(){
+        store.transaction("note-task-overrides",()->{
+            var vault=new VaultCollection(store,limits);vault.initialize();var entry=vault.put(new VaultPath("Individual.md"),null,true,"- [ ] Individual\n".getBytes(StandardCharsets.UTF_8));var ref=VaultSources.fromEntry(entry);var notes=new NoteClients(store);UUID first=client("Default"),other=client("Individual");notes.save(ref,notes.tag(ref),first,null);
+            var task=store.service().tasks().getFirst();store.clientDetails("TASK",task.id().value(),object().put("clientId",other.toString()));entry=vault.put(new VaultPath("Individual.md"),vault.tag(entry),false,"Prose\n\n- [ ] Individual\n- [ ] New task\n".getBytes(StandardCharsets.UTF_8));
+            assertEquals(other.toString(),store.find("TASK",task.id().value()).orElseThrow().path("clientId").asText());var added=store.service().tasks().stream().filter(value->value.summary().equals("New task")).findFirst().orElseThrow();assertEquals(first.toString(),store.find("TASK",added.id().value()).orElseThrow().path("clientId").asText());
+            notes.save(ref,notes.tag(ref),other,null);assertTrue(store.list("TASK").stream().allMatch(value->value.path("clientId").asText().equals(other.toString())));return null;
+        });
+    }
     @Test void projectAndClientAssignmentsPropagateToExistingAndFutureChecklistTasksWithoutEditingTheNote(){
         store.transaction("note-project-tasks",()->{
             var vault=new VaultCollection(store,limits);vault.initialize();byte[] body="- [ ] First\r\n- [x] Second\r\n".getBytes(StandardCharsets.UTF_8);var entry=vault.put(new VaultPath("Assigned.md"),null,true,body);var ref=VaultSources.fromEntry(entry);var clients=new NoteClients(store);UUID first=client("First client"),second=client("Second client"),project=project("First project",first);String contentTag=vault.tag(entry);
