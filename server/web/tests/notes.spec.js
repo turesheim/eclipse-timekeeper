@@ -7,7 +7,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {captureScreenshot} from './screenshots.js';
-import {setTheme,openAccountMenu} from './navigation.js';
+import {setTheme,openAccountMenu,openThemeSettings} from './navigation.js';
 import {browserRequest} from './browser-request.js';
 import {appendEditorText} from './editor-interactions.js';
 
@@ -24,6 +24,37 @@ async function setup(page,request){
   await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   await page.locator('[data-tab=notes]').click();await expect(page.locator('#notes-title')).toBeVisible();return api;
 }
+
+for(const location of ['same tab','another tab'])test(`Pele diagrams repaint after a theme change from ${location}`,async({page,request,context})=>{
+  const api=await setup(page,request),source='\uFEFF---\r\n# Keep imported metadata\r\ncustom: untouched\r\n---\r\n\r\n```mermaid\r\nflowchart LR\r\n A[Plan] --> B[Finish]\r\n```\r\n';
+  const entry=await(await api('PUT','/notes/files?path=Notes%2FDiagram.md',Buffer.from(source),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();
+  await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');
+  await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Diagram.md').click();await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
+  const image=page.locator('#notes-panel .markdown-mermaid-block img');
+  const pixels=()=>image.evaluate(image=>{
+    if(!image.complete||!image.naturalWidth||!image.src)return null;
+    const svg=new DOMParser().parseFromString(decodeURIComponent(image.src.split(',')[1]),'image/svg+xml'),group=svg.querySelector('.pele-node'),rect=group.querySelector('rect'),[x,y]=group.getAttribute('transform').match(/[\d.]+/g).map(Number);
+    const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d');context.drawImage(image,0,0);
+    const actual=[...context.getImageData(Math.round(x),Math.round(y+Number(rect.getAttribute('y'))+8),1,1).data];
+    context.clearRect(0,0,1,1);context.fillStyle=getComputedStyle(image).getPropertyValue('--bs-tertiary-bg');context.fillRect(0,0,1,1);const expected=[...context.getImageData(0,0,1,1).data];
+    return {actual,expected,match:actual.every((value,index)=>Math.abs(value-expected[index])<=2)};
+  });
+  await expect(image).toBeVisible();await expect.poll(pixels).toEqual(expect.objectContaining({match:true}));const light=await pixels();
+  const themePage=location==='same tab'?page:await context.newPage();
+  if(themePage!==page){await themePage.goto('/web/');await expect(themePage.locator('#status')).toHaveText('Up to date');}
+  for(const theme of ['timekeeper-dark','timekeeper']){
+    const before=await image.getAttribute('src');await openThemeSettings(themePage);await themePage.locator('#theme').selectOption(theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+    // Leave Account open until its hidden note has finished the debounced draw.
+    await expect.poll(async()=>{const source=await image.getAttribute('src');return !!source&&source!==before;}).toBe(true);
+    await themePage.locator('#account-page a[href="#tracking"]').click();
+    if(themePage===page)await page.locator('[data-tab=notes]').click();await expect(image).toBeVisible();
+    await expect.poll(pixels).toEqual(expect.objectContaining({match:true}));const value=await pixels();if(theme==='timekeeper-dark')expect(value.actual).not.toEqual(light.actual);else expect(value.actual).toEqual(light.actual);
+    await captureScreenshot(page,{path:'test-results/mermaid-account-'+location.replaceAll(' ','-')+'-'+theme+'.png',fullPage:true});
+  }
+  if(themePage!==page)await themePage.close();
+  expect(Buffer.from(await(await api('GET','/notes/entries/'+entry.id+'/content')).body())).toEqual(Buffer.from(source));
+});
 
 test('shared search prepares indexes before a query and presents normal-weight bookmarked notes',async({page,request})=>{
   let prepared=0,queries=0,failures=2;
