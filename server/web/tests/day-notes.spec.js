@@ -371,6 +371,24 @@ test('journal preserves unsupported source, opaque frontmatter and exact label-o
   }finally{await owner.close();}
 });
 
+test('journal recovery actions remain clickable during a controls refresh',async({page})=>{
+  await page.goto('/web/');await page.evaluate(async()=>{
+    const {TrackDayNotes}=await import('/web/track-day-notes.js'),root=document.createElement('div'),grid=document.createElement('div'),month=document.createElement('input');
+    root.id='journal-recovery-test';root.style.cssText='position:fixed;inset:0;overflow:auto;z-index:2000;background:white';root.append(grid,month);document.body.append(root);
+    const journal=new TrackDayNotes(root,grid,month,{}, {prefix:'recovery-test',inline:true});
+    journal.editor={etag:'current',originalText:'',originalBody:'',uncertain:true};journal.reloadEditor=()=>window.recoveryClicks++;
+    window.recoveryClicks=0;window.recoveryJournal=journal;journal.controls();
+  });
+  const root=page.locator('#journal-recovery-test');
+  for(const [index,state] of ['uncertain','stale','failedRead'].entries()){
+    await page.evaluate(state=>{const journal=window.recoveryJournal;Object.assign(journal.editor,{uncertain:false,stale:false,failedRead:false,[state]:true});journal.controls();},state);
+    const action=root.getByRole('button',{name:state==='uncertain'?'Check saved result':'Reload saved note',exact:true});
+    await action.hover();await page.mouse.down();await page.evaluate(()=>window.recoveryJournal.controls());await page.mouse.up();await expect.poll(()=>page.evaluate(()=>window.recoveryClicks)).toBe(index+1);
+  }
+  await root.getByRole('button',{name:'Reload saved note',exact:true}).press('Enter');expect(await page.evaluate(()=>window.recoveryClicks)).toBe(4);
+  await page.evaluate(()=>{window.recoveryJournal.reset();document.querySelector('#journal-recovery-test').remove();});
+});
+
 test('journal retains both drafts on conflicts, confirms dismissal and reload, and checks an unknown save without another write',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{

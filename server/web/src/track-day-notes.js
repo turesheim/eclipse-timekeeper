@@ -161,7 +161,12 @@ export class TrackDayNotes {
     this.delete.disabled=editor.loading||editor.failedRead||editor.busy||editor.saving||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!editor.present||!this.writable;
     this.cancel.disabled=editor.busy;this.markdown.syncActions();
     if(!editor.loading&&!editor.busy&&!editor.failedRead&&!editor.uncertain&&!editor.stale&&!editor.saveFailed)this.savedStatus.textContent=t(editor.saving?'journal.saving':!this.draftable?'journal.read_only':!this.writable?'journal.waiting_sync':this.dirty()?'journal.unsaved':'journal.saved');
-    if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
+    if(this.reload){
+      const hidden=!(editor.failedRead||editor.stale||editor.uncertain),disabled=editor.loading||editor.busy||this.markdown.loading,label=t(editor.uncertain?'journal.check_result':'journal.reload');
+      if(this.reload.hidden!==hidden)this.reload.hidden=hidden;
+      if(this.reload.disabled!==disabled)this.reload.disabled=disabled;
+      if(this.reload.textContent!==label)this.reload.textContent=label;
+    }
     if(this.recovery){
       if(editor.failedRead||editor.stale||editor.uncertain){if(this.markdown.root.previousSibling!==this.recovery)this.markdown.root.before(this.recovery);}
       else if(this.markdown.root.nextSibling!==this.recovery)this.markdown.root.after(this.recovery);
