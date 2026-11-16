@@ -61,10 +61,12 @@ export class NoteTaskControls {
     let offset;try{offset=selection.offset();}catch{return;}
     this.openContext=context;const cycle=++this.generation;this.abort=new AbortController();this.busy=true;this.task=null;this.stale=false;this.pending=null;this.inputs.replaceChildren();this.error.hidden=true;this.title.textContent=t('markdown.loading');this.dialog.showModal();this.paintDialog();this.action.hidden=true;
     try{
+      let reply;for(let attempt=0;;attempt++)try{
       const source=await f.resources.readTaskSource({signal:this.abort.signal});if(!this.active(context,cycle))return;
       const saved=splitMarkdown(normalize(source.text)),body=splitMarkdown(normalize(f.value())).body;
       if(saved.body!==body||source.entry.sourceType!==context.sourceType||source.entry.sourceKey!==context.sourceKey)throw new Error(t('notes.stale'));
-      if(f.bodyBomMoved)offset--;const reply=await context.session.request('/notes/tasks/resolve',{method:'POST',etag:source.etag,body:{sourceType:context.sourceType,sourceKey:context.sourceKey,offset:saved.frontmatter.length+offset},signal:this.abort.signal});
+      const bodyOffset=offset-(f.bodyBomMoved?1:0);reply=await context.session.request('/notes/tasks/resolve',{method:'POST',etag:source.etag,body:{sourceType:context.sourceType,sourceKey:context.sourceKey,offset:saved.frontmatter.length+bodyOffset},signal:this.abort.signal});break;
+      }catch(error){if(attempt===2||error.status!==412||!this.active(context,cycle))throw error;}
       const profile=await context.session.request('/me',{signal:this.abort.signal});if(!this.active(context,cycle))return;this.zone=profile.data.zoneId;this.accept(reply);
     }catch(error){if(this.active(context,cycle)&&error.name!=='AbortError')this.failure(error);}
     finally{if(this.active(context,cycle)){this.busy=false;this.paintDialog();this.inputs.querySelector('select,input,textarea')?.focus();}}

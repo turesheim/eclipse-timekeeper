@@ -106,6 +106,7 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     readTaskSource:async({signal}={})=>{
       const current=currentSession(),source=JSON.stringify(origin()),active=()=>current===session()&&source===JSON.stringify(origin());
       if(!canCreate()||!await beforeCreate()||!active())throw new Error(t('notes.stale'));
+      for(let attempt=0;;attempt++)try{
       const collection=await collectionInfo(),value=origin();let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);
       if(!path||!active()||!canCreate())throw new Error(t('notes.stale'));
       const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}),{signal})).data;
@@ -113,6 +114,7 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
       const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream',signal});
       const text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());if(!active()||!canCreate())throw new Error(t('notes.stale'));
       return {session:current,entry,text,etag:reply.etag};
+      }catch(error){if(!active()||attempt===2||error.code!=='NOTE_CATALOG_CHANGED')throw error;clearCatalog();}
     },
     dailyBannerContext,serializeBanner,bannerCommitted,bannerMatches,bannerFailed,canCaptureBanner:canCreate,
     announceBanner:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')),

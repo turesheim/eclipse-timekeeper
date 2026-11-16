@@ -65,6 +65,15 @@ test('a stale task retains dialog changes until explicit reload',async({page,req
   page.once('dialog',dialog=>dialog.accept());await dialog.getByRole('button',{name:'Reload task',exact:true}).click();await expect(dialog.getByLabel('Priority',{exact:true})).toHaveValue('HIGH');await dialog.getByLabel('Notes',{exact:true}).fill('Reviewed draft');await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();expect((await(await api('GET','/tasks/'+task.id)).json()).flagged).toBe(true);
 });
 
+test('source validator retry accepts metadata-only changes but retains a peer-edited note',async({page,request})=>{
+  const api=await setup(page,request),entry=await put(api,'Source retry.md','- [ ] Source retry\n'),root=await openNote(page,'Source retry.md');let calls=0,peer=false;
+  await page.route('**/api/v1/notes/tasks/resolve',async route=>{
+    if(++calls===1){if(peer){const current=await api('GET','/notes/entries/'+entry.id+'/content');await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from('- [ ] Peer changed source\n'),{'Content-Type':'application/octet-stream','If-Match':current.headers().etag});}return route.fulfill({status:412,contentType:'application/problem+json',body:JSON.stringify({type:'urn:timekeeper:problem:stale-version',title:'Stale version',status:412,code:'STALE_VERSION'})});}return route.continue();
+  });
+  let dialog=await edit(root,root.locator('li p'));expect(calls).toBe(2);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();peer=true;calls=0;
+  await caret(root.locator('li p'));await root.getByRole('button',{name:'Edit task details',exact:true}).click();dialog=root.locator('.note-task-dialog');await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.getByRole('button',{name:'Save',exact:true})).toBeDisabled();expect(calls).toBe(1);await expect(root.locator('li p')).toHaveText('Source retry');await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+});
+
 test('an uncertain task save is read back without repeating the write',async({page,request})=>{
   const api=await setup(page,request),client=await(await api('POST','/clients',{name:'Unknown result client',color:'#176653'})).json(),project=await(await api('POST','/projects',{name:'Unknown result project',clientId:client.id,icon:null})).json();await put(api,'Uncertain task.md','- [ ] Verify\n');const root=await openNote(page,'Uncertain task.md'),dialog=await edit(root,root.locator('li p'));let writes=0;
   await page.route('**/api/v1/tasks/*',async route=>{if(route.request().method()!=='PUT')return route.continue();writes++;await route.fetch();await route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({type:'urn:timekeeper:problem:unavailable',title:'Unavailable',status:503,code:'UNAVAILABLE'})});});
