@@ -2,13 +2,13 @@ import {t} from './i18n.js';
 import {noteClientDirectory} from './note-client.js';
 import {taskMomentFields} from './task-editor-fields.js';
 import {splitMarkdown} from './markdown-document.js';
-import {noteTaskLines} from './assets/milkdown/markdown-preview.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=(label,run)=>{const value=node('button',label,'btn btn-outline-secondary');value.type='button';value.addEventListener('click',run);return value;};
 const same=(a,b)=>!!a&&!!b&&a.session===b.session&&a.sourceType===b.sourceType&&a.sourceKey===b.sourceKey;
 const normalize=value=>value.replace(/\r\n?/g,'\n');
 const equivalent=(a,b)=>a===b||!!a&&!!b&&typeof a==='object'&&typeof b==='object'&&Object.keys(a).length===Object.keys(b).length&&Object.keys(a).every(key=>equivalent(a[key],b[key]));
+let parser;
 
 /** A contextual task editor. The checklist's Markdown is never rewritten here. */
 export class NoteTaskControls {
@@ -33,7 +33,7 @@ export class NoteTaskControls {
     if(this.dialog.open)this.paintDialog();this.update();
   }
   update(delay=0){if(document.activeElement===this.field.text&&this.sourceText!==this.field.text.value)delay=Math.max(delay,100);clearTimeout(this.timer);this.timer=setTimeout(()=>void this.paint(),delay);}
-  paint(){
+  async paint(){
     const f=this.field,current=this.current(),active=document.activeElement;
     if(this.dialog.open||!current?.writable||f.readOnly||f.loading||f.bannerBusy||!f.root.getClientRects().length){this.action.hidden=true;return;}
     if(active===this.action&&!this.action.hidden)return;
@@ -42,7 +42,14 @@ export class NoteTaskControls {
     else if(active===f.text&&f.text.selectionStart===f.text.selectionEnd){
       const text=f.text.value,position=f.text.selectionStart,start=text.lastIndexOf('\n',position-1)+1,line=text.slice(start,text.indexOf('\n',position)<0?text.length:text.indexOf('\n',position));
       if(!/^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+\[[ xX]\]\s+\S/.test(line)){this.action.hidden=true;return;}
-      if(this.sourceText!==text){this.sourceText=text;this.lines=noteTaskLines(text);}
+      if(this.sourceText!==text){
+        this.action.hidden=true;
+        // Keep the DOM-dependent bundle lazy for non-browser module consumers.
+        try{parser??=import('./assets/milkdown/markdown-preview.js');const module=await parser;
+          if(text!==f.text.value||position!==f.text.selectionStart||position!==f.text.selectionEnd||document.activeElement!==f.text||!same(current,this.current())||!this.current()?.writable||f.readOnly||f.loading||this.dialog.open)return;
+          this.lines=module.noteTaskLines(text);this.sourceText=text;
+        }catch{parser=null;return;}
+      }
       const item=this.lines.find(item=>position>=item.start&&position<=item.end);if(item){context={offset:()=>item.offset};rect=f.caret.sourceRect(f.text);}
     }
     if(!context||!rect){this.action.hidden=true;return;}const box=(f.editor?f.rich:f.text).getBoundingClientRect(),height=rect.height||rect.bottom-rect.top;
@@ -58,14 +65,14 @@ export class NoteTaskControls {
   failure(error){this.error.textContent=error.message;this.error.hidden=false;}
   async open(){
     const context=this.current(),selection=this.selection,f=this.field;if(!context?.writable||f.readOnly||!selection||this.dialog.open)return;
-    let offset;try{offset=selection.offset();}catch{return;}
+    let offset,selected;const movedAtClick=f.bodyBomMoved;try{offset=selection.offset();selected=splitMarkdown(normalize(f.value()));}catch{return;}
     this.openContext=context;const cycle=++this.generation;this.abort=new AbortController();this.busy=true;this.task=null;this.stale=false;this.pending=null;this.inputs.replaceChildren();this.error.hidden=true;this.title.textContent=t('markdown.loading');this.dialog.showModal();this.paintDialog();this.action.hidden=true;
     try{
       let reply;for(let attempt=0;;attempt++)try{
       const source=await f.resources.readTaskSource({signal:this.abort.signal});if(!this.active(context,cycle))return;
-      const saved=splitMarkdown(normalize(source.text)),body=splitMarkdown(normalize(f.value())).body;
-      if(saved.body!==body||source.entry.sourceType!==context.sourceType||source.entry.sourceKey!==context.sourceKey)throw new Error(t('notes.stale'));
-      const bodyOffset=offset-(f.bodyBomMoved?1:0);reply=await context.session.request('/notes/tasks/resolve',{method:'POST',etag:source.etag,body:{sourceType:context.sourceType,sourceKey:context.sourceKey,offset:saved.frontmatter.length+bodyOffset},signal:this.abort.signal});break;
+      const saved=splitMarkdown(normalize(source.text)),moved=!selected.frontmatter&&selected.body.startsWith('\uFEFF')&&saved.frontmatter.startsWith('\uFEFF')&&saved.body===selected.body.slice(1);
+      if(saved.body!==selected.body&&!moved||source.entry.sourceType!==context.sourceType||source.entry.sourceKey!==context.sourceKey)throw new Error(t('notes.stale'));
+      const bodyOffset=offset-(movedAtClick||moved?1:0);reply=await context.session.request('/notes/tasks/resolve',{method:'POST',etag:source.etag,body:{sourceType:context.sourceType,sourceKey:context.sourceKey,offset:saved.frontmatter.length+bodyOffset},signal:this.abort.signal});break;
       }catch(error){if(attempt===2||error.status!==412||!this.active(context,cycle))throw error;}
       const profile=await context.session.request('/me',{signal:this.abort.signal});if(!this.active(context,cycle))return;this.zone=profile.data.zoneId;this.accept(reply);
     }catch(error){if(this.active(context,cycle)&&error.name!=='AbortError')this.failure(error);}
