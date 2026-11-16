@@ -82,7 +82,7 @@ export class TodayView {
   paint(){
     if(!this.data||!this.date)return;
     byId('today-title').textContent=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(this.date+'T12:00:00Z'));
-    this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite(),this.callbacks.canWrite());
+    this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite(),this.callbacks.canWrite(),this.data.profile.data);
     this.paintMonth();void this.loadMonthNotes();this.paintSessions();this.paintEvents();this.paintTasks();
     this.sizeEditor();
   }

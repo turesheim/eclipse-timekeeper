@@ -25,6 +25,8 @@ async function setup(page,request,large=false){
   await api('POST','/day-entries/'+date,{text:'Original label',labelVersion:entry.labelVersion,body,noteVersion:entry.version},{'Idempotency-Key':randomUUID()});
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);
   await expect(page.locator('#today-note-text')).toHaveValue('Original label');await expect(page.locator('#today-journal-formatted .ProseMirror')).toContainText('Paragraph 399:');
+  // Establish the baseline after the separate automatic metadata write.
+  await expect(page.locator('#today-note-editor .markdown-banner img')).toHaveAttribute('src',/^blob:/);
   return {api,client:clients[0]};
 }
 async function editor(page,mode){

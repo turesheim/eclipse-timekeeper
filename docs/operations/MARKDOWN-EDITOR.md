@@ -302,22 +302,32 @@ properties `banner`, `banner_x` and `banner_y`. The default image height is
 access as note attachments. Unsupported, missing or ambiguous images leave the
 note usable. Remote image URLs are never fetched.
 
-Daily banners are optional. Open **Note tools → Add seasonal banner** to create
-one for the selected day; opening a new daily note does not create one automatically.
-Daily notes offer **Add seasonal banner**, **Change banner image** and
-**Restore seasonal image** in **Note tools**. Seasonal artwork is a generic
-landscape. Optionally set latitude and longitude under Account → Profile →
-Weather location before creating a banner. Creation sends those coordinates to
-[MET Norway](https://api.met.no/doc/TermsOfService); forecasts are credited under
-CC BY 4.0. No location gives artwork alone. Past dates or unavailable forecasts
-also give artwork alone.
+Daily notes show seasonal artwork automatically in formatted view. The whole
+seasonal image is shown at its original proportions; custom images retain the
+112 px crop. The locally bundled image appears while weather and private image
+reads run in the background. Opening an empty day does not create a note.
 
-Creation saves the artwork, crop, local date, time zone and three forecast slots.
-Opening a saved note does not fetch weather. Changing the account location,
-forecast or illustration catalog does not change a saved banner. You can upload
-a raster image or select one from the vault and adjust its crop for that day.
-The saved forecast stays over the chosen picture. Restore brings back the
-original seasonal image and crop. Read-only sessions can view these banners.
+Optionally set latitude and longitude under Account → Profile → Weather location.
+Opening a daily note without a saved forecast then sends those coordinates to
+[MET Norway](https://api.met.no/doc/TermsOfService); forecasts are credited under
+CC BY 4.0. The banner links to these settings when no location is configured.
+Past dates, missing data or an unavailable provider show artwork with a forecast
+status and a retry action. Read-only sessions can view the automatic presentation
+without saving it.
+
+Once a daily note exists, Dagsverk saves the seasonal artwork and available
+forecast in the background without interrupting typing. A saved three-slot
+forecast stays fixed when the account location, provider forecast or illustration
+catalog changes. A banner saved without weather can acquire its missing forecast
+after configuring a location; **Note tools → Retry forecast** retries this lookup.
+
+**Note tools** also offers **Add seasonal banner** to save a snapshot on an empty
+day, **Change banner image** to upload or choose a vault image and adjust its crop,
+and **Restore seasonal image** to return to the original seasonal picture. An
+existing custom image stays in place during automatic capture. Imported banner
+metadata stays unchanged until you choose **Add seasonal banner** to attach a
+saved forecast. The saved forecast stays with the chosen picture. Banner metadata saves share the editor's autosave
+queue, so newer prose and navigation retain the current note validator.
 
 The extra `dagsverk_seasonal_banner` text property preserves the original
 seasonal selection and forecast. Keep it, the standard banner properties and
