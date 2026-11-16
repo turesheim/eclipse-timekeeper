@@ -13,7 +13,7 @@ export class RecentNotes {
     this.root=root;this.section=section;this.callbacks=callbacks;this.generation=0;this.visible=false;this.items=[];
     document.addEventListener('timekeeper:notes-changed',()=>void this.refresh(true));
   }
-  reset(){this.hide();this.scope=null;this.items=[];this.page=null;this.extent=0;this.error=null;this.root.replaceChildren();this.root.removeAttribute('aria-busy');}
+  reset(){this.hide();this.scope=null;this.items=[];this.page=null;this.extent=0;this.error=null;this.list=this.more=this.rowsKey=null;this.root.replaceChildren();this.root.removeAttribute('aria-busy');}
   hide(){this.visible=false;this.key=null;this.busy=false;this.loadingMore=false;++this.generation;clearInterval(this.timer);this.timer=null;}
   show(host,id){
     if(host&&this.section.parentElement!==host)host.append(this.section);
