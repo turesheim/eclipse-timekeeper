@@ -18,6 +18,7 @@ public class CalendarResource {
     @Inject Pages pages;
     @Context UriInfo uri;
     private Response tx(Supplier<ApiReplies> operation){return store.authenticated(identity,()->operation.get().response());}
+    private Response read(Supplier<ApiReplies> operation){return store.authenticatedReadSnapshot(identity,()->operation.get().response());}
     private CalendarSubscriptions calendars(){return new CalendarSubscriptions(store);}
     private void noQueries(){ContractInputs.queries(uri.getQueryParameters());}
     @GET @Path("/calendar-subscriptions") public Response list(){noQueries();return tx(()->new ApiReplies(200,calendars().list(),null,null));}
@@ -41,11 +42,11 @@ public class CalendarResource {
         UUID key=ContractInputs.pathId(id);noQueries();return refresh.refresh(identity,key).response();
     }
     @GET @Path("/calendar-events") public Response events(@QueryParam("fromDate")String from,@QueryParam("toDate")String to){
-        ContractInputs.queries(uri.getQueryParameters(),"fromDate","toDate");return tx(()->new ApiReplies(200,calendars().events(from,to),null,null));
+        ContractInputs.queries(uri.getQueryParameters(),"fromDate","toDate");return read(()->new ApiReplies(200,calendars().events(from,to),null,null));
     }
     @GET @Path("/calendar-tasks") public Response tasks(@QueryParam("limit")String limit,@QueryParam("cursor")String cursor,@HeaderParam("If-Match")String match){
         ContractInputs.queries(uri.getQueryParameters(),"limit","cursor");int size=ContractInputs.number(limit,100,1,500);
-        return tx(()->{
+        return read(()->{
             var catalog=calendars().tasks();String snapshot=catalog.path("snapshot").asText();
             if(cursor!=null&&match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");
             if(match!=null&&!match.equals(snapshot))throw new ApiFailure(412,"STALE_VERSION");

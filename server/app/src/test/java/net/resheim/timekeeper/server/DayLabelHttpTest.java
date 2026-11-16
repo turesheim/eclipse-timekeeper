@@ -17,10 +17,31 @@ import jakarta.inject.Inject;
 class DayLabelHttpTest {
     @Inject ServerStore store;
     @Inject ContractInputs inputs;
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:independent_day_labels");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return ArchiveTestDatabase.configuration("daylabels","jdbc:h2:mem:independent_day_labels");}}
     private Response get(String owner,String path){return given().header("Authorization","Bearer "+owner).get("/api/v1"+path);}
     private Response put(String owner,String path,String tag,String json){return given().header("Authorization","Bearer "+owner).header("If-Match",tag).contentType("application/json").body(json).put("/api/v1"+path);}
     private Response edit(String date,String json){return given().header("Authorization","Bearer test-a").contentType("application/json").body(json).post("/api/v1/day-entries/"+date);}
+    @Test void entryReadsAConsistentCommittedSnapshotWithoutWaitingForTheOwnerWriteLock() throws Exception {
+        String day="2026-10-11",before="---\nbanner: \"[[Images/before.png]]\"\n---\n",after="---\nbanner: \"[[Images/after.png]]\"\n---\n";
+        store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date(day);notes.saveDocument(date,etag(notes.getContent(date)),(before+"Before\n").getBytes(StandardCharsets.UTF_8));return null;});
+        assertEquals(200,get("test-a","/day-entries/"+day).statusCode());
+        var locked=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
+        try(var workers=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()){
+            var writer=workers.submit(()->store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date(day);notes.saveDocument(date,etag(notes.getContent(date)),(after+"After\n").getBytes(StandardCharsets.UTF_8));store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(java.util.Optional.empty(),"Snapshot-pending-task",java.util.Optional.empty()));locked.countDown();try{if(!release.await(15,java.util.concurrent.TimeUnit.SECONDS))throw new IllegalStateException("Writer was not released");}catch(InterruptedException failure){Thread.currentThread().interrupt();throw new IllegalStateException(failure);}return null;}));
+            try{
+                assertTrue(locked.await(5,java.util.concurrent.TimeUnit.SECONDS));
+                var read=workers.submit(()->get("test-read","/day-entries/"+day)).get(5,java.util.concurrent.TimeUnit.SECONDS);
+                assertEquals(200,read.statusCode());assertEquals("Before\n",read.jsonPath().getString("body"));assertEquals(before,read.jsonPath().getString("frontmatter"));assertFalse(writer.isDone());
+                var tasks=workers.submit(()->get("test-read","/tasks?q=Snapshot-pending-task&includeNoteSources=true")).get(5,java.util.concurrent.TimeUnit.SECONDS);
+                assertEquals(200,tasks.statusCode());assertEquals(0,tasks.jsonPath().getList("items").size());assertFalse(writer.isDone());
+                for(String route:java.util.List.of("/calendar-events?fromDate=2026-10-11&toDate=2026-10-12","/calendar-tasks")){
+                    var calendar=workers.submit(()->get("test-read",route)).get(5,java.util.concurrent.TimeUnit.SECONDS);
+                    assertEquals(200,calendar.statusCode());assertFalse(writer.isDone());
+                }
+            }finally{release.countDown();writer.get(5,java.util.concurrent.TimeUnit.SECONDS);}
+        }
+        var committed=get("test-a","/day-entries/"+day);assertEquals("After\n",committed.jsonPath().getString("body"));assertEquals(after,committed.jsonPath().getString("frontmatter"));assertEquals(1,get("test-read","/tasks?q=Snapshot-pending-task&includeNoteSources=true").jsonPath().getList("items").size());
+    }
     @Test void entryIncludesExactPrivateOuterMetadataWithoutTurningItIntoBodyContent(){
         String day="2026-10-09",header="\ufeff---\r\n# Preserve this metadata\r\nbanner: \"[[Images/private.png]]\"\r\ncustom: ' keep spacing '  \r\n---\r\n",body="# Original body\r\n";
         store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date(day);notes.saveDocument(date,etag(notes.getContent(date)),(header+body).getBytes(StandardCharsets.UTF_8));return null;});

@@ -233,9 +233,43 @@ public class ServerStore {
     public <T> T authenticated(RequestIdentity identity,Supplier<T> work) {
         return transaction(identity.owner(),()->{
             identity.guard(current().connection());
-            var previous=journalPrincipal.get();journalPrincipal.set(identity.principal());
-            try{return work.get();}finally{if(previous==null)journalPrincipal.remove();else journalPrincipal.set(previous);}
+            return asPrincipal(identity,work);
         });
+    }
+    /** Pure queries release credential locks before reading a consistent data snapshot. */
+    public <T> T authenticatedReadSnapshot(RequestIdentity identity,Supplier<T> work) {
+        return authenticatedReadSnapshot(identity,()->true,work);
+    }
+    /** Queries with lazy legacy preparation retain their first-use write transaction. */
+    <T> T authenticatedReadSnapshot(RequestIdentity identity,java.util.function.BooleanSupplier ready,Supplier<T> work) {
+        if(context.get()!=null)throw new IllegalStateException("Read snapshots must not nest inside owner transactions");
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
+            connection.setAutoCommit(false);int isolation=connection.getTransactionIsolation();
+            try {
+                identity.guard(connection);boolean initialized;
+                try(var query=connection.prepareStatement("SELECT initialized FROM tk_account WHERE owner_id=?")) {
+                    query.setString(1,identity.owner());try(var rows=query.executeQuery()){initialized=rows.next()&&rows.getBoolean(1);}
+                }
+                connection.commit();
+                if(initialized) {
+                    connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setReadOnly(true);
+                    T result=null;boolean prepared;
+                    context.set(new Context(identity.owner(),connection,clock.now(),true));
+                    try{prepared=ready.getAsBoolean();if(prepared)result=asPrincipal(identity,work);}finally{context.remove();}
+                    connection.commit();connection.setReadOnly(false);connection.setTransactionIsolation(isolation);
+                    // A revoked credential or disabled account must not receive the result.
+                    if(prepared){identity.guard(connection);connection.commit();return result;}
+                }
+            } catch(Throwable failure) {
+                try{connection.rollback();}catch(SQLException rollback){failure.addSuppressed(rollback);}throw failure;
+            }
+        }catch(SQLException failure){throw databaseFailure(failure);}
+        // Preserve first-use initialization, default labels and legacy preparation.
+        return authenticated(identity,work);
+    }
+    private <T> T asPrincipal(RequestIdentity identity,Supplier<T> work) {
+        var previous=journalPrincipal.get();journalPrincipal.set(identity.principal());
+        try{return work.get();}finally{if(previous==null)journalPrincipal.remove();else journalPrincipal.set(previous);}
     }
     /** Whitelist public client identity; never persist principal/session digests. */
     private ObjectNode safeJournalClient(TokenRegistry.Principal principal) {
