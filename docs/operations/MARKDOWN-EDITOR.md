@@ -302,6 +302,8 @@ properties `banner`, `banner_x` and `banner_y`. The default image height is
 access as note attachments. Unsupported, missing or ambiguous images leave the
 note usable. Remote image URLs are never fetched.
 
+Daily banners are optional. Open **Note tools → Add seasonal banner** to create
+one for the selected day; opening a new daily note does not create one automatically.
 Daily notes offer **Add seasonal banner**, **Change banner image** and
 **Restore seasonal image** in **Note tools**. Seasonal artwork is a generic
 landscape. Optionally set latitude and longitude under Account → Profile →

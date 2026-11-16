@@ -9,6 +9,12 @@ import {vaultEditorResources} from '../src/vault-editor-resources.js';
 
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 const collection=(journalFolder='journal',assetsFolder='journal/assets')=>({settings:{journalFolder,assetsFolder,eventsFolder:'events'},limits:{pageSize:200},snapshot:'snapshot'});
+test('a versioned native header supplied with the note avoids all header lookup requests',async()=>{
+  const requests=[],session={request:async path=>{requests.push(path);throw new Error('Unexpected header lookup');}};
+  let frontmatter='\ufeff---\r\nbanner: "[[Images/private.png]]"\r\n---\r\n';
+  const resources=vaultEditorResources(()=>session,()=>({sourceType:'DAY_NOTE',sourceKey:'2026-11-16'}),undefined,{hasBannerSource:()=>true,bannerFrontmatter:()=>frontmatter});
+  assert.equal(await resources.bannerFrontmatter(),frontmatter);frontmatter='';resources.invalidate();assert.equal(await resources.bannerFrontmatter(),'');assert.deepEqual(requests,[]);
+});
 test('missing native notes do not initialize the vault for a banner lookup',async()=>{
   for(const sourceType of ['DAY_NOTE','EVENT_NOTE']){
     let present=false;const requests=[],header='---\nbanner: "[[cover.png]]"\n---\n';

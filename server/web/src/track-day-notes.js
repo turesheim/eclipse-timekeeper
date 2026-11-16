@@ -25,7 +25,7 @@ export class TrackDayNotes {
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
     const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),
-      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image),{noteClient:{current:()=>this.editor?.etag?{session:this.editor.session,sourceType:'DAY_NOTE',sourceKey:this.editor.date,writable:this.writable&&!this.editor.busy}:null,error:error=>{this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}},bookmark:{current:()=>this.editor?.etag?{session:this.editor.session,sourceType:'DAY_NOTE',sourceKey:this.editor.date,writable:this.writable&&!this.editor.busy}:null,error:error=>{this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);},changed:value=>{if(value.bookmarked)this.bookmarkedDates.add(value.sourceKey);else this.bookmarkedDates.delete(value.sourceKey);this.paint();document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));this.callbacks.onChanged?.();}},...noteRevisionResources(()=>this.editor?.session,()=>({sourceType:'DAY_NOTE',sourceId:this.editor?.noteId}),{bodyOnly:true,latest:async()=>{const reply=await this.editor.session.request('/day-entries/'+this.editor.date);return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.editor?.session),...vaultEditorResources(()=>this.editor?.session,()=>({sourceType:'DAY_NOTE',sourceKey:this.editor?.date}),undefined,{canCreate:()=>this.writable&&!!this.editor&&!this.editor.busy&&!this.editor.stale,beforeCreate:()=>this.canLeaveInline(),hasBannerSource:()=>!!this.editor?.present,afterBannerChange:()=>this.reloadEditor()})});
+      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image),{noteClient:{current:()=>this.editor?.etag?{session:this.editor.session,sourceType:'DAY_NOTE',sourceKey:this.editor.date,writable:this.writable&&!this.editor.busy}:null,error:error=>{this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}},bookmark:{current:()=>this.editor?.etag?{session:this.editor.session,sourceType:'DAY_NOTE',sourceKey:this.editor.date,writable:this.writable&&!this.editor.busy}:null,error:error=>{this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);},changed:value=>{if(value.bookmarked)this.bookmarkedDates.add(value.sourceKey);else this.bookmarkedDates.delete(value.sourceKey);this.paint();document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));this.callbacks.onChanged?.();}},...noteRevisionResources(()=>this.editor?.session,()=>({sourceType:'DAY_NOTE',sourceId:this.editor?.noteId}),{bodyOnly:true,latest:async()=>{const reply=await this.editor.session.request('/day-entries/'+this.editor.date);return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.editor?.session),...vaultEditorResources(()=>this.editor?.session,()=>({sourceType:'DAY_NOTE',sourceKey:this.editor?.date}),undefined,{canCreate:()=>this.writable&&!!this.editor&&!this.editor.busy&&!this.editor.stale,beforeCreate:()=>this.canLeaveInline(),hasBannerSource:()=>!!this.editor?.present,bannerFrontmatter:()=>this.editor?.frontmatter??null,afterBannerChange:()=>this.reloadEditor()})});
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.close'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());const documentTools=node('div');documentTools.append(this.delete);this.markdown.addActionsGroup(documentTools);this.retrySave=button(t('journal.retry_save'),'btn btn-outline-secondary');this.retrySave.hidden=true;this.retrySave.addEventListener('click',()=>void this.autosave.flush());actions.append(this.savedStatus,this.retrySave);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
@@ -71,7 +71,7 @@ export class TrackDayNotes {
   closeEditor(){if(!this.inline)this.dialog.close();this.finishEditor();}
   finishEditor(){
     if(!this.inline&&this.dialog.open)return;
-    this.autosave?.reset();const date=this.editor?.date,uncertain=this.editor?.uncertain;if(date&&this.editor?.etag&&!this.editor.loading)this.positions.set(date,this.markdown.position());this.editor=null;this.text.value='';if(this.labelRoot)this.text.disabled=true;this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
+    this.autosave?.reset();this.editor?.abort?.abort();const date=this.editor?.date,uncertain=this.editor?.uncertain;if(date&&this.editor?.etag&&!this.editor.loading)this.positions.set(date,this.markdown.position());this.editor=null;this.text.value='';if(this.labelRoot)this.text.disabled=true;this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
     if(date)this.focusDate(date);
     if(uncertain&&this.session){this.key=null;this.load();}
   }
@@ -165,7 +165,7 @@ export class TrackDayNotes {
     if(this.autosave&&this.dirty()&&this.writable&&!editor.loading&&!editor.busy&&!editor.saving&&!editor.failedRead&&!editor.stale&&!editor.uncertain&&!editor.saveFailed&&!this.markdown.loading)this.autosave.changed();
   }
   reset(){
-    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.writable=false;this.draftable=false;this.key=null;this.range=null;this.loaded=false;this.positions.clear();this.notes.clear();this.bodyDates.clear();this.bookmarkedDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
+    this.editor?.abort?.abort();this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.writable=false;this.draftable=false;this.key=null;this.range=null;this.loaded=false;this.positions.clear();this.notes.clear();this.bodyDates.clear();this.bookmarkedDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
     this.closeEditor();this.text.value='';this.error.textContent='';this.status.hidden=true;this.message.textContent='';this.retry.hidden=true;
   }
   hide(){this.cancelHold();this.closeMenu();if(!this.editor?.busy)this.closeEditor();}
@@ -206,13 +206,17 @@ export class TrackDayNotes {
     this.title.textContent=this.inline?t('day_notes.count'):t('day_notes.title',{date:this.dateLabel(date)});this.controls();if(!this.inline)this.dialog.showModal();this.content.scrollTop=0;
     await this.loadEditor(editor);
   }
-  async loadEditor(editor){
-    editor.loading=true;this.controls();this.savedStatus.textContent=t('day_notes.loading');
+  async refreshClean(){
+    const editor=this.editor;if(!editor||editor.loading||editor.busy||editor.saving||editor.uncertain||editor.stale||editor.failedRead||this.markdown.loading||this.dirty())return;
+    const position=this.markdown.position();return this.loadEditor(editor,{position,formatted:position.formatted});
+  }
+  async loadEditor(editor,{position=this.positions.get(editor.date),formatted=true}={}){
+    editor.abort?.abort();editor.abort=new AbortController();editor.loading=true;this.controls();this.savedStatus.textContent=t('day_notes.loading');
     try{
-      const reply=await editor.session.request('/day-entries/'+editor.date);
+      const reply=await editor.session.request('/day-entries/'+editor.date,{signal:editor.abort.signal});
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.text.value=reply.data.text;editor.noteId=reply.data.id;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;editor.saveFailed=false;
-      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});const position=this.positions.get(editor.date);if(position)await this.markdown.restorePosition({...position,formatted:true});else void this.markdown.showFormatted(false);
+      this.text.value=reply.data.text;editor.noteId=reply.data.id;editor.frontmatter=reply.data.frontmatter??null;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;editor.saveFailed=false;
+      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});if(position)await this.markdown.restorePosition({...position,formatted});else if(formatted)void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();this.error.scrollIntoView({block:'nearest'});if(error.status===401)this.callbacks.onUnauthorized(error);
@@ -243,11 +247,13 @@ export class TrackDayNotes {
     if(reply.data.text||reply.data.hasBody)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
     this.paint();
     if(this.inline||draft||autosaved){
+      const previousFrontmatter=editor.frontmatter;editor.frontmatter=reply.data.frontmatter??null;
       editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;
       if(!labelDuring)this.text.value=draft?draft.value:reply.data.text;
       if(draft&&draft.version!==reply.data.labelVersion||labelDuring&&!Object.hasOwn(sent,'text')&&previous.labelVersion!==reply.data.labelVersion){editor.originalText=draft?.original??previous.text;editor.labelVersion=draft?.version??previous.labelVersion;editor.stale=true;this.error.textContent=t('day_labels.stale');}
       if(bodyDuring&&!Object.hasOwn(sent,'body')&&previous.noteVersion!==reply.data.version){editor.originalBody=previous.body;editor.noteVersion=previous.noteVersion;editor.stale=true;this.error.textContent=t('notes.stale');}
       if(!bodyDuring&&!this.markdown.matches(reply.data.body)){const position=this.markdown.position();this.markdown.setValue(reply.data.body);void this.markdown.restorePosition(position);}
+      if(previousFrontmatter!==editor.frontmatter&&this.markdown.editor)this.markdown.banner.update(this.markdown.frontmatter,this.markdown.resources);
       this.controls();
     }else this.closeEditor();
     this.callbacks.onChanged();

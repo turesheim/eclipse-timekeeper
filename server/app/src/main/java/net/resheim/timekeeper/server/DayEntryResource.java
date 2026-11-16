@@ -17,7 +17,7 @@ public class DayEntryResource {
     @Context UriInfo uri;
     private ObjectNode entry(java.time.LocalDate date){
         var notes=new DayNotes(store);var labels=new DayLabels(store);
-        return notes.get(date).put("noteEtag",etag(notes.getContent(date))).put("labelEtag",etag(labels.get(date)));
+        return notes.get(date).put("frontmatter",notes.frontmatter(date)).put("noteEtag",etag(notes.getContent(date))).put("labelEtag",etag(labels.get(date)));
     }
     private Response reply(java.time.LocalDate date){
         return Response.fromResponse(ApiReplies.resource(200,entry(date),null).response()).header("Cache-Control",null).header("Cache-Control","private, no-store").build();

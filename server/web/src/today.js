@@ -63,8 +63,9 @@ export class TodayView {
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
   reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
-  show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
+  show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){if(this.connected&&this.journal.editor?.date===this.date)void this.journal.refreshClean();this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
+  setConnected(value){this.connected=value;const writable=this.callbacks.canWrite();this.journal.setWritable(value&&writable,writable);}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;if(visible)this.contents.show();}
     this.data=data;this.connected=connected;
@@ -81,8 +82,9 @@ export class TodayView {
   paint(){
     if(!this.data||!this.date)return;
     byId('today-title').textContent=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(this.date+'T12:00:00Z'));
+    this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite(),this.callbacks.canWrite());
     this.paintMonth();void this.loadMonthNotes();this.paintSessions();this.paintEvents();this.paintTasks();
-    this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite(),this.callbacks.canWrite());this.sizeEditor();
+    this.sizeEditor();
   }
   sizeEditor(){
     if(!this.visible||!this.root.offsetParent)return;

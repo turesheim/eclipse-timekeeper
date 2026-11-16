@@ -58,6 +58,14 @@ final class DayNotes {
         if(value.path("version").asLong()==0||value.path("deleted").asBoolean())return null;
         return document(date,value);
     }
+    /** Opaque outer metadata for the editor; it never becomes part of a body write. */
+    String frontmatter(LocalDate date){
+        var value=record(date);
+        if(value.path("version").asLong()==0||value.path("deleted").asBoolean())return "";
+        String source=new String(document(date,value),StandardCharsets.UTF_8),body=value.path("body").asText();
+        if(!source.endsWith(body))throw new ApiFailure(503,"UNAVAILABLE");
+        return source.substring(0,source.length()-body.length());
+    }
     static byte[] document(LocalDate date,ObjectNode value){
         if(value.has("markdown"))return value.path("markdown").asText().getBytes(StandardCharsets.UTF_8);
         return JournalMarkdown.render(date+".md",null,value.path("text").asText(),value.path("body").asText());
