@@ -69,6 +69,13 @@ external-reference uniqueness, version checks and the single-open-interval rule
 within the transaction. Merely checking an activity's `ownerId` at serialization
 or filtering a shared repository after a service operation is insufficient.
 
+Pure daily-entry, task-list and calendar event/task queries use a consistent
+snapshot of committed data without acquiring the owner write lock. They do not
+provision records or perform activity rollover. Credential and account validity
+are checked in short transactions before and after the snapshot; revocation or
+account disable prevents the private result from being returned. A first-use
+read still performs the normal owner initialization before using this path.
+
 A foreign resource or foreign relation is indistinguishable from a missing one:
 404 `NOT_FOUND`, with no resource contents, versions or owner information.
 Foreign filters also return 404. Lists, totals, provider lookups and exported

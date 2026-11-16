@@ -527,7 +527,7 @@ public class TimekeeperResource {
         else if(type.equals("TASK_TOMBSTONE")) ContractInputs.queries(query,"limit","cursor");
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
-        return tx(() -> {
+        Supplier<ApiReplies> read=() -> {
             boolean noteSources=type.equals("TASK")&&query.containsKey("includeNoteSources");
             if(noteSources&&!Set.of("true","false").contains(query.getFirst("includeNoteSources")))throw ApiFailure.badRequest();
             var origins=noteSources&&query.getFirst("includeNoteSources").equals("true")?new NoteTasks(store).origins():Map.<String,ObjectNode>of();
@@ -558,7 +558,8 @@ public class TimekeeperResource {
                 filters.put(name,name.equals("q") ? q : value);
             });
             return json(pages.page(type,values,canonical(filters),limit,query.getFirst("cursor")));
-        });
+        };
+        return type.equals("TASK")?store.authenticatedReadSnapshot(identity,()->read.get().response()):tx(read);
     }
     private void validateFilters(MultivaluedMap<String,String> query){validateFilters(query,false);}
     private void validateFilters(MultivaluedMap<String,String> query,boolean history) {

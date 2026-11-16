@@ -24,7 +24,7 @@ public class DayEntryResource {
     }
     @GET public Response get(@PathParam("date")String date){
         ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);
-        return store.authenticated(identity,()->reply(day));
+        return store.authenticatedReadSnapshot(identity,()->reply(day));
     }
     @POST public Response edit(@PathParam("date")String date,@HeaderParam("If-Match")String match,JsonNode body){
         if(match!=null)throw ApiFailure.badRequest();
