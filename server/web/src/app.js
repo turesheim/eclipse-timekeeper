@@ -66,6 +66,7 @@ const track = new MonthTrack($('track-panel'), { onUnauthorized:error=>auth.clea
 const recentNotes=new RecentNotes($('today-recent-notes'),{onUnauthorized:error=>auth.clear(errorText(error))},{section:$('today-recent-notes').closest('section')});
 const today = new TodayView($('today-panel'), {
   canWrite:()=>canWrite,
+  onOpenTask:(id,origin)=>void tasks.openTask(id,origin),
   onUnauthorized:error=>auth.clear(errorText(error)),
   onNotesChanged:()=>void refresh().catch(()=>{}),
   onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))

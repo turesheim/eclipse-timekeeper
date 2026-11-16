@@ -46,6 +46,7 @@
 .task-metadata { display:grid;grid-template-columns:auto minmax(0,1fr);gap:.25rem 1rem; }
 .task-metadata dd { margin:0;overflow-wrap:anywhere; }
 .task-markdown-body { overflow-wrap:anywhere; }
+.task-markdown-body img { max-width:100%; height:auto; }
 .task-markdown-body :is(pre,table) { max-width:100%;overflow:auto; }
 @media(max-width:760px) {
   .tasks-layout { grid-template-columns:minmax(0,1fr); }

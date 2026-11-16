@@ -240,6 +240,9 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
     if(original.locale!==null){const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId,locale:null},{'If-Match':profile.headers().etag});}
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
     await expect(page.locator('#today-note-editor')).toBeVisible();await expect(page.locator('html')).toHaveAttribute('lang',locale);
+    // The journal appears before the initial account snapshot finishes docking
+    // the work-session card. Measure layout after that publication settles.
+    await expect(page.locator('#status')).toHaveAttribute('data-state','ready');await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
     await page.locator('#today-date').fill('2026-10-26');
     await expect(page.locator('#today-date')).toHaveAccessibleName(locale==='nb-NO'?'Dato':'Date');await expect(page.locator('label[for="today-date"]')).toHaveClass(/visually-hidden/);
     const navigator=page.getByRole('toolbar',{name:locale==='nb-NO'?'Datonavigasjon':'Date navigation',exact:true});

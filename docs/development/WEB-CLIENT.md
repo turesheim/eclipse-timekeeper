@@ -59,6 +59,14 @@ use their review/receipt flows. See [task synchronization](../architecture/TASK-
 [provider capabilities](../architecture/TASK-SYNC-CAPABILITIES.md) and
 [operator setup](../operations/SHARED-SIGN-IN.md).
 
+Today planned tasks reuse summary-card typography and the shared task-details
+dialog. The dialog lives at workspace level so opening it keeps Today and its
+journal in place. Unchanged cards retain their DOM and return focus after closing.
+Task descriptions may resolve relative attachment images through the authenticated
+vault raster resolver. Markdown and sanitized HTML opt into this resolver; remote
+image URLs remain inert. Closing, reopening or changing accounts disposes previews
+and fences late image and source-note responses.
+
 ## Shared Markdown component
 
 Use the shared MarkdownField rather than another editor implementation. Preserve

@@ -8,9 +8,10 @@ import {clientMentionRanges} from '../src/client-mentions.js';
 
 const parser=unified().use(remarkParse).use(remarkGfm,{singleTilde:false}).use(remarkInlineStyles);
 const tags={strong:'strong',emphasis:'em',delete:'del',highlight:'mark',subscript:'sub',superscript:'sup',paragraph:'p',blockquote:'blockquote',listItem:'li',table:'table',tableRow:'tr',tableCell:'td'};
-/** Read-only task presentation uses the editor dialect; authored HTML and images stay inert. */
-export function renderMarkdown(source,{inline=false,links=true}={}){
+/** Read-only task presentation; images require an explicit authenticated resolver. */
+export function renderMarkdown(source,{inline=false,links=true,image}={}){
   const fragment=document.createDocumentFragment(),tree=parser.runSync(parser.parse(source));
+  const definitions=new Map(tree.children.filter(node=>node.type==='definition').map(node=>[node.identifier,node.url]));
   const append=(host,value,literal=false)=>{
     if(literal){host.append(document.createTextNode(value));return;}
     let offset=0;const ranges=[...hashtagRanges(value).map(range=>({...range,className:'markdown-hashtag'})),...clientMentionRanges(value).map(range=>({...range,className:'markdown-client-mention'}))].sort((a,b)=>a.from-b.from);
@@ -19,6 +20,9 @@ export function renderMarkdown(source,{inline=false,links=true}={}){
   };
   const render=(node,host,literal=false)=>{
     if(node.type==='text'){append(host,node.value,literal);return;}
+    if(['image','imageReference'].includes(node.type)&&image&&!inline){
+      const preview=image(node.type==='image'?node.url:definitions.get(node.identifier),node.alt||'');if(preview)host.append(preview);return;
+    }
     if(['html','image','imageReference'].includes(node.type)){host.append(document.createTextNode(node.value||node.alt||''));return;}
     if(['definition','footnoteDefinition'].includes(node.type))return;
     if(node.type==='break'){host.append(inline?document.createTextNode(' '):document.createElement('br'));return;}
