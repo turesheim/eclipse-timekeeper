@@ -99,7 +99,15 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
       if(!canCreate()||flush&&!await beforeCreate())throw new Error(t('notes.invalid_link'));
       const current=currentSession(),source=JSON.stringify(origin()),collection=await collectionInfo();let path=originPath([],origin(),collection.settings);
       if(!path)path=originPath(await catalog(),origin(),collection.settings);if(!path)throw new Error(t('notes.invalid_link'));
-      let entry,reply,text='';try{entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;if(entry.deleted)throw new Error(t('notes.invalid_link'));reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());}catch(error){if(error.status!==404)throw error;}
+      let entry,reply,text='';const native=typeof origin()==='object'&&origin()?.sourceType==='DAY_NOTE',matches=entry=>!native||entry.sourceType===origin().sourceType&&entry.sourceKey===origin().sourceKey;
+      try{entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;}catch(error){if(error.status!==404)throw error;}
+      // A native daily note retains its identity after a vault move or rename.
+      // Never create a second file at its former conventional path.
+      if(native&&(!entry||!matches(entry))&&hasBannerSource()){
+        entry=(await catalog()).find(value=>!value.deleted&&matches(value));
+        if(!entry)throw new Error(t('notes.stale'));path=entry.path;
+      }
+      if(entry){if(entry.deleted||!matches(entry))throw new Error(t('notes.invalid_link'));reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());}
       const date=entry?.kind==='DAY'?entry.sourceKey:typeof origin()==='object'&&origin()?.sourceType==='DAY_NOTE'?origin().sourceKey:null;
       if(!date||!/^\d{4}-\d\d-\d\d$/.test(date)||current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
       return {session:current,source,path,id:entry?.id,date,text,etag:reply?.etag||null,assetsFolder:collection.settings.assetsFolder};

@@ -14,15 +14,16 @@ const button=key=>{const value=node('button',t('daily_banner.'+key),'btn btn-out
 export function dailyBannerTools(f){
   const resources=f.resources;if(!resources?.readBanner)return;
   automaticDailyBanner(f);
-  const group=node('div'),add=button('add'),change=button('change'),restore=button('restore');group.append(add,change,restore);f.addActionsGroup(group);
+  const group=node('div'),add=button('add'),change=button('change'),restore=button('restore'),retry=button('retry_forecast');group.append(add,change,restore,retry);f.addActionsGroup(group);
   f.syncDailyBanner=()=>{
     group.hidden=!resources.dailyBannerContext?.()||f.readOnly;
     const saved=f.banner.snapshot||dailyBannerSnapshot(f.frontmatter);
-    add.hidden=!!saved;restore.hidden=!saved;
+    add.hidden=!!saved;restore.hidden=!saved;retry.hidden=!saved||saved.forecast.length===3||!resources.dailyBannerContext?.()?.weatherLocation;
     for(const action of group.children)action.disabled=f.loading||f.readOnly;
     f.syncAutomaticBanner();
   };
   f.banner.dom.addEventListener('timekeeper:banner-metadata',()=>{f.syncDailyBanner();f.syncActions();});
+  retry.addEventListener('click',()=>{f.clearAutomaticBanner();f.syncAutomaticBanner();});
   const run=async operation=>{
     if(f.readOnly||f.loading||!resources.dailyBannerContext?.())return;
     const generation=f.generation,active=()=>generation===f.generation&&!f.readOnly;let saved=false;

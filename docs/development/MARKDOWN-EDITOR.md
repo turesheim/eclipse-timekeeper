@@ -23,7 +23,7 @@ the separate About prototype and its scratchpad controls have been retired.
   fallback. Neither path adds metadata to a body write. Previews use the
   same authenticated resolver/raster checks and are disposed on mode, note or
   account changes. Ordinary prose edits never serialize banner metadata; explicit
-  daily banner actions use guarded full-file updates described below.
+  daily banner capture and explicit actions use guarded full-file updates described below.
 - `editor/milkdown.js` provides the shared Milkdown/ProseMirror schema, history,
   keyboard behavior and semantic admission guard. `tracked-document.js` reuses
   unchanged top-level Markdown spans after a rich edit. Unfamiliar blocks remain
@@ -180,11 +180,28 @@ points; account templates are limited to 64 KiB of UTF-8 text in total.
 
 ## Saved daily banner presentation
 
-`daily-banner-tools.js` flushes host autosave before reading the complete vault
-file and performs an ETagged update through `vaultEditorResources`. Ordinary
-body edits keep all frontmatter opaque. Only explicit banner actions patch the
-owned top-level properties, retaining unrelated YAML bytes and the body. Native
-daily editors reload their body-only projection after a presentation change.
+`daily-banner-automatic.js` renders bundled seasonal artwork immediately for a
+civil day. It requests weather only when the profile has a location and no saved
+three-slot forecast. Empty days and read-only sessions remain presentation only.
+Existing daily notes capture a private artwork asset and the available forecast
+in the background. Missing saved forecasts can be filled later; populated saved
+forecasts and authored custom images are preserved.
+
+Weather, full-file preparation and artwork uploads stay outside the autosave
+queue. `DocumentAutosave.exclusive` drains prose, performs the conditional metadata
+write, then drains edits made during that write before navigation can finish.
+Hosts adopt the new header and validators without rebuilding the rich editor or
+its undo history. A final full-file read must match the host's current validator;
+stale and uncertain results retain the draft and require recovery. Date/account
+generations fence late replies. Moved native notes resolve by canonical source
+identity instead of creating another conventional-path file.
+
+`daily-banner-tools.js` also provides explicit capture, image and restore actions.
+These flush host autosave before reading the complete vault file and perform an
+ETagged update through `vaultEditorResources`. Ordinary body edits keep frontmatter
+opaque. Banner updates patch only owned top-level properties, retaining unrelated
+YAML, line endings, BOM and prose. Imported custom banners keep their crop; known
+seasonal assets use natural proportions with mobile forecast content below them.
 
 `dagsverk_seasonal_banner` is a YAML text property containing version-1 JSON:
 `date`, `zoneId`, `season`, `seasonal` (private vault `reference`, `x`, `y`, catalog
@@ -192,9 +209,11 @@ daily editors reload their body-only projection after a presentation change.
 `condition`, saved localized `label`, `temperature` and `temperatureCelsius`).
 Forecast proposals also retain provider `instant`, `symbol`, `provider` and
 `capturedAt` for provenance. The current standard banner fields can override the
-saved seasonal image. Restore changes only those fields. Rendering never loads
-weather or catalog assets; each chosen illustration is copied into the private
-vault, so WebDAV and account archives preserve the original bytes.
+saved seasonal image. Restore changes only those fields. A populated saved forecast
+never fetches weather. Each captured illustration is copied into the private vault,
+so WebDAV and account archives preserve the original bytes. Saved seasonal images
+use canonical path resolution and a binary read, with the bundled version as an
+immediate placeholder; unchanged images remain visible during metadata refresh.
 
 `GET /api/v1/daily-banners/{date}/preview` reads the authenticated account's
 optional `weatherLocation` and time zone. MET Norway Locationforecast requests

@@ -27,7 +27,7 @@ export function automaticDailyBanner(f){
       }
       if(f.loading||!resources.canCaptureBanner?.())return;
       const success=await resources.serializeBanner(async()=>{
-        if(!active(state)||f.readOnly)return false;
+        if(!active(state)||f.readOnly||f.loading)return false;
         try{
           context=await resources.refreshBanner(context);if(!active(state))return false;
           if(!resources.bannerMatches?.(context))throw stale();
