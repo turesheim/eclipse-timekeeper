@@ -7488,7 +7488,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "One consistent owner-scoped snapshot, including when the caller is an administrator. No list-page, 10,000-record or 20 MiB export truncation. Includes work, preferences, account/credential-management metadata and inert import audit. Excludes all credential material and global settings/secrets."
+        "description": "One consistent owner-scoped snapshot, including when the caller is an administrator. No list-page, 10,000-record or 20 MiB export truncation. Includes work, preferences, account/credential-management metadata and inert import audit. Excludes all credential material and global settings/secrets. Preparation streams large vault content through bounded buffers into a private temporary ZIP. One account or Notes export is prepared per server process; overlapping preparations return 503 ACCOUNT_ARCHIVE_BUSY. Authentication is checked again before the prepared archive is released."
       }
     },
     "/data/account/uploads": {
@@ -17956,7 +17956,7 @@
             "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
-        "description": "A consistent owner-private snapshot with exact bytes, portable paths and timestamp metadata. Recently deleted content, account data and authentication secrets are excluded. Preparation and private download follow the account export mechanism."
+        "description": "A consistent owner-private snapshot with exact bytes, portable paths and timestamp metadata. Recently deleted content, account data and authentication secrets are excluded. Preparation and private download follow the account export mechanism. Preparation streams large vault content through bounded buffers into a private temporary ZIP. One account or Notes export is prepared per server process; overlapping preparations return 503 ACCOUNT_ARCHIVE_BUSY. Authentication is checked again before the prepared archive is released."
       }
     },
     "/notes/recent": {

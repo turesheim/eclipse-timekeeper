@@ -8,6 +8,17 @@ using the official `postgres:18.6-bookworm` image, and HAProxy for HTTP load bal
 It targets the DS923+ (AMD64), DSM 7.4.1 and Container Manager. The published
 server image and official PostgreSQL image support Linux AMD64 and ARM64.
 
+Each API replica requires **at least 2 GiB of Java heap**; the two replicas need
+4 GiB of heap capacity together, plus JVM native memory, thread stacks,
+PostgreSQL and NAS/OS memory. The Compose default is
+`JAVA_OPTS=-Xms128m -Xmx2g`. Preserve at least `-Xmx2g` in overrides and leave
+container memory headroom above the heap budget. Heap exhaustion terminates the
+JVM so its restart policy can recover it.
+
+The load balancer allows up to 30 minutes of server preparation time for the
+account and Notes export endpoints. Other API requests keep the ordinary timeout.
+Configure any additional HTTPS reverse proxy with a compatible export timeout.
+
 The API updater drains and replaces one server at a time while the other keeps
 serving requests. PostgreSQL is left running throughout an API update. There is
 no database failover: a database restart or failure interrupts both servers until

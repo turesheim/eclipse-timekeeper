@@ -8,7 +8,7 @@ export function archiveDownload(view,container,{path,fileName}){
   const prepare=button(t('ui.prepare_archive'),()=>void view.run(async()=>{
     prepare.disabled=true;clear();feedback.textContent=t('ui.preparing_archive');
     try{
-      const reply=await view.session.request(path,{binary:true,timeout:300000});if(!active||!view.valid())return;
+      const reply=await view.session.request(path,{binary:true,timeout:1800000});if(!active||!view.valid())return;
       const url=URL.createObjectURL(reply.data);urls.add(url);const link=node('a',t('ui.download_archive'),'btn btn-outline-secondary');link.href=url;link.download=reply.fileName||fileName;
       feedback.replaceChildren(node('span',t('ui.your_private_archive_is_ready')),link);
     }finally{if(view.valid())prepare.disabled=false;}

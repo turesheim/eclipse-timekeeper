@@ -14,22 +14,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 final class VaultArchive {
     private static final Set<String> ENTRY_FIELDS=Set.of("id","path","kind","parentId","deleted","deletionBatch","sourceType","sourceId","sourceKey","createdAt","modifiedAt","createdAtSource","title");
     private static final Set<String> SETTINGS_FIELDS=Set.of("journalFolder","eventsFolder","assetsFolder","syncObsidianConfig","hideJournalFolder","recentNotesDays","editorCursor");
-    @FunctionalInterface interface File {void accept(String path,byte[] bytes)throws IOException;}
+    @FunctionalInterface interface File {void accept(String path,ArchiveBinarySource source)throws IOException;}
     static boolean owns(String name){return name!=null&&name.matches("vault/(content|recycle)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\.bin");}
     private static String filename(String type,UUID id){return "vault/"+(type.equals(VaultContent.TYPE)?"content":"recycle")+"/"+id+".bin";}
     private static ObjectNode logical(JsonNode value,Set<String> fields){var result=object();for(String field:fields)if(value.has(field))result.set(field,value.get(field));return result;}
     static void files(Connection connection,String owner,File output)throws SQLException,IOException{
-        for(String type:List.of(VaultContent.TYPE,VaultRecycle.TYPE))AccountArchive.records(connection,owner,type,value->{
-            final byte[] bytes;try{bytes=Base64.getDecoder().decode(value.path("data").asText());}catch(IllegalArgumentException invalid){throw new IOException("Invalid vault bytes");}
-            if(bytes.length!=value.path("byteLength").asLong(-1)||!ArchiveJournalFiles.digest(bytes).equals(value.path("sha256").asText()))throw new IOException("Invalid vault bytes");
-            output.accept(filename(type,uuid(value.path("id"))),bytes);
-        });
+        for(String type:List.of(VaultContent.TYPE,VaultRecycle.TYPE))ArchiveBinarySource.each(connection,owner,type,source->output.accept(filename(type,source.id()),source));
     }
     static void metadata(Connection connection,String owner,JsonGenerator json)throws SQLException,IOException{
         json.writeObjectFieldStart("vault");json.writeNumberField("format",1);var settings=object().put("journalFolder","journal").put("eventsFolder","events").put("assetsFolder","assets").put("syncObsidianConfig",false).put("hideJournalFolder",false).put("recentNotesDays",VaultSettings.RECENT_DAYS).put("editorCursor","default");
         AccountArchive.records(connection,owner,VaultSettings.TYPE,value->settings.setAll(logical(value,SETTINGS_FIELDS)));json.writeObjectField("settings",settings);
         json.writeArrayFieldStart("entries");AccountArchive.records(connection,owner,VaultIndex.ENTRY,value->json.writeTree(logical(value,ENTRY_FIELDS)));json.writeEndArray();
-        json.writeArrayFieldStart("files");files(connection,owner,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));json.writeEndArray();json.writeEndObject();
+        json.writeArrayFieldStart("files");files(connection,owner,(path,source)->json.writeTree(object().put("path",path).put("bytes",source.length()).put("sha256",source.digest())));json.writeEndArray();json.writeEndObject();
     }
     static byte[] read(ZipFile zip,JsonNode file,int maximum)throws IOException{
         String path=file.path("path").asText();long size=file.path("bytes").asLong(-1);

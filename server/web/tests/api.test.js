@@ -207,3 +207,7 @@ test('binary upload bodies retain CSRF, owner binding and exact bytes',async()=>
   const foreign=new Api(null,async()=>reply({received:5},'b3duZXItYg'),{ownerId:'owner-a',csrf:'csrf-fixture'});
   await assert.rejects(foreign.request('/anything',{method:'PUT',rawBody:bytes}),error=>error.code==='OWNER_CHANGED');
 });
+test('an overlapping archive preparation gives a retryable message without treating the problem as ZIP bytes',async()=>{
+  const api=new Api(null,async()=>reply({code:'ACCOUNT_ARCHIVE_BUSY'},'b3duZXItYQ',503),{ownerId:'owner-a'});
+  await assert.rejects(api.request('/data/account/export',{binary:true}),error=>error.code==='ACCOUNT_ARCHIVE_BUSY'&&error.message==='The server is preparing another archive. Try again after it finishes.');
+});
