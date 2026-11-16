@@ -24,8 +24,8 @@ class UbuntuMirrorTest(unittest.TestCase):
             unrelated = "deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/26.04/prod resolute main\n"
             other.write_text(unrelated)
             self.assertEqual(2, len(mirror.configure(apt)))
-            for name in mirror.MIRROR_LISTS:
-                self.assertEqual(mirror.MIRROR + "\n", (apt / name).read_text())
+            self.assertEqual("https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://security.ubuntu.com/ubuntu/\tpriority:2\n", (apt / "apt-mirrors.txt").read_text())
+            self.assertEqual("https://security.ubuntu.com/ubuntu/\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\n", (apt / "apt-mirrors-security.txt").read_text())
             self.assertEqual(trusted, ubuntu.read_text())
             self.assertEqual(unrelated, other.read_text())
 
