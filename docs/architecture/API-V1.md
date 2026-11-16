@@ -985,7 +985,9 @@ checks, revocation and optional `X-Timekeeper-Owner` binding apply to every rout
   leaves the day label intact. Label changes never invalidate this note ETag.
 - `GET /day-entries/{date}` is the editor read model: it includes the current
   label, body, independent `labelVersion` and note `version`, plus `labelEtag`
-  and `noteEtag`. `POST /day-entries/{date}` is an atomic form command, containing
+  and `noteEtag`. Its optional read-only `frontmatter` field provides the exact
+  outer header from the same note version for banner presentation, separately
+  from the editable body. `POST /day-entries/{date}` is an atomic form command, containing
   only the independently changed resources: `{text,labelVersion}`,
   `{body,noteVersion}`, or both pairs. It checks only supplied versions. A peer
   label edit does not block a note-only save, and a peer note edit does not block

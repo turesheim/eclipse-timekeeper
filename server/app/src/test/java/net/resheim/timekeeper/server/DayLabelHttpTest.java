@@ -16,10 +16,22 @@ import jakarta.inject.Inject;
 @QuarkusTest @TestProfile(DayLabelHttpTest.Profile.class)
 class DayLabelHttpTest {
     @Inject ServerStore store;
+    @Inject ContractInputs inputs;
     public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:independent_day_labels");}}
     private Response get(String owner,String path){return given().header("Authorization","Bearer "+owner).get("/api/v1"+path);}
     private Response put(String owner,String path,String tag,String json){return given().header("Authorization","Bearer "+owner).header("If-Match",tag).contentType("application/json").body(json).put("/api/v1"+path);}
     private Response edit(String date,String json){return given().header("Authorization","Bearer test-a").contentType("application/json").body(json).post("/api/v1/day-entries/"+date);}
+    @Test void entryIncludesExactPrivateOuterMetadataWithoutTurningItIntoBodyContent(){
+        String day="2026-10-09",header="\ufeff---\r\n# Preserve this metadata\r\nbanner: \"[[Images/private.png]]\"\r\ncustom: ' keep spacing '  \r\n---\r\n",body="# Original body\r\n";
+        store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date(day);notes.saveDocument(date,etag(notes.getContent(date)),(header+body).getBytes(StandardCharsets.UTF_8));return null;});
+        var initial=get("test-a","/day-entries/"+day);assertEquals(200,initial.statusCode());inputs.validate("DayEntry",parse(initial.asString()));
+        assertEquals(header,initial.jsonPath().getString("frontmatter"));assertEquals(body,initial.jsonPath().getString("body"));
+        assertEquals(header,get("test-read","/day-entries/"+day).jsonPath().getString("frontmatter"));assertEquals("",get("test-b","/day-entries/"+day).jsonPath().getString("frontmatter"));
+        var changed=edit(day,object().put("body","Edited body\n").put("noteVersion",initial.jsonPath().getLong("version")).toString());assertEquals(200,changed.statusCode());assertEquals(header,changed.jsonPath().getString("frontmatter"));
+        assertEquals(400,edit(day,object().put("body","Denied").put("noteVersion",changed.jsonPath().getLong("version")).put("frontmatter","replacement").toString()).statusCode());
+        var content=get("test-a","/day-notes/"+day+"/content");assertEquals(204,given().header("Authorization","Bearer test-a").header("If-Match",content.header("ETag")).delete("/api/v1/day-notes/"+day+"/content").statusCode());
+        assertEquals("",get("test-a","/day-entries/"+day).jsonPath().getString("frontmatter"));assertEquals("",get("test-a","/day-entries/2026-10-10").jsonPath().getString("frontmatter"));
+    }
     @Test void labelsAndNotesHaveIndependentVersionsAndDeletion(){
         String day="2026-10-01",label="/day-labels/"+day,note="/day-notes/"+day+"/content";
         var emptyNote=get("test-a",note);var initialLabel=get("test-a",label);

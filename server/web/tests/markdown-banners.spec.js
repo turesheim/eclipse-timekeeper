@@ -12,6 +12,7 @@ const image=await readFile(new URL('./fixtures/banner.png',import.meta.url));
 const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jI1sAAAAASUVORK5CYII=','base64');
 const header='\uFEFF---\r\n# Keep the banner and unrelated metadata exactly\r\nbanner: "![[Images/Project cover.png]]"\r\nbanner_x: 0.25\r\nbanner_y: 0.75\r\ncustom: [one, two]\r\n---\r\n';
 const banner=root=>root.locator('.markdown-banner:not(.banner-image-preview)');
+const followingMonth=date=>{const [year,month]=date.split('-').map(Number);return new Date(Date.UTC(year,month,20)).toISOString().slice(0,10);};
 async function fresh(page,request){
   const username='banner-'+randomUUID().slice(0,8),password='Private banner acceptance passphrase';
   expect((await request.post('/api/v1/admin/users',{headers:{Authorization:'Bearer '+process.env.TIMEKEEPER_WEB_TOKEN},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}})).status()).toBe(201);
@@ -98,8 +99,8 @@ test('shared daily and weekly journals show banners in writable and read-only se
   // file header defines its Obsidian banner, not this embedded body fragment.
   const body=header+'\n# Body fragment\n',before=await api('GET','/day-notes/2026-11-03/content');
   await api('PUT','/day-notes/2026-11-03/content',{body},{'If-Match':before.headers().etag});
-  const entry=await(await api('GET','/notes/resolve?path=journal%2F2026-11-03.md')).json(),headerRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/notes/entries/'+entry.id+'/content');
-  await page.locator('#today-date').fill('2026-11-03');await headerRead;await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeHidden();
+  const entryRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/day-entries/2026-11-03');
+  await page.locator('#today-date').fill('2026-11-03');expect((await(await entryRead).json()).frontmatter).not.toContain('banner:');await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeHidden();
   expect((await(await api('GET','/day-notes/2026-11-03/content')).json()).body).toBe(body);
   // Existing files may consist of metadata alone; an empty body still has a banner.
   await put('journal/2026-11-04.md',header);await page.locator('#today-date').fill('2026-11-04');await expectBanner(page.locator('#today-note-editor'));
@@ -143,8 +144,33 @@ test('a daily image can come from the vault without changing another day',async(
 
 test('a failed custom image leaves the saved seasonal restore action available',async({page,request})=>{
   const {put}=await fresh(page,request);await put('Images/Project cover.png',image);await put('Images/broken.png',Buffer.concat([image.subarray(0,12),Buffer.from('Incomplete PNG')]));
-  const snapshot={version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/Project cover.png',x:.25,y:.75},forecast:[]};
-  await put('journal/2026-11-16.md','---\nbanner: "[[Images/broken.png]]"\ndagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify(snapshot))+'\n---\n\n# Restore me\n');
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Restore me');await expect(banner(root).locator('img')).toHaveCount(0);await expect(banner(root)).toBeHidden();
+  const date=await page.locator('#today-date').inputValue();await expect(page.locator('#today-note-editor .ProseMirror')).toHaveText('');
+  const snapshot={version:1,date,zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/Project cover.png',x:.25,y:.75},forecast:[]};
+  await put('journal/'+date+'.md','---\nbanner: "[[Images/broken.png]]"\ndagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify(snapshot))+'\n---\n\n# Restore me\n');
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Restore me');await expect(banner(root).locator('img')).toHaveCount(0);await expect(banner(root)).toBeHidden();
   await dailyTool(root,'Restore seasonal image');await expectBanner(root);
+});
+
+test('daily banners render from the note snapshot without another full-document read',async({page,request})=>{
+  const {put}=await fresh(page,request);const date=followingMonth(await page.locator('#today-date').inputValue());await put('Images/Project cover.png',image);const entry=await put('journal/'+date+'.md',header+'\n# Immediate banner\n');
+  const redundant=[];await page.route('**/api/v1/notes/entries/'+entry.id+'/content',route=>{redundant.push(route.request().url());return route.abort('failed');});
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Immediate banner');await expectBanner(root);expect(redundant).toEqual([]);
+});
+
+test('the selected daily note loads before serialized month metadata reads',async({page,request})=>{
+  const {put}=await fresh(page,request);const date=followingMonth(await page.locator('#today-date').inputValue());await put('journal/'+date+'.md','# Selected note first\n');
+  let allowMetadata;const gate=new Promise(resolve=>allowMetadata=resolve);let tail=Promise.resolve();const calls=[];
+  await page.route(/\/api\/v1\/(?:day-entries\/|day-notes\?|week-notes\?)/,async route=>{
+    const previous=tail;let release;tail=new Promise(resolve=>release=resolve);await previous;
+    try{const path=new URL(route.request().url()).pathname;calls.push(path);if(!path.startsWith('/api/v1/day-entries/'))await gate;const response=await route.fetch();await route.fulfill({response});}finally{release();}
+  });
+  try{await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor .ProseMirror')).toContainText('Selected note first');expect(calls[0]).toBe('/api/v1/day-entries/'+date);}
+  finally{allowMetadata();await page.unrouteAll({behavior:'wait'});}
+});
+
+test('returning to a clean daily note refreshes peer edits without changing source mode',async({page,request})=>{
+  const {api,put}=await fresh(page,request);const date=followingMonth(await page.locator('#today-date').inputValue()),entry=await put('journal/'+date+'.md','# Before peer edit\n');
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Before peer edit');await root.getByRole('button',{name:'Markdown source',exact:true}).click();
+  const current=await api('GET','/notes/entries/'+entry.id+'/content');await api('PUT','/notes/entries/'+entry.id+'/content',Buffer.from('# After peer edit\n'),{'Content-Type':'application/octet-stream','If-Match':current.headers().etag});
+  await page.locator('[data-tab=today]').click();await expect(root.locator('textarea')).toHaveValue('# After peer edit\n');await expect(root.getByRole('button',{name:'Markdown source',exact:true})).toHaveAttribute('aria-pressed','true');
 });

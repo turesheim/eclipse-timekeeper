@@ -31104,6 +31104,12 @@
             "readOnly": true,
             "description": "Independent day-label version in this deprecated combined projection. It participates in the combined ETag."
           },
+          "frontmatter": {
+            "type": "string",
+            "maxLength": 20000,
+            "readOnly": true,
+            "description": "Exact outer Markdown frontmatter, including its delimiters, BOM and line endings, or an empty string. Read-only presentation metadata from the same note version as body; body-only edits never include or replace it. Optional for compatibility with older servers."
+          },
           "noteEtag": {
             "type": "string",
             "readOnly": true,

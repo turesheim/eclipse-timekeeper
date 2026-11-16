@@ -17,8 +17,10 @@ the separate About prototype and its scratchpad controls have been retired.
   Unchanged source, BOM and mixed line endings survive a round trip exactly.
 - `src/markdown-banner.js` reads supported top-level Obsidian Banners properties
   for a decorative image outside the rich document. Native daily/event bodies
-  omit file metadata, so their vault resources read the original header through
-  the existing Notes API without adding it to the saved body. Previews use the
+  omit file metadata from the editable body. Daily editor responses provide the
+  exact outer `frontmatter` separately, so banner rendering avoids three extra
+  serialized vault requests. Event notes and older servers retain the Notes API
+  fallback. Neither path adds metadata to a body write. Previews use the
   same authenticated resolver/raster checks and are disposed on mode, note or
   account changes. Ordinary prose edits never serialize banner metadata; explicit
   daily banner actions use guarded full-file updates described below.
