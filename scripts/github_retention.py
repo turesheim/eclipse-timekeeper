@@ -23,6 +23,13 @@ def api(repo, path, method='GET', **fields):
     return json.loads(output) if output.strip() else None
 
 
+def missing_resource(failure):
+    try:
+        return str(json.loads(failure.output).get('status')) == '404'
+    except (ValueError, AttributeError, TypeError):
+        return False
+
+
 def pages(repo, path, field=None):
     result = json.loads(gh('api', f'repos/{repo}/{path}', '--paginate', '--slurp'))
     return [item for page in result for item in (page[field] if field else page)]
@@ -90,11 +97,19 @@ def clean_artifacts(repo, retained_id, apply=False):
     if retained is None or retained.get('expired'):
         raise ValueError('The current Synology artifact must exist before old artifacts are removed')
     selected = artifact_plan(artifacts, retained)
-    report = {'retained': retained_id, 'selected': [item['id'] for item in selected], 'deleted': []}
+    report = {'retained': retained_id, 'selected': [item['id'] for item in selected],
+              'deleted': [], 'alreadyAbsent': []}
     if apply:
         for item in selected:
-            api(repo, f"actions/artifacts/{item['id']}", 'DELETE')
-            report['deleted'].append(item['id'])
+            try:
+                api(repo, f"actions/artifacts/{item['id']}", 'DELETE')
+            except subprocess.CalledProcessError as failure:
+                # Inventories can outlive an earlier cleanup or artifact expiry.
+                if not missing_resource(failure):
+                    raise
+                report['alreadyAbsent'].append(item['id'])
+            else:
+                report['deleted'].append(item['id'])
     return report
 
 
@@ -125,11 +140,7 @@ def clean_registry(repo, apply=False):
     try:
         package = json.loads(gh('api', path))
     except subprocess.CalledProcessError as failure:
-        try:
-            missing = str(json.loads(failure.output).get('status')) == '404'
-        except (ValueError, AttributeError, TypeError):
-            missing = False
-        if not missing:
+        if not missing_resource(failure):
             raise
         return {'package': 'eclipse-timekeeper-server', 'total': 0, 'selected': [],
                 'retained': [], 'deleted': [], 'absent': True}

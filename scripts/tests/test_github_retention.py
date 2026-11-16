@@ -1,6 +1,7 @@
 """Retention must preserve current work, versioned outputs and unrelated data."""
 import unittest
 import json
+import subprocess
 from unittest.mock import patch
 
 import github_retention as retention
@@ -8,6 +9,11 @@ import github_retention as retention
 
 def deployment(identity, environment='github-pages'):
     return {'id': identity, 'created_at': f'2026-11-06T00:00:{identity:02d}Z', 'environment': environment}
+
+
+def artifact(identity, name='synology-installer', branch='main'):
+    return {'id': identity, 'created_at': f'2026-11-06T00:00:{identity:02d}Z',
+            'name': name, 'workflow_run': {'head_branch': branch}}
 
 
 class RetentionTest(unittest.TestCase):
@@ -33,8 +39,6 @@ class RetentionTest(unittest.TestCase):
         self.assertEqual(['deployments/2'], [path for path,method,_ in calls if method == 'DELETE'])
 
     def test_only_old_temporary_spk_artifacts_are_removed(self):
-        def artifact(identity, name='synology-installer', branch='main'):
-            return {'id': identity, 'created_at': str(identity), 'name': name, 'workflow_run': {'head_branch': branch}}
         current = artifact(5)
         items = [artifact(1), artifact(2, branch='v2.0.0'), artifact(3, branch='v1.0.1a'),
                  artifact(4, name='server-compose'), current, artifact(6)]
@@ -48,6 +52,35 @@ class RetentionTest(unittest.TestCase):
             self.assertTrue(all(len(call.args) == 2 for call in api.call_args_list))
         with patch.object(retention, 'pages', return_value=[]), self.assertRaises(ValueError):
             retention.clean_artifacts('owner/repo', 123, apply=True)
+
+    def test_cleanup_continues_when_an_old_artifact_was_already_removed(self):
+        items = [artifact(1), artifact(2), artifact(3, branch='v2.0.0'),
+                 artifact(4, name='server-compose'), artifact(5), artifact(6)]
+        for status in ('404', 404):
+            with self.subTest(status=status):
+                missing = subprocess.CalledProcessError(1, ['gh', 'api'],
+                             output=json.dumps({'message': 'Not Found', 'status': status}))
+                with patch.object(retention, 'pages', return_value=items), \
+                     patch.object(retention, 'gh', side_effect=[missing, '']) as gh:
+                    result = retention.clean_artifacts('owner/repo', 5, apply=True)
+                self.assertEqual([1, 2], result['selected'])
+                self.assertEqual([1], result['alreadyAbsent'])
+                self.assertEqual([2], result['deleted'])
+                self.assertEqual([('api', 'repos/owner/repo/actions/artifacts/1', '--method', 'DELETE'),
+                                  ('api', 'repos/owner/repo/actions/artifacts/2', '--method', 'DELETE')],
+                                 [call.args for call in gh.call_args_list])
+
+    def test_cleanup_still_fails_for_permission_service_and_unrecognized_errors(self):
+        items = [artifact(1), artifact(2), artifact(5)]
+        for output in ('{"status":"401"}', '{"status":"403"}', '{"status":"500"}',
+                       '{"message":"Not Found"}', 'network unavailable', None):
+            with self.subTest(output=output):
+                failure = subprocess.CalledProcessError(1, ['gh', 'api'], output=output)
+                with patch.object(retention, 'pages', return_value=items), \
+                     patch.object(retention, 'gh', side_effect=failure) as gh, \
+                     self.assertRaises(subprocess.CalledProcessError):
+                    retention.clean_artifacts('owner/repo', 5, apply=True)
+                self.assertEqual(1, gh.call_count)
 
     def test_registry_keeps_all_version_tags_even_when_they_also_have_temporary_tags(self):
         versions = [{'id': i, 'metadata': {'container': {'tags': tags}}}
