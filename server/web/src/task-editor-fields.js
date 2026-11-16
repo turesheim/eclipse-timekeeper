@@ -3,21 +3,28 @@ import {taskPresentation} from './model.js';
 
 /** Task-only controls retain the exact original timed deadline unless it is edited. */
 export function taskEditorFields(field,value,data,id,homes=[]){
-  const client=field(t('ui.client'),'clientId',value.clientId||data().projects.find(item=>item.id===value.projectId)?.clientId||'',{choices:[]});
+  const originalClient=value.clientId||data().projects.find(item=>item.id===value.projectId)?.clientId||'';
+  const client=field(t('ui.client'),'clientId',originalClient,{choices:[]});
   const project=field(t('ui.project'),'projectId',value.projectId||'',{choices:[]});
   const parent=field(t('ui.parent_task'),'parentTaskId',value.parentTaskId||'',{choices:[]});
   const choices=(input,items,empty)=>{
     const selected=input.value;input.replaceChildren();
-    for(const [id,label]of [['',empty],...items]){const option=document.createElement('option');option.value=id;option.textContent=label;input.append(option);}
-    input.value=selected;
+    for(const [id,label,disabled=false]of [['',empty],...items]){const option=document.createElement('option');option.value=id;option.textContent=label;option.disabled=disabled;input.append(option);}
+    input.value=selected;if(input.selectedIndex<0)input.value='';
   };
-  const refresh=()=>{
+  const refresh=(selectedParent=parent.value)=>{
     const current=data();choices(client,current.clients.map(item=>[item.id,item.name]),t('ui.unassigned'));
     choices(project,current.projects.filter(item=>!client.value||item.clientId===client.value).map(item=>[item.id,item.name]),t('ui.no_project'));
-    choices(parent,current.tasks.filter(item=>item.id!==id&&(item.projectId||'')===project.value).map(item=>[item.id,taskPresentation(item).title]),t('ui.no_parent'));
+    const contextClient=current.projects.find(item=>item.id===project.value)?.clientId||client.value;
+    const candidates=current.tasks.filter(item=>item.id!==id&&!['COMPLETED','CANCELLED'].includes(item.status)&&(item.projectId||'')===project.value&&(current.projects.find(project=>project.id===item.projectId)?.clientId||item.clientId||'')===contextClient).map(item=>[item.id,taskPresentation(item).title]);
+    // A completed current parent is retained for unrelated edits, but cannot be
+    // selected again or carried into a different client/project assignment.
+    const retained=current.tasks.find(item=>item.id===selectedParent&&item.id===value.parentTaskId&&item.id!==id);
+    if(retained&&client.value===originalClient&&project.value===(value.projectId||'')&&!candidates.some(([id])=>id===retained.id))candidates.push([retained.id,taskPresentation(retained).title+' · '+t('tasks.status.'+(retained.status||'NOT_STARTED')),true]);
+    choices(parent,candidates,t('ui.no_parent'));parent.value=candidates.some(([id])=>id===selectedParent)?selectedParent:'';
   };
   // Install initial choices before selecting IDs, since an empty select drops its value.
-  refresh();client.value=value.clientId||data().projects.find(item=>item.id===value.projectId)?.clientId||'';refresh();project.value=value.projectId||'';refresh();parent.value=value.parentTaskId||'';
+  refresh();client.value=originalClient;refresh();project.value=value.projectId||'';refresh(value.parentTaskId||'');
   project.addEventListener('change',()=>{const selected=data().projects.find(item=>item.id===project.value);if(selected)client.value=selected.clientId;refresh();});
   client.addEventListener('change',()=>{const selected=data().projects.find(item=>item.id===project.value);if(selected&&selected.clientId!==client.value)project.value='';refresh();});
   const home=field(t('tasks.sync_list'),'syncListId',value.syncListId||'',{choices:[['',t('tasks.local_only')],...homes.map(list=>[list.id,list.name])]});

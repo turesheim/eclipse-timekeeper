@@ -17,6 +17,29 @@ async function setup(page,request,locale='en-GB'){
 const allTasks=async api=>(await(await api('GET','/tasks?limit=500')).json()).items;
 const taskButton=(page,title)=>page.locator('#tasks-list').getByRole('button',{name:'Open task '+title,exact:true});
 
+test('parent task choices include only open tasks in the selected client and project',async({page,request})=>{
+  const api=await setup(page,request),clients=[];
+  for(const name of ['First client','Second client'])clients.push(await(await api('POST','/clients',{name,color:'#285ca8'})).json());
+  const projects=[];for(const [name,client]of [['First project',clients[0]],['Other project',clients[0]],['Second client project',clients[1]]])projects.push(await(await api('POST','/projects',{name,clientId:client.id,icon:null})).json());
+  const tasks=[];for(const [summary,client,project,status]of [['Unassigned open',null,null,'NOT_STARTED'],['First client open',clients[0],null,'NOT_STARTED'],['First client completed',clients[0],null,'COMPLETED'],['Second client open',clients[1],null,'NOT_STARTED'],['First project open',clients[0],projects[0],'NOT_STARTED'],['First project waiting',clients[0],projects[0],'WAITING'],['First project completed',clients[0],projects[0],'COMPLETED'],['Other project open',clients[0],projects[1],'NOT_STARTED'],['Second client project open',clients[1],projects[2],'NOT_STARTED']])tasks.push(await(await api('POST','/tasks',{summary,clientId:client?.id||null,projectId:project?.id||null,parentTaskId:null,url:null,status})).json());
+  await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=tasks]').click();await page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true}).click();
+  const editor=page.locator('#editor'),parent=editor.getByLabel('Parent task',{exact:true}),client=editor.getByLabel('Client',{exact:true}),project=editor.getByLabel('Project',{exact:true});
+  await expect(parent.locator('option')).toHaveText(['No parent','Unassigned open']);
+  await client.selectOption(clients[0].id);await expect(parent.locator('option')).toHaveText(['No parent','First client open']);await parent.selectOption(tasks.find(task=>task.summary==='First client open').id);
+  await client.selectOption(clients[1].id);await expect(parent).toHaveValue('');await expect(parent.locator('option')).toHaveText(['No parent','Second client open']);
+  await client.selectOption(clients[0].id);await project.selectOption(projects[0].id);expect((await parent.locator('option').allTextContents()).sort()).toEqual(['First project open','First project waiting','No parent']);
+  await project.selectOption(projects[1].id);await expect(parent.locator('option')).toHaveText(['No parent','Other project open']);await editor.getByRole('button',{name:'Cancel',exact:true}).click();
+});
+
+test('editing a child retains its completed parent without offering it as a new choice',async({page,request})=>{
+  const api=await setup(page,request),parentTask=await(await api('POST','/tasks',{summary:'Completed parent',projectId:null,parentTaskId:null,url:null})).json(),child=await(await api('POST','/tasks',{summary:'Existing child',projectId:null,parentTaskId:parentTask.id,url:null})).json();
+  const current=await api('GET','/tasks/'+parentTask.id);await api('PUT','/tasks/'+parentTask.id+'/planning',{status:'COMPLETED',scheduledDate:null,completedAt:'2026-11-15T12:00:00Z'},{'If-Match':current.headers().etag});
+  await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=tasks]').click();await taskButton(page,'Existing child').click();await page.locator('#task-details').getByRole('button',{name:'Edit task',exact:true}).click();
+  const editor=page.locator('#editor'),parent=editor.getByLabel('Parent task',{exact:true});await expect(parent).toHaveValue(parentTask.id);await expect(parent.locator('option:checked')).toBeDisabled();
+  await editor.getByLabel('Summary',{exact:true}).fill('Retained child');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).toBeHidden();expect((await(await api('GET','/tasks/'+child.id)).json()).parentTaskId).toBe(parentTask.id);
+  await taskButton(page,'Retained child').click();await page.locator('#task-details').getByRole('button',{name:'Edit task',exact:true}).click();await parent.selectOption('');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).toBeHidden();expect((await(await api('GET','/tasks/'+child.id)).json()).parentTaskId).toBeNull();
+});
+
 test('Markdown assignments, source note links and removals use the same owned tasks',async({page,request})=>{
   const api=await setup(page,request),client=await(await api('POST','/clients',{name:'Client With Spaces',color:'#285ca8'})).json(),project=await(await api('POST','/projects',{name:'Project With Spaces',clientId:client.id,icon:null})).json();
   const text='- [ ] Direct :smiley: @Client_With_Spaces\n- [x] Project @Project_With_Spaces\n';
