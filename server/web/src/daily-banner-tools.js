@@ -5,6 +5,7 @@ import {dailyBannerSnapshot,replaceBanner} from './daily-banner-model.js';
 import {seasonalArtwork} from './seasonal-banner-catalog.js';
 import {imagePreview} from './image-preview.js';
 import {rasterType} from './notes-links.js';
+import {automaticDailyBanner} from './daily-banner-automatic.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=key=>{const value=node('button',t('daily_banner.'+key),'btn btn-outline-secondary');value.type='button';return value;};
@@ -12,12 +13,14 @@ const button=key=>{const value=node('button',t('daily_banner.'+key),'btn btn-out
 /** Daily presentation changes use the complete, ETagged vault file after flushing prose. */
 export function dailyBannerTools(f){
   const resources=f.resources;if(!resources?.readBanner)return;
+  automaticDailyBanner(f);
   const group=node('div'),add=button('add'),change=button('change'),restore=button('restore');group.append(add,change,restore);f.addActionsGroup(group);
   f.syncDailyBanner=()=>{
     group.hidden=!resources.dailyBannerContext?.()||f.readOnly;
     const saved=f.banner.snapshot||dailyBannerSnapshot(f.frontmatter);
     add.hidden=!!saved;restore.hidden=!saved;
     for(const action of group.children)action.disabled=f.loading||f.readOnly;
+    f.syncAutomaticBanner();
   };
   f.banner.dom.addEventListener('timekeeper:banner-metadata',()=>{f.syncDailyBanner();f.syncActions();});
   const run=async operation=>{

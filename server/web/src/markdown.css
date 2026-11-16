@@ -203,8 +203,14 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .notes-editor > .markdown-banner,.journal-dialog > .markdown-banner,.journal-inline > form > .markdown-banner,.journal-dialog > form > .markdown-banner { width:calc(100% + 1rem); margin:-.5rem -.5rem .25rem; border-radius:var(--bs-border-radius) var(--bs-border-radius) 0 0; }
 
 .markdown-banner {position:relative;flex-shrink:0}
+.markdown-banner.seasonal-banner {height:auto}
+.markdown-banner.seasonal-banner > img {height:auto;object-fit:contain}
+.banner-forecast-status {position:absolute;right:.35rem;bottom:.35rem;display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;max-width:calc(100% - .7rem);padding:.3rem .5rem;background:rgb(15 30 32 / 88%);color:#fff;border-radius:var(--bs-border-radius);font-size:.8rem}
+.banner-forecast-status a,.banner-forecast-status .btn {color:#fff}
+.banner-forecast-status .btn {padding:.1rem .25rem;font-size:inherit}
 .banner-forecast {position:absolute;inset:.35rem .35rem 1.25rem auto;display:flex;align-items:stretch;gap:.25rem;max-width:calc(100% - .7rem);list-style:none;margin:0;padding:0;color:#fff;font-size:.75rem;line-height:1.15}
 .banner-forecast li {display:grid;grid-template-columns:auto auto;align-content:center;align-items:center;gap:.1rem .3rem;min-width:0;max-width:8rem;padding:.25rem .4rem;border-radius:.25rem;background:rgb(15 30 32 / 88%)}
+.banner-forecast li {color:#fff}
 .banner-forecast time {font-variant-numeric:tabular-nums}
 .banner-weather-symbol {font-size:1.2rem;text-align:right}
 .banner-weather-label {grid-column:1 / -1;overflow-wrap:anywhere}
@@ -215,3 +221,10 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .banner-image-dialog label {display:block;margin:.5rem 0}
 .banner-image-preview {width:100%;margin:.5rem 0;height:112px}
 @media(max-width:400px) {.banner-forecast {inset-inline:.25rem;justify-content:flex-end;gap:.2rem}.banner-forecast li {flex:1;padding:.2rem .3rem;font-size:.7rem}.banner-forecast strong {font-size:.8rem}}
+@media(max-width:600px) {
+  .seasonal-banner .banner-forecast {position:static;max-width:none;padding:.35rem;background:var(--bs-body-bg)}
+  .seasonal-banner .banner-forecast li {flex:1;max-width:none}
+  .seasonal-banner .banner-weather-credit {position:static;display:block;text-align:right;padding:.2rem .35rem}
+  .seasonal-banner .banner-forecast-status {position:static;max-width:none;border-radius:0;background:var(--bs-body-bg);color:var(--bs-body-color)}
+  .seasonal-banner .banner-forecast-status a,.seasonal-banner .banner-forecast-status .btn {color:var(--bs-link-color)}
+}

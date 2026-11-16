@@ -17,7 +17,7 @@ const relativeReference=(origin,target)=>{
 // resolved note origin before an authenticated collection lookup.
 const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',reference,{legacyAssets:false});
 /** All lookups use the current API session. No credentials enter resource URLs. */
-export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true,bannerFrontmatter=()=>null,afterBannerChange=async()=>{},dailyBannerContext=()=>origin()?.sourceType==='DAY_NOTE'}={}){
+export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true,bannerFrontmatter=()=>null,afterBannerChange=async()=>{},serializeBanner,bannerCommitted,bannerMatches,bannerFailed,dailyBannerContext=()=>origin()?.sourceType==='DAY_NOTE'}={}){
   let cachedSession,cache,allCache,info,infoRequest,generation=0,opening=false;
   const invalidate=()=>{cache=null;allCache=null;info=null;infoRequest=null;generation++;};
   const currentSession=()=>{const current=session();if(!current)throw new Error(t('notes.invalid_link'));if(current!==cachedSession){cachedSession=current;invalidate();}return current;};
@@ -89,10 +89,14 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
   };
   const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
   return {
-    dailyBannerContext,
+    dailyBannerContext,serializeBanner,bannerCommitted,bannerMatches,bannerFailed,canCaptureBanner:canCreate,
+    announceBanner:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')),
+    bannerVersion:()=>generation,
+    bannerPreview:async(date,{signal}={})=>{const current=currentSession(),source=JSON.stringify(origin());const reply=await current.request('/daily-banners/'+date+'/preview',{signal});if(current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));return reply.data;},
+    bannerIdentity:()=>({session:session(),origin:JSON.stringify(origin())}),
     bannerChanged:afterBannerChange,
-    readBanner:async()=>{
-      if(!canCreate()||!await beforeCreate())throw new Error(t('notes.invalid_link'));
+    readBanner:async({flush=true}={})=>{
+      if(!canCreate()||flush&&!await beforeCreate())throw new Error(t('notes.invalid_link'));
       const current=currentSession(),source=JSON.stringify(origin()),collection=await collectionInfo();let path=originPath([],origin(),collection.settings);
       if(!path)path=originPath(await catalog(),origin(),collection.settings);if(!path)throw new Error(t('notes.invalid_link'));
       let entry,reply,text='';try{entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}))).data;if(entry.deleted)throw new Error(t('notes.invalid_link'));reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'});text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());}catch(error){if(error.status!==404)throw error;}
@@ -100,11 +104,17 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
       if(!date||!/^\d{4}-\d\d-\d\d$/.test(date)||current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
       return {session:current,source,path,id:entry?.id,date,text,etag:reply?.etag||null,assetsFolder:collection.settings.assetsFolder};
     },
-    writeBanner:async(context,text)=>{
+    refreshBanner:async context=>{
+      const current=currentSession();if(!context.id||current!==context.session||context.source!==JSON.stringify(origin()))throw new Error(t('notes.stale'));
+      const reply=await current.request('/notes/entries/'+context.id+'/content',{binary:'application/octet-stream'});
+      if(current!==session()||context.source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
+      return {...context,text:new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer()),etag:reply.etag};
+    },
+    writeBanner:async(context,text,{notify=true}={})=>{
       const current=currentSession(),active=()=>canCreate()&&current===context.session&&context.source===JSON.stringify(origin());if(!active())throw new Error(t('notes.invalid_link'));
-      if(!await ensureParents(context.path,current,active))throw new Error(t('notes.invalid_link'));
-      await current.request(context.etag?'/notes/entries/'+context.id+'/content':'/notes/files?'+new URLSearchParams({path:context.path}),{method:'PUT',...(context.etag?{etag:context.etag}:{noneMatch:'*'}),rawBody:new TextEncoder().encode(text)});
-      if(!active())return;invalidate();document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));
+      if(!context.etag&&!await ensureParents(context.path,current,active))throw new Error(t('notes.invalid_link'));
+      const reply=await current.request(context.etag?'/notes/entries/'+context.id+'/content':'/notes/files?'+new URLSearchParams({path:context.path}),{method:'PUT',...(context.etag?{etag:context.etag}:{noneMatch:'*'}),rawBody:new TextEncoder().encode(text)});
+      if(active()){invalidate();if(notify)document.dispatchEvent(new CustomEvent('timekeeper:notes-changed'));}return reply;
     },
     uploadBanner:async(context,bytes,extension)=>{
       const current=currentSession(),active=()=>canCreate()&&current===context.session&&context.source===JSON.stringify(origin());if(!active()||!['png','jpg','gif','webp'].includes(extension)||bytes.length>5_000_000)throw new Error(t('markdown.upload_failed'));
@@ -127,6 +137,10 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
       if(current!==session()||cycle!==generation)return '';
       return splitMarkdown(await reply.data.text()).frontmatter;
     },
+    bannerImage:(reference,alt)=>previewImage(async()=>{
+      try{return(await currentSession().request('/notes/resolve?'+new URLSearchParams({path:reference}))).data;}
+      catch(error){if(error.status!==404)throw error;return resolveWiki(reference);}
+    },alt),
     image:(reference,alt)=>previewImage(()=>resolveRelative(reference),alt),
     canonicalAsset:async reference=>(await resolveRelative(reference)).path,
     assetReference:async entry=>{const value=origin(),collection=typeof value==='string'?null:await collectionInfo();let path=originPath([],value,collection?.settings);if(!path)path=originPath(await catalog(),value,collection?.settings);return relativeReference(path,entry.path);},

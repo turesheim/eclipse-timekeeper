@@ -1,7 +1,7 @@
 import {form,field,node} from './account-ui.js';
 import {t} from './i18n.js';
 
-/** Location is optional and is used only when an owner explicitly creates a seasonal banner. */
+/** Optional coordinates supply uncaptured daily forecasts; saved forecasts stay unchanged. */
 export function weatherSettings(view,profile){
   const current=profile.data.weatherLocation;
   const editor=form(view,t('daily_banner.location'),t('ui.save'),async()=>{

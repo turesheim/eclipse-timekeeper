@@ -176,7 +176,7 @@ export class MonthTrack {
       }
       if (!clients.length) this.totals.append(node('p', i18nText("ui.no_work_sessions_this_month"), 'hint'));
       if (focused) this.dailyTimes.get(focused.date + '/' + focused.client)?.summary.focus();
-      this.notes.update(this.calendar,holidayCells,this.session,this.snapshot.revision,this.writable,noteFocused);
+      this.notes.update(this.calendar,holidayCells,this.session,this.snapshot.revision,this.writable,noteFocused,this.snapshot.profile.data);
       this.holidays.update(this.calendar,holidayCells,holidayFocused,this.snapshot.profile.data.holidayCountry);
       this.paintPicker();
     }

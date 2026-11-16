@@ -11,12 +11,25 @@ export class DocumentAutosave {
   flush(options={}){
     this.cancelTimers();if(this.pending)return this.pending;
     const generation=this.generation;
-    const pending=Promise.resolve().then(async()=>{
-      while(generation===this.generation&&this.dirty()){
-        if(!this.ready()||!await this.save(options))return false;
-      }
-      return generation===this.generation;
-    }).finally(()=>{if(this.pending===pending){this.pending=null;if(!this.dirty())this.cancelTimers();}});
+    return this.track(Promise.resolve().then(()=>this.drain(generation,options)));
+  }
+  async drain(generation,options={}){
+    while(generation===this.generation&&this.dirty()){
+      if(!this.ready()||!await this.save(options))return false;
+    }
+    return generation===this.generation;
+  }
+  /** Queue metadata between prose writes; navigation also waits for newer edits. */
+  exclusive(operation){
+    this.cancelTimers();const generation=this.generation,previous=this.pending;
+    return this.track(Promise.resolve(previous).then(async success=>{
+      if(success===false||!await this.drain(generation)||!this.ready())return false;
+      if(await operation()===false||generation!==this.generation)return false;
+      return this.drain(generation);
+    }));
+  }
+  track(work){
+    const pending=work.finally(()=>{if(this.pending===pending){this.pending=null;if(!this.dirty())this.cancelTimers();}});
     this.pending=pending;return pending;
   }
   reset(){this.cancelTimers();++this.generation;this.pending=null;}

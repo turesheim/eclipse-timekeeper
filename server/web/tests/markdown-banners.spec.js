@@ -35,6 +35,51 @@ async function expectBanner(root,position='25% 75%'){
   await expect.poll(()=>banner(root).locator('img').evaluate(img=>img.naturalWidth)).toBe(800);expect(await root.locator('.ProseMirror .markdown-banner').count()).toBe(0);
 }
 
+test('daily artwork appears automatically at full proportions without creating an empty note',async({page,request})=>{
+  const {api}=await fresh(page,request),writes=[];
+  page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&new URL(r.url()).pathname.startsWith('/api/v1/notes'))writes.push(r.url());});
+  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-12-01');
+  const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toBeVisible();await expect(banner(root)).toBeVisible();
+  await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v1/winter-snow.png');
+  await expect(root.locator('.banner-forecast-status')).toContainText('Add a weather location');await expect(root.getByRole('link',{name:'Set weather location',exact:true})).toHaveAttribute('href','#account/profile');
+  for(const width of [1200,320])for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
+    const image=banner(root).locator('img');await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1800);
+    const box=await image.boundingBox();expect(Math.abs(box.height-box.width*400/1800)).toBeLessThan(1);await expect(image).toHaveCSS('object-fit','contain');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+    await captureScreenshot(page,{path:`test-results/automatic-banner-${theme}-${width}.png`,fullPage:true});
+  }
+  expect((await(await api('GET','/day-entries/2026-12-01')).json()).version).toBe(0);expect(writes).toEqual([]);
+});
+
+test('slow weather and banner writes keep typing editable and preserve newer prose',async({page,request})=>{
+  test.setTimeout(90000);const {api,put}=await fresh(page,request),date='2026-11-16';
+  let releaseWeather,releaseMetadata,enteredMetadata;const weatherGate=new Promise(resolve=>releaseWeather=resolve),metadataGate=new Promise(resolve=>releaseMetadata=resolve),metadataStarted=new Promise(resolve=>enteredMetadata=resolve);
+  const owner=(await api('GET','/me')).headers()['x-timekeeper-owner'];
+  await page.route('**/api/v1/daily-banners/*/preview',async route=>{
+    const requested=new URL(route.request().url()).pathname.split('/').at(-2);await weatherGate;
+    await route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:requested,zoneId:'Europe/Oslo',season:'late-autumn',weather:'snow',provider:'MET Norway',capturedAt:'2026-11-16T08:00:00Z',forecast:[9,12,15].map(hour=>({time:String(hour).padStart(2,'0')+':00',condition:'snow',temperatureCelsius:-2}))}}).catch(()=>{});
+  });
+  const entry=await put('journal/'+date+'.md','# Weather wait\n\nKeep this prose.\n');
+  await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{
+    if(route.request().method()==='PUT'&&route.request().postData()?.includes('dagsverk_seasonal_banner:')){enteredMetadata();await metadataGate;}await route.continue();
+  });
+  const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo',weatherLocation:{latitude:63.43,longitude:10.39}},{'If-Match':profile.headers().etag});
+  try{
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);
+    const root=page.locator('#today-note-editor'),rich=root.locator('.ProseMirror');await expect(rich).toContainText('Keep this prose.');await expect(banner(root)).toBeVisible();
+    await expect(root.locator('.banner-forecast-status')).toContainText('Loading forecast');await expect(rich).toHaveAttribute('contenteditable','true');
+    await rich.evaluate(node=>node.bannerIdentity='keep-this-editor');await appendEditorText(root,' Typed while weather waits.');
+    await expect.poll(async()=>(await(await api('GET','/day-entries/'+date)).json()).body).toContain('Typed while weather waits.');
+    releaseWeather();await metadataStarted;await expect(root.locator('.banner-forecast li')).toHaveCount(3);await expect(rich).toHaveAttribute('contenteditable','true');
+    await appendEditorText(root,' More typing during banner save.');await page.locator('#today-date').click();releaseMetadata();
+    await expect.poll(async()=>(await(await api('GET','/day-entries/'+date)).json()).body).toContain('More typing during banner save.');
+    const saved=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(saved).toContain('dagsverk_seasonal_banner:');expect(saved).toContain('Typed while weather waits.');expect(saved).toContain('More typing during banner save.');
+    expect(await rich.evaluate(node=>node.bannerIdentity)).toBe('keep-this-editor');await expect(root.locator('.banner-forecast li')).toHaveCount(3);
+  }finally{releaseWeather();releaseMetadata();}
+});
+
 test('Obsidian banners stay outside prose and preserve YAML through mode changes, saving and narrow themes',async({page,request})=>{
   const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);await put('Other/Project cover.png',pixel);
   const source=header+'\r\n# A banner note\r\n\r\nKeep this prose.\r\n',entry=await put('Notes/Banner.md',source),root=await openNote(page,'Notes/Banner.md');await expectBanner(root);

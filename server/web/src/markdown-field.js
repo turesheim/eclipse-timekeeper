@@ -187,12 +187,21 @@ export class MarkdownField {
   }
 
   setRaw(value){this.raw=value;this.text.value=value;this.displayedBody=this.text.value;}
-  value(){return (this.frontmatter||'')+(this.editor?this.editor.markdown():this.rawBody());}
+  value(){const body=this.editor?this.editor.markdown():this.rawBody();return (this.frontmatter||'')+(this.bodyBomMoved&&body.startsWith('\uFEFF')?body.slice(1):body);}
   matches(value){
     if(typeof value!=='string')return false;
+    if(this.bodyBomMoved)return this.value()===value;
     if(!this.editor)return this.value()===value;
     const prefix=this.frontmatter||'';
     return value.startsWith(prefix)&&this.editor.matchesSource(value.slice(prefix.length));
+  }
+  /** Adopt only outer metadata, retaining prose, selection and undo history. */
+  adoptMetadata(previous,next,{bodyOnly=false,originalBody}={}){
+    const before=splitMarkdown(previous),after=splitMarkdown(next);
+    const moved=!before.frontmatter&&before.body.startsWith('\uFEFF')&&after.frontmatter.startsWith('\uFEFF')&&before.body.slice(1)===after.body;
+    if(before.body!==after.body&&!moved)throw new Error('A metadata update cannot replace prose');
+    if(moved&&(originalBody??before.body)===before.body&&(this.editor?this.editor.markdown():this.rawBody()).startsWith('\uFEFF'))this.bodyBomMoved=true;
+    if(!bodyOnly){this.frontmatter=after.frontmatter;this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;if(!this.rich.hidden)this.banner.update(this.frontmatter,this.resources);}
   }
   setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.suspended?.editor.setReadOnly(value);this.controls();}
   paintBlockStyle(){
@@ -243,6 +252,7 @@ export class MarkdownField {
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.clearAutomaticBanner?.();this.bodyBomMoved=false;
     this.dailyBannerDialog?.close();
     this.banner.clear();
     this.resetCompletions?.();

@@ -162,7 +162,7 @@ export class WeekCalendar {
       const day = calendar.days.find((day) => day.date === today && !day.skipped) || calendar.days.find((day) => !day.skipped);
       this.selection = day ? { date: day.date, row: this.defaultRow(day) } : null;
     }
-    this.paintSelection();this.buttons();this.notes.update(calendar,this.noteCells,this.scope,data.revision,this.connected&&this.callbacks.canWrite(),focus?.note);this.paintHolidays();
+    this.paintSelection();this.buttons();this.notes.update(calendar,this.noteCells,this.scope,data.revision,this.connected&&this.callbacks.canWrite(),focus?.note,data.profile.data);this.paintHolidays();
     if (this.scrollWeek !== key) {
       this.scrollWeek = key;this.scroll.scrollTop = Math.max(0, calendar.rows.indexOf('07:00/0') * ROW_HEIGHT);
     }
