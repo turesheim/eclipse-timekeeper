@@ -1,5 +1,5 @@
 import {clickNoteAction,noteActions} from './editor-interactions.js';
-import {saveMarkdown} from './editor-interactions.js';
+import {saveMarkdown,nativeConfirmations} from './editor-interactions.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
@@ -124,26 +124,29 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
 });
 
 test('deleting a day note preserves its label, ignores unrelated label edits, and guards note conflicts',async({browser,request})=>{
-  const owner=await context(browser),page=await owner.newPage(),date='2026-05-17';
+  const owner=await context(browser),page=await owner.newPage(),date='2026-05-17',confirmations=nativeConfirmations(page);
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page);
     const empty=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'First label',body:'First body'},{'If-Match':empty.headers().etag});await month(page);
     await menu(page);const remove=(await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true});
-    await expect(remove).toBeEnabled();page.once('dialog',prompt=>prompt.dismiss());await clickNoteAction(page,dialog(page),'Delete note');
+    await expect(remove).toBeEnabled();await confirmations.run('Keep the day note',[false],async()=>{const prompt=page.waitForEvent('dialog');await clickNoteAction(page,dialog(page),'Delete note');await prompt;});
     await expect(dialog(page)).toBeVisible();expect((await(await api('GET','/day-notes/'+date)).json()).deleted).toBe(false);
-    page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,dialog(page),'Delete note');await expect(dialog(page)).toBeHidden();
+    await confirmations.run('Delete the day note',[true],async()=>{const prompt=page.waitForEvent('dialog');await clickNoteAction(page,dialog(page),'Delete note');await prompt;await expect(dialog(page)).toBeHidden();});
     const deletedValue=await(await api('GET','/day-notes/'+date)).json();expect(deletedValue.deleted).toBe(true);expect(deletedValue.text).toBe('First label');await expect(note(page)).toContainText('First label');
     await note(page).click();await expect((await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true})).toBeDisabled();await page.keyboard.press('Escape');
     await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Restored body');await saveMarkdown(dialog(page),{close:true});await expect(dialog(page)).toBeHidden();
     const restored=await(await api('GET','/day-notes/'+date)).json();expect(restored.deleted).toBe(false);expect(restored.text).toBe('First label');expect(restored.version).toBeGreaterThan(deletedValue.version);
     await note(page).click();let current=await api('GET','/day-labels/'+date);await api('PUT','/day-labels/'+date,{text:'Changed elsewhere'},{'If-Match':current.headers().etag});
-    page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,dialog(page),'Delete note');await expect(dialog(page)).toBeHidden();
+    await confirmations.run('Delete without changing the peer label',[true],async()=>{const prompt=page.waitForEvent('dialog');await clickNoteAction(page,dialog(page),'Delete note');await prompt;await expect(dialog(page)).toBeHidden();});
     expect((await(await api('GET','/day-labels/'+date)).json()).text).toBe('Changed elsewhere');
-    current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'New note'},{'If-Match':current.headers().etag});await note(page).click();await expect((await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true})).toBeEnabled();await page.keyboard.press('Escape');
+    current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'New note'},{'If-Match':current.headers().etag});await note(page).click();
+    // Finish the automatic metadata capture before introducing the peer write,
+    // so this case exercises DELETE's own stale validator rather than capture's.
+    await expect(dialog(page).locator('.markdown-banner img')).toHaveAttribute('src',/^blob:/);await expect((await noteActions(page,dialog(page))).getByRole('menuitem',{name:'Delete note',exact:true})).toBeEnabled();await page.keyboard.press('Escape');
     current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'Peer body'},{'If-Match':current.headers().etag});
-    page.once('dialog',prompt=>prompt.accept());await clickNoteAction(page,dialog(page),'Delete note');await expect(dialog(page).getByRole('alert')).toBeVisible();
+    await confirmations.run('Keep the peer note after a stale delete',[true],async()=>{const prompt=page.waitForEvent('dialog');await clickNoteAction(page,dialog(page),'Delete note');await prompt;await expect(dialog(page).getByRole('alert')).toBeVisible();});
     expect((await(await api('GET','/day-notes/'+date+'/content')).json()).body).toBe('Peer body');
-  }finally{await owner.close();}
+  }finally{confirmations.dispose();await owner.close();}
 });
 
 test('journal images and file attachments survive editing and remain available over WebDAV',async({browser,request})=>{
