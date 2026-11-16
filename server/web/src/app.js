@@ -205,7 +205,7 @@ function readOnlyWhileDisconnected() {
   for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
-  today.journal.setWritable(connected && canWrite,canWrite);
+  today.setConnected(connected);
   notes.writable=connected && canWrite;notes.controls();
   notePopup.writable=connected&&canWrite;notePopup.controls();
   for(const view of [calendarSearchPopup,calendarSearchWorkspace]){view.writable=connected&&canWrite&&!!view.context?.entry;view.controls();}

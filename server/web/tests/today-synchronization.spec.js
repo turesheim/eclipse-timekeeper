@@ -97,6 +97,17 @@ for(const mode of ['source','formatted'])for(const transition of ['post-save','r
   }finally{gate.release();await page.unrouteAll({behavior:'wait'});}
 });
 
+for(const mode of ['source','formatted'])test(`Today ${mode} reopens its clean recovery snapshot without another note read`,async({page,request})=>{
+  await setup(page,request);const field=await editor(page,mode),gate=holdSnapshots(page);let reads=0,releaseNote;const noteGate=new Promise(resolve=>releaseNote=resolve);
+  await field.evaluate(node=>window.recoveryEditor=node);await gate.install();
+  try{
+    await recover(page,gate);await page.route('**/api/v1/day-entries/'+date,async route=>{if(route.request().method()==='GET'){reads++;await noteGate;}await route.continue();});
+    await page.locator('[data-tab=tasks]').click();await expect(page.locator('#tasks-panel')).toBeVisible();await page.locator('[data-tab=today]').click();
+    await expect(field).toBeEditable({timeout:1500});expect(reads).toBe(0);expect(await field.evaluate(node=>node===window.recoveryEditor)).toBe(true);
+    if(mode==='source')await expect(field).toHaveValue(body);else await expect(field).toContainText('Paragraph 399:');
+  }finally{releaseNote();gate.release();await page.unrouteAll({behavior:'wait'});}
+});
+
 for(const mode of ['source','formatted'])test(`Today ${mode} retains a recovery draft when a peer changes the same note`,async({page,request})=>{
   const {api}=await setup(page,request),field=await editor(page,mode),gate=holdSnapshots(page),base=await(await api('GET','/day-entries/'+date)).json(),confirmations=nativeConfirmations(page);
   const writes=[];page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/api/v1/day-entries/'+date)writes.push(request.postDataJSON());});
