@@ -32,7 +32,7 @@ export class NoteTaskControls {
     const current=this.current();if(!same(current,this.context)){this.context=current;this.sourceText=null;this.lines=[];this.selection=null;if(this.dialog.open){this.abort?.abort();this.dialog.close();}}
     if(this.dialog.open)this.paintDialog();this.update();
   }
-  update(delay=0){clearTimeout(this.timer);this.timer=setTimeout(()=>void this.paint(),delay);}
+  update(delay=0){if(document.activeElement===this.field.text&&this.sourceText!==this.field.text.value)delay=Math.max(delay,100);clearTimeout(this.timer);this.timer=setTimeout(()=>void this.paint(),delay);}
   async paint(){
     const f=this.field,current=this.current(),active=document.activeElement;
     if(active===this.action&&!this.action.hidden)return;
@@ -73,7 +73,7 @@ export class NoteTaskControls {
   accept(reply){
     this.task=reply.data;this.etag=reply.etag;this.stale=false;this.pending=null;this.inputs.replaceChildren();this.error.hidden=true;this.title.textContent=this.task.summary;
     const field=(label,name,value,{choices,type='text',multiline=false,max=65536}={})=>{
-      const wrap=node('label',label,'form-label'),input=node(choices?'select':multiline?'textarea':'input',undefined,choices?'form-select':'form-control');input.name=name;if(!choices&&!multiline)input.type=type;if(choices)for(const [key,text]of choices)input.append(new Option(text,key));input.value=value;input.maxLength=max;if(multiline)input.rows=3;wrap.append(input);this.inputs.append(wrap);return input;
+      const wrap=node('label',undefined,'form-label'),caption=node('span',label),input=node(choices?'select':multiline?'textarea':'input',undefined,choices?'form-select':'form-control');caption.id='task-field-'+crypto.randomUUID();input.setAttribute('aria-labelledby',caption.id);input.name=name;if(!choices&&!multiline)input.type=type;if(choices)for(const [key,text]of choices)input.append(new Option(text,key));input.value=value;input.maxLength=max;if(multiline)input.rows=3;wrap.append(caption,input);this.inputs.append(wrap);return input;
     };
     const directory=noteClientDirectory(this.openContext.session)||{clients:[],projects:[]},value=this.task;
     this.client=field(t('ui.client'),'clientId',value.clientId||directory.projects.find(item=>item.id===value.projectId)?.clientId||'',{choices:[['',t('ui.unassigned')],...directory.clients.map(item=>[item.id,item.name])]});
