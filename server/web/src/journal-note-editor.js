@@ -23,7 +23,7 @@ export class JournalNoteEditor {
     const heading=node('div',undefined,'week-note-heading');heading.append(this.title,windowTools);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
-    this.resources=vaultEditorResources(()=>this.session,()=>this.vault&&!['DAY','WEEK','EVENT'].includes((this.note||this.context?.entry)?.kind)?(this.note?.path||this.context?.entry?.path||''):this.source(),undefined,{canCreate:()=>this.writable&&!this.busy&&!this.stale,beforeCreate:()=>this.canLeave(),hasBannerSource:()=>!!this.note&&(this.vault||this.note.version>0&&!this.note.deleted)});
+    this.resources=vaultEditorResources(()=>this.session,()=>this.vault&&!['DAY','WEEK','EVENT'].includes((this.note||this.context?.entry)?.kind)?(this.note?.path||this.context?.entry?.path||''):this.source(),undefined,{canCreate:()=>this.writable&&!this.busy&&!this.stale,beforeCreate:()=>this.canLeave(),hasBannerSource:()=>!!this.note&&(this.vault||this.note.version>0&&!this.note.deleted),afterBannerChange:()=>this.reloadSaved()});
     const host=node('div',undefined,'journal-document-content');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,(file,image)=>this.uploadAsset(file,image),{noteClient:{current:()=>this.note&&(this.vault||this.source().sourceType!=='EVENT_NOTE'||this.note.version)?{session:this.session,...this.source(),writable:this.writable&&!this.busy}:null,error:error=>{this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized(error);}},...noteRevisionResources(()=>this.session,()=>{const {sourceType,sourceId}=this.source();return {sourceType,sourceId};},{bodyOnly:!vault,latest:async()=>{const reply=await this.readNote();return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.session),...this.resources});
     const actions=node('div',undefined,'dialog-actions');
     this.delete=iconButton(button('','btn btn-outline-secondary'),'trash',t('journal.delete_note'));this.delete.addEventListener('click',()=>void this.remove());
@@ -32,7 +32,7 @@ export class JournalNoteEditor {
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.hidden=true;this.reload.addEventListener('click',()=>void this.reloadSaved());
     actions.append(this.status,this.retrySave,this.reload);
     this.autosave=new DocumentAutosave({dirty:()=>!!this.dirty(),ready:()=>!!this.note&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(this.dialog,this.autosave);
-    this.dialog.append(heading,this.error,host,actions);root.append(this.dialog);this.dialog.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
+    this.dialog.append(this.markdown.banner.dom,heading,this.error,host,actions);root.append(this.dialog);this.dialog.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
     guardDayNoteNavigation(this.dialog,()=>!this.busy&&this.autosave.flush(),()=>this.close(true));
     this.dialog.addEventListener('close',()=>{

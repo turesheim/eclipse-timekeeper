@@ -22049,6 +22049,46 @@
           "Task synchronization"
         ]
       }
+    },
+    "/daily-banners/{date}/preview": {
+      "get": {
+        "operationId": "previewDailyBanner",
+        "summary": "Propose seasonal artwork and a local-date forecast for a daily note",
+        "description": "Uses only the current account weather location and time zone. The forecast is optional, bounded and cached; provider failure returns a seasonal-only proposal. This read does not create or change a note. Save the complete chosen presentation in the note for offline reopening and portable transfer.",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Seasonal proposal, with three forecast times when available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyBannerPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        },
+        "x-required-permission": "read"
+      }
     }
   },
   "components": {
@@ -22583,6 +22623,16 @@
               }
             ],
             "description": "Owner-private plain-text snippets. Null restores built-in shortcuts; an empty list disables expansion. Keywords are unique ignoring case; the combined UTF-8 limit is 64 KiB. Omission on a profile write preserves this preference."
+          },
+          "weatherLocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeatherLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -23040,6 +23090,16 @@
               }
             ],
             "description": "Owner-private plain-text snippets. Null restores built-in shortcuts; an empty list disables expansion. Keywords are unique ignoring case; the combined UTF-8 limit is 64 KiB. Omission on a profile write preserves this preference."
+          },
+          "weatherLocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeatherLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -40163,6 +40223,130 @@
         "minProperties": 1,
         "additionalProperties": false,
         "description": "Atomically save calendar and task subscriptions for one Internet account. A validation or version failure leaves both selections unchanged."
+      },
+      "WeatherLocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ]
+      },
+      "DailyBannerForecastSlot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "time": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$"
+          },
+          "instant": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "fair",
+              "partlycloudy",
+              "cloudy",
+              "rain",
+              "snow",
+              "sleet",
+              "fog",
+              "thunder"
+            ]
+          },
+          "temperatureCelsius": {
+            "type": "number",
+            "minimum": -120,
+            "maximum": 80
+          }
+        },
+        "required": [
+          "time",
+          "instant",
+          "symbol",
+          "condition",
+          "temperatureCelsius"
+        ]
+      },
+      "DailyBannerPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "zoneId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "season": {
+            "type": "string",
+            "enum": [
+              "winter",
+              "spring",
+              "summer",
+              "autumn",
+              "late-autumn"
+            ]
+          },
+          "weather": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "MET Norway"
+            ]
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "forecast": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/DailyBannerForecastSlot"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "date",
+          "zoneId",
+          "season",
+          "weather",
+          "forecast"
+        ]
       }
     },
     "parameters": {

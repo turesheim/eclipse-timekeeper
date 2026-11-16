@@ -142,6 +142,26 @@ class AccountArchiveImportTest {
             return null;
         });
     }
+    @Test void savedSeasonalSelectionForecastAndCustomRasterOverrideRoundTripInAnAccountArchive()throws Exception {
+        source();
+        var saved=object().put("version",1).put("date","2026-11-16").put("zoneId","Europe/Oslo").put("season","late-autumn");
+        saved.set("seasonal",object().put("reference","seasonal.png").put("x",0.25).put("y",0.75).put("id","late-autumn-snow").put("version",1));
+        var forecast=saved.putArray("forecast");for(String time:List.of("09:00","12:00","15:00"))forecast.add(object().put("time",time).put("condition","snow").put("label","Snow").put("temperature","−1 °C").put("temperatureCelsius",-1));
+        String markdown="\uFEFF---\r\n# Keep this metadata\r\nbanner: \"![[custom.png]]\"\r\nbanner_x: 0.1\r\nbanner_y: 0.8\r\ndagsverk_seasonal_banner: "+MAPPER.writeValueAsString(saved.toString())+"\r\n---\r\n\r\nExact prose.\r\n";
+        byte[] original=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jI1sAAAAASUVORK5CYII="),custom=original.clone();
+        store.transaction("a",()->{
+            var notes=new DayNotes(store);var date=DayNotes.date("2026-11-16");notes.saveDocument(date,etag(notes.getContent(date)),markdown.getBytes(StandardCharsets.UTF_8));
+            var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();vault.put(new VaultPath("seasonal.png"),null,true,original);vault.put(new VaultPath("custom.png"),null,true,custom);return null;
+        });
+        byte[] bytes;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){bytes=java.nio.file.Files.readAllBytes(file.file());}
+        UUID upload=stage(bytes,"application/zip");var review=store.transaction("b",()->importer().preview(upload,false));assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->importer().apply(upload,false,review.etag()));
+        store.transaction("b",()->{
+            var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();
+            assertArrayEquals(markdown.getBytes(StandardCharsets.UTF_8),vault.read(vault.get(new VaultPath("journal/2026-11-16.md"))));
+            assertArrayEquals(original,vault.read(vault.get(new VaultPath("seasonal.png"))));assertArrayEquals(custom,vault.read(vault.get(new VaultPath("custom.png"))));return null;
+        });
+    }
     @Test void bookmarksRoundTripWithAnAccountArchiveAndPreviewRollsBackMetadata() throws Exception {
         source();
         var source=store.transaction("a",()->{

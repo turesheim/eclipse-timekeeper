@@ -130,7 +130,7 @@ to use the same resources. The preference defaults to off and is retained in
 account archives; older archives default to showing the folder.
 
 Markdown source, frontmatter, unknown metadata, empty files, attachment bytes and
-unsupported Obsidian syntax are stored without rewriting. An unchanged editor
+unsupported Markdown extensions are stored without rewriting. An unchanged editor
 save does not normalize the file. Formatted edits can normalize Markdown body
 syntax in the edited block; unchanged top-level blocks retain their source when
 the semantic preservation check succeeds. Frontmatter remains separate and
@@ -138,7 +138,8 @@ read-only in the editor. Use a local source editor to change frontmatter. Ordina
 wikilinks, aliases, heading targets and raster image embeds (including sizing)
 render in formatted mode. Missing or ambiguous targets are reported instead of
 selecting an arbitrary file. Unknown extensions remain editable source fragments.
-Timekeeper does not execute Obsidian plugins. See the
+Dagsverk imports note files and attachments without requiring the application
+that created them. It does not execute third-party note plugins. See the
 [shared editor guide](MARKDOWN-EDITOR.md) for the supported dialect and controls.
 Standard relative Markdown links navigate within the collection. Verified raster
 images use authenticated previews, both inline in formatted Markdown and in the
@@ -147,8 +148,9 @@ Journal image references also resolve companions imported through vault synchron
 including ordinary binary files in the configured assets folder. Renaming
 a file does not rewrite links in other files. Review relative links after moves.
 
-Obsidian [Banners](https://github.com/noatpad/obsidian-banners#advanced) appear above formatted notes, including daily, weekly and event
-notes. Use the plugin's default YAML properties:
+Imported notes can display a banner above formatted content, including daily,
+weekly and event notes. Dagsverk reads these YAML properties, inspired by
+Obsidian [Banners](https://github.com/noatpad/obsidian-banners#advanced):
 
 ```yaml
 banner: "![[Images/Project cover.jpg]]"
@@ -159,8 +161,12 @@ banner_y: 0.25
 Quoted `"[[…]]"` links also work. Local PNG, JPEG, GIF and WebP images use the
 same private vault previews as inline images. Crop coordinates range from 0 to 1;
 each missing or invalid coordinate defaults to the center. Missing, ambiguous,
-unsupported or remote images leave no banner. YAML remains unchanged; set or
-reposition banners in Obsidian. Custom field names and banner icons are not supported.
+unsupported or remote images leave no banner. Import the referenced images with
+the notes, retaining their folder paths. Prose edits preserve the original YAML;
+daily note tools can change the banner image and crop in Dagsverk. See
+[note banners and daily weather](MARKDOWN-EDITOR.md#note-banners-and-daily-weather).
+Custom field names and banner icons are not supported. Running Obsidian or its
+plugins is not required to import, edit or display these notes in Dagsverk.
 
 ## Searching note contents
 

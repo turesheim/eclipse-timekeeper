@@ -102,7 +102,7 @@ test('a Today hashtag opens Notes tag search using the current private journal',
 test('Notes account imports a vault with review, guarded conflicts and exact file bytes',async({page,request})=>{
   const {mkdtemp,mkdir,writeFile,rm}=await import('node:fs/promises'),{join}=await import('node:path'),{tmpdir}=await import('node:os');
   const api=await setup(page,request),root=await mkdtemp(join(tmpdir(),'timekeeper-notes-import-')),day='2026-11-02';
-  const body='\uFEFF---\r\ncustom: keep\r\n---\r\n\r\n# Imported æ\r\n',png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  const body='\uFEFF---\r\n# Preserve imported metadata\r\ncustom: keep\r\nbanner: "![[journal/assets/pixel.png]]"\r\nbanner_x: 0.25\r\nbanner_y: 0.75\r\n---\r\n\r\n# Imported æ\r\n',png=await readFile(new URL('./fixtures/banner.png',import.meta.url));
   await api('PUT','/notes/files?path=Notes%2FKeep.md',Buffer.from('Server original'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   const label=await api('GET','/day-labels/'+day);await api('PUT','/day-labels/'+day,{text:'Independent label'},{'If-Match':label.headers().etag});
   try{
@@ -122,6 +122,11 @@ test('Notes account imports a vault with review, guarded conflicts and exact fil
     for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/assets/pixel.png',png],['Notes/Keep.md','Server original'],['Notes/Race.md','Concurrent server file']]){const entry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path}))).json();expect(Buffer.from(await(await api('GET','/notes/entries/'+entry.id+'/content')).body()).equals(Buffer.from(bytes))).toBe(true);}
     expect((await(await api('GET','/day-labels/'+day)).json()).text).toBe('Independent label');expect((await(await api('GET','/week-notes/2026-W45')).json()).body).toBe('# Week\r\n');
     await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#notes-panel')).toBeVisible();await expect(page.locator('#notes-document-title')).toBeVisible();
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const editor=page.locator('#today-note-editor');
+    await expect(editor.locator('.markdown-banner')).toBeVisible();await expect(editor.locator('.markdown-banner img')).toHaveCSS('object-position','25% 75%');await expect(editor.locator('.ProseMirror h1')).toHaveText('Imported æ');
+    await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');await saveMarkdown(editor);
+    const imported=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:'journal/'+day+'.md'}))).json();
+    expect(Buffer.from(await(await api('GET','/notes/entries/'+imported.id+'/content')).body())).toEqual(Buffer.from(body.replace('# Imported æ','# Imported æ Reviewed.')));
   }finally{await rm(root,{recursive:true,force:true});}
 });
 

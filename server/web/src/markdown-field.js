@@ -6,6 +6,7 @@ import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
 import {splitMarkdown} from './markdown-document.js';
 import {MarkdownBanner} from './markdown-banner.js';
+import {dailyBannerTools} from './daily-banner-tools.js';
 import {icon,iconButton} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -54,10 +55,22 @@ export class MarkdownField {
     });
     document.addEventListener('scroll',()=>this.positionBlockMenu(),true);window.addEventListener('resize',()=>this.positionBlockMenu());
     this.tools.append(this.blockTrigger);
+    this.listTrigger=iconButton(button(),'list-ul',t('markdown.lists'));this.listTrigger.append(icon('down'));
+    this.listTrigger.setAttribute('aria-haspopup','menu');this.listTrigger.setAttribute('aria-expanded','false');this.listTrigger.setAttribute('aria-controls',prefix+'-list-menu');
+    this.listMenu=node('div',undefined,'dropdown-menu markdown-block-menu shadow');this.listMenu.id=prefix+'-list-menu';this.listMenu.popover='auto';this.listMenu.setAttribute('role','menu');this.listMenu.setAttribute('aria-label',t('markdown.lists'));
+    for(const [name,glyph]of [['list','list-ul'],['ordered','list-ol'],['tasks','list-check']]){
+      const choice=button();choice.className='dropdown-item';choice.dataset.command=name;choice.tabIndex=-1;choice.setAttribute('role','menuitemradio');choice.setAttribute('aria-checked','false');choice.append(icon(glyph),node('span',t('markdown.'+name)));
+      choice.addEventListener('mousedown',event=>event.preventDefault());choice.addEventListener('click',()=>{if(this.readOnly||this.loading||!this.editor)return;this.closeListMenu();this.editor.command(name);});this.listMenu.append(choice);
+    }
+    this.listTrigger.addEventListener('mousedown',event=>event.preventDefault());this.listTrigger.addEventListener('click',()=>{if(this.listMenu.matches(':popover-open'))this.closeListMenu();else this.showListMenu();});
+    this.listTrigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();this.showListMenu(event.key==='ArrowUp');}});
+    this.listMenu.addEventListener('beforetoggle',event=>this.listTrigger.setAttribute('aria-expanded',String(event.newState==='open')));
+    this.listMenu.addEventListener('keydown',event=>{const choices=[...this.listMenu.children],current=choices.indexOf(document.activeElement);if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();choices[event.key==='Home'?0:event.key==='End'?choices.length-1:(current+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length].focus();}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();this.closeListMenu();this.listTrigger.focus();}else if(event.key==='Tab'){this.closeListMenu();this.listTrigger.focus();}});
+    document.addEventListener('scroll',()=>this.positionListMenu(),true);window.addEventListener('resize',()=>this.positionListMenu());this.tools.append(this.listTrigger);
     for(const [name,glyph] of [
       ['bold','type-bold'],['italic','type-italic'],['strike','type-strikethrough'],
       ['highlight','highlighter'],['subscript','subscript'],['superscript','superscript'],
-      ['inline_code','code'],['code_block','code-square'],['list','list-ul'],['ordered','list-ol'],['tasks','list-check'],
+      ['inline_code','code'],['code_block','code-square'],
       ['link','link-45deg'],['quote','quote'],['table','table'],['hr','hr']
     ]){
       const action=iconButton(button(),glyph,t('markdown.'+name));action.dataset.command=name;const shortcuts={bold:'Mod+B',italic:'Mod+I',undo:'Mod+Z',redo:'Mod+Shift+Z'};if(shortcuts[name])action.title+=' ('+shortcuts[name]+')';
@@ -92,7 +105,7 @@ export class MarkdownField {
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-description',t('markdown.tab_help'));this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.toolbar.append(this.modes,this.tools);
-    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.metadata,this.toolbar,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
+    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.toolbar,this.status,this.rich,this.plain,this.metadata,this.imagePicker,this.attachmentPicker,this.blockMenu,this.listMenu);
     this.toolbar.addEventListener('keydown',event=>this.historyShortcut(event));
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>{
@@ -103,7 +116,7 @@ export class MarkdownField {
     this.text.addEventListener('keydown',event=>{if(this.expandSourceSnippet(event))return;if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     if(resources?.bookmark)this.bookmark=new NoteBookmark(root,resources.bookmark);
-    buildExperience(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);
+    buildExperience(this);dailyBannerTools(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
   closeSourceTyping(){
@@ -183,6 +196,9 @@ export class MarkdownField {
   }
   setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.suspended?.editor.setReadOnly(value);this.controls();}
   paintBlockStyle(){
+    const list=this.editor?.listType?.()||'',glyph={list:'list-ul',ordered:'list-ol',tasks:'list-check'}[list]||'list-ul';
+    iconButton(this.listTrigger,glyph,t('markdown.lists'));this.listTrigger.append(icon('down'));this.listTrigger.title=t('markdown.lists')+(list?': '+t('markdown.'+list):'');
+    for(const choice of this.listMenu.children)choice.setAttribute('aria-checked',String(choice.dataset.command===list));
     const level=this.editor?.headingLevel()||0;
     if(level!==this.blockLevel){
       this.blockLevel=level;iconButton(this.blockTrigger,level?'type-h'+level:'paragraph',t('markdown.block_style'));this.blockTrigger.append(icon('down'));
@@ -192,7 +208,7 @@ export class MarkdownField {
   }
   showBlockMenu(last=false){
     if(this.readOnly||this.loading||!this.editor)return;
-    this.closeActions();
+    this.closeActions();this.closeListMenu();
     this.paintBlockStyle();if(!this.blockMenu.matches(':popover-open'))this.blockMenu.showPopover();this.positionBlockMenu();
     (last?this.blockMenu.lastElementChild:this.blockMenu.querySelector('[aria-checked="true"]')||this.blockMenu.firstElementChild).focus();
   }
@@ -203,25 +219,31 @@ export class MarkdownField {
     this.blockMenu.style.top=Math.max(8,Math.min(rect.bottom+4+height<=innerHeight-8?rect.bottom+4:rect.top-height-4,innerHeight-height-8))+'px';
   }
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
+  showListMenu(last=false){if(this.readOnly||this.loading||!this.editor)return;this.closeActions();this.closeBlockMenu();this.paintBlockStyle();this.listMenu.showPopover();this.positionListMenu();(last?this.listMenu.lastElementChild:this.listMenu.querySelector('[aria-checked="true"]')||this.listMenu.firstElementChild).focus();}
+  positionListMenu(){if(!this.listMenu.matches(':popover-open'))return;const rect=this.listTrigger.getBoundingClientRect(),height=this.listMenu.offsetHeight;this.listMenu.style.left=Math.max(8,Math.min(rect.left,innerWidth-this.listMenu.offsetWidth-8))+'px';this.listMenu.style.top=Math.max(8,Math.min(rect.bottom+4+height<=innerHeight-8?rect.bottom+4:rect.top-height-4,innerHeight-height-8))+'px';}
+  closeListMenu(){if(this.listMenu.matches(':popover-open'))this.listMenu.hidePopover();}
   controls(){
+    this.editor?.setReadOnly(this.readOnly||this.bannerBusy);this.syncDailyBanner?.();
     this.caret?.update();this.bookmark?.sync();this.client?.sync();
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
-    if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
+    for(const choice of this.listMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
+    if(this.readOnly||this.loading||this.rich.hidden){this.closeBlockMenu();this.closeListMenu();}
     this.tools.hidden=this.rich.hidden||this.readOnly;
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
-    if(formatted)this.banner.update(this.frontmatter,this.resources);else this.banner.clear();
+    if(formatted)this.banner.update(this.frontmatter,this.resources);else this.banner.clear({keepMetadata:true});
     this.resetCompletions?.();
-    if(!formatted)this.closeBlockMenu();
+    if(!formatted){this.closeBlockMenu();this.closeListMenu();}
     this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.plain.hidden=formatted;
     this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
+    this.dailyBannerDialog?.close();
     this.banner.clear();
     this.resetCompletions?.();
     this.closeActions?.();
@@ -230,7 +252,7 @@ export class MarkdownField {
     this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();
     this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.text.hidden=false;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
-    this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
+    this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.bannerBusy=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
   setValue(value){
     this.resources?.invalidate?.();this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.text.setSelectionRange(0,0);this.text.scrollTop=0;

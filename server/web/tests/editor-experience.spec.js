@@ -174,6 +174,20 @@ test('failed pasted files retain the draft and can be retried at the original in
   await page.evaluate(()=>globalThis.failUpload=false);await page.locator('#experience-field').getByRole('button',{name:'Retry',exact:true}).click();
   await expect(page.locator('#experience-formatted a')).toHaveText('example.txt');expect(await page.evaluate(()=>globalThis.field.value())).toContain('Keep this draft.');
 });
+test('pending uploads preserve edits and insert at their bookmarked position without moving another caret',async({page})=>{
+  await field(page,'One.\n\nTwo.\n');const rich=page.locator('#experience-formatted .ProseMirror');await appendEditorText(rich.locator('p').first(),'');
+  await page.evaluate(()=>{globalThis.field.onUpload=()=>new Promise(resolve=>globalThis.finishUpload=resolve);globalThis.pendingUpload=globalThis.field.uploadFiles([new File(['bytes'],'waiting.txt',{type:'text/plain'})],globalThis.field.editor.bookmark());});
+  await expect(page.locator('#experience-field').getByRole('button',{name:'Markdown source',exact:true})).toBeDisabled();
+  await appendEditorText(rich.locator('p').last(),' While waiting.');
+  await page.evaluate(async()=>{globalThis.finishUpload('assets/waiting.txt');await globalThis.pendingUpload;});
+  await expect(rich.locator('p').first().getByRole('link')).toHaveText('waiting.txt');await rich.pressSequentially(' Kept caret.');await expect(rich.locator('p').last()).toHaveText('Two. While waiting. Kept caret.');
+});
+test('a late upload cannot insert content or unlock an editor after write permission is removed',async({page})=>{
+  await field(page,'Keep this draft.\n');
+  await page.evaluate(()=>{globalThis.field.onUpload=()=>new Promise(resolve=>globalThis.finishUpload=resolve);globalThis.pendingUpload=globalThis.field.uploadFiles([new File(['bytes'],'private.txt',{type:'text/plain'})],globalThis.field.editor.bookmark());globalThis.field.setReadOnly(true);});
+  await page.evaluate(async()=>{globalThis.finishUpload('assets/private.txt');await globalThis.pendingUpload;});
+  const rich=page.locator('#experience-formatted .ProseMirror');await expect(rich).toHaveAttribute('aria-readonly','true');await expect(rich.getByRole('link')).toHaveCount(0);expect(await page.evaluate(()=>globalThis.field.value())).toBe('Keep this draft.\n');
+});
 test('table commands edit rows, columns and alignment and preserve other blocks',async({page})=>{
   await engine(page,'Before.\n\n| A | B |\n| --- | --- |\n| One | Two |\n\nAfter.\n');await page.locator('#experience-editor td p').first().click({position:{x:3,y:3}});await expect.poll(()=>page.evaluate(()=>globalThis.experience.context().table)).toBe(true);
   expect(await page.evaluate(()=>globalThis.experience.command('row_after'))).toBe(true);await expect(page.locator('#experience-editor tr')).toHaveCount(3);

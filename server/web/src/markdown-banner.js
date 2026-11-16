@@ -1,4 +1,8 @@
 import {wikiReference} from './wiki-links.js';
+import {dailyBannerSnapshot} from './daily-banner-model.js';
+import {t} from './i18n.js';
+
+const weatherSymbols={clear:'☀',fair:'☀',partlycloudy:'⛅',cloudy:'☁',rain:'☂',snow:'❄',sleet:'❄',fog:'≋',thunder:'ϟ'};
 
 const quoted=/^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*')[ \t]*(?:#.*)?$/;
 const scalar=value=>{
@@ -44,8 +48,10 @@ export class MarkdownBanner{
   constructor(){
     this.generation=0;this.dom=document.createElement('div');this.dom.className='markdown-banner';this.dom.hidden=true;this.dom.setAttribute('aria-hidden','true');
   }
-  clear(){
+  clear({keepMetadata=false}={}){
+    if(!keepMetadata)this.snapshot=null;
     ++this.generation;const previous=this.preview;this.preview=null;this.dom.hidden=true;previous?.destroy();this.dom.replaceChildren();
+    this.dom.setAttribute('aria-hidden','true');
   }
   update(frontmatter,resources){
     this.clear();const current=this.generation;
@@ -54,11 +60,22 @@ export class MarkdownBanner{
     }else this.show(frontmatter,resources);
   }
   show(frontmatter,resources){
+    this.snapshot=dailyBannerSnapshot(frontmatter);this.dom.dispatchEvent(new Event('timekeeper:banner-metadata'));
     const metadata=bannerMetadata(frontmatter);if(!metadata||!resources?.wikiImage)return;
     const preview=resources.wikiImage(metadata.reference,'');this.preview=preview;
     const image=preview.dom;image.loading='eager';image.alt='';image.style.objectPosition=metadata.x*100+'% '+metadata.y*100+'%';
     image.addEventListener('load',()=>{if(this.preview===preview&&image.naturalWidth>0)this.dom.hidden=false;});
-    image.addEventListener('error',()=>{if(this.preview===preview)this.clear();});
+    image.addEventListener('error',()=>{if(this.preview===preview)this.clear({keepMetadata:true});});
     this.dom.append(image);
+    if(this.snapshot?.forecast.length===3){
+      this.dom.removeAttribute('aria-hidden');
+      const forecast=document.createElement('ul');forecast.className='banner-forecast';forecast.setAttribute('aria-label',t('daily_banner.saved_forecast',{date:this.snapshot.date,zone:this.snapshot.zoneId}));
+      for(const slot of this.snapshot.forecast){
+        const item=document.createElement('li'),time=document.createElement('time'),symbol=document.createElement('span'),label=document.createElement('span'),temperature=document.createElement('strong');
+        time.textContent=slot.time;time.dateTime=this.snapshot.date+'T'+slot.time;symbol.textContent=weatherSymbols[slot.condition];symbol.className='banner-weather-symbol';symbol.setAttribute('aria-hidden','true');label.textContent=slot.label;label.className='banner-weather-label';temperature.textContent=slot.temperature;
+        item.append(time,symbol,label,temperature);forecast.append(item);
+      }
+      const attribution=document.createElement('a');attribution.className='banner-weather-credit';attribution.href='https://www.met.no/en/free-meteorological-data/Licensing-and-crediting';attribution.target='_blank';attribution.rel='noopener noreferrer';attribution.textContent='MET Norway · CC BY 4.0';this.dom.append(forecast,attribution);
+    }
   }
 }
