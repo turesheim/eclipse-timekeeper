@@ -173,6 +173,8 @@ test('journal images and file attachments survive editing and remain available o
     const attachment=await api('GET','/journal-assets/'+filePath.slice(7));expect(await attachment.text()).toBe('attached text');
     await note(page).click();await dialog(page).getByRole('button',{name:'Formatted'}).click();
     await expect.poll(()=>dialog(page).locator('.ProseMirror img[alt="photo.png"]').evaluate(img=>img.naturalWidth)).toBe(1);
+    // Establish the synced-file baseline after the automatic presentation write.
+    await expect(dialog(page).locator('.markdown-banner img')).toHaveAttribute('src',/^blob:/);
     const token=await(await api('POST','/auth/tokens',{name:'Attachment browser test',permissions:['read'],expiresAt:null})).json();
     const basic=Buffer.from('webdav:'+token.token).toString('base64');
     const dav=await request.get('/dav/notes/journal/'+imagePath,{headers:{Authorization:'Basic '+basic}});
