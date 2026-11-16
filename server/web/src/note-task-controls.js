@@ -22,7 +22,7 @@ export class NoteTaskControls {
     this.check=button(t('notes.check_task_save'),()=>void this.checkSaved());this.check.hidden=true;this.save=node('button',t('ui.save'),'btn btn-primary');this.save.type='submit';const actions=node('div',undefined,'dialog-actions');actions.append(this.reload,this.check,this.cancel,this.save);this.form.append(heading,this.title,this.inputs,this.error,actions);this.dialog.append(this.form);field.root.append(this.dialog);
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.commit();});
     this.dialog.addEventListener('cancel',event=>{event.stopPropagation();if(this.saving)event.preventDefault();});
-    this.dialog.addEventListener('close',()=>{this.abort?.abort();++this.generation;this.busy=this.saving=false;this.inputs.replaceChildren();this.title.textContent='';this.error.textContent='';this.task=this.pending=null;if(same(this.openContext,this.current())&&field.root.getClientRects().length)field.focus();this.update();});
+    this.dialog.addEventListener('close',()=>{if(this.dialog.open)return;this.abort?.abort();++this.generation;this.busy=this.saving=false;this.inputs.replaceChildren();this.title.textContent='';this.error.textContent='';this.task=this.pending=null;if(same(this.openContext,this.current())&&field.root.getClientRects().length)field.focus();this.update();});
     for(const name of ['selectionchange','focusin','focusout','keyup','pointerup','scroll'])document.addEventListener(name,()=>this.update(),true);
     field.text.addEventListener('input',()=>this.update(100));window.addEventListener('resize',()=>this.update());
   }
@@ -35,19 +35,18 @@ export class NoteTaskControls {
   update(delay=0){if(document.activeElement===this.field.text&&this.sourceText!==this.field.text.value)delay=Math.max(delay,100);clearTimeout(this.timer);this.timer=setTimeout(()=>void this.paint(),delay);}
   async paint(){
     const f=this.field,current=this.current(),active=document.activeElement;
+    if(this.dialog.open||!current?.writable||f.readOnly||f.loading||f.bannerBusy||!f.root.getClientRects().length){this.action.hidden=true;return;}
     if(active===this.action&&!this.action.hidden)return;
-    this.action.hidden=true;
-    if(this.dialog.open||!current?.writable||f.readOnly||f.loading||f.bannerBusy||!f.root.getClientRects().length)return;
     let context,rect;
     if(f.editor&&f.rich.contains(active)){context=f.editor.taskContext();rect=context&&f.editor.selectionRect();}
     else if(active===f.text&&f.text.selectionStart===f.text.selectionEnd){
       const text=f.text.value,position=f.text.selectionStart,start=text.lastIndexOf('\n',position-1)+1,line=text.slice(start,text.indexOf('\n',position)<0?text.length:text.indexOf('\n',position));
-      if(!/^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+\[[ xX]\]\s+\S/.test(line))return;
+      if(!/^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+\[[ xX]\]\s+\S/.test(line)){this.action.hidden=true;return;}
       if(this.sourceText!==text){parser??=import('./assets/milkdown/markdown-preview.js');const module=await parser;if(text!==f.text.value||document.activeElement!==f.text||!same(current,this.current()))return;this.sourceText=text;this.lines=module.noteTaskLines(text);}
       const item=this.lines.find(item=>position>=item.start&&position<=item.end);if(item){context={offset:()=>item.offset};rect=f.caret.sourceRect(f.text);}
     }
-    if(!context||!rect)return;const box=(f.editor?f.rich:f.text).getBoundingClientRect(),height=rect.height||rect.bottom-rect.top;
-    if(rect.top<Math.max(0,box.top)||rect.top+height>Math.min(innerHeight,box.bottom))return;
+    if(!context||!rect){this.action.hidden=true;return;}const box=(f.editor?f.rich:f.text).getBoundingClientRect(),height=rect.height||rect.bottom-rect.top;
+    if(rect.top<Math.max(0,box.top)||rect.top+height>Math.min(innerHeight,box.bottom)){this.action.hidden=true;return;}
     this.selection=context;this.action.style.left=Math.max(8,Math.min(box.right-68,innerWidth-76))+'px';this.action.style.top=Math.max(8,Math.min(rect.top-4,innerHeight-44))+'px';this.action.hidden=false;
   }
   paintDialog(){
@@ -84,7 +83,7 @@ export class NoteTaskControls {
     this.priority=field(t('tasks.priority'),'priority',value.priority||'UNSPECIFIED',{choices:['UNSPECIFIED','LOW','NORMAL','HIGH'].map(key=>[key,t('tasks.priority_'+key.toLowerCase())])});
     this.notes=field(t('tasks.notes'),'bodyContent',value.body?.content||'',{multiline:true});
   }
-  values(){const value=this.task,clientId=this.client.value||null,projectId=this.project.value||null,changed=clientId!==(value.clientId||null)||projectId!==(value.projectId||null);return {summary:value.summary,url:value.url,clientId,projectId,parentTaskId:changed?null:value.parentTaskId,scheduledDate:this.scheduled.value||null,due:this.due(),priority:this.priority.value,body:{format:value.body?.format||'TEXT',content:this.notes.value}};}
+  values(){const value=this.task,projectId=this.project.value||null,clientId=projectId?null:this.client.value||null,changed=projectId!==(value.projectId||null)||!projectId&&clientId!==(value.clientId||null);return {summary:value.summary,url:value.url,clientId,projectId,parentTaskId:changed?null:value.parentTaskId,scheduledDate:this.scheduled.value||null,due:this.due(),priority:this.priority.value,body:{format:value.body?.format||'TEXT',content:this.notes.value}};}
   async commit(){
     const context=this.current(),cycle=this.generation;if(!same(context,this.openContext)||!context.writable||this.field.readOnly||this.busy||this.stale||this.pending||!this.task||!this.form.reportValidity())return;
     const body=this.values();this.busy=this.saving=true;this.error.hidden=true;this.paintDialog();
