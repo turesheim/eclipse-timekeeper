@@ -137,17 +137,19 @@ test('a saved seasonal picture appears before its private image finishes loading
 });
 
 test('an existing empty forecast fills after location setup while keeping its custom image and metadata',async({page,request})=>{
+  // Keep the runtime's current day different from the saved note across reloads.
+  await page.clock.setFixedTime(new Date('2026-11-17T12:00:00Z'));
   const {api,put}=await fresh(page,request),date='2026-11-16';await put('Images/Project cover.png',image);
   const snapshot={version:1,date,zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/Project cover.png',x:.25,y:.75},forecast:[]};
   const source=header.replace('custom: [one, two]','custom: [one, two]\r\ndagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify(snapshot)))+'\r\nKeep the imported prose.\r\n',entry=await put('journal/'+date+'.md',source);
-  const owner=(await api('GET','/me')).headers()['x-timekeeper-owner'];let previews=0;
-  await page.route('**/api/v1/daily-banners/*/preview',route=>{previews++;const requested=new URL(route.request().url()).pathname.split('/').at(-2);return route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:requested,zoneId:'Europe/Oslo',season:'late-autumn',weather:'rain',forecast:[9,12,15].map(hour=>({time:String(hour).padStart(2,'0')+':00',condition:'rain',temperatureCelsius:4}))}});});
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await expect(root.locator('.banner-forecast-status')).toContainText('Add a weather location');expect(previews).toBe(0);
+  const owner=(await api('GET','/me')).headers()['x-timekeeper-owner'];const previews=[];
+  await page.route('**/api/v1/daily-banners/*/preview',route=>{const requested=new URL(route.request().url()).pathname.split('/').at(-2);previews.push(requested);return route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:requested,zoneId:'Europe/Oslo',season:'late-autumn',weather:'rain',forecast:[9,12,15].map(hour=>({time:String(hour).padStart(2,'0')+':00',condition:'rain',temperatureCelsius:4}))}});});
+  await page.goto('/web/?day='+date);await expect(page.locator('#status')).toHaveText('Up to date');await expect(page.locator('#today-date')).toHaveValue(date);const root=page.locator('#today-note-editor');await expect(root.locator('.banner-forecast-status')).toContainText('Add a weather location');expect(previews).toEqual([]);
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo',weatherLocation:{latitude:63.43,longitude:10.39}},{'If-Match':profile.headers().etag});
-  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);await expect(root.locator('.banner-forecast li')).toHaveCount(3);
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await expect(page.locator('#today-date')).toHaveValue(date);await expect(root.locator('.banner-forecast li')).toHaveCount(3);
   await expect.poll(async()=>(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).includes('temperatureCelsius')).toBe(true);
   const saved=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(saved).toContain('# Keep the banner and unrelated metadata exactly\r\n');expect(saved).toContain('custom: [one, two]\r\n');expect(saved.endsWith('\r\nKeep the imported prose.\r\n')).toBe(true);await expectBanner(root);
-  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);await expect(root.locator('.banner-forecast li')).toHaveCount(3);expect(previews).toBe(1);
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await expect(page.locator('#today-date')).toHaveValue(date);await expect(root.locator('.banner-forecast li')).toHaveCount(3);expect(previews).toEqual([date]);
 });
 
 for(const host of ['Today','Notes'])test('automatic capture preserves a BOM and newer prose in '+host,async({page,request})=>{
