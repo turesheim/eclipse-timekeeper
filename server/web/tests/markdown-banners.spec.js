@@ -90,7 +90,7 @@ test('a saved seasonal picture appears before its private image finishes loading
   let release,arrived;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
   await page.route('**/api/v1/notes/entries/'+asset.id+'/content',async route=>{arrived();await gate;await route.continue();});
   try{
-    await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await started;
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await started;
     await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v1/late-autumn-snow.png');await expect(root.locator('.ProseMirror')).toContainText('Keep writing');await expect(root.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');
     release();await expect(banner(root).locator('img')).toHaveAttribute('src',/^blob:/);await expect(banner(root).locator('img')).toHaveCount(1);await expect(banner(root).locator('img')).toHaveCSS('object-fit','contain');
     expect((await(await api('GET','/day-entries/'+date)).json()).body).toBe('\nKeep writing while the picture loads.\n');
