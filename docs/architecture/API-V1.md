@@ -75,6 +75,9 @@ provision records or perform activity rollover. Credential and account validity
 are checked in short transactions before and after the snapshot; revocation or
 account disable prevents the private result from being returned. A first-use
 read still performs the normal owner initialization before using this path.
+Task lists requesting note origins also retain first-use vault indexing and
+legacy layout preparation in an owner transaction; subsequent reads use the
+prepared catalog in the snapshot.
 
 A foreign resource or foreign relation is indistinguishable from a missing one:
 404 `NOT_FOUND`, with no resource contents, versions or owner information.

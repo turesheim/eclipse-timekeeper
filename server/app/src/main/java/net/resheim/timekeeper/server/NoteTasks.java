@@ -115,6 +115,11 @@ final class NoteTasks {
         if(entry==null||entry.path("deleted").asBoolean())throw ApiFailure.notFound();return vault.metadata(vault.get(VaultCollection.id(entry)));
     }
     /** Optional list projection; resolve each owned source once without changing task validators. */
+    boolean originsReady(){
+        if(store.list(LINK).isEmpty())return true;
+        var state=new VaultState(store,store.vaultLimits()).get();
+        return state.path("initialized").asBoolean()&&state.path("assetsLayoutReviewed").asBoolean()&&state.hasNonNull("collectionId");
+    }
     Map<String,ObjectNode> origins(){
         var links=store.list(LINK);if(links.isEmpty())return Map.of();
         var vault=new VaultCollection(store,store.vaultLimits());vault.initialize();

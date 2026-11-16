@@ -559,7 +559,8 @@ public class TimekeeperResource {
             });
             return json(pages.page(type,values,canonical(filters),limit,query.getFirst("cursor")));
         };
-        return type.equals("TASK")?store.authenticatedReadSnapshot(identity,()->read.get().response()):tx(read);
+        return type.equals("TASK")?store.authenticatedReadSnapshot(identity,
+                ()->!"true".equals(query.getFirst("includeNoteSources"))||new NoteTasks(store).originsReady(),()->read.get().response()):tx(read);
     }
     private void validateFilters(MultivaluedMap<String,String> query){validateFilters(query,false);}
     private void validateFilters(MultivaluedMap<String,String> query,boolean history) {

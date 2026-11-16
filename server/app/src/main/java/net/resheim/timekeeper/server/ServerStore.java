@@ -238,6 +238,10 @@ public class ServerStore {
     }
     /** Pure queries release credential locks before reading a consistent data snapshot. */
     public <T> T authenticatedReadSnapshot(RequestIdentity identity,Supplier<T> work) {
+        return authenticatedReadSnapshot(identity,()->true,work);
+    }
+    /** Queries with lazy legacy preparation retain their first-use write transaction. */
+    <T> T authenticatedReadSnapshot(RequestIdentity identity,java.util.function.BooleanSupplier ready,Supplier<T> work) {
         if(context.get()!=null)throw new IllegalStateException("Read snapshots must not nest inside owner transactions");
         try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
             connection.setAutoCommit(false);int isolation=connection.getTransactionIsolation();
@@ -249,18 +253,18 @@ public class ServerStore {
                 connection.commit();
                 if(initialized) {
                     connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setReadOnly(true);
-                    T result;
+                    T result=null;boolean prepared;
                     context.set(new Context(identity.owner(),connection,clock.now(),true));
-                    try{result=asPrincipal(identity,work);}finally{context.remove();}
+                    try{prepared=ready.getAsBoolean();if(prepared)result=asPrincipal(identity,work);}finally{context.remove();}
                     connection.commit();connection.setReadOnly(false);connection.setTransactionIsolation(isolation);
                     // A revoked credential or disabled account must not receive the result.
-                    identity.guard(connection);connection.commit();return result;
+                    if(prepared){identity.guard(connection);connection.commit();return result;}
                 }
             } catch(Throwable failure) {
                 try{connection.rollback();}catch(SQLException rollback){failure.addSuppressed(rollback);}throw failure;
             }
         }catch(SQLException failure){throw databaseFailure(failure);}
-        // Preserve first-use owner initialization and default-label behavior.
+        // Preserve first-use initialization, default labels and legacy preparation.
         return authenticated(identity,work);
     }
     private <T> T asPrincipal(RequestIdentity identity,Supplier<T> work) {

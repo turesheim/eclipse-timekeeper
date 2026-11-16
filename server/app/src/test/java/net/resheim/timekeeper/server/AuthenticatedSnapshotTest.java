@@ -54,4 +54,16 @@ class AuthenticatedSnapshotTest {
         }));
         assertEquals("",store.authenticatedReadSnapshot(identity,()->new DayNotes(store).get(DayNotes.date("2026-11-16")).path("body").asText()));
     }
+    @Test void firstNoteOriginReadPreparesTheLegacyCatalogThenSubsequentReadsArePure(){
+        var identity=identity(tokens.authenticate("Bearer test-b"));var date=DayNotes.date("2026-11-17");
+        var before=store.authenticated(identity,()->{
+            var notes=new DayNotes(store);var saved=notes.saveContent(date,etag(notes.getContent(date)),object().put("body","- [ ] Private checklist task\n"));
+            assertFalse(new NoteTasks(store).originsReady());return saved;
+        });
+        var origins=store.authenticatedReadSnapshot(identity,()->new NoteTasks(store).originsReady(),()->new NoteTasks(store).origins());
+        assertEquals(1,origins.size());assertEquals("DAY",origins.values().iterator().next().path("kind").asText());
+        assertEquals(origins,store.authenticatedReadSnapshot(identity,()->{
+            assertTrue(new NoteTasks(store).originsReady());assertEquals(before,new DayNotes(store).getContent(date));return new NoteTasks(store).origins();
+        }));
+    }
 }
