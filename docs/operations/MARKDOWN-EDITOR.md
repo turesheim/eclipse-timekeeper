@@ -293,3 +293,36 @@ the Notes collection root; required parent folders are created after confirmatio
 Aliases and heading targets do not become part of the
 filename. Ambiguous links require resolution, and read-only sessions cannot
 create notes. Existing files are never overwritten by this action.
+
+### Note banners and daily weather
+
+Formatted notes display local raster images named by the Obsidian Banners
+properties `banner`, `banner_x` and `banner_y`. The default image height is
+112 px; crop coordinates run from 0 to 1. Images use the same private vault
+access as note attachments. Unsupported, missing or ambiguous images leave the
+note usable. Remote image URLs are never fetched.
+
+Daily notes offer **Add seasonal banner**, **Change banner image** and
+**Restore seasonal image** in **Note tools**. Seasonal artwork is a generic
+landscape. Optionally set latitude and longitude under Account → Profile →
+Weather location before creating a banner. Creation sends those coordinates to
+[MET Norway](https://api.met.no/doc/TermsOfService); forecasts are credited under
+CC BY 4.0. No location gives artwork alone. Past dates or unavailable forecasts
+also give artwork alone.
+
+Creation saves the artwork, crop, local date, time zone and three forecast slots.
+Opening a saved note does not fetch weather. Changing the account location,
+forecast or illustration catalog does not change a saved banner. You can upload
+a raster image or select one from the vault and adjust its crop for that day.
+The saved forecast stays over the chosen picture. Restore brings back the
+original seasonal image and crop. Read-only sessions can view these banners.
+
+The extra `dagsverk_seasonal_banner` text property preserves the original
+seasonal selection and forecast. Keep it, the standard banner properties and
+both referenced raster assets when syncing or moving a note. WebDAV and account
+archives carry them together. Other Markdown clients can display the ordinary
+banner image without understanding Dagsverk's saved forecast.
+
+The toolbar's **Lists** menu follows **Text style** and contains bulleted,
+numbered and task lists. Arrow keys select commands, Enter applies one, and
+Escape closes the menu. The menu marks the list type at the caret.

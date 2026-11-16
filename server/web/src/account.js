@@ -1,3 +1,4 @@
+import {weatherSettings} from './weather-settings.js';
 import {renderSnippets} from './snippets-account.js';
 import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
@@ -71,6 +72,7 @@ export async function renderAccount(view, part) {
     ...countries.map(country=>[country,regionNames.of(country)]).sort((a,b)=>a[1].localeCompare(b[1],getLocale()))
   ]});
   holidayPreferences.value.append(node('p',i18nText('holidays.independent'),'hint'));holidayPreferences.finish();
+  weatherSettings(view,profile);
   const preferences = form(view, i18nText("ui.time_zone_b9fe14"), i18nText("ui.save_time_zone"), async () => {
     try {dateTimeFormat(getLocale(), { timeZone: input.value.trim() });} catch {throw new Error(i18nText("ui.enter_a_valid_time_zone_for_example_europe_oslo"));}
     const reply = await view.session.request('/me', { method: 'PUT', etag: profile.etag, body: { zoneId: input.value.trim() } });

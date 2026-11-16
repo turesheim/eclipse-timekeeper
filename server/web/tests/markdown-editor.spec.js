@@ -199,3 +199,10 @@ test('production serves the shared editor without the retired prototype or sourc
   const index=await request.get('/web/');expect(index.ok()).toBe(true);expect(await index.text()).not.toContain('markdown-lab');
   for(const path of ['/web/markdown-lab.html','/web/markdown-lab.js','/web/markdown-preview.js','/web/assets/milkdown/source-editor.js'])expect((await request.get(path)).status(),path).toBe(404);
 });
+
+test('Lists menu preserves a selected paragraph and supports pointer and keyboard list commands',async({page})=>{
+  await open(page);await importNote(page,'Selected paragraph\n');await page.locator('#markdown-rich').click();const rich=page.locator('#markdown-formatted .ProseMirror'),lists=page.getByRole('button',{name:'Lists',exact:true}),menu=page.getByRole('menu',{name:'Lists',exact:true});
+  await rich.locator('p').click();await rich.press('ControlOrMeta+A');await lists.click();await expect(menu).toBeVisible();await menu.getByRole('menuitemradio',{name:'Bullet list',exact:true}).click();await expect(rich.locator('ul li')).toHaveText('Selected paragraph');await expect(rich).toBeFocused();await rich.locator('li p').first().click();
+  await lists.focus();await lists.press('ArrowDown');await expect(menu.getByRole('menuitemradio',{name:'Bullet list',exact:true})).toHaveAttribute('aria-checked','true');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');await expect(rich.locator('ol li')).toHaveText('Selected paragraph');await rich.locator('li p').first().click();
+  await lists.focus();await lists.press('ArrowUp');await expect(menu.getByRole('menuitemradio',{name:'Task list',exact:true})).toBeFocused();await page.keyboard.press('Enter');await expect(rich.getByRole('checkbox')).toBeVisible();await lists.click();await expect(menu.getByRole('menuitemradio',{name:'Task list',exact:true})).toHaveAttribute('aria-checked','true');await page.keyboard.press('Escape');await expect(lists).toBeFocused();await expect(menu).toBeHidden();
+});
