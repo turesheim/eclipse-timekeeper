@@ -79,7 +79,7 @@ export class MarkdownBanner{
     const fallback=seasonal?(savedArtwork||proposal?.artwork):null;
     const imageKey=metadata?'private:'+metadata.reference+':'+(resources?.bannerVersion?.()??0):fallback?'public:'+fallback.path:null;
     if(imageKey!==this.imageKey){
-      if(this.preview!==this.shownPreview)this.preview?.destroy();
+      if(this.preview!==this.shownPreview){this.preview?.destroy();this.preview?.dom.remove();}
       if(!metadata||metadata.reference!==this.imageReference){this.shownPreview?.destroy();this.shownPreview=null;this.dom.querySelector('img')?.remove();}
       this.preview=null;this.imageReference=metadata?.reference;this.imageKey=imageKey;this.dom.hidden=!this.dom.querySelector('img');
       let placeholder;

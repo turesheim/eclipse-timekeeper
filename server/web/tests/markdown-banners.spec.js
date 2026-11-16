@@ -124,7 +124,7 @@ for(const host of ['Today','Notes'])test('automatic capture preserves a BOM and 
   }finally{release();}
 });
 
-for(const outcome of ['stale','uncertain'])test('a '+outcome+' automatic banner save keeps newer prose without replaying the write',async({page,request})=>{
+for(const outcome of ['stale','uncertain'])test((outcome==='uncertain'?'an ':'a ')+outcome+' automatic banner save keeps newer prose without replaying the write',async({page,request})=>{
   const {api,put}=await fresh(page,request),date='2026-11-16',entry=await put('journal/'+date+'.md','# Saved version\n\nKeep this prose.\n');
   let release,arrived,writes=0;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
   await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{

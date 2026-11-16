@@ -91,7 +91,7 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
   return {
     dailyBannerContext,serializeBanner,bannerCommitted,bannerMatches,bannerFailed,canCaptureBanner:canCreate,
     announceBanner:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')),
-    bannerVersion:()=>generation,
+    bannerVersion:()=>{if(session())currentSession();return generation;},
     bannerPreview:async(date,{signal}={})=>{const current=currentSession(),source=JSON.stringify(origin());const reply=await current.request('/daily-banners/'+date+'/preview',{signal});if(current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));return reply.data;},
     bannerIdentity:()=>({session:session(),origin:JSON.stringify(origin())}),
     bannerChanged:afterBannerChange,
