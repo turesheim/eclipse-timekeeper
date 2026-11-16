@@ -17,7 +17,7 @@ import jakarta.inject.Inject;
 class DayLabelHttpTest {
     @Inject ServerStore store;
     @Inject ContractInputs inputs;
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:independent_day_labels");}}
+    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return ArchiveTestDatabase.configuration("daylabels","jdbc:h2:mem:independent_day_labels");}}
     private Response get(String owner,String path){return given().header("Authorization","Bearer "+owner).get("/api/v1"+path);}
     private Response put(String owner,String path,String tag,String json){return given().header("Authorization","Bearer "+owner).header("If-Match",tag).contentType("application/json").body(json).put("/api/v1"+path);}
     private Response edit(String date,String json){return given().header("Authorization","Bearer test-a").contentType("application/json").body(json).post("/api/v1/day-entries/"+date);}

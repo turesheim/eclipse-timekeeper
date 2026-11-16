@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(AuthenticatedSnapshotTest.Profile.class)
 class AuthenticatedSnapshotTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:authenticated_snapshots");}
+        public Map<String,String> getConfigOverrides(){return ArchiveTestDatabase.configuration("authenticatedsnapshots","jdbc:h2:mem:authenticated_snapshots");}
     }
     @Inject ServerStore store;
     @Inject AccountStore accounts;
