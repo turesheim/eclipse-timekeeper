@@ -196,7 +196,9 @@ Hosts adopt the new header and validators without rebuilding the rich editor or
 its undo history. A final full-file read must match the host's current validator;
 stale and uncertain results retain the draft and require recovery. Date/account
 generations fence late replies. Captures require the existing note identity and
-never recreate a missing note at its former path.
+never recreate a missing note at its former path. Recent notes rebuilds its
+expanded pages atomically from a fresh snapshot after metadata changes, retaining
+the requested extent and focused entry. A changed date window resets paging.
 
 `daily-banner-tools.js` also provides explicit capture, image and restore actions.
 These flush host autosave before reading the complete vault file and perform an

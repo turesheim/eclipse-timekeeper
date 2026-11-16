@@ -45,7 +45,7 @@ test('Today and Notes stack Recent notes below the outline with one scrollbar pe
   const text=Array.from({length:12},(_,index)=>'#'.repeat(2+index%4)+' '+(index<2?'Section '+index:'A long heading that wraps across lines in a narrow sidebar: section '+index)+'\n\nText.\n').join('\n'),date=new Date().toISOString().slice(0,10),daily=await api('GET','/day-notes/'+date+'/content');
   await api('PUT','/day-notes/'+date+'/content',{body:text},{'If-Match':daily.headers().etag});
   for(let index=0;index<23;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Sidebar'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===0?text:'# Sidebar note '+index+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
-  await page.reload();await page.locator('[data-tab=notes]').click();const recent=page.locator('#notes-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
+  await page.reload();await expect(page.locator('#today-note-editor .markdown-banner img')).toHaveAttribute('src',/^blob:/);await expect(page.locator('#status')).toHaveText('Up to date');await expect(page.locator('#today-recent-notes')).toHaveAttribute('aria-busy','false');await page.locator('[data-tab=notes]').click();const recent=page.locator('#notes-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
   const navigation=page.locator('#notes-navigation');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Sidebar00.md').click();
   const requests=[];page.on('request',request=>{if(request.url().includes('/notes/recent?'))requests.push(request.url());});
   for(const view of ['today','notes']){
@@ -167,6 +167,26 @@ test('note views use filename and event titles while headings and Markdown stay 
   expect(await(await api('GET','/notes/entries/'+ordinary.id+'/content')).text()).toBe(prefix+updated);expect(await(await api('GET','/notes/entries/'+event.id+'/content')).text()).toBe(eventText);
   expect((await new AxeBuilder({page}).include('.today-sidebar').analyze()).violations).toEqual([]);
   await page.setViewportSize({width:1440,height:900});await captureScreenshot(page,{path:'test-results/note-display-titles.png',fullPage:false});
+});
+
+test('background metadata refresh retains expanded Recent notes and fences a superseded page',async({page})=>{
+  await page.goto('/web/');await page.evaluate(async()=>{
+    const {RecentNotes}=await import('/web/recent-notes.js'),root=document.createElement('div');root.id='recent-paging-test';document.body.append(root);
+    let version='old',days=7,oldReply;const items=Array.from({length:23},(_,n)=>({id:'note-'+n,path:'Note '+n+'.md',modifiedAt:'2026-11-16T12:00:00Z'}));
+    const reply=(offset,snapshot=version)=>({data:{snapshot,days,zoneId:'UTC',fromDate:'2026-11-10',toDate:'2026-11-16',items:items.slice(offset,offset+20),...(offset===0?{nextOffset:20}:{})}});
+    const scope={request:async(path,options={})=>{
+      const offset=Number(new URL(path,location.origin).searchParams.get('offset')||0);
+      if(offset&&options.etag!==version)throw Object.assign(new Error('Stale snapshot'),{status:412});
+      if(offset&&version==='old')return new Promise(resolve=>oldReply=()=>resolve(reply(offset,'old')));
+      return reply(offset);
+    }};
+    const list=new RecentNotes(root,{onUnauthorized:()=>{throw new Error('Unexpected authorization failure');}});list.update(scope,'UTC',1);list.show();
+    window.recentPaging={list,pending:()=>!!oldReply,change:()=>{version='new';document.dispatchEvent(new Event('timekeeper:notes-changed'));},finish:()=>oldReply(),window:()=>{days=1;void list.refresh(true);}};
+  });
+  const root=page.locator('#recent-paging-test');await expect(root.locator('[data-recent-note]')).toHaveCount(20);await root.getByRole('button',{name:'More notes',exact:true}).hover();await page.mouse.down();await page.evaluate(()=>window.recentPaging.list.refresh(true));await page.mouse.up();await expect.poll(()=>page.evaluate(()=>window.recentPaging.pending())).toBe(true);
+  await page.evaluate(()=>window.recentPaging.change());await expect(root.locator('[data-recent-note]')).toHaveCount(23);await page.evaluate(()=>window.recentPaging.finish());await expect(root.locator('[data-recent-note]')).toHaveCount(23);
+  const last=root.locator('[data-recent-note="note-22"]');await last.focus();await page.evaluate(()=>window.recentPaging.list.refresh(true));await expect(root).toHaveAttribute('aria-busy','false');await expect(root.locator('[data-recent-note]')).toHaveCount(23);await expect(last).toBeFocused();
+  await page.evaluate(()=>window.recentPaging.window());await expect(root).toHaveAttribute('aria-busy','false');await expect(root.locator('[data-recent-note]')).toHaveCount(20);await page.evaluate(()=>window.recentPaging.list.reset());
 });
 
 test('Recent notes ignores stale account responses and refreshes after local midnight',async({page})=>{
