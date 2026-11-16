@@ -18,7 +18,11 @@ export function automaticDailyBanner(f){
     state.capturing=true;
     try{
       let context=await resources.readBanner({flush:false});if(!active(state))return;
-      const previous=dailyBannerSnapshot(splitMarkdown(context.text).frontmatter);if(previous?.forecast.length===3){state.captured=true;return;}
+      const parts=splitMarkdown(context.text),previous=dailyBannerSnapshot(parts.frontmatter);
+      // Imported or future-version presentation properties remain opaque.
+      const declares=key=>new RegExp('^(?:'+key+'|"'+key+'"|\''+key+'\')[ \t]*:','m').test(parts.frontmatter);
+      if(parts.unterminated||declares('banner')&&!bannerMetadata(parts.frontmatter)||declares('dagsverk_seasonal_banner')&&!previous){state.captured=true;return;}
+      if(previous?.forecast.length===3){state.captured=true;return;}
       let reference=previous?.seasonal.reference;
       if(!reference){
         const response=await fetch(state.proposal.artwork.path,{credentials:'same-origin'});if(!response.ok)throw new Error(t('daily_banner.failed'));

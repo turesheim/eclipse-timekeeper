@@ -355,7 +355,7 @@ test('journal preserves unsupported source, opaque frontmatter and exact label-o
     await signIn(page,await fresh(request));const api=await apiFor(page),body='\uFEFF---\r\ntags: [private]\r\n---\r\n\r\n[[Daily link]] ==highlight==\r\n<img src="https://journal-image.invalid/pixel">\r\n[unsafe](javascript:alert(1))\r\n';
     const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});
     const external=[];page.on('request',request=>{if(request.url().includes('journal-image.invalid'))external.push(request.url());});await month(page);await menu(page);
-    await expect(dialog(page).locator('.markdown-source-fragment textarea').first()).toBeVisible();await expect(dialog(page).locator('img')).toHaveCount(0);
+    await expect(dialog(page).locator('.markdown-source-fragment textarea').first()).toBeVisible();await expect(dialog(page).locator('.ProseMirror img')).toHaveCount(0);
     await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(dialog(page).locator('.markdown-source-fragment textarea').first()).toBeVisible();
     await expect(dialog(page).getByRole('button',{name:'Download Markdown',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Clear note body',exact:true})).toHaveCount(0);
 

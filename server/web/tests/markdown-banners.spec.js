@@ -82,6 +82,23 @@ test('slow weather and banner writes keep typing editable and preserve newer pro
 
 
 
+test('automatic presentation leaves unsupported imported banner properties untouched',async({page,request})=>{
+  const {api,put}=await fresh(page,request),sources=[
+    'banner: "https://example.invalid/private-image.png"',
+    'banner: "[[Images/one.png]]"\nbanner: "[[Images/two.png]]"',
+    'dagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify({version:2,private:'future metadata'}))
+  ],external=[],writes=[];
+  page.on('request',r=>{if(r.url().startsWith('https://example.invalid/'))external.push(r.url());if(r.method()==='PUT'&&new URL(r.url()).pathname.startsWith('/api/v1/notes'))writes.push(r.url());});
+  for(let i=0;i<sources.length;i++){
+    const date='2026-11-'+(20+i),source='\uFEFF---\r\n'+sources[i].replaceAll('\n','\r\n')+'\r\ncustom: keep exactly\r\n---\r\n\r\nImported daily prose.\r\n',entry=await put('journal/'+date+'.md',source);writes.length=0;
+    const read=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/v1/notes/entries/'+entry.id+'/content');
+    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);await read;
+    const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toContainText('Imported daily prose.');await root.getByRole('button',{name:'Formatted',exact:true}).press('ControlOrMeta+s');
+    expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);expect(writes).toEqual([]);
+  }
+  expect(external).toEqual([]);
+});
+
 test('a saved seasonal picture appears before its private image finishes loading',async({page,request})=>{
   const {api,put}=await fresh(page,request),date='2026-11-16';
   const artwork=await readFile(new URL('../src/assets/seasonal/v1/late-autumn-snow.png',import.meta.url)),asset=await put('Images/Saved season.png',artwork);
