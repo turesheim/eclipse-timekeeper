@@ -7,6 +7,7 @@ import {noteEntry} from './note-entry.js';
 import {appendEditorText,saveMarkdown} from './editor-interactions.js';
 import {openAccountMenu} from './navigation.js';
 import {captureScreenshot} from './screenshots.js';
+import {monthCalendar} from '../src/month-model.js';
 
 const image=await readFile(new URL('./fixtures/banner.png',import.meta.url));
 const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jI1sAAAAASUVORK5CYII=','base64');
@@ -159,13 +160,17 @@ test('daily banners render from the note snapshot without another full-document 
 
 test('the selected daily note loads before serialized month metadata reads',async({page,request})=>{
   const {put}=await fresh(page,request);const date=followingMonth(await page.locator('#today-date').inputValue());await put('journal/'+date+'.md','# Selected note first\n');
-  let allowMetadata;const gate=new Promise(resolve=>allowMetadata=resolve);let tail=Promise.resolve();const calls=[];
-  await page.route(/\/api\/v1\/(?:day-entries\/|day-notes\?|week-notes\?)/,async route=>{
-    const previous=tail;let release;tail=new Promise(resolve=>release=resolve);await previous;
-    try{const path=new URL(route.request().url()).pathname;calls.push(path);if(!path.startsWith('/api/v1/day-entries/'))await gate;const response=await route.fetch();await route.fulfill({response});}finally{release();}
-  });
+  const first=monthCalendar(date.slice(0,7),'UTC').days[0].date,pattern=/\/api\/v1\/(?:day-entries\/|day-notes\?)/;
+  let allowMetadata;const gate=new Promise(resolve=>allowMetadata=resolve);let tail=Promise.resolve();const calls=[],pending=[];
+  const handle=route=>{
+    const url=new URL(route.request().url()),selected=url.pathname==='/api/v1/day-entries/'+date;
+    if(!selected&&url.searchParams.get('fromDate')!==first)return route.continue();
+    const previous=tail;let release;tail=new Promise(resolve=>release=resolve);
+    const work=(async()=>{await previous;try{calls.push(url.pathname);if(!selected)await gate;const response=await route.fetch();await route.fulfill({response});}finally{release();}})();pending.push(work);return work;
+  };
+  await page.route(pattern,handle);
   try{await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor .ProseMirror')).toContainText('Selected note first');expect(calls[0]).toBe('/api/v1/day-entries/'+date);}
-  finally{allowMetadata();await page.unrouteAll({behavior:'wait'});}
+  finally{allowMetadata();await Promise.all(pending);await page.unroute(pattern,handle);}
 });
 
 test('returning to a clean daily note refreshes peer edits without changing source mode',async({page,request})=>{
