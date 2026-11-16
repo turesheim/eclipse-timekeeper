@@ -324,8 +324,9 @@ after configuring a location; **Note tools → Retry forecast** retries this loo
 **Note tools** also offers **Add seasonal banner** to save a snapshot on an empty
 day, **Change banner image** to upload or choose a vault image and adjust its crop,
 and **Restore seasonal image** to return to the original seasonal picture. An
-existing custom image stays in place during automatic capture. The saved forecast
-stays with the chosen picture. Banner metadata saves share the editor's autosave
+existing custom image stays in place during automatic capture. Imported banner
+metadata stays unchanged until you choose **Add seasonal banner** to attach a
+saved forecast. The saved forecast stays with the chosen picture. Banner metadata saves share the editor's autosave
 queue, so newer prose and navigation retain the current note validator.
 
 The extra `dagsverk_seasonal_banner` text property preserves the original

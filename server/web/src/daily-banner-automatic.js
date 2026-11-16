@@ -21,7 +21,7 @@ export function automaticDailyBanner(f){
       const parts=splitMarkdown(context.text),previous=dailyBannerSnapshot(parts.frontmatter);
       // Imported or future-version presentation properties remain opaque.
       const declares=key=>new RegExp('^(?:'+key+'|"'+key+'"|\''+key+'\')[ \t]*:','m').test(parts.frontmatter);
-      if(parts.unterminated||declares('banner')&&!bannerMetadata(parts.frontmatter)||declares('dagsverk_seasonal_banner')&&!previous){state.captured=true;return;}
+      if(parts.unterminated||declares('banner')&&(!previous||!bannerMetadata(parts.frontmatter))||declares('dagsverk_seasonal_banner')&&!previous){state.captured=true;return;}
       if(previous?.forecast.length===3){state.captured=true;return;}
       let reference=previous?.seasonal.reference;
       if(!reference){

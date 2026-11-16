@@ -82,8 +82,9 @@ test('slow weather and banner writes keep typing editable and preserve newer pro
 
 
 
-test('automatic presentation leaves unsupported imported banner properties untouched',async({page,request})=>{
-  const {api,put}=await fresh(page,request),sources=[
+test('automatic presentation leaves imported banner properties untouched',async({page,request})=>{
+  const {api,put}=await fresh(page,request);await put('Images/Imported.png',image);const sources=[
+    'banner: \"[[Images/Imported.png]]\"\nbanner_x: 0.25\nbanner_y: 0.75',
     'banner: "https://example.invalid/private-image.png"',
     'banner: "[[Images/one.png]]"\nbanner: "[[Images/two.png]]"',
     'dagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify({version:2,private:'future metadata'}))

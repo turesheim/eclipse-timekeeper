@@ -185,9 +185,9 @@ civil day. It requests weather only when the profile has a location and no saved
 three-slot forecast. Empty days and read-only sessions remain presentation only.
 Existing daily notes capture a private artwork asset and the available forecast
 in the background. Missing saved forecasts can be filled later; populated saved
-forecasts and authored custom images are preserved. Unsupported imported banner
-properties and unknown snapshot versions are left opaque and are not captured
-automatically.
+forecasts and authored custom images are preserved. Imported banner metadata
+without a Dagsverk snapshot, unsupported properties and unknown snapshot versions
+are left opaque and are not captured automatically.
 
 Weather, full-file preparation and artwork uploads stay outside the autosave
 queue. `DocumentAutosave.exclusive` drains prose, performs the conditional metadata
