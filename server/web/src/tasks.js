@@ -189,7 +189,7 @@ export class TasksView {
       try{
         const reply=await session.request('/tasks/'+row.id+'/note');if(session!==this.session||current!==this.detailGeneration||!this.detail.open)return;
         const entry=reply.data,link=node('a',undefined,'btn btn-outline-secondary task-source-note');link.href='#notes';link.append(icon(noteIcon(entry)),document.createTextNode(t('tasks.source_note',{title:noteTitle(entry)})));
-        link.addEventListener('click',event=>{event.preventDefault();document.dispatchEvent(new CustomEvent(vaultNoteNavigation,{cancelable:true,detail:{entry,popup:true,guards:[()=>session===this.session],leave:[()=>this.detail.close()],originElement:this.rowElements.get(key)?.button}}));});this.detailBody.append(link);
+        link.addEventListener('click',event=>{event.preventDefault();document.dispatchEvent(new CustomEvent(vaultNoteNavigation,{cancelable:true,detail:{entry,popup:true,guards:[()=>session===this.session],leave:[()=>this.detail.close()],originElement:origin}}));});this.detailBody.append(link);
       }catch(error){if(session===this.session&&current===this.detailGeneration&&error.status===401)this.callbacks.onUnauthorized?.(error);}
     }
   }
