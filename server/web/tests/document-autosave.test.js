@@ -51,3 +51,11 @@ test('an uncertain metadata operation retains the new draft and stops navigation
   draft='Keep this draft';autosave.changed();const navigation=autosave.flush();release();
   assert.equal(await metadata,false);assert.equal(await navigation,false);assert.equal(await autosave.flush(),false);assert.equal(writes,0);assert.equal(draft,'Keep this draft');autosave.reset();
 });
+
+test('reset fences pending metadata while the next account can save independently',async()=>{
+  let draft='',saved='',release,entered;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>entered=resolve);
+  const autosave=new DocumentAutosave({dirty:()=>draft!==saved,ready:()=>true,save:async()=>{saved=draft;return true;}});
+  const old=autosave.exclusive(async()=>{entered();await gate;return true;});await started;
+  autosave.reset();draft='New account draft';assert.equal(await autosave.flush(),true);release();
+  assert.equal(await old,false);assert.equal(saved,'New account draft');
+});

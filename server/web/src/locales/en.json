@@ -1934,7 +1934,7 @@
   "daily_banner.set_location": "Set weather location",
   "daily_banner.loading_forecast": "Loading forecast…",
   "daily_banner.forecast_unavailable": "No forecast is available for this day.",
-  "daily_banner.retry_forecast": "Try again",
+  "daily_banner.retry_forecast": "Retry forecast",
   "daily_banner.add": "Add seasonal banner",
   "daily_banner.change": "Change banner image",
   "daily_banner.restore": "Restore seasonal image",

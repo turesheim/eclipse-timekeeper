@@ -144,7 +144,7 @@ for(const outcome of ['stale','uncertain'])test((outcome==='uncertain'?'an ':'a 
 for(const destination of ['another day','another account'])test('late automatic weather cannot populate '+destination,async({page,request})=>{
   const {api}=await fresh(page,request),date='2026-11-16',owner=(await api('GET','/me')).headers()['x-timekeeper-owner'];
   let release,arrived;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
-  await page.route('**/api/v1/daily-banners/*/preview',async route=>{const requested=new URL(route.request().url()).pathname.split('/').at(-2);if(requested===date){arrived();await gate;}await route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:requested,zoneId:'Europe/Oslo',season:'late-autumn',weather:'snow',forecast:[]}}).catch(()=>{});});
+  await page.route('**/api/v1/daily-banners/*/preview',async route=>{const requested=new URL(route.request().url()).pathname.split('/').at(-2);if(requested===date){arrived();await gate;}await route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date:requested,zoneId:'Europe/Oslo',season:requested==='2026-12-01'?'winter':'late-autumn',weather:'snow',forecast:requested===date?[9,12,15].map(hour=>({time:String(hour).padStart(2,'0')+':00',condition:'snow',temperatureCelsius:-99})):[]}}).catch(()=>{});});
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo',weatherLocation:{latitude:63.43,longitude:10.39}},{'If-Match':profile.headers().etag});
   try{
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);await started;
