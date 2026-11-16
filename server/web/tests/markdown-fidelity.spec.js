@@ -11,6 +11,13 @@ async function open(page,source){
 }
 async function download(page){const pending=page.waitForEvent('download');await page.locator('#markdown-download').click();return readFile(await(await pending).path(),'utf8');}
 
+test('redundant nested bold preserves its outer range and exact unchanged source',async({page})=>{
+  const source='# Upgrade plan\r\n\r\n- [x] Prepare the platform\r\n  - [x] Review policy\r\n\r\n| Environment | Version |\r\n| --- | --- |\r\n| TEST | **1.2.3** |\r\n\r\n1. Add **the namespace **`controller` and its policies.\r\n\r\n   **Wait before activating **ControllerConfig**.**\r\n\r\n   ==Prepare the subscription, but **do not approve** the plan yet.==\r\n\r\n1) [Preparation](https\\://example.invalid/pull/100)\r\n2) [Migration](https\\://example.invalid/pull/101)\r\n';
+  await open(page,source);const rich=page.locator('#markdown-formatted');
+  await expect(rich.locator('strong').filter({hasText:'Wait before activating ControllerConfig.'})).toBeVisible();await expect(rich.locator('mark')).toContainText('do not approve');await expect(rich.locator('table')).toBeVisible();
+  expect(await download(page)).toBe(source);await page.locator('#markdown-source').click();await page.locator('#markdown-rich').click();expect(await download(page)).toBe(source);
+});
+
 test('Obsidian callouts, media source and PDF references retain a formatted document',async({page})=>{
   const callout='>[!IMPORTANT] Viktig!\n> Dette er et opprinnelig arbeidsdokument.\n';
   const html='<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/example" title="Example video" frameborder="0" allowfullscreen></iframe>\n[https://www.youtube.com/watch?v=example](https://www.youtube.com/watch?v=example)\n';
