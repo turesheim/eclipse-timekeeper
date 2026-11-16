@@ -22,8 +22,8 @@ the separate About prototype and its scratchpad controls have been retired.
   serialized vault requests. Event notes and older servers retain the Notes API
   fallback. Neither path adds metadata to a body write. Previews use the
   same authenticated resolver/raster checks and are disposed on mode, note or
-  account changes. Ordinary prose edits never serialize banner metadata; explicit
-  daily banner capture and explicit actions use guarded full-file updates described below.
+  account changes. Ordinary prose edits preserve banner metadata; automatic capture
+  and explicit daily actions use the guarded full-file updates described below.
 - `editor/milkdown.js` provides the shared Milkdown/ProseMirror schema, history,
   keyboard behavior and semantic admission guard. `tracked-document.js` reuses
   unchanged top-level Markdown spans after a rich edit. Unfamiliar blocks remain
@@ -193,8 +193,8 @@ write, then drains edits made during that write before navigation can finish.
 Hosts adopt the new header and validators without rebuilding the rich editor or
 its undo history. A final full-file read must match the host's current validator;
 stale and uncertain results retain the draft and require recovery. Date/account
-generations fence late replies. Moved native notes resolve by canonical source
-identity instead of creating another conventional-path file.
+generations fence late replies. Captures require the existing note identity and
+never recreate a missing note at its former path.
 
 `daily-banner-tools.js` also provides explicit capture, image and restore actions.
 These flush host autosave before reading the complete vault file and perform an

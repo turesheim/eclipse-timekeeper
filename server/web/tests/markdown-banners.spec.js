@@ -82,6 +82,21 @@ test('slow weather and banner writes keep typing editable and preserve newer pro
 
 
 
+test('a saved seasonal picture appears before its private image finishes loading',async({page,request})=>{
+  const {api,put}=await fresh(page,request),date='2026-11-16';
+  const artwork=await readFile(new URL('../src/assets/seasonal/v1/late-autumn-snow.png',import.meta.url)),asset=await put('Images/Saved season.png',artwork);
+  const snapshot={version:1,date,zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:asset.path,id:'late-autumn-snow',version:1,x:.5,y:.5},forecast:[]};
+  await put('journal/'+date+'.md','---\nbanner: '+JSON.stringify('![['+asset.path+']]')+'\ndagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify(snapshot))+'\n---\n\nKeep writing while the picture loads.\n');
+  let release,arrived;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
+  await page.route('**/api/v1/notes/entries/'+asset.id+'/content',async route=>{arrived();await gate;await route.continue();});
+  try{
+    await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor');await started;
+    await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v1/late-autumn-snow.png');await expect(root.locator('.ProseMirror')).toContainText('Keep writing');await expect(root.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');
+    release();await expect(banner(root).locator('img')).toHaveAttribute('src',/^blob:/);await expect(banner(root).locator('img')).toHaveCount(1);await expect(banner(root).locator('img')).toHaveCSS('object-fit','contain');
+    expect((await(await api('GET','/day-entries/'+date)).json()).body).toBe('\nKeep writing while the picture loads.\n');
+  }finally{release();}
+});
+
 test('an existing empty forecast fills after location setup while keeping its custom image and metadata',async({page,request})=>{
   const {api,put}=await fresh(page,request),date='2026-11-16';await put('Images/Project cover.png',image);
   const snapshot={version:1,date,zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/Project cover.png',x:.25,y:.75},forecast:[]};
@@ -98,18 +113,18 @@ test('an existing empty forecast fills after location setup while keeping its cu
 
 for(const host of ['Today','Notes'])test('automatic capture preserves a BOM and newer prose in '+host,async({page,request})=>{
   const {api,put}=await fresh(page,request),date='2026-11-16',source='\uFEFF# Original title\r\n\r\nKeep this prose.\r\n',entry=await put('journal/'+date+'.md',source);
-  let release,arrived;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
-  await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{if(route.request().method()==='PUT'&&route.request().postData()?.includes('dagsverk_seasonal_banner:')){arrived();await gate;}await route.continue();});
+  let release,arrived,captured;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
+  await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{if(!captured&&route.request().method()==='PUT'&&route.request().postData()?.includes('dagsverk_seasonal_banner:')){captured=route.request().postData();arrived();await gate;}await route.continue();});
   try{
     let root;if(host==='Notes')root=await openNote(page,'journal/'+date+'.md');else{await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(date);root=page.locator('#today-note-editor');}
     await started;await appendEditorText(root.locator('.ProseMirror > p').last(),' New draft.');release();
     await expect.poll(async()=>(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).includes('New draft.')).toBe(true);
-    const saved=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(saved.startsWith('\uFEFF---\r\n')).toBe(true);expect(saved.match(/\uFEFF/g)).toHaveLength(1);expect(saved).toContain('# Original title\r\n');expect(saved).toContain('Keep this prose. New draft.');await expect(root.locator('.ProseMirror')).toContainText('New draft.');
+    const saved=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(saved.startsWith('\uFEFF---\r\n')).toBe(true);expect(saved.match(/\uFEFF/g)).toHaveLength(1);expect(captured.endsWith(source.slice(1))).toBe(true);expect(saved).toContain('# Original title');expect(saved).toContain('Keep this prose. New draft.');await expect(root.locator('.ProseMirror')).toContainText('New draft.');
     await root.getByRole('button',{name:'Formatted',exact:true}).press('ControlOrMeta+z');await expect(root.locator('.ProseMirror')).not.toContainText('New draft.');await saveMarkdown(root);const undone=await(await api('GET','/notes/entries/'+entry.id+'/content')).text();expect(undone).toContain('dagsverk_seasonal_banner:');expect(undone.endsWith(source.slice(1))).toBe(true);
   }finally{release();}
 });
 
-for(const outcome of ['stale','uncertain'])test('an '+outcome+' automatic banner save keeps newer prose without replaying the write',async({page,request})=>{
+for(const outcome of ['stale','uncertain'])test('a '+outcome+' automatic banner save keeps newer prose without replaying the write',async({page,request})=>{
   const {api,put}=await fresh(page,request),date='2026-11-16',entry=await put('journal/'+date+'.md','# Saved version\n\nKeep this prose.\n');
   let release,arrived,writes=0;const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
   await page.route('**/api/v1/notes/entries/'+entry.id+'/content',async route=>{

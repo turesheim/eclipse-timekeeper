@@ -87,8 +87,8 @@ export class MarkdownBanner{
       if(metadata&&resources?.wikiImage){
         const preview=(seasonal&&resources.bannerImage?resources.bannerImage:resources.wikiImage)(metadata.reference,'');this.preview=preview;
         const image=preview.dom;image.loading='eager';image.alt='';
-        image.addEventListener('load',()=>{if(this.preview!==preview||!image.naturalWidth)return;this.shownPreview?.destroy();this.dom.querySelector('img')?.remove();this.shownPreview=preview;this.dom.prepend(image);this.dom.hidden=false;});
-        image.addEventListener('error',()=>{if(this.preview!==preview)return;preview.destroy();if(preview!==this.shownPreview)image.remove();this.preview=this.shownPreview;this.imageKey=null;if(!this.dom.querySelector('img'))this.dom.hidden=true;});
+        image.addEventListener('load',()=>{if(this.preview!==preview||!image.naturalWidth||this.shownPreview===preview)return;this.shownPreview?.destroy();this.dom.querySelector('img')?.remove();this.shownPreview=preview;this.dom.prepend(image);this.dom.hidden=false;});
+        image.addEventListener('error',()=>{if(this.preview!==preview)return;preview.destroy();image.remove();if(this.shownPreview===preview)this.shownPreview=null;this.preview=this.shownPreview;if(!this.dom.querySelector('img'))this.dom.hidden=true;});
         if(!this.dom.querySelector('img'))this.dom.prepend(image);
       }
     }
