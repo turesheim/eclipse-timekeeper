@@ -392,12 +392,16 @@ test('journal recovery actions remain clickable during a controls refresh',async
 test('journal retains both drafts on conflicts, confirms dismissal and reload, and checks an unknown save without another write',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Private body draft');await page.locator('#track-note-text').fill('Draft label');
+    await signIn(page,await fresh(request));const api=await apiFor(page);
+    // Imported presentation properties stay opaque, keeping this recovery
+    // scenario independent of automatic seasonal metadata capture.
+    await api('GET','/notes');await api('PUT','/notes/files?path=journal/2026-05-17.md',Buffer.from('---\nbanner: "Keep this imported property"\n---\n'),{'If-None-Match':'*','Content-Type':'application/octet-stream'});
+    await month(page);await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Private body draft');await page.locator('#track-note-text').fill('Draft label');
     const current=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{text:'Peer label',body:'Peer body'},{'If-Match':current.headers().etag});
     await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(dialog(page).getByRole('alert')).toBeInViewport();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');await expect(page.locator('#track-note-text')).toHaveValue('Draft label');
     page.once('dialog',prompt=>prompt.dismiss());await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');
     await discard(page,()=>dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click());await expect(page.locator('#track-note-text')).toHaveValue('Peer label');await expect(page.locator('#journal-formatted .ProseMirror')).toHaveText('Peer body');
-    let writes=0;await page.route('**/api/v1/day-entries/2026-05-17',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
+    let writes=0;await page.route('**/api/v1/day-entries/2026-05-17',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;const applied=await route.fetch();expect(applied.status()).toBe(200);await route.abort('failed');});
     await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Committed body once');await page.locator('#track-note-text').fill('Committed label once');await saveMarkdown(dialog(page),{wait:false});await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');
     await dialog(page).getByRole('button',{name:'Check saved result',exact:true}).click();await expect(dialog(page)).toContainText('Saved');await dialog(page).getByRole('button',{name:'Close',exact:true}).click();await expect(dialog(page)).toBeHidden();expect(writes).toBe(1);expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe('Committed body once');
   }finally{await owner.close();}
