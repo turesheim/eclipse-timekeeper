@@ -49,7 +49,16 @@ test('planned cards match summary typography, retain keyboard focus and fit narr
       await action.click();const popup=page.locator('#task-details');await expect(popup).toBeVisible();expect((await new AxeBuilder({page}).include('#task-details').analyze()).violations).toEqual([]);await popup.getByRole('button',{name:'Close',exact:true}).click();await expect(action).toBeFocused();await captureScreenshot(page,{path:`test-results/planned-tasks-${theme}-${width}.png`});
     }
   }
-  await page.evaluate(()=>{window.plannedAction=document.querySelector('[data-today-task]');document.dispatchEvent(new Event('timekeeper:notes-changed'));});await expect(action).toBeFocused();expect(await action.evaluate(node=>node===window.plannedAction)).toBe(true);
+  await page.setViewportSize({width:1440,height:1000});await action.hover();await page.evaluate(()=>window.plannedAction=document.querySelector('[data-today-task]'));
+  await page.mouse.down();await page.evaluate(()=>document.querySelector('#refresh').click());await expect(page.locator('#status')).toHaveText('Up to date');await page.mouse.up();
+  const popup=page.locator('#task-details');await expect(popup).toBeVisible();await popup.getByRole('button',{name:'Close',exact:true}).click();await expect(action).toBeFocused();expect(await action.evaluate(node=>node===window.plannedAction)).toBe(true);
+});
+
+test('opening planned task details preserves an editable daily draft',async({page,request})=>{
+  const {api,create}=await setup(page,request),task=await create('Review without leaving Today');await today(page);
+  const journal=page.locator('#today-note-editor');await journal.getByRole('button',{name:'Markdown source',exact:true}).click();const draft=page.locator('#today-journal-body');await draft.fill('# Keep this daily draft\n\nMy work stays here.');
+  await card(page,task.id).click();await expect(page.locator('#task-details')).toBeVisible();await expect(page.locator('#today-panel')).toBeVisible();await page.keyboard.press('Escape');await expect(draft).toHaveValue('# Keep this daily draft\n\nMy work stays here.');
+  await expect.poll(async()=>(await(await api('GET','/day-entries/'+date)).json()).body).toBe('# Keep this daily draft\n\nMy work stays here.');
 });
 
 test('read-only planned details allow private images while write actions stay disabled',async({page,request,browser})=>{
