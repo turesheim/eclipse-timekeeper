@@ -87,9 +87,13 @@ export class RecentNotes {
       }
       this.list.replaceChildren(...rows);
     }
-    this.list.hidden=!this.items.length;
+    if(this.list.hidden!==!this.items.length)this.list.hidden=!this.items.length;
     for(const action of this.list.querySelectorAll('[data-recent-note]'))action.recentGeneration=this.generation;
-    this.more.hidden=!this.error&&this.page?.nextOffset===undefined;this.more.textContent=t(this.error?'ui.retry':'today.more_notes');this.more.disabled=this.busy&&this.loadingMore;
+    const hidden=!this.error&&this.page?.nextOffset===undefined,label=t(this.error?'ui.retry':'today.more_notes'),disabled=this.busy&&this.loadingMore;
+    if(this.more.hidden!==hidden)this.more.hidden=hidden;
+    // Replacing even identical text between pointerdown/up cancels WebKit activation.
+    if(this.more.textContent!==label)this.more.textContent=label;
+    if(this.more.disabled!==disabled)this.more.disabled=disabled;
     for(const status of this.root.querySelectorAll(':scope > p'))status.remove();
     if(!this.items.length&&!this.busy&&!this.error)this.root.append(node('p',t('today.no_recent_notes'),'hint'));
     if(this.busy)this.root.append(node('p',t('calendar.loading'),'hint'));

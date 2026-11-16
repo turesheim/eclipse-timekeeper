@@ -171,7 +171,9 @@ test('note views use filename and event titles while headings and Markdown stay 
 
 test('background metadata refresh retains expanded Recent notes and fences a superseded page',async({page})=>{
   await page.goto('/web/');await page.evaluate(async()=>{
-    const {RecentNotes}=await import('/web/recent-notes.js'),root=document.createElement('div');root.id='recent-paging-test';document.body.append(root);
+    const {RecentNotes}=await import('/web/recent-notes.js'),root=document.createElement('div');root.id='recent-paging-test';
+    // Keep the isolated control clear of the application's asynchronous startup layout.
+    root.style.cssText='position:fixed;inset:0;overflow:auto;z-index:2000;background:white';document.body.append(root);
     let version='old',days=7,oldReply;const items=Array.from({length:23},(_,n)=>({id:'note-'+n,path:'Note '+n+'.md',modifiedAt:'2026-11-16T12:00:00Z'}));
     const reply=(offset,snapshot=version)=>({data:{snapshot,days,zoneId:'UTC',fromDate:'2026-11-10',toDate:'2026-11-16',items:items.slice(offset,offset+20),...(offset===0?{nextOffset:20}:{})}});
     const scope={request:async(path,options={})=>{
