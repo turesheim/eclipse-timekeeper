@@ -148,7 +148,7 @@ An associated note supplies the client/project of new checklist tasks. Changing
 its association updates existing linked tasks atomically without rewriting the
 note. Normal task dependency rules apply; a conflict leaves all records intact.
 
-While the caret is in a checkbox item, **✔ +** opens **Edit task details** in
+While the caret is in a checkbox item, a compact **+** to the left of its checkbox opens **Edit task details** in
 both editor modes. The compact dialog offers client, project, scheduled day,
 deadline, priority and notes for that item's existing task. It flushes the note
 draft before resolving the source location, preserving duplicate task identity

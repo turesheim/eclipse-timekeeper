@@ -203,8 +203,8 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .notes-editor > .markdown-banner,.journal-dialog > .markdown-banner,.journal-inline > form > .markdown-banner,.journal-dialog > form > .markdown-banner { width:calc(100% + 1rem); margin:-.5rem -.5rem .25rem; border-radius:var(--bs-border-radius) var(--bs-border-radius) 0 0; }
 
 .markdown-banner {position:relative;flex-shrink:0}
-.markdown-banner.seasonal-banner {height:120px;background:var(--bs-tertiary-bg)}
-.markdown-banner.seasonal-banner > img {height:100%;object-fit:contain}
+.markdown-banner.seasonal-banner {height:120px;background:var(--bs-tertiary-bg);background-repeat:no-repeat}
+.markdown-banner.seasonal-banner > img {height:100%;object-fit:cover}
 .banner-forecast-status {position:absolute;right:.35rem;bottom:.35rem;display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;max-width:calc(100% - .7rem);padding:.3rem .5rem;background:rgb(15 30 32 / 76%);color:#fff;border-radius:var(--bs-border-radius);font-size:.8rem}
 .banner-forecast-status a,.banner-forecast-status .btn {color:#fff}
 .banner-forecast-status .btn {padding:.1rem .25rem;font-size:inherit}
@@ -232,7 +232,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .drawio-files button {width:100%;overflow-wrap:anywhere;}
 .drawio-filename {overflow-wrap:anywhere;font-size:.875rem;}
 .drawio-file-preview {display:block;max-width:100%;max-height:16rem;object-fit:contain;margin:1rem auto;background:#fff;}
-.note-task-action {position:fixed;z-index:1080;min-width:3.5rem;background:var(--bs-body-bg);border-radius:2rem;box-shadow:0 2px 6px #0002;}
+.note-task-action {position:fixed;z-index:1080;display:inline-grid;place-items:center;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;background:var(--bs-body-bg);border-radius:50%;font-size:1rem;line-height:1;}
 .note-task-dialog {width:min(32rem,calc(100vw - 2rem));}
 .note-task-title {overflow-wrap:anywhere;max-height:4.5em;overflow:auto;}
 .note-task-fields {display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1rem;}

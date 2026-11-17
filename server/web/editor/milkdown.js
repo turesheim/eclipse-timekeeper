@@ -396,7 +396,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const {empty,$from}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph'||!$from.parent.textContent.trim())return null;
         const item=$from.node($from.depth-1);if(item?.type.name!=='list_item'||item.attrs.checked==null||item.firstChild!==$from.parent)return null;
         const position=$from.start();
-        return {offset:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source));return cursorMap(tree,view.state.doc,source).source(position);}};
+        return {checkboxRect:()=>view.nodeDOM($from.before($from.depth-1))?.querySelector(':scope > input[type=checkbox]')?.getBoundingClientRect(),offset:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source));return cursorMap(tree,view.state.doc,source).source(position);}};
       },
       focus:()=>view.focus(),
       setReadOnly,

@@ -2,7 +2,7 @@ import {wikiReference} from './wiki-links.js';
 import {dailyBannerSnapshot} from './daily-banner-model.js';
 import {t} from './i18n.js';
 import {dailyBannerProposal} from './daily-banner-presentation.js';
-import {seasonalCatalog} from './seasonal-banner-catalog.js';
+import {seasonalCatalog,panoramicArtwork} from './seasonal-banner-catalog.js';
 
 const weatherSymbols={clear:'☀',fair:'☀',partlycloudy:'⛅',cloudy:'☁',rain:'☂',snow:'❄',sleet:'❄',fog:'≋',thunder:'ϟ'};
 
@@ -49,9 +49,19 @@ export function bannerMetadata(frontmatter){
 export class MarkdownBanner{
   constructor(){
     this.generation=0;this.dom=document.createElement('div');this.dom.className='markdown-banner';this.dom.hidden=true;this.dom.setAttribute('aria-hidden','true');
+    this.resize=new ResizeObserver(()=>this.layoutPanorama());this.resize.observe(this.dom);
+  }
+  layoutPanorama(){
+    const image=this.dom.querySelector('img');
+    if(!this.panorama){this.dom.style.backgroundImage='';image?.style.removeProperty('object-fit');return;}
+    const {original,wide,x}=this.panorama,height=this.dom.clientHeight,width=this.dom.clientWidth;if(!height||!width)return;
+    const originalWidth=original.width*height/original.height,panoramaWidth=wide.width*height/wide.height;
+    this.dom.style.backgroundImage='url("'+wide.path+'")';this.dom.style.backgroundSize=panoramaWidth+'px '+height+'px';this.dom.style.backgroundPosition=((width-originalWidth)*x-(panoramaWidth-originalWidth)/2)+'px 0px';
+    if(image)image.style.objectFit=width<originalWidth?'cover':'contain';
   }
   clear({keepMetadata=false}={}){
     this.metadataReady=false;
+    this.panorama=null;this.dom.style.backgroundImage='';
     if(!keepMetadata){this.snapshot=null;this.proposal=null;this.proposalState=null;}
     ++this.generation;if(this.preview!==this.shownPreview)this.preview?.destroy();this.shownPreview?.destroy();this.preview=this.shownPreview=null;this.imageKey=this.forecastKey=this.imageReference=null;this.dom.hidden=true;this.dom.replaceChildren();this.dom.setAttribute('aria-hidden','true');
   }
@@ -77,22 +87,24 @@ export class MarkdownBanner{
     const seasonal=!metadata&&!!proposal||!!savedArtwork&&metadata?.reference===this.snapshot.seasonal.reference;
     this.dom.classList.toggle('seasonal-banner',seasonal);
     const fallback=seasonal?(savedArtwork||proposal?.artwork):null;
+    this.panorama=fallback?.version===1?{original:fallback,wide:panoramicArtwork(fallback),x:metadata?.x??.5}:null;
     const imageKey=metadata?'private:'+metadata.reference+':'+(resources?.bannerVersion?.()??0):fallback?'public:'+fallback.path:null;
     if(imageKey!==this.imageKey){
       if(this.preview!==this.shownPreview){this.preview?.destroy();this.preview?.dom.remove();}
       if(!metadata||metadata.reference!==this.imageReference){this.shownPreview?.destroy();this.shownPreview=null;this.dom.querySelector('img')?.remove();}
       this.preview=null;this.imageReference=metadata?.reference;this.imageKey=imageKey;this.dom.hidden=!this.dom.querySelector('img');
       let placeholder;
-      if(fallback&&!this.dom.querySelector('img')){placeholder=document.createElement('img');placeholder.alt='';placeholder.loading='eager';placeholder.width=1800;placeholder.height=400;placeholder.src=fallback.path;this.dom.prepend(placeholder);this.dom.hidden=false;}
+      if(fallback&&!this.dom.querySelector('img')){placeholder=document.createElement('img');placeholder.alt='';placeholder.loading='eager';placeholder.width=fallback.width;placeholder.height=fallback.height;placeholder.src=fallback.path;this.dom.prepend(placeholder);this.dom.hidden=false;}
       if(metadata&&resources?.wikiImage){
         const preview=(seasonal&&resources.bannerImage?resources.bannerImage:resources.wikiImage)(metadata.reference,'');this.preview=preview;
         const image=preview.dom;image.loading='eager';image.alt='';
-        image.addEventListener('load',()=>{if(this.preview!==preview||!image.naturalWidth||this.shownPreview===preview)return;this.shownPreview?.destroy();this.dom.querySelector('img')?.remove();this.shownPreview=preview;this.dom.prepend(image);this.dom.hidden=false;});
+        image.addEventListener('load',()=>{if(this.preview!==preview||!image.naturalWidth||this.shownPreview===preview)return;this.shownPreview?.destroy();this.dom.querySelector('img')?.remove();this.shownPreview=preview;this.dom.prepend(image);this.dom.hidden=false;this.layoutPanorama();});
         image.addEventListener('error',()=>{if(this.preview!==preview)return;preview.destroy();image.remove();if(this.shownPreview===preview)this.shownPreview=null;this.preview=this.shownPreview;if(!this.dom.querySelector('img'))this.dom.hidden=true;});
         if(!this.dom.querySelector('img'))this.dom.prepend(image);
       }
     }
     for(const image of [this.preview?.dom,this.dom.querySelector('img')].filter(Boolean))image.style.objectPosition=(metadata?.x??.5)*100+'% '+(metadata?.y??.5)*100+'%';
+    this.layoutPanorama();
     const forecast=this.snapshot?.forecast.length===3?this.snapshot:proposal;
     const state=this.proposalState||{},forecastKey=JSON.stringify({forecast:forecast?.forecast,date:forecast?.date,zone:forecast?.zoneId,saved:!!this.snapshot?.forecast.length,location:!!context?.weatherLocation,pending:state.pending,failed:state.failed});
     if(forecastKey!==this.forecastKey){
