@@ -19,7 +19,7 @@ const put=async(api,path,text)=>(await api('PUT','/notes/files?'+new URLSearchPa
 async function openNote(page,path){await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=notes]').click();await noteEntry(page.locator('#notes-navigation'),path).click();const root=page.locator('#notes-panel');await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror')).toBeVisible();return root;}
 async function caret(paragraph){await paragraph.evaluate(node=>{node.closest('[contenteditable=true]').focus();const range=document.createRange();range.selectNodeContents(node);range.collapse(false);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);document.dispatchEvent(new Event('selectionchange'));});}
 async function taskAction(root,paragraph,label='Edit task details'){
-  await caret(paragraph);const action=root.getByRole('button',{name:label,exact:true});await expect(action).toBeVisible();await expect(action).toHaveText('+');
+  await caret(paragraph);const action=root.getByRole('button',{name:label,exact:true});await expect(action).toBeVisible();await expect(action.locator('.bi-plus-circle')).toHaveAttribute('aria-hidden','true');
   await expect.poll(async()=>{const a=await action.boundingBox(),c=await paragraph.evaluate(node=>node.closest('li').querySelector(':scope > input[type=checkbox]').getBoundingClientRect().toJSON());return a.x+a.width<c.x&&Math.abs(a.y+a.height/2-c.y-c.height/2)<2;}).toBe(true);
   const box=await action.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.width).toBeLessThanOrEqual(28);expect(box.height).toBeLessThanOrEqual(28);return action;
 }

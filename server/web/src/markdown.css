@@ -232,7 +232,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .drawio-files button {width:100%;overflow-wrap:anywhere;}
 .drawio-filename {overflow-wrap:anywhere;font-size:.875rem;}
 .drawio-file-preview {display:block;max-width:100%;max-height:16rem;object-fit:contain;margin:1rem auto;background:#fff;}
-.note-task-action {position:fixed;z-index:1080;display:inline-grid;place-items:center;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;background:var(--bs-body-bg);border-radius:50%;font-size:1rem;line-height:1;}
+.note-task-action {position:fixed;z-index:1080;display:inline-grid;place-items:center;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;border:0;background:var(--bs-body-bg);border-radius:50%;font-size:1.5rem;line-height:1;}
 .note-task-dialog {width:min(32rem,calc(100vw - 2rem));}
 .note-task-title {overflow-wrap:anywhere;max-height:4.5em;overflow:auto;}
 .note-task-fields {display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1rem;}

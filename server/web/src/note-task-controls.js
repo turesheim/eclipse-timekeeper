@@ -1,4 +1,5 @@
 import {t} from './i18n.js';
+import {icon} from './icons.js';
 import {noteClientDirectory} from './note-client.js';
 import {clientChoices,projectChoices} from './client-state.js';
 import {taskMomentFields} from './task-editor-fields.js';
@@ -15,7 +16,7 @@ let parser;
 export class NoteTaskControls {
   constructor(field){
     this.field=field;this.generation=0;
-    this.action=button('+',()=>void this.open());this.action.className='btn btn-sm btn-outline-primary note-task-action';this.action.setAttribute('aria-label',t('notes.edit_task'));this.action.title=t('notes.edit_task');this.action.hidden=true;
+    this.action=button('',()=>void this.open());this.action.append(icon('plus-circle'));this.action.className='btn btn-sm btn-outline-primary note-task-action';this.action.setAttribute('aria-label',t('notes.edit_task'));this.action.title=t('notes.edit_task');this.action.hidden=true;
     this.action.addEventListener('mousedown',event=>event.preventDefault());field.root.append(this.action);
     this.dialog=node('dialog',undefined,'app-dialog note-task-dialog');this.form=node('form');const heading=node('h2',t('notes.edit_task'));heading.id='note-task-'+crypto.randomUUID();this.dialog.setAttribute('aria-labelledby',heading.id);this.title=node('p','','note-task-title');this.inputs=node('div',undefined,'note-task-fields');
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
