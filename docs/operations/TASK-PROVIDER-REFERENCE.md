@@ -35,19 +35,24 @@ or accepting a known Google result requires reconnecting.
 
 ## Conflicts and deletions
 
-Open **Review incoming changes** for the affected list. Compare the saved Google
-scan with current Dagsverk values; filter by title or exact identity for lists
-with more than 100 decisions. Choose **Keep Dagsverk for conflicts** or **Use Google
-Tasks for conflicts**. Both accept independent remote changes and retain
-unsupported local fields. These review decisions send no writes to Google.
+Healthy incoming changes merge automatically. For a conflicting list, open
+**Review incoming changes** and compare the saved scan with current Dagsverk
+values. **Keep Dagsverk for conflicts** or **Use Google Tasks for conflicts**
+resolves opposing values; independent remote changes still merge and unsupported
+local fields stay intact. With two-way access, keeping a supported local value
+queues its normal background write. Read-only access sends no provider mutation.
 
-A confirmed Google deletion offers **Keep the Dagsverk task** or **Delete the
-Dagsverk task**. Other source links, incomplete hierarchy or unresolved identities
-can prevent deletion. Lost access and absent records never imply deletion.
-Read-only Dagsverk sessions can inspect comparisons but cannot resolve them.
+Ordinary confirmed deletions synchronize while retaining recorded work and
+identity/deletion history. A complete healthy reconciliation can also establish
+absence; a failed/incomplete scan, lost permission or an isolated 404 cannot.
+If a local deletion races with a Google edit, choose whether to keep the deletion
+or restore the Google task. Other source links or unresolved hierarchy/identity
+can block deletion until resolved. Read-only Dagsverk sessions can inspect these
+comparisons but cannot decide them.
 
 Polling preserves open comparisons. A changed task, list selection or scan
-requires reopening the review. Comparisons expire after 15 minutes; refresh from the provider for a fresh scan.
+requires reopening the review. Comparisons expire after 15 minutes; refresh from
+the provider for a fresh scan. Large reviews support title/identity filtering.
 
 ## Task identities
 
@@ -64,13 +69,19 @@ still need their own decisions. Identity resolution sends no provider writes.
 
 ## Google editing restrictions
 
-Each outgoing change has a separate preview and explicit confirmation. The
-account page shows active operations and the latest 20 completed results.
-Creating at Google links the returned ID to the existing Dagsverk task; hierarchy,
-order, rich text and unsupported fields stay local. Imported Google hierarchy
-and order continue to synchronize. Google's due date is a scheduled civil day,
-not a deadline or reminder. Assigned tasks cannot be deleted here; edit their
-notes at the original assignment source.
+With two-way OAuth consent, supported local changes synchronize automatically.
+The account page exposes exceptions and the latest 20 completed results; legacy
+preview endpoints remain for older clients, rather than requiring normal edits
+to be prepared and sent manually.
+
+Creation links the returned identity to the existing Dagsverk task. Parent/order
+and supported list moves synchronize without moving its Dagsverk project. A
+proven changed provider ID retains an alias; matching titles never prove a move.
+Google’s scheduled civil day does not create a timed deadline or reminder.
+Unsupported rich text, timed dates and other fields remain local, with the
+restriction identified beside the affected task. Google Docs assignments cannot
+have notes; assigned/repeating tasks restrict placement, and assigned tasks
+cannot be deleted here. Edit source-specific content at its original surface.
 
 Google's title/note limits and observed version are checked before a write.
 Concurrent changes need a fresh comparison. Resolving an uncertain operation
@@ -111,7 +122,7 @@ the matching app credentials. See [instance backup](INSTANCE-BACKUP.md) and
 [OAuth service operations](CONNECT-SERVICE.md).
 
 `DAGSVERK_TASK_AUTOMATIC=false` (or `timekeeper.tasks.automatic=false` in an
-operator properties file) disables scheduled task imports at startup. Manual
+operator properties file) disables scheduled task synchronization at startup. Manual
 refresh remains available.
 
 For developer contracts, see [API v1](../architecture/API-V1.md) and the
@@ -120,3 +131,6 @@ For developer contracts, see [API v1](../architecture/API-V1.md) and the
 does not establish live Google/Microsoft app-registration acceptance; use
 [Verify configuration](SHARED-SIGN-IN.md#verify-the-connection) and a disposable
 provider list to test a deployment's consent, import, refresh and reconnect.
+
+For a repeatable Google-specific automated and opt-in live round-trip check, use
+[Google Tasks connector acceptance](../development/GOOGLE-TASKS-ACCEPTANCE.md).
