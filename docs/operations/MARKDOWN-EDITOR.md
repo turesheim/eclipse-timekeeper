@@ -298,16 +298,23 @@ create notes. Existing files are never overwritten by this action.
 
 Formatted notes display local raster images named by the Obsidian Banners
 properties `banner`, `banner_x` and `banner_y`. The default image height is
-112 px; crop coordinates run from 0 to 1. Images use the same private vault
+120 px; crop coordinates run from 0 to 1. Images use the same private vault
 access as note attachments. Unsupported, missing or ambiguous images leave the
 note usable. Remote image URLs are never fetched.
 
 Daily notes show seasonal artwork automatically in formatted view. The whole
 seasonal image is shown at its original proportions; custom images retain the
-112 px crop. The locally bundled image appears while weather and private image
+120 px crop. The locally bundled image appears while weather and private image
 reads run in the background. Opening an empty day does not create a note.
 
-Optionally set latitude and longitude under Account → Profile → Weather location.
+Seasonal artwork fits within that height; custom images keep their saved crop
+position. Forecast boxes fit their contents.
+
+Under Account → Profile → Weather location, search for a place and choose a result,
+then save the draft location. Search text is sent through Dagsverk to
+[Photon/OpenStreetMap](https://github.com/komoot/photon#demo-server); account and
+note data are not sent. Searches are explicit, cached and rate limited. Coordinates
+can also be entered manually, including when online search is unavailable.
 Opening a daily note without a saved forecast then sends those coordinates to
 [MET Norway](https://api.met.no/doc/TermsOfService); forecasts are credited under
 CC BY 4.0. The banner links to these settings when no location is configured.

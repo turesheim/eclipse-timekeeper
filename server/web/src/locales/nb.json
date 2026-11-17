@@ -1957,5 +1957,19 @@
   "daily_banner.condition_snow": "Snø",
   "daily_banner.condition_sleet": "Sludd",
   "daily_banner.condition_fog": "Tåke",
-  "daily_banner.condition_thunder": "Torden"
+  "daily_banner.condition_thunder": "Torden",
+  "weather.search_title": "Søk etter sted for værvarsel",
+  "weather.search_query": "Stedsnavn",
+  "weather.search_button": "Søk etter steder",
+  "weather.search_help": "Søketeksten sendes via Dagsverk til Photon. Velg et treff og lagre stedet. Du kan også skrive inn koordinater nedenfor.",
+  "weather.credit": "Photon · © OpenStreetMap-bidragsytere",
+  "weather.results": "Steder som passer",
+  "weather.use_location": "Bruk {{name}}",
+  "weather.searching": "Søker etter steder…",
+  "weather.no_results": "Fant ingen steder. Prøv et annet navn eller skriv inn koordinater nedenfor.",
+  "weather.choose_result": "Velg et sted for å fylle ut utkastet.",
+  "weather.selected": "Stedet er lagt til i utkastet. Lagre for å bruke det i nye værvarsler.",
+  "weather.busy": "Stedssøket er opptatt. Prøv senere eller skriv inn koordinater nedenfor.",
+  "weather.failed": "Stedssøket er utilgjengelig. Prøv senere eller skriv inn koordinater nedenfor.",
+  "weather.query_short": "Skriv inn minst to tegn."
 }
