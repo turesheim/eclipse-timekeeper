@@ -34,7 +34,11 @@ for(const format of ['TEXT','HTML'])test('planned task details show safe links a
   await expect(popup.getByRole('link',{name:'Specification',exact:true})).toHaveAttribute('rel','noopener noreferrer');await expect(popup.getByRole('link',{name:'Open task URL',exact:true})).toHaveAttribute('href','https://example.invalid/work');
   const preview=popup.getByRole('img',{name:'Overview',exact:true});await expect(preview).toHaveAttribute('src',/^blob:/);await preview.scrollIntoViewIfNeeded();await expect.poll(()=>preview.evaluate(image=>image.naturalWidth)).toBeGreaterThan(0);await expect(popup.locator('script,img[src^="https:"]')).toHaveCount(0);expect(await page.evaluate(()=>window.taskImageUnsafe)).toBeUndefined();expect(external).toBe(0);
   expect((await(await api('GET','/tasks/'+task.id)).json()).body).toEqual({format,content:body});
-  expect((await new AxeBuilder({page}).include('#task-details').analyze()).violations).toEqual([]);await page.keyboard.press('Escape');await expect(popup).toBeHidden();await expect(action).toBeFocused();
+  expect((await new AxeBuilder({page}).include('#task-details').analyze()).violations).toEqual([]);
+  // A delayed Close hint consumes Escape before the containing native dialog.
+  // Wait for it explicitly rather than racing accessibility-analysis duration.
+  await popup.getByRole('button',{name:'Close',exact:true}).focus();const hint=page.getByRole('tooltip');await expect(hint).toBeVisible();await page.keyboard.press('Escape');await expect(hint).toBeHidden();await expect(popup).toBeVisible();
+  await page.keyboard.press('Escape');await expect(popup).toBeHidden();await expect(action).toBeFocused();
   await page.locator('[data-tab=tasks]').click();await page.locator('#tasks-list').getByRole('button',{name:'Open task Review website',exact:true}).click();await expect(popup.getByRole('img',{name:'Overview',exact:true})).toHaveAttribute('src',/^blob:/);
 });
 
