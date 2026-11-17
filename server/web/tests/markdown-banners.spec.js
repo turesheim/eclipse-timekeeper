@@ -260,6 +260,9 @@ test('shared daily and weekly journals show banners in writable and read-only se
   const entryRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/day-entries/2026-11-03');
   await page.locator('#today-date').fill('2026-11-03');expect((await(await entryRead).json()).frontmatter).not.toContain('banner:');await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeVisible();await expect(banner(page.locator('#today-note-editor')).locator('img')).toHaveAttribute('src',/^(?:\/web\/assets\/seasonal|blob:)/);
   expect((await(await api('GET','/day-notes/2026-11-03/content')).json()).body).toBe(body);
+  // Native ambiguous prose uses an empty outer YAML map. Capture must produce
+  // valid metadata before navigation can drain its background write.
+  await expect.poll(async()=>(await(await api('GET','/day-entries/2026-11-03')).json()).frontmatter).toContain('dagsverk_seasonal_banner:');
   // Existing files may consist of metadata alone; an empty body still has a banner.
   await put('journal/2026-11-04.md',header);await page.locator('#today-date').fill('2026-11-04');await expectBanner(page.locator('#today-note-editor'));
   const token=(await(await api('POST','/auth/tokens',{name:'Read-only banners',permissions:['read'],expiresAt:null})).json()).token;

@@ -1957,5 +1957,11 @@
   "daily_banner.condition_snow": "Snow",
   "daily_banner.condition_sleet": "Sleet",
   "daily_banner.condition_fog": "Fog",
-  "daily_banner.condition_thunder": "Thunder"
+  "daily_banner.condition_thunder": "Thunder",
+  "notes.edit_task": "Edit task details",
+  "notes.reload_task": "Reload task",
+  "notes.reload_task_confirm": "Reload the saved task and replace your changes in this dialog?",
+  "notes.check_task_save": "Check saved result",
+  "notes.task_stale": "The task changed elsewhere. Reload it to review the saved version. Your changes are still here.",
+  "notes.task_not_saved": "These changes were not saved. You can retry saving."
 }

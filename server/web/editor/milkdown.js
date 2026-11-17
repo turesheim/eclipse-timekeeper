@@ -392,6 +392,12 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       insertAt:(target,name,payload)=>{if(readOnly||!target)return false;const insertion=target.selection.resolve(view.state.doc),follow=view.state.selection.eq(insertion),restore={selection:view.state.selection.getBookmark()};if(!follow)targets.add(restore);try{view.dispatch(view.state.tr.setSelection(insertion));const applied=command(name,payload,false);if(!follow)view.dispatch(view.state.tr.setSelection(restore.selection.resolve(view.state.doc)));return applied;}finally{targets.delete(restore);}},
       release:target=>targets.delete(target),
       matchesSource,
+      taskContext:()=>{
+        const {empty,$from}=view.state.selection;if(!empty||$from.parent.type.name!=='paragraph'||!$from.parent.textContent.trim())return null;
+        const item=$from.node($from.depth-1);if(item?.type.name!=='list_item'||item.attrs.checked==null||item.firstChild!==$from.parent)return null;
+        const position=$from.start();
+        return {offset:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source));return cursorMap(tree,view.state.doc,source).source(position);}};
+      },
       focus:()=>view.focus(),
       setReadOnly,
       command,

@@ -37,12 +37,29 @@ final class NoteTasks {
     /** Invoked after a successful canonical Markdown write, including DAV/import writers. */
     void source(VaultSources.Ref ref,byte[] bytes){
         if(store.noteTaskSync()||bytes==null)return;
-        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8),null,null);return null;});
+        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8),null,null,-1);return null;});
     }
     void imported(VaultSources.Ref ref,byte[] bytes,NoteTaskImport policy,java.time.Instant completedAt){
-        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8),policy,completedAt);return null;});
+        store.withNoteTaskSync(()->{reconcile(ref,new String(bytes,StandardCharsets.UTF_8),policy,completedAt,-1);return null;});
     }
-    private void reconcile(VaultSources.Ref ref,String source,NoteTaskImport policy,java.time.Instant importedAt){
+    /** Explicit editing resolves one saved checkbox, never a title-based guess. */
+    UUID resolve(VaultSources.Ref ref,String match,int offset){
+        var source=new VaultSources(store,store.vaultLimits(),ref);var state=source.snapshot();if(state.deleted())throw ApiFailure.notFound();VaultCollection.match(state.tag(),match);
+        String text=new String(source.read(),StandardCharsets.UTF_8),normalized=text.replace("\r\n","\n").replace('\r','\n');
+        if(offset<0||offset>normalized.length())throw ApiFailure.validation();
+        var candidates=NoteTaskMarkup.items(normalized);int selected=-1;
+        for(int i=0;i<candidates.size();i++){
+            int marker=candidates.get(i).marker(),start=normalized.lastIndexOf('\n',marker-1)+1,end=normalized.indexOf('\n',marker);if(end<0)end=normalized.length();
+            if(offset>=start&&offset<=end){selected=i;break;}
+        }
+        if(selected<0)throw ApiFailure.notFound();
+        var raw=NoteTaskMarkup.items(text);if(raw.size()!=candidates.size())throw new ApiFailure(503,"UNAVAILABLE");int index=selected;
+        // Reconciliation preserves durable IDs. Only this explicit action may
+        // recreate a deliberately removed/ignored task at the chosen checkbox.
+        store.withNoteTaskSync(()->{reconcile(ref,text,null,null,raw.get(index).marker());return null;});
+        return uuid(record(ref).path("items").get(index).path("taskId"));
+    }
+    private void reconcile(VaultSources.Ref ref,String source,NoteTaskImport policy,java.time.Instant importedAt,int requested){
         var previous=record(ref);var old=new ArrayList<NoteTaskMarkup.Item>();previous.path("items").forEach(value->old.add(item(value)));
         var next=NoteTaskMarkup.items(source);if(next.size()>1000)throw ApiFailure.validation();
         int[] matches=NoteTaskMatches.previous(old,next);var result=previous.deepCopy();var items=result.putArray("items");var retained=new HashSet<UUID>();String normalized=source;
@@ -53,7 +70,8 @@ final class NoteTasks {
             boolean edited=before==null||!current.summary().equals(before.path("summary").asText())||current.checked()!=before.path("checked").asBoolean();
             // Deleting a normal task is deliberate. Unrelated prose edits must
             // not resurrect it; editing its checkbox/title can create a new task.
-            if(task==null&&(edited||policy!=null)&&policy!=NoteTaskImport.IGNORE){task=store.service().createTask(new CreateTask(Optional.empty(),summary(current.summary()),Optional.empty()));task=planning(task,policy==NoteTaskImport.COMPLETED||current.checked(),importedAt);taskId=task.id().value();}
+            boolean created=false;
+            if(task==null&&(edited||policy!=null||current.marker()==requested)&&policy!=NoteTaskImport.IGNORE){task=store.service().createTask(new CreateTask(Optional.empty(),summary(current.summary()),Optional.empty()));task=planning(task,policy==NoteTaskImport.COMPLETED||current.checked(),importedAt);taskId=task.id().value();created=true;}
             else if(task!=null){
                 if(before!=null&&!current.summary().equals(before.path("summary").asText())&&!task.summary().equals(summary(current.summary())))task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),summary(current.summary()),task.url()));
                 if(policy==NoteTaskImport.COMPLETED)task=planning(task,true,importedAt);
@@ -63,8 +81,12 @@ final class NoteTasks {
             // An ignored item has the same durable suppression as a deliberately
             // deleted task. Maintenance and prose-only edits cannot enroll it.
             if(taskId==null)taskId=UUID.randomUUID();
-            if(task!=null&&association.hasNonNull("clientId"))task=assign(task,uuid(association.get("clientId")),association.hasNonNull("projectId")?uuid(association.get("projectId")):null);
-            else if(task!=null&&assignments!=null&&(before==null||!previous.has("contentTag")||!current.summary().equals(before.path("summary").asText()))) {
+            if(task!=null&&association.hasNonNull("clientId")){
+                // A note association is the enrollment default; explicit task
+                // edits survive prose changes. NoteClients.assign still applies
+                // an explicitly changed note association to all linked tasks.
+                if(created||before==null||!previous.has("contentTag"))task=assign(task,uuid(association.get("clientId")),association.hasNonNull("projectId")?uuid(association.get("projectId")):null);
+            }else if(task!=null&&assignments!=null&&(created||before==null||!previous.has("contentTag")||!current.summary().equals(before.path("summary").asText()))) {
                 var assignment=assignments.resolve(current.assignments()).orElse(null);
                 if(assignment!=null)task=assign(task,assignment.client(),assignment.project().map(ProjectId::value).orElse(null));
             }

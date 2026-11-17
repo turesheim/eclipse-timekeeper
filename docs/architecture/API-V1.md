@@ -1507,6 +1507,19 @@ task is not recreated by prose-only edits. Trash retains task identities for res
 `GET /tasks/{id}/note` resolves the current active source as `VaultEntry`, following
 file moves and renames, and returns 404 for an unlinked, deleted or foreign source.
 
+`POST /notes/tasks/resolve` accepts `{sourceType, sourceKey, offset}` and the
+canonical note **content ETag** in `If-Match`. The offset is a UTF-16 position in
+the full Markdown after CRLF/CR normalization to LF, on the first physical line
+of a nonempty checkbox item. It resolves the owned durable task by source
+location, including duplicate titles, and returns the normal Task and its ETag.
+Explicit resolution can enroll a legacy item or recreate a deliberately deleted
+task at that checkbox. It never rewrites the note. Missing/stale validators,
+foreign sources and read-only callers follow the ordinary 428/412/404/403 rules.
+Subsequent metadata edits use conditional `PUT /tasks/{id}`. Note associations
+supply enrollment defaults; ordinary prose edits preserve an explicit task
+assignment. Explicitly changing the note association still reassigns its linked
+tasks atomically.
+
 Account snapshots may include `noteTasks`, an array of source references and
 ordered checklist identities. Every non-null task ID must reference the owned
 work graph exactly once and is remapped by account restoration. Null IDs retain

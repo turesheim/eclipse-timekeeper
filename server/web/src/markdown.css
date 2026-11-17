@@ -228,3 +228,10 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
   .seasonal-banner .banner-forecast-status {position:static;max-width:none;border-radius:0;background:var(--bs-body-bg);color:var(--bs-body-color)}
   .seasonal-banner .banner-forecast-status a,.seasonal-banner .banner-forecast-status .btn {color:var(--bs-link-color)}
 }
+.note-task-action {position:fixed;z-index:1080;min-width:3.5rem;background:var(--bs-body-bg);border-radius:2rem;box-shadow:0 2px 6px #0002;}
+.note-task-dialog {width:min(32rem,calc(100vw - 2rem));}
+.note-task-title {overflow-wrap:anywhere;max-height:4.5em;overflow:auto;}
+.note-task-fields {display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1rem;}
+.note-task-fields label {display:block;min-width:0;margin:0;}
+.note-task-fields label:has(textarea) {grid-column:1/-1;}
+@media(max-width:480px){.note-task-fields {grid-template-columns:1fr;}}

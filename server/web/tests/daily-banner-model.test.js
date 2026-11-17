@@ -6,6 +6,17 @@ import {splitMarkdown} from '../src/markdown-document.js';
 import {seasonalArtwork} from '../src/seasonal-banner-catalog.js';
 const snapshot={version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/original.png',x:.25,y:.75,id:'late-autumn-snow',version:1},forecast:[9,12,15].map(hour=>({time:hour.toString().padStart(2,'0')+':00',condition:'snow',label:'Light snow',temperature:'−1 °C',temperatureCelsius:-1}))};
 
+test('an empty YAML root map becomes a block map without changing its comments or nested body',()=>{
+ const body='\ufeff---\r\nprose: preserved\r\n---\r\nBody\r\n',source='\ufeff---\r\n# Outer header\r\n{} # Empty native metadata\r\n---\r\n'+body;
+ const result=replaceBanner(source,{...snapshot.seasonal,snapshot});
+ assert.ok(!splitMarkdown(result).frontmatter.includes('{}'));
+ assert.ok(result.includes('# Outer header\r\n'));assert.ok(result.includes(' # Empty native metadata\r\n'));assert.equal(splitMarkdown(result).body,body);
+ assert.deepEqual(dailyBannerSnapshot(splitMarkdown(result).frontmatter),snapshot);
+});
+test('nonempty flow-style root maps remain opaque to banner updates',()=>{
+ assert.throws(()=>replaceBanner('---\n{custom: preserved}\n---\nBody',snapshot.seasonal));
+});
+
 test('saved selection and forecast survive an override and restore without touching unrelated YAML or prose',()=>{
  const before='\uFEFF---\r\n# Keep this\r\nother: [one, two]\r\n---\r\n\r\nExact **body**.\r\n';
  const seasonal=replaceBanner(before,{...snapshot.seasonal,snapshot});

@@ -1957,5 +1957,11 @@
   "daily_banner.condition_snow": "Snø",
   "daily_banner.condition_sleet": "Sludd",
   "daily_banner.condition_fog": "Tåke",
-  "daily_banner.condition_thunder": "Torden"
+  "daily_banner.condition_thunder": "Torden",
+  "notes.edit_task": "Rediger oppgavedetaljer",
+  "notes.reload_task": "Last oppgaven på nytt",
+  "notes.reload_task_confirm": "Last den lagrede oppgaven på nytt og erstatt endringene dine i denne dialogen?",
+  "notes.check_task_save": "Kontroller lagringen",
+  "notes.task_stale": "Oppgaven er endret et annet sted. Last den på nytt for å se den lagrede versjonen. Endringene dine er fortsatt her.",
+  "notes.task_not_saved": "Endringene ble ikke lagret. Du kan prøve å lagre på nytt."
 }

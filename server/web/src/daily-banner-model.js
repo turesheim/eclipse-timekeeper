@@ -27,6 +27,12 @@ export function replaceBanner(source,{reference,x=.5,y=.5,snapshot}={}){
   if(snapshot!==undefined)changes.set(dailyBannerProperty,JSON.stringify(JSON.stringify(snapshot)));
   if(!parts.frontmatter)return (source.startsWith('\uFEFF')?'\uFEFF':'')+'---'+newline+[...changes].map(([key,value])=>key+': '+value+newline).join('')+'---'+newline+source.replace(/^\uFEFF/,'');
   const lines=parts.frontmatter.match(/[^\n]*\n|[^\n]+$/g)||[],counts=new Map();
+  const content=lines.slice(1,-1).map((line,index)=>({line,index:index+1})).filter(({line})=>!/^[ \t]*(?:#.*)?$/.test(line.replace(/\r?\n$/,'')));
+  // Native notes with YAML-looking prose have an empty outer root map. A
+  // block property cannot follow `{}`; remove only that empty-map token while
+  // retaining its comments, line endings and the entire nested body.
+  if(content.length===1&&/^[ \t]*\{[ \t]*\}[ \t]*(?:#[^\r\n]*)?\r?\n?$/.test(content[0].line))lines[content[0].index]=content[0].line.replace(/\{[ \t]*\}/,'');
+  else if(/^[ \t]*[\[{]/.test(content[0]?.line||''))throw new Error('Unsupported flow-style frontmatter');
   for(let at=1;at<lines.length-1;at++){
     const match=/^(?:"(banner|banner_x|banner_y|dagsverk_seasonal_banner)"|'(banner|banner_x|banner_y|dagsverk_seasonal_banner)'|(banner|banner_x|banner_y|dagsverk_seasonal_banner))[ \t]*:/.exec(lines[at]);const key=match&&(match[1]||match[2]||match[3]);if(!changes.has(key))continue;
     if(/^[ \t]*[|>]/.test(lines[at].slice(match[0].length))||/^[ \t]+[^#\s]/.test(lines[at+1]||''))throw new Error('Unsupported banner metadata');counts.set(key,(counts.get(key)||0)+1);if(counts.get(key)>1)throw new Error('Ambiguous banner metadata');
