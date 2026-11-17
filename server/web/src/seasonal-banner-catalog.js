@@ -1,5 +1,5 @@
 // Immutable original Dagsverk illustrations. A changed illustration gets a new catalog version.
-export const seasonalCatalog=Object.freeze([
+const scenes=[
   {id:'winter-snow',season:'winter',weather:['snow','sleet','cloudy'],file:'winter-snow.png'},
   {id:'spring-clear',season:'spring',weather:['clear','fair','partlycloudy'],file:'spring-clear.png'},
   {id:'spring-rain',season:'spring',weather:['rain','thunder','cloudy','fog'],file:'spring-rain.png'},
@@ -9,5 +9,7 @@ export const seasonalCatalog=Object.freeze([
   {id:'autumn-rain',season:'autumn',weather:['rain','thunder','cloudy','fog'],file:'autumn-rain.png'},
   {id:'late-autumn-snow',season:'late-autumn',weather:['snow','sleet'],file:'late-autumn-snow.png'},
   {id:'late-autumn-cloudy',season:'late-autumn',weather:['clear','fair','partlycloudy','rain','thunder','cloudy','fog'],file:'late-autumn-cloudy.png'}
-].map(value=>Object.freeze({...value,version:1,path:'/web/assets/seasonal/v1/'+value.file,x:.5,y:.5})));
+];
+export const seasonalCatalog=Object.freeze([2,1].flatMap(version=>scenes.map(value=>Object.freeze({...value,version,width:version===1?1800:5120,height:version===1?400:160,path:'/web/assets/seasonal/v'+version+'/'+value.file,x:.5,y:.5}))));
+export const panoramicArtwork=art=>seasonalCatalog.find(value=>value.id===art.id&&value.version===2)||art;
 export function seasonalArtwork(season,weather){return seasonalCatalog.find(value=>value.season===season&&value.weather.includes(weather))||seasonalCatalog.find(value=>value.season===season)||seasonalCatalog[0];}

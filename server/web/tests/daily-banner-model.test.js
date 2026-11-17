@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {dailyBannerSnapshot,replaceBanner} from '../src/daily-banner-model.js';
 import {bannerMetadata} from '../src/markdown-banner.js';
 import {splitMarkdown} from '../src/markdown-document.js';
-import {seasonalArtwork} from '../src/seasonal-banner-catalog.js';
+import {seasonalArtwork,seasonalCatalog,panoramicArtwork} from '../src/seasonal-banner-catalog.js';
 const snapshot={version:1,date:'2026-11-16',zoneId:'Europe/Oslo',season:'late-autumn',seasonal:{reference:'Images/original.png',x:.25,y:.75,id:'late-autumn-snow',version:1},forecast:[9,12,15].map(hour=>({time:hour.toString().padStart(2,'0')+':00',condition:'snow',label:'Light snow',temperature:'−1 °C',temperatureCelsius:-1}))};
 
 test('an empty YAML root map becomes a block map without changing its comments or nested body',()=>{
@@ -44,4 +44,7 @@ test('catalog chooses seasonal weather artwork with a seasonal-only fallback',()
  assert.equal(seasonalArtwork('late-autumn','snow').id,'late-autumn-snow');
  assert.equal(seasonalArtwork('summer','rain').id,'summer-rain');
  assert.equal(seasonalArtwork('spring','unavailable').season,'spring');
+ const current=seasonalArtwork('winter','snow'),original=seasonalCatalog.find(art=>art.id===current.id&&art.version===1);
+ assert.equal(current.version,2);assert.ok(current.width/current.height>=30);assert.ok(current.width*current.height<original.width*original.height*1.2);
+ assert.equal(panoramicArtwork(original),current);assert.equal(original.path,'/web/assets/seasonal/v1/winter-snow.png');
 });

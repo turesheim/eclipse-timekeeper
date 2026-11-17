@@ -14,7 +14,7 @@ let parser;
 export class NoteTaskControls {
   constructor(field){
     this.field=field;this.generation=0;
-    this.action=button('✔ +',()=>void this.open());this.action.className='btn btn-sm btn-outline-primary note-task-action';this.action.setAttribute('aria-label',t('notes.edit_task'));this.action.title=t('notes.edit_task');this.action.hidden=true;
+    this.action=button('+',()=>void this.open());this.action.className='btn btn-sm btn-outline-primary note-task-action';this.action.setAttribute('aria-label',t('notes.edit_task'));this.action.title=t('notes.edit_task');this.action.hidden=true;
     this.action.addEventListener('mousedown',event=>event.preventDefault());field.root.append(this.action);
     this.dialog=node('dialog',undefined,'app-dialog note-task-dialog');this.form=node('form');const heading=node('h2',t('notes.edit_task'));heading.id='note-task-'+crypto.randomUUID();this.dialog.setAttribute('aria-labelledby',heading.id);this.title=node('p','','note-task-title');this.inputs=node('div',undefined,'note-task-fields');
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
@@ -38,10 +38,10 @@ export class NoteTaskControls {
     if(this.dialog.open||!current?.writable||f.readOnly||f.loading||f.bannerBusy||!f.root.getClientRects().length){this.action.hidden=true;return;}
     if(active===this.action&&!this.action.hidden)return;
     let context,rect;
-    if(f.editor&&f.rich.contains(active)){context=f.editor.taskContext();rect=context&&f.editor.selectionRect();}
+    if(f.editor&&f.rich.contains(active)){context=f.editor.taskContext();rect=context?.checkboxRect();}
     else if(active===f.text&&f.text.selectionStart===f.text.selectionEnd){
       const text=f.text.value,position=f.text.selectionStart,start=text.lastIndexOf('\n',position-1)+1,line=text.slice(start,text.indexOf('\n',position)<0?text.length:text.indexOf('\n',position));
-      if(!/^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+\[[ xX]\]\s+\S/.test(line)){this.action.hidden=true;return;}
+      const marker=/^(\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+)\[[ xX]\]\s+\S/.exec(line);if(!marker){this.action.hidden=true;return;}
       if(this.sourceText!==text){
         this.action.hidden=true;
         // Keep the DOM-dependent bundle lazy for non-browser module consumers.
@@ -50,11 +50,12 @@ export class NoteTaskControls {
           this.lines=module.noteTaskLines(text);this.sourceText=text;
         }catch{parser=null;return;}
       }
-      const item=this.lines.find(item=>position>=item.start&&position<=item.end);if(item){context={offset:()=>item.offset};rect=f.caret.sourceRect(f.text);}
+      const item=this.lines.find(item=>position>=item.start&&position<=item.end);if(item){context={offset:()=>item.offset};rect=f.caret.sourceRect(f.text,start+marker[1].length);}
     }
     if(!context||!rect){this.action.hidden=true;return;}const box=(f.editor?f.rich:f.text).getBoundingClientRect(),height=rect.height||rect.bottom-rect.top;
     if(rect.top<Math.max(0,box.top)||rect.top+height>Math.min(innerHeight,box.bottom)){this.action.hidden=true;return;}
-    this.selection=context;this.action.style.left=Math.max(8,Math.min(box.right-68,innerWidth-76))+'px';this.action.style.top=Math.max(8,Math.min(rect.top-4,innerHeight-44))+'px';this.action.hidden=false;
+    const size=24,left=rect.left-size-4,top=rect.top+(height-size)/2;if(left<0||left+size>innerWidth||top<0||top+size>innerHeight){this.action.hidden=true;return;}
+    this.selection=context;this.action.style.left=left+'px';this.action.style.top=top+'px';this.action.hidden=false;
   }
   paintDialog(){
     const writable=this.current()?.writable&&!this.field.readOnly,disabled=this.busy||!writable;

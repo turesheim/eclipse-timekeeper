@@ -327,13 +327,13 @@ properties `banner`, `banner_x` and `banner_y`. The default image height is
 access as note attachments. Unsupported, missing or ambiguous images leave the
 note usable. Remote image URLs are never fetched.
 
-Daily notes show seasonal artwork automatically in formatted view. The whole
-seasonal image is shown at its original proportions; custom images retain the
-120 px crop. The locally bundled image appears while weather and private image
+Daily notes show wide panoramic seasonal artwork automatically in formatted view,
+filling the note width at 120 px high. Narrow screens show the central part of
+the landscape. Custom images retain their saved crop. The locally bundled image appears while weather and private image
 reads run in the background. Opening an empty day does not create a note.
 
-Seasonal artwork fits within that height; custom images keep their saved crop
-position. Forecast boxes fit their contents.
+Earlier seasonal pictures keep their original files, with matching panoramic
+scenery extending into the unused space beside them. Forecast boxes fit their contents.
 
 Under Account → Profile → Weather location, search for a place and choose a result,
 then save the draft location. Search text is sent through Dagsverk to

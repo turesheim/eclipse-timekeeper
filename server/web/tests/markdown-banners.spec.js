@@ -35,22 +35,38 @@ async function expectBanner(root,position='25% 75%'){
   await expect.poll(()=>banner(root).locator('img').evaluate(img=>img.naturalWidth)).toBe(800);expect(await root.locator('.ProseMirror .markdown-banner').count()).toBe(0);
 }
 
-test('daily artwork appears automatically at full proportions without creating an empty note',async({page,request})=>{
+test('daily panoramic artwork fills the note width without creating an empty note',async({page,request})=>{
   const {api}=await fresh(page,request),writes=[];
   page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&new URL(r.url()).pathname.startsWith('/api/v1/notes'))writes.push(r.url());});
   await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-12-01');
   const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror')).toBeVisible();await expect(banner(root)).toBeVisible();
-  await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v1/winter-snow.png');
+  await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v2/winter-snow.png');
   await expect(root.locator('.banner-forecast-status')).toContainText('Add a weather location');await expect(root.getByRole('link',{name:'Set weather location',exact:true})).toHaveAttribute('href','#account/profile');
   for(const width of [1200,320])for(const theme of ['timekeeper','timekeeper-dark']){
     await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
-    const image=banner(root).locator('img');await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1800);
-    const box=await image.boundingBox();expect(box.height).toBe(120);await expect(image).toHaveCSS('object-fit','contain');
+    const image=banner(root).locator('img');await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(5120);
+    const box=await image.boundingBox(),outer=await banner(root).boundingBox();expect(box.height).toBe(120);expect(box.width).toBe(outer.width);await expect(image).toHaveCSS('object-fit','cover');
+    expect(await image.evaluate(img=>img.naturalWidth*img.clientHeight/img.naturalHeight>=img.clientWidth)).toBe(true);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:`test-results/automatic-banner-${theme}-${width}.png`,fullPage:true});
   }
   expect((await(await api('GET','/day-entries/2026-12-01')).json()).version).toBe(0);expect(writes).toEqual([]);
+});
+
+test('saved original artwork gains panoramic scenery without changing its note or image bytes',async({page,request})=>{
+  const {api,put}=await fresh(page,request),date='2026-12-01',original=await readFile(new URL('../src/assets/seasonal/v1/winter-snow.png',import.meta.url)),asset=await put('Images/Original winter.png',original);
+  const snapshot={version:1,date,zoneId:'UTC',season:'winter',seasonal:{reference:asset.path,id:'winter-snow',version:1,x:.5,y:.5},forecast:[]};
+  const source='---\r\nbanner: "![[Images/Original winter.png]]"\r\ndagsverk_seasonal_banner: '+JSON.stringify(JSON.stringify(snapshot))+'\r\n---\r\n\r\nKeep the original winter note.\r\n',entry=await put('journal/'+date+'.md',source),writes=[];
+  page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&new URL(r.url()).pathname.startsWith('/api/v1/notes'))writes.push(r.url());});
+  await page.locator('#today-date').fill(date);const root=page.locator('#today-note-editor'),art=banner(root);await expect(art.locator('img')).toHaveAttribute('src',/^blob:/);await expect.poll(()=>art.locator('img').evaluate(img=>img.naturalWidth)).toBe(1800);
+  for(const width of [1600,1200,320])for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
+    await expect(art).toHaveCSS('height','120px');await expect(art).toHaveCSS('background-image',/\/assets\/seasonal\/v2\/winter-snow\.png/);
+    await expect.poll(()=>art.evaluate(node=>{const css=getComputedStyle(node),[width,height]=css.backgroundSize.split(' ').map(parseFloat),left=parseFloat(css.backgroundPositionX);return height===120&&left<=0&&left+width>=node.clientWidth;})).toBe(true);
+    await captureScreenshot(page,{path:`test-results/legacy-panorama-${theme}-${width}.png`,fullPage:true});
+  }
+  expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(source);expect(Buffer.from(await(await api('GET','/notes/entries/'+asset.id+'/content')).body())).toEqual(original);expect(writes).toEqual([]);
 });
 
 test('slow weather and banner writes keep typing editable and preserve newer prose',async({page,request})=>{
@@ -190,7 +206,7 @@ for(const destination of ['another day','another account'])test('late automatic 
   try{
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);await started;
     if(destination==='another day')await page.locator('#today-date').fill('2026-12-01');else{await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login-form')).toBeVisible();await fresh(page,request);await page.locator('#today-date').fill('2026-12-01');}
-    release();const root=page.locator('#today-note-editor');await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v1/winter-snow.png');await expect(root.locator('.banner-forecast li')).toHaveCount(0);expect((await(await api('GET','/day-entries/'+date)).json()).version).toBe(0);
+    release();const root=page.locator('#today-note-editor');await expect(banner(root).locator('img')).toHaveAttribute('src','/web/assets/seasonal/v2/winter-snow.png');await expect(root.locator('.banner-forecast li')).toHaveCount(0);expect((await(await api('GET','/day-entries/'+date)).json()).version).toBe(0);
   }finally{release();}
 });
 

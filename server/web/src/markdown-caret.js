@@ -21,13 +21,13 @@ export class MarkdownCaret {
     this.canvas??=document.createElement('canvas');const context=this.canvas.getContext('2d');context.font=style.font||`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
     const character=position<text.length?String.fromCodePoint(text.codePointAt(position)):' ';return Math.max(4,context.measureText(/[\r\n]/.test(character)?' ':character).width);
   }
-  sourceRect(source){
+  sourceRect(source,position=source.selectionStart){
     const style=getComputedStyle(source);
     if(!this.mirror){this.mirror=document.createElement('div');this.mirror.className='markdown-caret-mirror';this.mirror.inert=true;this.mirror.setAttribute('aria-hidden','true');this.field.root.append(this.mirror);}
     const key=[source.clientWidth,...fontProperties.map(name=>style[name]),style.padding].join('|');
     if(key!==this.styleKey){for(const name of fontProperties)this.mirror.style[name]=style[name];this.mirror.style.padding=style.padding;this.mirror.style.width=source.clientWidth+'px';this.styleKey=key;}
     if(this.value!==source.value||!this.mirror.firstChild){this.mirror.textContent=source.value+'\u200b';this.value=source.value;}
-    const range=document.createRange(),position=source.selectionStart;range.setStart(this.mirror.firstChild,position);range.collapse(true);const caret=range.getBoundingClientRect(),box=source.getBoundingClientRect();
+    const range=document.createRange();range.setStart(this.mirror.firstChild,position);range.collapse(true);const caret=range.getBoundingClientRect(),box=source.getBoundingClientRect();
     if(!caret.height)return null;let width=this.glyph(source.value,position,style),left=caret.left;
     if(position<source.value.length&&!/[\r\n]/.test(source.value[position])){range.setEnd(this.mirror.firstChild,position+String.fromCodePoint(source.value.codePointAt(position)).length);const next=range.getBoundingClientRect();if(next.width>0&&Math.abs(next.top-caret.top)<2){width=next.width;left=next.left;}}
     return {left:box.left+source.clientLeft+left-source.scrollLeft,top:box.top+source.clientTop+caret.top-source.scrollTop,height:caret.height,width,color:style.color,box};
