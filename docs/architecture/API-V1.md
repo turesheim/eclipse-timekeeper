@@ -1593,3 +1593,21 @@ A retained task and its tombstone share their source UUID. Import mappings are
 qualified by `entityType`; both records retain their relationship after remapping.
 A tombstone may have no external identities if creation had not yet been
 acknowledged by the provider.
+
+### Weather-location search
+
+`GET /daily-banners/locations?q=Trondheim&language=nb` is an authenticated read
+returning `{items:[{name,latitude,longitude}]}` with at most eight public results.
+`q` has 2–120 characters; `language` is `en` (default) or `nb`. Other/duplicate
+parameters are rejected. It does not read or change the caller’s weather
+location; selecting and saving still uses the current profile ETag in `PUT /me`.
+Responses are owner-bound and `private, no-store`.
+
+Photon lookups run outside owner transactions, without credentials or account
+identifiers. Requests are bounded by the existing provider transport and an
+eight-second deadline. Per-process public-result caching lasts 24 hours (failed
+lookups 30 seconds), with at most 256 keys. One outbound lookup at a time, at most
+one per second and 500 per UTC day, keeps use moderate. Capacity/usage limits
+return 429 `WEATHER_LOCATION_RATE_LIMITED`; provider failure returns 503
+`WEATHER_LOCATION_UNAVAILABLE`, preserving manual coordinate entry. Search is
+user-triggered and never runs while typing.

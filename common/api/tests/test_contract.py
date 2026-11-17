@@ -31,6 +31,16 @@ class ContractTest(unittest.TestCase):
             for invalid in ['true',None,1]:
                 self.assertFalse(validator(schema).is_valid({**value,'retired':invalid}))
 
+    def test_place_search_returns_only_bounded_public_coordinates_and_cannot_accept_an_owner(self):
+        value={'items':[{'name':'Trondheim, Trøndelag, Norge','latitude':63.4304,'longitude':10.3952}]}
+        validator('WeatherLocationResults').validate(value)
+        self.assertFalse(validator('WeatherLocationResults').is_valid({'items':value['items']*9}))
+        self.assertFalse(validator('WeatherLocationResults').is_valid({'items':[{**value['items'][0],'ownerId':'foreign'}]}))
+        self.assertFalse(validator('WeatherLocationResults').is_valid({'items':[{'name':'Invalid','latitude':91,'longitude':0}]}))
+        operation=CONTRACT['paths']['/daily-banners/locations']['get']
+        self.assertEqual('read',operation['x-required-permission'])
+        self.assertEqual({'q','language'},{p['name'] for p in operation['parameters']})
+
     def test_note_task_resolution_requires_a_saved_source_location_and_write_authority(self):
         value={'sourceType':'VAULT_CONTENT','sourceKey':ID,'offset':42}
         validator('NoteTaskResolveInput').validate(value)
@@ -932,7 +942,7 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'synchronizedTaskLists', 'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
-            'getAdministrationSettings', 'getAdministrationInternetAccounts', 'updateAdministrationInternetAccounts', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'previewDailyBanner', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation', 'getTaskSourceNote',
+            'getAdministrationSettings', 'getAdministrationInternetAccounts', 'updateAdministrationInternetAccounts', 'updateAdministrationSettings', 'getAdministrationNotesLimits', 'updateAdministrationNotesLimits', 'getProfile', 'updateProfile', 'previewDailyBanner', 'searchWeatherLocations', 'getFocusAreas', 'replaceFocusAreas', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation', 'getTaskSourceNote',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}

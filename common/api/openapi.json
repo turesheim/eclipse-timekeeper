@@ -22090,6 +22090,76 @@
         "x-required-permission": "read"
       }
     },
+    "/daily-banners/locations": {
+      "get": {
+        "operationId": "searchWeatherLocations",
+        "summary": "Find public place names and coordinates for a weather-location draft",
+        "description": "Explicit authenticated search using Photon/OpenStreetMap, with bounded requests and cached public results. Only the query and language leave the server; no profile or note is changed. The selected result can be saved separately through PUT /me. Online search is optional; manual coordinates remain supported.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "nb"
+              ],
+              "default": "en"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to eight normalized public locations",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeatherLocationResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "x-required-permission": "read"
+      }
+    },
     "/notes/tasks/resolve": {
       "post": {
         "operationId": "resolveNoteTask",
@@ -40455,6 +40525,22 @@
           "weather",
           "forecast"
         ]
+      },
+      "WeatherLocationResults": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/WeatherLocation"
+            }
+          }
+        }
       },
       "NoteTaskResolveInput": {
         "type": "object",

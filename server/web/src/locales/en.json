@@ -1987,5 +1987,19 @@
   "notes.reload_task_confirm": "Reload the saved task and replace your changes in this dialog?",
   "notes.check_task_save": "Check saved result",
   "notes.task_stale": "The task changed elsewhere. Reload it to review the saved version. Your changes are still here.",
-  "notes.task_not_saved": "These changes were not saved. You can retry saving."
+  "notes.task_not_saved": "These changes were not saved. You can retry saving.",
+  "weather.search_title": "Search for a weather location",
+  "weather.search_query": "Place name",
+  "weather.search_button": "Search places",
+  "weather.search_help": "Search text is sent through Dagsverk to Photon. Select a result, then save the location. You can also enter coordinates below.",
+  "weather.credit": "Photon · © OpenStreetMap contributors",
+  "weather.results": "Matching locations",
+  "weather.use_location": "Use {{name}}",
+  "weather.searching": "Searching places…",
+  "weather.no_results": "No matching places. Try another name or enter coordinates below.",
+  "weather.choose_result": "Choose a location to fill the draft.",
+  "weather.selected": "Location added to the draft. Save to use it for new forecasts.",
+  "weather.busy": "Place search is busy. Try later or enter coordinates below.",
+  "weather.failed": "Place search is unavailable. Try later or enter coordinates below.",
+  "weather.query_short": "Enter at least two characters."
 }

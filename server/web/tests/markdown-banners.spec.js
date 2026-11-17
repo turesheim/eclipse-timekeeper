@@ -31,7 +31,7 @@ async function openNote(page,path){
   await entry.click();await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror')).toBeVisible();return root;
 }
 async function expectBanner(root,position='25% 75%'){
-  await expect(banner(root)).toBeVisible();await expect(banner(root)).toHaveCSS('height','112px');await expect(banner(root).locator('img')).toHaveCSS('object-position',position);await expect(banner(root).locator('img')).toHaveCSS('object-fit','cover');await expect(banner(root).locator('img')).toHaveAttribute('alt','');if(!await root.locator('.banner-forecast-status,.banner-forecast').count())await expect(banner(root)).toHaveAttribute('aria-hidden','true');
+  await expect(banner(root)).toBeVisible();await expect(banner(root)).toHaveCSS('height','120px');await expect(banner(root).locator('img')).toHaveCSS('object-position',position);await expect(banner(root).locator('img')).toHaveCSS('object-fit','cover');await expect(banner(root).locator('img')).toHaveAttribute('alt','');if(!await root.locator('.banner-forecast-status,.banner-forecast').count())await expect(banner(root)).toHaveAttribute('aria-hidden','true');
   await expect.poll(()=>banner(root).locator('img').evaluate(img=>img.naturalWidth)).toBe(800);expect(await root.locator('.ProseMirror .markdown-banner').count()).toBe(0);
 }
 
@@ -45,7 +45,7 @@ test('daily artwork appears automatically at full proportions without creating a
   for(const width of [1200,320])for(const theme of ['timekeeper','timekeeper-dark']){
     await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
     const image=banner(root).locator('img');await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1800);
-    const box=await image.boundingBox();expect(Math.abs(box.height-box.width*400/1800)).toBeLessThan(1);await expect(image).toHaveCSS('object-fit','contain');
+    const box=await image.boundingBox();expect(box.height).toBe(120);await expect(image).toHaveCSS('object-fit','contain');
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:`test-results/automatic-banner-${theme}-${width}.png`,fullPage:true});
@@ -296,7 +296,9 @@ test('daily seasonal snapshots keep their forecast across custom upload, reload,
   await page.unroute('**/api/v1/daily-banners/*/preview');await page.route('**/api/v1/daily-banners/*/preview',route=>{const date=new URL(route.request().url()).pathname.split('/').at(-2);expect(date).not.toBe('2026-11-16');return route.fulfill({headers:{'X-Timekeeper-Owner':owner},json:{version:1,date,zoneId:'Pacific/Auckland',season:'spring',weather:'cloudy',forecast:[]}});});
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');await expect(banner(root).locator('img')).toHaveCSS('object-position','10% 80%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);
   await page.locator('#today-date').fill('2026-11-17');await expect(banner(root)).toBeVisible();await expect(root.locator('.banner-forecast')).toHaveCount(0);await page.locator('#today-date').fill('2026-11-16');await expect(banner(root)).toBeVisible();
-  for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width:320,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);await expect(banner(root)).toHaveCSS('height','112px');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/seasonal-banner-'+theme+'-320.png',fullPage:true});}
+  for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width:320,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);await expect(banner(root)).toHaveCSS('height','120px');for(const item of await root.locator('.banner-forecast li').all()){const box=await item.boundingBox();expect(box.height).toBeLessThan(85);await expect(item).toHaveCSS('background-color','rgba(15, 30, 32, 0.76)');}expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/seasonal-banner-'+theme+'-320.png',fullPage:true});}
+  const bannerBox=await banner(root).boundingBox();
+  for(const overlay of [root.locator('.banner-forecast'),root.locator('.banner-weather-credit')]){const box=await overlay.boundingBox();expect(box.y).toBeGreaterThanOrEqual(bannerBox.y);expect(box.y+box.height).toBeLessThanOrEqual(bannerBox.y+bannerBox.height);}
   await dailyTool(root,'Restore seasonal image');await expect(banner(root).locator('img')).toHaveCSS('object-position','50% 50%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original);expect(previews).toBe(1);
 });
 

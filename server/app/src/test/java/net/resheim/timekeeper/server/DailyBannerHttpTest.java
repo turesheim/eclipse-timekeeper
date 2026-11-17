@@ -5,11 +5,32 @@ import static io.restassured.RestAssured.given;
 import io.quarkus.test.junit.*;
 import io.restassured.response.Response;
 import java.util.Map;
+import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Alternative;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(DailyBannerHttpTest.Profile.class)
 class DailyBannerHttpTest {
-    public static class Profile implements QuarkusTestProfile {public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:daily_banner_tests");}}
+    public static class Profile implements QuarkusTestProfile {
+        public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:daily_banner_tests");}
+        public Set<Class<?>> getEnabledAlternatives(){return Set.of(Locations.class);}
+    }
+    @Alternative @ApplicationScoped public static class Locations extends WeatherLocations {
+        public Locations(){super(new TaskProviderHttp(Set.of("photon.komoot.io"),request->new TaskProviderHttp.Reply(200,Map.of(),WeatherLocationsTest.places().getBytes(StandardCharsets.UTF_8))));}
+    }
+    @Test void publicPlaceLookupRequiresAuthenticationAndNeverChangesAnOwnedProfile(){
+        String path="/api/v1/daily-banners/locations?q=Trondheim&language=nb";var before=read("test-a");
+        assertEquals(401,given().get(path).statusCode());
+        for(String token:Set.of("test-a","test-b","test-read")){
+            var result=given().header("Authorization","Bearer "+token).get(path);assertEquals(200,result.statusCode());assertEquals("private, no-store",result.header("Cache-Control"));assertEquals("Trondheim, Trøndelag, Norge",result.jsonPath().getString("items[0].name"));
+        }
+        assertEquals(before.header("ETag"),read("test-a").header("ETag"));assertEquals(before.asString(),read("test-a").asString());
+        assertEquals(400,given().header("Authorization","Bearer test-a").get(path+"&ownerId=test-b").statusCode());
+        assertEquals(400,given().header("Authorization","Bearer test-a").get(path+"&q=Oslo").statusCode());
+        assertEquals(422,given().header("Authorization","Bearer test-a").get("/api/v1/daily-banners/locations?q=x").statusCode());
+    }
     private Response read(String token){return given().header("Authorization","Bearer "+token).get("/api/v1/me");}
     private Response edit(String token,String etag,String location){return given().header("Authorization","Bearer "+token).header("If-Match",etag).contentType("application/json").body("{\"zoneId\":\"Europe/Oslo\",\"weatherLocation\":"+location+"}").put("/api/v1/me");}
     @Test void locationIsOptionalPrivateVersionedAndValidatedAndPreviewIsAuthenticated(){

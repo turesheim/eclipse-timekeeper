@@ -13,7 +13,13 @@ public class DailyBannerResource {
     @Inject RequestIdentity identity;
     @Inject BackendClock clock;
     @Inject DailyBannerForecast weather;
+    @Inject WeatherLocations locations;
     @Context UriInfo uri;
+    @GET @Path("/locations") public Response locations(@QueryParam("q")String query,@QueryParam("language")@DefaultValue("en")String language){
+        ContractInputs.queries(uri.getQueryParameters(),"q","language");
+        store.authenticated(identity,()->true);
+        return Response.ok(locations.search(query,language,clock.now())).header("Cache-Control","private, no-store").build();
+    }
     @GET @Path("/{date}/preview") public Response preview(@PathParam("date")String value){
         ContractInputs.queries(uri.getQueryParameters());final LocalDate date;
         try{date=LocalDate.parse(value);}catch(RuntimeException invalid){throw ApiFailure.badRequest();}
