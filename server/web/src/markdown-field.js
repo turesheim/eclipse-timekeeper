@@ -1,6 +1,7 @@
 import {snippetAt,sourceSnippetAt} from './snippets.js';
 import {NoteBookmark} from './note-bookmark.js';
 import {NoteClient} from './note-client.js';
+import {DrawioTools} from './drawio-tools.js';
 import {NoteTaskControls} from './note-task-controls.js';
 import {MarkdownCaret} from './markdown-caret.js';
 import {buildExperience} from './markdown-experience.js';
@@ -117,7 +118,7 @@ export class MarkdownField {
     this.text.addEventListener('keydown',event=>{if(this.expandSourceSnippet(event))return;if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     if(resources?.bookmark)this.bookmark=new NoteBookmark(root,resources.bookmark);
-    buildExperience(this);dailyBannerTools(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);if(resources?.readTaskSource)this.taskControls=new NoteTaskControls(this);
+    buildExperience(this);dailyBannerTools(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);if(resources?.readAsset)this.drawio=new DrawioTools(this);if(resources?.readTaskSource)this.taskControls=new NoteTaskControls(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
   closeSourceTyping(){
@@ -166,7 +167,7 @@ export class MarkdownField {
   async upload(picker,image){
     const file=picker.files?.[0];picker.value='';if(file)await this.uploadFiles([file],this.editor?.bookmark(),image);
   }
-  async uploadFiles(files,target,forceImage){
+  async uploadFiles(files,target,forceImage,{label:labelOverride,retry=true}={}){
     if(!this.onUpload||this.readOnly||this.loading)return;
     const remaining=[...files];
     const generation=this.generation,editor=this.editor;let start=this.text.selectionStart,end=this.text.selectionEnd;
@@ -177,13 +178,13 @@ export class MarkdownField {
         if(file.size>5_000_000)throw new Error(t('markdown.asset_too_large'));
         this.status.textContent=t('markdown.upload_progress',{name:file.name,current:index+1,total:files.length});this.status.setAttribute('aria-busy','true');
         const path=await this.onUpload(file,image);this.resources?.invalidate?.();if(generation!==this.generation)return;if(this.readOnly)throw new Error(t('markdown.upload_failed'));
-        const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
+        const label=(labelOverride??file.name).replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
         if(editor){if(!editor.insertAt(target,image?'image':'asset_link',{path,label}))throw new Error(t('markdown.upload_failed'));}
         else{const inserted=this.insertSource(image?`![${label}](${path})`:`[${label}](${path})`,start,end);start=end=inserted;}
         remaining.shift();
       }
-      editor?.release(target);this.retryUpload=null;this.status.textContent='';
-    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');this.retryUpload=()=>this.uploadFiles(remaining,target,forceImage);this.retryButton.hidden=false;}}
+      editor?.release(target);this.retryUpload=null;this.status.textContent='';return true;
+    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');if(retry){this.retryUpload=()=>this.uploadFiles(remaining,target,forceImage,{label:labelOverride});this.retryButton.hidden=false;}}return false;}
     finally{if(generation===this.generation){this.status.removeAttribute('aria-busy');this.loading=false;this.controls();}}
   }
 
@@ -235,7 +236,7 @@ export class MarkdownField {
   closeListMenu(){if(this.listMenu.matches(':popover-open'))this.listMenu.hidePopover();}
   controls(){
     this.editor?.setReadOnly(this.readOnly||this.bannerBusy);this.syncDailyBanner?.();
-    this.caret?.update();this.bookmark?.sync();this.client?.sync();this.taskControls?.sync();
+    this.caret?.update();this.bookmark?.sync();this.client?.sync();this.drawio?.sync();this.taskControls?.sync();
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));
@@ -255,7 +256,7 @@ export class MarkdownField {
   }
   clear(){
     this.clearAutomaticBanner?.();this.bodyBomMoved=false;
-    this.dailyBannerDialog?.close();
+    this.dailyBannerDialog?.close();this.drawio?.dialog.close();
     this.banner.clear();
     this.resetCompletions?.();
     this.closeActions?.();
