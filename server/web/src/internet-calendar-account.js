@@ -1,3 +1,4 @@
+import {activeClients,clientChoices} from './client-state.js';
 import {t} from './i18n.js';
 import {ApiError} from './api.js';
 import {instantText} from './model.js';
@@ -44,14 +45,14 @@ export function internetCalendarAccount(view,panel,{reload,clients,zone,controls
           signature=next;choices.replaceChildren();const selected=value.selectedCalendars||[],available=[...(value.availableCalendars||[])];
           for(const id of selected)if(!available.some(item=>item.id===id))available.push({id,name:t('internet_accounts.unavailable_calendar'),readable:false});
           for(const calendar of available){
-            const row=node('div',undefined,'internet-selection-row'),label=node('label',undefined,'internet-selection-check'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.name='selectedCalendars';input.value=calendar.id;input.checked=selected.includes(calendar.id);input.dataset.unreadable=String(!calendar.readable&&!input.checked);label.append(input,node('span',calendar.name,'text-break'));row.append(label);
+            const row=node('div',undefined,'internet-selection-row'),label=node('label',undefined,'internet-selection-check'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.name='selectedCalendars';input.value=calendar.id;input.checked=selected.includes(calendar.id);input.dataset.unreadable=String((!calendar.readable||!activeClients(clients).length&&!value.calendarMappings?.[calendar.id])&&!input.checked);label.append(input,node('span',calendar.name,'text-break'));row.append(label);
             const clientLabel=node('label',undefined,'internet-selection-mapping'),select=node('select',undefined,'form-select form-select-sm');select.dataset.calendarClient=calendar.id;
-            for(const client of clients)select.append(new Option(client.name,client.id));select.value=value.calendarMappings?.[calendar.id]||clients[0]?.id||'';
+            for(const client of clientChoices(clients,[value.calendarMappings?.[calendar.id]]))select.append(new Option(client.name,client.id));select.value=value.calendarMappings?.[calendar.id]||activeClients(clients)[0]?.id||'';
             const visible=node('span',t('internet_accounts.client_mapping'),'form-label');visible.setAttribute('aria-hidden','true');clientLabel.append(visible,node('span',t('internet_accounts.calendar_client',{name:calendar.name}),'visually-hidden'),select);row.append(clientLabel);
             if(!calendar.readable)row.append(node('p',t('internet_accounts.calendar_unreadable'),'hint'));choices.append(row);
           }
           if(!available.length)choices.append(node('p',t('internet_accounts.no_calendars'),'hint'));
-          if(!clients.length)choices.append(node('p',t('internet_accounts.calendar_needs_client'),'hint'));
+          if(!activeClients(clients).length)choices.append(node('p',t('internet_accounts.calendar_needs_client'),'hint'));
         }
       }
       controls();

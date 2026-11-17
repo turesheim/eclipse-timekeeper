@@ -1,3 +1,4 @@
+import {activeClients,clientChoices,projectChoices} from './client-state.js';
 import {configureSnippets} from './snippets.js';
 import {updateNoteClientDirectory} from './note-client.js';
 import {editorPreferences} from './editor-preferences.js';
@@ -277,7 +278,7 @@ const auth = authentication({
     refreshController?.abort();refreshController = null;refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);configureSnippets(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();canWrite = false;
+    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();showRetiredClients.checked=false;canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -438,6 +439,9 @@ function paintFocus(){
   if(selector.dataset.choices!==key){selector.replaceChildren();for(const area of choices){const option=element('option',area.name);option.value=area.id;selector.append(option);}selector.dataset.choices=key;}
   selector.value=focusId;
 }
+const showRetiredClients=element('input');showRetiredClients.id='show-retired-clients';showRetiredClients.type='checkbox';showRetiredClients.className='form-check-input me-2';
+const retiredFilter=element('label',undefined,'form-check-label');retiredFilter.append(showRetiredClients,element('span',i18nText('clients.show_retired')));$('add-client').before(retiredFilter);
+showRetiredClients.addEventListener('change',()=>render());
 $('focus-select').addEventListener('change',()=>{
   // Keep inline edits intact; switching a filter must not discard an editor.
   if(weekSessions.draft||calendar.drag||calendar.busy||document.querySelector('dialog[open]')){
@@ -477,7 +481,8 @@ function renderChangedList(id,records,paint){
 }
 function renderLegacyViews(s,zone){
   const catalogs=snapshot||s;
-  if(!$('clients-panel').hidden)renderChangedList('clients',catalogs.clients,()=>table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], catalogs.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))]))));
+  const shownClients=showRetiredClients.checked?catalogs.clients:activeClients(catalogs.clients);
+  if(!$('clients-panel').hidden)renderChangedList('clients',shownClients,()=>table('clients', [i18nText("ui.name"), i18nText("ui.color"),i18nText('clients.status'), i18nText("ui.actions")], shownClients.map((value) => row([value.name, colorSwatch(value.color),i18nText(value.retired?'clients.retired':'clients.active')], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))]))));
   if(!$('projects-panel').hidden)renderChangedList('projects',[catalogs.clients,catalogs.projects],()=>renderProjects(catalogs));
   for(const action of document.querySelectorAll('#add-client,#add-project,#clients td.actions button,#projects td.actions button'))action.disabled=!connected||!canWrite;
   if(!$('labels-panel').hidden){
@@ -586,21 +591,21 @@ function colorSwatch(color) {
   return swatch;
 }
 function clientField(value) {
-  return field(i18nText("ui.client"), 'clientId', value || (snapshot.clients.length === 1 ? snapshot.clients[0].id : ''), {
-    required: true, choices: [['', i18nText("ui.choose_a_client")], ...snapshot.clients.map((client) => [client.id, client.name])],
-    hint: snapshot.clients.length ? i18nText("ui.each_project_and_work_session_belongs_to_one_client") : i18nText("ui.create_a_client_in_the_clients_tab_first")
+  return field(i18nText("ui.client"), 'clientId', value || (activeClients(snapshot.clients).length === 1 ? activeClients(snapshot.clients)[0].id : ''), {
+    required: true, choices: [['', i18nText("ui.choose_a_client")], ...clientChoices(snapshot.clients,[value]).map((client) => [client.id, client.name])],
+    hint: activeClients(snapshot.clients).length ? i18nText("ui.each_project_and_work_session_belongs_to_one_client") : i18nText("ui.create_a_client_in_the_clients_tab_first")
   });
 }
 function refreshClientChoices() {
   const input = $('field-clientId');if (!input || editor?.busy || editor?.uncertain) return;
   if(editor?.taskFields){editor.taskFields.refresh();return;}
   const selected = input.value;input.replaceChildren();
-  for (const [id, label] of [['', i18nText("ui.choose_a_client")], ...snapshot.clients.map((client) => [client.id, client.name])]) {const option = element('option', label);option.value = id;input.append(option);}
+  for (const [id, label] of [['', i18nText("ui.choose_a_client")], ...clientChoices(snapshot.clients,[selected]).map((client) => [client.id, client.name])]) {const option = element('option', label);option.value = id;input.append(option);}
   if (selected && !snapshot.clients.some((client) => client.id === selected)) {const option = element('option', i18nText("ui.removed_client_choose_another"));option.value = selected;input.append(option);}
   input.value = selected;
   if (editor?.collection === 'work-sessions' || editor?.command === 'session-start') refreshSessionProjectChoices();
 }
-function sessionProjectChoices(clientId) {return [['', i18nText("ui.no_project")], ...snapshot.projects.filter((project) => !clientId || project.clientId === clientId).map((project) => [project.id, `${project.name} · ${name(snapshot.clients, project.clientId)}`])];}
+function sessionProjectChoices(clientId) {return [['', i18nText("ui.no_project")], ...projectChoices(snapshot.projects,snapshot.clients,[editor?.originalProjectId]).filter((project) => !clientId || project.clientId === clientId).map((project) => [project.id, `${project.name} · ${name(snapshot.clients, project.clientId)}`])];}
 function refreshSessionProjectChoices(selected = $('field-projectId')?.value || '') {
   const project = $('field-projectId'),client = $('field-clientId');if (!project || !client || editor?.busy || editor?.uncertain) return;
   project.replaceChildren();
@@ -644,9 +649,9 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
     catch(error){if(error.status===401)throw error;}
     if(session!==api||!connected)return;
   }
-  if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag, deletionLabel: value.summary, legacyLabelIds: collection === 'work-sessions' && !id && Array.isArray(value.labelIds) ? [...value.labelIds] : undefined })) return;
+  if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag,originalProjectId:value.projectId, deletionLabel: value.summary, legacyLabelIds: collection === 'work-sessions' && !id && Array.isArray(value.labelIds) ? [...value.labelIds] : undefined })) return;
   if (['clients', 'projects', 'labels'].includes(collection)) field(i18nText("ui.name"), 'name', value.name, { required: true, max: 1000 });
-  if (collection === 'clients') field(i18nText("ui.color"), 'color', value.color || '#2563eb', { type: 'color', required: true });
+  if (collection === 'clients') {field(i18nText("ui.color"), 'color', value.color || '#2563eb', { type: 'color', required: true });field(i18nText('clients.status'),'retired',String(!!value.retired),{choices:[['false',i18nText('clients.active')],['true',i18nText('clients.retired')]],hint:i18nText('clients.retire_help')});}
   if (collection === 'projects') {clientField(value.clientId);$('fields').append(createProjectIconPicker(value.icon));}
   if (collection === 'labels') field(i18nText("ui.color_optional"), 'color', value.color, { hint: i18nText("ui.hex_color_for_example_176653") });
   if (collection === 'tasks') {
@@ -656,7 +661,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   }
   if (collection === 'activities') {
     const task = field(i18nText("ui.task"), 'taskId', value.taskId, { choices: [['', i18nText("ui.no_task")], ...snapshot.tasks.map((v) => [v.id, taskPresentation(v).title])] });task.disabled = !!id;
-    if (!id) {field(i18nText("ui.project_without_task"), 'projectId', value.projectId, { choices: [['', i18nText("ui.no_project")], ...snapshot.projects.map((v) => [v.id, v.name])] });}
+    if (!id) {field(i18nText("ui.project_without_task"), 'projectId', value.projectId, { choices: [['', i18nText("ui.no_project")], ...projectChoices(snapshot.projects,snapshot.clients).map((v) => [v.id, v.name])] });}
     field(i18nText("ui.summary"), 'summary', value.summary, { max: 2000, multiline:true });
     timeFields(value, 'tracking');labelFields(value.labelIds);
     const source=activitySource;if(source)$('fields').prepend(element('p',i18nText('calendar.recorded_source',{title:source.title,calendar:source.calendarName,client:source.clientName}),'hint'));
@@ -763,7 +768,7 @@ function values() {
   if (editor.command === 'session-start') return { summary: get('summary'), clientId: get('clientId'), projectId: get('projectId') || null };
   if (editor.command === 'start') return { taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null };
   switch (editor.collection) {
-    case 'clients':return { name: get('name'), color: get('color') };
+    case 'clients':return { name: get('name'), color: get('color'),retired:get('retired')==='true' };
     case 'projects':return { name: get('name'), clientId: get('clientId'), icon: $('fields').querySelector('[name=icon]:checked')?.value || null };
     case 'labels':return { name: get('name'), color: get('color') || null };
     case 'tasks':return { summary: get('summary'), clientId:get('clientId')||null,projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null,...editor.taskFields.values() };

@@ -22,6 +22,15 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_client_retirement_is_optional_boolean_and_portable(self):
+        client={'name':'Historical client','color':'#176653'}
+        for schema in ['ClientInput','TransferClient']:
+            value=client if schema=='ClientInput' else {**client,'id':'12345678-1234-4234-8234-123456789abc'}
+            validator(schema).validate(value)
+            validator(schema).validate({**value,'retired':True})
+            for invalid in ['true',None,1]:
+                self.assertFalse(validator(schema).is_valid({**value,'retired':invalid}))
+
     def test_place_search_returns_only_bounded_public_coordinates_and_cannot_accept_an_owner(self):
         value={'items':[{'name':'Trondheim, Trøndelag, Norge','latitude':63.4304,'longitude':10.3952}]}
         validator('WeatherLocationResults').validate(value)

@@ -86,6 +86,8 @@ public final class CsvSnapshot {
             if(clients && table.getKey().equals("workSessions"))
                 for(String optional:List.of("title","labelIds","projectId"))
                     for(var item:items) if(item.getAsJsonObject().has(optional)) {names.add(optional);break;}
+            if(table.getKey().equals("clients"))
+                for(var item:items) if(item.getAsJsonObject().has("retired")) {names.add("retired");break;}
             if(table.getKey().equals("projects"))
                 for(var item:items) if(item.getAsJsonObject().has("icon")) {names.add("icon");break;}
             if(table.getKey().equals("taskConnections"))
@@ -109,7 +111,7 @@ public final class CsvSnapshot {
                         value=extras;
                     }
                     if(value==null && table.getKey().equals("workSessions") && column.equals("labelIds")) value=new JsonArray();
-                    if (value == null && !List.of("workSessionId","projectId","title","icon","capabilities","sharing").contains(column)
+                    if (value == null && !List.of("workSessionId","projectId","title","icon","capabilities","sharing","retired").contains(column)
                             && !(table.getKey().equals("taskAttachments") && List.of("providerId","remoteId").contains(column))) throw invalid();
                     if(value==null) value=JsonNull.INSTANCE;
                     fields.add(value.isJsonNull() ? null : value.isJsonPrimitive() ? value.getAsString() : value.toString());
@@ -170,6 +172,7 @@ public final class CsvSnapshot {
                 var names=rows.removeFirst();var expected=new ArrayList<>(table.getValue());
                 if(clients && table.getKey().equals("workSessions"))
                     for(String optional:List.of("title","labelIds","projectId")) if(names.contains(optional)) expected.add(optional);
+                if(table.getKey().equals("clients") && names.contains("retired")) expected.add("retired");
                 if(table.getKey().equals("projects") && names.contains("icon")) expected.add("icon");
                 if(table.getKey().equals("taskConnections") && names.contains("capabilities")) expected.add("capabilities");
                 if(table.getKey().equals("taskLists") && names.contains("sharing")) expected.add("sharing");
@@ -187,7 +190,7 @@ public final class CsvSnapshot {
                     JsonObject item = new JsonObject();
                     for (int i = 0; i < fields.size(); i++) {
                         String column = names.get(i), value = fields.get(i);
-                        if ((column.equals("title") || column.equals("icon") || column.equals("capabilities") || column.equals("sharing") || column.equals("providerData")
+                        if ((column.equals("retired") || column.equals("title") || column.equals("icon") || column.equals("capabilities") || column.equals("sharing") || column.equals("providerData")
                                 || table.getKey().equals("taskAttachments") && List.of("providerId","remoteId").contains(column)) && value == null) continue; // Optional metadata in mixed exports.
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("taskExtras")) {
@@ -208,7 +211,7 @@ public final class CsvSnapshot {
                             try {item.addProperty(column,Long.parseLong(value));} catch(NumberFormatException error) {throw invalid();}
                         } else if (table.getKey().equals("taskAttachments") && column.equals("bytes")) {
                             try {item.addProperty(column,Integer.parseInt(value));} catch(NumberFormatException error) {throw invalid();}
-                        } else if (column.equals("manual") || (List.of("taskConnections","taskLists","taskListSections").contains(table.getKey())
+                        } else if (column.equals("manual") || column.equals("retired") || (List.of("taskConnections","taskLists","taskListSections").contains(table.getKey())
                                 && List.of("readable","writable","enabled","shared","owner","present").contains(column))) {
                             if (!value.equals("true") && !value.equals("false")) throw invalid();item.addProperty(column, Boolean.parseBoolean(value));
                         } else if (List.of("taskLists","taskListSections").contains(table.getKey()) && column.equals("position")) {

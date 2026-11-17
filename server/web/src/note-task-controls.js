@@ -1,5 +1,6 @@
 import {t} from './i18n.js';
 import {noteClientDirectory} from './note-client.js';
+import {clientChoices,projectChoices} from './client-state.js';
 import {taskMomentFields} from './task-editor-fields.js';
 import {splitMarkdown} from './markdown-document.js';
 
@@ -84,10 +85,10 @@ export class NoteTaskControls {
     const field=(label,name,value,{choices,type='text',multiline=false,max=65536}={})=>{
       const wrap=node('label',undefined,'form-label'),caption=node('span',label),input=node(choices?'select':multiline?'textarea':'input',undefined,choices?'form-select':'form-control');caption.id='task-field-'+crypto.randomUUID();input.setAttribute('aria-labelledby',caption.id);input.name=name;if(!choices&&!multiline)input.type=type;if(choices)for(const [key,text]of choices)input.append(new Option(text,key));input.value=value;input.maxLength=max;if(multiline)input.rows=3;wrap.append(caption,input);this.inputs.append(wrap);return input;
     };
-    const directory=noteClientDirectory(this.openContext.session)||{clients:[],projects:[]},value=this.task;
-    this.client=field(t('ui.client'),'clientId',value.clientId||directory.projects.find(item=>item.id===value.projectId)?.clientId||'',{choices:[['',t('ui.unassigned')],...directory.clients.map(item=>[item.id,item.name])]});
+    const directory=noteClientDirectory(this.openContext.session)||{clients:[],projects:[]},value=this.task,currentClient=value.clientId||directory.projects.find(item=>item.id===value.projectId)?.clientId||'';
+    this.client=field(t('ui.client'),'clientId',currentClient,{choices:[['',t('ui.unassigned')],...clientChoices(directory.clients,[currentClient]).map(item=>[item.id,item.name])]});
     this.project=field(t('ui.project'),'projectId','',{choices:[]});
-    const projects=selected=>{this.project.replaceChildren(new Option(t('ui.no_project'),''));for(const item of directory.projects.filter(item=>!this.client.value||item.clientId===this.client.value))this.project.append(new Option(item.name,item.id));this.project.value=selected;if(this.project.selectedIndex<0)this.project.value='';};projects(value.projectId||'');
+    const projects=selected=>{this.project.replaceChildren(new Option(t('ui.no_project'),''));for(const item of projectChoices(directory.projects,directory.clients,[value.projectId]).filter(item=>!this.client.value||item.clientId===this.client.value))this.project.append(new Option(item.name,item.id));this.project.value=selected;if(this.project.selectedIndex<0)this.project.value='';};projects(value.projectId||'');
     this.client.addEventListener('change',()=>projects(this.project.value));this.project.addEventListener('change',()=>{const selected=directory.projects.find(item=>item.id===this.project.value);if(selected)this.client.value=selected.clientId;});
     this.scheduled=field(t('tasks.scheduled_day'),'scheduledDate',value.scheduledDate||'',{type:'date'});this.due=taskMomentFields(field,'due',value.due,this.zone);
     this.priority=field(t('tasks.priority'),'priority',value.priority||'UNSPECIFIED',{choices:['UNSPECIFIED','LOW','NORMAL','HIGH'].map(key=>[key,t('tasks.priority_'+key.toLowerCase())])});

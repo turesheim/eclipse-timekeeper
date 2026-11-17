@@ -1,3 +1,4 @@
+import {clientChoices,projectChoices} from './client-state.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { node, button, field, section, form, table } from './account-ui.js';
 import { instantText, nanosText } from './model.js';
@@ -140,7 +141,8 @@ export async function renderImports(view, zone) {
       if (plan.mappings.some((value) => value.resourceType !== 'CLIENT')) list.append(node('h3', i18nText("ui.other_mappings")), other);
       for (const definition of plan.mappings) {
         const parent = definitions.get(definition.parentKey),type = definition.resourceType;
-        const choices = (catalog[type] || []).filter((value) => !parent || parent.action === 'REUSE' && value[type === 'PROJECT' ? 'clientId' : 'projectId'] === parent.id).
+        const candidates=type==='CLIENT'?clientChoices(catalog.CLIENT||[],resume?[definition.id]:[]):type==='PROJECT'?projectChoices(catalog.PROJECT||[],catalog.CLIENT||[],resume?[definition.id]:[]):catalog[type]||[];
+        const choices = candidates.filter((value) => !parent || parent.action === 'REUSE' && value[type === 'PROJECT' ? 'clientId' : 'projectId'] === parent.id).
         sort((a, b) => (a.name || a.summary).localeCompare(b.name || b.summary,getLocale()));
         if (definition.action === 'REUSE' && !choices.some((value) => value.id === definition.id) && !resume) {
           definition.action = 'CREATE';delete definition.id;delete definition.etag;

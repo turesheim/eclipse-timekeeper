@@ -75,11 +75,11 @@ export class WeekCalendar {
   }
   selected() {return this.data?.workSessions.find((value) => value.id === this.selectedId);}
   preferredClient() {
-    const available = (id) => this.data?.clients.some((value) => value.id === id);
+    const available = (id) => this.data?.clients.some((value) => value.id === id&&!value.retired);
     return [this.lastClientId, this.selected()?.clientId, this.data?.activeWorkSession?.data?.clientId,
     ...[...(this.data?.workSessions || [])].sort((a, b) => b.start.localeCompare(a.start)).map((value) => value.clientId)].find(available);
   }
-  rememberClient(id) {if (this.data?.clients.some((value) => value.id === id)) this.lastClientId = id;}
+  rememberClient(id) {if (this.data?.clients.some((value) => value.id === id&&!value.retired)) this.lastClientId = id;}
   buttons() {
     const available = this.connected && !this.busy && !this.drag;
     this.controls.copy.disabled = !this.selected() || !available;

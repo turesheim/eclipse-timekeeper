@@ -1,3 +1,4 @@
+import {activeClients,clientChoices,projectChoices} from '../src/client-state.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {focusedSnapshot,focusIncludes,focusedCurrentSession,focusIncludesActivity} from '../src/focus-model.js';
@@ -48,4 +49,12 @@ test('a direct client task and its recorded work remain in that client focus wit
   const source=fixture();source.tasks.push({id:'direct',projectId:null,clientId:'a'});source.activities.push({id:'direct-work',taskId:'direct',start:'2025-10-26T10:00:00Z',end:'2025-10-26T11:00:00Z'});
   const focused=focusedSnapshot(source,{clientIds:['a']});assert.ok(focused.tasks.some(task=>task.id==='direct'));assert.ok(focused.activities.some(activity=>activity.id==='direct-work'));
   assert.equal(focusedSnapshot(source,{clientIds:['b']}).tasks.some(task=>task.id==='direct'),false);
+});
+
+
+test('retiring a client removes new assignments without removing recorded work or focus history',()=>{
+  const source=fixture();source.clients[0].retired=true;const before=structuredClone(source);
+  assert.deepEqual(activeClients(source.clients).map(value=>value.id),['b']);assert.deepEqual(clientChoices(source.clients,['a']).map(value=>value.id),['a','b']);
+  assert.deepEqual(projectChoices(source.projects,source.clients).map(value=>value.id),['pb']);assert.deepEqual(projectChoices(source.projects,source.clients,['pa']).map(value=>value.id),['pa','pb']);
+  const history=focusedSnapshot(source,{clientIds:['a']});assert.equal(history.clients[0].id,'a');assert.equal(history.workSessions[0].id,'sa');assert.equal(history.tasks[0].id,'ta');assert.equal(durationNanos(history.report.total),25n*3600000000000n-1n);assert.deepEqual(source,before);
 });

@@ -1,3 +1,4 @@
+import {clientChoices} from './client-state.js';
 import {t} from './i18n.js';
 import {node,field,form,button} from './account-ui.js';
 
@@ -18,7 +19,7 @@ export async function renderFocusSettings(view,changed){
   let selectedArea=null,selection=new Set(),trigger=null;
   const paintMembers=()=>{
     members.replaceChildren();const query=search.value.trim().toLocaleLowerCase();
-    for(const client of [...clients.items].sort((a,b)=>a.name.localeCompare(b.name))){
+    for(const client of clientChoices(clients.items,selectedArea?.clientIds||[]).sort((a,b)=>a.name.localeCompare(b.name))){
       if(query&&!client.name.toLocaleLowerCase().includes(query))continue;
       const label=node('label',undefined,'focus-client-choice'),choice=node('input');choice.type='checkbox';choice.className='form-check-input';choice.checked=selection.has(client.id);choice.disabled=!view.canWrite;
       choice.addEventListener('change',()=>choice.checked?selection.add(client.id):selection.delete(client.id));label.append(choice,node('span',client.name));members.append(label);

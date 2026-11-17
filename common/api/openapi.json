@@ -24758,6 +24758,10 @@
           },
           "color": {
             "$ref": "#/components/schemas/Color"
+          },
+          "retired": {
+            "type": "boolean",
+            "description": "Optional retirement flag. Creation defaults to false; an update that omits it retains the current value."
           }
         },
         "required": [
@@ -24783,6 +24787,10 @@
           },
           "color": {
             "$ref": "#/components/schemas/Color"
+          },
+          "retired": {
+            "type": "boolean",
+            "description": "Hidden from new-assignment suggestions; existing data and associations remain intact. Omitted on legacy records means false."
           }
         },
         "required": [
@@ -24835,6 +24843,10 @@
           },
           "color": {
             "$ref": "#/components/schemas/Color"
+          },
+          "retired": {
+            "type": "boolean",
+            "description": "Hidden from new-assignment suggestions; existing data and associations remain intact. Omitted on legacy records means false."
           }
         },
         "required": [
