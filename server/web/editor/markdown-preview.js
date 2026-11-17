@@ -5,9 +5,31 @@ import {remarkInlineStyles} from './remark-inline-styles.js';
 import {emojiText} from '../src/emoji.js';
 import {hashtagRanges} from '../src/hashtags.js';
 import {clientMentionRanges} from '../src/client-mentions.js';
+import {wikiReference} from '../src/wiki-links.js';
+import {escapedBracket} from '../src/markdown-brackets.js';
 
 const parser=unified().use(remarkParse).use(remarkGfm,{singleTilde:false}).use(remarkInlineStyles);
+/** Source locations of real, nonempty checklist items; examples in code/HTML are inert. */
+export function noteTaskLines(source){
+  const items=[],visit=node=>{
+    if(node.type==='listItem'&&typeof node.checked==='boolean'&&node.children?.[0]?.type==='paragraph'){
+      const paragraph=node.children[0],offset=paragraph.position.start.offset,start=source.lastIndexOf('\n',offset-1)+1,end=source.indexOf('\n',offset);
+      if(paragraph.children.some(child=>child.value?.trim()||child.alt?.trim()||child.children?.length))items.push({start,end:end<0?source.length:end,offset});
+    }
+    for(const child of node.children||[])visit(child);
+  };visit(parser.parse(source));return items;
+}
 const tags={strong:'strong',emphasis:'em',delete:'del',highlight:'mark',subscript:'sub',superscript:'sup',paragraph:'p',blockquote:'blockquote',listItem:'li',table:'table',tableRow:'tr',tableCell:'td'};
+/** References in prose only; code, HTML and escaped examples remain inert. */
+export function markdownImages(source){
+  const tree=parser.runSync(parser.parse(source)),images=[],definitions=new Map(tree.children.filter(node=>node.type==='definition').map(node=>[node.identifier,node.url]));
+  const visit=node=>{
+    if(['code','inlineCode','html','link','linkReference','definition'].includes(node.type))return;
+    if(node.type==='image'||node.type==='imageReference'){const reference=node.url||definitions.get(node.identifier);if(reference)images.push({reference,kind:'relative',alt:node.alt||''});return;}
+    if(node.type==='text'&&node.position){const offset=node.position.start.offset,raw=source.slice(offset,node.position.end.offset);for(const match of raw.matchAll(/!\[\[([^\]\r\n]+)\]\]/g)){if(escapedBracket(source,offset+match.index))continue;const ref=wikiReference(match[1],true);if(ref)images.push({reference:match[1],kind:'wiki',alt:ref.label||ref.path.split('/').at(-1)});}}
+    for(const child of node.children||[])visit(child);
+  };visit(tree);return [...new Map(images.map(value=>[value.kind+'\0'+value.reference,value])).values()];
+}
 /** Read-only task presentation; images require an explicit authenticated resolver. */
 export function renderMarkdown(source,{inline=false,links=true,image}={}){
   const fragment=document.createDocumentFragment(),tree=parser.runSync(parser.parse(source));

@@ -148,6 +148,16 @@ An associated note supplies the client/project of new checklist tasks. Changing
 its association updates existing linked tasks atomically without rewriting the
 note. Normal task dependency rules apply; a conflict leaves all records intact.
 
+While the caret is in a checkbox item, **✔ +** opens **Edit task details** in
+both editor modes. The compact dialog offers client, project, scheduled day,
+deadline, priority and notes for that item's existing task. It flushes the note
+draft before resolving the source location, preserving duplicate task identity
+and the note's bytes. Per-task assignments survive later prose edits. Metadata
+saves use the task ETag; stale results retain the dialog draft until explicit
+reload, and uncertain results are checked by reading without replaying a write.
+The shared field supplies this behavior in Notes, daily/weekly journals, saved
+event notes and note popups. Read-only fields do not offer the control.
+
 ## Text snippets
 
 **My account → Text snippets** stores up to 50 private keyword/expansion pairs.

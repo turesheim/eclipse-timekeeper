@@ -107,6 +107,9 @@ Use `--postgres-image postgres:18.6-bookworm` for PostgreSQL 18 and
 `--expected-commit` to require an exact clean checkout. CI records results for
 both PostgreSQL versions. The ordinary Maven suite skips this opt-in test.
 
+For the Google-specific fixture map and opt-in live round trip, see
+[Google Tasks connector acceptance](GOOGLE-TASKS-ACCEPTANCE.md).
+
 ## Layout and evidence
 
 For changed surfaces, check keyboard operation, accessible names, mobile widths,

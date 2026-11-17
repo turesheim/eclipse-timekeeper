@@ -9,6 +9,7 @@ Start with [repository setup](REPOSITORY.md); run commands from the repository r
 | Make and verify a change | [Agent workflow and affected quality checks](AGENT-WORKFLOW.md) |
 | Change the browser client | [Web implementation](WEB-CLIENT.md) and [browser acceptance](WEB-ACCEPTANCE.md) |
 | Change the editor | [Journal integration](JOURNAL-EDITOR.md) and [Markdown component](MARKDOWN-EDITOR.md) |
+| Verify Google Tasks synchronization | [Connector fixtures and opt-in live round trip](GOOGLE-TASKS-ACCEPTANCE.md) |
 | Change the Java HTTP client | [HTTP client](HTTP-CLIENT.md) |
 | Verify installed Eclipse clients | [Remote base client](REMOTE-ECLIPSE.md) and [optional Mylyn integration](REMOTE-MYLYN.md) |
 | Package Synology builds | [Candidate, promotion and publication](SYNOLOGY-PACKAGING.md) |

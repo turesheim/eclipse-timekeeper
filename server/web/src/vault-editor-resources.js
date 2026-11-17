@@ -17,7 +17,7 @@ const relativeReference=(origin,target)=>{
 // resolved note origin before an authenticated collection lookup.
 const relativeSyntax=reference=>!!relativeNotePath('x/'.repeat(32)+'note.md',reference,{legacyAssets:false});
 /** All lookups use the current API session. No credentials enter resource URLs. */
-export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true,bannerFrontmatter=()=>null,afterBannerChange=async()=>{},serializeBanner,bannerCommitted,bannerMatches,bannerFailed,dailyBannerContext=()=>origin()?.sourceType==='DAY_NOTE'}={}){
+export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>false,beforeCreate=async()=>true,hasBannerSource=()=>true,bannerFrontmatter=()=>null,afterBannerChange=async()=>{},serializeBanner,bannerCommitted,bannerMatches,bannerFailed,assetResolver,dailyBannerContext=()=>origin()?.sourceType==='DAY_NOTE'}={}){
   let cachedSession,cache,allCache,info,infoRequest,generation=0,opening=false;
   const clearCatalog=()=>{cache=null;allCache=null;info=null;infoRequest=null;};
   const invalidate=()=>{clearCatalog();generation++;};
@@ -101,8 +101,32 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
     }
     return active()&&canCreate();
   };
-  const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data;},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
+  const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return {blob:(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data,session:current,id:entry.id};},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
   return {
+    assetIdentity:()=>({session:session(),origin:JSON.stringify(origin())}),canReplaceAsset:canCreate,
+    readAsset:async(reference,{signal}={})=>{
+      const current=currentSession(),source=JSON.stringify(origin()),active=()=>current===session()&&source===JSON.stringify(origin());
+      const entry=reference.kind==='wiki'?await resolveWiki(reference.reference):await (assetResolver||resolveRelative)(reference.reference,current);if(!active()||entry.deleted||!['ASSET','BINARY'].includes(entry.kind))throw new Error(t('notes.invalid_link'));
+      const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream',signal});if(!active())throw new Error(t('notes.invalid_link'));
+      return {session:current,source,entry,blob:reply.data,etag:reply.etag};
+    },
+    replaceAsset:async(context,blob,{signal}={})=>{
+      const current=currentSession();if(!canCreate()||current!==context.session||context.source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
+      return current.request('/notes/entries/'+context.entry.id+'/content',{method:'PUT',etag:context.etag,rawBody:blob,signal});
+    },
+    readTaskSource:async({signal}={})=>{
+      const current=currentSession(),source=JSON.stringify(origin()),active=()=>current===session()&&source===JSON.stringify(origin());
+      if(!canCreate()||!await beforeCreate()||!active())throw new Error(t('notes.stale'));
+      for(let attempt=0;;attempt++)try{
+      const collection=await collectionInfo(),value=origin();let path=originPath([],value,collection.settings);if(!path)path=originPath(await catalog(),value,collection.settings);
+      if(!path||!active()||!canCreate())throw new Error(t('notes.stale'));
+      const entry=(await current.request('/notes/resolve?'+new URLSearchParams({path}),{signal})).data;
+      if(entry.deleted||!['MARKDOWN','DAY','WEEK','EVENT'].includes(entry.kind)||typeof value==='object'&&(entry.sourceType!==value.sourceType||entry.sourceKey!==value.sourceKey))throw new Error(t('notes.stale'));
+      const reply=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream',signal});
+      const text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await reply.data.arrayBuffer());if(!active()||!canCreate())throw new Error(t('notes.stale'));
+      return {session:current,entry,text,etag:reply.etag};
+      }catch(error){if(!active()||attempt===2||error.code!=='NOTE_CATALOG_CHANGED')throw error;clearCatalog();}
+    },
     dailyBannerContext,serializeBanner,bannerCommitted,bannerMatches,bannerFailed,canCaptureBanner:canCreate,
     announceBanner:()=>document.dispatchEvent(new CustomEvent('timekeeper:notes-changed')),
     bannerVersion:()=>{if(session())currentSession();return generation;},
