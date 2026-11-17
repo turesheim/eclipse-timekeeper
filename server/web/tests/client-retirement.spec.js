@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
-import {navigateView,openAccountMenu} from './navigation.js';
+import {navigateView} from './navigation.js';
 import {clickNoteAction} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {captureScreenshot} from './screenshots.js';
@@ -21,7 +21,7 @@ async function fresh(page,request){
   const change=async(client,retired)=>{const before=await api('GET','/clients/'+client.id);return api('PUT','/clients/'+client.id,{name:client.name,color:client.color,retired},{'If-Match':before.headers().etag});};
   return {api,active,finished,change};
 }
-const clientRow=(page,name)=>page.locator('#clients tbody tr').filter({has:page.getByRole('cell',{name,exact:true})});
+const clientRow=(page,name)=>page.locator('#clients tbody tr').filter({has:page.locator('td:first-child').filter({hasText:new RegExp('^'+name+'$')})});
 async function save(page){await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();await expect(page.locator('#status')).toHaveText('Up to date');}
 async function openNote(page,path){
   await navigateView(page,'notes');const nav=page.locator('#notes-navigation'),expand=page.locator('#notes-panel').getByRole('button',{name:'Expand left sidebar',exact:true});if(await expand.isVisible())await expand.click();await nav.getByRole('button',{name:'Refresh',exact:true}).click();await expect(nav.locator('[role=tree]')).toHaveAttribute('aria-busy','false');
@@ -34,7 +34,7 @@ test('retire and restore hide empty clients from new assignments while retaining
   await expect(clientRow(page,finished.name)).toHaveCount(0);expect((await(await api('GET','/clients/'+finished.id)).json()).retired).toBe(true);
   await navigateView(page,'tasks');await expect(page.locator('#tasks-navigation').getByRole('button',{name:finished.name,exact:true})).toHaveCount(0);await page.locator('#tasks-panel').getByRole('button',{name:'New task',exact:true}).click();await expect(page.locator('#field-clientId option[value="'+finished.id+'"]')).toHaveCount(0);await expect(page.locator('#field-clientId option[value="'+active.id+'"]')).toHaveCount(1);await page.keyboard.press('Escape');
   await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});await api('PUT','/notes/files?path=Notes%2FUnassigned.md',Buffer.from('# Unassigned note\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});await openNote(page,'Notes/Unassigned.md');const dialog=await noteChoice(page);await expect(dialog.getByLabel('Note client',{exact:true}).locator('option[value="'+finished.id+'"]')).toHaveCount(0);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
-  await navigateView(page,'clients');await page.getByLabel('Show retired clients',{exact:true}).check();await expect(clientRow(page,finished.name)).toContainText('Retired');
+  await navigateView(page,'clients');await page.getByLabel('Show retired clients',{exact:true}).focus();await page.keyboard.press('Space');await expect(page.getByLabel('Show retired clients',{exact:true})).toBeChecked();await expect(clientRow(page,finished.name)).toContainText('Retired');
   for(const width of [1200,320])for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('#clients-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await clientRow(page,finished.name).scrollIntoViewIfNeeded();await captureScreenshot(page,{path:`test-results/retired-clients-${theme}-${width}.png`});}
   await clientRow(page,finished.name).getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByLabel('Client status',{exact:true})).toHaveValue('true');await page.getByLabel('Client status',{exact:true}).selectOption('false');await save(page);await page.getByLabel('Show retired clients',{exact:true}).uncheck();await expect(clientRow(page,finished.name)).toBeVisible();expect((await(await api('GET','/clients/'+finished.id)).json()).retired).toBe(false);
 });
@@ -57,4 +57,11 @@ test('stale retirement preserves the draft and read-only clients can inspect but
 
 test('Norwegian client status and retired-list recovery fit narrow screens',async({page,request})=>{
   const {api,finished,change}=await fresh(page,request);await change(finished,true);const profile=await api('GET','/me');await api('PUT','/me',{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await page.locator('#account-menu > summary').click();await page.locator('#account').click();await page.locator('#account-navigation a[href="#account/clients"]').click();await page.setViewportSize({width:320,height:900});await page.getByLabel('Vis avsluttede kunder',{exact:true}).check();await expect(clientRow(page,finished.name)).toContainText('Avsluttet');await clientRow(page,finished.name).getByRole('button',{name:'Rediger',exact:true}).click();await expect(page.getByLabel('Kundestatus',{exact:true})).toHaveValue('true');expect((await new AxeBuilder({page}).include('#editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/retired-client-nb-320.png'});
+});
+
+
+test('calendar mappings retain an assigned retired client and omit it for a new subscription',async({page,request})=>{
+  const {api,active,finished,change}=await fresh(page,request),feed=await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body:'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dagsverk//Retired mapping test//EN\r\nEND:VCALENDAR\r\n'}});expect(feed.status()).toBe(201);
+  await api('POST','/calendar-subscriptions',{name:'Historical calendar',clientId:finished.id,url:(await feed.json()).url,visible:true});await change(finished,true);await page.reload();await page.locator('#account-menu > summary').click();await page.locator('#account').click();await page.locator('#account-navigation a[href="#account/calendars"]').click();const row=page.locator('#calendar-subscription-list > li').filter({hasText:'Historical calendar'});await expect(row).toContainText(finished.name);await row.getByRole('button',{name:/Edit/}).click();const dialog=page.locator('#calendar-subscription-editor');await expect(dialog.locator('select[name=clientId]')).toHaveValue(finished.id);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.locator('#calendar-subscription-add').click();await expect(dialog.locator('select[name=clientId] option[value="'+finished.id+'"]')).toHaveCount(0);await expect(dialog.locator('select[name=clientId]')).toHaveValue(active.id);
 });
