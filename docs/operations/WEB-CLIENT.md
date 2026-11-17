@@ -73,8 +73,9 @@ native-task count before writing.
 
 Clients represent customers, not login accounts. Projects group work for a client;
 tasks can also have a direct client assignment. A project report opens separately
-and uses the account's reporting zone. Google Tasks defaults to import-only;
-optional two-way access requires consent and review of outgoing changes.
+and uses the account's reporting zone. Google Tasks imports automatically;
+supported local edits synchronize automatically after two-way OAuth consent.
+Read-only access never sends those edits to Google.
 See [task providers](TASK-PROVIDERS.md) for supported operations and reconnect steps.
 
 ## Notes and journals

@@ -1,6 +1,7 @@
 import {snippetAt,sourceSnippetAt} from './snippets.js';
 import {NoteBookmark} from './note-bookmark.js';
 import {NoteClient} from './note-client.js';
+import {NoteTaskControls} from './note-task-controls.js';
 import {MarkdownCaret} from './markdown-caret.js';
 import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
@@ -116,7 +117,7 @@ export class MarkdownField {
     this.text.addEventListener('keydown',event=>{if(this.expandSourceSnippet(event))return;if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     if(resources?.bookmark)this.bookmark=new NoteBookmark(root,resources.bookmark);
-    buildExperience(this);dailyBannerTools(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);
+    buildExperience(this);dailyBannerTools(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);if(resources?.readTaskSource)this.taskControls=new NoteTaskControls(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
   closeSourceTyping(){
@@ -205,6 +206,7 @@ export class MarkdownField {
   }
   setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.suspended?.editor.setReadOnly(value);this.controls();}
   paintBlockStyle(){
+    this.taskControls?.update();
     const list=this.editor?.listType?.()||'',glyph={list:'list-ul',ordered:'list-ol',tasks:'list-check'}[list]||'list-ul';
     iconButton(this.listTrigger,glyph,t('markdown.lists'));this.listTrigger.append(icon('down'));this.listTrigger.title=t('markdown.lists')+(list?': '+t('markdown.'+list):'');
     for(const choice of this.listMenu.children)choice.setAttribute('aria-checked',String(choice.dataset.command===list));
@@ -233,7 +235,7 @@ export class MarkdownField {
   closeListMenu(){if(this.listMenu.matches(':popover-open'))this.listMenu.hidePopover();}
   controls(){
     this.editor?.setReadOnly(this.readOnly||this.bannerBusy);this.syncDailyBanner?.();
-    this.caret?.update();this.bookmark?.sync();this.client?.sync();
+    this.caret?.update();this.bookmark?.sync();this.client?.sync();this.taskControls?.sync();
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));

@@ -63,6 +63,35 @@ class TaskProviderWritesTest {
         tx(f,()->{var scans=new TaskProviderScans(store,receipts,inputs);var scan=scans.begin(claim);scans.acknowledge(claim,scan,new TaskCloudProvider.Page<>(List.of(remote("Original","\"g1\"")),null,null));scans.reconcile(claim);return null;});
         return claim;
     }
+    @Test void automaticGoogleScheduleAndCompletionRoundTripKeepsTheLocalDeadlineProjectAndIdentity(){
+        var f=fixture();var claim=automatic(f);var google=raw("Original","\"g1\"");var mutations=new AtomicInteger();
+        var day=java.time.LocalDate.of(2026,11,20);
+        var project=tx(f,()->store.service().createProject(new CreateProject("Local project")).id());
+        tx(f,()->{
+            var task=(Task)decode("TASK",store.find("TASK",f.task()).orElseThrow());
+            var update=new UpdateTask(task.id(),task.version(),Optional.of(project),task.parentTaskId(),"Local title",task.url());
+            var timing=new TaskTiming(Optional.empty(),Optional.of(TaskMoment.zoned(day,java.time.LocalTime.of(14,30),"Europe/Oslo")));
+            store.service().updateTaskDetails(new UpdateTaskDetails(update,new TaskPlanning(TaskStatus.COMPLETED,Optional.of(day),Optional.of(store.now().minusSeconds(2))),task.body(),timing,task.importance(),task.siblingOrder(),task.metadata()));return null;
+        });
+        var deadline=task(f).path("due").deepCopy();
+        var transport=writer(request->{
+            if(request.method().equals("GET"))return reply(200,google);
+            assertEquals("PATCH",request.method());assertEquals(google.path("etag").asText(),request.headers().firstValue("If-Match").orElseThrow());
+            var patch=body(request);var fields=new HashSet<String>();patch.fieldNames().forEachRemaining(fields::add);assertEquals(Set.of("title","due","status","completed"),fields);
+            assertEquals(day+"T00:00:00Z",patch.path("due").asText());assertEquals("completed",patch.path("status").asText());
+            patch.fields().forEachRemaining(entry->google.set(entry.getKey(),entry.getValue().deepCopy()));google.put("etag","\"g2\"");mutations.incrementAndGet();return reply(200,google);
+        });
+        writes().drain(claim,"synthetic-access",transport);assertEquals(1,mutations.get());assertEquals("Local title",baseline(f));assertEquals(deadline,task(f).path("due"));
+        google.put("title","Google title").put("notes","Google notes").put("status","needsAction").put("due",day.plusDays(1)+"T00:00:00Z").put("etag","\"g3\"");google.remove("completed");
+        tx(f,()->{var remote=new TaskCloudProvider(TaskCloudProvider.Provider.GOOGLE).normalize(google);var result=new TaskCloudPull(store,receipts,inputs).apply(f.connection(),f.list(),new TaskCloudPull.Scan("google","account","remote-list",List.of(remote),store.now(),false));assertTrue(result.path("complete").asBoolean());return null;});
+        var current=task(f);assertEquals(f.task().toString(),current.path("id").asText());assertEquals(project.value().toString(),current.path("projectId").asText());assertEquals("Google title",current.path("summary").asText());assertEquals("Google notes",current.path("body").path("content").asText());assertEquals("NOT_STARTED",current.path("status").asText());assertTrue(current.path("completedAt").isNull());assertEquals(day.plusDays(1).toString(),current.path("scheduledDate").asText());assertEquals(deadline,current.path("due"));
+        assertEquals("remote-task",current.path("externalReferences").get(0).path("externalId").asText());writes().drain(claim,"synthetic-access",transport);assertEquals(1,mutations.get());assertEquals(1,tx(f,()->store.list("TASK").size()));assertTrue(tx(f,()->store.list("ACTIVITY").isEmpty()));
+    }
+    @Test void anAutomaticReadOnlyGoogleSubscriptionNeverSendsLocalEditsToTheProvider(){
+        var f=fixture(false,false);var claim=automatic(f);assertFalse(claim.writable());rename(f,"Local-only edit");
+        writes().drain(claim,"synthetic-readonly-access",writer(request->{assertEquals("GET",request.method());return reply(200,raw("Original","\"g1\""));}));
+        assertEquals("Local-only edit",task(f).path("summary").asText());assertEquals("Original",baseline(f));assertTrue(tx(f,()->store.list(TaskProviderWrites.KIND).isEmpty()));
+    }
     @Test void legacySubscriptionsRetainPausedEditsAndResumeAutomaticallyWithoutResaving(){
         var f=fixture();tx(f,()->{var legacy=connections().required(f.connection());legacy.remove("automatic");connections().save(TaskProviderConnections.AUTH,legacy);connections().pause(f.connection(),true,etag(connections().view(f.connection())));assertTrue(new TaskProviderHomes(store).lists().stream().anyMatch(list->list.id().equals(f.list())));return null;});
         rename(f,"Edited while paused before upgrade");

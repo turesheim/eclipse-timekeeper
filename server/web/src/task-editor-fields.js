@@ -37,10 +37,16 @@ export function taskEditorFields(field,value,data,id,homes=[]){
   const priority=field(t('tasks.priority'),'priority',value.priority||'UNSPECIFIED',{choices:['UNSPECIFIED','LOW','NORMAL','HIGH'].map(key=>[key,t('tasks.priority_'+key.toLowerCase())])});
   const order=field(t('tasks.sibling_order'),'siblingOrder',value.siblingOrder||0,{type:'number'});order.min='0';order.step='1';
   const categories=field(t('tasks.categories'),'categories',(value.metadata?.categories||[]).join('\n'),{multiline:true,hint:t('tasks.categories_help')});
-  function moment(prefix,initial){
+  const start=taskMomentFields(field,'start',value.start,data().profile.data.zoneId),due=taskMomentFields(field,'due',value.due,data().profile.data.zoneId);
+  return {refresh,values:()=>({syncListId:home.value||null,status:status.value,scheduledDate:scheduled.value||null,
+    completedAt:status.value==='COMPLETED'?(value.completedAt||null):null,body:{format:format.value,content:notes.value},priority:priority.value,siblingOrder:Number(order.value),
+    metadata:{...(value.metadata||{tags:[],links:[]}),categories:[...new Set(categories.value.split('\n').map(value=>value.trim()).filter(Boolean))]},start:start(),due:due()})};
+}
+
+export function taskMomentFields(field,prefix,initial,zoneId){
     const clockPrefix=prefix==='start'?'start':'deadline';
     const kind=field(t('tasks.'+prefix+'_type'),prefix+'Kind',initial?.kind||'',{choices:[['',t('tasks.no_date')],['DATE',t('tasks.deadline_date')],['DATE_TIME',t('tasks.deadline_time')]]});
-    const date=field(t('tasks.'+prefix+'_label'),prefix+'Date',initial?.date||'',{type:'date'}),time=field(t('tasks.'+clockPrefix+'_clock'),prefix+'Time',(initial?.time||'').split('.')[0],{type:'time'}),zone=field(t('tasks.'+clockPrefix+'_zone'),prefix+'Zone',initial?.timeZone||data().profile.data.zoneId,{max:255});time.step='any';
+    const date=field(t('tasks.'+prefix+'_label'),prefix+'Date',initial?.date||'',{type:'date'}),time=field(t('tasks.'+clockPrefix+'_clock'),prefix+'Time',(initial?.time||'').split('.')[0],{type:'time'}),zone=field(t('tasks.'+clockPrefix+'_zone'),prefix+'Zone',initial?.timeZone||zoneId,{max:255});time.step='any';
     const visibility=()=>{date.closest('label').hidden=!kind.value;date.required=!!kind.value;for(const input of [time,zone]){input.closest('label').hidden=kind.value!=='DATE_TIME';input.required=kind.value==='DATE_TIME';}};
     kind.addEventListener('change',visibility);visibility();const original=[kind.value,date.value,time.value,zone.value];
     return ()=>{
@@ -48,8 +54,3 @@ export function taskEditorFields(field,value,data,id,homes=[]){
       return !kind.value?null:{kind:kind.value,date:date.value,...(kind.value==='DATE_TIME'?{time:time.value===original[2]&&initial?.kind==='DATE_TIME'?initial.time:time.value,timeZone:zone.value}:{})};
     };
   }
-  const start=moment('start',value.start),due=moment('due',value.due);
-  return {refresh,values:()=>({syncListId:home.value||null,status:status.value,scheduledDate:scheduled.value||null,
-    completedAt:status.value==='COMPLETED'?(value.completedAt||null):null,body:{format:format.value,content:notes.value},priority:priority.value,siblingOrder:Number(order.value),
-    metadata:{...(value.metadata||{tags:[],links:[]}),categories:[...new Set(categories.value.split('\n').map(value=>value.trim()).filter(Boolean))]},start:start(),due:due()})};
-}

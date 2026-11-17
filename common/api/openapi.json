@@ -22159,6 +22159,96 @@
         },
         "x-required-permission": "read"
       }
+    },
+    "/notes/tasks/resolve": {
+      "post": {
+        "operationId": "resolveNoteTask",
+        "summary": "Resolve a saved checklist item for explicit task editing",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteTaskResolveInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the current canonical note content ETag. offset is a UTF-16 offset in the full canonical Markdown after CRLF/CR normalization to LF. It must point to the first physical line of a nonempty checklist item. Resolves its durable owned task, enrolling old notes or explicitly recreating the selected removed/ignored task when necessary. Never rewrites the Markdown; repeated resolution retains task identity. Read-only callers cannot materialize tasks. The returned ETag guards ordinary conditional task updates."
+      }
     }
   },
   "components": {
@@ -40437,6 +40527,36 @@
             "items": {
               "$ref": "#/components/schemas/WeatherLocation"
             }
+          }
+        }
+      },
+      "NoteTaskResolveInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceType",
+          "sourceKey",
+          "offset"
+        ],
+        "properties": {
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DAY_NOTE",
+              "WEEK_NOTE",
+              "EVENT_NOTE",
+              "VAULT_CONTENT"
+            ]
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
           }
         }
       }

@@ -262,6 +262,9 @@ test('shared daily and weekly journals show banners in writable and read-only se
   const entryRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/day-entries/2026-11-03');
   await page.locator('#today-date').fill('2026-11-03');expect((await(await entryRead).json()).frontmatter).not.toContain('banner:');await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeVisible();await expect(banner(page.locator('#today-note-editor')).locator('img')).toHaveAttribute('src',/^(?:\/web\/assets\/seasonal|blob:)/);
   expect((await(await api('GET','/day-notes/2026-11-03/content')).json()).body).toBe(body);
+  // Native ambiguous prose uses an empty outer YAML map. Capture must produce
+  // valid metadata before navigation can drain its background write.
+  await expect.poll(async()=>(await(await api('GET','/day-entries/2026-11-03')).json()).frontmatter).toContain('dagsverk_seasonal_banner:');
   // Existing files may consist of metadata alone; an empty body still has a banner.
   const metadataRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/day-entries/2026-11-04');await page.locator('#today-date').fill('2026-11-04');expect((await(await metadataRead).json()).frontmatter).toContain('banner:');await expectBanner(page.locator('#today-note-editor'));
   const token=(await(await api('POST','/auth/tokens',{name:'Read-only banners',permissions:['read'],expiresAt:null})).json()).token;
@@ -294,6 +297,8 @@ test('daily seasonal snapshots keep their forecast across custom upload, reload,
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-16');await expect(banner(root).locator('img')).toHaveCSS('object-position','10% 80%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);
   await page.locator('#today-date').fill('2026-11-17');await expect(banner(root)).toBeVisible();await expect(root.locator('.banner-forecast')).toHaveCount(0);await page.locator('#today-date').fill('2026-11-16');await expect(banner(root)).toBeVisible();
   for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width:320,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);await expect(banner(root)).toHaveCSS('height','120px');for(const item of await root.locator('.banner-forecast li').all()){const box=await item.boundingBox();expect(box.height).toBeLessThan(85);await expect(item).toHaveCSS('background-color','rgba(15, 30, 32, 0.76)');}expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#today-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/seasonal-banner-'+theme+'-320.png',fullPage:true});}
+  const bannerBox=await banner(root).boundingBox();
+  for(const overlay of [root.locator('.banner-forecast'),root.locator('.banner-weather-credit')]){const box=await overlay.boundingBox();expect(box.y).toBeGreaterThanOrEqual(bannerBox.y);expect(box.y+box.height).toBeLessThanOrEqual(bannerBox.y+bannerBox.height);}
   await dailyTool(root,'Restore seasonal image');await expect(banner(root).locator('img')).toHaveCSS('object-position','50% 50%');await expect(root.locator('.banner-forecast')).toHaveText(forecast);expect(await(await api('GET','/notes/entries/'+entry.id+'/content')).text()).toBe(original);expect(previews).toBe(1);
 });
 

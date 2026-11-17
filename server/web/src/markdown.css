@@ -226,3 +226,10 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .weather-location-results {list-style:none;padding:0;display:grid;gap:.5rem}
 .weather-location-results li {display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem}
 .weather-location-results .btn {text-align:start;overflow-wrap:anywhere;max-width:100%}
+.note-task-action {position:fixed;z-index:1080;min-width:3.5rem;background:var(--bs-body-bg);border-radius:2rem;box-shadow:0 2px 6px #0002;}
+.note-task-dialog {width:min(32rem,calc(100vw - 2rem));}
+.note-task-title {overflow-wrap:anywhere;max-height:4.5em;overflow:auto;}
+.note-task-fields {display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1rem;}
+.note-task-fields label {display:block;min-width:0;margin:0;}
+.note-task-fields label:has(textarea) {grid-column:1/-1;}
+@media(max-width:480px){.note-task-fields {grid-template-columns:1fr;}}

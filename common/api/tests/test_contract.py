@@ -32,6 +32,16 @@ class ContractTest(unittest.TestCase):
         self.assertEqual('read',operation['x-required-permission'])
         self.assertEqual({'q','language'},{p['name'] for p in operation['parameters']})
 
+    def test_note_task_resolution_requires_a_saved_source_location_and_write_authority(self):
+        value={'sourceType':'VAULT_CONTENT','sourceKey':ID,'offset':42}
+        validator('NoteTaskResolveInput').validate(value)
+        for invalid in [{**value,'offset':-1},{**value,'offset':1.5},{**value,'sourceType':'TASK'},{**value,'ownerId':'foreign'},{k:v for k,v in value.items() if k!='offset'}]:
+            self.assertFalse(validator('NoteTaskResolveInput').is_valid(invalid))
+        operation=CONTRACT['paths']['/notes/tasks/resolve']['post']
+        self.assertEqual('write',operation['x-required-permission'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+        self.assertEqual('#/components/schemas/Task',operation['responses']['200']['content']['application/json']['schema']['$ref'])
+
     def test_temporary_oauth_verification_has_bounded_redacted_results(self):
         validator('TaskProviderAuthorizeInput').validate({'verification': True, 'services': {'tasks': True, 'calendars': False}})
         self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid({'verification': 'true'}))
@@ -905,7 +915,7 @@ class ContractTest(unittest.TestCase):
             'createTaskListSection', 'updateTaskListSection', 'updateTaskListSectionProviderData', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync', 'importTaskSyncItem', 'applyTaskSyncItem', 'previewTaskSyncExport',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'resolveNoteTask', 'listTasks',
             'listTaskAttachments', 'createTaskAttachment', 'getTaskAttachment', 'updateTaskAttachment', 'deleteTaskAttachment', 'downloadTaskAttachmentContent',
             'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'updateExternalTaskAssignment', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',

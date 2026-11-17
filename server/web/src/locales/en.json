@@ -1971,5 +1971,11 @@
   "weather.selected": "Location added to the draft. Save to use it for new forecasts.",
   "weather.busy": "Place search is busy. Try later or enter coordinates below.",
   "weather.failed": "Place search is unavailable. Try later or enter coordinates below.",
-  "weather.query_short": "Enter at least two characters."
+  "weather.query_short": "Enter at least two characters.",
+  "notes.edit_task": "Edit task details",
+  "notes.reload_task": "Reload task",
+  "notes.reload_task_confirm": "Reload the saved task and replace your changes in this dialog?",
+  "notes.check_task_save": "Check saved result",
+  "notes.task_stale": "The task changed elsewhere. Reload it to review the saved version. Your changes are still here.",
+  "notes.task_not_saved": "These changes were not saved. You can retry saving."
 }
