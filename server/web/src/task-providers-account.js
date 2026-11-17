@@ -1,3 +1,4 @@
+import {projectChoices} from './client-state.js';
 import {t,getLocale} from './i18n.js';
 import {ApiError} from './api.js';
 import {authorizationTarget} from './task-provider-authorization.js';
@@ -157,7 +158,7 @@ export async function renderTaskProviders(view){
           for(const list of value.availableLists){
             const row=node('div',undefined,'internet-selection-row'),label=node('label',undefined,'internet-selection-check'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.name='selectedLists';input.value=list.id;input.checked=value.selectedLists.includes(list.id);label.append(input,node('span',list.name,'text-break'));
             const projectLabel=node('label',undefined,'internet-selection-mapping'),select=node('select',undefined,'form-select form-select-sm');select.dataset.projectFor=list.id;select.append(new Option(t('task_providers.no_project'),''));
-            for(const project of projects)select.append(new Option(project.label,project.id));select.value=value.projectMappings?.[list.id]||'';
+            for(const project of projectChoices(projects,clients,[value.projectMappings?.[list.id]]))select.append(new Option(project.label,project.id));select.value=value.projectMappings?.[list.id]||'';
             if(value.projectMappings?.[list.id]&&!select.value){select.append(new Option(t('task_providers.project_missing'),value.projectMappings[list.id]));select.value=value.projectMappings[list.id];}
             const visible=node('span',t('internet_accounts.project_mapping'),'form-label');visible.setAttribute('aria-hidden','true');projectLabel.append(visible,node('span',t('task_providers.project_for',{name:list.name}),'visually-hidden'),select);row.append(label,projectLabel);card.choices.append(row);
           }

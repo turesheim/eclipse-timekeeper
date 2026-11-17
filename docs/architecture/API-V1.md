@@ -118,6 +118,14 @@ JSON processing; transfer limits also apply to exported snapshots. Successful
 JSON is `application/json`; errors are `application/problem+json` with matching
 HTTP/body status and stable `code`. Clients branch on status/code, not prose.
 
+Clients have an optional `retired` boolean. Creation defaults to false; older records
+without the field are active. Conditional updates that omit the flag preserve its
+current value. Retirement does not delete or reassign any owned record. The API
+continues to return the full directory so historical reports and associations keep
+their labels; browser assignment choices exclude retired clients and their projects
+except the record’s current assignment. JSON, CSV and account archives preserve the
+flag, and import remaps IDs normally. Restoring a client sets `retired` to false.
+
 Tasks may be unassigned. A task without a project can have an optional, owned
 `clientId`; tasks in a project inherit that project's client. This business-client
 metadata lives in the server adapter, like project and work-session clients.

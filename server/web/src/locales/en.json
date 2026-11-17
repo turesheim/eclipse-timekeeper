@@ -1957,5 +1957,10 @@
   "daily_banner.condition_snow": "Snow",
   "daily_banner.condition_sleet": "Sleet",
   "daily_banner.condition_fog": "Fog",
-  "daily_banner.condition_thunder": "Thunder"
+  "daily_banner.condition_thunder": "Thunder",
+  "clients.status": "Client status",
+  "clients.active": "Active",
+  "clients.retired": "Retired",
+  "clients.show_retired": "Show retired clients",
+  "clients.retire_help": "Keep existing records and hide this client from new assignment choices. Use Show retired clients to restore it."
 }

@@ -1,3 +1,4 @@
+import {clientChoices,projectChoices} from './client-state.js';
 import {icon} from './icons.js';
 import {t,getLocale} from './i18n.js';
 
@@ -53,13 +54,13 @@ export class NoteClient {
   }
   choices(){
     this.select.replaceChildren(new Option(t('notes.no_client'),''));
-    for(const client of [...directory.clients].sort((a,b)=>a.name.localeCompare(b.name,getLocale(),{numeric:true,sensitivity:'base'})||a.id.localeCompare(b.id)))this.select.append(new Option(client.name,client.id));
+    for(const client of clientChoices(directory.clients,[this.data?.clientId]).sort((a,b)=>a.name.localeCompare(b.name,getLocale(),{numeric:true,sensitivity:'base'})||a.id.localeCompare(b.id)))this.select.append(new Option(client.name,client.id));
     this.select.value=this.data?.clientId||'';
     this.projectChoices(this.data?.projectId||'');
   }
   projectChoices(selected){
     this.project.replaceChildren(new Option(t('notes.no_project'),''));
-    for(const project of [...directory.projects].filter(value=>!this.select.value||value.clientId===this.select.value).sort((a,b)=>a.name.localeCompare(b.name,getLocale(),{numeric:true,sensitivity:'base'})||a.id.localeCompare(b.id)))this.project.append(new Option(project.name,project.id));
+    for(const project of projectChoices(directory.projects,directory.clients,[this.data?.projectId]).filter(value=>!this.select.value||value.clientId===this.select.value).sort((a,b)=>a.name.localeCompare(b.name,getLocale(),{numeric:true,sensitivity:'base'})||a.id.localeCompare(b.id)))this.project.append(new Option(project.name,project.id));
     this.project.value=[...this.project.options].some(option=>option.value===selected)?selected:'';
   }
   failure(error){this.error.textContent=error.message;this.error.hidden=false;this.options.error?.(error);}

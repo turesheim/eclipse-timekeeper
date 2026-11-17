@@ -1,3 +1,4 @@
+import {activeClients,clientChoices} from './client-state.js';
 import {focusIncludes} from './focus-model.js';
 import {calendarSourceFailure} from './calendar-source-status.js';
 import {calendarDescription,calendarLocation} from './tooltip-description.js';
@@ -117,8 +118,8 @@ export class CalendarSubscriptions {
     const subscriptions=this.rows.filter(value=>!value.managed);
     this.title.textContent=subscriptions.length?t('calendar.subscriptions_count',{count:subscriptions.length}):t('calendar.subscriptions');
     const active=document.activeElement,focus=this.panel.contains(active)?active.dataset.calendarAction:null;
-    this.add.disabled=!this.writable||!(this.data.allClients||this.data.clients).length;this.list.replaceChildren();
-    if(!subscriptions.length)this.list.append(node('li',(this.data.allClients||this.data.clients).length?t('calendar.none'):t('calendar.client_required'),'hint'));
+    this.add.disabled=!this.writable||!activeClients(this.data.allClients||this.data.clients).length;this.list.replaceChildren();
+    if(!subscriptions.length)this.list.append(node('li',activeClients(this.data.allClients||this.data.clients).length?t('calendar.none'):t('calendar.client_required'),'hint'));
     for(const value of subscriptions) {
       const row=node('li',undefined,'calendar-subscription-row'),label=node('label',undefined,'calendar-subscription-choice'),input=node('input',undefined,'form-check-input');input.type='checkbox';input.checked=value.visible;input.disabled=!this.writable||this.busy.has(value.id);input.dataset.calendarAction='visible:'+value.id;input.setAttribute('aria-label',t('calendar.show_name',{name:value.name}));
       input.addEventListener('change',()=>void this.visibility(value,input.checked));
@@ -153,7 +154,7 @@ export class CalendarSubscriptions {
   }
   async edit(id=null,remove=false) {
     if(!this.writable||!this.managementView?.valid()||this.dialog.open)return;const session=this.scope,generation=this.managementGeneration;
-    const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:(this.data.allClients||this.data.clients)[0]?.id,visible:true,includeEvents:true,includeTodos:false},etag:null};
+    const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:activeClients(this.data.allClients||this.data.clients)[0]?.id,visible:true,includeEvents:true,includeTodos:false},etag:null};
     if(session!==this.scope||generation!==this.managementGeneration||!this.managementView?.valid()||!this.writable||this.dialog.open)return;
     const value=loaded.data;this.fields.replaceChildren();this.formError.textContent='';this.formHint.textContent=remove?t('calendar.remove_explanation'):t('calendar.url_hint');
     this.draft={session,id,remove,etag:loaded.etag,original:value,key:!id?crypto.randomUUID():null,origin:id?(remove?'delete:':'edit:')+id:'add'};
@@ -162,7 +163,7 @@ export class CalendarSubscriptions {
     if(remove)this.fields.append(node('p',t('calendar.remove_confirm',{name:value.name})));
     else {
       this.field(t('ui.name'),'name',value.name,{required:true});const wrap=node('label',undefined,'form-label');wrap.append(node('span',t('ui.client')));const select=node('select',undefined,'form-select');select.id='calendar-subscription-client';select.name='clientId';select.required=true;
-      for(const client of (this.data.allClients||this.data.clients)){const option=node('option',client.name);option.value=client.id;select.append(option);}select.value=value.clientId||'';wrap.append(select);this.fields.append(wrap);
+      for(const client of clientChoices(this.data.allClients||this.data.clients,[value.clientId])){const option=node('option',client.name);option.value=client.id;select.append(option);}select.value=value.clientId||'';wrap.append(select);this.fields.append(wrap);
       this.field(t(id?'calendar.url_keep':'calendar.url'),'url','',{required:!id,type:'url'});
       const advanced=node('details',undefined,'mt-3');advanced.open=!!value.includeTodos;
       advanced.append(node('summary',t('calendar.advanced_feed_options')));

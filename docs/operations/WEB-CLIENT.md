@@ -77,6 +77,13 @@ and uses the account's reporting zone. Google Tasks defaults to import-only;
 optional two-way access requires consent and review of outgoing changes.
 See [task providers](TASK-PROVIDERS.md) for supported operations and reconnect steps.
 
+To retire a client, open Account → Clients, edit it and set **Client status** to
+**Retired**. Its work, tasks, notes and existing mappings stay associated with it.
+It appears where those records are displayed, and is omitted from new assignment
+choices along with its projects. Client administration hides retired clients by
+default; select **Show retired clients** and edit the status to **Active** to restore
+one. Restoration keeps the same client and history.
+
 ## Notes and journals
 
 Use Notes for folders, Markdown documents and attachments. Today edits the daily

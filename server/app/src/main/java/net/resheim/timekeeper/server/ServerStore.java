@@ -614,11 +614,12 @@ public class ServerStore {
         ImportProvenance.workSessionDescriptions(this,migrated);
     }
     JsonNode createClient(JsonNode input) {
-        var node=((ObjectNode)input).deepCopy();node.put("id",UUID.randomUUID().toString());node.put("ownerId",owner());node.put("version",0);
+        var node=((ObjectNode)input).deepCopy();node.put("id",UUID.randomUUID().toString());node.put("ownerId",owner());node.put("version",0);node.put("retired",input.path("retired").asBoolean(false));
         writeClient(node);change("CLIENT","CREATED",node.get("id").asText());return node;
     }
     JsonNode updateClient(UUID id,long version,JsonNode input) {
-        var node=((ObjectNode)input).deepCopy();node.put("id",id.toString());node.put("ownerId",owner());node.put("version",version+1);
+        var previous=find("CLIENT",id).orElseThrow(ApiFailure::notFound);
+        var node=((ObjectNode)input).deepCopy();node.put("id",id.toString());node.put("ownerId",owner());node.put("version",version+1);node.put("retired",input.has("retired")?input.get("retired").asBoolean():previous.path("retired").asBoolean(false));
         writeClient(node);change("CLIENT","UPDATED",id.toString());return node;
     }
     private void writeClient(ObjectNode node) {

@@ -1957,5 +1957,10 @@
   "daily_banner.condition_snow": "Snø",
   "daily_banner.condition_sleet": "Sludd",
   "daily_banner.condition_fog": "Tåke",
-  "daily_banner.condition_thunder": "Torden"
+  "daily_banner.condition_thunder": "Torden",
+  "clients.status": "Kundestatus",
+  "clients.active": "Aktiv",
+  "clients.retired": "Avsluttet",
+  "clients.show_retired": "Vis avsluttede kunder",
+  "clients.retire_help": "Behold eksisterende data og skjul kunden når du velger kunde for nye oppføringer. Bruk Vis avsluttede kunder for å aktivere kunden igjen."
 }

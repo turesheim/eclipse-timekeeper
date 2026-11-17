@@ -107,7 +107,7 @@ final class DomainTransfer {
                 if(!sourceClients.contains(uuid(item.get("clientId")))) throw ApiFailure.validation();
         }
         for(var item:input.path("clients")) {
-            var fields=object();fields.put("name",item.get("name").asText());fields.put("color",item.get("color").asText());
+            var fields=object();fields.put("name",item.get("name").asText());fields.put("color",item.get("color").asText());if(item.has("retired"))fields.set("retired",item.get("retired").deepCopy());
             var created=store.createClient(fields);clients.put(uuid(item.get("id")),uuid(created.get("id")));mapping(mappings,"CLIENT",item,uuid(created.get("id")));
         }
         Set<String> accountKeys=new HashSet<>();

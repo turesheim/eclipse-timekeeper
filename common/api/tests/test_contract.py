@@ -22,6 +22,15 @@ def validator(name):
 
 
 class ContractTest(unittest.TestCase):
+    def test_client_retirement_is_optional_boolean_and_portable(self):
+        client={'name':'Historical client','color':'#176653'}
+        for schema in ['ClientInput','TransferClient']:
+            value=client if schema=='ClientInput' else {**client,'id':'12345678-1234-4234-8234-123456789abc'}
+            validator(schema).validate(value)
+            validator(schema).validate({**value,'retired':True})
+            for invalid in ['true',None,1]:
+                self.assertFalse(validator(schema).is_valid({**value,'retired':invalid}))
+
     def test_temporary_oauth_verification_has_bounded_redacted_results(self):
         validator('TaskProviderAuthorizeInput').validate({'verification': True, 'services': {'tasks': True, 'calendars': False}})
         self.assertFalse(validator('TaskProviderAuthorizeInput').is_valid({'verification': 'true'}))

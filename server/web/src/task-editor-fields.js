@@ -1,3 +1,4 @@
+import {clientChoices,projectChoices} from './client-state.js';
 import {t} from './i18n.js';
 import {taskPresentation} from './model.js';
 
@@ -13,8 +14,8 @@ export function taskEditorFields(field,value,data,id,homes=[]){
     input.value=selected;if(input.selectedIndex<0)input.value='';
   };
   const refresh=(selectedParent=parent.value)=>{
-    const current=data();choices(client,current.clients.map(item=>[item.id,item.name]),t('ui.unassigned'));
-    choices(project,current.projects.filter(item=>!client.value||item.clientId===client.value).map(item=>[item.id,item.name]),t('ui.no_project'));
+    const current=data();choices(client,clientChoices(current.clients,[originalClient]).map(item=>[item.id,item.name]),t('ui.unassigned'));
+    choices(project,projectChoices(current.projects,current.clients,[value.projectId]).filter(item=>!client.value||item.clientId===client.value).map(item=>[item.id,item.name]),t('ui.no_project'));
     const contextClient=current.projects.find(item=>item.id===project.value)?.clientId||client.value;
     const candidates=current.tasks.filter(item=>item.id!==id&&!['COMPLETED','CANCELLED'].includes(item.status)&&(item.projectId||'')===project.value&&(current.projects.find(project=>project.id===item.projectId)?.clientId||item.clientId||'')===contextClient).map(item=>[item.id,taskPresentation(item).title]);
     // A completed current parent is retained for unrelated edits, but cannot be
@@ -27,7 +28,8 @@ export function taskEditorFields(field,value,data,id,homes=[]){
   refresh();client.value=originalClient;refresh();project.value=value.projectId||'';refresh(value.parentTaskId||'');
   project.addEventListener('change',()=>{const selected=data().projects.find(item=>item.id===project.value);if(selected)client.value=selected.clientId;refresh();});
   client.addEventListener('change',()=>{const selected=data().projects.find(item=>item.id===project.value);if(selected&&selected.clientId!==client.value)project.value='';refresh();});
-  const home=field(t('tasks.sync_list'),'syncListId',value.syncListId||'',{choices:[['',t('tasks.local_only')],...homes.map(list=>[list.id,list.name])]});
+  const availableProjects=new Set(projectChoices(data().projects,data().clients).map(project=>project.id)),availableHomes=homes.filter(list=>list.id===value.syncListId||!list.projectId||availableProjects.has(list.projectId));
+  const home=field(t('tasks.sync_list'),'syncListId',value.syncListId||'',{choices:[['',t('tasks.local_only')],...availableHomes.map(list=>[list.id,list.name])]});
   home.addEventListener('change',()=>{if(!id&&!project.value){const selected=homes.find(list=>list.id===home.value);if(selected?.projectId){project.value=selected.projectId;refresh();}}});
   parent.addEventListener('change',()=>{const ancestor=data().tasks.find(task=>task.id===parent.value);if(ancestor?.syncListId)home.value=ancestor.syncListId;});
   const status=field(t('tasks.status_label'),'status',value.status||'NOT_STARTED',{choices:['NOT_STARTED','IN_PROGRESS','COMPLETED','WAITING','DEFERRED'].map(key=>[key,t('tasks.status.'+key)])});

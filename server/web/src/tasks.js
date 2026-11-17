@@ -1,3 +1,4 @@
+import {clientChoices} from './client-state.js';
 import {t,getLocale} from './i18n.js';
 import {dateInZone,localDateTime,localDateTimeToInstant,instantNanos,nanosText} from './model.js';
 import {SidebarActions} from './sidebar-actions.js';
@@ -120,7 +121,7 @@ export class TasksView {
   }
   paint(){
     if(!this.data)return;const today=dateInZone(Date.now(),this.data.profile.data.zoneId),collator=new Intl.Collator(getLocale(),{numeric:true,sensitivity:'base'});this.rows=taskRows(this.data,this.catalogZone===this.data.profile.data.zoneId?this.sourceTasks:[]);
-    const smart=[['today','tasks.today'],['all','tasks.all'],['critical','tasks.critical']].map(([value,label])=>({kind:'smart',value,label:t(label)})),clients=this.data.clients.map(value=>({kind:'client',value:value.id,label:value.name}));
+    const smart=[['today','tasks.today'],['all','tasks.all'],['critical','tasks.critical']].map(([value,label])=>({kind:'smart',value,label:t(label)})),clients=clientChoices(this.data.clients,this.rows.filter(row=>taskMatches(row,{kind:'smart',value:'all'},today,{hideCompleted:this.hideCompleted.checked})).map(row=>row.clientId)).map(value=>({kind:'client',value:value.id,label:value.name}));
     if(this.rows.some(row=>!row.clientId))clients.push({kind:'client',value:null,label:t('ui.unassigned')});
     const categories=[...new Set(this.rows.flatMap(row=>row.categories))].sort(collator.compare).map(value=>({kind:'category',value,label:value})),all=[...smart,...clients,...categories];
     if(!all.some(value=>selectionKey(value)===selectionKey(this.selection)))this.selection={kind:'smart',value:'all'};

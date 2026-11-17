@@ -15,6 +15,19 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
+    @Test void retiredClientsRoundTripAlongsideLegacyClientsWithoutInventingFlags() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[
+             {"id":"old","name":"Legacy","color":"#176653"},
+             {"id":"retired","name":"Historical","color":"#176653","retired":true},
+             {"id":"active","name":"Active","color":"#176653","retired":false}],
+             "projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("retired-clients");CsvSnapshot.write(data,folder);assertEquals(data,CsvSnapshot.read(folder));
+        var csv=folder.resolve("clients.csv");Files.writeString(csv,Files.readString(csv).replace("true","invalid"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+    }
+
+
     @Test void listEnvelopesRetainUnknownJsonAndDistinguishAbsentFromNullInMixedCsv() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
