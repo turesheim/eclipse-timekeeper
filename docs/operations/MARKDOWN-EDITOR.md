@@ -232,6 +232,31 @@ converts an ordinary Markdown image into an Obsidian embed. Sized embeds use
 the filename as their label. Journal uploads go in the configured journal assets
 subfolder. No external image URL is fetched automatically.
 
+### Draw.io diagrams
+
+In draw.io, choose **File → Export As → PNG** and enable **Include a copy of
+my diagram**. Keep **All Pages** selected to retain the whole editable drawing;
+the preview itself shows the exported page. See the
+[draw.io export options](https://www.drawio.com/docs/manual/export/export-to-png/).
+
+Choose **Note tools → Insert draw.io diagram**, select that PNG, and give it
+meaningful alternative text. Dagsverk stores the original bytes using the same
+5 MB and account limits as other attachments. The note contains a normal relative
+Markdown image reference. Its preview needs no draw.io connection.
+
+Use **Note tools → Draw.io diagrams** to select an image and **Download original
+PNG**. Open it in draw.io to recover its shapes and pages. Export a revised PNG
+with the same diagram-data options, choose it in Dagsverk and select **Replace
+PNG**. Replacement keeps the attachment path and note text intact, and updates
+references to that attachment. Read-only sessions can download the original.
+WebDAV and account archives preserve the original PNG bytes.
+
+If another client changed the image, review and reload the saved file before
+retrying. If a response was lost, use **Check saved result** first. The chosen
+file stays available in the dialog while you resolve the failure. Missing images
+and ordinary PNGs remain readable/downloadable through the normal attachment
+tools; they cannot be replaced as editable diagrams through this dialog.
+
 ## Saving, conflicts and history
 
 Notes and daily, weekly and event-note documents save automatically after a

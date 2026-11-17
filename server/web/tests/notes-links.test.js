@@ -9,6 +9,22 @@ import {vaultEditorResources} from '../src/vault-editor-resources.js';
 
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 const collection=(journalFolder='journal',assetsFolder='journal/assets')=>({settings:{journalFolder,assetsFolder,eventsFolder:'events'},limits:{pageSize:200},snapshot:'snapshot'});
+test('diagram replacement uses the saved content validator and preserves the exact blob and entry',async()=>{
+  const entry={id:'diagram',path:'Images/system.png',kind:'BINARY'},blob=new Blob(['opaque PNG bytes']),requests=[];
+  const session={request:async(path,options={})=>{requests.push({path,options});return path.includes('/content')?{data:blob,etag:'content-7'}:{data:entry};}};
+  const resources=vaultEditorResources(()=>session,()=> 'Notes/plan.md',undefined,{canCreate:()=>true}),context=await resources.readAsset({reference:'../Images/system.png',kind:'relative'});
+  assert.equal(context.blob,blob);assert.equal(context.etag,'content-7');const next=new Blob(['original revised bytes']);await resources.replaceAsset(context,next);
+  assert.equal(requests.at(-1).path,'/notes/entries/diagram/content');assert.equal(requests.at(-1).options.etag,'content-7');assert.equal(requests.at(-1).options.rawBody,next);assert.equal(requests.at(-1).options.method,'PUT');
+});
+test('read-only, changed-origin and changed-owner contexts cannot replace an attachment',async()=>{
+  let origin='one.md',write=true,session;const first={request:async path=>path.includes('/content')?{data:new Blob(['PNG']),etag:'content'}:{data:{id:'diagram',kind:'ASSET'}}};session=first;
+  const resources=vaultEditorResources(()=>session,()=>origin,undefined,{canCreate:()=>write}),context=await resources.readAsset({reference:'diagram.png',kind:'relative'});
+  write=false;await assert.rejects(resources.replaceAsset(context,new Blob()));write=true;origin='two.md';await assert.rejects(resources.replaceAsset(context,new Blob()));origin='one.md';session={};await assert.rejects(resources.replaceAsset(context,new Blob()));
+});
+test('a delayed attachment read cannot repopulate another note or owner',async()=>{
+  const pending=deferred();let origin='one.md';const session={request:async path=>path.includes('/content')?pending.promise:{data:{id:'diagram',kind:'BINARY'}}};
+  const resources=vaultEditorResources(()=>session,()=>origin),read=resources.readAsset({reference:'diagram.png',kind:'relative'}),rejected=assert.rejects(read);origin='two.md';pending.resolve({data:new Blob(['PNG']),etag:'old'});await rejected;
+});
 test('a versioned native header supplied with the note avoids all header lookup requests',async()=>{
   const requests=[],session={request:async path=>{requests.push(path);throw new Error('Unexpected header lookup');}};
   let frontmatter='\ufeff---\r\nbanner: "[[Images/private.png]]"\r\n---\r\n';
