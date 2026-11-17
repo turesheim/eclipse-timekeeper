@@ -1976,5 +1976,11 @@
   "drawio.not_editable": "Denne PNG-filen har ingen gjenkjente draw.io-data. Eksporter den på nytt med «Include a copy of my diagram» valgt.",
   "drawio.stale": "Filen er endret et annet sted. Last inn den lagrede filen for å se gjennom den før den erstattes. Den valgte filen beholdes.",
   "drawio.unknown": "Erstatningen kunne ikke bekreftes. Kontroller lagringen før du prøver på nytt. Den valgte filen beholdes.",
-  "drawio.not_saved": "Erstatningen ble ikke lagret. Den valgte filen beholdes, og du kan prøve på nytt."
+  "drawio.not_saved": "Erstatningen ble ikke lagret. Den valgte filen beholdes, og du kan prøve på nytt.",
+  "notes.edit_task": "Rediger oppgavedetaljer",
+  "notes.reload_task": "Last oppgaven på nytt",
+  "notes.reload_task_confirm": "Last den lagrede oppgaven på nytt og erstatt endringene dine i denne dialogen?",
+  "notes.check_task_save": "Kontroller lagringen",
+  "notes.task_stale": "Oppgaven er endret et annet sted. Last den på nytt for å se den lagrede versjonen. Endringene dine er fortsatt her.",
+  "notes.task_not_saved": "Endringene ble ikke lagret. Du kan prøve å lagre på nytt."
 }

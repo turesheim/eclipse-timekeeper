@@ -1976,5 +1976,11 @@
   "drawio.not_editable": "This PNG has no recognized draw.io data. Export it again with “Include a copy of my diagram” selected.",
   "drawio.stale": "This file changed elsewhere. Reload the saved file to review it before replacing it. Your selected file is kept.",
   "drawio.unknown": "The replacement could not be confirmed. Check the saved result before trying again. Your selected file is kept.",
-  "drawio.not_saved": "The replacement was not saved. Your selected file is kept; you can retry."
+  "drawio.not_saved": "The replacement was not saved. Your selected file is kept; you can retry.",
+  "notes.edit_task": "Edit task details",
+  "notes.reload_task": "Reload task",
+  "notes.reload_task_confirm": "Reload the saved task and replace your changes in this dialog?",
+  "notes.check_task_save": "Check saved result",
+  "notes.task_stale": "The task changed elsewhere. Reload it to review the saved version. Your changes are still here.",
+  "notes.task_not_saved": "These changes were not saved. You can retry saving."
 }

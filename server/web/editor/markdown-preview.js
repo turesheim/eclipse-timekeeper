@@ -9,6 +9,16 @@ import {wikiReference} from '../src/wiki-links.js';
 import {escapedBracket} from '../src/markdown-brackets.js';
 
 const parser=unified().use(remarkParse).use(remarkGfm,{singleTilde:false}).use(remarkInlineStyles);
+/** Source locations of real, nonempty checklist items; examples in code/HTML are inert. */
+export function noteTaskLines(source){
+  const items=[],visit=node=>{
+    if(node.type==='listItem'&&typeof node.checked==='boolean'&&node.children?.[0]?.type==='paragraph'){
+      const paragraph=node.children[0],offset=paragraph.position.start.offset,start=source.lastIndexOf('\n',offset-1)+1,end=source.indexOf('\n',offset);
+      if(paragraph.children.some(child=>child.value?.trim()||child.alt?.trim()||child.children?.length))items.push({start,end:end<0?source.length:end,offset});
+    }
+    for(const child of node.children||[])visit(child);
+  };visit(parser.parse(source));return items;
+}
 const tags={strong:'strong',emphasis:'em',delete:'del',highlight:'mark',subscript:'sub',superscript:'sup',paragraph:'p',blockquote:'blockquote',listItem:'li',table:'table',tableRow:'tr',tableCell:'td'};
 /** References in prose only; code, HTML and escaped examples remain inert. */
 export function markdownImages(source){

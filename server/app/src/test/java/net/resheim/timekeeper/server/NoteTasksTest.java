@@ -19,6 +19,27 @@ class NoteTasksTest {
     private static byte[] bytes(String text){return text.getBytes(StandardCharsets.UTF_8);}
     private Task completed(Task task,boolean done){return store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),new TaskPlanning(done?TaskStatus.COMPLETED:TaskStatus.NOT_STARTED,task.planning().scheduledDate(),done?Optional.of(store.now()):Optional.empty())));}
     private VaultCollection vault(){var vault=new VaultCollection(store,limits);vault.initialize();return vault;}
+    @Test void explicitResolutionSelectsOneRealCheckboxAndRetainsCanonicalBytes(){
+        store.transaction("tasks-resolve",()->{
+            var vault=vault();String text="\ufeff---\r\ncustom: exact\r\n---\r\n😀\r\n- [ ] Same\r\n  - [ ] Same\r\n```md\r\n- [ ] Example\r\n```\r\n";
+            var entry=vault.put(new VaultPath("Resolve.md"),null,true,bytes(text));var ref=VaultSources.fromEntry(entry);var tasks=new NoteTasks(store);String normalized=text.replace("\r\n","\n"),tag=vault.tag(entry);int first=normalized.indexOf("Same"),second=normalized.indexOf("Same",first+1);
+            UUID one=tasks.resolve(ref,tag,first),two=tasks.resolve(ref,tag,second);assertNotEquals(one,two);assertEquals(two,tasks.resolve(ref,tag,second));assertEquals(2,store.service().tasks().size());
+            assertEquals(404,assertThrows(ApiFailure.class,()->tasks.resolve(ref,tag,normalized.indexOf("Example"))).status);assertEquals(428,assertThrows(ApiFailure.class,()->tasks.resolve(ref,null,first)).status);assertEquals(412,assertThrows(ApiFailure.class,()->tasks.resolve(ref,"\"old\"",first)).status);
+            for(var task:store.service().tasks())store.service().deleteTask(new DeleteTask(task.id(),task.version()));assertTrue(store.service().tasks().isEmpty());UUID recreated=tasks.resolve(ref,tag,second);assertNotEquals(two,recreated);assertEquals(1,store.service().tasks().size());assertEquals(recreated,tasks.resolve(ref,tag,second));
+            assertArrayEquals(bytes(text),vault.read(vault.get(VaultCollection.id(entry))));assertEquals(tag,vault.tag(vault.get(VaultCollection.id(entry))));return null;
+        });
+    }
+    @Test void resolveHttpGuardsSourceOwnershipAndReturnsTheCanonicalTaskValidator(){
+        String text="- [ ] Task properties "+UUID.randomUUID()+"\n",path="Resolve "+UUID.randomUUID()+".md";
+        var created=given().header("Authorization","Bearer test-a").queryParam("path",path).header("If-None-Match","*").contentType("application/octet-stream").body(bytes(text)).put("/api/v1/notes/files");assertEquals(201,created.statusCode());String key=created.jsonPath().getString("sourceKey"),entry=created.jsonPath().getString("id"),tag=given().header("Authorization","Bearer test-a").get("/api/v1/notes/entries/"+entry+"/content").header("ETag");var input=object().put("sourceType",VaultContent.TYPE).put("sourceKey",key).put("offset",8);
+        assertEquals(403,resolve("test-read",tag,input).statusCode());assertEquals(404,resolve("test-b",tag,input).statusCode());assertEquals(428,resolve("test-a",null,input).statusCode());assertEquals(412,resolve("test-a","\"old\"",input).statusCode());
+        var resolved=resolve("test-a",tag,input);assertEquals(200,resolved.statusCode());String id=resolved.jsonPath().getString("id");assertEquals(resolved.header("ETag"),given().header("Authorization","Bearer test-a").get("/api/v1/tasks/"+id).header("ETag"));assertEquals(id,resolve("test-a",tag,input).jsonPath().getString("id"));
+        // Use the ordinary task endpoint; unedited planning and provider identity are retained.
+        var update=object().put("summary",resolved.jsonPath().getString("summary")).putNull("url").putNull("projectId").putNull("parentTaskId").put("priority","HIGH").put("scheduledDate","2026-11-20");update.set("body",object().put("format","TEXT").put("content","Exact notes"));update.set("due",object().put("kind","DATE_TIME").put("date","2026-11-21").put("time","12:13:14.123456789").put("timeZone","Europe/Oslo"));
+        var saved=given().header("Authorization","Bearer test-a").header("If-Match",resolved.header("ETag")).contentType("application/json").body(update.toString()).put("/api/v1/tasks/"+id);assertEquals(200,saved.statusCode(),saved.asString());assertEquals("HIGH",saved.jsonPath().getString("priority"));assertEquals("12:13:14.123456789",saved.jsonPath().getString("due.time"));assertEquals(412,given().header("Authorization","Bearer test-a").header("If-Match",resolved.header("ETag")).contentType("application/json").body(update.toString()).put("/api/v1/tasks/"+id).statusCode());
+        var content=given().header("Authorization","Bearer test-a").get("/api/v1/notes/entries/"+entry+"/content");assertEquals(text,content.asString());assertEquals(tag,content.header("ETag"));
+    }
+    private io.restassured.response.Response resolve(String token,String tag,Object body){var request=given().header("Authorization","Bearer "+token).contentType("application/json");if(tag!=null)request.header("If-Match",tag);return request.body(body.toString()).post("/api/v1/notes/tasks/resolve");}
     @Test void canonicalFileWritesTrackSeparateTasksWithoutChangingMarkdown(){
         store.transaction("tasks-file",()->{
             var vault=vault();String text="\ufeff---\r\ncustom: preserved\r\n---\r\n# Work\r\n- [ ] First **task**\r\n- [x] Same\r\n- [ ] Same\r\n```md\r\n- [ ] Example only\r\n```\r\n";

@@ -35,9 +35,11 @@ direct registration. Managed mode lets multiple installations use an operator's
 app registration; each user's account, consent and permissions remain individual.
 The user connects their own account in either mode.
 
-Both modes support calendars, tasks or both. Calendars and Microsoft To Do are
-read-only. Google Tasks defaults to import-only; two-way access requires explicit
-write consent and review of outgoing changes.
+Both modes support calendars, tasks or both. Calendars are read-only. Google
+Tasks offers read-only or two-way access with the corresponding OAuth consent.
+Selected lists synchronize automatically; supported local edits are sent only
+with write access. Healthy edits need no separate outgoing review. See
+[task connections and permissions](TASK-PROVIDERS.md).
 
 ## Direct
 

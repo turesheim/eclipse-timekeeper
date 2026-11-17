@@ -2,6 +2,7 @@ import {icon} from './icons.js';
 import {t,getLocale} from './i18n.js';
 
 const fields=new Set();let directory={session:null,revision:null,clients:[],projects:[]};
+export const noteClientDirectory=session=>directory.session===session?directory:null;
 /** The complete owned list is independent of the workspace's focus filter. */
 export function updateNoteClientDirectory(session,clients=[],revision=null,projects=[]){
   if(directory.session===session&&directory.revision===revision&&directory.clients===clients&&directory.projects===projects)return;

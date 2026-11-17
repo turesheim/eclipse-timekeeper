@@ -57,6 +57,10 @@ public class VaultResource {
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
         return tx(false,()->{var history=new NoteRevisions(store);var snapshot=history.snapshot(history.reference(type,id),version);return Response.ok(snapshot.body()).header("ETag",snapshot.etag()).build();});
     }
+    @POST @Path("/tasks/resolve") @Consumes("application/json") public Response resolveTask(@HeaderParam("If-Match")String match,JsonNode body){
+        var input=inputs.validate("NoteTaskResolveInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(false,()->{var ref=new NoteReferences(store).reference(input.path("sourceType").asText(),input.path("sourceKey").asText());UUID task=new NoteTasks(store).resolve(ref,match,input.path("offset").asInt());return ApiReplies.resource(200,store.find("TASK",task).orElseThrow(ApiFailure::notFound),null).response();});
+    }
     @GET @Path("/client") public Response client(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return tx(false,()->{var clients=new NoteClients(store);var ref=clients.reference(type,key);return Response.ok(clients.get(ref)).header("ETag",clients.tag(ref)).build();});
     }

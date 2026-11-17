@@ -249,7 +249,7 @@ for(const destination of ['another note','another account'])test('a late banner 
 });
 
 test('shared daily and weekly journals show banners in writable and read-only sessions',async({page,request,browser})=>{
-  const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);await put('journal/2026-11-02.md',header+'\n# Daily banner\n');await put('journal/2026-W45.md',header+'\n# Weekly banner\n');
+  const {api,put}=await fresh(page,request);await put('Images/Project cover.png',image);await put('journal/2026-11-02.md',header+'\n# Daily banner\n');await put('journal/2026-W45.md',header+'\n# Weekly banner\n');await put('journal/2026-11-04.md',header);
   const check=async(target,readOnly=false)=>{
     await target.locator('[data-tab=today]').click();await target.locator('#today-date').fill('2026-11-02');const daily=target.locator('#today-note-editor');await expectBanner(daily);await expect(daily.locator('.ProseMirror')).toHaveAttribute('aria-readonly',String(readOnly));
     await target.locator('#today-month-grid [data-week="2026-W45"]').click();const weekly=target.locator('#today-week-note-editor');await expectBanner(weekly);await expect(weekly.locator('.ProseMirror')).toHaveAttribute('aria-readonly',String(readOnly));await weekly.getByRole('button',{name:'Close',exact:true}).click();
@@ -262,8 +262,11 @@ test('shared daily and weekly journals show banners in writable and read-only se
   const entryRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/day-entries/2026-11-03');
   await page.locator('#today-date').fill('2026-11-03');expect((await(await entryRead).json()).frontmatter).not.toContain('banner:');await expect(page.locator('#today-journal-formatted')).toContainText('Body fragment');await expect(banner(page.locator('#today-note-editor'))).toBeVisible();await expect(banner(page.locator('#today-note-editor')).locator('img')).toHaveAttribute('src',/^(?:\/web\/assets\/seasonal|blob:)/);
   expect((await(await api('GET','/day-notes/2026-11-03/content')).json()).body).toBe(body);
+  // Native ambiguous prose uses an empty outer YAML map. Capture must produce
+  // valid metadata before navigation can drain its background write.
+  await expect.poll(async()=>(await(await api('GET','/day-entries/2026-11-03')).json()).frontmatter).toContain('dagsverk_seasonal_banner:');
   // Existing files may consist of metadata alone; an empty body still has a banner.
-  await put('journal/2026-11-04.md',header);await page.locator('#today-date').fill('2026-11-04');await expectBanner(page.locator('#today-note-editor'));
+  const metadataRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/day-entries/2026-11-04');await page.locator('#today-date').fill('2026-11-04');expect((await(await metadataRead).json()).frontmatter).toContain('banner:');await expectBanner(page.locator('#today-note-editor'));
   const token=(await(await api('POST','/auth/tokens',{name:'Read-only banners',permissions:['read'],expiresAt:null})).json()).token;
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:process.env.TIMEKEEPER_WEB_URL.startsWith('https:')});
   try{

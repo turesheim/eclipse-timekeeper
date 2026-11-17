@@ -62,7 +62,13 @@ test('Today and weekly Markdown writers create the same ordinary tasks and reope
   const api=await setup(page,request),day='2026-11-09',daily=await api('GET','/day-notes/'+day+'/content'),week='2026-W46',weekly=await api('GET','/week-notes/'+week);
   await api('PUT','/day-notes/'+day+'/content',{body:'- [ ] Daily follow up\n'},{'If-Match':daily.headers().etag});await api('PUT','/week-notes/'+week,{body:'- [x] Weekly follow up\n'},{'If-Match':weekly.headers().etag});expect(await tasks(api)).toHaveLength(2);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const dailyCheckbox=page.locator('#today-journal-formatted').getByRole('checkbox',{name:'Task: Daily follow up',exact:true});await expect(dailyCheckbox).not.toBeChecked();await dailyCheckbox.check();await saveMarkdown(page.locator('#today-note-editor'));await expect.poll(async()=>(await tasks(api)).find(value=>value.summary==='Daily follow up').status).toBe('COMPLETED');
-  const task=(await tasks(api)).find(value=>value.summary==='Daily follow up');await complete(api,task.id,false);await page.locator('#today-date').fill('2026-11-10');await page.locator('#today-date').fill(day);await expect(dailyCheckbox).not.toBeChecked();
+  const task=(await tasks(api)).find(value=>value.summary==='Daily follow up');await complete(api,task.id,false);await page.locator('#today-date').fill('2026-11-10');
+  const root=page.locator('#today-note-editor'),reload=root.getByRole('button',{name:'Reload saved note',exact:true});
+  // A peer completion can arrive while automatic banner metadata is settling.
+  // Review an explicitly retained stale note before navigating away from it.
+  await expect.poll(async()=>await dailyCheckbox.count()===0?'left':await reload.isVisible()?'review':'waiting').not.toBe('waiting');
+  if(await reload.isVisible()){page.once('dialog',dialog=>dialog.accept());await reload.click();await expect(dailyCheckbox).not.toBeChecked();await page.locator('#today-date').fill('2026-11-10');}
+  await expect(dailyCheckbox).toHaveCount(0);await page.locator('#today-date').fill(day);await expect(dailyCheckbox).not.toBeChecked();
 });
 
 test('search popups and maximized event notes synchronize their ordinary checklist tasks',async({page,request})=>{
