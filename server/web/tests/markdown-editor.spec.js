@@ -113,9 +113,15 @@ test('Markdown supports touch task toggling and text entry on a mobile viewport'
 });
 test('Markdown schema guard retains metadata and escaped-code dialects without remote image requests',async({page})=>{
   const external=[];page.on('request',request=>{if(request.url().includes('example.invalid'))external.push(request.url());});
+  let release,arrived;const loading=new Promise(resolve=>arrived=resolve),gate=new Promise(resolve=>release=resolve);
+  await page.route('**/web/assets/milkdown/milkdown.js',async route=>{arrived();await gate;await route.continue();});
   await open(page);
+  try{
+  let first=true;
   for(const value of ['```js title="preserve this"\nconst day = "Sunday";\n```\n','\\`outside [[wikilink]]\\`','\\`![image](https://example.invalid/pixel)\\`']){
     await page.locator('#markdown-body').fill(value);await page.locator('#markdown-rich').click();
+    if(first){await loading;await expect(page.locator('#markdown-download')).toBeDisabled();release();await expect(page.locator('#markdown-formatted')).toBeVisible();first=false;}
+    await expect(page.locator('#markdown-rich')).toBeEnabled();
     // The shared engine now preserves unfamiliar constructs as inert source
     // fragments. Rich admission is safe when the exact authored bytes survive.
     expect(await downloaded(page)).toBe(value);
@@ -123,6 +129,7 @@ test('Markdown schema guard retains metadata and escaped-code dialects without r
     await expect(page.locator('#markdown-body')).toHaveValue(value);
   }
   expect(external).toEqual([]);
+  }finally{release();}
 });
 test('Mermaid fences render as inert SVG previews and preserve editable Markdown',async({page})=>{
   const outside=[],requested=[];page.on('request',request=>{requested.push(request.url());if(!request.url().startsWith('data:')&&new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)outside.push(request.url());});
