@@ -1,10 +1,11 @@
+import {icon} from './icons.js';
 import {wikiReference} from './wiki-links.js';
 import {dailyBannerSnapshot} from './daily-banner-model.js';
 import {t} from './i18n.js';
 import {dailyBannerProposal} from './daily-banner-presentation.js';
 import {seasonalCatalog,panoramicArtwork} from './seasonal-banner-catalog.js';
 
-const weatherSymbols={clear:'☀',fair:'☀',partlycloudy:'⛅',cloudy:'☁',rain:'☂',snow:'❄',sleet:'❄',fog:'≋',thunder:'ϟ'};
+const weatherSymbols={clear:'sun',fair:'cloud-sun',partlycloudy:'cloud-sun',cloudy:'cloud',rain:'cloud-rain',snow:'cloud-snow',sleet:'cloud-sleet',fog:'cloud-fog',thunder:'cloud-lightning-rain'};
 
 const quoted=/^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*')[ \t]*(?:#.*)?$/;
 const scalar=value=>{
@@ -115,8 +116,8 @@ export class MarkdownBanner{
         this.dom.removeAttribute('aria-hidden');
         const list=document.createElement('ul');list.className='banner-forecast';list.setAttribute('aria-label',t(this.snapshot?.forecast.length?'daily_banner.saved_forecast':'daily_banner.forecast',{date:forecast.date,zone:forecast.zoneId}));
         for(const slot of forecast.forecast){
-          const item=document.createElement('li'),time=document.createElement('time'),symbol=document.createElement('span'),label=document.createElement('span'),temperature=document.createElement('strong');
-          time.textContent=slot.time;time.dateTime=forecast.date+'T'+slot.time;symbol.textContent=weatherSymbols[slot.condition];symbol.className='banner-weather-symbol';symbol.setAttribute('aria-hidden','true');label.textContent=slot.label;label.className='banner-weather-label';temperature.textContent=slot.temperature;
+          const item=document.createElement('li'),time=document.createElement('time'),symbol=icon(weatherSymbols[slot.condition]),label=document.createElement('span'),temperature=document.createElement('strong');
+          time.textContent=slot.time;time.dateTime=forecast.date+'T'+slot.time;symbol.classList.add('banner-weather-symbol');label.textContent=slot.label;label.className='banner-weather-label';temperature.textContent=slot.temperature;
           item.append(time,symbol,label,temperature);list.append(item);
         }
         const credit=document.createElement('a');credit.className='banner-weather-credit';credit.href='https://www.met.no/en/free-meteorological-data/Licensing-and-crediting';credit.target='_blank';credit.rel='noopener noreferrer';credit.textContent='MET Norway · CC BY 4.0';this.dom.append(list,credit);

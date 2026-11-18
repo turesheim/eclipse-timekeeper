@@ -208,7 +208,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .banner-forecast-status {position:absolute;right:.35rem;bottom:.35rem;display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem;max-width:calc(100% - .7rem);padding:.3rem .5rem;background:rgb(15 30 32 / 76%);color:#fff;border-radius:var(--bs-border-radius);font-size:.8rem}
 .banner-forecast-status a,.banner-forecast-status .btn {color:#fff}
 .banner-forecast-status .btn {padding:.1rem .25rem;font-size:inherit}
-.banner-forecast {position:absolute;top:.35rem;right:.35rem;display:flex;align-items:flex-start;gap:.25rem;max-width:calc(100% - .7rem);list-style:none;margin:0;padding:0;color:#fff;font-size:.75rem;line-height:1.15}
+.banner-forecast {position:absolute;top:.35rem;left:.35rem;display:flex;align-items:flex-start;gap:.25rem;max-width:calc(100% - 5.5rem);list-style:none;margin:0;padding:0;color:#fff;font-size:.75rem;line-height:1.15}
 .banner-forecast li {display:grid;grid-template-columns:auto auto;align-content:start;align-items:center;gap:.1rem .3rem;min-width:0;max-width:8rem;padding:.25rem .4rem;border-radius:.25rem;background:rgb(15 30 32 / 76%)}
 .banner-forecast li {color:#fff}
 .banner-forecast time {font-variant-numeric:tabular-nums}
@@ -220,7 +220,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .banner-image-dialog {max-width:34rem}
 .banner-image-dialog label {display:block;margin:.5rem 0}
 .banner-image-preview {width:100%;margin:.5rem 0;height:120px}
-@media(max-width:400px) {.banner-forecast {inset-inline:.25rem;justify-content:flex-end;gap:.2rem}.banner-forecast li {flex:1;padding:.2rem .3rem;font-size:.7rem}.banner-forecast strong {font-size:.8rem}}
+@media(max-width:400px) {.banner-forecast {inset-inline:.25rem 5rem;justify-content:flex-start;gap:.2rem}.banner-forecast li {flex:1;padding:.2rem .3rem;font-size:.7rem}.banner-forecast strong {font-size:.8rem}}
 .weather-location-search {margin-block:0 1rem;padding-bottom:1rem;border-bottom:1px solid var(--bs-border-color)}
 .weather-location-search > .btn {margin-bottom:.5rem}
 .weather-location-results {list-style:none;padding:0;display:grid;gap:.5rem}
@@ -232,7 +232,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .drawio-files button {width:100%;overflow-wrap:anywhere;}
 .drawio-filename {overflow-wrap:anywhere;font-size:.875rem;}
 .drawio-file-preview {display:block;max-width:100%;max-height:16rem;object-fit:contain;margin:1rem auto;background:#fff;}
-.note-task-action {position:fixed;z-index:1080;display:inline-grid;place-items:center;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;background:var(--bs-body-bg);border-radius:50%;font-size:1rem;line-height:1;}
+.note-task-action {position:fixed;z-index:1080;display:inline-grid;place-items:center;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;border:0;background:var(--bs-body-bg);border-radius:50%;font-size:1.5rem;line-height:1;}
 .note-task-dialog {width:min(32rem,calc(100vw - 2rem));}
 .note-task-title {overflow-wrap:anywhere;max-height:4.5em;overflow:auto;}
 .note-task-fields {display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1rem;}
