@@ -120,8 +120,22 @@ and [script lifecycle](https://help.synology.com/developer-guide/synology_packag
 
 ### Synchronization diagnostics
 
-Server diagnostics appear in **Container Manager → timekeeper-server → Log**, or
-through SSH with `sudo docker logs --since 30m timekeeper-server`.
+The native package inherits the Docker daemon's logging driver so that standard
+DSM installations can show diagnostics in **Container Manager → timekeeper-server → Log**
+using Synology's `db` driver. Log retention follows the NAS settings. Upgrading
+from a package that forced `json-file` applies the inherited driver when
+Container Manager recreates the container. The Log tab shows new output from
+the recreated container.
+
+If the tab is empty, compare the daemon default with the running container's
+driver over SSH. On a host configured with `json-file`, use `docker logs` to
+read the output.
+
+```sh
+sudo /usr/local/bin/docker info --format '{{.LoggingDriver}}'
+sudo /usr/local/bin/docker inspect -f '{{.HostConfig.LogConfig.Type}}' timekeeper-server
+sudo /usr/local/bin/docker logs --tail 100 timekeeper-server
+```
 API calls taking at least one second produce `API request completed` warnings
 with a generated `request_id`, route template, HTTP status and `elapsed_ms`.
 A request still running after five seconds produces an earlier warning. Normal

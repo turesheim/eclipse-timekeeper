@@ -106,6 +106,8 @@ class SynologyPackageTest(unittest.TestCase):
                 self.assertEqual(validate(package)['imageId'],provenance['imageId'])
                 self.assertEqual(package_id,validate(package)['package'])
                 with tarfile.open(package) as outer,tarfile.open(fileobj=io.BytesIO(outer.extractfile('package.tgz').read()),mode='r:gz') as inner:
+                    project=json.load(inner.extractfile('project/compose.yaml'))
+                    self.assertNotIn('logging',project['services']['server'], 'The native package must inherit Container Manager’s log driver')
                     self.assertEqual(b'1.0\n',outer.extractfile('scripts/backup/version').read())
                     for callback in ('export','import'):
                         member=outer.getmember('scripts/backup/'+callback)
