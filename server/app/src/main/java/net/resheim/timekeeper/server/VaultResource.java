@@ -37,10 +37,8 @@ public class VaultResource {
         // Finish lazy catalogue initialization before opening the independent
         // repeatable-read export snapshot; never nest its authorization locks.
         store.authenticated(identity,()->{vault().initialize();return null;});
-        var file=archives.notesDownload(identity.principal());routing.addEndHandler(ignored->file.close());
-        StreamingOutput body=output->{try(file){java.nio.file.Files.copy(file.file(),output);}};
-        return Response.ok(body,"application/zip").header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Length",file.length())
-                .header("Content-Disposition","attachment; filename=\"timekeeper-notes-"+java.time.LocalDate.now(java.time.ZoneOffset.UTC)+".zip\"").build();
+        return AccountArchiveResource.exportResponse(routing,()->archives.notesDownload(identity.principal()),"timekeeper-notes")
+                .header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();
     }
     @GET @Path("/revisions") public Response revisions(@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source);

@@ -66,6 +66,45 @@ test('portability: private download, accessible review, stale review and duplica
   await page.reload();await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Archive already restored',exact:true})).toBeVisible();expect((await snapshot(page)).workSessions).toHaveLength(2);
 });
+test('portability: a prepared archive survives navigation and is cleared at sign-out',async({page,request})=>{
+  await account(page,request);
+  const prepare=page.getByRole('button',{name:'Prepare archive',exact:true});
+  const progress=page.getByRole('status').filter({hasText:'Preparing archive…'});
+  const downloadLink=page.getByRole('link',{name:'Download archive',exact:true});
+  const profile=page.getByRole('link',{name:'Profile',exact:true});
+  const data=page.getByRole('link',{name:'Your data',exact:true});
+  const endpoint='**/api/v1/data/account/export';
+  let exports=0,release;
+  const allowTransfer=new Promise(resolve=>{release=resolve;});
+  await page.route(endpoint,async route=>{exports++;await allowTransfer;await route.continue();});
+  try{
+    await prepare.click();
+    await expect(progress).toBeVisible();await expect(prepare).toBeDisabled();
+    await expect.poll(()=>exports).toBe(1);
+    await profile.click();await expect(prepare).toHaveCount(0);
+    await data.click();await expect(progress).toBeVisible();await expect(prepare).toBeDisabled();
+    await profile.click();await expect(prepare).toHaveCount(0);
+    const transfer=page.waitForResponse(endpoint);release();
+    expect(await (await transfer).finished()).toBeNull();
+    await data.click();await expect(downloadLink).toBeVisible();
+    const url=await downloadLink.getAttribute('href');
+    await profile.click();await expect(downloadLink).toHaveCount(0);
+    await data.click();await expect(downloadLink).toHaveAttribute('href',url);
+
+    const waiting=page.waitForEvent('download');await downloadLink.click();
+    const archive=await waiting;
+    expect(archive.suggestedFilename()).toMatch(/^timekeeper-account-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(await archive.failure()).toBeNull();expect(exports).toBe(1);
+    await openAccountMenu(page);
+    await page.getByRole('button',{name:'Sign out',exact:true}).click();
+    await expect(page.locator('#login-form')).toBeVisible();
+    expect(await page.evaluate(async url=>{try{await fetch(url);return true;}catch{return false;}},url)).toBe(false);
+    await account(page,request);
+    await expect(prepare).toBeEnabled();await expect(downloadLink).toHaveCount(0);
+  }finally{
+    release();await page.unroute(endpoint);
+  }
+});
 test('portability: a committed but lost restore reply is reconciled without another write',async({page,request})=>{
   await account(page,request);const file=await download(page);await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByRole('button',{name:'Import reviewed records',exact:true})).toBeEnabled();
   let writes=0;await page.route('**/api/v1/data/account/uploads/*/import',async route=>{writes++;expect((await route.fetch()).status()).toBe(201);await route.abort('failed');});
