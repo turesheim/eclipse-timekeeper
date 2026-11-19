@@ -80,6 +80,9 @@ test('checking an unknown daily-note save retains edits made while its first wri
   await page.route(path,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;if(writes===1){await route.fetch();await gate;await route.abort('connectionfailed');}else await route.continue();});
   try{
     await page.locator('#today-journal-body').fill('First body');await expect.poll(()=>writes).toBe(1);await expect(page.locator('#today-journal-body')).toBeEditable();await page.locator('#today-journal-body').fill('Newest body');release();await expect(daily.getByRole('alert')).toContainText('could not be confirmed');
+    await page.setViewportSize({width:440,height:956});const datePicker=page.getByLabel('Date',{exact:true});
+    await datePicker.fill('2026-11-03');await expect(datePicker).toHaveValue('2026-11-02');
+    await expect(page.locator('#today-journal-body')).toHaveValue('Newest body');
     await daily.getByRole('button',{name:'Check saved result',exact:true}).click();await expect(page.locator('#today-journal-body')).toHaveValue('Newest body');await expect.poll(async()=>(await(await api('GET','/day-entries/2026-11-02')).json()).body).toBe('Newest body');expect(writes).toBe(2);
   }finally{release();await page.unrouteAll({behavior:'wait'});}
 });

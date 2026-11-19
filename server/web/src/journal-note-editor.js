@@ -39,9 +39,12 @@ export class JournalNoteEditor {
       if(root.closest('[hidden]'))return;
       let origin=this.context?.originSelector?root.querySelector(this.context.originSelector)||this.origin:this.origin;
       if(!origin?.isConnected)return;
-      // Resizing a popup to a phone layout may collapse its source sidebar.
-      // Return to that sidebar's visible control when the source is hidden.
-      if(!origin.getClientRects().length){const pane=origin.closest('[hidden][id]');origin=pane?root.querySelector('.sidebar-actions button[aria-controls="'+CSS.escape(pane.id)+'"]'):null;}
+      // A resize can hide both the popup's source and its sidebar toggle.
+      if(!origin.getClientRects().length){
+        const pane=origin.closest('[hidden][id]');
+        origin=pane?root.querySelector('.sidebar-actions button[aria-controls="'+CSS.escape(pane.id)+'"]'):null;
+        if(!origin?.getClientRects().length&&pane?.id==='today-contents')origin=root.querySelector('#today-date');
+      }
       if(origin?.getClientRects().length)origin.focus();
     });
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});

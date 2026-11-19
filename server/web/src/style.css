@@ -228,12 +228,25 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
   .today-layout.sidebar-right-collapsed .today-sidebar { grid-row: 3; }
 }
 @media(max-width: 650px) {
-  .today-sidebar { grid-template-columns: minmax(0,1fr); }
+  .today-layout .today-main { grid-row: 2; }
+  .today-layout .today-sidebar { grid-row: 3; grid-template-columns: minmax(0,1fr); }
   .today-toolbar { grid-template-columns: minmax(0,1fr); }
   .today-toolbar .track-heading { grid-column: 1; grid-row: 1; }
-  .today-toolbar .today-date-navigation { grid-column: 1; grid-row: 2; flex-wrap: wrap; }
-  .today-main-actions { grid-column: 1; grid-row: 3; }
-  .today-toolbar .today-date-navigation { grid-column: 1 / -1; }
+  .today-toolbar .today-date-navigation { grid-column: 1; grid-row: 2; }
+  .today-date-navigation .date-navigation-field { width: 100%; }
+  #today-date { min-height: var(--control-target-size); border-radius: var(--bs-border-radius); font-size: max(16px, var(--font-input)); appearance: auto; }
+  .today-date-navigation input::-webkit-calendar-picker-indicator { display: revert; }
+  .today-date-navigation > .btn-toolbar, #today-date-choose, .today-calendar { display: none; }
+  .today-toolbar .today-day-label { grid-column: 1; grid-row: 3; }
+  .today-main-actions { grid-column: 1; grid-row: 4; }
+  #today-panel[data-journal-keyboard] {
+    /* Main already reserves the dock height. Add the remaining keyboard space. */
+    padding-block-end: max(0px, calc(var(--today-keyboard-inset) - var(--workspace-nav-height)));
+  }
+  #today-panel[data-journal-keyboard] .journal-inline {
+    height: max(16rem, calc(var(--today-keyboard-height) - 2 * var(--workspace-content-gap)));
+  }
+  #workspace:has(#today-panel[data-journal-keyboard]) > .workspace-nav { visibility: hidden; }
 }
 .table-wrap { overflow: auto; max-width: 100%; }
 .table { font-size: var(--font-table); --bs-table-border-color: var(--line); --bs-table-hover-bg: #edf3ef; --bs-table-hover-color: #233b38; }
