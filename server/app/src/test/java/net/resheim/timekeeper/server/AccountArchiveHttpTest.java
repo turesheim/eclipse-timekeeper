@@ -45,6 +45,35 @@ class AccountArchiveHttpTest {
         if(match!=null) request.header("If-Match",match);if(key!=null) request.header("Idempotency-Key",key);
         return request.request(method,"/api/v1"+path);
     }
+    @Test void chunkRouteUsesTheDeclaredLengthAtTheZipAndJsonLimits() {
+        String uploads="/data/account/uploads";
+        var zip=object().put("fileName","account.zip").put("mediaType","application/zip")
+                .put("bytes",1_073_741_824L).put("sha256","a".repeat(64));
+        var created=call("test-a","POST",uploads,zip,null,UUID.randomUUID().toString()).then().statusCode(201).extract().response();
+        var upload=(ObjectNode)parse(created.asString());
+        UUID id=uuid(upload.get("id"));
+        String path=uploads+"/"+id;
+        assertEquals(1024,upload.path("chunkCount").asInt());
+        // Exercise the HTTP boundary as a resumed upload without staging its first GiB.
+        store.transaction("a",()->{new AccountUploads(store).update(upload.put("nextChunk",1023));return null;});
+        var chunk=object().put("data",Base64.getEncoder().encodeToString(new byte[1024*1024]));
+        call("test-b","PUT",path+"/chunks/1023",chunk,null,null).then().statusCode(404);
+        call("test-a","PUT",path+"/chunks/1024",chunk,null,null).then().statusCode(422);
+        var written=call("test-a","PUT",path+"/chunks/1023",chunk,null,null).then().statusCode(200).extract().response();
+        assertEquals("READY",parse(written.asString()).path("state").asText());
+        assertEquals(1024,parse(written.asString()).path("nextChunk").asInt());
+        assertEquals(written.asString(),call("test-a","PUT",path+"/chunks/1023",chunk,null,null).asString());
+        call("test-a","DELETE",path,null,written.header("ETag"),null).then().statusCode(204);
+
+        var json=zip.deepCopy().put("fileName","archive.json").put("mediaType","application/json").put("bytes",268_435_457L);
+        call("test-a","POST",uploads,json,null,UUID.randomUUID().toString()).then().statusCode(422);
+        var jsonUpload=call("test-a","POST",uploads,json.put("bytes",268_435_456L),null,UUID.randomUUID().toString()).then().statusCode(201).extract().response();
+        var jsonState=parse(jsonUpload.asString());
+        assertEquals(256,jsonState.path("chunkCount").asInt());
+        String jsonPath=uploads+"/"+jsonState.path("id").asText();
+        call("test-a","PUT",jsonPath+"/chunks/256",chunk,null,null).then().statusCode(422);
+        call("test-a","DELETE",jsonPath,null,jsonUpload.header("ETag"),null).then().statusCode(204);
+    }
     @Test void privateZipDownloadAndReviewedRestoreRespectReadOnlyOwnerAndConditionalBoundaries() throws Exception {
         call("test-a","POST","/projects",object().put("name","Source project"),null,UUID.randomUUID().toString()).then().statusCode(201);
         String date="2026-08-06",journal="Private account journal\r\n  preserve this spacing  \n";

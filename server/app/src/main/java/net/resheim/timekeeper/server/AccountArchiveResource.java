@@ -56,7 +56,7 @@ public class AccountArchiveResource {
         noQueries();UUID key=ContractInputs.pathId(id);return tx(()->ApiReplies.resource(200,uploads().get(key),null));
     }
     @PUT @Path("/uploads/{id}/chunks/{index}") public Response chunk(@PathParam("id") String id,@PathParam("index") String index,JsonNode body) {
-        noQueries();UUID key=ContractInputs.pathId(id);int number=ContractInputs.number(index,-1,0,255);var value=inputs.validate("AccountArchiveChunkInput",body);
+        noQueries();UUID key=ContractInputs.pathId(id);int number=ContractInputs.number(index,-1,0,AccountUploads.MAX_CHUNK_INDEX);var value=inputs.validate("AccountArchiveChunkInput",body);
         return tx(()->ApiReplies.resource(200,uploads().chunk(key,number,value.path("data").asText()),null));
     }
     @DELETE @Path("/uploads/{id}") @Consumes("*/*") public Response remove(@PathParam("id") String id,@HeaderParam("If-Match") String match) {

@@ -317,6 +317,8 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('AccountArchiveUploadInput').is_valid({**value,'bytes':1073741825}))
         schema=CONTRACT['components']['schemas']['AccountArchiveUpload']['properties']
         self.assertEqual(1024,schema['chunkCount']['maximum']);self.assertEqual(1048576,schema['chunkBytes']['const'])
+        index=next(p['schema'] for p in CONTRACT['paths']['/data/account/uploads/{id}/chunks/{index}']['parameters'] if p.get('name')=='index')
+        self.assertEqual(schema['chunkCount']['maximum']-1,index['maximum'])
 
     def test_reminder_observation_masks_are_typed_and_ordinary_writes_stay_arrays(self):
         absolute={'id':ID,'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-29','time':'09:00','timeZone':'Europe/Oslo'}}
