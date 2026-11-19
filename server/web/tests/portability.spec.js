@@ -1,6 +1,9 @@
 import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
+import {mkdtemp,open,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {openAccountMenu} from './navigation.js';
@@ -78,6 +81,43 @@ test('portability: upload resumes the next chunk after a lost reply, reload and 
   await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByText('Upload paused. Select Review archive to resume safely.',{exact:true})).toBeVisible();expect(firstWrites).toBe(1);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();await expect(page.getByRole('button',{name:'Import reviewed records',exact:true})).toBeEnabled();expect(firstWrites).toBe(1);expect(secondWrites).toBe(1);
   await page.getByRole('button',{name:'Import reviewed records',exact:true}).click();await expect(page.getByRole('heading',{name:'Archive restored',exact:true})).toBeVisible();expect((await snapshot(page)).workSessions).toHaveLength(2);
+});
+test('portability: a ZIP above 256 MiB is fingerprinted and starts uploading while JSON is rejected',async({page,request})=>{
+  await account(page,request);
+  const directory=await mkdtemp(join(tmpdir(),'dagsverk-archive-boundary-')),chunkBytes=1024*1024,bytes=256*chunkBytes+1;
+  const select=page.getByLabel('Dagsverk archive',{exact:true}),review=page.getByRole('button',{name:'Review archive',exact:true});
+  const createRoute='**/api/v1/data/account/uploads',firstChunk='**/api/v1/data/account/uploads/*/chunks/0';
+  let creates=0;
+  try{
+    for(const name of ['archive.zip','archive.json']){
+      const file=await open(join(directory,name),'wx');
+      try{await file.truncate(bytes);}finally{await file.close();}
+    }
+    await page.route(createRoute,route=>{
+      if(route.request().method()==='POST')creates++;
+      return route.continue();
+    });
+    await select.setInputFiles(join(directory,'archive.json'));await review.click();
+    await expect(page.getByText('Choose a Dagsverk ZIP or legacy archive.json ZIP up to 1 GiB; JSON up to 256 MiB.',{exact:true})).toBeVisible();
+    expect(creates).toBe(0);
+
+    const hash=createHash('sha256'),zeros=Buffer.alloc(chunkBytes);
+    for(let index=0;index<256;index++)hash.update(zeros);
+    const sha256=hash.update(zeros.subarray(0,1)).digest('hex');
+    await page.route(firstChunk,async route=>{expect((await route.fetch()).status()).toBe(200);await route.abort('failed');});
+    await select.setInputFiles(join(directory,'archive.zip'));await review.click();
+    await expect(page.getByText('Upload paused. Select Review archive to resume safely.',{exact:true})).toBeVisible();
+    expect(creates).toBe(1);
+    const pending=await own(page,'GET','/data/account/uploads');
+    expect(pending.status()).toBe(200);
+    expect((await pending.json()).items).toMatchObject([{bytes,sha256,nextChunk:1,chunkCount:257}]);
+    await page.reload();
+    await page.getByRole('button',{name:'Discard upload',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Discard upload',exact:true})).toHaveCount(0);
+  }finally{
+    await page.unroute(createRoute);await page.unroute(firstChunk);
+    await rm(directory,{recursive:true,force:true});
+  }
 });
 test('portability: read-only sessions can download repeatedly while restore stays disabled',async({page})=>{
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');

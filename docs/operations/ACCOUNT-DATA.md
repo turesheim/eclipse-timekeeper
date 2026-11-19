@@ -128,7 +128,7 @@ work records.
 
 Restore accepts ZIP files up to 1 GiB and uncompressed JSON up to 256 MiB, up to 250,000 records
 of each work type and 1,000,000 import audit records. Oversized input is rejected
-explicitly. At most three uploads and 512 MiB of declared upload data can be
+explicitly. At most three uploads and 2 GiB of declared upload data can be
 pending for one account. Read-only sessions can download their account and cannot
 stage or restore an archive.
 

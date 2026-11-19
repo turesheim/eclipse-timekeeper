@@ -13,6 +13,7 @@ final class AccountUploads {
     static final int CHUNK_BYTES=1024*1024;
     static final long MAX_BYTES=1024L*1024*1024;
     static final long MAX_JSON_BYTES=256L*1024*1024;
+    static final int MAX_CHUNK_INDEX=(int)((MAX_BYTES-1)/CHUNK_BYTES);
     static final String UPLOAD="ARCHIVE_UPLOAD",CHUNK="ARCHIVE_CHUNK";
     private final ServerStore store;
     AccountUploads(ServerStore store) {this.store=store;}
