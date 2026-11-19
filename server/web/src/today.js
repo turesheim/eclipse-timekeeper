@@ -17,6 +17,7 @@ import {clientColors} from './calendar-model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
 import {iconButton,isProjectIcon,projectIcon} from './icons.js';
 import {TrackDayNotes} from './track-day-notes.js';
+import {TodayJournalViewport} from './today-journal-viewport.js';
 import {WeekNoteEditor,isoWeek} from './week-note-editor.js';
 import {workSummaryCard} from './work-summary-card.js';
 
@@ -27,14 +28,19 @@ const byId=id=>document.getElementById(id);
 export class TodayView {
   constructor(root,callbacks){
     this.root=root;this.callbacks=callbacks;this.dateInput=byId('today-date');this.grid=byId('today-month-grid');this.monthTitle=byId('today-month-title');this.journalRoot=byId('today-journal');
+    const phone=matchMedia('(max-width:650px)'),mainActions=byId('today-main-actions'),dayLabel=byId('today-day-label'),calendar=dayLabel.parentElement;
     this.sidebar=root.querySelector('.today-sidebar');this.sidebar.id='today-sidebar';
     this.sidebarResize=new SidebarResize(root,this.sidebar,{variable:'--today-sidebar-width',label:t('today.resize_sidebar'),width:196,changed:()=>this.sizeEditor(),focusFallback:()=>this.dateInput,className:'today-resize'}).element;
     this.sidebar.after(this.sidebarResize);
-    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions:byId('today-main-actions'),inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
+    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions,compactTools:phone,inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:dayLabel});
+    this.journalViewport=new TodayJournalViewport(root,phone,this.journal.markdown,()=>this.visible);
     this.contents=new NoteContents(byId('today-outline'),this.journal.markdown);
     this.contentsResize=new SidebarResize(root,byId('today-contents'),{side:'right',variable:'--today-contents-width',label:t('today.resize_contents'),changed:()=>this.sizeEditor(),focusFallback:()=>byId('today-main-actions-toggle-right-sidebar'),className:'today-contents-resize'}).element;
     byId('today-contents').before(this.contentsResize);
-    this.sidebarActions=new SidebarActions(byId('today-main-actions'),root.querySelector('.today-layout'),{left:{panel:this.sidebar,separator:this.sidebarResize},right:{panel:byId('today-contents'),separator:this.contentsResize,collapseOnNarrow:true}},()=>this.sizeEditor());
+    this.sidebarActions=new SidebarActions(mainActions,root.querySelector('.today-layout'),{
+      left:{panel:this.sidebar,separator:this.sidebarResize,expandedInFixedLayout:true},
+      right:{panel:byId('today-contents'),separator:this.contentsResize,collapseOnNarrow:true}
+    },()=>this.sizeEditor(),{fixedLayout:phone,focusFallback:()=>this.dateInput});
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
@@ -48,6 +54,14 @@ export class TodayView {
     this.picker.addEventListener('close',()=>{const origin=this.pickerOrigin;this.pickerOrigin=null;this.picking=null;this.choices.replaceChildren();if(origin&&this.visible&&!document.querySelector('#editor[open]'))root.querySelector(`[data-today-client="${origin}"]`)?.focus();});
     this.dateInput.addEventListener('change',()=>this.select(this.dateInput.value));
     dateNavigation(root.querySelector('.today-date-navigation'),{input:this.dateInput,choose:byId('today-date-choose'),previous:byId('today-previous'),current:byId('today-current'),next:byId('today-next'),previousLabel:t('today.previous_day'),currentLabel:t('ui.today'),nextLabel:t('today.next_day')});
+    const applyPhoneLayout=()=>{
+      this.dateInput.labels[0].classList.toggle('visually-hidden',!phone.matches);
+      if(phone.matches)mainActions.before(dayLabel);
+      else calendar.append(dayLabel);
+      this.sizeEditor();
+    };
+    phone.addEventListener('change',applyPhoneLayout);
+    applyPhoneLayout();
     for(const [id,days] of [['today-previous',-1],['today-next',1]])byId(id).addEventListener('click',()=>this.select(addDays(this.date,days)));
     byId('today-current').addEventListener('click',()=>this.select(dateInZone(Date.now(),this.data.profile.data.zoneId)));
     for(const [id,months] of [['today-month-previous',-1],['today-month-next',1]]){
@@ -61,10 +75,10 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.journalViewport.reset();this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){if(this.connected&&this.journal.editor?.date===this.date)void this.journal.refreshClean();this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
-  hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
+  hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;this.journalViewport.reset();++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
   setConnected(value){this.connected=value;const writable=this.callbacks.canWrite();this.journal.setWritable(value&&writable,writable);}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;if(visible)this.contents.show();}

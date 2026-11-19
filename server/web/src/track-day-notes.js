@@ -8,6 +8,7 @@ import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {icon,iconButton} from './icons.js';
 import {MarkdownField} from './markdown-field.js';
+import {buildCompactActions} from './markdown-actions.js';
 import {guardDayNoteNavigation,dayNoteNavigation} from './journal-links.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -53,6 +54,7 @@ export class TrackDayNotes {
       this.delete.classList.replace('btn-outline-secondary','btn-outline-danger');field.client.group.className='today-client-action';
       const deleteGroup=this.delete.parentElement;
       this.mainActions.append(field.historyButton,field.client.group,this.delete);deleteGroup.remove();field.syncActions();
+      if(this.compactTools)buildCompactActions(field,this.compactTools,this.mainActions);
     }
     if(!this.inline)this.buildMenu();
   }

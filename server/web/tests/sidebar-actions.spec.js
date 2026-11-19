@@ -38,13 +38,24 @@ for(const locale of ['en-GB','nb-NO'])test(`Main actions independently toggle To
     const left=page.locator('#today-sidebar'),right=page.locator('#today-contents'),resize=page.locator('.today-resize'),editor=page.locator('#today-note-editor'),source=page.locator('#today-journal-body');
     const toggles={left:page.locator('#today-main-actions-toggle-left-sidebar'),right:page.locator('#today-main-actions-toggle-right-sidebar')};
     await expect(toggles.left).toHaveAttribute('aria-controls','today-sidebar');await expect(toggles.right).toHaveAttribute('aria-controls','today-contents');
-    const set=async(side,expanded)=>{if(await toggles[side].getAttribute('aria-expanded')!==String(expanded))await toggles[side].click();};
+    const resizeTo=async width=>{
+      await page.setViewportSize({width,height:1000});
+      // Desktop, tablet and phone restore different sidebar states on media change.
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    };
+    const set=async(side,expanded)=>{
+      const toggle=toggles[side];
+      await expect(toggle).toBeVisible();
+      if(await toggle.getAttribute('aria-expanded')!==String(expanded))await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded',String(expanded));
+    };
     await resize.focus();await resize.press('End');const leftWidth=(await left.boundingBox()).width;
+    await expect(editor.locator('.markdown-banner img')).toHaveAttribute('src',/^blob:/);
     const saved=await api(request,'GET',path);
     for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
-      for(const width of [1440,390,320]){
-        await page.setViewportSize({width,height:1000});await set('left',true);await set('right',true);
+      for(const width of [1440,768]){
+        await resizeTo(width);await set('left',true);await set('right',true);
         const initialWidth=(await page.locator('.today-main').boundingBox()).width;
         for(const [showLeft,showRight] of [[true,true],[false,true],[true,false],[false,false]]){
           await set('left',showLeft);await set('right',showRight);
@@ -63,13 +74,22 @@ for(const locale of ['en-GB','nb-NO'])test(`Main actions independently toggle To
         expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
         await captureScreenshot(page,{path:`test-results/sidebar-controls-${locale}-${theme}-${width}.png`});
       }
+      for(const width of [390,320]){
+        await resizeTo(width);
+        await expect(toggles.left).toBeHidden();await expect(toggles.right).toBeHidden();
+        await expect(left).toBeVisible();await expect(right).toBeHidden();await expect(resize).toBeHidden();
+        await expect(editor).toBeVisible();
+        expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+        await captureScreenshot(page,{path:`test-results/sidebar-controls-${locale}-${theme}-${width}.png`});
+      }
     }
+    await resizeTo(768);
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     await editor.getByRole('button',{name:locale==='nb-NO'?'Markdown-kilde':'Markdown source',exact:true}).click();const draft=(await source.inputValue())+'\nDraft survives sidebar changes.\n';await source.fill(draft);
     await set('left',true);await set('left',false);await set('right',true);await set('right',false);await expect(source).toHaveValue(draft);
     await toggles.left.focus();await toggles.left.press('ControlOrMeta+s');await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toBe(draft);
     await navigateView(page,'track');await navigateView(page,'today');await expect(toggles.left).toHaveAttribute('aria-expanded','false');await expect(toggles.right).toHaveAttribute('aria-expanded','false');await expect(source).toHaveValue(draft);
-    await page.setViewportSize({width:1440,height:1000});await expect(toggles.left).toHaveAttribute('aria-expanded','false');await expect(toggles.right).toHaveAttribute('aria-expanded','false');
+    await resizeTo(1440);await expect(toggles.left).toHaveAttribute('aria-expanded','false');await expect(toggles.right).toHaveAttribute('aria-expanded','false');
     await set('left',true);expect((await left.boundingBox()).width).toBeCloseTo(leftWidth,0);
     await set('right',true);await expect(right.locator('ol button').first()).toHaveText('Sidebar heading');
     await toggles.left.focus();await toggles.left.press('Space');await expect(left).toBeHidden();await expect(toggles.left).toBeFocused();await toggles.left.press('Enter');await expect(left).toBeVisible();

@@ -9,9 +9,18 @@ export function buildActionsMenu(field){
   trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-controls',menu.id);
   f.actionsTrigger=trigger;f.actionsMenu=menu;f.toolbar.append(trigger);f.root.append(menu);
   const choices=()=>[...menu.querySelectorAll('button')].filter(button=>!button.disabled&&!button.closest('[hidden]'));
-  const position=()=>{if(!menu.matches(':popover-open'))return;const rect=trigger.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(rect.right-menu.offsetWidth,innerWidth-menu.offsetWidth-8))+'px';menu.style.top=Math.max(8,Math.min(rect.bottom+4+menu.offsetHeight<=innerHeight-8?rect.bottom+4:rect.top-menu.offsetHeight-4,innerHeight-menu.offsetHeight-8))+'px';};
+  const position=()=>{
+    if(!menu.matches(':popover-open'))return;
+    const viewport=f.compactTools?.matches?window.visualViewport:null;
+    const left=viewport?.offsetLeft??0,top=viewport?.offsetTop??0,right=left+(viewport?.width??innerWidth),bottom=top+(viewport?.height??innerHeight);
+    menu.style.maxHeight=viewport?`min(30rem, ${Math.max(0,viewport.height-16)}px)`:'';
+    const rect=trigger.getBoundingClientRect(),height=menu.offsetHeight;
+    menu.style.left=Math.max(left+8,Math.min(rect.right-menu.offsetWidth,right-menu.offsetWidth-8))+'px';
+    menu.style.top=Math.max(top+8,Math.min(rect.bottom+4+height<=bottom-8?rect.bottom+4:rect.top-height-4,bottom-height-8))+'px';
+  };
   f.closeActions=()=>{if(menu.matches(':popover-open'))menu.hidePopover();};
   f.syncActions=()=>{
+    f.syncCompactActions?.();
     for(const button of menu.querySelectorAll('button'))if(!bound.has(button)){
       bound.add(button);const label=button.getAttribute('aria-label')||button.title;
       if(label){const text=document.createElement('span');text.textContent=label;button.append(text);}
@@ -24,14 +33,60 @@ export function buildActionsMenu(field){
     trigger.disabled=f.loading||!choices().length;if(trigger.disabled)f.closeActions();
   };
   f.addActionsGroup=group=>{group.className='markdown-actions-group';menu.append(group);f.syncActions();};
-  const open=(last=false)=>{f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
+  const open=(last=false)=>{f.prepareCompactActions?.();f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
   trigger.addEventListener('mousedown',event=>event.preventDefault());trigger.addEventListener('click',()=>menu.matches(':popover-open')?f.closeActions():open());
+  trigger.addEventListener('pointerdown',()=>{if(f.compactTools?.matches)f.editor?.syncSelection();});
   trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
-  menu.addEventListener('beforetoggle',event=>{const opened=event.newState==='open';trigger.setAttribute('aria-expanded',String(opened));for(const [target,type,options]of [[window,'resize',false],[document,'scroll',true]])target[opened?'addEventListener':'removeEventListener'](type,position,options);});
+  menu.addEventListener('beforetoggle',event=>{
+    const opened=event.newState==='open',listen=opened?'addEventListener':'removeEventListener';
+    trigger.setAttribute('aria-expanded',String(opened));
+    window[listen]('resize',position);document[listen]('scroll',position,true);
+    if(f.compactTools){window.visualViewport?.[listen]('resize',position);window.visualViewport?.[listen]('scroll',position);}
+  });
   menu.addEventListener('keydown',event=>{
     const items=choices(),index=items.indexOf(document.activeElement);
     if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();items[event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();}
     else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();f.closeActions();trigger.focus();}
     else if(event.key==='Tab'){f.closeActions();trigger.focus();}
   });
+}
+
+/** Move the existing note menu into Today’s phone header and add basic editing choices. */
+export function buildCompactActions(f,media,host){
+  f.compactTools=media;
+  const group=document.createElement('div');group.className='markdown-actions-group';
+  const choice=(key,glyph,run)=>{
+    const button=document.createElement('button');button.type='button';iconButton(button,glyph,t('markdown.'+key));
+    button.addEventListener('click',run);group.append(button);return button;
+  };
+  const marks=[
+    choice('bold','type-bold',()=>f.editor?.command('bold')),
+    choice('italic','type-italic',()=>f.editor?.command('italic'))
+  ];
+  const source=choice('source','markdown',()=>void f.showSource());
+  const formatted=choice('formatted','file-richtext',()=>void f.showFormatted());
+  f.actionsMenu.prepend(group);
+  let fragmentFocus=false;
+  f.prepareCompactActions=()=>{
+    if(media.matches){
+      fragmentFocus=!!document.activeElement?.closest('.markdown-source-fragment');
+      f.editor?.syncSelection();
+    }
+  };
+  f.syncCompactActions=()=>{
+    group.hidden=!media.matches;
+    const rich=!!f.editor;
+    for(const mark of marks)mark.hidden=!rich||f.readOnly||f.bannerBusy||fragmentFocus;
+    source.hidden=!rich;formatted.hidden=rich;
+  };
+  const apply=()=>{
+    const {actionsTrigger:trigger,actionsMenu:menu,toolbar}=f;
+    const focused=trigger===document.activeElement||menu.contains(document.activeElement);
+    f.closeActions();f.closeBlockMenu();f.closeListMenu();
+    toolbar.hidden=media.matches;
+    (media.matches?host:toolbar).append(trigger);
+    f.syncActions();
+    if(focused)trigger.focus({preventScroll:true});
+  };
+  media.addEventListener('change',apply);apply();
 }

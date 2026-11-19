@@ -42,7 +42,8 @@ test('Notes right sidebar keeps Recent notes below the contents and restores its
 test('Today and Notes stack Recent notes below the outline with one scrollbar per right sidebar',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'UTC'},{'If-Match':profile.headers().etag});
-  const text=Array.from({length:12},(_,index)=>'#'.repeat(2+index%4)+' '+(index<2?'Section '+index:'A long heading that wraps across lines in a narrow sidebar: section '+index)+'\n\nText.\n').join('\n'),date=new Date().toISOString().slice(0,10),daily=await api('GET','/day-notes/'+date+'/content');
+  const longHeading='A long heading that wraps across lines in both the desktop sidebar and the wider tablet outline when recent notes share the same panel';
+  const text=Array.from({length:12},(_,index)=>'#'.repeat(2+index%4)+' '+(index<2?'Section ':longHeading+': section ')+index+'\n\nText.\n').join('\n'),date=new Date().toISOString().slice(0,10),daily=await api('GET','/day-notes/'+date+'/content');
   await api('PUT','/day-notes/'+date+'/content',{body:text},{'If-Match':daily.headers().etag});
   for(let index=0;index<23;index++)await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Sidebar'+String(index).padStart(2,'0')+'.md'}),Buffer.from(index===0?text:'# Sidebar note '+index+'\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.reload();await expect(page.locator('#today-note-editor .markdown-banner img')).toHaveAttribute('src',/^blob:/);await expect(page.locator('#status')).toHaveText('Up to date');await expect(page.locator('#today-recent-notes')).toHaveAttribute('aria-busy','false');await page.locator('[data-tab=notes]').click();const recent=page.locator('#notes-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
@@ -52,8 +53,9 @@ test('Today and Notes stack Recent notes below the outline with one scrollbar pe
     await page.setViewportSize({width:1280,height:844});await page.locator('[data-tab='+view+']').click();const right=page.locator('#'+view+'-contents'),list=page.locator('#'+view+'-recent-notes'),outline=page.locator('#'+view+'-outline'),toggle=page.locator('#'+view+'-main-actions-toggle-right-sidebar');
     await expect(list.locator('[data-recent-note]')).toHaveCount(23);await expect(outline.locator('ol button')).toHaveCount(12);expect(requests).toEqual([]);
     await expect(page.locator(view==='today'?'.today-sidebar .recent-notes':'#notes-sidebar .recent-notes')).toHaveCount(0);
-    for(const width of [1280,390,320]){
-      await page.setViewportSize({width,height:844});if(width===390)await expect(toggle).toHaveAttribute('aria-expanded','false');if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
+    const narrowWidths=view==='today'?[768]:[390,320];
+    for(const width of [1280,...narrowWidths]){
+      await page.setViewportSize({width,height:844});if(width===narrowWidths[0])await expect(toggle).toHaveAttribute('aria-expanded','false');if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
       for(const theme of ['timekeeper','timekeeper-dark']){
         await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
         await expect(right).toBeVisible();const rows=await outline.locator('ol button').evaluateAll(buttons=>buttons.map(button=>{const {top,bottom,height}=button.getBoundingClientRect();return {top,bottom,height,clipped:button.scrollWidth>button.clientWidth+1};}));expect(rows[0].height).toBeGreaterThanOrEqual(24);expect(rows[1].top-rows[0].top).toBeLessThanOrEqual(24.1);expect(rows.some(row=>row.height>24)).toBe(true);for(const [index,row]of rows.entries()){expect(row.clipped).toBe(false);if(index)expect(Math.abs(row.top-rows[index-1].bottom)).toBeLessThanOrEqual(.1);}await expect.poll(()=>right.evaluate(root=>[root,...root.querySelectorAll('*')].filter(node=>node.clientHeight>0&&node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).map(node=>node.id))).toEqual([view+'-contents']);
@@ -123,8 +125,8 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
       await expect(page.locator('#today-note-editor .markdown-banner img')).toHaveAttribute('src',/^blob:/);await expect(recent).toHaveAttribute('aria-busy','false');
     }else await expect(page.locator('#notes-document-title')).toHaveText(title);await page.locator('[data-tab=today]').click();
   }
-  for(const [width,height] of [[1440,1000],[320,900]]){
-    await page.setViewportSize({width,height});const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');if(width===320)await expect(sidebar).toHaveAttribute('aria-expanded','false');if(await sidebar.getAttribute('aria-expanded')==='false')await sidebar.click();await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
+  for(const [width,height] of [[1440,1000],[768,900]]){
+    await page.setViewportSize({width,height});const sidebar=page.locator('#today-main-actions-toggle-right-sidebar');if(width===768)await expect(sidebar).toHaveAttribute('aria-expanded','false');if(await sidebar.getAttribute('aria-expanded')==='false')await sidebar.click();await page.evaluate(()=>document.fonts.load('1em bootstrap-icons'));
     for(const theme of ['timekeeper','timekeeper-dark']){
       await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=(theme==='timekeeper')?'light':'dark';},theme);
       for(const [entry] of cases){

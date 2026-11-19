@@ -305,7 +305,7 @@ export class MarkdownField {
     const host=node('div');host.inert=true;this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
-      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,expandSnippet:snippetAt,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},escape:()=>this.source.focus()});
+      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),resources:this.resources,uploadFiles:(files,target)=>void this.uploadFiles(files,target),readOnly:this.readOnly,expandSnippet:snippetAt,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();this.updateExperience();},nativeFormatting:()=>this.compactTools?.matches,escape:()=>(this.compactTools?.matches?this.actionsTrigger:this.source).focus()});
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;host.inert=false;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}

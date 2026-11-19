@@ -45,6 +45,8 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     const contents=page.locator('#today-contents'),choices=contents.locator('ol button'),field=page.locator('#today-note-editor');
     await expect(contents.getByRole('heading',{name:locale==='nb-NO'?'Innholdsfortegnelse':'Table of contents',exact:true})).toBeVisible();
     await expect(choices).toHaveText(['Plan','Next steps','Decisions','Next steps']);
+    // Wait for the automatic banner write before measuring whether outline navigation changes the note.
+    await expect(field.locator('.markdown-banner img')).toHaveAttribute('src',/^blob:/);
     const saved=await api(request,'GET',path);
     await choices.last().click();
     await expect(field.locator('.ProseMirror h2').last()).toBeInViewport();
@@ -67,17 +69,20 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     await field.getByRole('button',{name:locale==='nb-NO'?'Formatert':'Formatted',exact:true}).click();await choices.first().click();await expect(field.locator('.ProseMirror h1').first()).toBeInViewport();
     for(const theme of ['timekeeper','timekeeper-dark']){
       await setTheme(page,theme);
-      for(const width of [1440,390,320]){
+      for(const width of [1440,768,390,320]){
         await page.setViewportSize({width,height:1000});
         if(width===1440){
           await expect(page.locator('.today-sidebar')).toBeVisible();await expect(contents).toBeVisible();
           const left=await page.locator('.today-sidebar').boundingBox(),main=await page.locator('.today-main').boundingBox(),right=await contents.boundingBox(),toolbar=await page.locator('.today-toolbar').boundingBox();
           expect(left.x+left.width).toBeLessThan(main.x);expect(right.x).toBeGreaterThanOrEqual(main.x+main.width);expect(Math.abs(left.y-main.y)).toBeLessThan(1);expect(Math.abs(right.y-toolbar.y)).toBeLessThan(1);
-        }else{
+        }else if(width===768){
           const toggle=page.locator('#today-main-actions-toggle-right-sidebar');await expect(toggle).toHaveAttribute('aria-expanded','false');
           await toggle.click();await expect(choices.last()).toBeVisible();
           await expect.poll(async()=>{const editor=await field.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();return editor.y+editor.height<=nav.y+1;}).toBe(true);
           await toggle.click();
+        }else{
+          await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toBeHidden();
+          await expect(contents).toBeHidden();
         }
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
         expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);

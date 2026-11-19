@@ -155,7 +155,9 @@ test('Notes account imports a vault with review, guarded conflicts and exact fil
     await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#notes-panel')).toBeVisible();await expect(page.locator('#notes-document-title')).toBeVisible();
     await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const editor=page.locator('#today-note-editor');
     await expect(editor.locator('.markdown-banner')).toBeVisible();await expect(editor.locator('.markdown-banner img')).toHaveCSS('object-position','25% 75%');await expect(editor.locator('.ProseMirror h1')).toHaveText('Imported æ');
-    await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');await saveMarkdown(editor);
+    await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');
+    await editor.locator('.ProseMirror').press('ControlOrMeta+s');
+    await expect(editor.locator('.dialog-actions > [role=status]')).toHaveText('Saved');
     const imported=await(await api('GET','/notes/resolve?'+new URLSearchParams({path:'journal/'+day+'.md'}))).json();
     expect(Buffer.from(await(await api('GET','/notes/entries/'+imported.id+'/content')).body())).toEqual(Buffer.from(body.replace('# Imported æ','# Imported æ Reviewed.')));
   }finally{await rm(root,{recursive:true,force:true});}

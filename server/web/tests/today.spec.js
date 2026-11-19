@@ -35,7 +35,12 @@ test('Today sidebars resize with pointer and keyboard while preserving the journ
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/today-sidebar-wide.png'});
     await right.focus();await page.setViewportSize({width:1000,height:844});await expect(right).toBeHidden();await expect(rightToggle).toBeFocused();await page.setViewportSize({width:1440,height:1000});await expect(right).toBeVisible();
     await resize.focus();await page.setViewportSize({width:1000,height:844});await expect(resize).toBeHidden();await expect(page.locator('#today-date')).toBeFocused();
-    await page.setViewportSize({width:390,height:844});await expect(resize).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(body).toHaveValue(draft);await captureScreenshot(page,{path:'test-results/today-sidebar-mobile.png',fullPage:true});
+    const leftToggle=page.locator('#today-main-actions-toggle-left-sidebar');
+    await leftToggle.click();await expect(sidebar).toBeHidden();await leftToggle.focus();
+    await page.setViewportSize({width:390,height:844});
+    await expect(resize).toBeHidden();await expect(leftToggle).toBeHidden();await expect(page.locator('#today-date')).toBeFocused();
+    await expect(sidebar).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(body).toHaveValue(draft);await captureScreenshot(page,{path:'test-results/today-sidebar-mobile.png',fullPage:true});
+    await page.setViewportSize({width:1000,height:844});await expect(leftToggle).toBeVisible();await expect(sidebar).toBeHidden();
     await page.setViewportSize({width:1440,height:1000});await expect(resize).toBeVisible();await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(480,0);
     await page.locator('[data-tab=calendar]').click();await page.locator('[data-tab=today]').click();await expect(resize).toHaveAttribute('aria-valuenow','480');await expect(body).toHaveValue(draft);
   }finally{const current=await api(request,'GET','/day-notes/'+date+'/content');await api(request,'PUT','/day-notes/'+date+'/content',{body:original},{'If-Match':current.headers().etag});}
@@ -132,8 +137,9 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
       const calendarStyle=await cardStyle(calendarCard);expect(sessionStyle).toEqual(calendarStyle);expect(eventStyle).toEqual(calendarStyle);
       await page.locator('[data-tab=today]').click();await expect(page.locator('#today-date')).toHaveValue(date);
     }
-    for(const width of [1440,768,390]){
+    for(const width of [1440,768]){
       await page.setViewportSize({width,height:1200});
+      await expect(page.locator('.today-calendar #today-day-label')).toBeVisible();
       const position=await page.locator('.today-calendar').evaluate(root=>{const calendar=root.querySelector('.today-month').getBoundingClientRect(),label=root.querySelector('#today-day-label').getBoundingClientRect();return {gap:label.top-calendar.bottom,offset:label.left-calendar.left};});
       expect(position.gap).toBeGreaterThan(0);expect(Math.abs(position.offset)).toBeLessThan(1);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -189,6 +195,16 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size',await resolvedLength(page,'--font-calendar-card-mobile'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
+    const datePicker=page.getByLabel('Date',{exact:true});
+    await datePicker.fill(next);
+    await expect(page.locator('#today-title')).toContainText('Sunday');
+    await expect(page.locator('#today-note-text')).toHaveValue('');
+    await expect(page.locator('#today-sessions')).toContainText('No work sessions');
+    await expect(page.locator('#today-events')).toContainText('No calendar events');
+    await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
+    await datePicker.fill(date);
+    await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
+    await page.setViewportSize({width:1440,height:1200});
     await page.locator('#today-month-grid [data-week="2025-W20"]').click();
     await expect(weekly).toContainText('Saved');
     page.once('dialog',dialog=>dialog.accept());await clickNoteAction(page,weekly,'Delete note');
@@ -207,6 +223,150 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
   }
 });
 
+test('Today phone journal applies native and menu formatting and reopens in rich text',async({browser,request})=>{
+  const date='2025-04-14',path='/day-notes/'+date+'/content',original=await api(request,'GET',path);
+  const originalBody=(await original.json()).body;
+  await api(request,'PUT',path,{body:'Alpha Beta Gamma\n'},{'If-Match':original.headers().etag});
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,viewport:{width:440,height:956},isMobile:true,hasTouch:true});
+  try{
+    const page=await context.newPage();
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
+    await expect(page.locator('#status')).toHaveText('Up to date');
+    const datePicker=page.getByLabel('Date',{exact:true});
+    await datePicker.fill(date);
+    const journal=page.locator('#today-note-editor'),rich=journal.locator('.ProseMirror'),paragraph=rich.locator('p');
+    const trigger=page.locator('#today-main-actions').getByRole('button',{name:'Note tools',exact:true});
+    await expect(paragraph).toHaveText('Alpha Beta Gamma');await expect(rich).toBeEditable();
+    await expect(journal.getByRole('toolbar',{name:'Formatting',exact:true})).toBeHidden();
+    await expect(journal.locator('#today-journal-body')).toBeHidden();
+    // Let automatic banner metadata settle before making the first edit.
+    await expect(journal.locator('.markdown-banner img')).toHaveAttribute('src',/^blob:/);
+    const select=(word,inputType)=>paragraph.evaluate((node,{word,inputType})=>{
+      const editor=node.closest('.ProseMirror');editor.focus();
+      const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let leaf;
+      while((leaf=walker.nextNode())&&!leaf.textContent.includes(word)){}
+      if(!leaf)throw new Error('Text to format was missing');
+      const start=leaf.textContent.indexOf(word);
+      getSelection().setBaseAndExtent(leaf,start,leaf,start+word.length);
+      if(inputType)return editor.dispatchEvent(new InputEvent('beforeinput',{inputType,bubbles:true,cancelable:true}));
+      return true;
+    },{word,inputType});
+    expect(await select('Alpha','formatBold')).toBe(false);
+    expect(await select('Beta','formatItalic')).toBe(false);
+    await expect(rich.locator('strong')).toHaveText('Alpha');await expect(rich.locator('em')).toHaveText('Beta');
+    expect(await select('Alpha','formatBold')).toBe(false);
+    await expect(rich.locator('strong')).toHaveCount(0);
+    await select('Alpha');
+    await trigger.tap();await expect(journal.getByRole('menuitem',{name:'Bold',exact:true})).toBeFocused();
+    await journal.getByRole('menuitem',{name:'Bold',exact:true}).tap();
+    await expect(rich.locator('strong')).toHaveText('Alpha');
+    await select('Gamma');
+    await trigger.tap();await journal.getByRole('menuitem',{name:'Italic',exact:true}).tap();
+    await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
+    await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toMatch(/\*\*Alpha\*\* [*_]Beta[*_] [*_]Gamma[*_]/);
+    await page.evaluate(()=>{document.documentElement.dataset.theme='timekeeper-dark';document.documentElement.dataset.bsTheme='dark';});
+    await trigger.tap();
+    await captureScreenshot(page,{path:'test-results/today-phone-note-tools.png'});
+    await journal.getByRole('menuitem',{name:'Markdown source',exact:true}).tap();
+    await expect(journal.locator('#today-journal-body')).toHaveValue(/\*\*Alpha\*\*/);
+    await datePicker.fill('2025-04-15');await expect(rich).toBeEditable();await expect(rich).not.toContainText('Alpha');
+    await datePicker.fill(date);await expect(rich.locator('strong')).toHaveText('Alpha');await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
+  }finally{
+    await context.close();
+    const current=await api(request,'GET',path);await api(request,'PUT',path,{body:originalBody},{'If-Match':current.headers().etag});
+  }
+});
+
+test('Today phone journal keeps source accessible when the rich editor fails to load',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const editorModule='**/assets/milkdown/milkdown.js*';
+  await page.route(editorModule,route=>route.abort('failed'));
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+  const journal=page.locator('#today-note-editor'),source=journal.locator('#today-journal-body');
+  await expect(journal.getByRole('toolbar',{name:'Formatting',exact:true})).toBeHidden();
+  await expect(journal.locator('.markdown-editor > [role=status]')).toContainText(/could not|failed/i);
+  await expect(source).toBeEditable();
+  await page.unroute(editorModule);
+  const trigger=page.locator('#today-main-actions').getByRole('button',{name:'Note tools',exact:true});
+  await trigger.press('ArrowDown');
+  await expect(journal.getByRole('menuitem',{name:'Bold',exact:true})).toBeHidden();
+  await journal.getByRole('menuitem',{name:'Formatted',exact:true}).press('Enter');
+  await expect(journal.locator('.ProseMirror')).toBeEditable();
+  await expect(source).toBeHidden();
+});
+
+test('Today phone keeps the journal caret and actions above a keyboard-sized viewport',async({page,request})=>{
+  const date='2025-04-16',path='/day-notes/'+date+'/content',original=await api(request,'GET',path);
+  const originalBody=(await original.json()).body;
+  const body=Array.from({length:100},(_,i)=>`Paragraph ${i+1}: a long daily journal.`).join('\n\n')+'\n';
+  await api(request,'PUT',path,{body},{'If-Match':original.headers().etag});
+  try{
+    await page.setViewportSize({width:390,height:844});
+    // Desktop browser engines do not display the iPhone keyboard. Drive the
+    // visual viewport separately from the layout viewport, as it moves on iOS.
+    await page.addInitScript(()=>{
+      const actual=window.visualViewport,viewport=new EventTarget();
+      for(const property of ['width','height','scale','offsetTop','offsetLeft']){
+        Object.defineProperty(viewport,property,{get:()=>values[property]??actual[property]});
+      }
+      let values={};
+      window.setTestViewport=(next,event='resize')=>{values=next;viewport.dispatchEvent(new Event(event));};
+      Object.defineProperty(window,'visualViewport',{value:viewport});
+    });
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
+    await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByLabel('Date',{exact:true}).fill(date);
+    const journal=page.locator('#today-note-editor'),rich=journal.locator('.ProseMirror');
+    const navigation=page.locator('#workspace-navigation'),lastSummary=page.locator('#today-planned-tasks').locator('..');
+    await expect(rich.locator('p').last()).toHaveText('Paragraph 100: a long daily journal.');
+    await expect(journal.locator('.markdown-banner img')).toHaveAttribute('src',/^blob:/);
+    await page.evaluate(()=>document.documentElement.style.setProperty('--workspace-nav-bottom-inset','34px'));
+    await rich.evaluate(editor=>{
+      editor.focus();
+      const text=editor.querySelector('p:last-of-type').lastChild,range=document.createRange();
+      range.setStart(text,text.length);range.collapse(true);
+      const selection=getSelection();selection.removeAllRanges();selection.addRange(range);
+      editor.scrollTop=editor.scrollHeight;
+      window.scrollTo(0,0);
+    });
+    const caretVisible=()=>rich.evaluate(editor=>{
+      const selection=getSelection(),caret=selection.getRangeAt(0).getBoundingClientRect(),box=editor.getBoundingClientRect(),viewport=visualViewport;
+      const dock=document.querySelector('#workspace-navigation'),dockTop=getComputedStyle(dock).visibility==='hidden'?Infinity:dock.getBoundingClientRect().top;
+      return selection.isCollapsed&&caret.height>0&&caret.top>=Math.max(box.top,viewport.offsetTop)&&caret.bottom<=Math.min(box.bottom,viewport.offsetTop+viewport.height,dockTop);
+    });
+    // A zoomed viewport alone should leave the dock available.
+    await page.evaluate(async()=>{
+      window.setTestViewport({height:422,scale:2});
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    });
+    await expect(navigation).toBeVisible();
+    await page.evaluate(()=>window.setTestViewport({height:390,offsetTop:24}));
+    await expect(navigation).toBeHidden();
+    await expect.poll(caretVisible).toBe(true);
+    await expect(rich).toBeFocused();
+    await page.evaluate(()=>window.setTestViewport({height:390,offsetTop:96},'scroll'));
+    await expect.poll(caretVisible).toBe(true);
+    await page.keyboard.insertText(' Still visible.');
+    await expect(rich.locator('p').last()).toHaveText('Paragraph 100: a long daily journal. Still visible.');
+    await expect.poll(caretVisible).toBe(true);
+    await captureScreenshot(page,{path:'test-results/today-keyboard-viewport.png'});
+    // While the layout viewport stays tall, the bottom of Today must still scroll
+    // above the obscured area.
+    await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+    await expect.poll(()=>lastSummary.evaluate(node=>node.getBoundingClientRect().bottom<=visualViewport.offsetTop+visualViewport.height)).toBe(true);
+    await page.evaluate(()=>window.setTestViewport({}));
+    await expect(navigation).toBeVisible();
+    await expect.poll(caretVisible).toBe(true);
+    await expect.poll(()=>navigation.evaluate(dock=>[...dock.querySelectorAll('button')].every(button=>button.getBoundingClientRect().bottom<=dock.getBoundingClientRect().bottom-34))).toBe(true);
+    await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+    await expect.poll(()=>lastSummary.evaluate(node=>node.getBoundingClientRect().bottom<=document.querySelector('#workspace-navigation').getBoundingClientRect().top)).toBe(true);
+    await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toContain('Still visible.');
+  }finally{
+    const current=await api(request,'GET',path);await api(request,'PUT',path,{body:originalBody},{'If-Match':current.headers().etag});
+  }
+});
+
 test('Today editor stays above navigation with long Markdown in either mode',async({page,request})=>{
   const date='2025-04-13',body=Array.from({length:100},(_,i)=>`Paragraph ${i}: long journal content.`).join('\n\n');
   const existing=await api(request,'GET','/day-notes/'+date);
@@ -217,9 +377,12 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
     for(const [width,height] of [[1440,1000],[1440,720],[390,844]]) {
       await page.setViewportSize({width,height});await page.evaluate(()=>window.scrollTo(0,0));
       if(width===1440)await expect.poll(()=>page.evaluate(()=>Math.max(0,document.documentElement.scrollHeight-innerHeight)),{message:'Today fits after the viewport resize is laid out'}).toBeLessThanOrEqual(1);
+      const editor=page.locator('#today-note-editor');
       for(const mode of ['Formatted','Markdown source']) {
-        await page.locator('#today-note-editor').getByRole('button',{name:mode,exact:true}).click();
-        const editor=page.locator('#today-note-editor');
+        if(width===390){
+          await page.locator('#today-main-actions').getByRole('button',{name:'Note tools',exact:true}).click();
+          await editor.getByRole('menuitem',{name:mode,exact:true}).click();
+        }else await editor.getByRole('button',{name:mode,exact:true}).click();
         await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-(a.y+a.height)-gap);}).toBeLessThan(2);
         const content=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');
         await expect(content).toBeVisible();expect(await content.evaluate(value=>value.scrollHeight>value.clientHeight)).toBe(true);
@@ -262,10 +425,20 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
       expect(geometry.overflow,`${locale}: viewport ${width}px, base font ${font}px, heading ${heading||'default'}, brand ${brand||'default'}`).toBe(false);
       if(width>650){
         expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.actionsLeft)/2)).toBeLessThan(2);
-        expect(Math.abs(geometry.titleCenterY-geometry.controlsCenter)).toBeLessThan(2);
+        if(width>767)expect(Math.abs(geometry.titleCenterY-geometry.controlsCenter)).toBeLessThan(2);
+        else expect(Math.abs(geometry.titleTop-geometry.controlsTop)).toBeLessThan(2);
       }else{
         expect(geometry.titleBottom).toBeLessThanOrEqual(geometry.controlsTop+1);
         expect(Math.abs(geometry.titleCenterX-(geometry.mainLeft+geometry.mainRight)/2)).toBeLessThan(2);
+        await expect(navigator).toBeHidden();
+        await expect(page.locator('#today-date')).toHaveAttribute('type','date');
+        await expect(page.locator('label[for="today-date"]')).not.toHaveClass(/visually-hidden/);
+        expect((await page.locator('#today-date').boundingBox()).height).toBeGreaterThanOrEqual(44);
+        for(const selector of ['#today-date-choose','.today-month','#today-contents','.today-main-actions .sidebar-actions'])await expect(page.locator(selector)).toBeHidden();
+        const label=await page.locator('#today-day-label').boundingBox();
+        expect(label.y).toBeGreaterThan(geometry.controlsTop);
+        expect(label.y+label.height).toBeLessThanOrEqual(geometry.editorTop);
+        for(const id of ['today-sessions','today-events','today-planned-tasks'])await expect(page.locator('#'+id).locator('..')).toBeVisible();
       }
       if(width>1050){
         expect(Math.abs(geometry.sidebarTop-geometry.editorTop)).toBeLessThan(1);
@@ -277,7 +450,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
       }else expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.editorBottom);
       for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);}
     };
-    for(const [width,font,heading,brand]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[650,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20],[320,20,null,'2rem']])await check(width,font,heading,brand);
+    for(const [width,font,heading,brand]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[651,14],[650,14],[440,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20],[320,20,null,'2rem']])await check(width,font,heading,brand);
     running=await(await api(request,'POST','/work-sessions',{summary:'Running session with a deliberately long title to exercise wrapping',start:new Date(Date.now()-3600000).toISOString(),end:null})).json();
     await page.locator('#refresh').click();await expect(page.locator('#session-stop')).toBeVisible();
     for(const [width,font]of [[1440,14],[1051,20],[320,20],[390,14]])await check(width,font);

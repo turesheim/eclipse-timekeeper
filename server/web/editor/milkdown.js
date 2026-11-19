@@ -152,7 +152,7 @@ function mermaidBlock(node){
   schedule(node.attrs.value);
   return {dom,update(value){if(value.type!==node.type)return false;schedule(value.attrs.value);return true;},destroy(){++generation;clearTimeout(timer);theme.disconnect();resize.disconnect();image.removeAttribute('src');},ignoreMutation:()=>true};
 }
-export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles,expandSnippet}){
+export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false,resources,uploadFiles,expandSnippet,nativeFormatting}){
   let emptyMarker;do{emptyMarker='<!-- timekeeper-empty-'+crypto.randomUUID()+' -->';}while(value.includes(emptyMarker));
   const cleanGenerated=value=>value.replaceAll(emptyMarker,'');
   const assetAllowed=url=>resources?resources.allowsAsset(url):safeAsset(url),linkAllowed=url=>safeLink(url)||!!resources?.allowsLink(url);
@@ -220,9 +220,14 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         else dom.textContent=node.attrs.alt||'';
         return {dom};
       }},
-      // Following a link leaves the document unchanged. Local note navigation
-      // still delegates to the owner-aware resource adapter and its draft guard.
-      handleDOMEvents:{compositionstart:()=>{composing=true;return false;},compositionend:view=>{composing=false;setTimeout(()=>{if(!view.isDestroyed)view.dispatch(view.state.tr.setMeta(wikiCompositionEnd,true));},0);return false;},click:(_view,event)=>{
+      handleDOMEvents:{compositionstart:()=>{composing=true;return false;},compositionend:view=>{composing=false;setTimeout(()=>{if(!view.isDestroyed)view.dispatch(view.state.tr.setMeta(wikiCompositionEnd,true));},0);return false;},beforeinput:(view,event)=>{
+        if(!nativeFormatting?.()||event.target!==view.dom||!event.cancelable||event.isComposing||view.composing||readOnly)return false;
+        const action=event.inputType==='formatBold'?toggleStrongCommand:event.inputType==='formatItalic'?toggleEmphasisCommand:null;
+        if(!action)return false;
+        // Apply the platform edit through the same transaction as the toolbar.
+        event.preventDefault();syncDOMSelection(view,root);editor.action(callCommand(action.key));return true;
+      },click:(_view,event)=>{
+        // Local note navigation uses the owner-aware resource adapter and draft guard.
         if(hashtags.click(event))return true;
         const foot=event.target.closest('[data-footnote-reference]');if(foot){event.preventDefault();const target=[...root.querySelectorAll('[data-footnote-definition]')].find(node=>node.dataset.footnoteDefinition===foot.dataset.footnoteReference);if(target){const pos=_view.posAtDOM(target,0);_view.dispatch(_view.state.tr.setSelection(TextSelection.near(_view.state.doc.resolve(pos))).scrollIntoView());}return true;}
         const link=event.target.closest('a[href]');if(!link)return false;
@@ -399,6 +404,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         return {checkboxRect:()=>view.nodeDOM($from.before($from.depth-1))?.querySelector(':scope > input[type=checkbox]')?.getBoundingClientRect(),offset:()=>{const source=markdown().replace(/\r\n?/g,'\n'),tree=editor.action(ctx=>dialect.project(ctx.get(remarkCtx).parse(source),source));return cursorMap(tree,view.state.doc,source).source(position);}};
       },
       focus:()=>view.focus(),
+      syncSelection:()=>syncDOMSelection(view,root),
       setReadOnly,
       command,
       listType:()=>{
