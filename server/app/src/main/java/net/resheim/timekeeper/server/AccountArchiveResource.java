@@ -6,9 +6,11 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.smallrye.common.annotation.Blocking;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
@@ -21,7 +23,7 @@ public class AccountArchiveResource {
     @Inject ContractInputs inputs;
     @Inject CommandReceipts receipts;
     @Context UriInfo uri;
-    @Context io.vertx.ext.web.RoutingContext routing;
+    @Context RoutingContext routing;
     private void noQueries() {ContractInputs.queries(uri.getQueryParameters());}
     private Response tx(Supplier<ApiReplies> work) {return store.authenticated(identity,()->work.get().response());}
     private AccountUploads uploads() {return new AccountUploads(store);}
@@ -31,11 +33,21 @@ public class AccountArchiveResource {
         noQueries();
         // This operation owns one repeatable-read snapshot itself. Nesting it
         // inside a business transaction would wait on its authorization locks.
-        var file=archives.download(identity.principal());
-        routing.addEndHandler(ignored->file.close());
+        return exportResponse(routing,()->archives.download(identity.principal()),"timekeeper-account")
+                .header("Cache-Control","no-store").build();
+    }
+    static Response.ResponseBuilder exportResponse(RoutingContext routing,Supplier<AccountArchive.Download> prepare,String prefix) {
+        // A disconnect can end the exchange while the ZIP is still being built.
+        var ended=new CompletableFuture<Void>();
+        routing.addEndHandler(ignored->ended.complete(null));
+        var file=prepare.get();
+        ended.thenRun(file::close);
+        if(ended.isDone()||routing.response().closed()) {
+            file.close();return Response.noContent();
+        }
         StreamingOutput body=output->{try(file) {Files.copy(file.file(),output);}};
-        return Response.ok(body,"application/zip").header("Cache-Control","no-store").header("Content-Length",file.length())
-                .header("Content-Disposition","attachment; filename=\"timekeeper-account-"+LocalDate.now(ZoneOffset.UTC)+".zip\"").build();
+        return Response.ok(body,"application/zip").header("Content-Length",file.length())
+                .header("Content-Disposition","attachment; filename=\""+prefix+"-"+LocalDate.now(ZoneOffset.UTC)+".zip\"");
     }
     @POST @Path("/uploads") public Response create(@HeaderParam("Idempotency-Key") String key,JsonNode body) {
         noQueries();var value=inputs.validate("AccountArchiveUploadInput",body);

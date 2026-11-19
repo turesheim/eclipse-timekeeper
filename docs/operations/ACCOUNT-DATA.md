@@ -8,8 +8,10 @@ signed-in account. Administrator access does not include anyone else's records.
 In **Download my data**, select **Prepare archive**. This creates and fetches a
 consistent snapshot without opening a browser download. When it is ready, select
 **Download archive** to save `timekeeper-account-YYYY-MM-DD.zip`; the date is the
-server's UTC preparation date. Preparing again replaces the previous browser
-copy. Leaving the page releases that copy; prepare again if you return later.
+server's UTC preparation date. Preparation continues while you visit other
+Dagsverk pages in the same tab. Return to **Your data** to see the progress or
+download the prepared ZIP. Preparing again replaces the previous browser copy.
+Signing out, reloading the tab or closing it releases that copy.
 Read-only sessions can also prepare and download archives.
 
 Preparation favors bounded memory over speed: the server builds the ZIP in a
@@ -19,14 +21,16 @@ transfer. Normal requests and health checks remain available while it runs.
 Only one account/Notes archive is prepared per server process at a time; if the
 server is already preparing one, wait for it to finish and try again.
 Authorization is checked before preparation and again before releasing the
-archive. Temporary output is removed after transfer or a failed preparation.
+archive. Temporary output is removed after transfer, disconnection or a failed
+preparation.
 The container templates place Java temporary files on the private state volume
 (`TMPDIR=/instance/tmp` in Compose, `/state/server/tmp` on Synology), rather than
 the RAM-backed `/tmp` mount. Allow disk space for the prepared ZIP. Standalone
 services should use a private disk directory with `-Djava.io.tmpdir=/path/to/tmp`.
-After an abrupt process termination, temporary archives can remain on disk;
-remove abandoned files only while every API process sharing that directory is
-stopped. These files contain private account data and must not be shared.
+After an abrupt process termination, `timekeeper-account-download-*` directories
+can remain in the Java temporary directory. Remove abandoned archives only
+while every API process sharing that directory is stopped. These files contain
+private account data and must not be shared.
 
 The supported server requires at least **2 GiB of Java heap**, plus memory for
 the JVM outside its heap and for the database/OS. See the

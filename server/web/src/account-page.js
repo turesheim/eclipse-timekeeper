@@ -1,6 +1,7 @@
 import { t as i18nText } from "./i18n.js";import { renderAccount } from './account.js';
 import { settingsView } from './settings-view.js';
 import { node, link } from './account-ui.js';
+import { createArchiveDownloads } from './archive-download.js';
 const $ = (id) => document.getElementById(id);
 let context = null,generation = 0,view = null,acceptedHash = '';
 function disposeView() {for (const cleanup of view?.cleanup || []) cleanup();view = null;}
@@ -11,12 +12,13 @@ function canLeave() {
   return !view?.dirty.size || window.confirm(i18nText("ui.discard_unsaved_account_changes"));
 }
 export function closeAccount() {
-  ++generation;context = null;disposeView();acceptedHash = '';
+  ++generation;context?.archiveDownloads.close();context = null;disposeView();acceptedHash = '';
   $('account-page').hidden = true;$('account-content').replaceChildren();$('account-navigation').replaceChildren();
   $('account-error').replaceChildren();$('account-heading').textContent = '';$('account-identity').textContent = '';$('users-link').hidden = true;
 }
 export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate) {
-  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate };
+  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate,
+    archiveDownloads: createArchiveDownloads(session) };
   $('users-link').hidden = !account.administrator || !account.permissions?.includes('write');
   await show(route(), false);
 }
@@ -46,6 +48,7 @@ async function show(hash, ask = true) {
     signOut: scope.signOut, refreshProfile: scope.refreshProfile, navigate: (next) => {location.hash = next;},
     reload: () => void show(acceptedHash)
   });
+  view.archiveDownloads = scope.archiveDownloads;
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', i18nText("ui.this_session_is_read_only_sign_in_with_your_password_to_change_settings"), 'alert alert-info'));
   if (page === 'account') {
