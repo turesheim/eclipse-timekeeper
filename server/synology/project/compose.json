@@ -37,8 +37,7 @@
       "healthcheck": {
         "test": ["CMD-SHELL", "curl --fail --silent --connect-timeout 2 --max-time 4 http://127.0.0.1:$$(cat /config/http-port)/q/health/ready"],
         "interval":"10s", "timeout":"5s", "start_period":"60s", "retries":3
-      },
-      "logging": {"driver":"json-file", "options":{"max-size":"10m", "max-file":"3"}}
+      }
     }
   }
 }
