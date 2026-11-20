@@ -41,6 +41,7 @@ $('about-open').addEventListener('click', () => openAbout($('server-info'),snaps
 $('about-close').addEventListener('click', () => $('server-info').close());
 $('server-info').addEventListener('close', () => {if (!$('session').hidden) $('account-menu').querySelector('summary').focus();});
 let api = null,snapshot = null,connected = false,refreshing = null,refreshController = null,reloadAgain = false;
+let reportController = null;
 let editor = null,deleteCandidate = null,selectedActivity = null,selectedDay = null;
 let focusId = '';
 let watchSession = null;
@@ -299,6 +300,7 @@ $('expand-activities').addEventListener('click', () => {activitiesCollapsed = fa
 
 async function refresh() {
   if (!api) return;
+  reportController?.abort();
   if (refreshing) {reloadAgain = true;refreshController?.abort();await refreshing;return;}
   const session = api;
   const pending = (async () => {
@@ -322,7 +324,7 @@ async function refresh() {
       // flight. Publish only the final snapshot before enabling dependent forms.
       if (reloadAgain) continue;
       window.timekeeperTypography?.receive(current.profile);
-      snapshot = current;snapshotAt = performance.now();activeAsOf = instantNanos(current.report.generatedAt);connected = true;
+      acceptSnapshot(current);connected = true;
       render();setStatus(i18nText("ui.up_to_date"), 'ready');
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);
@@ -333,6 +335,31 @@ async function refresh() {
     if (session === api) {if (error.status === 401) auth.clear(errorText(error));else {connected = false;setStatus(errorText(error));readOnlyWhileDisconnected();}}
     throw error;
   } finally {if (refreshing === pending) {refreshing = null;$('refresh').disabled = false;$('workspace').setAttribute('aria-busy', 'false');}}
+}
+function acceptSnapshot(current) {
+  snapshot = current;snapshotAt = performance.now();activeAsOf = instantNanos(current.report.generatedAt);
+}
+async function refreshRunningReports(session) {
+  const previous = snapshot;
+  const controller = new AbortController();
+  reportController = controller;
+  const current = () => session===api && snapshot===previous && !refreshing && connected && !controller.signal.aborted;
+  let updated;
+  try {
+    updated = await session.refreshReports(previous,{signal:controller.signal});
+  } catch(error) {
+    if(current())throw error;
+    return;
+  } finally {
+    if(reportController===controller)reportController=null;
+  }
+  if(!current())return;
+  if(!updated){await refresh();return;}
+  acceptSnapshot(updated);
+  const visible = focusedSnapshot(updated,currentFocus());
+  if(!$('activities-panel').hidden)renderLegacyViews(visible,visible.profile.data.zoneId);
+  renderTimeViews(visible);
+  renderSessionTime();
 }
 async function watch(session) {
   let delay = 1000;
@@ -345,8 +372,11 @@ async function watch(session) {
       // Await that read before deciding whether another consistent read is needed.
       const reading=refreshing;if(reading)await reading;if(session!==api)return;
       // Full consistent reads include changes made during pagination/report loading.
-      if (changes.nextSequence>snapshot.revision || !reading&&(snapshot.active.data || snapshot.activeWorkSession.data)) await refresh();else
-      if(!reading)void refreshServerInfo(session);
+      if (changes.nextSequence>snapshot.revision) await refresh();
+      else if(!reading&&!refreshing){
+        if(snapshot.active.data||snapshot.activeWorkSession.data)await refreshRunningReports(session);
+        if(session===api)void refreshServerInfo(session);
+      }
       delay = 1000;
     } catch (error) {
       if (session !== api) return;
@@ -465,14 +495,17 @@ function render() {
   $('stop').hidden = !active;readOnlyWhileDisconnected();
   renderLegacyViews(s,zone);
   refreshLabelFields();refreshClientChoices();renderSession();
-  weekSessions.update(s, activeAsOf, displayNanos, api, connected && canWrite, null);
-  calendar.update(s, connected, api);
-  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
-  today.update(s, connected, api);
+  renderTimeViews(s);
   notes.update(s,connected,api,canWrite);noteSearch.update(api,connected&&canWrite,s.revision);
   recentNotes.update(api,s.profile.data.zoneId,s.revision);
   tasks.update(s,connected,api,canWrite);
   renderSessionTime();
+}
+function renderTimeViews(s) {
+  weekSessions.update(s, activeAsOf, displayNanos, api, connected && canWrite, null);
+  calendar.update(s, connected, api);
+  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
+  today.update(s, connected, api);
 }
 function renderChangedList(id,records,paint){
   const key=JSON.stringify([getLocale(),records]);

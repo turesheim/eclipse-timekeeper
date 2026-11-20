@@ -85,6 +85,39 @@ test('a change newer than an in-flight snapshot still triggers the required seco
   }finally{release();await page.unrouteAll({behavior:'wait'});}
 });
 
+test('an unchanged revision refreshes running totals without reloading the account snapshot',async({page,request})=>{
+  const {api}=await setup(page,request);
+  const task=await(await api('POST','/tasks',{summary:'Running synchronization fixture',projectId:null,parentTaskId:null,url:null})).json();
+  await api('POST','/work-sessions/start',{summary:'Running work session'},{'Idempotency-Key':randomUUID()});
+  await api('POST','/activities/start',{taskId:task.id,summary:'Running activity',labelIds:[],workSessionId:null,
+    expectedActiveId:null,expectedActiveVersion:null},{'Idempotency-Key':randomUUID()});
+  await page.reload();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#work-session-state')).toHaveText('Running');
+  await navigateView(page,'activities');
+  const total=page.locator('#week-total'),activity=page.locator('#active-elapsed'),session=page.locator('#work-session-elapsed');
+  const initial=await Promise.all([total.textContent(),activity.textContent(),session.textContent()]);
+  const paths=[];
+  const record=request=>{if(request.method()==='GET')paths.push(new URL(request.url()).pathname);};
+  page.on('request',record);
+  try{
+    await expect(total).not.toHaveText(initial[0]);
+    await expect(activity).not.toHaveText(initial[1]);await expect(session).not.toHaveText(initial[2]);
+    expect(paths).toContain('/api/v1/reports/activities');
+    expect(paths.some(path=>/^\/api\/v1\/work-sessions\/[^/]+\/report$/.test(path))).toBe(true);
+    for(const collection of ['me','clients','projects','tasks','labels','activities','focus-areas','work-sessions'])
+      expect(paths).not.toContain('/api/v1/'+collection);
+
+    const name='Client committed during timer';
+    const refreshed=page.waitForResponse(async response=>response.request().method()==='GET'
+      &&new URL(response.url()).pathname==='/api/v1/clients'&&response.ok()
+      &&(await response.json()).items.some(value=>value.name===name));
+    await api('POST','/clients',{name,color:'#507030'});await refreshed;
+    await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
+    expect(paths).toContain('/api/v1/me');expect(paths).toContain('/api/v1/tasks');
+  }finally{page.off('request',record);}
+});
+
 test('a Notes catalog refresh arriving during an older catalog read is retained',async({page,request})=>{
   const {api,folder}=await setup(page,request);await openNote(page);await page.locator('#refresh').click();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(page.locator('#notes-navigation [role=tree]')).toHaveAttribute('aria-busy','false');
   const revision=(await(await api('GET','/projects?limit=500')).json()).revision;let held=false,release;const pending=new Promise(resolve=>{release=resolve;});
