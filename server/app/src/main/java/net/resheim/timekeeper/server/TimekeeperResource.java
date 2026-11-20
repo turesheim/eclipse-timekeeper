@@ -28,6 +28,10 @@ public class TimekeeperResource {
     @Inject Pages pages;
     @Context UriInfo uri;
     private Response tx(Supplier<ApiReplies> work) { return store.authenticated(identity,() -> work.get().response()); }
+    private Response read(Supplier<ApiReplies> work) {return store.authenticatedReadSnapshot(identity,()->work.get().response());}
+    private Response readActivities(Supplier<ApiReplies> work) {
+        return store.authenticatedReadSnapshot(identity,store::activityPartitionsCurrent,()->work.get().response());
+    }
     private static ApiReplies json(JsonNode value) { return new ApiReplies(200,value,null,null); }
     private static ApiReplies empty() { return new ApiReplies(204,null,null,null); }
     private JsonNode required(String type,UUID id) { return store.find(type,id).filter(value->!type.equals("TASK")||!value.path("deleted").asBoolean()).orElseThrow(ApiFailure::notFound); }
@@ -91,7 +95,9 @@ public class TimekeeperResource {
     @GET @Path("/openapi.json") public JsonNode openApi() { return inputs.contract(); }
     @GET @Path("/{collection}/{id}") public Response get(@PathParam("collection") String collection,@PathParam("id") String id) {
         String type=ContractInputs.type(collection);UUID key=ContractInputs.pathId(id);
-        ContractInputs.queries(uri.getQueryParameters());return tx(() -> ApiReplies.resource(200,required(type,key),null));
+        ContractInputs.queries(uri.getQueryParameters());
+        Supplier<ApiReplies> work=()->ApiReplies.resource(200,required(type,key),null);
+        return type.equals("ACTIVITY")?readActivities(work):read(work);
     }
     @POST @Path("/{collection}") public Response create(@PathParam("collection") String collection,JsonNode body) {
         String type=ContractInputs.type(collection);JsonNode input=inputs.validate(ContractInputs.input(type,true),body);
@@ -347,17 +353,20 @@ public class TimekeeperResource {
     }
     @GET @Path("/tasks/{id}/note") public Response taskNote(@PathParam("id") String id) {
         UUID key=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters());
-        return tx(() -> {required("TASK",key);return ApiReplies.resource(200,new NoteTasks(store).origin(key),null);});
+        var tasks=new NoteTasks(store);
+        return store.authenticatedReadSnapshot(identity,tasks::originsReady,()->{
+            required("TASK",key);return ApiReplies.resource(200,tasks.origin(key),null).response();
+        });
     }
     private JsonNode sessionSnapshot(WorkSession value) {return required("WORK_SESSION",value.id().value());}
     @GET @Path("/tasks/by-external-reference") public Response external() {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var query=uri.getQueryParameters();
-        var ref=referenceQuery(query);return tx(() -> ApiReplies.resource(200,resourceSnapshot(store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
+        var ref=referenceQuery(query);return read(() -> ApiReplies.resource(200,resourceSnapshot(store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
     }
     @GET @Path("/task-tombstones/by-external-reference") public Response deletedExternal() {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");
         var key=referenceQuery(uri.getQueryParameters());
-        return tx(() -> {
+        return read(() -> {
             JsonNode newest=null;
             for(var tombstone:store.list("TASK_TOMBSTONE")) for(var ref:tombstone.path("externalReferences"))
                 if(ref.path("providerId").asText().equals(key.providerId()) && ref.path("repositoryId").asText().equals(key.repositoryId())
@@ -439,7 +448,7 @@ public class TimekeeperResource {
         return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,resourceSnapshot(store.service().unlinkExternalReference(new UnlinkExternalReference(new TaskId(key),version,reference))),null); });
     }
     @GET @Path("/activities/active") public Response active() {
-        ContractInputs.queries(uri.getQueryParameters());return tx(() -> store.active().map(value -> ApiReplies.resource(200,value,null)).orElseGet(TimekeeperResource::empty));
+        ContractInputs.queries(uri.getQueryParameters());return readActivities(() -> store.active().map(value -> ApiReplies.resource(200,value,null)).orElseGet(TimekeeperResource::empty));
     }
     @POST @Path("/activities/start") public Response start(@HeaderParam("Idempotency-Key") String key,JsonNode body) {
         JsonNode input=inputs.validate("StartActivityInput",body);ContractInputs.queries(uri.getQueryParameters());
@@ -464,7 +473,7 @@ public class TimekeeperResource {
         }));
     }
     @GET @Path("/work-sessions/active") public Response activeWorkSession() {
-        ContractInputs.queries(uri.getQueryParameters());return tx(() -> store.workSessionService().activeWorkSession(new OwnerId(store.owner()))
+        ContractInputs.queries(uri.getQueryParameters());return read(() -> store.workSessionService().activeWorkSession(new OwnerId(store.owner()))
                 .map(value -> ApiReplies.resource(200,sessionSnapshot(value),null)).orElseGet(TimekeeperResource::empty));
     }
     @POST @Path("/work-sessions/start") public Response startWorkSession(@HeaderParam("Idempotency-Key") String key,JsonNode body) {
@@ -493,7 +502,7 @@ public class TimekeeperResource {
     }
     @GET @Path("/work-sessions/{id}/report") public Response workSessionReport(@PathParam("id") String id) {
         var session=new WorkSessionId(ContractInputs.pathId(id));ContractInputs.queries(uri.getQueryParameters());
-        return tx(() -> {
+        return readActivities(() -> {
             var report=store.workSessionService().workSessionReport(session);var response=object();response.set("session",sessionSnapshot(report.session()));
             var activities=response.putArray("activities");report.activities().forEach(value -> activities.add(resourceSnapshot(value)));
             var time=response.putObject("time");time.put("duration",report.time().duration().toString());time.put("trackedActivityTime",report.time().trackedActivityTime().toString());
@@ -503,13 +512,13 @@ public class TimekeeperResource {
         });
     }
     @GET @Path("/focus-areas") public Response focusAreas() {
-        ContractInputs.queries(uri.getQueryParameters());return tx(()->ApiReplies.resource(200,new FocusAreas(store).get(),null));
+        ContractInputs.queries(uri.getQueryParameters());return read(()->ApiReplies.resource(200,new FocusAreas(store).get(),null));
     }
     @PUT @Path("/focus-areas") public Response focusAreas(@HeaderParam("If-Match") String match,JsonNode body) {
         ContractInputs.queries(uri.getQueryParameters());var input=inputs.validate("FocusAreasInput",body);
         return tx(()->ApiReplies.resource(200,new FocusAreas(store).save(match,input),null));
     }
-    @GET @Path("/me") public Response profile() { ContractInputs.queries(uri.getQueryParameters());return tx(() -> ApiReplies.resource(200,store.profile(),null)); }
+    @GET @Path("/me") public Response profile() { ContractInputs.queries(uri.getQueryParameters());return read(() -> ApiReplies.resource(200,store.profile(),null)); }
     @PUT @Path("/me") public Response profile(@HeaderParam("If-Match") String match,JsonNode body) {
         var input=inputs.validate("ProfileInput",body);String zone=ContractInputs.zone(input.get("zoneId").asText()).getId();ContractInputs.queries(uri.getQueryParameters());
         String locale=input.hasNonNull("locale") ? input.get("locale").asText() : null;
@@ -527,7 +536,7 @@ public class TimekeeperResource {
         else if(type.equals("TASK_TOMBSTONE")) ContractInputs.queries(query,"limit","cursor");
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
-        Supplier<ApiReplies> read=() -> {
+        Supplier<ApiReplies> work=() -> {
             boolean noteSources=type.equals("TASK")&&query.containsKey("includeNoteSources");
             if(noteSources&&!Set.of("true","false").contains(query.getFirst("includeNoteSources")))throw ApiFailure.badRequest();
             var origins=noteSources&&query.getFirst("includeNoteSources").equals("true")?new NoteTasks(store).origins():Map.<String,ObjectNode>of();
@@ -559,8 +568,10 @@ public class TimekeeperResource {
             });
             return json(pages.page(type,values,canonical(filters),limit,query.getFirst("cursor")));
         };
-        return type.equals("TASK")?store.authenticatedReadSnapshot(identity,
-                ()->!"true".equals(query.getFirst("includeNoteSources"))||new NoteTasks(store).originsReady(),()->read.get().response()):tx(read);
+        if(type.equals("ACTIVITY"))return readActivities(work);
+        if(type.equals("TASK")&&"true".equals(query.getFirst("includeNoteSources")))
+            return store.authenticatedReadSnapshot(identity,()->new NoteTasks(store).originsReady(),()->work.get().response());
+        return read(work);
     }
     private void validateFilters(MultivaluedMap<String,String> query){validateFilters(query,false);}
     private void validateFilters(MultivaluedMap<String,String> query,boolean history) {
@@ -579,7 +590,7 @@ public class TimekeeperResource {
     }
     @GET @Path("/reports/activities") public Response report() {
         var query=uri.getQueryParameters();ContractInputs.queries(query,"from","to","taskId","projectId","labelId","zoneId");
-        return tx(() -> {
+        return readActivities(() -> {
             List<Activity> values=activities(query);Instant from=ContractInputs.instant(query.getFirst("from")),to=ContractInputs.instant(query.getFirst("to")),asOf=store.now();
             ZoneId zone=ContractInputs.zone(Optional.ofNullable(query.getFirst("zoneId")).orElse(store.profile().get("zoneId").asText()));
             ObjectNode result=object();result.put("from",from.toString());result.put("to",to.toString());result.put("zoneId",zone.getId());result.put("generatedAt",asOf.toString());result.put("revision",store.revision());

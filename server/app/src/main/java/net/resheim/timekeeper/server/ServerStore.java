@@ -128,6 +128,12 @@ public class ServerStore {
     private static String partitionDate(String zone,Instant now) {
         return zone+":"+now.atZone(java.time.ZoneId.of(zone)).toLocalDate();
     }
+    boolean activityPartitionsCurrent() {
+        try(var query=statement("SELECT zone_id FROM tk_owner WHERE id=?",owner());var rows=query.executeQuery()) {
+            if(!rows.next())throw ApiFailure.notFound();
+            return partitionDate(rows.getString(1),now()).equals(partitionDates.get(owner()));
+        }catch(SQLException failure){throw databaseFailure(failure);}
+    }
     private void maintainDays() {
         try {
             var owners=new java.util.HashMap<String,String>();
@@ -730,7 +736,7 @@ public class ServerStore {
     public WorkSessionService workSessionService() {
         String owner=owner();var ports=new ScopedPorts(owner);
         return new DefaultWorkSessionService(new WorkSessionPorts(ports.sessions(),ports.activities(),WorkSessionId::random,ServerStore.this::now,
-                new TransactionRunner() {public <T> T required(Supplier<T> work) {return transaction(owner,work);}},
+                scopedServiceTransaction(owner),
                 event -> change(event.entityType().name(),event.changeType().name(),event.entityId())));
     }
     public TimekeeperService service() {
@@ -746,8 +752,18 @@ public class ServerStore {
             public java.time.ZoneId zone(OwnerId ignored) {return java.time.ZoneId.of(profile().get("zoneId").asText());}
         };
         return new DefaultTimekeeperService(new ServicePorts(ports.projects(),ports.tasks(),ports.activities(),ports.labels(),ids,time,
-                new TransactionRunner() { public <T> T required(Supplier<T> work) { return transaction(owner,work); } },
+                scopedServiceTransaction(owner),
                 event -> change(event.entityType().name(),event.changeType().name(),event.entityId())),workSessionService());
+    }
+    private TransactionRunner scopedServiceTransaction(String owner) {
+        return new TransactionRunner() {
+            @Override public <T> T required(Supplier<T> work) {
+                if(!owner.equals(owner()))throw new IllegalStateException("Service reused outside its owner scope");
+                // The caller already chose a transaction or a read snapshot. SQL writes
+                // still fail in the read snapshot.
+                return work.get();
+            }
+        };
     }
     private class ScopedPorts {
         private final String boundOwner;

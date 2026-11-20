@@ -27,6 +27,7 @@ class RequestTimingsTest {
             var response=given().header("Authorization","Bearer test-a").get("/api/v1/me");
             assertEquals(200,response.statusCode());String id=response.header(RequestTimings.HEADER);assertNotNull(id);java.util.UUID.fromString(id);
             assertTrue(messages.stream().anyMatch(message->message.contains("request_id="+id)&&message.contains("route=/api/v1/me")&&message.contains("elapsed_ms=")));
+            writeProfile(response.header("ETag")).then().statusCode(200);
             assertTrue(messages.stream().anyMatch(message->message.contains("Database transaction")&&List.of("pool_ms=","owner_lock_ms=","work_ms=","commit_ms=").stream().allMatch(message::contains)));
             String resource="ebcddfed-3ac9-4a54-8f8f-408362eeff73",secret="do-not-log-this-value";
             var rejected=given().header("Authorization","Bearer test-a").queryParam("private",secret).get("/api/v1/clients/"+resource);
@@ -39,7 +40,9 @@ class RequestTimingsTest {
             assertFalse(messages.stream().anyMatch(message->message.contains(secret)||message.contains(resource)||message.contains("test-a")));
         } finally {requestLog.removeHandler(capture);databaseLog.removeHandler(capture);}
     }
-    @Test void aBlockedAccountReadReportsThePendingRequestAndItsLockWait() throws Exception {
+    @Test void aBlockedAccountWriteReportsThePendingRequestAndItsLockWait() throws Exception {
+        var profile=given().header("Authorization","Bearer test-a").get("/api/v1/me");
+        profile.then().statusCode(200);
         var messages=new CopyOnWriteArrayList<String>();
         var capture=new Handler(){
             public void publish(LogRecord record){messages.add(record instanceof org.jboss.logmanager.ExtLogRecord value?value.getFormattedMessage():record.getMessage());}
@@ -52,16 +55,20 @@ class RequestTimingsTest {
             var blocker=workers.submit(()->store.transaction("a",()->{held.countDown();try{release.await();}catch(InterruptedException stopped){Thread.currentThread().interrupt();}return null;}));
             try {
                 assertTrue(held.await(5,java.util.concurrent.TimeUnit.SECONDS));
-                var pending=workers.submit(()->given().header("Authorization","Bearer test-a").get("/api/v1/me"));
+                var pending=workers.submit(()->writeProfile(profile.header("ETag")));
                 long deadline=System.nanoTime()+8_000_000_000L;
                 while(messages.stream().noneMatch(message->message.contains("API request still running"))&&System.nanoTime()<deadline)Thread.sleep(20);
-                assertTrue(messages.stream().anyMatch(message->message.contains("API request still running")&&message.contains("route=/api/v1/me")));
+                assertTrue(messages.stream().anyMatch(message->message.contains("API request still running")&&message.contains("method=PUT")&&message.contains("route=/api/v1/me")));
                 release.countDown();var response=pending.get(5,java.util.concurrent.TimeUnit.SECONDS);assertEquals(200,response.statusCode());
                 String id=response.header(RequestTimings.HEADER);
                 assertTrue(messages.stream().anyMatch(message->message.contains("API request still running request_id="+id)));
                 assertTrue(messages.stream().anyMatch(message->message.matches(".*owner_lock_ms=[1-9][0-9]{3,}.*")));
             } finally {release.countDown();blocker.get(5,java.util.concurrent.TimeUnit.SECONDS);}
         } finally {requestLog.removeHandler(capture);databaseLog.removeHandler(capture);}
+    }
+    private static io.restassured.response.Response writeProfile(String etag) {
+        return given().header("Authorization","Bearer test-a").header("If-Match",etag)
+                .contentType("application/json").body("{\"zoneId\":\"UTC\"}").put("/api/v1/me");
     }
     @Test void ordinaryLongPollingHasItsRequestedWaitAllowanceOnlyOnTheChangeRoute(){
         assertEquals(5000,RequestTimings.pollAllowance("/api/v1/changes","5"));

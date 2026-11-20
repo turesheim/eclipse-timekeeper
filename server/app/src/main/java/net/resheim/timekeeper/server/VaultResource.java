@@ -23,14 +23,23 @@ public class VaultResource {
     private static UUID uuid(String input){if(input==null)throw ApiFailure.validation();try{var value=UUID.fromString(input);if(!value.toString().equals(input))throw ApiFailure.validation();return value;}catch(IllegalArgumentException invalid){throw ApiFailure.validation();}}
     private Response tx(Supplier<Response> operation){return tx(true,operation);}
     private Response tx(boolean initialize,Supplier<Response> operation){return store.authenticated(identity,()->{
-        if(initialize)vault().initialize();return Response.fromResponse(operation.get()).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();
+        if(initialize)vault().initialize();return privateResponse(operation.get());
     });}
+    private Response read(Supplier<Response> operation){return store.authenticatedReadSnapshot(identity,()->privateResponse(operation.get()));}
+    private Response readCatalog(Supplier<Response> operation){
+        return store.authenticatedReadSnapshot(identity,()->new VaultState(store,limits).catalogReady(),()->{
+            vault().initialize();return privateResponse(operation.get());
+        });
+    }
+    private static Response privateResponse(Response response){
+        return Response.fromResponse(response).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();
+    }
     private static void fields(JsonNode input,String...allowed){
         if(input==null||!input.isObject())throw ApiFailure.validation();var fields=Set.of(allowed);
         input.fieldNames().forEachRemaining(field->{if(!fields.contains(field))throw ApiFailure.validation();});
         for(String field:allowed)if(!input.path(field).isTextual())throw ApiFailure.validation();
     }
-    @GET public Response info(){ContractInputs.queries(uri.getQueryParameters());return tx(()->{
+    @GET public Response info(){ContractInputs.queries(uri.getQueryParameters());return readCatalog(()->{
         var value=object().put("rootId",VaultIndex.ROOT.toString()).put("snapshot",vault().generation());value.set("settings",new VaultSettings(store).get());value.set("limits",limits.snapshot());return Response.ok(value).build();});}
     @GET @Path("/export") @Produces("application/zip") public Response export(){
         ContractInputs.queries(uri.getQueryParameters());
@@ -42,10 +51,10 @@ public class VaultResource {
     }
     @GET @Path("/revisions") public Response revisions(@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source);
-        return tx(false,()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
+        return read(()->{var history=new NoteRevisions(store);return Response.ok(history.list(history.reference(type,id))).build();});
     }
     @GET @Path("/bookmark") public Response bookmark(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key){
-        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return tx(false,()->{var bookmarks=new NoteBookmarks(store);var ref=bookmarks.reference(type,key);return Response.ok(bookmarks.get(ref)).header("ETag",bookmarks.tag(ref)).build();});
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return read(()->{var bookmarks=new NoteBookmarks(store);var ref=bookmarks.reference(type,key);return Response.ok(bookmarks.get(ref)).header("ETag",bookmarks.tag(ref)).build();});
     }
     @PUT @Path("/bookmark") @Consumes("application/json") public Response bookmark(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key,@HeaderParam("If-Match")String match,JsonNode input){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");var value=inputs.validate("NoteBookmarkInput",input);
@@ -53,14 +62,14 @@ public class VaultResource {
     }
     @GET @Path("/revisions/{revisionId}") public Response revision(@PathParam("revisionId")String revision,@QueryParam("sourceType")String type,@QueryParam("sourceId")String source){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
-        return tx(false,()->{var history=new NoteRevisions(store);var snapshot=history.snapshot(history.reference(type,id),version);return Response.ok(snapshot.body()).header("ETag",snapshot.etag()).build();});
+        return read(()->{var history=new NoteRevisions(store);var snapshot=history.snapshot(history.reference(type,id),version);return Response.ok(snapshot.body()).header("ETag",snapshot.etag()).build();});
     }
     @POST @Path("/tasks/resolve") @Consumes("application/json") public Response resolveTask(@HeaderParam("If-Match")String match,JsonNode body){
         var input=inputs.validate("NoteTaskResolveInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(false,()->{var ref=new NoteReferences(store).reference(input.path("sourceType").asText(),input.path("sourceKey").asText());UUID task=new NoteTasks(store).resolve(ref,match,input.path("offset").asInt());return ApiReplies.resource(200,store.find("TASK",task).orElseThrow(ApiFailure::notFound),null).response();});
     }
     @GET @Path("/client") public Response client(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key){
-        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return tx(false,()->{var clients=new NoteClients(store);var ref=clients.reference(type,key);return Response.ok(clients.get(ref)).header("ETag",clients.tag(ref)).build();});
+        ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");return read(()->{var clients=new NoteClients(store);var ref=clients.reference(type,key);return Response.ok(clients.get(ref)).header("ETag",clients.tag(ref)).build();});
     }
     @PUT @Path("/client") @Consumes("application/json") public Response client(@QueryParam("sourceType")String type,@QueryParam("sourceKey")String key,@HeaderParam("If-Match")String match,JsonNode input){
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceKey");var value=inputs.validate("NoteClientInput",input);UUID client=value.path("clientId").isNull()?null:ContractInputs.pathId(value.path("clientId").asText());
@@ -70,8 +79,8 @@ public class VaultResource {
         ContractInputs.queries(uri.getQueryParameters(),"sourceType","sourceId");UUID id=uuid(source),version=uuid(revision);
         return tx(false,()->{var history=new NoteRevisions(store);history.delete(history.reference(type,id),version,match);return Response.noContent().build();});
     }
-    @GET @Path("/settings") public Response settings(){ContractInputs.queries(uri.getQueryParameters());return tx(false,()->ApiReplies.resource(200,new VaultSettings(store).get(),null).response());}
-    @GET @Path("/resolve") public Response resolve(@QueryParam("path")String path){ContractInputs.queries(uri.getQueryParameters(),"path");var target=new VaultPath(path);return tx(()->{var collection=vault();var value=collection.get(target);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
+    @GET @Path("/settings") public Response settings(){ContractInputs.queries(uri.getQueryParameters());return read(()->ApiReplies.resource(200,new VaultSettings(store).get(),null).response());}
+    @GET @Path("/resolve") public Response resolve(@QueryParam("path")String path){ContractInputs.queries(uri.getQueryParameters(),"path");var target=new VaultPath(path);return readCatalog(()->{var collection=vault();var value=collection.get(target);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
     @PUT @Path("/settings") @Consumes("application/json") public Response settings(@HeaderParam("If-Match")String match,JsonNode input){ContractInputs.queries(uri.getQueryParameters());return tx(false,()->{
         // Check the caller's representation before derived folder initialization
         // can migrate the default assets path, all under the same owner lock.
@@ -83,15 +92,16 @@ public class VaultResource {
         if(trash!=null&&!Set.of("true","false").contains(trash))throw ApiFailure.validation();
         UUID directory=parent==null?VaultIndex.ROOT:uuid(parent);
         int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,limits.pageSize(),1,limits.pageSize());
-        return tx(()->Response.ok(vault().page(directory,query==null&&uri.getQueryParameters().containsKey("query")?"":query,"true".equals(trash),start,count,snapshot)).build());
+        return readCatalog(()->Response.ok(vault().page(directory,query==null&&uri.getQueryParameters().containsKey("query")?"":query,"true".equals(trash),start,count,snapshot)).build());
     }
     @GET @Path("/recent") public Response recent(@QueryParam("offset")String offset,@QueryParam("limit")String limit,@HeaderParam("If-Match")String snapshot){
         ContractInputs.queries(uri.getQueryParameters(),"offset","limit");
         int start=ContractInputs.number(offset,0,0,Integer.MAX_VALUE),count=ContractInputs.number(limit,Math.min(20,limits.pageSize()),1,limits.pageSize());
-        return tx(false,()->Response.ok(new RecentNotes(store,limits).page(start,count,snapshot)).build());
+        var recent=new RecentNotes(store,limits);
+        return store.authenticatedReadSnapshot(identity,()->!recent.needsBackfill(),()->privateResponse(Response.ok(recent.page(start,count,snapshot)).build()));
     }
     @GET @Path("/storage") public Response storage(){
-        ContractInputs.queries(uri.getQueryParameters());return tx(false,()->Response.ok(new VaultStorage(store,limits).get()).header("Cache-Control","no-store").build());
+        ContractInputs.queries(uri.getQueryParameters());return read(()->Response.ok(new VaultStorage(store,limits).get()).header("Cache-Control","no-store").build());
     }
     @POST @Path("/folders") @Consumes("application/json") public Response mkdir(JsonNode input){
         ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("VaultFolderInput",input);var path=new VaultPath(value.path("path").asText());
@@ -103,9 +113,9 @@ public class VaultResource {
         ContractInputs.queries(uri.getQueryParameters(),"path","createdAt","modifiedAt","createdAtSource","taskPolicy");if(!"*".equals(none))throw new ApiFailure(428,"PRECONDITION_REQUIRED");var path=new VaultPath(name);var dates=VaultImportDates.parse(created,modified,createdSource);var policy=NoteTaskImport.parse(tasks);
         return tx(()->{var collection=vault();var entry=policy.write(store,dates,()->collection.put(path,null,true,bytes));return Response.status(201).entity(collection.metadata(entry)).header("ETag",collection.metadataTag(entry)).build();});
     }
-    @GET @Path("/entries/{id}") public Response entry(@PathParam("id")String id){ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.get(entry);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
+    @GET @Path("/entries/{id}") public Response entry(@PathParam("id")String id){ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return readCatalog(()->{var collection=vault();var value=collection.get(entry);return Response.ok(collection.metadata(value)).header("ETag",collection.metadataTag(value)).build();});}
     @GET @Path("/entries/{id}/content") @Produces("application/octet-stream") public Response content(@PathParam("id")String id){
-        ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return tx(()->{var collection=vault();var value=collection.get(entry);
+        ContractInputs.queries(uri.getQueryParameters());UUID entry=uuid(id);return readCatalog(()->{var collection=vault();var value=collection.get(entry);
             return Response.ok(collection.read(value)).header("ETag",collection.tag(value)).header("Content-Disposition","attachment").build();});
     }
     @PUT @Path("/entries/{id}/content") @Consumes("application/octet-stream") public Response save(@PathParam("id")String id,@HeaderParam("If-Match")String match,byte[] bytes){

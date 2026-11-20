@@ -25,7 +25,8 @@ public class NotesSearchResource {
         new VaultCollection(store,limits).initialize();new NotesSearchChanges(store).snapshot();
         return new Access(new NotesSearchSources(store).state(),new CalendarSearchSources(store).state(),new NotesSearchCursor(store.cursorSecret(),store.owner(),store.now()));
     }
-    private Access access(){return store.authenticated(identity,this::capture);}
+    private boolean prepared(){return new VaultState(store,limits).catalogReady()&&new NotesSearchChanges(store).existing().isPresent();}
+    private Access access(){return store.authenticatedReadSnapshot(identity,this::prepared,this::capture);}
     private static Response response(int status,Object entity){return Response.status(status).entity(entity).header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").build();}
     private static ApiFailure indexing(){return new ApiFailure(503,"NOTES_SEARCH_INDEXING");}
     @GET public Response results(@QueryParam("q")String text,@QueryParam("limit")String requested,@QueryParam("cursor")String cursor){
@@ -40,7 +41,7 @@ public class NotesSearchResource {
             var notes=search.search(access.state(),query,count,frame.after(),250,NotesSearchService.NOTES,fences);
             page=merge(notes,calendar,count);
         }catch(IOException unavailable){throw indexing();}
-        return store.authenticated(identity,()->{
+        return store.authenticatedReadSnapshot(identity,()->{
             var sources=new NotesSearchSources(store);var current=sources.state();
             var calendars=new CalendarSearchSources(store);var calendarState=calendars.state();
             if(!current.equals(access.state())||!calendarState.equals(access.calendar()))throw cursor==null?indexing():new ApiFailure(412,"NOTES_SEARCH_SNAPSHOT_EXPIRED");
@@ -68,7 +69,7 @@ public class NotesSearchResource {
         ContractInputs.queries(uri.getQueryParameters());UUID key=ContractInputs.pathId(id);var access=access();final NotesLuceneIndex.Hit hit;
         try{search.status(access.calendar(),CalendarSearchSources.BACKEND);hit=search.lookup(access.calendar(),CalendarSearchSources.BACKEND,key);}catch(IOException unavailable){throw indexing();}
         if(hit==null)throw ApiFailure.notFound();
-        return store.authenticated(identity,()->{
+        return store.authenticatedReadSnapshot(identity,()->{
             var sources=new NotesSearchSources(store);var calendars=new CalendarSearchSources(store);
             if(!sources.state().equals(access.state())||!calendars.state().equals(access.calendar()))throw indexing();
             if(hit.calendar()==null)throw indexing();return response(200,item(hit,sources,calendars,new HashMap<>()));
@@ -81,15 +82,14 @@ public class NotesSearchResource {
     }
     @GET @Path("/status") public Response status(){
         ContractInputs.queries(uri.getQueryParameters());
-        var access=store.authenticated(identity,()->{
-            // An empty account has nothing to index. Probing readiness must not
-            // create folders, consume its quota or change restore eligibility.
-            if(!new VaultState(store,limits).get().path("initialized").asBoolean()
-                    &&!store.hasResources(DayNotes.TYPE,WeekNotes.TYPE,EventNotes.TYPE,CalendarSubscriptions.FEED))return null;
-            return capture();
-        });
+        var access=store.authenticatedReadSnapshot(identity,()->prepared()||!indexNeeded(),()->indexNeeded()?capture():null);
         var status=access==null?new NotesSearchService.Status("READY",0,0,false,null):combined(access);
-        return store.authenticated(identity,()->response(200,status));
+        return store.authenticatedReadSnapshot(identity,()->response(200,status));
+    }
+    private boolean indexNeeded(){
+        // An empty account has nothing to index. Probing readiness must not create a vault.
+        return new VaultState(store,limits).get().path("initialized").asBoolean()
+                ||store.hasResources(DayNotes.TYPE,WeekNotes.TYPE,EventNotes.TYPE,CalendarSubscriptions.FEED);
     }
     @POST @Path("/rebuild") public Response rebuild(){
         ContractInputs.queries(uri.getQueryParameters());var access=access();

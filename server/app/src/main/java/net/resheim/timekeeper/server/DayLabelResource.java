@@ -13,14 +13,16 @@ public class DayLabelResource {
     @Inject RequestIdentity identity;
     @Inject ContractInputs inputs;
     @Context UriInfo uri;
-    private Response tx(Supplier<ApiReplies> action){return store.authenticated(identity,()->store.withJournalSource(DayNoteHistory.Source.REST_LABEL,()->Response.fromResponse(action.get().response()).header("Cache-Control",null).header("Cache-Control","private, no-store").build()));}
+    private Response tx(Supplier<ApiReplies> action){return store.authenticated(identity,()->store.withJournalSource(DayNoteHistory.Source.REST_LABEL,()->privateReply(action.get())));}
+    private Response read(Supplier<ApiReplies> operation){return store.authenticatedReadSnapshot(identity,()->privateReply(operation.get()));}
+    private static Response privateReply(ApiReplies reply){return Response.fromResponse(reply.response()).header("Cache-Control",null).header("Cache-Control","private, no-store").build();}
     @GET public Response list(@QueryParam("fromDate")String from,@QueryParam("toDate")String to){
         ContractInputs.queries(uri.getQueryParameters(),"fromDate","toDate");var first=DayNotes.date(from);var last=DayNotes.date(to);
-        return tx(()->new ApiReplies(200,new DayLabels(store).list(first,last),null,null));
+        return read(()->new ApiReplies(200,new DayLabels(store).list(first,last),null,null));
     }
     @GET @Path("/{date}") public Response get(@PathParam("date")String date){
         ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);
-        return tx(()->ApiReplies.resource(200,new DayLabels(store).get(day),null));
+        return read(()->ApiReplies.resource(200,new DayLabels(store).get(day),null));
     }
     @PUT @Path("/{date}") public Response save(@PathParam("date")String date,@HeaderParam("If-Match")String match,JsonNode body){
         ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);var input=inputs.validate("DayLabelInput",body);

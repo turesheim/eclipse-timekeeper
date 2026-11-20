@@ -12,17 +12,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class ChangeResource {
     @Inject ServerStore store;
     @Inject RequestIdentity identity;
-    @Inject TokenRegistry tokens;
-    @Context HttpHeaders headers;
     @Context UriInfo uri;
     @GET public Response changes() {
         var query=uri.getQueryParameters();ContractInputs.queries(query,"after","limit","waitSeconds");
         long after=ContractInputs.sequence(query.getFirst("after"));int limit=ContractInputs.number(query.getFirst("limit"),100,1,500),wait=ContractInputs.number(query.getFirst("waitSeconds"),0,0,25);
-        String owner=identity.owner();long deadline=System.nanoTime()+wait*1_000_000_000L;
+        long deadline=System.nanoTime()+wait*1_000_000_000L;
         while(true) {
-            ObjectNode page=store.authenticated(identity,() -> page(after,limit));
+            ObjectNode page=store.authenticatedReadSnapshot(identity,store::activityPartitionsCurrent,() -> page(after,limit));
             if(!page.get("items").isEmpty() || System.nanoTime()>=deadline) return new ApiReplies(200,page,null,null).response();
-            // Release connection/owner lock while waiting; cancellation does not mutate data.
+            // Release the connection while waiting.
             try {Thread.sleep(Math.min(250,Math.max(1,(deadline-System.nanoTime())/1_000_000)));}
             catch(InterruptedException e) {Thread.currentThread().interrupt();throw new ApiFailure(503,"UNAVAILABLE");}
         }

@@ -138,9 +138,7 @@ final class NoteTasks {
     }
     /** Optional list projection; resolve each owned source once without changing task validators. */
     boolean originsReady(){
-        if(store.list(LINK).isEmpty())return true;
-        var state=new VaultState(store,store.vaultLimits()).get();
-        return state.path("initialized").asBoolean()&&state.path("assetsLayoutReviewed").asBoolean()&&state.hasNonNull("collectionId");
+        return !store.hasResources(LINK)||new VaultState(store,store.vaultLimits()).catalogReady();
     }
     Map<String,ObjectNode> origins(){
         var links=store.list(LINK);if(links.isEmpty())return Map.of();
