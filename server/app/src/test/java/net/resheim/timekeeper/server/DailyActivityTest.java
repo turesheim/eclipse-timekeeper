@@ -104,4 +104,20 @@ class DailyActivityTest {
             }
         }
     }
+    @Test @Order(4) void activeReadCompletesMidnightRolloverBeforeMaintenanceRuns() throws Exception {
+        store.stopMaintenance();
+        Instant start=Instant.parse("2025-06-01T23:59:59Z");
+        Instant midnight=Instant.parse("2025-06-02T00:00:00Z");
+        clock.set(start);
+        try(var api=client()) {
+            var task=api.createTask(new CreateTask(Optional.empty(),"Read-time daily tracking",Optional.empty()));
+            var original=api.startActivity(new StartActivity(task.id(),OwnerId.LOCAL,"Read at midnight",Set.of()));
+            clock.set(midnight.plusSeconds(1));
+            assertEquals(1,stored().size());
+            var active=api.activeActivity(OwnerId.LOCAL).orElseThrow();
+            assertEquals(original.id(),active.id());
+            assertEquals(midnight,active.start());
+            assertEquals(2,stored().size());
+        }
+    }
 }

@@ -21,9 +21,9 @@ public class CalendarResource {
     private Response read(Supplier<ApiReplies> operation){return store.authenticatedReadSnapshot(identity,()->operation.get().response());}
     private CalendarSubscriptions calendars(){return new CalendarSubscriptions(store);}
     private void noQueries(){ContractInputs.queries(uri.getQueryParameters());}
-    @GET @Path("/calendar-subscriptions") public Response list(){noQueries();return tx(()->new ApiReplies(200,calendars().list(),null,null));}
+    @GET @Path("/calendar-subscriptions") public Response list(){noQueries();return read(()->new ApiReplies(200,calendars().list(),null,null));}
     @GET @Path("/calendar-subscriptions/{id}") public Response get(@PathParam("id")String id){
-        UUID key=ContractInputs.pathId(id);noQueries();return tx(()->ApiReplies.resource(200,calendars().visible(calendars().required(key)),null));
+        UUID key=ContractInputs.pathId(id);noQueries();return read(()->ApiReplies.resource(200,calendars().visible(calendars().required(key)),null));
     }
     @POST @Path("/calendar-subscriptions") public Response create(@HeaderParam("Idempotency-Key")String key,JsonNode body){
         var input=inputs.validate("CalendarSubscriptionCreate",body);noQueries();

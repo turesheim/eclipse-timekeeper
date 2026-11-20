@@ -17,6 +17,9 @@ final class RecentNotes {
     private final ServerStore store;
     private final VaultLimits limits;
     RecentNotes(ServerStore store,VaultLimits limits){this.store=store;this.limits=limits;}
+    boolean needsBackfill(){
+        return !new VaultState(store,limits).get().path("initialized").asBoolean()&&hasDocuments();
+    }
     private boolean hasDocuments(){
         try(var query=store.statement("SELECT id FROM tk_resource WHERE owner_id=? AND entity_type IN (?,?,?) FETCH FIRST 1 ROWS ONLY",store.owner(),EventNotes.TYPE,DayNotes.TYPE,WeekNotes.TYPE);var rows=query.executeQuery()){
             return rows.next();
@@ -26,7 +29,7 @@ final class RecentNotes {
         if(offset<0||count<1||count>limits.pageSize())throw ApiFailure.validation();
         // Merely viewing Today must not create a namespace in an unused
         // database. Existing pre-collection event and journal notes need one backfill.
-        if(!new VaultState(store,limits).get().path("initialized").asBoolean()&&hasDocuments())new VaultCollection(store,limits).initialize();
+        if(needsBackfill())new VaultCollection(store,limits).initialize();
         var settings=new VaultSettings(store).get();int days=settings.path("recentNotesDays").asInt();
         var window=window(store.now(),ZoneId.of(store.profile().path("zoneId").asText()),days);
         var vault=new VaultCollection(store,limits);

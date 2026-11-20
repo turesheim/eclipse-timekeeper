@@ -23,7 +23,7 @@ public class DailyBannerResource {
     @GET @Path("/{date}/preview") public Response preview(@PathParam("date")String value){
         ContractInputs.queries(uri.getQueryParameters());final LocalDate date;
         try{date=LocalDate.parse(value);}catch(RuntimeException invalid){throw ApiFailure.badRequest();}
-        var profile=store.authenticated(identity,()->store.profile());
+        var profile=store.authenticatedReadSnapshot(identity,store::profile);
         // Network I/O is outside the owner transaction.
         return Response.ok(weather.preview(profile,date,clock.now())).header("Cache-Control","private, no-store").build();
     }

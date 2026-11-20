@@ -69,15 +69,15 @@ external-reference uniqueness, version checks and the single-open-interval rule
 within the transaction. Merely checking an activity's `ownerId` at serialization
 or filtering a shared repository after a service operation is insufficient.
 
-Pure daily-entry, task-list and calendar event/task queries use a consistent
-snapshot of committed data without acquiring the owner write lock. They do not
-provision records or perform activity rollover. Credential and account validity
-are checked in short transactions before and after the snapshot; revocation or
-account disable prevents the private result from being returned. A first-use
-read still performs the normal owner initialization before using this path.
-Task lists requesting note origins also retain first-use vault indexing and
-legacy layout preparation in an owner transaction; subsequent reads use the
-prepared catalog in the snapshot.
+Account refresh queries read a consistent snapshot of committed data without
+acquiring the owner write lock. This covers the change feed, profile, focus
+areas, work collections and reports, calendar, journal, vault and Notes search.
+Credential and account validity are checked in short transactions before and
+after each snapshot. Revocation or account disable prevents the private result
+from being returned. First-use owner initialization and legacy vault or search
+preparation still run in an owner transaction when needed. Activity queries
+and the change feed also fall back to that transaction when the owner's local
+day has changed and the server has yet to roll over the activity records.
 
 A foreign resource or foreign relation is indistinguishable from a missing one:
 404 `NOT_FOUND`, with no resource contents, versions or owner information.
