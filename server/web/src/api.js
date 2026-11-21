@@ -211,6 +211,21 @@ export class Api {
       return this.request('/me');
     }
   }
+  activityReport(dates, zoneId, options) {
+    return this.request('/reports/activities?'+new URLSearchParams({from:dates.from,to:dates.to,zoneId}),options);
+  }
+  async refreshReports(snapshot, options) {
+    const session = snapshot.workSessionReport?.session;
+    const [activity, workSession] = await Promise.all([
+      this.activityReport(snapshot.dates,snapshot.profile.data.zoneId,options),
+      session ? this.request(`/work-sessions/${session.id}/report`,options).catch(error=>{
+        if(error.status===404)return null;
+        throw error;
+      }) : null
+    ]);
+    if(activity.data.revision!==snapshot.revision || (session && workSession?.data.revision!==snapshot.revision))return null;
+    return {...snapshot,report:activity.data,workSessionReport:workSession?.data??null};
+  }
   async snapshot(range, selectedSession = null, {timeout = 30000, signal} = {}) {
     const started=performance.now();let attempts=0;
     try {
@@ -226,7 +241,7 @@ export class Api {
             this.page('/clients',{},options),this.page('/projects',{},options),this.page('/tasks',{includeNoteSources:true},options),this.page('/labels',{},options),
             this.page('/work-sessions',{},options),this.request('/work-sessions/active',options),
             this.page('/activities',{from:dates.from,to:dates.to},options),this.request('/activities/active',options),
-            this.request(`/reports/activities?${new URLSearchParams({from:dates.from,to:dates.to,zoneId:profile.data.zoneId})}`,options),this.request('/focus-areas',options)
+            this.activityReport(dates,profile.data.zoneId,options),this.request('/focus-areas',options)
           ]);
           const chosen = workSessions.items.find((value) => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a, b) => b.start.localeCompare(a.start))[0];
           const [sessionReport,confirmed,head,confirmedFocus] = await Promise.all([

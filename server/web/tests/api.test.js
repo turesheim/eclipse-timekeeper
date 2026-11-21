@@ -180,6 +180,29 @@ test('parallel snapshots retry mixed revisions and never publish inconsistent da
   const api=new Api('token',async url=>{if(new URL(url,'http://localhost').pathname==='/api/v1/me')profiles++;return snapshotReply(url,profiles<3?2:1);});
   const snapshot=await api.snapshot(snapshotDates);assert.equal(snapshot.report.revision,1);assert.equal(profiles,4);
 });
+test('report refresh reuses the account collections and rejects changed revisions',async()=>{
+  const calls=[];let activityRevision=1,sessionRevision=1,sessionMissing=false;
+  const api=new Api('token',async url=>{
+    const route=new URL(url,'http://localhost');calls.push(route);
+    if(route.pathname==='/api/v1/reports/activities')return reply({revision:activityRevision,total:'PT5S'});
+    if(sessionMissing)return reply({code:'NOT_FOUND'},'b3duZXItYQ',404);
+    return reply({revision:sessionRevision,session:{id:'session-a'},time:{duration:'PT5S'}});
+  },{ownerId:'owner-a'});
+  const snapshot={revision:1,clients:[],tasks:[],dates:{from:'2026-05-04T00:00:00Z',to:'2026-05-11T00:00:00Z'},
+    profile:{data:{zoneId:'Europe/Oslo'}},workSessionReport:{session:{id:'session-a'}}};
+  const next=await api.refreshReports(snapshot);
+  assert.equal(next.clients,snapshot.clients);assert.equal(next.tasks,snapshot.tasks);
+  assert.equal(next.report.total,'PT5S');assert.equal(next.workSessionReport.time.duration,'PT5S');
+  assert.deepEqual(calls.map(route=>route.pathname),['/api/v1/reports/activities','/api/v1/work-sessions/session-a/report']);
+  assert.equal(calls[0].searchParams.get('zoneId'),'Europe/Oslo');
+  assert.equal(calls[0].searchParams.get('from'),snapshot.dates.from);
+  activityRevision=2;assert.equal(await api.refreshReports(snapshot),null);
+  activityRevision=1;sessionRevision=2;assert.equal(await api.refreshReports(snapshot),null);
+  sessionMissing=true;assert.equal(await api.refreshReports(snapshot),null);
+  calls.length=0;
+  const withoutSession=await api.refreshReports({...snapshot,workSessionReport:null});
+  assert.equal(withoutSession.workSessionReport,null);assert.equal(calls.length,1);
+});
 test('the snapshot deadline aborts outstanding reads together without signing out the session',async()=>{
   const signals=[];let stalled=true;
   const api=new Api('token',async(url,options)=>{

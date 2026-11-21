@@ -16,6 +16,11 @@ rejects mixed snapshots. It has a 30-second overall budget and up to three
 attempts; failed or superseded reads are aborted. Polls share in-flight refreshes
 and schedule a follow-up when that read predates a received change.
 
+An unchanged change poll reuses the account snapshot. While a timer is running,
+the browser advances its elapsed display locally and requests only the activity
+and selected work-session reports. A report from a different revision triggers
+a full refresh. Calendar subscriptions continue polling independently.
+
 Preserve focused controls and drafts during background publication. Retain
 unchanged rows/cards instead of repainting inactive views. Notes catalog changes
 arriving during a read or busy operation stay pending for a follow-up. A
