@@ -22,6 +22,7 @@
         "TIMEKEEPER_SERVER_TOKENS_FILE": "/config/tokens.json",
         "DAGSVERK_SERVER_SETUP_FILE": "/config/account-setup.json",
         "TIMEKEEPER_SERVER_SETUP_FILE": "/config/account-setup.json",
+        "TIMEKEEPER_ACCOUNT_ARCHIVE_STORAGE": "/state/server/account-archives",
         "DAGSVERK_INSTANCE_BACKUP_STORAGE": "/state/server/instance-backup",
         "TIMEKEEPER_INSTANCE_BACKUP_STORAGE": "/state/server/instance-backup",
         "DAGSVERK_INSTANCE_RESTORE_STORAGE": "/state/server/instance-restore",

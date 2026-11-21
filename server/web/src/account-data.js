@@ -1,7 +1,7 @@
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { node, button, field, section, form, table } from './account-ui.js';
 import { instantText } from './model.js';
-import {archiveDownload} from './archive-download.js';
+import {preparedAccountArchive} from './archive-download.js';
 
 const MAX_BYTES = 1024 * 1024 * 1024;
 const labels = { noteTasks:i18nText("notes.task_count"), noteClients:i18nText('notes.client_associations'),bookmarks:i18nText('notes.bookmarks'), notesEntries:i18nText('notes.entry_count'),notesFiles:i18nText('notes.file_count'),eventNotes: i18nText("event_notes.count"), dayNotes: i18nText("day_notes.count"), clients: i18nText("ui.clients"), projects: i18nText("ui.projects"), tasks: i18nText("ui.tasks"), labels: i18nText("ui.labels"), activities: i18nText("ui.activities"), workSessions: i18nText("ui.work_sessions"), importAuditRecords: i18nText("ui.import_audit_records") };
@@ -13,7 +13,7 @@ export async function renderAccountData(view, zone) {
   const api = view.session;let worker = null,cancelWorker = null,selected = null,fingerprint = null,createKey = null,uploadId = null,review = null,uncertain = false,historyAfter = null,historyItems = [];
   const downloadCard = section(view, i18nText("ui.download_my_data"));
   downloadCard.append(node('p', i18nText("ui.a_private_zip_with_json_for_restoring_your_work_and_csv_files_for_other_tools_include")+' '+i18nText("ui.prepare_archive_help")));
-  archiveDownload(view,downloadCard,{path:base+'/export',fileName:`timekeeper-account-${new Date().toISOString().slice(0,10)}.zip`});
+  preparedAccountArchive(view,downloadCard);
 
   const upload = form(view, i18nText("ui.restore_from_a_timekeeper_archive"), i18nText("ui.review_archive"), reviewFile);
   upload.value.append(node('p', i18nText("ui.adds_the_listed_records_to_this_account_existing_records_and_sign_in_details_are_kept")));

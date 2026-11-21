@@ -28,7 +28,7 @@ async function account(page,request) {
   const project=await own(page,'POST','/projects',{name:'Archive project',clientId:(await client.json()).id});expect(project.status()).toBe(201);
   const session=await own(page,'POST','/work-sessions',{projectId:(await project.json()).id,summary:'Exact private notes',start:'2026-10-16T06:00:00.123456789Z',end:'2026-10-16T07:00:00.987654321Z'});expect(session.status()).toBe(201);
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Your data',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Download my data',exact:true})).toBeVisible();return {username,session:await session.json()};
+  await expect(page.getByRole('heading',{name:'Download my data',exact:true})).toBeVisible();return {username,password,session:await session.json()};
 }
 async function download(page) {
   const downloads=[];const observe=value=>downloads.push(value);page.on('download',observe);
@@ -66,17 +66,17 @@ test('portability: private download, accessible review, stale review and duplica
   await page.reload();await page.getByLabel('Dagsverk archive',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Review archive',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Archive already restored',exact:true})).toBeVisible();expect((await snapshot(page)).workSessions).toHaveLength(2);
 });
-test('portability: a prepared archive survives navigation and is cleared at sign-out',async({page,request})=>{
-  await account(page,request);
+test('portability: the prepared archive survives navigation, reload and sign-in until replaced or deleted',async({page,request})=>{
+  const {username,password}=await account(page,request);
   const prepare=page.getByRole('button',{name:'Prepare archive',exact:true});
   const progress=page.getByRole('status').filter({hasText:'Preparing archive…'});
   const downloadLink=page.getByRole('link',{name:'Download archive',exact:true});
   const profile=page.getByRole('link',{name:'Profile',exact:true});
   const data=page.getByRole('link',{name:'Your data',exact:true});
-  const endpoint='**/api/v1/data/account/export';
+  const endpoint='**/api/v1/data/account/prepared-archive';
   let exports=0,release;
   const allowTransfer=new Promise(resolve=>{release=resolve;});
-  await page.route(endpoint,async route=>{exports++;await allowTransfer;await route.continue();});
+  await page.route(endpoint,async route=>{if(route.request().method()==='POST'){exports++;await allowTransfer;}await route.continue();});
   try{
     await prepare.click();
     await expect(progress).toBeVisible();await expect(prepare).toBeDisabled();
@@ -84,12 +84,13 @@ test('portability: a prepared archive survives navigation and is cleared at sign
     await profile.click();await expect(prepare).toHaveCount(0);
     await data.click();await expect(progress).toBeVisible();await expect(prepare).toBeDisabled();
     await profile.click();await expect(prepare).toHaveCount(0);
-    const transfer=page.waitForResponse(endpoint);release();
+    const transfer=page.waitForResponse(response=>response.url().endsWith('/prepared-archive')&&response.request().method()==='POST');release();
     expect(await (await transfer).finished()).toBeNull();
     await data.click();await expect(downloadLink).toBeVisible();
     const url=await downloadLink.getAttribute('href');
     await profile.click();await expect(downloadLink).toHaveCount(0);
     await data.click();await expect(downloadLink).toHaveAttribute('href',url);
+    await page.reload();await expect(downloadLink).toHaveAttribute('href',url);
 
     const waiting=page.waitForEvent('download');await downloadLink.click();
     const archive=await waiting;
@@ -98,9 +99,18 @@ test('portability: a prepared archive survives navigation and is cleared at sign
     await openAccountMenu(page);
     await page.getByRole('button',{name:'Sign out',exact:true}).click();
     await expect(page.locator('#login-form')).toBeVisible();
-    expect(await page.evaluate(async url=>{try{await fetch(url);return true;}catch{return false;}},url)).toBe(false);
-    await account(page,request);
-    await expect(prepare).toBeEnabled();await expect(downloadLink).toHaveCount(0);
+    expect((await browserRequest(page).get(url)).status()).toBe(401);
+    await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(username);await page.locator('#password').fill(password);
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await data.click();
+    await expect(downloadLink).toHaveAttribute('href',url);
+
+    await prepare.click();await expect(downloadLink).not.toHaveAttribute('href',url);await expect(downloadLink).toBeVisible();
+    const replacement=await downloadLink.getAttribute('href');
+    expect((await browserRequest(page).get(url)).status()).toBe(404);
+    await page.getByRole('button',{name:'Delete archive',exact:true}).click();await expect(downloadLink).toHaveCount(0);
+    await page.reload();await expect(prepare).toBeEnabled();await expect(downloadLink).toHaveCount(0);
+    expect((await browserRequest(page).get(replacement)).status()).toBe(404);
   }finally{
     release();await page.unroute(endpoint);
   }
@@ -166,14 +176,21 @@ test('portability: read-only sessions can download repeatedly while restore stay
   expect(await page.getByRole('link',{name:'Download archive',exact:true}).getAttribute('href')).not.toBe(previous);
   expect(await page.evaluate(async url=>{try{await fetch(url);return true;}catch{return false;}},previous)).toBe(false);
 });
-test('portability: busy archive preparation can be retried from the account page',async({page,request})=>{
-  await account(page,request);
-  await page.route('**/api/v1/data/account/export',route=>route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({status:503,code:'ACCOUNT_ARCHIVE_BUSY'})}));
+test('portability: a failed replacement leaves the previous archive downloadable',async({page,request})=>{
+  await account(page,request);await download(page);
+  const link=page.getByRole('link',{name:'Download archive',exact:true});
+  const previous=await link.getAttribute('href');
+  const endpoint='**/api/v1/data/account/prepared-archive';
+  await page.route(endpoint,route=>route.request().method()==='POST'
+    ?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({status:503,code:'ACCOUNT_ARCHIVE_BUSY'})})
+    :route.continue());
   await page.getByRole('button',{name:'Prepare archive',exact:true}).click();
   await expect(page.getByText('The server is preparing another archive. Try again after it finishes.',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Prepare archive',exact:true})).toBeEnabled();
-  await expect(page.getByRole('link',{name:'Download archive',exact:true})).toHaveCount(0);
-  await page.unroute('**/api/v1/data/account/export');await download(page);
+  await expect(link).toHaveAttribute('href',previous);
+  expect((await browserRequest(page).get(previous)).status()).toBe(200);
+  await page.unroute(endpoint);await download(page);
+  await expect(link).not.toHaveAttribute('href',previous);
 });
 test('portability: concurrent session refreshes stay available while overlapping archives return busy',async({page,request})=>{
   await account(page,request);

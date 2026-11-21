@@ -776,9 +776,9 @@ class ContractTest(unittest.TestCase):
     def test_versioned_mutations_and_durable_commands(self):
         for path, item in CONTRACT['paths'].items():
             for method in ('put', 'delete'):
-                # Chunks are immutable: index plus exact content identifies a
-                # write, and conflicting bytes return 409 instead of overwriting.
-                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}', '/admin/instance/uploads/{id}/content'):
+                # Chunks have immutable content. The prepared archive ID is
+                # itself a version, so a stale delete cannot remove a replacement.
+                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}', '/admin/instance/uploads/{id}/content', '/data/account/prepared-archive/{id}'):
                     op = item[method]
                     if path == '/journal-assets/{filename}' and method == 'put':
                         self.assertIn({'$ref': '#/components/parameters/IfMatchOptional'}, op['parameters'])
@@ -911,7 +911,8 @@ class ContractTest(unittest.TestCase):
             'getDayNoteHistory', 'getDayNoteContent', 'saveDayNoteContent', 'deleteDayNoteContent', 'getDayEntry', 'editDayEntry',
             'listWeekNotes', 'getWeekNote', 'saveWeekNote', 'deleteWeekNote', 'downloadWeekNote',
             'getJournalAsset', 'putJournalAsset', 'deleteJournalAsset',
-            'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
+            'downloadAccountArchive', 'getPreparedAccountArchive', 'prepareAccountArchive',
+            'downloadPreparedAccountArchive', 'deletePreparedAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
             'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
             'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',

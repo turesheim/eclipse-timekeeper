@@ -16,8 +16,8 @@ set -eu
 test "$2" = timekeeper
 case "$1" in
   status)
-    if test -e /run/dagsverk-fixture-running; then state=running; else state=stop; fi
-    printf '{"status":"%s","status_code":0}\\n' "$state"
+    if test -e /run/dagsverk-fixture-running; then state=running; code=0; else state=stop; code=273; fi
+    printf '{"status":"%s","aspect":{"active":{"status":"%s","status_code":%s}}}\\n' "$state" "$state" "$code"
     ;;
   stop) rm -f /run/dagsverk-fixture-running ;;
   start) touch /run/dagsverk-fixture-running ;;

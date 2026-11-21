@@ -48,14 +48,15 @@ class AccountArchive {
         return folder;
     }
     @FunctionalInterface private interface Writer {void write(Connection connection,String owner,Path file)throws SQLException,IOException;}
-    Download download(TokenRegistry.Principal principal) {return download(principal,"timekeeper-account.zip",this::write);}
-    Download notesDownload(TokenRegistry.Principal principal) {return download(principal,"timekeeper-notes.zip",VaultExport::write);}
-    private Download download(TokenRegistry.Principal principal,String filename,Writer writer) {
+    Download download(TokenRegistry.Principal principal) {return download(principal,null);}
+    Download download(TokenRegistry.Principal principal,Path storage) {return download(principal,"timekeeper-account.zip",this::write,storage);}
+    Download notesDownload(TokenRegistry.Principal principal) {return download(principal,"timekeeper-notes.zip",VaultExport::write,null);}
+    private Download download(TokenRegistry.Principal principal,String filename,Writer writer,Path storage) {
         if(!preparing.tryAcquire())throw new ApiFailure(503,"ACCOUNT_ARCHIVE_BUSY");
         var operation=new Preparation(filename.equals("timekeeper-account.zip")?"account":"notes");preparation.set(operation);phase("authorization");
         try {
         for(int attempt=0;;attempt++) {
-            try {var result=snapshot(principal,filename,writer);LOG.infof("Archive preparation completed operation_id=%s kind=%s elapsed_ms=%d bytes=%d",operation.id,operation.kind,operation.elapsed(),result.length());return result;}
+            try {var result=snapshot(principal,filename,writer,storage);LOG.infof("Archive preparation completed operation_id=%s kind=%s elapsed_ms=%d bytes=%d",operation.id,operation.kind,operation.elapsed(),result.length());return result;}
             catch(RuntimeException failure) {
                 if(attempt>=15 || !snapshotConflict(failure)) throw failure;
                 // A concurrent authenticated read can update last-seen metadata
@@ -80,10 +81,11 @@ class AccountArchive {
             if(cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
         return false;
     }
-    private Download snapshot(TokenRegistry.Principal principal,String filename,Writer writer) {
+    private Download snapshot(TokenRegistry.Principal principal,String filename,Writer writer,Path storage) {
         Path folder=null,file=null;
         try {
-            folder=privateDirectory();file=folder.resolve(filename);
+            folder=storage==null ? privateDirectory() : Files.createTempDirectory(storage,".preparing-",PreparedAccountArchive.DIRECTORY_MODE);
+            file=folder.resolve(filename);
             try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
                 int isolation=connection.getTransactionIsolation();
                 connection.setAutoCommit(false);
@@ -104,7 +106,7 @@ class AccountArchive {
                     principal=tokens.recheck(principal);accounts.guard(connection,principal);connection.commit();
                 }catch(Throwable failure) {try{connection.rollback();}catch(SQLException rollback){failure.addSuppressed(rollback);}throw failure;}
             }
-            folder.toFile().deleteOnExit();file.toFile().deleteOnExit();
+            if(storage==null){folder.toFile().deleteOnExit();file.toFile().deleteOnExit();}
             return new Download(file,Files.size(file));
         }catch(SQLException | IOException failure) {
             if(file!=null) new Download(file,0).close();else if(folder!=null) try {Files.deleteIfExists(folder);}catch(IOException ignored) {}

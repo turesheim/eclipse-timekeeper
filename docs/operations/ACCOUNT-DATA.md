@@ -5,32 +5,37 @@ signed-in account. Administrator access does not include anyone else's records.
 
 ## Download
 
-In **Download my data**, select **Prepare archive**. This creates and fetches a
-consistent snapshot without opening a browser download. When it is ready, select
-**Download archive** to save `timekeeper-account-YYYY-MM-DD.zip`; the date is the
-server's UTC preparation date. Preparation continues while you visit other
-Dagsverk pages in the same tab. Return to **Your data** to see the progress or
-download the prepared ZIP. Preparing again replaces the previous browser copy.
-Signing out, reloading the tab or closing it releases that copy.
-Read-only sessions can also prepare and download archives.
+Select **Prepare archive** in **Download my data** to create a consistent
+snapshot. When it is ready, select **Download archive** to save
+`timekeeper-account-YYYY-MM-DD.zip`. The date is the server's UTC
+preparation date. You can leave **Your data** while the server builds the ZIP.
+Return to see its progress or download it.
 
-Preparation favors bounded memory over speed: the server builds the ZIP in a
-private temporary file, reading large attachment content in chunks. A large
-archive can take time; the browser allows up to 30 minutes for preparation and
-transfer. Normal requests and health checks remain available while it runs.
-Only one account/Notes archive is prepared per server process at a time; if the
-server is already preparing one, wait for it to finish and try again.
-Authorization is checked before preparation and again before releasing the
-archive. Temporary output is removed after transfer, disconnection or a failed
-preparation.
-The container templates place Java temporary files on the private state volume
-(`TMPDIR=/instance/tmp` in Compose, `/state/server/tmp` on Synology), rather than
-the RAM-backed `/tmp` mount. Allow disk space for the prepared ZIP. Standalone
-services should use a private disk directory with `-Djava.io.tmpdir=/path/to/tmp`.
-After an abrupt process termination, `timekeeper-account-download-*` directories
-can remain in the Java temporary directory. Remove abandoned archives only
-while every API process sharing that directory is stopped. These files contain
-private account data and must not be shared.
+With write access, preparing an archive saves one private ZIP on the server.
+The link is available to the same account after a reload, sign-in on another
+device, or server restart. The existing link stays usable while a replacement
+is being prepared, and a failed replacement leaves it available. Select
+**Delete archive** to remove the prepared copy. Read-only sessions can download
+the saved ZIP or prepare a temporary copy when there is no saved ZIP.
+
+The server builds the ZIP on disk, reading large attachments in chunks. The
+browser waits up to 30 minutes for preparation. Only one account or Notes ZIP
+is prepared per server process at a time. Authorization is checked before and
+after preparation and on each download. The browser downloads the saved ZIP
+directly from the server.
+
+Compose keeps prepared archives in `/instance/account-archives`. The Synology
+package uses `/state/server/account-archives`. For standalone services, set
+`TIMEKEEPER_ACCOUNT_ARCHIVE_STORAGE` to a private, persistent directory
+(the default is `account-archives` relative to the working directory). All API
+processes serving the same instance must share that directory. Allow disk
+space for both the existing ZIP and its replacement during preparation.
+Prepared ZIPs are derived data and must be prepared again after restoring the
+instance from backup. After an abrupt termination, private `.preparing-*`
+directories may remain in archive storage and
+`timekeeper-account-download-*` directories may remain in the Java temporary
+directory. Remove abandoned staging directories while all API processes
+using them are stopped.
 
 The supported server requires at least **2 GiB of Java heap**, plus memory for
 the JVM outside its heap and for the database/OS. See the
