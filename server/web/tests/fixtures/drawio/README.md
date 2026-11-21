@@ -42,3 +42,15 @@ editor to verify both pages and edits.
 This checks static hosting using synthetic fixtures over loopback HTTP.
 Packaged Dagsverk dialog behavior, vault writes and HTTPS deployment are
 separate acceptance scenarios.
+
+For the packaged Dagsverk flow, use the same extracted directory with the
+HTTPS acceptance runner. It serves the editor on a second loopback hostname
+and configures the packaged application to frame it.
+
+```sh
+python3 server/web/tests/acceptance.py \
+  --distribution server/target/distribution/timekeeper-server.zip \
+  --https --spec drawio.spec.js --drawio-root "$editor_dir"
+```
+
+Add `--browser webkit` to run the same scenarios in WebKit.

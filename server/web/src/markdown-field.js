@@ -167,10 +167,10 @@ export class MarkdownField {
   async upload(picker,image){
     const file=picker.files?.[0];picker.value='';if(file)await this.uploadFiles([file],this.editor?.bookmark(),image);
   }
-  async uploadFiles(files,target,forceImage,{label:labelOverride,retry=true}={}){
+  async uploadFiles(files,target,forceImage,{label:labelOverride,retry=true,selection}={}){
     if(!this.onUpload||this.readOnly||this.loading)return;
     const remaining=[...files];
-    const generation=this.generation,editor=this.editor;let start=this.text.selectionStart,end=this.text.selectionEnd;
+    const generation=this.generation,editor=this.editor;let start=selection?.start??this.text.selectionStart,end=selection?.end??this.text.selectionEnd;
     this.loading=true;this.controls();this.retryButton.hidden=true;
     try{
       for(let index=0;index<files.length;index++){

@@ -233,6 +233,14 @@ func publishConfiguration(root, target string, s Settings) error {
 			return err
 		}
 	}
+	// The editor host is specific to this installation and optional.
+	drawio, err := os.ReadFile(filepath.Join(root, "config/drawio.properties"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := atomic(filepath.Join(private, "config/drawio.properties"), drawio, 0644); err != nil {
+		return err
+	}
 	// The server's HostPolicy follows the effective central hostname. A static
 	// deployment allowlist would prevent a hostname saved in Administration.
 	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\nquarkus.http.host-validation.require-localhost=false\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, s.PublicOrigin, s.DeployedAt)

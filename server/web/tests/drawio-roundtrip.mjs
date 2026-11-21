@@ -16,7 +16,7 @@ const editorOrigin = editorUrl.origin;
 editorUrl.search = new URLSearchParams({embed: '1', proto: 'json', ui: 'min', offline: '1', stealth: '1'});
 // Keep the host's production policy and grant framing to the configured editor alone.
 const properties = await readFile(new URL('../../app/src/main/resources/application.properties', import.meta.url), 'utf8');
-const policy = properties.match(/^quarkus\.http\.filter\.web\.header\."Content-Security-Policy"=(.+)$/m)?.[1];
+const policy = properties.match(/^timekeeper\.web\.content-security-policy=(.+)$/m)?.[1];
 assert.ok(policy, 'Missing Dagsverk web Content Security Policy');
 assert.doesNotMatch(policy, /(?:^|;)\s*frame-src\s/);
 
