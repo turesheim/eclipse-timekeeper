@@ -36,7 +36,11 @@ class AccountArchiveHttpTest {
         }
     }
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("http","jdbc:h2:mem:account_archive_http_tests");}
+        public Map<String,String> getConfigOverrides() {
+            var config=new HashMap<>(ArchiveTestDatabase.configuration("http","jdbc:h2:mem:account_archive_http_tests"));
+            config.put("timekeeper.account-archive.storage","target/prepared-archive-test-"+UUID.randomUUID());
+            return config;
+        }
     }
     @Inject ServerStore store;
     private Response call(String token,String method,String path,JsonNode body,String match,String key) {
@@ -44,6 +48,30 @@ class AccountArchiveHttpTest {
         if(body!=null) request.contentType("application/json").body(body.toString());
         if(match!=null) request.header("If-Match",match);if(key!=null) request.header("Idempotency-Key",key);
         return request.request(method,"/api/v1"+path);
+    }
+    @Test void preparedZipIsOwnerScopedAndOnlyTheCurrentLinkWorks() {
+        String path="/data/account/prepared-archive";
+        call("test-a","GET",path,null,null,null).then().statusCode(204);
+        call("test-read","POST",path,object(),null,null).then().statusCode(403);
+        String first=call("test-a","POST",path,object(),null,null).then().statusCode(200).extract().path("id");
+        assertEquals(first,call("test-read","GET",path,null,null,null).then().statusCode(200).extract().path("id"));
+        byte[] zip=call("test-read","GET",path+"/"+first,null,null,null).then().statusCode(200)
+                .header("Cache-Control","no-store").contentType("application/zip").extract().asByteArray();
+        assertEquals('P',zip[0]);assertEquals('K',zip[1]);
+        assertArrayEquals(zip,call("test-a","GET",path+"/"+first,null,null,null).then().statusCode(200).extract().asByteArray());
+        given().get("/api/v1"+path+"/"+first).then().statusCode(401);
+        call("test-b","GET",path,null,null,null).then().statusCode(204);
+        call("test-b","GET",path+"/"+first,null,null,null).then().statusCode(404);
+        call("test-b","DELETE",path+"/"+first,null,null,null).then().statusCode(404);
+        call("test-read","DELETE",path+"/"+first,null,null,null).then().statusCode(403);
+        String second=call("test-a","POST",path,object(),null,null).then().statusCode(200).extract().path("id");
+        assertNotEquals(first,second);
+        call("test-a","GET",path+"/"+first,null,null,null).then().statusCode(404);
+        call("test-a","DELETE",path+"/"+first,null,null,null).then().statusCode(404);
+        call("test-a","GET",path+"/"+second,null,null,null).then().statusCode(200);
+        call("test-a","DELETE",path+"/"+second,null,null,null).then().statusCode(204);
+        call("test-a","GET",path,null,null,null).then().statusCode(204);
+        call("test-a","GET",path+"/"+second,null,null,null).then().statusCode(404);
     }
     @Test void chunkRouteUsesTheDeclaredLengthAtTheZipAndJsonLimits() {
         String uploads="/data/account/uploads";

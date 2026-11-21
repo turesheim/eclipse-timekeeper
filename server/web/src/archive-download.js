@@ -10,7 +10,7 @@ export function createArchiveDownloads(session){
   }
   const clear=(entry)=>{
     if(!entry.ready)return;
-    URL.revokeObjectURL(entry.ready.url);
+    if(entry.ready.url)URL.revokeObjectURL(entry.ready.url);
     entry.ready=null;
   };
   return {
@@ -64,4 +64,67 @@ export function archiveDownload(view,container,{path,fileName}){
   }
   if(entry.pending)void watch(entry.pending);
   else showReady();
+}
+
+export function preparedAccountArchive(view,container){
+  const path='/data/account/prepared-archive';
+  const entry=view.archiveDownloads.get(path);
+  const controls=node('div',undefined,'d-flex flex-wrap gap-2');
+  const feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
+  const prepare=button(t('ui.prepare_archive'),()=>{
+    if(view.valid()&&!view.busy&&!entry.pending)
+      void change(view.session.request(path,{method:'POST',timeout:1800000}),t('ui.preparing_archive'));
+  },'btn btn-primary');
+  container.append(controls,feedback);
+
+  function render(busy){
+    controls.replaceChildren();
+    if(view.canWrite){prepare.disabled=busy;controls.append(prepare);}
+    if(!entry.ready)return;
+    const link=node('a',t('ui.download_archive'),'btn btn-outline-secondary');
+    const archivePath=path+'/'+encodeURIComponent(entry.ready.id);
+    link.href='/api/v1'+archivePath;
+    link.referrerPolicy='origin';
+    controls.append(link);
+    if(view.canWrite){
+      const remove=button(t('ui.delete_prepared_archive'),()=>{
+        if(view.valid()&&!view.busy&&!entry.pending)
+          void change(view.session.request(archivePath,{method:'DELETE'}),'');
+      },'btn btn-outline-danger');
+      remove.disabled=busy;
+      controls.append(remove);
+    }
+  }
+
+  async function change(request,message){
+    entry.pending=request.then(({data})=>{entry.ready=data;}).finally(()=>{entry.pending=null;});
+    entry.message=message;
+    await watch(entry.pending,message);
+  }
+
+  async function watch(request,message){
+    render(true);
+    feedback.textContent=message;
+    if(message){
+      const spinner=node('span',undefined,'spinner-border spinner-border-sm me-2');
+      spinner.setAttribute('aria-hidden','true');
+      feedback.prepend(spinner);
+    }
+    try{
+      await request;
+      if(!view.valid())return;
+      feedback.textContent=entry.ready?t('ui.your_private_archive_is_ready'):'';
+      if(!view.canWrite&&!entry.ready)
+        archiveDownload(view,container,{path:'/data/account/export',fileName:'timekeeper-account.zip'});
+    }catch(error){
+      if(!view.valid())return;
+      if(error.status===401)view.signOut(error.message);
+      else feedback.textContent=error.message;
+    }finally{
+      if(view.valid())render(false);
+    }
+  }
+
+  if(entry.pending)void watch(entry.pending,entry.message);
+  else void watch(view.session.request(path).then(({data})=>{if(view.valid())entry.ready=data;}),'');
 }

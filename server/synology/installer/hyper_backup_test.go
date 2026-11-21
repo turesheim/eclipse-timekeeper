@@ -17,9 +17,9 @@ func hyperFixture(t *testing.T, running bool, fail string) (string, hyperBackupR
 	directory := t.TempDir()
 	input := `{"temp_path":` + strconv.Quote(directory) + `,"app_data_version":"1.0"}`
 	var calls []string
-	status := "stop"
+	status, code := "stop", 273
 	if running {
-		status = "running"
+		status, code = "running", 0
 	}
 	runtime := hyperBackupRuntime{
 		command: func(args ...string) ([]byte, error) {
@@ -31,7 +31,7 @@ func hyperFixture(t *testing.T, running bool, fail string) (string, hyperBackupR
 				return nil, errors.New("private command diagnostic")
 			}
 			if args[0] == "status" {
-				return []byte(`{"status":"` + status + `","status_code":0}`), nil
+				return []byte(`{"aspect":{"active":{"status":"` + status + `","status_code":` + strconv.Itoa(code) + `}},"package":"` + packageID + `","status":"` + status + `"}`), nil
 			}
 			return nil, nil
 		},
@@ -166,11 +166,26 @@ func TestHyperBackupRefusesAmbiguousStateAndReportsLifecycleFailures(t *testing.
 			t.Fatal("backup proceeded after failed stop")
 		}
 	}
-	for _, status := range []string{`{}`, `{"status":"stop","status_code":263}`, `{"status":"start_failed","status_code":272}`} {
+	for _, status := range []string{
+		`{}`, `{"status":"stop","status_code":263}`, `{"status":"start_failed","status_code":272}`,
+		`{"status":"running","aspect":{"active":{"status":"running","status_code":272}}}`,
+		`{"status":"stop","aspect":{"active":{"status":"stop","status_code":1}}}`,
+		`{"status":"non_installed","aspect":{"active":{"status":"stop","status_code":273}}}`,
+		`{"status":"running","aspect":{"active":{"status":"running"}}}`,
+		`{"status":"running","aspect":{"active":{"status":"stop","status_code":0}}}`,
+		`{"status":"running","status_code":272,"aspect":{"active":{"status":"running","status_code":0}}}`,
+	} {
 		input, runtime, calls := hyperFixture(t, true, "")
 		runtime.command = func(...string) ([]byte, error) { return []byte(status), nil }
 		if hyperBackupTransfer("hyper-backup-export", input, runtime) == nil || len(*calls) != 0 {
 			t.Fatal("ambiguous state allowed application backup")
 		}
+	}
+}
+
+func TestHyperBackupAcceptsLegacyFlatPackageState(t *testing.T) {
+	running, known := hyperBackupPackageState([]byte(`{"status":"running","status_code":0}`), nil)
+	if !known || !running {
+		t.Fatal("valid flat package state was rejected")
 	}
 }
