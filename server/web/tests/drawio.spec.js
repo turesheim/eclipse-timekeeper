@@ -171,6 +171,7 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(viewport.height).toBe(844);
     expect(viewport.x).toBe(0);
     expect(viewport.y).toBe(0);
+    await captureScreenshot(page,{path:test.info().outputPath('drawio-editor-phone.png')});
     await change(frame,'Saved detail','Discard this detail');
     const cancel=box.getByRole('button',{name:'Cancel',exact:true});
     page.once('dialog',prompt=>prompt.dismiss());

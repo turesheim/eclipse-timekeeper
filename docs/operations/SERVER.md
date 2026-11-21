@@ -98,7 +98,6 @@ the editor, apply a policy on the **editor host** following the
 Omit the setting to use manual PNG import, download, and replacement. See
 [editing diagrams in Dagsverk](MARKDOWN-EDITOR.md#drawio-diagrams).
 
-
 ## Data and operational behavior
 
 Every account has one immutable owner ID. Administrators do not gain access to

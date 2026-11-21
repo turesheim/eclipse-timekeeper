@@ -43,7 +43,7 @@ class DrawioWeb {
         String editorPolicy = origin == null ? policy : policy + "; frame-src " + origin;
         router.routeWithRegex("/(?:web|admin)(?:/.*)?").order(-1000).handler(context -> {
             String path = context.normalizedPath();
-            boolean web = path.equals("/web") || path.startsWith("/web/");
+            boolean web = path.equals("/web") || path.equals("/web/") || path.equals("/web/index.html");
             context.response().putHeader("Content-Security-Policy", web ? editorPolicy : policy);
             context.next();
         });

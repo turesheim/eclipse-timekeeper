@@ -24,14 +24,15 @@ class RecoveryFixture:
         self.base=f'http://127.0.0.1:{backend}'
         fixture=self
         if https:
-            class Proxy(http.server.BaseHTTPRequestHandler):
-                protocol_version='HTTP/1.1'
+            class FixtureHandler:
                 def log_message(self,*args):pass
                 def handle(self):
                     try:super().handle()
                     except (BrokenPipeError,ConnectionResetError,TimeoutError):pass
                     except ssl.SSLError as failure:
                         if failure.reason not in ('SSLV3_ALERT_CERTIFICATE_UNKNOWN','TLSV1_ALERT_UNKNOWN_CA'):raise
+            class Proxy(FixtureHandler,http.server.BaseHTTPRequestHandler):
+                protocol_version='HTTP/1.1'
                 def relay(self):
                     body=self.rfile.read(int(self.headers.get('Content-Length','0')))
                     headers={key:value for key,value in self.headers.items() if key.lower() not in ('connection','content-length','transfer-encoding')}
@@ -62,8 +63,7 @@ class RecoveryFixture:
             proxy.socket=tls.wrap_socket(proxy.socket,server_side=True,do_handshake_on_connect=False)
             self.base=f'https://{hostname}:{proxy.server_port}';self.start(proxy)
             if drawio_root:
-                class StaticEditor(http.server.SimpleHTTPRequestHandler):
-                    def log_message(self,*args):pass
+                class StaticEditor(FixtureHandler,http.server.SimpleHTTPRequestHandler):pass
                 static=ProxyServer(('127.0.0.1',0),partial(StaticEditor,directory=str(drawio_root)))
                 static.socket=tls.wrap_socket(static.socket,server_side=True,do_handshake_on_connect=False)
                 editor_host='localhost' if hostname=='127.0.0.1' else '127.0.0.1'
