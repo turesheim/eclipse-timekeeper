@@ -318,8 +318,16 @@ func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
+	editor := []byte("timekeeper.web.drawio-origin=https://diagrams.example.org\n")
+	if err := os.WriteFile(filepath.Join(root, "config/drawio.properties"), editor, 0644); err != nil {
+		t.Fatal(err)
+	}
 	if err := render(root, target, s); err != nil {
 		t.Fatal(err)
+	}
+	configuredEditor, err := os.ReadFile(filepath.Join(target, "private/config/drawio.properties"))
+	if err != nil || !bytes.Equal(configuredEditor, editor) {
+		t.Fatal("retained draw.io configuration was not supplied to the server")
 	}
 	runtime, err := os.ReadFile(filepath.Join(target, "private/config/runtime.properties"))
 	if err != nil || !strings.Contains(string(runtime), "timekeeper.spk-version=") {

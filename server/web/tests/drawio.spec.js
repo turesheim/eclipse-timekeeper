@@ -45,7 +45,7 @@ test('editable PNG insertion, original download and replacement preserve portabl
   await root.locator('.ProseMirror').click();await page.keyboard.press('ControlOrMeta+End');await insert(page,root);await saveMarkdown(root);const source=(await bytes(api,entry.id)).toString('utf8');expect(source).toContain('![System overview](system.drawio.png)');expect(source.startsWith('\uFEFF---\r\ncustom: exact\r\n---\r\n')).toBe(true);
   const asset=await(await api('GET','/notes/resolve?path=system.drawio.png')).json();expect(await bytes(api,asset.id)).toEqual(original);
   await notesSource(page);await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror img[alt="System overview"]')).toBeVisible();const previous=await root.locator('.ProseMirror img[alt="System overview"]').getAttribute('src');
-  let box=await manage(page,root);expect(await downloaded(page,box,'downloaded-original.png')).toEqual(original);await choose(box);
+  let box=await manage(page,root);if(!process.env.TIMEKEEPER_WEB_DRAWIO_ORIGIN)await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeHidden();expect(await downloaded(page,box,'downloaded-original.png')).toEqual(original);await choose(box);
   for(const theme of ['timekeeper','timekeeper-dark'])for(const width of [1200,320]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('.drawio-dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await box.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/drawio-${theme}-${width}.png`});}
   await box.getByRole('button',{name:'Replace PNG',exact:true}).click();await expect(box).toBeHidden();await expect(root.locator('.ProseMirror img[alt="System overview"]')).not.toHaveAttribute('src',previous);expect(await bytes(api,asset.id)).toEqual(revised);expect((await bytes(api,entry.id)).toString('utf8')).toBe(source);
   await page.reload();const reopened=await open(page,'Diagram.md');box=await manage(page,reopened);expect(await downloaded(page,box,'downloaded-revised.png')).toEqual(revised);await box.getByRole('button',{name:'Cancel',exact:true}).press('Escape');await expect(box).toBeHidden();expect(remote).toEqual([]);
@@ -161,11 +161,11 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(saved).not.toEqual(original);
     expect((await bytes(api,note.id)).toString()).toBe(source);
 
+    await page.setViewportSize({width:390,height:844});
     box=await manage(page,root);frame=await edit(box);
     await expect(frame.getByText('Saved overview',{exact:true})).toBeVisible();
     await frame.getByText('Details',{exact:true}).click();
     await expect(frame.getByText('Saved detail',{exact:true})).toBeVisible();
-    await page.setViewportSize({width:390,height:844});
     const viewport=await box.boundingBox();
     expect(viewport.width).toBe(390);
     expect(viewport.height).toBe(844);
@@ -224,6 +224,19 @@ test.describe('self-hosted draw.io editor',()=>{
     await box.getByRole('button',{name:'Check saved result',exact:true}).click();
     await expect(box).toBeHidden();
     expect(writes).toBe(1);
+  });
+
+  test('keeps manual replacement and download available when the configured editor cannot load',async({page,request})=>{
+    const {put}=await fresh(page,request);
+    await put('system.drawio.png',original);
+    await put('Diagram.md','![System overview](system.drawio.png)\n');
+    const root=await open(page,'Diagram.md'),box=await manage(page,root);
+    await page.route(origin+'/**',route=>route.abort());
+    await box.getByRole('button',{name:'Edit diagram',exact:true}).click();
+    await expect(box.getByRole('alert')).toContainText('editor is unavailable',{timeout:20_000});
+    await expect(box.locator('iframe')).toHaveCount(0);
+    expect(await downloaded(page,box,'fallback-original.png')).toEqual(original);
+    await choose(box);
   });
 
   test('creates a portable editable PNG and inserts it at the captured source cursor',async({page,request})=>{
