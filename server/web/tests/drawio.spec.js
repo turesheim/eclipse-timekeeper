@@ -46,7 +46,13 @@ test('editable PNG insertion, original download and replacement preserve portabl
   const asset=await(await api('GET','/notes/resolve?path=system.drawio.png')).json();expect(await bytes(api,asset.id)).toEqual(original);
   await notesSource(page);await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror img[alt="System overview"]')).toBeVisible();const previous=await root.locator('.ProseMirror img[alt="System overview"]').getAttribute('src');
   let box=await manage(page,root);if(!process.env.TIMEKEEPER_WEB_DRAWIO_ORIGIN)await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeHidden();expect(await downloaded(page,box,'downloaded-original.png')).toEqual(original);await choose(box);
-  for(const theme of ['timekeeper','timekeeper-dark'])for(const width of [1200,320]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('.drawio-dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await box.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/drawio-${theme}-${width}.png`});}
+  for(const theme of ['timekeeper','timekeeper-dark'])for(const width of [1200,320]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('.drawio-dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await box.evaluate(node=>{
+    const {left,right}=node.getBoundingClientRect();
+    return [...node.querySelectorAll('.dialog-actions > button:not([hidden])')].every(button=>{
+      const bounds=button.getBoundingClientRect();
+      return bounds.left>=left&&bounds.right<=right;
+    });
+  })).toBe(true);await captureScreenshot(page,{path:`test-results/drawio-${theme}-${width}.png`});}
   await box.getByRole('button',{name:'Replace PNG',exact:true}).click();await expect(box).toBeHidden();await expect(root.locator('.ProseMirror img[alt="System overview"]')).not.toHaveAttribute('src',previous);expect(await bytes(api,asset.id)).toEqual(revised);expect((await bytes(api,entry.id)).toString('utf8')).toBe(source);
   await page.reload();const reopened=await open(page,'Diagram.md');box=await manage(page,reopened);expect(await downloaded(page,box,'downloaded-revised.png')).toEqual(revised);await box.getByRole('button',{name:'Cancel',exact:true}).press('Escape');await expect(box).toBeHidden();expect(remote).toEqual([]);
 });

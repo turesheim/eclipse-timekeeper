@@ -228,6 +228,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .weather-location-results li {display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem}
 .weather-location-results .btn {text-align:start;overflow-wrap:anywhere;max-width:100%}
 .drawio-dialog {width:min(38rem,calc(100vw - 2rem));}
+.drawio-dialog > .dialog-actions {flex-wrap:wrap;}
 .drawio-dialog .form-label {display:block;margin-block:.75rem;}
 .drawio-files {list-style:none;padding:0;display:grid;gap:.35rem;max-height:12rem;overflow:auto;}
 .drawio-files button {width:100%;overflow-wrap:anywhere;}
