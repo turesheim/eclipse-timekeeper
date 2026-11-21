@@ -12,7 +12,7 @@
       "security_opt": ["no-new-privileges:true"],
       "environment": {
         "TMPDIR": "/state/server/tmp",
-        "QUARKUS_CONFIG_LOCATIONS": "file:/config/runtime.properties,file:/config/mail.properties,file:/run/secrets/task_providers.properties",
+        "QUARKUS_CONFIG_LOCATIONS": "file:/config/runtime.properties,file:/config/mail.properties,file:/config/drawio.properties,file:/run/secrets/task_providers.properties",
         "QUARKUS_HTTP_HOST": "127.0.0.1",
         "DAGSVERK_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password",
         "TIMEKEEPER_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password",

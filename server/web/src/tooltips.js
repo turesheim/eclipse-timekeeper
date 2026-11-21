@@ -53,8 +53,8 @@ export function richTooltip(node,render,{composite=true}={}) {
 }
 function plainTooltip(node) {
   // ProseMirror owns authored link/image titles. Changing those DOM attributes
-  // can change the saved Markdown, so only application UI hints are enhanced.
-  if(node.closest('.ProseMirror, [contenteditable="true"], .timekeeper-tooltip'))return;
+  // can change the saved Markdown. An iframe title is its accessible name.
+  if(node.closest('.ProseMirror, [contenteditable="true"], .timekeeper-tooltip, iframe'))return;
   const title=node.getAttribute('title');if(title===null)return;
   // A composite card owns its whole surface, including icons and text.
   if(node.parentElement?.closest('[data-tk-tooltip-composite]')){node.removeAttribute('title');return;}

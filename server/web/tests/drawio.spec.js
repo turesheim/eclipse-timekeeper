@@ -45,8 +45,14 @@ test('editable PNG insertion, original download and replacement preserve portabl
   await root.locator('.ProseMirror').click();await page.keyboard.press('ControlOrMeta+End');await insert(page,root);await saveMarkdown(root);const source=(await bytes(api,entry.id)).toString('utf8');expect(source).toContain('![System overview](system.drawio.png)');expect(source.startsWith('\uFEFF---\r\ncustom: exact\r\n---\r\n')).toBe(true);
   const asset=await(await api('GET','/notes/resolve?path=system.drawio.png')).json();expect(await bytes(api,asset.id)).toEqual(original);
   await notesSource(page);await root.getByRole('button',{name:'Formatted',exact:true}).click();await expect(root.locator('.ProseMirror img[alt="System overview"]')).toBeVisible();const previous=await root.locator('.ProseMirror img[alt="System overview"]').getAttribute('src');
-  let box=await manage(page,root);expect(await downloaded(page,box,'downloaded-original.png')).toEqual(original);await choose(box);
-  for(const theme of ['timekeeper','timekeeper-dark'])for(const width of [1200,320]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('.drawio-dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await box.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/drawio-${theme}-${width}.png`});}
+  let box=await manage(page,root);if(!process.env.TIMEKEEPER_WEB_DRAWIO_ORIGIN)await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeHidden();expect(await downloaded(page,box,'downloaded-original.png')).toEqual(original);await choose(box);
+  for(const theme of ['timekeeper','timekeeper-dark'])for(const width of [1200,320]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect((await new AxeBuilder({page}).include('.drawio-dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);expect(await box.evaluate(node=>{
+    const {left,right}=node.getBoundingClientRect();
+    return [...node.querySelectorAll('.dialog-actions > button:not([hidden])')].every(button=>{
+      const bounds=button.getBoundingClientRect();
+      return bounds.left>=left&&bounds.right<=right;
+    });
+  })).toBe(true);await captureScreenshot(page,{path:`test-results/drawio-${theme}-${width}.png`});}
   await box.getByRole('button',{name:'Replace PNG',exact:true}).click();await expect(box).toBeHidden();await expect(root.locator('.ProseMirror img[alt="System overview"]')).not.toHaveAttribute('src',previous);expect(await bytes(api,asset.id)).toEqual(revised);expect((await bytes(api,entry.id)).toString('utf8')).toBe(source);
   await page.reload();const reopened=await open(page,'Diagram.md');box=await manage(page,reopened);expect(await downloaded(page,box,'downloaded-revised.png')).toEqual(revised);await box.getByRole('button',{name:'Cancel',exact:true}).press('Escape');await expect(box).toBeHidden();expect(remote).toEqual([]);
 });
@@ -67,7 +73,7 @@ test('stale, rejected and lost replacement replies retain the file and never rep
 test('read-only sessions download while foreign accounts cannot read or replace PNGs',async({page,request,browser})=>{
   const owner=await fresh(page,request),asset=await owner.put('system.drawio.png',original);await owner.put('Diagram.md','![System overview](system.drawio.png)\n');const token=(await(await owner.api('POST','/auth/tokens',{name:'Read-only diagrams',permissions:['read'],expiresAt:null})).json()).token;
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});try{
-    const read=await context.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');const root=await open(read,'Diagram.md'),box=await manage(read,root);expect(await downloaded(read,box,'readonly-original.png')).toEqual(original);await expect(box.getByLabel('Draw.io PNG file',{exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Replace PNG',exact:true})).toBeHidden();await box.getByRole('button',{name:'Cancel',exact:true}).click();await clickNoteAction(read,root,'Draw.io diagrams');await dialog(read).getByRole('button',{name:'Cancel',exact:true}).click();
+    const read=await context.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');const root=await open(read,'Diagram.md'),box=await manage(read,root);expect(await downloaded(read,box,'readonly-original.png')).toEqual(original);await expect(box.getByLabel('Draw.io PNG file',{exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Replace PNG',exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeHidden();await box.getByRole('button',{name:'Cancel',exact:true}).click();await clickNoteAction(read,root,'Draw.io diagrams');await dialog(read).getByRole('button',{name:'Cancel',exact:true}).click();
   }finally{await context.close();}
   const other=await fresh(page,request);expect((await other.raw('GET','/notes/entries/'+asset.id+'/content')).status()).toBe(404);expect((await other.raw('PUT','/notes/entries/'+asset.id+'/content',revised,{'If-Match':'*','Content-Type':'application/octet-stream'})).status()).toBe(404);
 });
@@ -111,4 +117,153 @@ test('shared image previews refresh in place and a late initial read cannot rest
     const shared=Array.from(new Uint8Array(await objects.get(node.src).arrayBuffer()));active=false;preview.destroy();second.destroy();URL.createObjectURL=create;return {reads,late,shared,sameNode:node===second.dom,cleared:!node.hasAttribute('src')};
   },{original:[...original],revised:[...revised]});
   expect(result.reads).toBe(2);expect(Buffer.from(result.late)).toEqual(revised);expect(Buffer.from(result.shared)).toEqual(revised);expect(result.sameNode).toBe(true);expect(result.cleared).toBe(true);
+});
+
+test.describe('self-hosted draw.io editor',()=>{
+  const origin=process.env.TIMEKEEPER_WEB_DRAWIO_ORIGIN;
+  test.skip(!origin,'Requires the optional official draw.io fixture');
+
+  test.beforeEach(async({page})=>{
+    const allowed=new Set([origin,new URL(process.env.TIMEKEEPER_WEB_URL).origin]);
+    await page.route('**/*',route=>allowed.has(new URL(route.request().url()).origin)?route.continue():route.abort());
+  });
+
+  async function edit(box){
+    await box.getByRole('button',{name:'Edit diagram',exact:true}).click();
+    await expect(box.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
+    return box.frameLocator('iframe[title="Draw.io editor"]');
+  }
+
+  async function change(frame,oldLabel,newLabel){
+    await frame.getByText(oldLabel,{exact:true}).dblclick();
+    const editor=frame.locator('.mxCellEditor');
+    await editor.fill(newLabel);
+    await editor.press('ControlOrMeta+Enter');
+  }
+
+  test('edits both pages, retains the preview and Markdown path, and reopens from saved bytes',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    const source='![System overview](system.drawio.png)\n';
+    const asset=await put('system.drawio.png',original),note=await put('Diagram.md',source);
+    const root=await open(page,'Diagram.md');
+    const preview=root.locator('.ProseMirror img[alt="System overview"]');
+    await expect.poll(()=>preview.evaluate(img=>img.naturalWidth)).toBe(186);
+    const previous=await preview.getAttribute('src');
+    const web=await request.get('/web/'),admin=await request.get('/admin/');
+    expect(web.headers()['content-security-policy']).toContain('; frame-src '+origin);
+    expect(admin.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
+    expect(admin.headers()['content-security-policy']).not.toContain(origin);
+
+    let box=await manage(page,root),frame=await edit(box);
+    await expect(box.locator('iframe')).toBeFocused();
+    await frame.getByText('Details',{exact:true}).click();
+    await change(frame,'Stage B','Saved detail');
+    await frame.getByText('Overview',{exact:true}).press('Enter');
+    await change(frame,'Stage A','Saved overview');
+    await box.getByRole('button',{name:'Save diagram',exact:true}).click();
+    await expect(box).toBeHidden();
+    await expect(preview).not.toHaveAttribute('src',previous);
+    const saved=await bytes(api,asset.id);
+    expect(saved).not.toEqual(original);
+    expect((await bytes(api,note.id)).toString()).toBe(source);
+
+    await page.setViewportSize({width:390,height:844});
+    box=await manage(page,root);frame=await edit(box);
+    await expect(frame.getByText('Saved overview',{exact:true})).toBeVisible();
+    await frame.getByText('Details',{exact:true}).click();
+    await expect(frame.getByText('Saved detail',{exact:true})).toBeVisible();
+    const viewport=await box.boundingBox();
+    expect(viewport.width).toBe(390);
+    expect(viewport.height).toBe(844);
+    expect(viewport.x).toBe(0);
+    expect(viewport.y).toBe(0);
+    await captureScreenshot(page,{path:test.info().outputPath('drawio-editor-phone.png')});
+    await change(frame,'Saved detail','Discard this detail');
+    const cancel=box.getByRole('button',{name:'Cancel',exact:true});
+    page.once('dialog',prompt=>prompt.dismiss());
+    await cancel.press('Escape');
+    await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
+    page.once('dialog',prompt=>prompt.accept());
+    await cancel.press('Escape');
+    await expect(box.locator('iframe')).toHaveCount(0);
+    await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeFocused();
+    expect(await bytes(api,asset.id)).toEqual(saved);
+  });
+
+  test('keeps the embedded draft through a conflict and a lost save reply',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    const asset=await put('system.drawio.png',original);
+    await put('Diagram.md','![System overview](system.drawio.png)\n');
+    const root=await open(page,'Diagram.md'),box=await manage(page,root),frame=await edit(box);
+    await change(frame,'Stage A','Draft overview');
+    const endpoint='/notes/entries/'+asset.id+'/content',before=await api('GET',endpoint);
+    await api('PUT',endpoint,revised,{'If-Match':before.headers().etag,'Content-Type':'application/octet-stream'});
+    const save=box.getByRole('button',{name:'Save diagram',exact:true});
+    await save.click();
+    await expect(box.getByRole('alert')).toContainText('changed elsewhere');
+    await expect(frame.getByText('Draft overview',{exact:true})).toBeVisible();
+    expect(await bytes(api,asset.id)).toEqual(revised);
+
+    page.once('dialog',prompt=>prompt.accept());
+    await box.getByRole('button',{name:'Reload saved file',exact:true}).click();
+    await expect(box.getByAltText('Saved diagram preview')).toBeVisible();
+    await expect(frame.getByText('Draft overview',{exact:true})).toBeVisible();
+    await page.evaluate(endpoint=>{
+      const fetch=window.fetch;
+      window.fetch=async(...args)=>{
+        const response=await fetch(...args);
+        if(args[1]?.method==='PUT'&&new URL(args[0],location.href).pathname==='/api/v1'+endpoint&&response.ok){
+          throw new TypeError('Synthetic lost PNG reply');
+        }
+        return response;
+      };
+    },endpoint);
+    let writes=0;
+    await page.route('**/api/v1'+endpoint,route=>{
+      if(route.request().method()==='PUT')writes++;
+      return route.continue();
+    });
+    await save.click();
+    await expect(box.getByRole('alert')).toContainText('could not be confirmed');
+    await expect(save).toBeDisabled();
+    await expect(frame.getByText('Draft overview',{exact:true})).toBeVisible();
+    await box.getByRole('button',{name:'Check saved result',exact:true}).click();
+    await expect(box).toBeHidden();
+    expect(writes).toBe(1);
+  });
+
+  test('keeps manual replacement and download available when the configured editor cannot load',async({page,request})=>{
+    const {put}=await fresh(page,request);
+    await put('system.drawio.png',original);
+    await put('Diagram.md','![System overview](system.drawio.png)\n');
+    const root=await open(page,'Diagram.md'),box=await manage(page,root);
+    await page.route(origin+'/**',route=>route.abort());
+    await box.getByRole('button',{name:'Edit diagram',exact:true}).click();
+    await expect(box.getByRole('alert')).toContainText('editor is unavailable',{timeout:20_000});
+    await expect(box.locator('iframe')).toHaveCount(0);
+    expect(await downloaded(page,box,'fallback-original.png')).toEqual(original);
+    await choose(box);
+  });
+
+  test('creates a portable editable PNG and inserts it at the captured source cursor',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    const note=await put('Blank.md','Before\n\nAfter\n');
+    const root=await open(page,'Blank.md'),source=await notesSource(page);
+    // Use the cursor between the two paragraphs.
+    await source.evaluate(node=>{node.focus();node.setSelectionRange(7,7);});
+    await clickNoteAction(page,root,'New diagram');
+    const box=dialog(page),save=box.getByRole('button',{name:'Save diagram',exact:true});
+    await expect(save).toBeEnabled();
+    await expect(box.getByLabel('Filename')).toBeFocused();
+    await box.getByLabel('Filename').fill('concept.drawio.png');
+    await box.getByLabel('Diagram description').fill('Concept map');
+    await save.click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const entry=(await(await api('GET','/notes/resolve?path=concept.drawio.png')).json());
+    const saved=await bytes(api,entry.id);
+    const {drawioPngInfo}=await import('../src/drawio-png.js');
+    expect(drawioPngInfo(new Uint8Array(saved))?.editable).toBe(true);
+    expect((await bytes(api,note.id)).toString()).toBe('Before\n![Concept map](concept.drawio.png)\nAfter\n');
+  });
 });

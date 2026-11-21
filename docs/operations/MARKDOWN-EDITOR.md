@@ -234,6 +234,19 @@ subfolder. No external image URL is fetched automatically.
 
 ### Draw.io diagrams
 
+When an administrator configures a [draw.io editor host](SERVER.md#drawio-editor),
+choose **Note tools → New diagram** to draw in Dagsverk. Enter a filename and
+description, then choose **Save diagram** to insert the image at your cursor.
+Notes use the supplied filename with the `.drawio.png` extension. Journal
+uploads use the journal's existing asset naming and storage.
+
+To edit a linked diagram, choose **Note tools → Draw.io diagrams**, select the
+diagram, then choose **Edit diagram**. **Save diagram** replaces the attachment
+and refreshes its preview. The Markdown reference stays the same. If another
+client saved a newer copy, reload the saved preview and review it before
+retrying. If the result is uncertain, **Check saved result** compares the vault
+copy with the submitted PNG. The editor keeps the drawing open during recovery.
+
 In draw.io, choose **File → Export As → PNG** and enable **Include a copy of
 my diagram**. Keep **All Pages** selected to retain the whole editable drawing;
 the preview itself shows the exported page. See the

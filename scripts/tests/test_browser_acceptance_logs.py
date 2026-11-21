@@ -80,7 +80,12 @@ class BrowserAcceptanceLogsTest(unittest.TestCase):
 
     def test_a_failed_batch_is_not_retried_or_hidden_by_an_earlier_success_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary);output=root/'output';args=SimpleNamespace(distribution=root/'server.zip',java='java',browser='chromium',https=False,mail=False,passkeys=False,restore=False,spec=None,shard=None,grep=None)
+            root=Path(temporary);output=root/'output'
+            args=SimpleNamespace(
+                distribution=root/'server.zip',java='java',browser='chromium',
+                https=False,mail=False,passkeys=False,restore=False,
+                spec=None,shard=None,grep=None,drawio_root=None,
+            )
             calls=[]
             def run(command,timeout):
                 calls.append(command)
