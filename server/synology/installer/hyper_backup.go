@@ -114,14 +114,10 @@ func hyperBackupTransfer(action, input string, runtime hyperBackupRuntime) error
 		defer os.Remove(file.Name())
 	}
 	status, statusErr := runtime.command("status", packageID)
-	var state struct {
-		Status string `json:"status"`
-		Code   *int   `json:"status_code"`
-	}
-	if json.Unmarshal(status, &state) != nil || state.Code == nil || *state.Code != 0 || (state.Status != "running" && state.Status != "stop" && state.Status != "stopped") || (statusErr != nil && state.Status == "running") {
+	running, known := hyperBackupPackageState(status, statusErr)
+	if !known {
 		return errors.New("Cannot determine the package state; application data was not changed")
 	}
-	running := state.Status == "running"
 	if running {
 		if _, err = runtime.command("stop", packageID); err != nil {
 			return errors.New("Cannot stop the package for application backup or restore")
@@ -155,6 +151,43 @@ func hyperBackupTransfer(action, input string, runtime hyperBackupRuntime) error
 		return errors.New("Application backup or restore failed; follow the native recovery instructions")
 	}
 	return nil
+}
+
+func hyperBackupPackageState(response []byte, commandErr error) (running, known bool) {
+	type status struct {
+		Status string `json:"status"`
+		Code   *int   `json:"status_code"`
+	}
+	var state struct {
+		status
+		Aspect struct {
+			Active *status `json:"active"`
+		} `json:"aspect"`
+	}
+	if json.Unmarshal(response, &state) != nil {
+		return false, false
+	}
+	if active := state.Aspect.Active; active != nil {
+		// DSM 7 reports the lifecycle script's result under aspect.active.
+		// Check it against the package state before stopping or starting anything.
+		if active.Status != state.Status || active.Code == nil || (state.Code != nil && *state.Code != *active.Code) {
+			return false, false
+		}
+		state.Code = active.Code
+	}
+	if state.Code == nil {
+		return false, false
+	}
+	switch state.Status {
+	case "running":
+		return true, *state.Code == 0 && commandErr == nil
+	case "stop", "stopped":
+		// DSM 7 maps an inactive systemd package unit to 273. A nonzero
+		// lifecycle script result from an active unit is still ambiguous.
+		return false, *state.Code == 0 || (state.Aspect.Active != nil && *state.Code == 273)
+	default:
+		return false, false
+	}
 }
 
 func applicationExport(root string, output io.Writer) error {

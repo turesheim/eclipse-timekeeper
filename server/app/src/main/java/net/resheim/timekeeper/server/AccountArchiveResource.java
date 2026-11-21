@@ -19,6 +19,7 @@ import jakarta.ws.rs.core.*;
 public class AccountArchiveResource {
     @Inject ServerStore store;
     @Inject AccountArchive archives;
+    @Inject PreparedAccountArchive prepared;
     @Inject RequestIdentity identity;
     @Inject ContractInputs inputs;
     @Inject CommandReceipts receipts;
@@ -48,6 +49,32 @@ public class AccountArchiveResource {
         StreamingOutput body=output->{try(file) {Files.copy(file.file(),output);}};
         return Response.ok(body,"application/zip").header("Content-Length",file.length())
                 .header("Content-Disposition","attachment; filename=\""+prefix+"-"+LocalDate.now(ZoneOffset.UTC)+".zip\"");
+    }
+    @GET @Path("/prepared-archive") public Response preparedArchive() {
+        noQueries();String id=prepared.current(identity);
+        return (id==null ? Response.noContent() : Response.ok(object().put("id",id)))
+                .header("Cache-Control","no-store").build();
+    }
+    @POST @Path("/prepared-archive") @Consumes("*/*") public Response prepareArchive() {
+        noQueries();String id=prepared.prepare(identity);
+        return Response.ok(object().put("id",id)).header("Cache-Control","no-store").build();
+    }
+    @DELETE @Path("/prepared-archive/{id}") public Response deletePreparedArchive(@PathParam("id") String id) {
+        noQueries();prepared.delete(identity,ContractInputs.pathId(id).toString());
+        return Response.noContent().build();
+    }
+    @GET @Path("/prepared-archive/{id}") @Produces("application/zip") public Response downloadPreparedArchive(@PathParam("id") String id) {
+        noQueries();String key=ContractInputs.pathId(id).toString();
+        var ended=new CompletableFuture<Void>();
+        routing.addEndHandler(ignored->ended.complete(null));
+        var file=prepared.open(identity,key,download->ended.thenRun(download::close));
+        if(ended.isDone()||routing.response().closed()) {
+            file.close();return Response.noContent().build();
+        }
+        StreamingOutput body=output->{try(file){file.input().transferTo(output);}};
+        return Response.ok(body,"application/zip").header("Content-Length",file.length())
+                .header("Content-Disposition","attachment; filename=\"timekeeper-account-"+file.date()+".zip\"")
+                .header("Cache-Control","no-store").build();
     }
     @POST @Path("/uploads") public Response create(@HeaderParam("Idempotency-Key") String key,JsonNode body) {
         noQueries();var value=inputs.validate("AccountArchiveUploadInput",body);
