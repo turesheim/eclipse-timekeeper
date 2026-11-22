@@ -32,7 +32,17 @@ export class TodayView {
     this.sidebar=root.querySelector('.today-sidebar');this.sidebar.id='today-sidebar';
     this.sidebarResize=new SidebarResize(root,this.sidebar,{variable:'--today-sidebar-width',label:t('today.resize_sidebar'),width:196,changed:()=>this.sizeEditor(),focusFallback:()=>this.dateInput,className:'today-resize'}).element;
     this.sidebar.after(this.sidebarResize);
-    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions,compactTools:phone,inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:dayLabel});
+    this.dayLabel=dayLabel;
+    this.dayActions=node('div',undefined,'today-document-actions');
+    this.weekActions=node('div',undefined,'today-document-actions');
+    this.weekActions.hidden=true;
+    mainActions.append(this.dayActions,this.weekActions);
+    this.weekShortcut=node('button',undefined,'btn btn-outline-secondary icon-button today-week-shortcut');
+    this.weekShortcut.type='button';
+    this.weekShortcut.setAttribute('aria-controls','today-week-note-editor');
+    this.weekShortcut.addEventListener('click',()=>{if(this.date)void this.openWeek(isoWeek(this.date));});
+    this.journalNavigation=0;
+    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions:this.dayActions,compactTools:phone,inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:dayLabel});
     this.journalViewport=new TodayJournalViewport(root,phone,this.journal.markdown,()=>this.visible);
     this.contents=new NoteContents(byId('today-outline'),this.journal.markdown);
     this.contentsResize=new SidebarResize(root,byId('today-contents'),{side:'right',variable:'--today-contents-width',label:t('today.resize_contents'),changed:()=>this.sizeEditor(),focusFallback:()=>byId('today-main-actions-toggle-right-sidebar'),className:'today-contents-resize'}).element;
@@ -41,7 +51,16 @@ export class TodayView {
       left:{panel:this.sidebar,separator:this.sidebarResize,expandedInFixedLayout:true},
       right:{panel:byId('today-contents'),separator:this.contentsResize,collapseOnNarrow:true}
     },()=>this.sizeEditor(),{fixedLayout:phone,focusFallback:()=>this.dateInput});
-    this.weekEditor=new WeekNoteEditor(root,callbacks);
+    this.weekEditor=new WeekNoteEditor(this.journalRoot,{...callbacks,
+      onContentState:()=>this.contents.update(),
+      onClosed:restoreFocus=>{
+        this.syncJournal();
+        if(!restoreFocus||!this.visible)return;
+        const week=this.weekEditor.context.week,origin=this.grid.querySelector(`[data-week="${week}"]`);
+        (origin?.getClientRects().length?origin:this.weekShortcut.getClientRects().length?this.weekShortcut:this.dateInput).focus({preventScroll:true});
+      },
+    },phone,this.weekActions);
+    this.journalViewport.watch(this.weekEditor.markdown);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
     this.eventNoteEditor=new EventNoteEditor(root,{...callbacks,onNotesChanged:()=>{void this.loadEvents();callbacks.onNotesChanged();}},'today');
@@ -53,7 +72,9 @@ export class TodayView {
     this.picker.append(pickerTitle,this.pickerContext,this.choices,pickerActions);root.append(this.picker);
     this.picker.addEventListener('close',()=>{const origin=this.pickerOrigin;this.pickerOrigin=null;this.picking=null;this.choices.replaceChildren();if(origin&&this.visible&&!document.querySelector('#editor[open]'))root.querySelector(`[data-today-client="${origin}"]`)?.focus();});
     this.dateInput.addEventListener('change',()=>this.select(this.dateInput.value));
-    dateNavigation(root.querySelector('.today-date-navigation'),{input:this.dateInput,choose:byId('today-date-choose'),previous:byId('today-previous'),current:byId('today-current'),next:byId('today-next'),previousLabel:t('today.previous_day'),currentLabel:t('ui.today'),nextLabel:t('today.next_day')});
+    const navigation=root.querySelector('.today-date-navigation');
+    dateNavigation(navigation,{input:this.dateInput,choose:byId('today-date-choose'),previous:byId('today-previous'),current:byId('today-current'),next:byId('today-next'),previousLabel:t('today.previous_day'),currentLabel:t('ui.today'),nextLabel:t('today.next_day')});
+    navigation.append(this.weekShortcut);
     const applyPhoneLayout=()=>{
       this.dateInput.labels[0].classList.toggle('visually-hidden',!phone.matches);
       if(phone.matches)mainActions.before(dayLabel);
@@ -75,30 +96,64 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;this.visible=false;this.journalViewport.reset();this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;++this.journalNavigation;this.visible=false;this.journalViewport.reset();this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){if(this.connected&&this.journal.editor?.date===this.date)void this.journal.refreshClean();this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
-  hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;this.journalViewport.reset();++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();this.eventNoteEditor.close();}
-  setConnected(value){this.connected=value;const writable=this.callbacks.canWrite();this.journal.setWritable(value&&writable,writable);}
+  hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;this.journalViewport.reset();++this.generation;++this.noteGeneration;++this.journalNavigation;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.eventNoteEditor.close();}
+  setConnected(value){this.connected=value;const writable=this.callbacks.canWrite();this.journal.setWritable(value&&writable,writable);this.weekEditor.writable=value&&writable;this.weekEditor.controls();}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;if(visible)this.contents.show();}
     this.data=data;this.connected=connected;
     if(!this.date)this.initialize(dateInZone(data.report.generatedAt,data.profile.data.zoneId));
     if(this.visible){this.pollEvents();this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}
   }
+  isDayOpen(date){return date===this.date&&!this.weekEditor.opened;}
+  canLeaveJournal(){
+    return this.weekEditor.opened?this.weekEditor.canLeave():this.journal.canLeaveInline();
+  }
+  async openWeek(week){
+    const scope=this.scope,navigation=++this.journalNavigation;
+    if(!scope||this.weekEditor.context?.week===week&&this.weekEditor.opened)return;
+    if(!await this.canLeaveJournal()||scope!==this.scope||navigation!==this.journalNavigation)return;
+    void this.weekEditor.close(true);
+    const opening=this.weekEditor.open(week,scope,this.connected&&this.callbacks.canWrite());
+    this.syncJournal();
+    await opening;
+  }
+  syncJournal(){
+    const weekly=this.weekEditor.opened,field=weekly?this.weekEditor.markdown:this.journal.markdown;
+    this.journal.dialog.hidden=this.dayLabel.hidden=this.dayActions.hidden=weekly;
+    this.weekActions.hidden=!weekly;
+    if(this.contents.field!==field){
+      this.contents.reset();this.contents.field=field;
+      if(this.visible)this.contents.show();
+      this.journalViewport.use(field);
+    }
+    if(!this.date||!this.data)return;
+    const shortcutWeek=isoWeek(this.date);
+    const label=t('today.week_note',{week:shortcutWeek});
+    if(this.weekShortcut.getAttribute('aria-label')!==label)iconButton(this.weekShortcut,'calendar-week',label);
+    this.weekShortcut.setAttribute('aria-pressed',String(weekly&&this.weekEditor.context.week===shortcutWeek));
+    byId('today-title').textContent=weekly?this.weekEditor.title.textContent:
+      dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(this.date+'T12:00:00Z'));
+    this.paintMonth();this.sizeEditor();
+  }
   async select(date,{confirmed=false}={}){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date){this.dateInput.value=this.date;return false;}
-    if(date===this.date){this.dateInput.value=this.date;return true;}
-    if(!confirmed&&!await this.journal.canLeaveInline()){this.dateInput.value=this.date;return false;}
+    if(this.isDayOpen(date)){this.dateInput.value=this.date;return true;}
+    const navigation=++this.journalNavigation,scope=this.scope;
+    if(!confirmed&&!await this.canLeaveJournal()){this.dateInput.value=this.date;return false;}
+    if(scope!==this.scope||navigation!==this.journalNavigation)return false;
+    const changingDate=date!==this.date;
+    void this.weekEditor.close(true);
+    if(!changingDate){this.dateInput.value=this.date;return true;}
     this.closePicker();this.closeEvent();this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.events=[];this.eventKey=null;++this.generation;
     this.paint();void this.loadEvents();if(dailyNoteDateFromSearch(location.search))history.replaceState(history.state,'',dailyNoteHref(date));return true;
   }
   paint(){
     if(!this.data||!this.date)return;
-    byId('today-title').textContent=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(this.date+'T12:00:00Z'));
     this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite(),this.callbacks.canWrite(),this.data.profile.data);
-    this.paintMonth();void this.loadMonthNotes();this.paintSessions();this.paintEvents();this.paintTasks();
-    this.sizeEditor();
+    this.syncJournal();void this.loadMonthNotes();this.paintSessions();this.paintEvents();this.paintTasks();
   }
   sizeEditor(){
     if(!this.visible||!this.root.offsetParent)return;
@@ -121,15 +176,18 @@ export class TodayView {
       for(let day=0;day<7;day++)this.grid.append(node('span',dateTimeFormat(getLocale(),{weekday:'narrow',timeZone:'UTC'}).format(new Date(calendar.days[day].date+'T12:00:00Z')),'today-weekday'));
       for(let index=0;index<calendar.days.length;index++){
         const day=calendar.days[index];
-        if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',Number(week.slice(-2))+' · '+t('today.week_note',{week}));pick.title=t('today.week_note',{week});pick.addEventListener('click',()=>void this.weekEditor.open(week,this.scope,this.connected&&this.callbacks.canWrite()));this.grid.append(pick);}
+        if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',Number(week.slice(-2))+' · '+t('today.week_note',{week}));pick.title=t('today.week_note',{week});pick.addEventListener('click',()=>void this.openWeek(week));this.grid.append(pick);}
         const pick=node('button',String(Number(day.date.slice(-2))),'btn today-month-day');pick.type='button';pick.dataset.date=day.date;pick.classList.toggle('outside',!day.inMonth);
         pick.setAttribute('aria-label',dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z')));pick.addEventListener('click',()=>this.select(day.date));this.grid.append(pick);
       }
     }
     // Note refreshes update decorations without disconnecting a pressed or focused button.
+    const week=this.weekEditor.opened?this.weekEditor.context.week:null;
     const today=dateInZone(Date.now(),zone),dot=(pick,present)=>{const previous=pick.querySelector('.today-month-dot');if(present&&!previous)pick.append(node('span',undefined,'today-month-dot'));else if(!present&&previous)previous.remove();};
-    for(const pick of this.grid.querySelectorAll('[data-date]')){const date=pick.dataset.date;pick.classList.toggle('selected',date===this.date);pick.classList.toggle('current',date===today);pick.setAttribute('aria-pressed',String(date===this.date));dot(pick,this.noteDates.has(date));}
-    for(const pick of this.grid.querySelectorAll('[data-week]'))dot(pick,this.noteWeeks.has(pick.dataset.week));
+    for(const pick of this.grid.querySelectorAll('[data-date]')){const date=pick.dataset.date;pick.classList.toggle('selected',!week&&date===this.date);pick.classList.toggle('current',date===today);pick.setAttribute('aria-pressed',String(!week&&date===this.date));dot(pick,this.noteDates.has(date));}
+    for(const pick of this.grid.querySelectorAll('[data-week]')){
+      pick.setAttribute('aria-pressed',String(pick.dataset.week===week));dot(pick,this.noteWeeks.has(pick.dataset.week));
+    }
     if(rebuild&&focus){const selector=focus.date?`[data-date="${focus.date}"]`:focus.week?`[data-week="${focus.week}"]`:null;if(selector)this.grid.querySelector(selector)?.focus({preventScroll:true});}
   }
   async loadMonthNotes(){

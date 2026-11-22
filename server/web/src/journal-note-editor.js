@@ -12,29 +12,37 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 
 /** Shared guarded Markdown dialog for vault and journal notes. */
 export class JournalNoteEditor {
-  constructor(root,callbacks,prefix,fieldPrefix=prefix+'-journal',{vault=false,inline=false}={}){
+  constructor(root,callbacks,prefix,fieldPrefix=prefix+'-journal',{vault=false,inline=false,journalCard=false,mainActions}={}){
     this.callbacks=callbacks;this.vault=vault;this.inline=inline;this.generation=0;this.positions=new Map();
-    this.dialog=node(inline?'section':'dialog',undefined,'app-dialog journal-dialog journal-document-dialog '+(inline?'journal-document-inline':'shadow-lg'));this.dialog.id=prefix+'-editor';
+    const layout=journalCard?'card journal-inline':'app-dialog journal-dialog journal-document-dialog '+(inline?'journal-document-inline':'shadow-lg');
+    this.dialog=node(inline?'section':'dialog',undefined,layout);this.dialog.id=prefix+'-editor';
     if(inline){this.dialog.hidden=true;this.dialog.setAttribute('role','region');}
     this.title=node('h2');this.title.id=prefix+'-title';this.dialog.setAttribute('aria-labelledby',this.title.id);
     this.closeButton=iconButton(button('','btn btn-outline-secondary'),'close',t('ui.close'));this.closeButton.addEventListener('click',()=>this.close());
     this.maximizeButton=iconButton(button('','btn btn-outline-secondary'),'maximize',t('notes.maximize'));this.maximizeButton.addEventListener('click',()=>void this.maximize());
-    const windowTools=node('div',undefined,'btn-group');windowTools.append(this.maximizeButton,this.closeButton);windowTools.hidden=inline;
+    const windowTools=node('div',undefined,'btn-group');windowTools.append(this.maximizeButton,this.closeButton);windowTools.hidden=inline&&!journalCard;
     const heading=node('div',undefined,'week-note-heading');heading.append(this.title,windowTools);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
     this.resources=vaultEditorResources(()=>this.session,()=>this.vault&&!['DAY','WEEK','EVENT'].includes((this.note||this.context?.entry)?.kind)?(this.note?.path||this.context?.entry?.path||''):this.source(),undefined,{canCreate:()=>this.writable&&!this.busy&&!this.stale,beforeCreate:()=>this.canLeave(),hasBannerSource:()=>!!this.note&&(this.vault||this.note.version>0&&!this.note.deleted),afterBannerChange:()=>this.reloadSaved()});
-    const host=node('div',undefined,'journal-document-content');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),fieldPrefix,(file,image)=>this.uploadAsset(file,image),{noteClient:{current:()=>this.note&&(this.vault||this.source().sourceType!=='EVENT_NOTE'||this.note.version)?{session:this.session,...this.source(),writable:this.writable&&!this.busy}:null,error:error=>{this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized(error);}},...noteRevisionResources(()=>this.session,()=>{const {sourceType,sourceId}=this.source();return {sourceType,sourceId};},{bodyOnly:!vault,latest:async()=>{const reply=await this.readNote();return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.session),...this.resources});
+    const host=node('div',undefined,journalCard?'':'journal-document-content');this.markdown=new MarkdownField(host,()=>this.changed(),()=>{this.controls();callbacks.onContentState?.();},fieldPrefix,(file,image)=>this.uploadAsset(file,image),{noteClient:{current:()=>this.note&&(this.vault||this.source().sourceType!=='EVENT_NOTE'||this.note.version)?{session:this.session,...this.source(),writable:this.writable&&!this.busy}:null,error:error=>{this.error.textContent=error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized(error);}},...noteRevisionResources(()=>this.session,()=>{const {sourceType,sourceId}=this.source();return {sourceType,sourceId};},{bodyOnly:!vault,latest:async()=>{const reply=await this.readNote();return {text:reply.data.body,etag:reply.etag};}}),...journalImageResources(()=>this.session),...this.resources});
     const actions=node('div',undefined,'dialog-actions');
     this.delete=iconButton(button('','btn btn-outline-secondary'),'trash',t('journal.delete_note'));this.delete.addEventListener('click',()=>void this.remove());
     const documentTools=node('div');documentTools.append(this.delete);this.markdown.addActionsGroup(documentTools);
     this.retrySave=button(t('journal.retry_save'),'btn btn-outline-secondary');this.retrySave.hidden=true;this.retrySave.addEventListener('click',()=>void this.retryCommit());
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.hidden=true;this.reload.addEventListener('click',()=>void this.reloadSaved());
     actions.append(this.status,this.retrySave,this.reload);
-    this.autosave=new DocumentAutosave({dirty:()=>!!this.dirty(),ready:()=>!!this.note&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(this.dialog,this.autosave);
-    this.dialog.append(this.markdown.banner.dom,heading,this.error,host,actions);root.append(this.dialog);this.dialog.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
+    const editorRoot=journalCard?node('form'):this.dialog;
+    if(journalCard){
+      const content=node('div',undefined,'journal-content');content.append(heading,this.error,host);
+      editorRoot.append(this.markdown.banner.dom,content,actions);this.dialog.append(editorRoot);
+      editorRoot.addEventListener('submit',event=>{event.preventDefault();void this.autosave.flush();});
+    }else this.dialog.append(this.markdown.banner.dom,heading,this.error,host,actions);
+    this.autosave=new DocumentAutosave({dirty:()=>!!this.dirty(),ready:()=>!!this.note&&this.writable&&!this.busy&&!this.stale&&!this.markdown.loading,save:options=>this.commit(options)});bindDocumentAutosave(editorRoot,this.autosave,[mainActions]);
+    root.append(this.dialog);
+    for(const target of [this.dialog,mainActions].filter(Boolean))target.addEventListener('keydown',event=>this.markdown.historyShortcut(event));
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
-    guardDayNoteNavigation(this.dialog,()=>!this.busy&&this.autosave.flush(),()=>this.close(true));
+    if(!journalCard)guardDayNoteNavigation(this.dialog,()=>!this.busy&&this.autosave.flush(),()=>this.close(true));
     this.dialog.addEventListener('close',()=>{
       if(root.closest('[hidden]'))return;
       let origin=this.context?.originSelector?root.querySelector(this.context.originSelector)||this.origin:this.origin;
@@ -128,10 +136,11 @@ export class JournalNoteEditor {
   }
   async close(force=false){
     if(!this.opened)return;
-    if(!force&&(this.busy||!await this.autosave.flush()))return;
+    const generation=this.generation;
+    if(!force&&(this.busy||!await this.autosave.flush()||generation!==this.generation))return;
     this.autosave.reset();
     if(this.path&&this.note)this.positions.set(this.path,this.markdown.position());
-    ++this.generation;this.maximizing=false;if(this.inline)this.dialog.hidden=true;else this.dialog.close();this.note=null;this.session=null;this.markdown.clear();
+    ++this.generation;this.maximizing=false;if(this.inline)this.dialog.hidden=true;else this.dialog.close();this.note=null;this.session=null;this.markdown.clear();this.callbacks.onClosed?.(!force);
   }
   reset(){this.close(true);this.positions.clear();this.positionSession=null;}
   async commit({keepalive=false}={}){

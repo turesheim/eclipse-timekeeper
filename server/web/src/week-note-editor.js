@@ -1,5 +1,6 @@
 import {monday} from './model.js';
 import {t} from './i18n.js';
+import {buildCompactActions} from './markdown-actions.js';
 import {JournalNoteEditor} from './journal-note-editor.js';
 
 /** ISO week-based year and week number, including weeks crossing calendar years. */
@@ -11,6 +12,14 @@ export function isoWeek(date){
 }
 
 export class WeekNoteEditor extends JournalNoteEditor {
-  constructor(root,callbacks){super(root,callbacks,'today-week-note','weekly-journal');}
-  open(week,session,writable){return super.open({originSelector:`[data-week="${week}"]`,path:'/week-notes/'+week,title:t('today.week_note',{week}),deleteConfirm:t('week_notes.delete_confirm',{week})},session,writable);}
+  constructor(root,callbacks,phone,actions){
+    super(root,callbacks,'today-week-note','weekly-journal',{inline:true,journalCard:true,mainActions:actions});
+    this.title.classList.add('visually-hidden');
+    buildCompactActions(this.markdown,phone,actions);
+    this.dialog.addEventListener('keydown',event=>{
+      if(event.key!=='Escape'||event.defaultPrevented||event.target.closest('dialog'))return;
+      event.preventDefault();void this.close();
+    });
+  }
+  open(week,session,writable){return super.open({week,originSelector:`[data-week="${week}"]`,path:'/week-notes/'+week,title:t('today.week_note',{week}),deleteConfirm:t('week_notes.delete_confirm',{week})},session,writable);}
 }

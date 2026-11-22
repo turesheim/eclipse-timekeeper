@@ -36,6 +36,11 @@ Today combines the daily journal, calendar events and recent notes. Week places
 planned calendar time alongside recorded work. Calendar provides day/month
 navigation and summaries; select a day or item for its details and available actions.
 
+Select a week number in Today's mini calendar to open its weekly note in the
+journal pane. On phones, use the week note button beside the date. Select a day
+or close the weekly editor to return to the daily journal. Today saves pending
+changes before switching entries.
+
 Planned tasks use the same compact cards as the other Today summaries, with the
 client's color along the edge. Select a task to open its details without leaving
 your daily note. The popup includes task links and authenticated attachment images
