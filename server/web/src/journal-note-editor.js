@@ -136,7 +136,8 @@ export class JournalNoteEditor {
   }
   async close(force=false){
     if(!this.opened)return;
-    if(!force&&(this.busy||!await this.autosave.flush()))return;
+    const generation=this.generation;
+    if(!force&&(this.busy||!await this.autosave.flush()||generation!==this.generation))return;
     this.autosave.reset();
     if(this.path&&this.note)this.positions.set(this.path,this.markdown.position());
     ++this.generation;this.maximizing=false;if(this.inline)this.dialog.hidden=true;else this.dialog.close();this.note=null;this.session=null;this.markdown.clear();this.callbacks.onClosed?.(!force);
