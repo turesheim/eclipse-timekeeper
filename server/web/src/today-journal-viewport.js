@@ -20,8 +20,17 @@ export class TodayJournalViewport {
     this.viewport?.addEventListener('scroll',onViewportScroll);
     window.addEventListener('resize',schedule);
     phone.addEventListener('change',schedule);
-    for(const event of ['focusin','focusout','input','keyup'])markdown.root.addEventListener(event,schedule);
+    this.watch(markdown);
     document.addEventListener('selectionchange',()=>{if(this.open)schedule();});
+  }
+  watch(markdown){
+    for(const event of ['focusin','focusout','input','keyup'])markdown.root.addEventListener(event,()=>this.schedule());
+  }
+  use(markdown){
+    if(markdown===this.markdown)return;
+    this.reset();
+    this.markdown=markdown;
+    this.schedule();
   }
   get open(){return this.root.hasAttribute('data-journal-keyboard');}
   get field(){

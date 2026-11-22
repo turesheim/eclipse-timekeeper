@@ -80,6 +80,7 @@ dialog.journal-dialog { overflow: auto; }
 
 /* Today uses a bounded editing viewport above the fixed workspace navigation. */
 .today-journal .journal-inline form { min-height: 0; }
+.today-journal .journal-content > .week-note-heading:has(.btn-group) { justify-content: end; flex-shrink: 0; }
 .today-journal .journal-content { min-height: 0; overflow: hidden; }
 .today-journal .markdown-editor > :not(.journal-formatted,.journal-source) { flex-shrink: 0; }
 .today-journal :is(.journal-formatted,.journal-source):not([hidden]) { min-height: 0; overflow: hidden; }

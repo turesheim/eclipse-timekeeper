@@ -91,7 +91,7 @@ document.addEventListener(tagNavigation,async event=>{
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,detail=event.detail;
-  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
+  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
   detail.leave.forEach(leave=>leave());
   if(detail.popup){calendarSearchPopup.close(true);await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
   if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}
@@ -107,9 +107,9 @@ document.addEventListener(calendarSearchNavigation,async event=>{
   event.preventDefault();const session=api,detail=event.detail,request=++calendarNavigation;
   const current=()=>session===api&&request===calendarNavigation;
   try{
-    if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current())return;
+    if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current())return;
     const reply=await calendarSearchHit(session,detail.id,async()=>current()&&await navigationGuards(detail.guards,session)&&current(),detail.pending);
-    if(!reply||!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
+    if(!reply||!current()||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||!current()||!await navigationGuards(detail.guards,session))return;
     detail.leave.forEach(leave=>leave());
     if(detail.maximize){
       if(await tab('calendar-search')===false||session!==api)return;
@@ -125,7 +125,7 @@ document.addEventListener(calendarSearchNavigation,async event=>{
 });
 document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
-  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||date!==today.date&&!await today.journal.canLeaveInline()||session!==api)return;
+  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||(date!==today.date||today.weekEditor.opened)&&!await today.canLeaveJournal()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
   if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });
@@ -220,7 +220,7 @@ function readOnlyWhileDisconnected() {
 }
 async function tab(name) {
   if(['clients','projects'].includes(name)){location.hash='#account/'+name;return true;}
-  ++calendarNavigation;const session=api;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return false;
+  ++calendarNavigation;const session=api;if(!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return false;
   notePopup.close(true);calendarSearchPopup.close(true);calendarSearchWorkspace.close(true);
   for (const item of ['today', 'track', 'week', 'calendar', 'activities','notes','tasks','calendar-search']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
@@ -240,8 +240,8 @@ async function tab(name) {
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
-  beforeSignOut:async()=>await notes.canLeave()&&await today.journal.canLeaveInline()&&await notePopup.canLeave()&&await canLeaveSearchEvents(),
-  beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.journal.canLeaveInline()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},
+  beforeSignOut:async()=>await notes.canLeave()&&await today.canLeaveJournal()&&await notePopup.canLeave()&&await canLeaveSearchEvents(),
+  beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},
   renderFocus:view=>renderFocusSettings(view,()=>refresh().catch(()=>{})),
   renderCalendars:view=>calendar.subscriptions.mount(view),
   renderCatalog(view,part) {

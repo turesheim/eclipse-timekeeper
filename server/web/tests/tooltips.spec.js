@@ -66,7 +66,7 @@ test('shared hints update dynamically and remain visible inside native dialogs, 
   await next.evaluate(node=>{node.title='Next day';});await expect(updated).toContainText('Next day');
   await page.locator('#today-month-grid [data-week]').first().click();const dialog=page.locator('#today-week-note-editor');await expect(dialog).toBeVisible();
   const close=dialog.getByRole('button',{name:'Close',exact:true}),tip=await tooltipFor(close);
-  await expect(tip).toContainText('Close');expect(await tip.evaluate(node=>!!node.closest('dialog[open]'))).toBe(true);
+  await expect(tip).toContainText('Close');expect(await tip.evaluate(node=>node.parentElement===document.body)).toBe(true);
   await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);await expect(dialog).toBeVisible();
   await dialog.getByRole('button',{name:'Markdown source',exact:true}).click();
   await page.locator('#weekly-journal-body').fill('[Authored link](https://example.invalid "Authored title")\n\nText');
