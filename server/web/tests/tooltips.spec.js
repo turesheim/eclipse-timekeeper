@@ -54,7 +54,7 @@ test('one rich tooltip covers each composite, preserves literal data and support
   }
 });
 
-test('shared hints update dynamically and remain visible inside native dialogs, then clear on close and logout',async({page})=>{
+test('shared hints update dynamically and clear when leaving the weekly journal or signing out',async({page})=>{
   await signIn(page);
   const next=page.locator('#today-next');await expect(await tooltipFor(next)).toContainText('Next day');
   // UI modules update native title properties after rendering. Their values

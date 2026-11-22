@@ -165,6 +165,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.setViewportSize({width:390,height:844});
     await expect(weekly).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await captureScreenshot(page,{path:'test-results/today-weekly-inline-phone.png'});
     await weekly.getByRole('button',{name:'Close',exact:true}).click();
     await expect(weekly).toBeHidden();await expect(daily).toBeVisible();
     const shortcut=page.locator('.today-week-shortcut');

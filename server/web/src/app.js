@@ -125,7 +125,7 @@ document.addEventListener(calendarSearchNavigation,async event=>{
 });
 document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
-  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||(date!==today.date||today.weekEditor.opened)&&!await today.canLeaveJournal()||session!==api)return;
+  if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||!today.isDayOpen(date)&&!await today.canLeaveJournal()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
   if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
 });

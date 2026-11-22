@@ -235,8 +235,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
   .today-toolbar { grid-template-columns: minmax(0,1fr); }
   .today-toolbar .track-heading { grid-column: 1; grid-row: 1; }
   .today-toolbar .today-date-navigation { grid-column: 1; grid-row: 2; }
-  .today-date-navigation .date-navigation-field { width: 100%; }
-  .today-date-navigation .today-date-field { flex: 1; }
+  .today-date-navigation .date-navigation-field { width: auto; flex: 1; }
   .today-date-navigation .today-week-shortcut { display: inline-flex; }
   #today-date { min-height: var(--control-target-size); border-radius: var(--bs-border-radius); font-size: max(16px, var(--font-input)); appearance: auto; }
   .today-date-navigation input::-webkit-calendar-picker-indicator { display: revert; }

@@ -41,7 +41,6 @@ export class TodayView {
     this.weekShortcut.type='button';
     this.weekShortcut.setAttribute('aria-controls','today-week-note-editor');
     this.weekShortcut.addEventListener('click',()=>{if(this.date)void this.openWeek(isoWeek(this.date));});
-    this.dateInput.closest('.today-date-navigation').append(this.weekShortcut);
     this.journalNavigation=0;
     this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged,onContentState:()=>this.contents?.update()},{mainActions:this.dayActions,compactTools:phone,inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:dayLabel});
     this.journalViewport=new TodayJournalViewport(root,phone,this.journal.markdown,()=>this.visible);
@@ -73,7 +72,9 @@ export class TodayView {
     this.picker.append(pickerTitle,this.pickerContext,this.choices,pickerActions);root.append(this.picker);
     this.picker.addEventListener('close',()=>{const origin=this.pickerOrigin;this.pickerOrigin=null;this.picking=null;this.choices.replaceChildren();if(origin&&this.visible&&!document.querySelector('#editor[open]'))root.querySelector(`[data-today-client="${origin}"]`)?.focus();});
     this.dateInput.addEventListener('change',()=>this.select(this.dateInput.value));
-    dateNavigation(root.querySelector('.today-date-navigation'),{input:this.dateInput,choose:byId('today-date-choose'),previous:byId('today-previous'),current:byId('today-current'),next:byId('today-next'),previousLabel:t('today.previous_day'),currentLabel:t('ui.today'),nextLabel:t('today.next_day')});
+    const navigation=root.querySelector('.today-date-navigation');
+    dateNavigation(navigation,{input:this.dateInput,choose:byId('today-date-choose'),previous:byId('today-previous'),current:byId('today-current'),next:byId('today-next'),previousLabel:t('today.previous_day'),currentLabel:t('ui.today'),nextLabel:t('today.next_day')});
+    navigation.append(this.weekShortcut);
     const applyPhoneLayout=()=>{
       this.dateInput.labels[0].classList.toggle('visually-hidden',!phone.matches);
       if(phone.matches)mainActions.before(dayLabel);
@@ -106,6 +107,7 @@ export class TodayView {
     if(!this.date)this.initialize(dateInZone(data.report.generatedAt,data.profile.data.zoneId));
     if(this.visible){this.pollEvents();this.paint();const key=this.date+'|'+data.revision;if(key!==this.eventKey){this.eventKey=key;void this.loadEvents();}}
   }
+  isDayOpen(date){return date===this.date&&!this.weekEditor.opened;}
   canLeaveJournal(){
     return this.weekEditor.opened?this.weekEditor.canLeave():this.journal.canLeaveInline();
   }
@@ -138,7 +140,7 @@ export class TodayView {
   }
   async select(date,{confirmed=false}={}){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date){this.dateInput.value=this.date;return false;}
-    if(date===this.date&&!this.weekEditor.opened){this.dateInput.value=this.date;return true;}
+    if(this.isDayOpen(date)){this.dateInput.value=this.date;return true;}
     const navigation=++this.journalNavigation,scope=this.scope;
     if(!confirmed&&!await this.canLeaveJournal()){this.dateInput.value=this.date;return false;}
     if(scope!==this.scope||navigation!==this.journalNavigation)return false;
