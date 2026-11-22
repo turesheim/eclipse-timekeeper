@@ -5,7 +5,13 @@ import {fileURLToPath} from 'node:url';
 import {gzipSync} from 'node:zlib';
 
 const root=fileURLToPath(new URL('../',import.meta.url)),check=process.argv.includes('--check');
-const result=await build({absWorkingDir:root,entryPoints:['editor/mermaid.js'],bundle:true,format:'esm',target:['es2022'],minify:true,legalComments:'eof',write:false,outfile:'src/assets/mermaid/mermaid.js',metafile:true});
+const buildOptions={absWorkingDir:root,entryPoints:['editor/mermaid.js'],bundle:true,format:'esm',target:['es2022'],minify:true,legalComments:'eof',write:false,outfile:'src/assets/mermaid/mermaid.js',metafile:true};
+const trailingWhitespace=/[ \t]+$/m;
+let result=await build(buildOptions);
+if(trailingWhitespace.test(result.outputFiles[0].text)){
+  // Lower templates before trimming generated source to preserve literal whitespace.
+  result=await build({...buildOptions,supported:{'template-literal':false}});
+}
 const packages=new Map();
 for(const input of Object.keys(result.metafile.inputs)){
   if(!input.includes('node_modules/'))continue;
@@ -26,11 +32,12 @@ for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,
   inventory.push({name:pkg.name,version:pkg.version,license});
   for(const file of files)notices+=`\n\n${pkg.name}@${pkg.version} / ${file}\n\n`+await readFile(join(pkg.directory,file),'utf8');
 }
-const target=join(root,'src/assets/mermaid'),output=result.outputFiles[0];
-const sizes={file:'mermaid.js',bytes:output.contents.length};
-const files=[[join(target,'mermaid.js'),output.contents],[join(target,'LICENSE'),await readFile(join(root,'node_modules/pele/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n'],[join(target,'sizes.json'),JSON.stringify([sizes],null,2)+'\n']];
+const target=join(root,'src/assets/mermaid');
+const output=Buffer.from(result.outputFiles[0].text.replace(/[ \t]+$/gm,''));
+const sizes={file:'mermaid.js',bytes:output.length};
+const files=[[join(target,'mermaid.js'),output],[join(target,'LICENSE'),await readFile(join(root,'node_modules/pele/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n'],[join(target,'sizes.json'),JSON.stringify([sizes],null,2)+'\n']];
 for(const [path,content] of files){
   if(check){if(!Buffer.from(await readFile(path)).equals(Buffer.from(content)))throw new Error('Regenerate Mermaid renderer: '+path);}
   else{await mkdir(dirname(path),{recursive:true});await writeFile(path,content);}
 }
-console.log(`${check?'Verified':'Bundled'} Pele renderer for Mermaid diagrams: ${JSON.stringify({...sizes,gzipBytes:gzipSync(output.contents).length})}; ${packages.size} dependency licenses.`);
+console.log(`${check?'Verified':'Bundled'} Pele renderer for Mermaid diagrams: ${JSON.stringify({...sizes,gzipBytes:gzipSync(output).length})}; ${packages.size} dependency licenses.`);
