@@ -284,6 +284,22 @@ and container; retained files and all 14 database table fingerprints were
 unchanged. This does not replace the remaining NAS acceptance scenarios required
 for stable publication.
 
+## Bundled draw.io editor
+
+The server image carries a static copy of draw.io. To enable it, configure a
+separate HTTPS hostname and add the settings below to the retained file
+`/var/packages/timekeeper/var/server/config/drawio.properties`.
+
+```properties
+timekeeper.web.drawio-origin=https://diagrams.example.org
+timekeeper.web.drawio-port=8182
+```
+
+Give the package account read access to the file, restart Dagsverk in Package
+Center, and proxy the draw.io hostname to `127.0.0.1:8182`. Use a free port if
+8182 is occupied. The listener allows framing by the configured Dagsverk
+HTTPS origin. Keep the editor properties with your deployment configuration.
+
 ## Hyper Backup application backup
 
 The preview SPK includes Hyper Backup application callbacks. In Hyper Backup,

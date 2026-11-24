@@ -153,6 +153,12 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(web.headers()['content-security-policy']).toContain('; frame-src '+origin);
     expect(admin.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
     expect(admin.headers()['content-security-policy']).not.toContain(origin);
+    const editor=await request.get(origin+'/');
+    expect(editor.status()).toBe(200);
+    expect(editor.headers()['content-security-policy']).toContain('frame-ancestors '+new URL(process.env.TIMEKEEPER_WEB_URL).origin);
+    expect(editor.headers()['content-security-policy']).toContain("connect-src 'self'");
+    expect((await request.get(origin+'/api/v1/auth/status')).status()).toBe(404);
+    expect((await request.get(origin+'/WEB-INF/web.xml')).status()).toBe(404);
 
     let box=await manage(page,root),frame=await edit(box);
     await expect(box.locator('iframe')).toBeFocused();
