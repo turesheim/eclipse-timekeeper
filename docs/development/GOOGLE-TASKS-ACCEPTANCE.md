@@ -94,6 +94,12 @@ actual behavior and recovery, not credentials or assertions inferred from a
 successful OAuth login. A successful OAuth login or import alone does not establish a
 round trip. Keep any remaining live gaps explicit in the PR.
 
+### Maintainer confirmation
+
+On 2026-11-24 the maintainer reported that the Google Tasks connector was
+working in use. This is an overall confirmation. The per-scenario round-trip
+results come from the automated fixtures and CI recorded in [PR #696](https://github.com/turesheim/eclipse-timekeeper/pull/696).
+
 ## Provider contract
 
 Google documents [read-only/write scopes](https://developers.google.com/workspace/tasks/auth),
