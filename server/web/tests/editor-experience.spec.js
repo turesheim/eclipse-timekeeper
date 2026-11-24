@@ -199,7 +199,7 @@ test('the formatting toolbar inserts editable Obsidian callouts',async({page})=>
   await field(page,'Existing **text**.\n');
   const host=page.locator('#experience-field');
   const rich=host.locator('.ProseMirror');
-  const style=host.getByRole('button',{name:'Text style',exact:true});
+  const style=host.getByRole('button',{name:'Add callout',exact:true});
   await rich.locator('p').click();
   await style.focus();
   await page.keyboard.press('ArrowUp');
