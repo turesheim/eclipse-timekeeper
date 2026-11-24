@@ -21,6 +21,42 @@ async function setup(page,request){
   return api;
 }
 
+test('Tasks reuses Recent notes in its right sidebar and opens notes without leaving Tasks',async({page,request})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
+  await api('PUT','/notes/files?'+new URLSearchParams({path:'Notes/Task reference.md'}),Buffer.from('Reference for a task.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
+  await page.reload();
+  await expect(page.locator('#today-recent-notes [data-recent-note]')).toHaveCount(1);
+  await page.evaluate(()=>{window.sharedRecentSection=document.querySelector('#today-recent-notes').closest('section');});
+  await page.locator('[data-tab=tasks]').click();
+
+  const sidebar=page.locator('#tasks-contents'),recent=sidebar.getByRole('region',{name:'Recent notes',exact:true});
+  const pick=recent.getByRole('button',{name:/Task reference/}),toggle=page.locator('#tasks-main-actions-toggle-right-sidebar');
+  await expect(pick).toBeVisible();
+  expect(await recent.evaluate(node=>node===window.sharedRecentSection)).toBe(true);
+  expect((await sidebar.boundingBox()).x).toBeGreaterThan((await page.locator('.tasks-results').boundingBox()).x);
+  await pick.focus();
+  await pick.press('Enter');
+  const popup=page.locator('#note-popup-editor');
+  await expect(popup).toBeVisible();
+  await expect(page.locator('#note-popup-title')).toHaveText('Task reference');
+  await expect(page.locator('#tasks-panel')).toBeVisible();
+  await popup.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(pick).toBeFocused();
+
+  await page.setViewportSize({width:390,height:844});
+  await expect(sidebar).toBeHidden();
+  await expect(toggle).toBeFocused();
+  await toggle.click();
+  await expect(pick).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect((await new AxeBuilder({page}).include('#tasks-contents').analyze()).violations).toEqual([]);
+  await pick.focus();
+  await pick.press('Escape');
+  await expect(sidebar).toBeHidden();
+  await expect(toggle).toBeFocused();
+});
+
 test('Notes right sidebar keeps Recent notes below the contents and restores its own popup focus',async({page,request})=>{
   const api=await setup(page,request);await api('GET','/notes');await api('POST','/notes/folders',{path:'Notes'});
   const put=async(path,body)=>await(await api('PUT','/notes/files?'+new URLSearchParams({path}),Buffer.from(body),{'Content-Type':'application/octet-stream','If-None-Match':'*'})).json();

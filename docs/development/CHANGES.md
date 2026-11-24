@@ -62,6 +62,8 @@ database baseline.
 - Added Bootstrap 5.3.8 styling, Track month views and calendar session
   creation, dragging and resizing. Browser session editors use native date/time
   pickers in the account's time zone, with explicit choices for repeated DST times.
+- Added Recent notes to the Tasks right sidebar, with the same document popup
+  as Today and Notes (#715).
 - Added independent work sessions in Eclipse and the web client: start/stop,
   retrospective editing, taskless activities and reports of exact tracked,
   covered and unallocated time derived from owner-scoped interval overlap.
