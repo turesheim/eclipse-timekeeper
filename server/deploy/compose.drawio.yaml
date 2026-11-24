@@ -1,0 +1,13 @@
+# Opt-in local upstream for a dedicated HTTPS draw.io reverse proxy.
+services:
+  api-1:
+    environment:
+      DAGSVERK_DRAWIO_PORT: "8082"
+      TIMEKEEPER_WEB_DRAWIO_BIND: "0.0.0.0"
+  api-2:
+    environment:
+      DAGSVERK_DRAWIO_PORT: "8082"
+      TIMEKEEPER_WEB_DRAWIO_BIND: "0.0.0.0"
+  gateway:
+    ports:
+      - "127.0.0.1:${DAGSVERK_DRAWIO_PROXY_PORT:-8182}:8082"

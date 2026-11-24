@@ -8,6 +8,10 @@ database baseline.
 
 ### Highlights
 
+- Bundled an optional draw.io editor for Compose and Synology. Edit and save
+  multi-page diagrams from the vault, with editable PNGs that remain portable
+  through WebDAV and account archives (#708).
+
 - Avoided the H2 2.5.250/2.5.252 crash-recovery data-loss regression by using
   the unaffected published H2 2.4.240 runtime in the server and Eclipse client.
   Added deterministic chunk-reuse and journal forced-restart regression checks.
@@ -23,6 +27,8 @@ database baseline.
   versioned database baseline.
 - Made Timekeeper tasks provider-independent UUID aggregates with optional,
   uniquely constrained external task references.
+- Added automatic synchronization with selected Google Tasks lists, with
+  read-only access or opt-in two-way editing for supported fields (#621).
 - Added explicit activity owner identities, UTC instant persistence and
   time-zone-aware daily and weekly reporting, including DST-safe boundaries.
 - Added persistence-neutral Java domain and application-service modules with
@@ -64,6 +70,8 @@ database baseline.
   plus server/web clients grouping projects and work sessions.
 - Added note, tip, important, warning and caution callouts to the wiki editor’s
   formatting toolbar (#714).
+- Preserved password-change confirmation when another browser request receives
+  the session revocation first.
 - Added Bootstrap 5.3.8 styling, Track month views and calendar session
   creation, dragging and resizing. Browser session editors use native date/time
   pickers in the account's time zone, with explicit choices for repeated DST times.

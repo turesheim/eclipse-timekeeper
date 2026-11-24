@@ -36,8 +36,7 @@ export async function renderPassword(view) {
         body.currentPassword = old.value;old.value = '';
       }
       cancel.hidden = true;
-      await view.session.request('/auth/password', {method: 'POST', body});
-      if (view.valid()) view.signOut(t('ui.password_changed_sign_in_again_your_existing_sessions_and_api_tokens_have_been_revoke'));
+      await view.changePassword(body);
     } catch (error) {
       if (canceledPasskey(error) || canceled) {editor.feedback.textContent = t('ui.passkey_request_canceled');return;}
       if (error.status === 401) {

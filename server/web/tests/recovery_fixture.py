@@ -1,7 +1,6 @@
 """Loopback-only HTTPS/SMTP fixtures; no production security settings are relaxed."""
 from email import policy
 from email.parser import BytesParser
-from functools import partial
 import http.client
 import http.server
 import json
@@ -14,7 +13,7 @@ import threading
 
 
 class RecoveryFixture:
-    def __init__(self, directory, backend, *, https=False, mail=False, hostname='127.0.0.1', calendars=False, drawio_root=None):
+    def __init__(self, directory, backend, *, https=False, mail=False, hostname='127.0.0.1', calendars=False, drawio_port=None):
         if hostname not in ('127.0.0.1','localhost'):raise ValueError('Fixture must stay on loopback')
         self.servers=[];self.environment={};self.messages=[];self.events=[];self.lock=threading.Lock()
         self.calendars=None
@@ -33,10 +32,11 @@ class RecoveryFixture:
                         if failure.reason not in ('SSLV3_ALERT_CERTIFICATE_UNKNOWN','TLSV1_ALERT_UNKNOWN_CA'):raise
             class Proxy(FixtureHandler,http.server.BaseHTTPRequestHandler):
                 protocol_version='HTTP/1.1'
+                upstream=backend
                 def relay(self):
                     body=self.rfile.read(int(self.headers.get('Content-Length','0')))
                     headers={key:value for key,value in self.headers.items() if key.lower() not in ('connection','content-length','transfer-encoding')}
-                    connection=http.client.HTTPConnection('127.0.0.1',backend,timeout=35)
+                    connection=http.client.HTTPConnection('127.0.0.1',self.upstream,timeout=35)
                     try:
                         connection.request(self.command,self.path,body=body,headers=headers)
                         response=connection.getresponse();data=response.read()
@@ -62,13 +62,13 @@ class RecoveryFixture:
             # preconnection must not block accept() for every other module.
             proxy.socket=tls.wrap_socket(proxy.socket,server_side=True,do_handshake_on_connect=False)
             self.base=f'https://{hostname}:{proxy.server_port}';self.start(proxy)
-            if drawio_root:
-                class StaticEditor(FixtureHandler,http.server.SimpleHTTPRequestHandler):pass
-                static=ProxyServer(('127.0.0.1',0),partial(StaticEditor,directory=str(drawio_root)))
+            if drawio_port:
+                class EditorProxy(Proxy):upstream=drawio_port
+                static=ProxyServer(('127.0.0.1',0),EditorProxy)
                 static.socket=tls.wrap_socket(static.socket,server_side=True,do_handshake_on_connect=False)
                 editor_host='localhost' if hostname=='127.0.0.1' else '127.0.0.1'
                 origin=f'https://{editor_host}:{static.server_port}'
-                self.environment.update(DAGSVERK_DRAWIO_ORIGIN=origin,TIMEKEEPER_WEB_DRAWIO_ORIGIN=origin)
+                self.environment.update(DAGSVERK_DRAWIO_ORIGIN=origin,DAGSVERK_DRAWIO_PORT=str(drawio_port),TIMEKEEPER_WEB_DRAWIO_ORIGIN=origin)
                 self.start(static)
         if mail:
             class SMTP(socketserver.StreamRequestHandler):
