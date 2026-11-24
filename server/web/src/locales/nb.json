@@ -1234,6 +1234,7 @@
   "markdown.copied": "Kopiert",
   "markdown.copy_failed": "Kopiering mislyktes",
   "markdown.footnote": "Fotnote",
+  "markdown.callouts": "Legg til uthevet merknad",
   "markdown.insert_note_callout": "Legg til merknad",
   "markdown.insert_tip_callout": "Legg til tips",
   "markdown.insert_important_callout": "Legg til viktig merknad",

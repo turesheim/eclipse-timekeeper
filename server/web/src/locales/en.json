@@ -1234,6 +1234,7 @@
   "markdown.copied": "Copied",
   "markdown.copy_failed": "Copy failed",
   "markdown.footnote": "Footnote",
+  "markdown.callouts": "Add callout",
   "markdown.insert_note_callout": "Add note callout",
   "markdown.insert_tip_callout": "Add tip callout",
   "markdown.insert_important_callout": "Add important callout",

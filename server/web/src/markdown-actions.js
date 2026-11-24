@@ -82,7 +82,7 @@ export function buildCompactActions(f,media,host){
   const apply=()=>{
     const {actionsTrigger:trigger,actionsMenu:menu,toolbar}=f;
     const focused=trigger===document.activeElement||menu.contains(document.activeElement);
-    f.closeActions();f.closeBlockMenu();f.closeListMenu();
+    f.closeActions();f.closeBlockMenu();f.closeListMenu();f.closeCalloutMenu();
     toolbar.hidden=media.matches;
     (media.matches?host:toolbar).append(trigger);
     f.syncActions();
