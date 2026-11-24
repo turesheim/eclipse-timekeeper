@@ -74,7 +74,7 @@ export class DrawioEditor {
     const xml = blob ? await readPng(blob) : blank;
     const url = new URL('/', this.origin);
     url.search = new URLSearchParams({
-      embed: '1', proto: 'json', ui: 'min', offline: '1', stealth: '1',
+      embed: '1', proto: 'json', ui: 'min', offline: '1', stealth: '1', pwa: '0',
       noSaveBtn: '1', noExitBtn: '1', saveAndExit: '0',
     });
     await this.waitFor('init', () => { this.frame.src = url.href; });

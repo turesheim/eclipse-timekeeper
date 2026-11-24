@@ -70,30 +70,39 @@ is for tests, not durable deployment.
 
 ## Draw.io editor
 
-Serve a pinned copy of the official [draw.io 32.6.10 release](https://github.com/jgraph/drawio/releases/tag/v32.6.10)
-from the root of a dedicated HTTPS hostname. Extract the public web files from
-`draw.war`, excluding `WEB-INF` and `META-INF`. A static web server can serve
-the files used to edit and export diagrams. Dagsverk passes the selected image
-to that host's iframe and saves the returned PNG in the account's vault.
+The server image includes the public assets from the pinned [draw.io 32.6.10
+release](https://github.com/jgraph/drawio/releases/tag/v32.6.10). The optional
+static listener serves those assets with a browser policy that restricts framing
+to the configured Dagsverk HTTPS origin. Dagsverk opens the editor in offline
+mode and saves the resulting PNG to the account vault.
 
-- For standalone Java, set `DAGSVERK_DRAWIO_ORIGIN=https://diagrams.example.org`
-  in the service environment and restart Dagsverk.
-- For Compose, set the same variable in the deployment `.env` and recreate
-  both API containers.
-- For the Synology package, create the retained file
-  `/var/packages/timekeeper/var/server/config/drawio.properties` and set
-  `timekeeper.web.drawio-origin=https://diagrams.example.org`. Give the package
-  account read access to the file and restart it in Package Center. Keep the
-  file with your deployment configuration if migrating the installation.
+Use a dedicated HTTPS hostname for draw.io, separate from the Dagsverk hostname.
+Point that hostname's reverse proxy to the editor's loopback HTTP port. Use
+origins without a path or trailing slash. Both hostnames can use the same proxy.
 
-Use the origin alone, without a path or trailing slash. Serve draw.io from a
-different hostname than Dagsverk, including when both use the same proxy.
-The editor host must permit framing by the Dagsverk HTTPS origin. Configure
-its response policy to allow that origin in `frame-ancestors`. If your proxy
-adds a frame restriction to every site, adjust it for this editor host.
-Dagsverk opens the iframe in offline mode. To restrict outbound requests from
-the editor, apply a policy on the **editor host** following the
-[upstream hosting guide](https://github.com/jgraph/drawio/wiki/Self-Hosting).
+- **Compose.** Set `COMPOSE_FILE=compose.yaml:compose.drawio.yaml`,
+  `DAGSVERK_PUBLIC_ORIGIN=https://dagsverk.example.org` and
+  `DAGSVERK_DRAWIO_ORIGIN=https://diagrams.example.org` in the deployment
+  `.env`. Apply the project with `docker compose up -d --wait`. Point only the
+  draw.io virtual host at `127.0.0.1:8182`. Set `DAGSVERK_DRAWIO_PROXY_PORT`
+  in `.env` to use a different host port. Keep the Compose file setting in
+  `.env` so subsequent project operations use the same configuration.
+- **Synology.** Add these settings to the retained file
+  `/var/packages/timekeeper/var/server/config/drawio.properties` with read
+  access for the package account. Restart Dagsverk in Package Center and
+  point the draw.io HTTPS virtual host at `127.0.0.1:8182`. Choose a different
+  free port if another package already uses it. Retain this file with your
+  deployment configuration when migrating the installation.
+
+  ```properties
+  timekeeper.web.drawio-origin=https://diagrams.example.org
+  timekeeper.web.drawio-port=8182
+  ```
+
+Standalone Java installations and operators who prefer an existing editor
+server can still point `DAGSVERK_DRAWIO_ORIGIN` to a separate static host.
+That host must allow the Dagsverk origin in its `frame-ancestors` response header.
+See the [draw.io self-hosting guide](https://github.com/jgraph/drawio/wiki/Self-Hosting).
 
 Omit the setting to use manual PNG import, download, and replacement. See
 [editing diagrams in Dagsverk](MARKDOWN-EDITOR.md#drawio-diagrams).

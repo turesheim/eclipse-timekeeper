@@ -144,7 +144,7 @@ def main():
     parser.add_argument('--browser', choices=('chromium','webkit','firefox'), default='chromium', help='Browser engine for this acceptance run')
     parser.add_argument('--https', action='store_true', help='Use a loopback HTTPS reverse proxy with a test-only certificate')
     parser.add_argument('--mail', action='store_true', help='Exercise delivery with a loopback-only SMTP capture fixture (requires --https)')
-    parser.add_argument('--drawio-root', type=Path, help='Serve the official draw.io static assets over a separate loopback HTTPS origin (requires --https)')
+    parser.add_argument('--drawio-root', type=Path, help='Exercise the bundled draw.io listener with the extracted upstream assets over loopback HTTPS (requires --https)')
     parser.add_argument('--passkeys', action='store_true', help='Use the HTTPS localhost RP for virtual WebAuthn browser tests (requires --https)')
     parser.add_argument('--restore', action='store_true', help='Enable private restore staging for isolated confirmation acceptance')
     parser.add_argument('--spec', action='append', choices=sorted(path.name for path in (ROOT/'server/web/tests').glob('*.spec.js')), help='Run selected spec files in one isolated fixture')
@@ -177,7 +177,14 @@ def main():
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         backend = f'http://127.0.0.1:{port}'
-        fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1',calendars=True,drawio_root=args.drawio_root)
+        drawio_port = None
+        if args.drawio_root:
+            with socket.socket() as sock:
+                sock.bind(('127.0.0.1', 0))
+                drawio_port = sock.getsockname()[1]
+        fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1',calendars=True,drawio_port=drawio_port)
+        if args.drawio_root:
+            fixture.environment['TIMEKEEPER_WEB_DRAWIO_ROOT'] = str(args.drawio_root.resolve())
         base = fixture.base
         environment = {**{key:value for key,value in os.environ.items() if not key.startswith('DAGSVERK_')}, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
                        'TIMEKEEPER_ACCOUNT_ARCHIVE_STORAGE':str(data / 'account-archives'), 'TIMEKEEPER_INSTANCE_BACKUP_STORAGE':str(data / 'instance-backups'), 'TIMEKEEPER_INSTANCE_RESTORE_STORAGE':str(data / 'instance-restore') if args.restore else 'NONE', 'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}

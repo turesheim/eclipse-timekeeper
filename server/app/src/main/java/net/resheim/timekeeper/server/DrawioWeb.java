@@ -34,8 +34,12 @@ class DrawioWeb {
                 + (uri.getPort() == -1 || uri.getPort() == 443 ? "" : ":" + uri.getPort());
     }
 
+    String editorOrigin() { return validateOrigin(configured); }
+
+    String parentOrigin() { return validateOrigin(publicOrigin); }
+
     void routes(@Observes Router router) {
-        String origin = validateOrigin(configured);
+        String origin = editorOrigin();
         if (origin != null && !"NONE".equals(publicOrigin)
                 && URI.create(origin).getHost().equalsIgnoreCase(URI.create(publicOrigin).getHost())) {
             throw new IllegalArgumentException("The draw.io editor requires a dedicated host");
