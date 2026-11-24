@@ -6,6 +6,7 @@ import AxeBuilder from '@axe-core/playwright';
 import {openAccountMenu,openAbout,setTheme,workspaceDockSelector} from './navigation.js';
 
 test('bottom navigation keeps every view accessible, stationary and clear of content at compact widths',async({page,browserName})=>{
+  await page.setViewportSize({width:320,height:844});
   await page.goto('/web/');const bar=page.locator('#workspace-navigation');await expect(bar).not.toBeVisible();
   await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
