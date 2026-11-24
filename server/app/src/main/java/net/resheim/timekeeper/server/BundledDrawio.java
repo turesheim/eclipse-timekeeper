@@ -3,6 +3,7 @@ package net.resheim.timekeeper.server;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.FileSystemAccess;
@@ -69,6 +70,14 @@ class BundledDrawio {
                 .setIncludeHidden(false).setDirectoryListing(false).setMaxAgeSeconds(0);
         router.get().handler(files);
         router.head().handler(files);
+        router.route().handler(context -> {
+            HttpMethod method = context.request().method();
+            if (method == HttpMethod.GET || method == HttpMethod.HEAD) {
+                context.response().setStatusCode(404).end();
+            } else {
+                context.response().putHeader("Allow", "GET, HEAD").setStatusCode(405).end();
+            }
+        });
         return router;
     }
 
