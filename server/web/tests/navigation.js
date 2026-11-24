@@ -1,5 +1,7 @@
 import {expect} from '@playwright/test';
 
+export const workspaceDockSelector='body:has(#workspace[data-navigation=side]:not([hidden])) > .app-header, #workspace[data-navigation=bottom]:not([hidden]) > #workspace-navigation';
+
 export async function navigateView(page,name){
   if(['clients','projects'].includes(name)){
     if(!new URL(page.url()).hash.startsWith('#account')){

@@ -1,3 +1,4 @@
+import {workspaceDockSelector} from './navigation.js';
 import {clickNoteAction} from './editor-interactions.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {tooltipFor} from './tooltips.js';
@@ -206,8 +207,8 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
     await page.evaluate(()=>window.scrollTo(0,50));
     await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo(0,0));
-    await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);
-    expect(await page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(0);
+    await expect.poll(()=>page.evaluate(dock=>document.querySelector(dock).getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom,workspaceDockSelector)).toBeLessThan(24);
+    expect(await page.evaluate(dock=>document.querySelector(dock).getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom,workspaceDockSelector)).toBeGreaterThanOrEqual(0);
     expect(await page.locator('.today-month-day').evaluateAll(days=>days.every(day=>day.scrollHeight<=day.clientHeight+1))).toBe(true);
     await expect(page.locator('#today-note-form > .dialog-actions')).toHaveCSS('border-top-width','0px');
     await captureScreenshot(page,{path:'test-results/today-desktop.png'});
@@ -280,6 +281,11 @@ test('Today phone journal applies native and menu formatting and reopens in rich
     await journal.getByRole('menuitem',{name:'Bold',exact:true}).tap();
     await expect(rich.locator('strong')).toHaveText('Alpha');
     await select('Gamma');
+    // Touch selection can move between pressing the toolbar and opening its menu.
+    await trigger.evaluate(button=>button.addEventListener('pointerup',()=>{
+      const alpha=document.querySelector('#today-note-editor .ProseMirror strong').firstChild;
+      getSelection().setBaseAndExtent(alpha,0,alpha,alpha.length);
+    },{once:true}));
     await trigger.tap();await journal.getByRole('menuitem',{name:'Italic',exact:true}).tap();
     await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
     await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toMatch(/\*\*Alpha\*\* [*_]Beta[*_] [*_]Gamma[*_]/);
@@ -402,10 +408,10 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
           await page.locator('#today-main-actions').getByRole('button',{name:'Note tools',exact:true}).click();
           await editor.getByRole('menuitem',{name:mode,exact:true}).click();
         }else await editor.getByRole('button',{name:mode,exact:true}).click();
-        await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-(a.y+a.height)-gap);}).toBeLessThan(2);
+        await expect.poll(async()=>{const a=await editor.boundingBox(),nav=await page.locator(workspaceDockSelector).boundingBox(),gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));return Math.abs(nav.y-(a.y+a.height)-gap);}).toBeLessThan(2);
         const content=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');
         await expect(content).toBeVisible();expect(await content.evaluate(value=>value.scrollHeight>value.clientHeight)).toBe(true);
-        const actions=await editor.locator('#today-note-form > .dialog-actions').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(actions.y+actions.height).toBeLessThanOrEqual(nav.y);
+        const actions=await editor.locator('#today-note-form > .dialog-actions').boundingBox(),nav=await page.locator(workspaceDockSelector).boundingBox();expect(actions.y+actions.height).toBeLessThanOrEqual(nav.y);
       }
     }
     await captureScreenshot(page,{path:'test-results/today-bounded-editor-mobile.png'});
@@ -436,11 +442,11 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
       await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toHaveAttribute('aria-expanded',String(width>1050));
       const gap=parseFloat(await resolvedLength(page,'--workspace-content-gap'));
       // Font-only changes must redock both columns without a synthetic resize.
-      await expect.poll(()=>page.evaluate(gap=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector('#workspace-navigation').getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},gap)).toBeLessThan(2);
-      const geometry=await page.evaluate(()=>{
-        const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),controls=rect('.today-date-navigation'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect('#workspace-navigation'),main=rect('.today-main'),session=rect('#work-session');
+      await expect.poll(()=>page.evaluate(({gap,dockSelector})=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector(dockSelector).getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},{gap,dockSelector:workspaceDockSelector})).toBeLessThan(2);
+      const geometry=await page.evaluate(dockSelector=>{
+        const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),controls=rect('.today-date-navigation'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect(dockSelector),main=rect('.today-main'),session=rect('#work-session');
         return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,headerBottom:toolbar.bottom,headerRight:toolbar.right,actionsLeft:rect('#today-main-actions').left,contentsTop:rect('#today-contents').top,editorTop:editor.top,sidebarRight:sidebar.right,controlsRight:controls.right,controlsTop:controls.top,controlsCenter:controls.top+controls.height/2,titleTop:title.top,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,columnGap:parseFloat(getComputedStyle(document.querySelector('.today-toolbar')).columnGap),overflow:document.documentElement.scrollWidth>innerWidth};
-      });
+      },workspaceDockSelector);
       expect(geometry.overflow,`${locale}: viewport ${width}px, base font ${font}px, heading ${heading||'default'}, brand ${brand||'default'}`).toBe(false);
       if(width>650){
         expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.actionsLeft)/2)).toBeLessThan(2);

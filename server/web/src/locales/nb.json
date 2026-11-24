@@ -713,6 +713,8 @@
   "ui.work_session_timing": "Tidtaking for arbeidsøkt",
   "ui.work_session_tools": "Verktøy for arbeidsøkt",
   "ui.in_progress_6a506b": "PÅGÅR",
+  "ui.expand_navigation": "Utvid navigasjonen",
+  "ui.collapse_navigation": "Skjul navigasjonsteksten",
   "ui.time_tracking_views": "Visninger for tidsregistrering",
   "ui.track": "Kalender",
   "ui.workweek": "Arbeidsuke",

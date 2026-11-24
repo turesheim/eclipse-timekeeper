@@ -2,7 +2,11 @@
 export function accountMenu(menu) {
   const summary = menu.querySelector('summary'), panel = menu.querySelector('.account-menu-items');
   const fit = () => {
-    if (menu.open) panel.style.maxHeight = Math.max(0, innerHeight - panel.getBoundingClientRect().top - 8) + 'px';
+    if(!menu.open)return;
+    const opensUp=getComputedStyle(panel).getPropertyValue('--account-menu-opens-up').trim()==='1';
+    const bounds=panel.getBoundingClientRect();
+    const height=(opensUp?bounds.bottom:innerHeight-bounds.top)-8;
+    panel.style.maxHeight=Math.max(0,height)+'px';
   };
   menu.addEventListener('toggle', () => {
     summary.setAttribute('aria-expanded', String(menu.open));

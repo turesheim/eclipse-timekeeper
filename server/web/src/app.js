@@ -239,6 +239,23 @@ async function tab(name) {
 }
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
+const desktopNavigation=matchMedia('(min-width: 1051px) and (hover: hover) and (pointer: fine)');
+const navigationToggle=$('workspace-nav-toggle');
+const paintNavigation=()=>{
+  const wide=desktopNavigation.matches,expanded=navigationToggle.getAttribute('aria-expanded')==='true';
+  $('workspace').dataset.navigation=wide?'side':'bottom';
+  $('workspace').classList.toggle('workspace-nav-expanded',expanded);
+  if(!wide&&document.activeElement===navigationToggle)$('workspace-navigation').querySelector('[aria-current="page"]')?.focus();
+  navigationToggle.hidden=!wide;
+  iconButton(navigationToggle,expanded?'layout-sidebar-inset':'layout-sidebar',i18nText(expanded?'ui.collapse_navigation':'ui.expand_navigation'));
+};
+desktopNavigation.addEventListener('change',paintNavigation);
+navigationToggle.addEventListener('click',()=>{
+  navigationToggle.setAttribute('aria-expanded',String(navigationToggle.getAttribute('aria-expanded')!=='true'));
+  paintNavigation();
+});
+paintNavigation();
+
 const auth = authentication({
   beforeSignOut:async()=>await notes.canLeave()&&await today.canLeaveJournal()&&await notePopup.canLeave()&&await canLeaveSearchEvents(),
   beforeNavigate:async()=>{++calendarNavigation;if(!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents())return false;notePopup.close(true);calendarSearchPopup.close(true);return true;},

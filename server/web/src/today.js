@@ -157,7 +157,8 @@ export class TodayView {
   }
   sizeEditor(){
     if(!this.visible||!this.root.offsetParent)return;
-    const top=this.journalRoot.getBoundingClientRect().top+scrollY,navHeight=byId('workspace-navigation').getBoundingClientRect().height;
+    const workspace=byId('workspace'),dock=workspace.dataset.navigation==='side'?document.querySelector('.app-header'):byId('workspace-navigation');
+    const top=this.journalRoot.getBoundingClientRect().top+scrollY,navHeight=dock.getBoundingClientRect().height;
     this.root.style.setProperty('--today-editor-height',Math.max(0,innerHeight-top-navHeight)+'px');
     const sidebarTop=this.root.querySelector('.today-sidebar').getBoundingClientRect().top+scrollY;
     this.root.style.setProperty('--today-sidebar-height',Math.max(0,innerHeight-sidebarTop-navHeight)+'px');

@@ -713,6 +713,8 @@
   "ui.work_session_timing": "Work session timing",
   "ui.work_session_tools": "Work session tools",
   "ui.in_progress_6a506b": "IN PROGRESS",
+  "ui.expand_navigation": "Expand navigation",
+  "ui.collapse_navigation": "Collapse navigation",
   "ui.time_tracking_views": "Time tracking views",
   "ui.track": "Calendar",
   "ui.workweek": "Workweek",
