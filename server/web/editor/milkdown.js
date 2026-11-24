@@ -20,6 +20,7 @@ import {gfm,footnoteReferenceSchema,footnoteDefinitionSchema,insertTableCommand,
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose,$node,$remark,$inputRule} from '@milkdown/kit/utils';
 import {Fragment,Slice} from '@milkdown/kit/prose/model';
+import {wrapIn} from '@milkdown/kit/prose/commands';
 import {Plugin,TextSelection,NodeSelection} from '@milkdown/kit/prose/state';
 import {isInTable} from '@milkdown/kit/prose/tables';
 import {InputRule} from '@milkdown/kit/prose/inputrules';
@@ -166,7 +167,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const wikiInput=nativeWikiInput(()=>readOnly,brackets.pending,()=>composing);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
-  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
+  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed,emptyMarker});
   const changePlugin=$prose(()=>new Plugin({state:{init:()=>null,apply:transaction=>{for(const target of targets)target.selection=target.selection.map(transaction.mapping);return null;}},filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
     if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
@@ -311,7 +312,11 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     };
     const command=(name,payload,focus=true)=>{
       if(readOnly||root.contains(document.activeElement)&&document.activeElement.closest?.('.markdown-source-fragment'))return false;
-      if(name==='link'){
+      if(name==='callout'){
+        if(!['note','tip','important','warning','caution'].includes(payload))return false;
+        const marker='[!'+payload.toUpperCase()+']';
+        if(!wrapIn(view.state.schema.nodes.callout,{marker})(view.state,view.dispatch))return false;
+      }else if(name==='link'){
         if(!linkAllowed(payload))return false;
         if(!editor.action(callCommand(updateLinkCommand.key,{href:payload}))){
           const {from,empty}=view.state.selection;
