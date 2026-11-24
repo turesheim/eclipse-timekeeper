@@ -61,6 +61,8 @@ database baseline.
   and committed change notifications across connected clients.
 - Added browser account setup, sign-in, personal API tokens and email recovery,
   plus server/web clients grouping projects and work sessions.
+- Added note, tip, important, warning and caution callouts to the wiki editor’s
+  formatting toolbar (#714).
 - Added Bootstrap 5.3.8 styling, Track month views and calendar session
   creation, dragging and resizing. Browser session editors use native date/time
   pickers in the account's time zone, with explicit choices for repeated DST times.
@@ -74,6 +76,8 @@ database baseline.
   retain v1/v2 compatibility and ignore retired activity/session links.
   Native CSV includes session storage; known schema-2 databases receive guarded
   upgrades to schema 3 after a verified private backup.
+- Added icons and translated type labels to wiki admonitions while preserving
+  custom titles and Markdown source (#716).
 
 ### Upgrade notes
 

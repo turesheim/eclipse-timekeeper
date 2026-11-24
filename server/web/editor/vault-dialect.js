@@ -1,9 +1,10 @@
 import {$node,$remark} from '@milkdown/kit/utils';
 import {wikiReference} from '../src/wiki-links.js';
 import {t} from '../src/i18n.js';
+import {calloutAliases,calloutIcons} from '../src/markdown-callouts.js';
 import {normalizeFormatting} from './redundant-formatting.js';
 
-export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
+export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMarker}){
   // Render the safe anchor subset of authored HTML through the normal link
   // schema. An inert template only reads attributes/text; no user DOM is mounted.
   const anchor=(html,closed=false)=>{
@@ -63,11 +64,11 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
       ?{type:'inlineBreak',position:child.position}:convert(child)))};
     if(node.type!=='blockquote'||node.children?.[0]?.type!=='paragraph')return node;
     const first=node.children[0],text=first.children?.[0];if(text?.type!=='text')return node;
-    const match=/^(\[![A-Za-z]+\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;
+    const match=/^(\[![A-Za-z][A-Za-z0-9-]*\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;
     const remainder=text.value.slice(match[0].length),children=[...(remainder?[{...text,value:remainder}]:[]),...first.children.slice(1)];
     if(!remainder&&children[0]?.type==='break'&&children[0].data?.isInline)children.shift();
     const blocks=[...(children.length?[{...first,children}]:[]),...node.children.slice(1)];
-    if(!blocks.length)return node;
+    if(!blocks.length)blocks.push({...first,children:[]});
     return {...node,type:'callout',marker:match[1],title:match[2]||'',children:blocks};
   };
   const fragment=$node('source_fragment',()=>({group:'block',atom:true,isolating:true,selectable:true,
@@ -78,14 +79,30 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
   }));
   const project=(tree,source)=>{const normalized=normalizeFormatting(tree);return {...normalized,children:normalized.children.map(node=>convert(node,true)).map(node=>unsupported(node)?{type:'sourceFragment',value:source.slice(node.position.start.offset,node.position.end.offset),position:node.position}:node)};};
   const guard=$remark('timekeeperSourceFragments',()=>function(){
-    (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+'\n'+body.split('\n').map(line=>'> '+line).join('\n');}}});
+    (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replaceAll(emptyMarker,'').replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+(body.trim()?'\n'+body.split('\n').map(line=>line?'> '+line:'>').join('\n'):'');}}});
     return (tree,file)=>{tree.children=project(tree,String(file)).children;};
   });
   const nodeViews={
     callout:(initial,view,getPos)=>{
-      let node=initial;const dom=document.createElement('aside'),header=document.createElement('div'),fold=document.createElement('button'),title=document.createElement('input'),contentDOM=document.createElement('div');dom.className='markdown-callout';header.contentEditable='false';fold.type='button';fold.textContent=node.attrs.marker.replace(/[\[\]!+-]/g,'');fold.setAttribute('aria-label',t('markdown.toggle_callout'));title.value=node.attrs.title;title.setAttribute('aria-label',t('markdown.callout_title'));title.readOnly=readOnly();header.append(fold,title);dom.append(header,contentDOM);let collapsed=node.attrs.marker.endsWith('-');contentDOM.hidden=collapsed;fold.setAttribute('aria-expanded',String(!collapsed));
+      let node=initial;
+      const dom=document.createElement('aside'),header=document.createElement('div'),fold=document.createElement('button');
+      const glyph=document.createElement('span'),label=document.createElement('span'),title=document.createElement('input'),contentDOM=document.createElement('div');
+      dom.className='markdown-callout';header.contentEditable='false';fold.type='button';
+      glyph.setAttribute('aria-hidden','true');
+      const updateHeader=()=>{
+        const type=node.attrs.marker.slice(2,node.attrs.marker.indexOf(']')),id=type.toLowerCase();
+        const key=calloutAliases.get(id)||id;
+        const known=calloutIcons.get(key),name=known?t('markdown.callout_type_'+key):type;
+        glyph.className='icon bi bi-'+(known||'chat-left-text');
+        label.textContent=name;fold.setAttribute('aria-label',t('markdown.toggle_callout',{type:name}));
+        if(document.activeElement!==title)title.value=node.attrs.title;
+        title.readOnly=readOnly();
+      };
+      title.setAttribute('aria-label',t('markdown.callout_title'));
+      fold.append(glyph,label);header.append(fold,title);dom.append(header,contentDOM);updateHeader();
+      let collapsed=node.attrs.marker.endsWith('-');contentDOM.hidden=collapsed;fold.setAttribute('aria-expanded',String(!collapsed));
       fold.addEventListener('click',()=>{collapsed=!collapsed;contentDOM.hidden=collapsed;fold.setAttribute('aria-expanded',String(!collapsed));});title.addEventListener('change',()=>{if(readOnly())return;const pos=getPos();if(typeof pos==='number')view.dispatch(view.state.tr.setNodeMarkup(pos,undefined,{...node.attrs,title:title.value}));});
-      return {dom,contentDOM,stopEvent:event=>header.contains(event.target),ignoreMutation:mutation=>header.contains(mutation.target)||mutation.target===contentDOM&&mutation.type==='attributes',update(next){if(next.type!==node.type)return false;node=next;if(document.activeElement!==title)title.value=node.attrs.title;title.readOnly=readOnly();return true;}};
+      return {dom,contentDOM,stopEvent:event=>header.contains(event.target),ignoreMutation:mutation=>header.contains(mutation.target)||mutation.target===contentDOM&&mutation.type==='attributes',update(next){if(next.type!==node.type)return false;node=next;updateHeader();return true;}};
     },
     source_fragment:(initial,view,getPos)=>{
       let node=initial;const dom=document.createElement('div'),caption=document.createElement('label'),text=document.createElement('textarea');dom.className='markdown-source-fragment';dom.contentEditable='false';caption.textContent=t('markdown.fragment');text.setAttribute('aria-label',t('markdown.fragment'));text.value=node.attrs.value;text.readOnly=readOnly();text.spellcheck=false;dom.append(caption,text);

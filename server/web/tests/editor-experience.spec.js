@@ -110,14 +110,15 @@ test('source fragments cannot be changed in a read-only editor',async({page})=>{
   expect(await page.evaluate(()=>globalThis.experience.command('bold'))).toBe(false);
 });
 
-async function field(page,value,formatted=true,catalog=[]){
+async function field(page,value,formatted=true,catalog=[],locale){
   await openEditorFixture(page);await page.evaluate(()=>{const link=document.createElement('link');link.rel='stylesheet';link.href='/web/assets/bootstrap-icons/bootstrap-icons.min.css';document.head.append(link);});
-  await page.evaluate(async({value,formatted,catalog})=>{
+  await page.evaluate(async({value,formatted,catalog,locale})=>{
+    if(locale)(await import('/web/i18n.js')).setLocale(locale);
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
     const resources=catalog.length?{allowsAsset:()=>false,allowsLink:()=>false,complete:async query=>catalog.filter(entry=>entry.path.toLowerCase().includes(query.toLowerCase())),resolveWiki:async()=>catalog[0],openWiki:async()=>{}}:undefined;
     globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources);
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
-  },{value,formatted,catalog});
+  },{value,formatted,catalog,locale});
 }
 async function pasteText(page,text,{html='',plain=false}={}){
   await page.evaluate(({text,html,plain})=>{
@@ -194,6 +195,60 @@ test('table commands edit rows, columns and alignment and preserve other blocks'
   expect(await page.evaluate(()=>globalThis.experience.command('column_after'))).toBe(true);await expect(page.locator('#experience-editor tr').first().locator('th')).toHaveCount(3);
   expect(await page.evaluate(()=>globalThis.experience.command('align_right'))).toBe(true);expect(await source(page)).toContain('Before.');expect(await source(page)).toContain('After.');
 });
+test('the formatting toolbar inserts editable Obsidian callouts',async({page})=>{
+  await field(page,'Existing **text**.\n');
+  const host=page.locator('#experience-field');
+  const rich=host.locator('.ProseMirror');
+  const style=host.getByRole('button',{name:'Add callout',exact:true});
+  await rich.locator('p').click();
+  await style.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(host.getByRole('menuitem',{name:'Add caution callout'})).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(rich.locator('.markdown-callout strong')).toHaveText('text');
+  expect(await page.evaluate(()=>globalThis.field.value())).toContain('> [!CAUTION]\n> Existing **text**.');
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(rich.locator('.markdown-callout')).toHaveCount(0);
+
+  await field(page,'');
+  await style.click();
+  await host.getByRole('menuitem',{name:'Add tip callout'}).click();
+  await expect(rich.locator('.markdown-callout')).toBeVisible();
+  expect((await page.evaluate(()=>globalThis.field.value())).trim()).toBe('> [!TIP]');
+  await host.getByRole('button',{name:'Markdown source',exact:true}).click();
+  await host.locator('#experience-body').fill('> [!TIP]\n> Try this.\n');
+  await host.getByRole('button',{name:'Formatted',exact:true}).click();
+  await expect(rich.locator('.markdown-callout p')).toHaveText('Try this.');
+  await field(page,'> [!TIP]\n');
+  await expect(rich.locator('.markdown-callout p')).toBeEmpty();
+  await page.evaluate(()=>globalThis.field.setReadOnly(true));
+  await expect(style).toBeHidden();
+});
+
+test('admonition headers show type icons and localized labels while preserving authored titles',async({page})=>{
+  const markdown='> [!warning]- Read carefully\n> Existing body.\n\n> [!custom-type] Personal heading\n> Custom body.\n\n> [!FAQ]\n> A question.\n';
+  for(const [locale,type,question] of [['en-GB','Warning','Question'],['nb-NO','Advarsel','Spørsmål']]){
+    await page.setViewportSize({width:390,height:844});
+    await field(page,markdown,true,[],locale);
+    const callouts=page.locator('#experience-formatted .markdown-callout');
+    const fold=callouts.first().getByRole('button',{name:new RegExp(type)});
+    await expect(fold).toHaveText(type);
+    await expect(fold.locator('.bi-exclamation-triangle')).toHaveAttribute('aria-hidden','true');
+    await expect(callouts.first().locator('input')).toHaveValue('Read carefully');
+    await expect(callouts.first().locator('p')).toBeHidden();
+    await fold.press('Enter');
+    await expect(callouts.first().locator('p')).toHaveText('Existing body.');
+    const unknown=callouts.nth(1).getByRole('button',{name:/custom-type/});
+    await expect(unknown).toHaveText('custom-type');
+    await expect(unknown.locator('.bi-chat-left-text')).toHaveAttribute('aria-hidden','true');
+    await expect(callouts.nth(1).locator('input')).toHaveValue('Personal heading');
+    const alias=callouts.nth(2).getByRole('button',{name:new RegExp(question)});
+    await expect(alias).toHaveText(question);
+    await expect(alias.locator('.bi-question-circle')).toBeVisible();
+    expect(await page.evaluate(()=>globalThis.field.value())).toBe(markdown);
+  }
+});
+
 test('callouts and footnotes render, remain editable and preserve Markdown references',async({page})=>{
   const value='Text[^one].\n\n> [!NOTE] Decision\n> Keep this callout.\n\n[^one]: A **useful** footnote.\n\nTail.\n';await engine(page,value);
   await expect(page.locator('.markdown-callout')).toContainText('Keep this callout.');await expect(page.locator('[data-footnote-reference]')).toHaveText('one');await expect(page.locator('[data-footnote-definition]')).toContainText('useful');expect(await source(page)).toBe(value);
