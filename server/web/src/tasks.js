@@ -43,8 +43,15 @@ export class TasksView {
     const completedLabel=node('label',undefined,'form-check m-0');this.hideCompleted=node('input',undefined,'form-check-input');this.hideCompleted.type='checkbox';this.hideCompleted.checked=true;this.hideCompleted.id='tasks-hide-completed';completedLabel.htmlFor=this.hideCompleted.id;completedLabel.append(this.hideCompleted,node('span',t('tasks.hide_completed'),'form-check-label'));this.hideCompleted.addEventListener('change',()=>{this.visibleLimit=50;this.paint();});
     const toolbar=node('div',undefined,'btn-toolbar tasks-toolbar align-items-center gap-3');toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label',t('tasks.tools'));toolbar.append(actions,completedLabel);
     this.resize=new SidebarResize(root,this.navigation,{variable:'--tasks-nav-width',label:t('tasks.resize'),width:256,breakpoint:760,focusFallback:()=>this.toggle,className:'tasks-resize'}).element;
-    this.count=node('p','','hint');this.count.setAttribute('role','status');this.list=node('ul',undefined,'tasks-list');this.list.id='tasks-list';this.empty=node('p',t('tasks.empty'),'hint');this.more=button(t('tasks.more'),()=>{this.visibleLimit+=50;this.paint();});this.more.hidden=true;content.append(this.listTitle,toolbar,this.count,this.list,this.empty,this.more);layout.append(this.navigation,this.resize,content);root.append(heading,this.error,this.warning,layout);
-    this.sidebarActions=new SidebarActions(this.mainActions,root,{left:{panel:this.navigation,separator:this.resize,collapseOnNarrow:true,breakpoint:760}});this.toggle=this.sidebarActions.items[0].button;
+    this.recentHost=node('aside',undefined,'tasks-recent');
+    this.recentHost.id='tasks-contents';this.recentHost.setAttribute('aria-label',t('layout.right_sidebar'));
+    this.recentHost.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&this.sidebarActions.narrow.matches){
+        event.preventDefault();this.sidebarActions.setExpanded('right',false);
+      }
+    });
+    this.count=node('p','','hint');this.count.setAttribute('role','status');this.list=node('ul',undefined,'tasks-list');this.list.id='tasks-list';this.empty=node('p',t('tasks.empty'),'hint');this.more=button(t('tasks.more'),()=>{this.visibleLimit+=50;this.paint();});this.more.hidden=true;content.append(this.listTitle,toolbar,this.count,this.list,this.empty,this.more);layout.append(this.navigation,this.resize,content,this.recentHost);root.append(heading,this.error,this.warning,layout);
+    this.sidebarActions=new SidebarActions(this.mainActions,root,{left:{panel:this.navigation,separator:this.resize,collapseOnNarrow:true,breakpoint:760},right:{panel:this.recentHost,collapseOnNarrow:true}});this.toggle=this.sidebarActions.items[0].button;
     this.buildTaskActions();
     this.detail=node('dialog',undefined,'app-dialog task-details');this.detail.id='task-details';this.detailTitle=node('h2');this.detailTitle.id='task-details-title';this.detail.setAttribute('aria-labelledby',this.detailTitle.id);
     const close=button(t('ui.close'),()=>this.detail.close(),'close');close.classList.add('task-details-close');this.detailBody=node('div');

@@ -82,7 +82,7 @@ const calendarSearchPopup=new CalendarSearchEditor($('workspace'),searchEditorCa
 const calendarSearchWorkspace=new CalendarSearchEditor(calendarSearchPanel,searchEditorCallbacks,{inline:true});
 let calendarNavigation=0;
 async function canLeaveSearchEvents(){return await calendarSearchPopup.canLeave()&&await calendarSearchWorkspace.canLeave();}
-const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>void refresh().catch(()=>{}),onChanged:()=>refresh().catch(()=>{}),onTrack:id=>snapshot.active.data?.taskId===id?openStop():openStart(id),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error))),onDelete:id=>void openDelete('tasks',id).catch(error=>setStatus(errorText(error)))});
+const tasks = new TasksView($('tasks-panel'),{onUnauthorized:error=>auth.clear(errorText(error)),onRefresh:()=>{void refresh().catch(()=>{});void recentNotes.refresh(true);},onChanged:()=>refresh().catch(()=>{}),onTrack:id=>snapshot.active.data?.taskId===id?openStop():openStart(id),onNew:()=>void openRecord('tasks').catch(error=>setStatus(errorText(error))),onEdit:id=>void openRecord('tasks',id).catch(error=>setStatus(errorText(error))),onDelete:id=>void openDelete('tasks',id).catch(error=>setStatus(errorText(error)))});
 async function navigationGuards(guards,session=api){for(const guard of guards)if(!await guard()||session!==api)return false;return true;}
 document.addEventListener(tagNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,tag=hashtagKey(event.detail.tag);
@@ -229,7 +229,7 @@ async function tab(name) {
   if(name==='tasks')tasks.show();else tasks.hide();
   if (name === 'track') track.show();else track.hide();
   if (name === 'today') today.show();else today.hide();
-  if(name==='today')recentNotes.show($('today-contents'),'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else recentNotes.hide();
+  if(name==='today')recentNotes.show($('today-contents'),'today-recent-notes');else if(name==='notes')recentNotes.show(notes.recentHost,'notes-recent-notes');else if(name==='tasks')recentNotes.show(tasks.recentHost,'tasks-recent-notes');else recentNotes.hide();
   if (name === 'week') weekSessions.show();else weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
