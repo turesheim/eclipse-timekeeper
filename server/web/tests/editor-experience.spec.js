@@ -110,14 +110,15 @@ test('source fragments cannot be changed in a read-only editor',async({page})=>{
   expect(await page.evaluate(()=>globalThis.experience.command('bold'))).toBe(false);
 });
 
-async function field(page,value,formatted=true,catalog=[]){
+async function field(page,value,formatted=true,catalog=[],locale){
   await openEditorFixture(page);await page.evaluate(()=>{const link=document.createElement('link');link.rel='stylesheet';link.href='/web/assets/bootstrap-icons/bootstrap-icons.min.css';document.head.append(link);});
-  await page.evaluate(async({value,formatted,catalog})=>{
+  await page.evaluate(async({value,formatted,catalog,locale})=>{
+    if(locale)(await import('/web/i18n.js')).setLocale(locale);
     const {MarkdownField}=await import('/web/markdown-field.js');const root=document.createElement('section');root.id='experience-field';document.body.append(root);
     const resources=catalog.length?{allowsAsset:()=>false,allowsLink:()=>false,complete:async query=>catalog.filter(entry=>entry.path.toLowerCase().includes(query.toLowerCase())),resolveWiki:async()=>catalog[0],openWiki:async()=>{}}:undefined;
     globalThis.field=new MarkdownField(root,()=>{},()=>{},'experience',async file=>{if(globalThis.failUpload||globalThis.failUploadName===file.name)throw new Error('Upload failed');(globalThis.uploaded??=[]).push(file.name);return 'assets/'+file.name;},resources);
     globalThis.field.setValue(value);globalThis.field.setReadOnly(false);if(formatted)await globalThis.field.showFormatted();
-  },{value,formatted,catalog});
+  },{value,formatted,catalog,locale});
 }
 async function pasteText(page,text,{html='',plain=false}={}){
   await page.evaluate(({text,html,plain})=>{
@@ -222,6 +223,27 @@ test('the formatting toolbar inserts editable Obsidian callouts',async({page})=>
   await expect(rich.locator('.markdown-callout p')).toBeEmpty();
   await page.evaluate(()=>globalThis.field.setReadOnly(true));
   await expect(style).toBeHidden();
+});
+
+test('admonition headers show type icons and localized labels while preserving authored titles',async({page})=>{
+  const markdown='> [!warning]- Read carefully\n> Existing body.\n\n> [!CUSTOM] Personal heading\n> Custom body.\n';
+  for(const [locale,type] of [['en-GB','Warning'],['nb-NO','Advarsel']]){
+    await page.setViewportSize({width:390,height:844});
+    await field(page,markdown,true,[],locale);
+    const callouts=page.locator('#experience-formatted .markdown-callout');
+    const fold=callouts.first().getByRole('button',{name:new RegExp(type)});
+    await expect(fold).toHaveText(type);
+    await expect(fold.locator('.bi-exclamation-triangle')).toHaveAttribute('aria-hidden','true');
+    await expect(callouts.first().locator('input')).toHaveValue('Read carefully');
+    await expect(callouts.first().locator('p')).toBeHidden();
+    await fold.press('Enter');
+    await expect(callouts.first().locator('p')).toHaveText('Existing body.');
+    const unknown=callouts.nth(1).getByRole('button',{name:/CUSTOM/});
+    await expect(unknown).toHaveText('CUSTOM');
+    await expect(unknown.locator('.bi-chat-left-text')).toHaveAttribute('aria-hidden','true');
+    await expect(callouts.nth(1).locator('input')).toHaveValue('Personal heading');
+    expect(await page.evaluate(()=>globalThis.field.value())).toBe(markdown);
+  }
 });
 
 test('callouts and footnotes render, remain editable and preserve Markdown references',async({page})=>{

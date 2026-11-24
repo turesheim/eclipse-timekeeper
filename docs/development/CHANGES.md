@@ -74,6 +74,8 @@ database baseline.
   retain v1/v2 compatibility and ignore retired activity/session links.
   Native CSV includes session storage; known schema-2 databases receive guarded
   upgrades to schema 3 after a verified private backup.
+- Added icons and translated type labels to wiki admonitions while preserving
+  custom titles and Markdown source (#716).
 
 ### Upgrade notes
 

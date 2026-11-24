@@ -34,6 +34,7 @@ import {remarkDailyWikilinks} from './remark-daily-wikilinks.js';
 import {remarkAutolinks,autolinkSchema} from './autolinks.js';
 import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import {t} from '../src/i18n.js';
+import {calloutIcons} from '../src/markdown-callouts.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
@@ -313,7 +314,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     const command=(name,payload,focus=true)=>{
       if(readOnly||root.contains(document.activeElement)&&document.activeElement.closest?.('.markdown-source-fragment'))return false;
       if(name==='callout'){
-        if(!['note','tip','important','warning','caution'].includes(payload))return false;
+        if(!calloutIcons.has(payload))return false;
         const marker='[!'+payload.toUpperCase()+']';
         if(!wrapIn(view.state.schema.nodes.callout,{marker})(view.state,view.dispatch))return false;
       }else if(name==='link'){
