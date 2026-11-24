@@ -8,6 +8,10 @@ database baseline.
 
 ### Highlights
 
+- Bundled an optional draw.io editor for Compose and Synology. Edit and save
+  multi-page diagrams from the vault, with editable PNGs that remain portable
+  through WebDAV and account archives (#708).
+
 - Avoided the H2 2.5.250/2.5.252 crash-recovery data-loss regression by using
   the unaffected published H2 2.4.240 runtime in the server and Eclipse client.
   Added deterministic chunk-reuse and journal forced-restart regression checks.
