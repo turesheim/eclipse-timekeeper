@@ -164,7 +164,7 @@ body:has(#workspace[data-navigation=side]:not([hidden])) > .app-header {
 body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
   --account-menu-opens-up: 1;
   top: auto;
-  bottom: calc(100% + .5rem);
+  bottom: calc(100% + .5rem + (var(--workspace-nav-height) - 2.75rem) / 2);
 }
 #workspace[data-navigation=side] > .workspace-nav {
   inset: 0 auto var(--workspace-nav-height) 0;

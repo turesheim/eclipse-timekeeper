@@ -4,7 +4,8 @@ export function accountMenu(menu) {
   const fit = () => {
     if(!menu.open)return;
     const opensUp=getComputedStyle(panel).getPropertyValue('--account-menu-opens-up').trim()==='1';
-    const height=opensUp?menu.getBoundingClientRect().top-16:innerHeight-panel.getBoundingClientRect().top-8;
+    const bounds=panel.getBoundingClientRect();
+    const height=(opensUp?bounds.bottom:innerHeight-bounds.top)-8;
     panel.style.maxHeight=Math.max(0,height)+'px';
   };
   menu.addEventListener('toggle', () => {
