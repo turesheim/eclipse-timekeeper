@@ -14,6 +14,8 @@ database baseline.
 
 - Updated the build, target platform and runtime dependencies for Eclipse
   2026-09 and Java 21.
+- Moved the main navigation to a collapsible left sidebar on desktop, with
+  search, sync status and the account menu in a bottom bar (#713).
 - Added activity-based tracking with editable start and end times, improved
   refresh behavior and high-resolution display assets.
 - Preserved tasks, projects, labels, activities and reporting in the new

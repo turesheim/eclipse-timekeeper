@@ -1,3 +1,4 @@
+import {workspaceDockSelector} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {navigateView,setTheme} from './navigation.js';
@@ -69,7 +70,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Main actions independently toggle To
             if(!showLeft||!showRight)expect((await page.locator('.today-main').boundingBox()).width).toBeGreaterThan(initialWidth);
           }else await expect(resize).toBeHidden();
           expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-          const journal=await editor.boundingBox(),dock=await page.locator('#workspace-navigation').boundingBox();expect(journal.y+journal.height).toBeLessThanOrEqual(dock.y+1);
+          const journal=await editor.boundingBox(),dock=await page.locator(workspaceDockSelector).boundingBox();expect(journal.y+journal.height).toBeLessThanOrEqual(dock.y+1);
         }
         expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
         await captureScreenshot(page,{path:`test-results/sidebar-controls-${locale}-${theme}-${width}.png`});

@@ -1,3 +1,4 @@
+import {workspaceDockSelector} from './navigation.js';
 import {searchNotes} from './notes-search.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
@@ -56,7 +57,7 @@ test('Notes right sidebar resizes and collapses without replacing the draft, and
   await separator.focus();await page.setViewportSize({width:390,height:844});await expect(separator).toBeHidden();await expect(contents).toBeHidden();await expect(toggle).toBeFocused();
   for(const viewportWidth of [390,320]){
     await page.setViewportSize({width:viewportWidth,height:844});if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();await expect(contents).toBeVisible();expect((await contents.boundingBox()).width).toBeGreaterThan(200);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:`test-results/notes-contents-mobile-${viewportWidth}.png`});await toggle.click();
-    const editor=await page.locator('.notes-editor').boundingBox(),dock=await page.locator('#workspace-navigation').boundingBox();expect(editor.y+editor.height).toBeLessThanOrEqual(dock.y+1);
+    const editor=await page.locator('.notes-editor').boundingBox(),dock=await page.locator(workspaceDockSelector).boundingBox();expect(editor.y+editor.height).toBeLessThanOrEqual(dock.y+1);
   }
   await source.fill('Draft survives the sidebar controls.');await toggle.focus();await toggle.press('ControlOrMeta+s');await expect.poll(async()=>(await(await api('GET','/notes/entries/'+metadata.id+'/content')).body()).toString()).toBe('Draft survives the sidebar controls.');
 });
@@ -217,7 +218,7 @@ test('Notes keeps navigation and both editor modes anchored while their contents
       await content.hover();await page.mouse.wheel(0,5000);await expect.poll(()=>content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.mouse.wheel(0,5000);
       expect(await page.evaluate(()=>scrollY)).toBe(0);await expect(page.locator('.notes-footer')).toBeInViewport();
       expect(await page.evaluate(()=>document.documentElement.scrollHeight-document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
-      const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
+      const bounds=await page.locator('.notes-editor').boundingBox(),nav=await page.locator(workspaceDockSelector).boundingBox();expect(bounds.y+bounds.height).toBeLessThanOrEqual(nav.y+1);
       await captureScreenshot(page,{path:`test-results/notes-anchored-${width}-${mode==='Formatted'?'formatted':'source'}.png`});
     }
     if(width===320){const timestamps=page.locator('.notes-timestamps');await expect(timestamps).toHaveAttribute('tabindex','0');await timestamps.focus();await timestamps.press('ArrowRight');await expect.poll(()=>timestamps.evaluate(node=>node.scrollLeft)).toBeGreaterThan(0);expect((await new AxeBuilder({page}).include('#notes-panel').analyze()).violations).toEqual([]);const last=page.locator('.notes-markdown [data-command=hr]');await last.focus();await expect(last).toBeInViewport();}

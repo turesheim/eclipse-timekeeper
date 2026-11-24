@@ -1,3 +1,4 @@
+import {workspaceDockSelector} from './navigation.js';
 import {searchNotes} from './notes-search.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
@@ -197,7 +198,7 @@ test('Notes source and formatted editors stay above the menu at desktop and phon
     for(const mode of ['Markdown source','Formatted']){
       await page.locator('#notes-panel').getByRole('button',{name:mode,exact:true}).click();
       const content=mode==='Formatted'?page.locator('#notes-formatted .ProseMirror'):page.locator('#notes-body');await expect(content).toBeVisible();
-      await expect.poll(()=>page.locator('.notes-editor').evaluate(node=>{const nav=document.querySelector('#workspace-navigation').getBoundingClientRect(),gap=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--workspace-content-gap'))*parseFloat(getComputedStyle(document.documentElement).fontSize);return Math.abs(nav.top-node.getBoundingClientRect().bottom-gap);})).toBeLessThan(2);
+      await expect.poll(()=>page.locator('.notes-editor').evaluate((node,dockSelector)=>{const nav=document.querySelector(dockSelector).getBoundingClientRect(),gap=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--workspace-content-gap'))*parseFloat(getComputedStyle(document.documentElement).fontSize);return Math.abs(nav.top-node.getBoundingClientRect().bottom-gap);},workspaceDockSelector)).toBeLessThan(2);
       expect(await content.evaluate(node=>node.scrollHeight>node.clientHeight)).toBe(true);await content.evaluate(node=>node.scrollTop=node.scrollHeight);await expect(save).toBeInViewport();await expect(save).toHaveText('Saved');
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       await expect(page.locator('#notes-panel .markdown-source-tools')).toHaveCount(0);

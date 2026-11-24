@@ -1,3 +1,4 @@
+import {workspaceDockSelector} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -78,7 +79,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
         }else if(width===768){
           const toggle=page.locator('#today-main-actions-toggle-right-sidebar');await expect(toggle).toHaveAttribute('aria-expanded','false');
           await toggle.click();await expect(choices.last()).toBeVisible();
-          await expect.poll(async()=>{const editor=await field.boundingBox(),nav=await page.locator('#workspace-navigation').boundingBox();return editor.y+editor.height<=nav.y+1;}).toBe(true);
+          await expect.poll(async()=>{const editor=await field.boundingBox(),nav=await page.locator(workspaceDockSelector).boundingBox();return editor.y+editor.height<=nav.y+1;}).toBe(true);
           await toggle.click();
         }else{
           await expect(page.locator('#today-main-actions-toggle-right-sidebar')).toBeHidden();

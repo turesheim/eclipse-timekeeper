@@ -3,9 +3,9 @@ import {resolvedLength} from './style-metrics.js';
 import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import {openAccountMenu,openAbout} from './navigation.js';
+import {openAccountMenu,openAbout,setTheme,workspaceDockSelector} from './navigation.js';
 
-test('bottom navigation keeps every view accessible, stationary and clear of content at narrow and wide widths',async({page,browserName})=>{
+test('bottom navigation keeps every view accessible, stationary and clear of content at compact widths',async({page,browserName})=>{
   await page.goto('/web/');const bar=page.locator('#workspace-navigation');await expect(bar).not.toBeVisible();
   await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
@@ -19,17 +19,17 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
   const views=[['today','Today'],['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['tasks','Tasks'],['notes','Notes']];
   await expect(page.locator('[data-tab=labels]')).toHaveCount(0);
   await expect(page.locator('#activity-tasks,#tasks,#add-task')).toHaveCount(0);
-  expect(await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
-  for(const width of [320,390,768,1440]) {
+  expect(await bar.locator('[data-tab]').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
+  for(const width of [320,390,768]) {
     await page.setViewportSize({width,height:844});
-    await expect(bar.locator('button')).toHaveCount(7);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(7);
+    await expect(bar.locator('[data-tab]')).toHaveCount(7);await expect(bar.locator('[data-tab] .bi[aria-hidden=true]')).toHaveCount(7);
     const brand=await page.locator('.brand').boundingBox(),status=await page.locator('#sync-status').boundingBox();expect(status.x).toBeGreaterThanOrEqual(brand.x+brand.width);expect(Math.abs(status.y+status.height/2-brand.y-brand.height/2)).toBeLessThan(1);
     const bounds=await bar.boundingBox();expect(bounds.y+bounds.height).toBeCloseTo(844,0);
     for(const [id,label] of views) {
       const button=bar.getByRole('button',{name:label,exact:true});
       await expect(await tooltipFor(button)).toContainText(label);
       const box=await button.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.width).toBeGreaterThanOrEqual(32);expect(box.height).toBeGreaterThanOrEqual(44);
-      if(width<1024)await expect(button.locator('.nav-label')).not.toBeVisible();else await expect(button.locator('.nav-label')).toBeVisible();
+      await expect(button.locator('.nav-label')).toBeHidden();
       await button.click();await expect(button).toHaveAttribute('aria-current','page');await expect(page.locator('#'+id+'-panel')).toHaveJSProperty('hidden',false);
     }
     await page.locator('[data-tab=notes]').click();
@@ -51,8 +51,8 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(bar).not.toBeVisible();await expect(page.locator('#sync-status')).not.toBeVisible();
 });
 
-test('bottom navigation uses compact desktop spacing while preserving touch safe areas at every width',async({browser,browserName})=>{
-  for(const [touch,width] of [[false,1440],[false,390],[true,390],[true,1440]]){
+test('bottom navigation preserves touch safe areas on phones and touch-only desktops',async({browser,browserName})=>{
+  for(const [touch,width] of [[false,390],[true,390],[true,1440]]){
     const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,viewport:{width,height:900},hasTouch:touch,isMobile:touch&&browserName!=='firefox',locale:'en-GB'});
     try{
       const page=await context.newPage();await page.goto('/web/');
@@ -83,4 +83,44 @@ test('bottom navigation uses compact desktop spacing while preserving touch safe
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }finally{await context.close();}
   }
+});
+
+test('desktop navigation expands beside the view sidebar and docks global controls at the bottom',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto('/web/');
+  await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  const menu=page.locator('#workspace-navigation'),toggle=menu.getByRole('button',{name:/navigation$/});
+  const today=menu.getByRole('button',{name:'Today',exact:true}),dock=page.locator(workspaceDockSelector);
+  await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await expect(today.locator('.nav-label')).toBeHidden();
+  const closed=await menu.boundingBox();
+  await toggle.focus();await toggle.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await expect(today.locator('.nav-label')).toBeVisible();
+  expect((await menu.boundingBox()).width).toBeGreaterThan(closed.width);
+  expect((await page.locator('.today-sidebar').boundingBox()).x).toBeGreaterThan((await menu.boundingBox()).x+(await menu.boundingBox()).width);
+  const bar=await dock.boundingBox();
+  expect(bar.y+bar.height).toBeCloseTo(900,0);
+  expect((await toggle.boundingBox()).y).toBeGreaterThan((await menu.getByRole('button',{name:'Notes',exact:true}).boundingBox()).y);
+  await expect(dock.locator('#refresh')).toBeVisible();
+  await expect(dock.locator('#titlebar-notes-query')).toBeVisible();
+  await openAccountMenu(page);
+  const account=await page.locator('.account-menu-items').boundingBox();
+  expect(account.y).toBeGreaterThanOrEqual(0);
+  expect(account.y+account.height).toBeLessThan(bar.y);
+  await page.keyboard.press('Escape');
+  await expect(dock.getByRole('button',{name:'Account menu',exact:true})).toBeFocused();
+  await menu.getByRole('button',{name:'Notes',exact:true}).click();
+  await expect(page.locator('#notes-panel')).toBeVisible();
+  await setTheme(page,'timekeeper-dark');
+  expect((await new AxeBuilder({page}).include('#workspace-navigation').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+  await captureScreenshot(page,{path:'test-results/desktop-navigation-expanded.png'});
+  await page.setViewportSize({width:1051,height:800});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await toggle.focus();await page.setViewportSize({width:390,height:844});
+  await expect(toggle).toBeHidden();
+  await expect(menu.getByRole('button',{name:'Notes',exact:true})).toBeFocused();
+  await expect(page.locator('.app-header')).toHaveCSS('position','static');
+  expect((await menu.boundingBox()).y+(await menu.boundingBox()).height).toBeCloseTo(844,0);
 });

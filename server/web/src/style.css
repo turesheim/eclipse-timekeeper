@@ -146,6 +146,60 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .workspace-nav .nav-link[aria-current] { background: var(--accent); color: #fff; }
 .workspace-nav { padding-inline-end: max(env(safe-area-inset-right, 0px), .25rem); }
 @media(max-width: 1023px) { .workspace-nav .nav-label { display: none; } }
+
+body:has(#workspace[data-navigation=side]:not([hidden])) {
+  --workspace-rail-width: calc(var(--control-target-size) + 1rem);
+  padding-inline-start: var(--workspace-rail-width);
+}
+body:has(#workspace[data-navigation=side].workspace-nav-expanded:not([hidden])) { --workspace-rail-width: 12rem; }
+body:has(#workspace[data-navigation=side]:not([hidden])) > .app-header {
+  position: fixed;
+  inset: auto 0 0;
+  height: var(--workspace-nav-height);
+  z-index: 1040;
+  padding-block: .35rem;
+  border-block: 1px solid var(--line);
+  border-block-end: 0;
+}
+body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
+  --account-menu-opens-up: 1;
+  top: auto;
+  bottom: calc(100% + .5rem);
+}
+#workspace[data-navigation=side] > .workspace-nav {
+  inset: 0 auto var(--workspace-nav-height) 0;
+  width: var(--workspace-rail-width);
+  height: auto;
+  padding: .5rem;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  border-inline-end: 1px solid var(--line);
+  box-shadow: none;
+}
+#workspace[data-navigation=side] > .workspace-nav > .container-fluid {
+  flex: 1;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: space-between;
+  min-height: 0;
+  gap: .5rem;
+}
+#workspace[data-navigation=side] .workspace-nav .navbar-nav {
+  grid-auto-flow: row;
+  grid-auto-columns: minmax(0,1fr);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#workspace[data-navigation=side]:not(.workspace-nav-expanded) .nav-label { display: none; }
+#workspace[data-navigation=side].workspace-nav-expanded .nav-link {
+  justify-content: flex-start;
+  padding-inline: .75rem;
+  text-align: start;
+}
+#workspace[data-navigation=side] .nav-label { overflow-wrap: anywhere; }
+#workspace-nav-toggle { align-self: flex-start; flex-shrink: 0; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-block: .5rem 1rem; }
 .toolbar h2, .toolbar .hint { margin-bottom: .25rem; }
 .toolbar label { margin-block: 0; }
