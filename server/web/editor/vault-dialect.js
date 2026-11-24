@@ -3,7 +3,7 @@ import {wikiReference} from '../src/wiki-links.js';
 import {t} from '../src/i18n.js';
 import {normalizeFormatting} from './redundant-formatting.js';
 
-export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
+export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMarker}){
   // Render the safe anchor subset of authored HTML through the normal link
   // schema. An inert template only reads attributes/text; no user DOM is mounted.
   const anchor=(html,closed=false)=>{
@@ -78,7 +78,7 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
   }));
   const project=(tree,source)=>{const normalized=normalizeFormatting(tree);return {...normalized,children:normalized.children.map(node=>convert(node,true)).map(node=>unsupported(node)?{type:'sourceFragment',value:source.slice(node.position.start.offset,node.position.end.offset),position:node.position}:node)};};
   const guard=$remark('timekeeperSourceFragments',()=>function(){
-    (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+(body.trim()?'\n'+body.split('\n').map(line=>line?'> '+line:'>').join('\n'):'');}}});
+    (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replaceAll(emptyMarker,'').replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+(body.trim()?'\n'+body.split('\n').map(line=>line?'> '+line:'>').join('\n'):'');}}});
     return (tree,file)=>{tree.children=project(tree,String(file)).children;};
   });
   const nodeViews={

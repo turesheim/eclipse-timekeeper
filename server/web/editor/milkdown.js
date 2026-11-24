@@ -167,7 +167,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   const wikiInput=nativeWikiInput(()=>readOnly,brackets.pending,()=>composing);
   const targets=new Set();let plainPaste=false;
   const bookmark=(position)=>{const view=editor.action(ctx=>ctx.get(editorViewCtx));const target={selection:(position===undefined?view.state.selection:TextSelection.near(view.state.doc.resolve(position))).getBookmark()};targets.add(target);return target;};
-  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed});
+  const dialect=vaultDialect({unsupported:node=>unsupported(node,assetAllowed,linkAllowed),resources,readOnly:()=>readOnly,linkAllowed,emptyMarker});
   const changePlugin=$prose(()=>new Plugin({state:{init:()=>null,apply:transaction=>{for(const target of targets)target.selection=target.selection.map(transaction.mapping);return null;}},filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc,assetAllowed,linkAllowed),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
     if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
