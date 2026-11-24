@@ -8,6 +8,9 @@ database baseline.
 
 ### Highlights
 
+- Added note, tip, important, warning and caution callouts to the wiki editor’s
+  formatting toolbar (#714).
+
 - Avoided the H2 2.5.250/2.5.252 crash-recovery data-loss regression by using
   the unaffected published H2 2.4.240 runtime in the server and Eclipse client.
   Added deterministic chunk-reuse and journal forced-restart regression checks.

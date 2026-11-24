@@ -43,6 +43,17 @@ export class MarkdownField {
         this.closeBlockMenu();this.editor.command(level?'heading':'paragraph',level||undefined);
       });this.blockMenu.append(choice);
     }
+    for(const [type,glyph] of [['note','info-circle'],['tip','lightbulb'],['important','exclamation-circle'],['warning','exclamation-triangle'],['caution','x-octagon']]){
+      const choice=button();choice.className='dropdown-item';choice.tabIndex=-1;choice.setAttribute('role','menuitem');
+      choice.append(icon(glyph),node('span',t('markdown.insert_'+type+'_callout')));
+      choice.addEventListener('mousedown',event=>event.preventDefault());
+      choice.addEventListener('click',()=>{
+        if(this.readOnly||this.loading||!this.editor)return;
+        this.closeBlockMenu();
+        if(!this.editor.command('callout',type))this.blockTrigger.focus();
+      });
+      this.blockMenu.append(choice);
+    }
     this.blockTrigger.addEventListener('mousedown',event=>event.preventDefault());this.blockTrigger.addEventListener('click',()=>{
       if(this.blockMenu.matches(':popover-open'))this.closeBlockMenu();else this.showBlockMenu();
     });
@@ -216,7 +227,7 @@ export class MarkdownField {
       this.blockLevel=level;iconButton(this.blockTrigger,level?'type-h'+level:'paragraph',t('markdown.block_style'));this.blockTrigger.append(icon('down'));
       this.blockTrigger.title=t('markdown.block_style')+': '+(level?t('markdown.heading_level',{level}):t('markdown.plain_text'));
     }
-    for(const choice of this.blockMenu.children)choice.setAttribute('aria-checked',String(Number(choice.dataset.level)===level));
+    for(const choice of this.blockMenu.querySelectorAll('[data-level]'))choice.setAttribute('aria-checked',String(Number(choice.dataset.level)===level));
   }
   showBlockMenu(last=false){
     if(this.readOnly||this.loading||!this.editor)return;
