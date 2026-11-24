@@ -226,8 +226,8 @@ test('the formatting toolbar inserts editable Obsidian callouts',async({page})=>
 });
 
 test('admonition headers show type icons and localized labels while preserving authored titles',async({page})=>{
-  const markdown='> [!warning]- Read carefully\n> Existing body.\n\n> [!CUSTOM] Personal heading\n> Custom body.\n';
-  for(const [locale,type] of [['en-GB','Warning'],['nb-NO','Advarsel']]){
+  const markdown='> [!warning]- Read carefully\n> Existing body.\n\n> [!custom-type] Personal heading\n> Custom body.\n\n> [!FAQ]\n> A question.\n';
+  for(const [locale,type,question] of [['en-GB','Warning','Question'],['nb-NO','Advarsel','Spørsmål']]){
     await page.setViewportSize({width:390,height:844});
     await field(page,markdown,true,[],locale);
     const callouts=page.locator('#experience-formatted .markdown-callout');
@@ -238,10 +238,13 @@ test('admonition headers show type icons and localized labels while preserving a
     await expect(callouts.first().locator('p')).toBeHidden();
     await fold.press('Enter');
     await expect(callouts.first().locator('p')).toHaveText('Existing body.');
-    const unknown=callouts.nth(1).getByRole('button',{name:/CUSTOM/});
-    await expect(unknown).toHaveText('CUSTOM');
+    const unknown=callouts.nth(1).getByRole('button',{name:/custom-type/});
+    await expect(unknown).toHaveText('custom-type');
     await expect(unknown.locator('.bi-chat-left-text')).toHaveAttribute('aria-hidden','true');
     await expect(callouts.nth(1).locator('input')).toHaveValue('Personal heading');
+    const alias=callouts.nth(2).getByRole('button',{name:new RegExp(question)});
+    await expect(alias).toHaveText(question);
+    await expect(alias.locator('.bi-question-circle')).toBeVisible();
     expect(await page.evaluate(()=>globalThis.field.value())).toBe(markdown);
   }
 });

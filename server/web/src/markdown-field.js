@@ -8,7 +8,7 @@ import {buildExperience} from './markdown-experience.js';
 import {t} from './i18n.js';
 import {splitMarkdown} from './markdown-document.js';
 import {MarkdownBanner} from './markdown-banner.js';
-import {calloutIcons} from './markdown-callouts.js';
+import {calloutIcons,toolbarCalloutTypes} from './markdown-callouts.js';
 import {dailyBannerTools} from './daily-banner-tools.js';
 import {icon,iconButton} from './icons.js';
 
@@ -44,9 +44,9 @@ export class MarkdownField {
         this.closeBlockMenu();this.editor.command(level?'heading':'paragraph',level||undefined);
       });this.blockMenu.append(choice);
     }
-    for(const [type,glyph] of calloutIcons){
+    for(const type of toolbarCalloutTypes){
       const choice=button();choice.className='dropdown-item';choice.tabIndex=-1;choice.setAttribute('role','menuitem');
-      choice.append(icon(glyph),node('span',t('markdown.insert_'+type+'_callout')));
+      choice.append(icon(calloutIcons.get(type)),node('span',t('markdown.insert_'+type+'_callout')));
       choice.addEventListener('mousedown',event=>event.preventDefault());
       choice.addEventListener('click',()=>{
         if(this.readOnly||this.loading||!this.editor)return;

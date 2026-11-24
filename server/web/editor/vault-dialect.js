@@ -1,7 +1,7 @@
 import {$node,$remark} from '@milkdown/kit/utils';
 import {wikiReference} from '../src/wiki-links.js';
 import {t} from '../src/i18n.js';
-import {calloutIcons} from '../src/markdown-callouts.js';
+import {calloutAliases,calloutIcons} from '../src/markdown-callouts.js';
 import {normalizeFormatting} from './redundant-formatting.js';
 
 export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMarker}){
@@ -64,7 +64,7 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMa
       ?{type:'inlineBreak',position:child.position}:convert(child)))};
     if(node.type!=='blockquote'||node.children?.[0]?.type!=='paragraph')return node;
     const first=node.children[0],text=first.children?.[0];if(text?.type!=='text')return node;
-    const match=/^(\[![A-Za-z]+\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;
+    const match=/^(\[![A-Za-z][A-Za-z0-9-]*\][+-]?)(?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/.exec(text.value);if(!match)return node;
     const remainder=text.value.slice(match[0].length),children=[...(remainder?[{...text,value:remainder}]:[]),...first.children.slice(1)];
     if(!remainder&&children[0]?.type==='break'&&children[0].data?.isInline)children.shift();
     const blocks=[...(children.length?[{...first,children}]:[]),...node.children.slice(1)];
@@ -90,7 +90,8 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMa
       dom.className='markdown-callout';header.contentEditable='false';fold.type='button';
       glyph.setAttribute('aria-hidden','true');
       const updateHeader=()=>{
-        const type=node.attrs.marker.replace(/[\[\]!+-]/g,''),key=type.toLowerCase();
+        const type=node.attrs.marker.slice(2,node.attrs.marker.indexOf(']')),id=type.toLowerCase();
+        const key=calloutAliases.get(id)||id;
         const known=calloutIcons.get(key),name=known?t('markdown.callout_type_'+key):type;
         glyph.className='icon bi bi-'+(known||'chat-left-text');
         label.textContent=name;fold.setAttribute('aria-label',t('markdown.toggle_callout',{type:name}));
