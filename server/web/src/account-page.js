@@ -16,8 +16,8 @@ export function closeAccount() {
   $('account-page').hidden = true;$('account-content').replaceChildren();$('account-navigation').replaceChildren();
   $('account-error').replaceChildren();$('account-heading').textContent = '';$('account-identity').textContent = '';$('users-link').hidden = true;
 }
-export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate) {
-  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate,
+export async function connectAccount(session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate, changePassword) {
+  closeAccount();context = { session, account, signOut, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate, changePassword,
     archiveDownloads: createArchiveDownloads(session) };
   $('users-link').hidden = !account.administrator || !account.permissions?.includes('write');
   await show(route(), false);
@@ -49,6 +49,7 @@ async function show(hash, ask = true) {
     reload: () => void show(acceptedHash)
   });
   view.archiveDownloads = scope.archiveDownloads;
+  view.changePassword = scope.changePassword;
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', i18nText("ui.this_session_is_read_only_sign_in_with_your_password_to_change_settings"), 'alert alert-info'));
   if (page === 'account') {
