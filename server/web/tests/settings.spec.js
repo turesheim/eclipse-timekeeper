@@ -181,7 +181,26 @@ test('password validation preserves drafts and a successful change revokes only 
   await page.locator('#account-content').getByLabel('Confirm new password', {exact: true}).fill('a replacement private password'); await page.getByRole('button', {name: 'Show new password', exact: true}).click();
   await expect(page.locator('#account-content').getByLabel('New password', {exact: true})).toHaveAttribute('type', 'text');
   await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click(); await expect(page.locator('#account-content')).toContainText('current password was not accepted');
-  await page.getByLabel('Current password', {exact: true}).fill(user.password); await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click();
+  const changed=Promise.withResolvers(),deliver=Promise.withResolvers();
+  await page.route('**/api/v1/auth/password',async route=>{
+    const response=await route.fetch();
+    expect(response.status()).toBe(204);
+    changed.resolve();
+    await deliver.promise;
+    await route.fulfill({response});
+  });
+  await page.getByLabel('Current password', {exact: true}).fill(user.password);
+  try {
+    await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click();
+    await changed.promise;
+    // A background request can see the revoked session before the initiating
+    // tab receives its successful password-change response.
+    if(!await page.locator('#login').isVisible())await page.locator('#refresh').evaluate(button=>button.click());
+    await expect(page.locator('#login')).toBeVisible();
+    await expect(page.locator('#account-content')).toBeEmpty();
+  } finally {
+    deliver.resolve();
+  }
   await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#account-content')).toBeEmpty(); await expect(page.locator('#login-error')).toContainText('Password changed');
   expect((await request.get('/api/v1/me', {headers: {Authorization: `Bearer ${secret}`}})).status()).toBe(401);
   expect((await api(request, 'GET', '/me')).ok()).toBeTruthy();

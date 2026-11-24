@@ -6,7 +6,7 @@ import { PasskeyCeremony, passkeysSupported, canceledPasskey } from './webauthn.
 
 const $ = (id) => document.getElementById(id);
 export function authentication({ connect, clear, updateAccount, refreshProfile, renderCalendars, renderLabels,renderFocus,renderCatalog,beforeSignOut,beforeNavigate }) {
-  let active = null,generation = 0,recovery = null;
+  let active = null,generation = 0,recovery = null,passwordChange = null;
   let passkeysEnabled = false,passkeyBusy = false,passkeyStage = '',statusRequest = null;
   const errorText = (error) => error instanceof ApiError ? error.message : i18nText("ui.unable_to_sign_in_use_https_and_check_your_account_details");
   function mode() {
@@ -53,7 +53,7 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
     const session = new Api(null, undefined, data);active = session;window.timekeeperTypography?.connect(data.ownerId);forgetToken();
     $('login-form').reset();mode();$('login-error').textContent = '';
     if ((await connect(session, data)) === false) return;
-    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate);
+    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars, renderLabels, renderFocus, renderCatalog, beforeNavigate, body => changePassword(session,data,body));
   }
   function reset(message = '', retry = null, {restoring = false} = {}) {
     loginPasskey.cancel();passkeyState(false);
@@ -63,6 +63,29 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
     if (retry) {$('auth-mode').value = retry.mode;$('username').value = retry.username;}
     mode();$('login-error').textContent = message;
     if (!restoring) {const current = generation;void loadStatus().then((status) => {if (current === generation) capabilities(status);}).catch(() => {});}
+  }
+  function clearSession(message) {
+    if (!active && passwordChange?.signedOutGeneration === generation) return;
+    const pending = passwordChange?.session === active && passwordChange.generation === generation ? passwordChange : null;
+    reset(message);
+    if (pending) pending.signedOutGeneration = generation;
+  }
+  async function changePassword(session, context, body) {
+    if (session !== active) throw new ApiError('UNAUTHENTICATED', 401);
+    const pending = {session,generation};
+    passwordChange = pending;
+    // Another request can observe revocation after the server commits this
+    // write. Keep its one response independent of the normal session teardown.
+    const writer = new Api(null, undefined, context);
+    try {
+      await writer.request('/auth/password', {method:'POST', body});
+      const message = i18nText("ui.password_changed_sign_in_again_your_existing_sessions_and_api_tokens_have_been_revoke");
+      if (session === active && generation === pending.generation) reset(message);
+      else if (!active && pending.signedOutGeneration === generation) $('login-error').textContent = message;
+    } finally {
+      writer.close();
+      if (passwordChange === pending) passwordChange = null;
+    }
   }
   async function exchange(token, current) {
     if (!isSecureOrigin()) throw new Error();
@@ -148,7 +171,7 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
   });
   recovery = emailRecovery({ request: publicRequest, signIn: reset });
   window.addEventListener('hashchange', () => {void recovery.initializeFromLocation();});
-  return { clear: reset, suspend: () => reset('', null, {restoring: true}), async initialize() {
+  return { clear: clearSession, suspend: () => reset('', null, {restoring: true}), async initialize() {
       if (await recovery.initializeFromLocation()) return;
       const current = ++generation;
       const submit = $('login-form').querySelector('button');submit.disabled = true;
