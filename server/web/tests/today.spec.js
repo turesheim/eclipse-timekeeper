@@ -281,6 +281,11 @@ test('Today phone journal applies native and menu formatting and reopens in rich
     await journal.getByRole('menuitem',{name:'Bold',exact:true}).tap();
     await expect(rich.locator('strong')).toHaveText('Alpha');
     await select('Gamma');
+    // Touch selection can move between pressing the toolbar and opening its menu.
+    await trigger.evaluate(button=>button.addEventListener('pointerup',()=>{
+      const alpha=document.querySelector('#today-note-editor .ProseMirror strong').firstChild;
+      getSelection().setBaseAndExtent(alpha,0,alpha,alpha.length);
+    },{once:true}));
     await trigger.tap();await journal.getByRole('menuitem',{name:'Italic',exact:true}).tap();
     await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
     await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toMatch(/\*\*Alpha\*\* [*_]Beta[*_] [*_]Gamma[*_]/);

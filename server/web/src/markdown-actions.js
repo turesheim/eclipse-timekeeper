@@ -33,9 +33,9 @@ export function buildActionsMenu(field){
     trigger.disabled=f.loading||!choices().length;if(trigger.disabled)f.closeActions();
   };
   f.addActionsGroup=group=>{group.className='markdown-actions-group';menu.append(group);f.syncActions();};
-  const open=(last=false)=>{f.prepareCompactActions?.();f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
-  trigger.addEventListener('mousedown',event=>event.preventDefault());trigger.addEventListener('click',()=>menu.matches(':popover-open')?f.closeActions():open());
-  trigger.addEventListener('pointerdown',()=>{if(f.compactTools?.matches)f.editor?.syncSelection();});
+  const open=(last=false,fromPointer=false)=>{f.prepareCompactActions?.(fromPointer);f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
+  trigger.addEventListener('mousedown',event=>event.preventDefault());trigger.addEventListener('click',event=>menu.matches(':popover-open')?f.closeActions():open(false,event.detail>0));
+  trigger.addEventListener('pointerdown',()=>{if(!menu.matches(':popover-open'))f.captureCompactSelection?.();});
   trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
   menu.addEventListener('beforetoggle',event=>{
     const opened=event.newState==='open',listen=opened?'addEventListener':'removeEventListener';
@@ -60,29 +60,54 @@ export function buildCompactActions(f,media,host){
     button.addEventListener('click',run);group.append(button);return button;
   };
   const marks=[
-    choice('bold','type-bold',()=>f.editor?.command('bold')),
-    choice('italic','type-italic',()=>f.editor?.command('italic'))
+    choice('bold','type-bold',()=>applyMark('bold')),
+    choice('italic','type-italic',()=>applyMark('italic'))
   ];
   const source=choice('source','markdown',()=>void f.showSource());
   const formatted=choice('formatted','file-richtext',()=>void f.showFormatted());
   f.actionsMenu.prepend(group);
-  let fragmentFocus=false;
-  f.prepareCompactActions=()=>{
-    if(media.matches){
-      fragmentFocus=!!document.activeElement?.closest('.markdown-source-fragment');
-      f.editor?.syncSelection();
+  let pressed,selection;
+  const release=target=>{if(target?.bookmark)target.editor.release(target.bookmark);};
+  const capture=()=>{
+    const editor=f.editor,fragmentFocus=!!document.activeElement?.closest('.markdown-source-fragment');
+    if(!editor||fragmentFocus)return {editor,fragmentFocus};
+    editor.syncSelection();
+    return {editor,fragmentFocus,bookmark:editor.bookmark()};
+  };
+  const applyMark=name=>{
+    if(selection?.bookmark&&selection.editor===f.editor){
+      selection.editor.insertAt(selection.bookmark,name);
+      selection.editor.focus();
     }
   };
+  // Touch can change the live selection after pointerdown, before the menu
+  // receives its click. Use the mapped range captured at the initial press.
+  f.captureCompactSelection=()=>{
+    if(!media.matches)return;
+    release(pressed);
+    pressed=capture();
+  };
+  f.prepareCompactActions=fromPointer=>{
+    if(!media.matches)return;
+    release(selection);
+    selection=fromPointer&&pressed?pressed:capture();
+    if(pressed!==selection)release(pressed);
+    pressed=null;
+  };
+  f.actionsMenu.addEventListener('toggle',event=>{
+    if(event.newState==='closed'){release(selection);selection=null;}
+  });
   f.syncCompactActions=()=>{
     group.hidden=!media.matches;
     const rich=!!f.editor;
-    for(const mark of marks)mark.hidden=!rich||f.readOnly||f.bannerBusy||fragmentFocus;
+    for(const mark of marks)mark.hidden=!rich||f.readOnly||f.bannerBusy||selection?.fragmentFocus;
     source.hidden=!rich;formatted.hidden=rich;
   };
   const apply=()=>{
     const {actionsTrigger:trigger,actionsMenu:menu,toolbar}=f;
     const focused=trigger===document.activeElement||menu.contains(document.activeElement);
     f.closeActions();f.closeBlockMenu();f.closeListMenu();f.closeCalloutMenu();
+    release(pressed);pressed=null;
     toolbar.hidden=media.matches;
     (media.matches?host:toolbar).append(trigger);
     f.syncActions();
