@@ -86,7 +86,7 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMa
     callout:(initial,view,getPos)=>{
       let node=initial;
       const dom=document.createElement('aside'),header=document.createElement('div'),fold=document.createElement('button');
-      const glyph=document.createElement('span'),label=document.createElement('span'),title=document.createElement('input'),contentDOM=document.createElement('div');
+      const glyph=document.createElement('span'),title=document.createElement('input'),contentDOM=document.createElement('div');
       dom.className='markdown-callout';header.contentEditable='false';fold.type='button';
       glyph.setAttribute('aria-hidden','true');
       const updateHeader=()=>{
@@ -94,15 +94,18 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed,emptyMa
         const key=calloutAliases.get(id)||id;
         const known=calloutIcons.get(key),name=known?t('markdown.callout_type_'+key):type;
         glyph.className='icon bi bi-'+(known||'chat-left-text');
-        label.textContent=name;fold.setAttribute('aria-label',t('markdown.toggle_callout',{type:name}));
+        dom.dataset.calloutType=known?key:'custom';
+        title.placeholder=name;
+        fold.setAttribute('aria-label',t('markdown.toggle_callout',{type:name}));
         if(document.activeElement!==title)title.value=node.attrs.title;
         title.readOnly=readOnly();
       };
       title.setAttribute('aria-label',t('markdown.callout_title'));
-      fold.append(glyph,label);header.append(fold,title);dom.append(header,contentDOM);updateHeader();
+      fold.append(glyph);header.append(fold,title);dom.append(header,contentDOM);updateHeader();
       let collapsed=node.attrs.marker.endsWith('-');contentDOM.hidden=collapsed;fold.setAttribute('aria-expanded',String(!collapsed));
       fold.addEventListener('click',()=>{collapsed=!collapsed;contentDOM.hidden=collapsed;fold.setAttribute('aria-expanded',String(!collapsed));});title.addEventListener('change',()=>{if(readOnly())return;const pos=getPos();if(typeof pos==='number')view.dispatch(view.state.tr.setNodeMarkup(pos,undefined,{...node.attrs,title:title.value}));});
-      return {dom,contentDOM,stopEvent:event=>header.contains(event.target),ignoreMutation:mutation=>header.contains(mutation.target)||mutation.target===contentDOM&&mutation.type==='attributes',update(next){if(next.type!==node.type)return false;node=next;updateHeader();return true;}};
+      return {dom,contentDOM,stopEvent:event=>header.contains(event.target),ignoreMutation:mutation=>header.contains(mutation.target)
+        || mutation.type==='attributes'&&(mutation.target===contentDOM||mutation.target===dom&&mutation.attributeName==='data-callout-type'),update(next){if(next.type!==node.type)return false;node=next;updateHeader();return true;}};
     },
     source_fragment:(initial,view,getPos)=>{
       let node=initial;const dom=document.createElement('div'),caption=document.createElement('label'),text=document.createElement('textarea');dom.className='markdown-source-fragment';dom.contentEditable='false';caption.textContent=t('markdown.fragment');text.setAttribute('aria-label',t('markdown.fragment'));text.value=node.attrs.value;text.readOnly=readOnly();text.spellcheck=false;dom.append(caption,text);

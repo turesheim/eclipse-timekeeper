@@ -89,6 +89,8 @@ database baseline.
   upgrades to schema 3 after a verified private backup.
 - Added icons and translated type labels to wiki admonitions while preserving
   custom titles and Markdown source (#716).
+- Show custom admonition titles in place of the default label and tint
+  callouts by type in light and dark themes.
 
 ### Upgrade notes
 
