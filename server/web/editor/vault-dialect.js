@@ -78,7 +78,7 @@ export function vaultDialect({unsupported,resources,readOnly,linkAllowed}){
   }));
   const project=(tree,source)=>{const normalized=normalizeFormatting(tree);return {...normalized,children:normalized.children.map(node=>convert(node,true)).map(node=>unsupported(node)?{type:'sourceFragment',value:source.slice(node.position.start.offset,node.position.end.offset),position:node.position}:node)};};
   const guard=$remark('timekeeperSourceFragments',()=>function(){
-    (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+(body?'\n'+body.split('\n').map(line=>line?'> '+line:'>').join('\n'):'');}}});
+    (this.data().toMarkdownExtensions??=[]).push({handlers:{sourceFragment:node=>node.value,callout:(node,_parent,state,info)=>{const body=state.containerFlow({type:'root',children:node.children},info).replace(/\n$/,'');return '> '+node.marker+(node.title?' '+node.title:'')+(body.trim()?'\n'+body.split('\n').map(line=>line?'> '+line:'>').join('\n'):'');}}});
     return (tree,file)=>{tree.children=project(tree,String(file)).children;};
   });
   const nodeViews={

@@ -218,6 +218,8 @@ test('the formatting toolbar inserts editable Obsidian callouts',async({page})=>
   await host.locator('#experience-body').fill('> [!TIP]\n> Try this.\n');
   await host.getByRole('button',{name:'Formatted',exact:true}).click();
   await expect(rich.locator('.markdown-callout p')).toHaveText('Try this.');
+  await field(page,'> [!TIP]\n');
+  await expect(rich.locator('.markdown-callout p')).toBeEmpty();
   await page.evaluate(()=>globalThis.field.setReadOnly(true));
   await expect(style).toBeHidden();
 });
