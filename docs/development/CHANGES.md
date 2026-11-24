@@ -20,6 +20,8 @@ database baseline.
   versioned database baseline.
 - Made Timekeeper tasks provider-independent UUID aggregates with optional,
   uniquely constrained external task references.
+- Added automatic synchronization with selected Google Tasks lists, with
+  read-only access or opt-in two-way editing for supported fields (#621).
 - Added explicit activity owner identities, UTC instant persistence and
   time-zone-aware daily and weekly reporting, including DST-safe boundaries.
 - Added persistence-neutral Java domain and application-service modules with
