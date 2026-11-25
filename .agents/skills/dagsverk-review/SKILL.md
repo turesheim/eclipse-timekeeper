@@ -17,6 +17,10 @@ Use the root-relative architecture/component guides for affected boundaries.
 - Check that verification applies to the current source and exercises the
   changed behavior. Quick checks and test receipts support review; they do not
   prove the user outcome or replace browser/installed-client acceptance.
+- For a PR that affects the UI, check the PR description for embedded,
+  side-by-side **Before** and **After** screenshots for comparable states and
+  labeled screenshots for new features with no comparable prior state. Flag
+  missing or mismatched screenshots as gaps in the review evidence.
 - Report actionable findings with severity, file/line, trigger, consequence and
   supporting evidence. Separate confirmed defects from open questions. Prefer
   concrete regressions over speculative redesigns or stylistic preferences.

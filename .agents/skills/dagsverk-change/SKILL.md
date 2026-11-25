@@ -20,6 +20,13 @@ Paths in this skill are relative to the repository root.
   Preserve technical identifiers during the Dagsverk naming transition.
 - Implement the smallest coherent change. Cover meaningful changed behavior
   and regressions; reuse existing acceptance fixtures and synthetic accounts.
+- Every PR that affects the UI must include screenshots in its description.
+  For each affected client, capture comparable views or states from the PR
+  base and proposed change using the same synthetic data and display settings.
+  Embed them side by side with **Before** on the left and **After** on the right.
+  For a new feature with no comparable prior view or state, embed a labeled
+  screenshot of the new UI. If evidence cannot be captured or attached, report
+  what is missing and why.
 - Run `python3 scripts/quality.py --affected --plan`, then the selected checks.
   Add scenario checks appropriate to the behavior. A test command appearing
   in a plan or a successful syntax check does not establish acceptance.

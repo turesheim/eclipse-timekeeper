@@ -24,3 +24,7 @@ for remote-client changes and `REMOTE-MYLYN.md` for Mylyn changes.
   lifecycle changes, use the documented installed-client scenarios, including
   retained-workspace restart where relevant. State when display/native/runtime
   prerequisites prevent verification; compilation alone is not installed acceptance.
+- For UI-affecting PRs, follow the screenshot requirement in
+  [dagsverk-change](../dagsverk-change/SKILL.md). Capture the running Eclipse
+  client with matching perspective, window size and UI settings for comparable
+  states.
