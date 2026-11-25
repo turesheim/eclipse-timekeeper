@@ -1,3 +1,4 @@
+import {browserRequest} from './browser-request.js';
 import {workspaceDockSelector} from './navigation.js';
 import {clickNoteAction} from './editor-interactions.js';
 import {saveMarkdown} from './editor-interactions.js';
@@ -15,6 +16,58 @@ async function api(request,method,path,data,headers={}){
   const response=await request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});
   expect(response.ok(),`${method} ${path}: ${response.status()}`).toBe(true);return response;
 }
+
+test('Today matches Calendar spacing while tracking and keeps its normal stopped spacing',async({page,request})=>{
+  const username='tracking-spacing-'+randomUUID().slice(0,8),password='Synthetic tracking spacing test password';
+  await api(request,'POST','/admin/users',{username,password,displayName:'Tracking spacing test',email:username+'@example.invalid',administrator:false});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');
+  await page.locator('#username').fill(username);await page.locator('#password').fill(password);
+  await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');
+  const client=browserRequest(page),identity=await(await client.get('/api/v1/auth/session')).json();
+  const own=async(method,path,data,headers={})=>{
+    const res=await client.fetch('/api/v1'+path,{method,data,headers:{'X-CSRF-Token':identity.csrf,...headers}});
+    expect(res.ok(),method+' '+path).toBe(true);
+    return res;
+  };
+  const title='Review the long tracking task title in Today on desktop and on a narrow screen before switching to Calendar';
+  const task=await(await own('POST','/tasks',{summary:title,projectId:null,parentTaskId:null,url:null})).json();
+  const tracking=page.locator('.tracking'),today=page.locator('.today-toolbar'),calendar=page.locator('.track-toolbar');
+  const toolbarGap=(card,toolbar)=>page.evaluate(({card,toolbar})=>{
+    const bottom=document.querySelector(card).getBoundingClientRect().bottom;
+    return document.querySelector(toolbar).getBoundingClientRect().top-bottom;
+  },{card,toolbar});
+  const stopped=[];
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});
+    stopped.push(await toolbarGap('#work-session','.today-toolbar'));
+  }
+  const active=await own('POST','/activities/start',{taskId:task.id,summary:'Tracking spacing',labelIds:[],workSessionId:null,
+    expectedActiveId:null,expectedActiveVersion:null},{'Idempotency-Key':randomUUID()});
+  await page.locator('#refresh').click();await expect(tracking).toBeVisible();
+  await page.setViewportSize({width:1440,height:1000});
+  const wideTitle=await page.locator('#active-title').evaluate(node=>node.getBoundingClientRect().height);
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});
+    await expect(today).toBeVisible();
+    if(width===390)await expect.poll(()=>page.locator('#active-title').evaluate(node=>node.getBoundingClientRect().height)).toBeGreaterThan(wideTitle);
+    const todayGap=await toolbarGap('.tracking','.today-toolbar');
+    if(width===1440)await expect.poll(()=>page.evaluate(selector=>{
+      const dock=document.querySelector(selector),editor=document.querySelector('#today-note-editor');
+      return editor.getBoundingClientRect().bottom-dock.getBoundingClientRect().top;
+    },workspaceDockSelector)).toBeLessThanOrEqual(1);
+    await page.locator('[data-tab=track]').click();await expect(calendar).toBeVisible();
+    expect(todayGap).toBeCloseTo(await toolbarGap('.tracking','.track-toolbar'),0);
+    await page.locator('[data-tab=today]').click();
+  }
+  const activity=await active.json();
+  await own('POST','/activities/'+activity.id+'/stop',undefined,{'If-Match':active.headers().etag,'Idempotency-Key':randomUUID()});
+  await page.locator('#refresh').click();await expect(tracking).toBeHidden();
+  for(const [index,width] of [1440,390].entries()){
+    await page.setViewportSize({width,height:1000});
+    expect(await toolbarGap('#work-session','.today-toolbar')).toBeCloseTo(stopped[index],0);
+  }
+});
 
 test('weekly notes show events by day and tasks by deadline, then restore the daily sidebar',async({page,request})=>{
   const first='2026-12-28',last='2027-01-03',end='2027-01-04';

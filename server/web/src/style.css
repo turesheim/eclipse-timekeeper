@@ -201,11 +201,12 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
 }
 #workspace[data-navigation=side] .nav-label { overflow-wrap: anywhere; }
 #workspace-nav-toggle { align-self: flex-start; flex-shrink: 0; }
-.toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-block: .5rem 1rem; }
+.toolbar { --toolbar-top-spacing: .5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-block: var(--toolbar-top-spacing) 1rem; }
 .toolbar h2, .toolbar .hint { margin-bottom: .25rem; }
 .toolbar label { margin-block: 0; }
 .toolbar > * { min-width: 0; }
 .today-toolbar { display: grid; grid-template-columns: max-content minmax(0,1fr) auto; grid-column: 1 / 4; grid-row: 1; align-items: center; gap: .75rem; margin: 0 0 .75rem; }
+.tracking[data-active=true] ~ #today-panel .today-toolbar { margin-block-start: var(--toolbar-top-spacing); }
 .today-toolbar .track-heading { grid-column: 2; grid-row: 1; }
 .today-toolbar h2 { margin: 0; }
 .today-toolbar .today-date-navigation { grid-column: 1; grid-row: 1; display: flex; align-items: center; flex-wrap: nowrap; gap: .5rem; min-width: 0; }
