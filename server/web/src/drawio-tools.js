@@ -21,11 +21,12 @@ export class DrawioTools {
     };
     this.insert=button(t('drawio.insert'),()=>void this.open('new'));this.insert.hidden=true;
     this.browse=button(t('drawio.files'),()=>void this.open('files'));
+    this.insertExisting=button(t('drawio.insert_existing'),()=>void this.open('existing'));
     this.selectedEdit=button(t('drawio.edit'),editSelected);this.selectedEdit.hidden=true;
     this.quickEdit=button(t('drawio.edit'),editSelected);this.quickEdit.hidden=true;
     this.quickEdit.addEventListener('mousedown',event=>event.preventDefault());
     field.toolbar.append(this.quickEdit);
-    this.group.append(this.insert,this.selectedEdit,this.browse);field.addActionsGroup(this.group);
+    this.group.append(this.insert,this.insertExisting,this.selectedEdit,this.browse);field.addActionsGroup(this.group);
     this.dialog=node('dialog',undefined,'app-dialog drawio-dialog');this.heading=node('h2');this.heading.id='drawio-'+crypto.randomUUID();this.dialog.setAttribute('aria-labelledby',this.heading.id);
     this.resize=button(t('drawio.fill_window'),()=>{
       this.dialog.classList.toggle('drawio-fill-window');
@@ -34,6 +35,9 @@ export class DrawioTools {
     const headingRow=node('div',undefined,'drawio-heading');
     headingRow.append(this.heading,this.resize);
     this.help=node('p',t('drawio.help'),'hint');const guide=node('a',t('drawio.help_link'));guide.href='https://www.drawio.com/docs/manual/export/export-to-png/';guide.target='_blank';guide.rel='noopener noreferrer';
+    this.searchLabel=node('label',t('drawio.search'),'form-label');
+    this.search=node('input',undefined,'form-control');this.search.type='search';
+    this.searchLabel.append(this.search);this.search.addEventListener('input',()=>this.paintDiagrams());
     this.list=node('ul',undefined,'drawio-files');this.savedName=node('p','','drawio-filename');this.preview=node('img',undefined,'drawio-file-preview');this.preview.alt=t('drawio.preview');this.preview.hidden=true;
     this.fileLabel=node('label',t('drawio.file_label'),'form-label');this.fileInput=node('input',undefined,'form-control');this.fileInput.type='file';this.fileInput.accept='.png,image/png';this.fileInput.setAttribute('aria-label',t('drawio.file_label'));this.fileInput.addEventListener('change',()=>void this.selectFile());
     this.altLabel=node('label',t('drawio.alt'),'form-label');this.alt=node('input',undefined,'form-control');this.alt.maxLength=255;this.alt.setAttribute('aria-label',t('drawio.alt'));this.altLabel.append(this.alt);
@@ -50,7 +54,8 @@ export class DrawioTools {
     this.apply=button(t('drawio.save'),()=>void this.commit());this.apply.className='btn btn-primary';
     const actions=node('div',undefined,'dialog-actions');
     actions.append(this.download,this.edit,this.reload,this.check,this.cancel,this.apply);
-    this.manual=node('div');this.manual.append(this.help,guide,this.list,this.savedName);
+    this.manual=node('div');this.manual.append(this.help,guide,this.searchLabel,this.list,this.savedName);
+    this.exportGuide=guide;
     this.details=node('div',undefined,'drawio-details');this.details.append(this.nameLabel,this.altLabel);
     this.dialog.append(headingRow,this.manual,this.preview,this.fileLabel,this.stage,this.details,this.status,this.error,actions);
     field.root.append(this.dialog);
@@ -62,7 +67,7 @@ export class DrawioTools {
       this.stopEditor();this.abort?.abort();++this.generation;
       this.fileInput.remove();this.bookmarkEditor?.release(this.bookmark);
       this.bookmark=null;this.bookmarkEditor=null;this.clearFile();this.context=null;this.reference=null;
-      this.list.replaceChildren();this.error.textContent='';this.status.textContent='';this.savedName.textContent='';
+      this.diagrams=null;this.list.replaceChildren();this.error.textContent='';this.status.textContent='';this.savedName.textContent='';
       this.clearPreview();this.busy=this.saving=false;
       if(same(this.bound,this.current())&&field.root.getClientRects().length)field.focus();
       this.bound=null;
@@ -79,6 +84,8 @@ export class DrawioTools {
     set(this.insert,'hidden',!this.editorEndpoint);
     set(this.insert,'disabled',f.readOnly||f.loading||!f.onUpload||!f.resources.canReplaceAsset?.());
     set(this.browse,'disabled',f.loading||!current?.session);
+    set(this.insertExisting,'hidden',!f.resources.listDiagrams);
+    set(this.insertExisting,'disabled',f.readOnly||f.loading||!f.resources.canReplaceAsset?.());
     if(this.dialog.open)this.paint();f.syncActions();
   }
   selectedReference(){
@@ -94,23 +101,24 @@ export class DrawioTools {
   }
   paint(){
     const f=this.field,writable=!f.readOnly&&f.resources.canReplaceAsset?.();
-    const creating=this.mode==='new',editing=!!this.editor;
+    const creating=this.mode==='new',inserting=this.mode==='existing',editing=!!this.editor;
     this.dialog.classList.toggle('drawio-editor-dialog',editing);
     this.resize.hidden=!editing;
     set(this.resize,'textContent',t(this.dialog.classList.contains('drawio-fill-window')?'drawio.restore_size':'drawio.fill_window'));
-    set(this.heading,'textContent',t(creating?'drawio.new':editing||this.direct?'drawio.edit':'drawio.files'));
+    set(this.heading,'textContent',t(creating?'drawio.new':inserting?'drawio.insert_existing':editing||this.direct?'drawio.edit':'drawio.files'));
     set(this.apply,'textContent',t(editing?'drawio.save':'drawio.replace'));
     this.stage.hidden=!editing;this.stage.inert=!!this.saving;this.manual.hidden=editing||creating;
+    this.help.hidden=this.exportGuide.hidden=inserting;this.searchLabel.hidden=!inserting;
     this.details.hidden=!editing;this.nameLabel.hidden=!creating;this.list.hidden=this.direct;
     this.preview.hidden=!this.url||editing&&!this.reviewing;
-    this.fileLabel.hidden=editing||creating||!writable;
-    this.apply.hidden=!writable||creating&&!editing;
+    this.fileLabel.hidden=editing||creating||inserting||!writable;
+    this.apply.hidden=inserting||!writable||creating&&!editing;
     this.edit.hidden=editing||creating||!writable||!this.editorEndpoint||!this.info?.editable;
     this.edit.disabled=this.busy||this.stale||this.uncertain;
     this.fileInput.disabled=this.busy||!writable;this.name.disabled=this.alt.disabled=this.busy;
     this.apply.disabled=this.busy||f.loading||!writable||this.stale||this.uncertain
       ||(editing?!this.editorReady||!creating&&!this.info?.editable:!this.fileInfo?.editable||!this.info?.editable);
-    this.download.hidden=editing||creating;
+    this.download.hidden=editing||creating||inserting;
     this.download.disabled=this.busy||!this.context?.blob;
     this.cancel.disabled=!!this.saving;this.reload.hidden=!this.stale;this.check.hidden=!this.uncertain;
     this.reload.disabled=this.check.disabled=this.busy;
@@ -165,11 +173,12 @@ export class DrawioTools {
     this.stale=this.uncertain=false;this.clearFile();this.alt.value='';this.name.value='';
     this.error.hidden=true;this.status.textContent='';this.savedName.textContent='';this.clearPreview();this.list.replaceChildren();
     this.abort=new AbortController();const cycle=++this.generation;
-    this.bookmarkEditor=creating?f.editor:null;
+    this.bookmarkEditor=creating||mode==='existing'?f.editor:null;
     this.bookmark=this.bookmarkEditor?.bookmark();
     this.selection={start:f.text.selectionStart,end:f.text.selectionEnd};
     this.dialog.showModal();this.paint();
     if(creating){void this.openEditor();return;}
+    if(mode==='existing'){void this.loadDiagrams(cycle);return;}
     if(reference){
       await this.loadAsset();
       if(this.active(cycle))void this.openEditor(this.context?.blob);
@@ -184,6 +193,48 @@ export class DrawioTools {
       this.status.textContent=references.length?'':t('drawio.no_diagrams');
     }catch(error){if(this.active(cycle))this.failure(error);}
     finally{if(this.active(cycle)){this.busy=false;this.paint();this.list.querySelector('button')?.focus();}}
+  }
+  async loadDiagrams(cycle){
+    this.diagrams=null;this.search.value='';
+    this.busy=true;this.status.textContent=t('drawio.loading');this.paint();
+    this.search.focus();
+    try{
+      const diagrams=await this.field.resources.listDiagrams({signal:this.abort.signal});
+      if(this.active(cycle)){this.diagrams=diagrams;this.paintDiagrams();}
+    }catch(error){if(this.active(cycle)&&error.name!=='AbortError'){this.status.textContent='';this.failure(error);}}
+    finally{if(this.active(cycle)){this.busy=false;this.paint();}}
+  }
+  paintDiagrams(){
+    if(!this.diagrams)return;
+    const query=this.search.value.trim().normalize('NFC').toLocaleLowerCase();
+    this.list.replaceChildren();
+    for(const {entry,description} of this.diagrams){
+      if(![entry.path,description].some(text=>text.normalize('NFC').toLocaleLowerCase().includes(query)))continue;
+      const label=description||entry.path.split('/').at(-1);
+      const item=node('li'),pick=button(label,()=>void this.insertReference(entry,label));
+      pick.classList.add('text-start');item.append(pick);
+      if(description)item.append(node('div',entry.path,'drawio-filename hint'));
+      this.list.append(item);
+    }
+    this.status.textContent=this.list.children.length?'':t('drawio.no_matches');
+  }
+  async insertReference(entry,label){
+    const f=this.field,cycle=this.generation;
+    if(!this.active(cycle)||this.busy||f.readOnly)return;
+    this.busy=true;this.error.hidden=true;this.paint();
+    try{
+      const path=await f.resources.assetReference(entry);
+      if(!this.active(cycle)||f.readOnly)return;
+      const safeLabel=label.replace(/[\[\]\\\r\n]/g,' ').trim();
+      if(this.bookmarkEditor){
+        if(!this.bookmarkEditor.insertAt(this.bookmark,'image',{path,label:safeLabel}))throw new Error(t('markdown.upload_failed'));
+      }else{
+        const {start,end}=this.selection;
+        f.insertSource(`![${safeLabel}](<${path}>)`,start,end);
+      }
+      this.dialog.close();
+    }catch(error){if(this.active(cycle))this.failure(error);}
+    finally{if(this.active(cycle)){this.busy=false;this.paint();}}
   }
   async selectFile(){
     const file=this.fileInput.files?.[0],cycle=this.generation;this.file=file;this.fileInfo=null;this.bytes=null;this.error.hidden=true;if(!file){this.paint();return;}

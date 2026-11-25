@@ -53,8 +53,9 @@ export class DrawioEditor {
     let message;
     try { message = JSON.parse(event.data); }
     catch { return; }
-    if (message?.event === 'autosave' && typeof message.xml === 'string') {
-      this.changed = true;
+    if (message?.event === 'autosave') {
+      // Page selection and viewport changes may reserialize the XML without a model patch.
+      if (message.patch && Object.keys(message.patch).length) this.changed = true;
       return;
     }
     const pending = this.pending;
@@ -89,7 +90,7 @@ export class DrawioEditor {
       noSaveBtn: '1', noExitBtn: '1', saveAndExit: '0',
     });
     await this.waitFor('init', () => { this.frame.src = url.href; });
-    await this.waitFor('load', () => this.send({action: 'load', xml, autosave: 1}));
+    await this.waitFor('load', () => this.send({action: 'load', xml, autosave: 1, diffSync: {patchOnly: true}}));
   }
 
   async exportPng() {
