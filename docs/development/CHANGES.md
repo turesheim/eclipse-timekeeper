@@ -10,6 +10,10 @@ database baseline.
 
 - Added correlated revision and request diagnostics for workspace sync failures.
 
+- Added optional centralized logging on Synology using Grafana, Loki and Alloy.
+  The standalone project collects structured Dagsverk logs and can ingest logs
+  from selected containers and syslog sources (#726).
+
 - Bundled an optional draw.io editor for Compose and Synology. Edit and save
   multi-page diagrams from the vault, with editable PNGs that remain portable
   through WebDAV and account archives (#708).

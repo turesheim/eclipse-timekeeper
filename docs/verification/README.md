@@ -62,6 +62,7 @@ record, formerly this directory's README.
 | [SYNOLOGY-PACKAGE](SYNOLOGY-PACKAGE.md) | Earlier Synology package acceptance |
 | [TEST-UPGRADE](TEST-UPGRADE.md) | Test execution on Java 21 |
 | [TOGGL-IMPORT-ACCEPTANCE](TOGGL-IMPORT-ACCEPTANCE.md) | Toggl Track import and Undo acceptance |
+| [SYNOLOGY-LOGGING](SYNOLOGY-LOGGING.md) | Centralized logging on local Docker |
 | [UNCERTAIN-NATIVE-CREATE](UNCERTAIN-NATIVE-CREATE.md) | Unknown native create outcomes |
 | [UNCERTAIN-NATIVE-DELETION](UNCERTAIN-NATIVE-DELETION.md) | Unknown native deletion outcomes |
 | [UNCERTAIN-NATIVE-TRACKING](UNCERTAIN-NATIVE-TRACKING.md) | Unknown native tracking outcomes |
