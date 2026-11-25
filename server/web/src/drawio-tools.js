@@ -229,7 +229,7 @@ export class DrawioTools {
     this.clearFile();this.editorAbort=new AbortController();
     this.originalDescription=this.info?.description||'';
     this.alt.value=this.originalDescription;
-    const editor=new DrawioEditor(this.editorEndpoint,this.editorAbort.signal);
+    const editor=new DrawioEditor(this.editorEndpoint,this.editorAbort.signal,()=>this.cancelDialog());
     this.editor=editor;this.stage.append(editor.frame);this.busy=true;this.error.hidden=true;
     this.status.textContent=t('drawio.loading_editor');this.paint();this.cancel.focus();
     try{

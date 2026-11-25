@@ -223,12 +223,12 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(viewport.y).toBe(0);
     await captureScreenshot(page,{path:test.info().outputPath('drawio-editor-phone.png')});
     await change(frame,'Saved detail','Discard this detail');
-    const cancel=box.getByRole('button',{name:'Cancel',exact:true});
     page.once('dialog',prompt=>prompt.dismiss());
-    await cancel.press('Escape');
+    await box.locator('iframe').focus();
+    await page.keyboard.press('Escape');
     await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
     page.once('dialog',prompt=>prompt.accept());
-    await cancel.press('Escape');
+    await page.keyboard.press('Escape');
     await expect(box.locator('iframe')).toHaveCount(0);
     await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeFocused();
     expect(await bytes(api,asset.id)).toEqual(saved);
@@ -315,7 +315,8 @@ test.describe('self-hosted draw.io editor',()=>{
     await clickNoteAction(page,root,'Insert draw.io diagram');
     box=dialog(page);
     await expect(box.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
-    await box.getByRole('button',{name:'Cancel',exact:true}).press('Escape');
+    await expect(box.locator('iframe')).toBeFocused();
+    await page.keyboard.press('Escape');
     await expect(box).toBeHidden();
     expect(prompts).toEqual([]);
 
