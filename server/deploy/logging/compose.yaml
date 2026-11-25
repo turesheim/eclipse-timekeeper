@@ -1,4 +1,4 @@
-name: dagsverk-logging
+name: centralized-logging
 
 x-service: &service
   restart: unless-stopped

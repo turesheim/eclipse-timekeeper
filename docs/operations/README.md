@@ -12,6 +12,7 @@ For browser and Eclipse workflows, see the [end-user documentation](../user/READ
 | Notes and editing | [Markdown editor](MARKDOWN-EDITOR.md), [WebDAV clients](NOTES-WEBDAV.md), [journal storage and encryption](JOURNAL-STORAGE.md) |
 | Import and export | [Personal account archives](ACCOUNT-DATA.md), [Toggl import and Undo](TOGGL-IMPORT.md) |
 | Backup and recovery | [Full-instance backup and restore](INSTANCE-BACKUP.md), [embedded Eclipse database recovery](DATABASE-RECOVERY.md) |
+| Centralized logging | [Set up shared logging on Synology](../../server/deploy/logging/README.md), [send Dagsverk logs to Grafana](../../server/deploy/DAGSVERK-LOGGING.md) |
 | Diagnose problems | [API diagnostics](API-DIAGNOSTICS.md), [CI check selection](CI.md) |
 
 A personal account archive transfers that account's work. An encrypted instance

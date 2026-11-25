@@ -1,10 +1,12 @@
-# Centralized logging on Synology
+# Set up shared logging on Synology
 
-This optional Container Manager project runs Grafana Alloy, Loki and Grafana
-independently of Dagsverk. Alloy pulls selected containers' stdout and stderr
-through a restricted Docker API proxy and sends them to Loki. Loki stores logs
-on the NAS using a single process, a filesystem store and TSDB v13 indexes.
-Grafana provides the Dagsverk operations dashboard, Explore and Logs Drilldown.
+This Container Manager project runs Grafana, Loki and Grafana Alloy for any
+service on your NAS. Alloy collects selected Docker and syslog inputs, Loki
+stores them, and Grafana provides Explore and Logs Drilldown. You can start
+with an empty stack and connect services as you need them.
+
+To connect Dagsverk to an existing stack, see
+[Send Dagsverk logs to Grafana](../DAGSVERK-LOGGING.md).
 
 ## Install
 
@@ -12,37 +14,75 @@ Use a DSM 7.2 or later NAS model with Container Manager, a Compose v2 CLI,
 Docker Engine API 1.40 or later, a local Btrfs or ext4 volume, and a 64-bit
 x86 (`linux/amd64`) or Arm (`linux/arm64`) CPU supported by Container Manager.
 The pinned images offer both architectures. Allow **2–4 GB of RAM** for this
-stack in addition to Dagsverk, DSM and other services. Size disk from measured growth and leave
+stack in addition to DSM and the applications it hosts. Size disk from
+measured growth and leave
 headroom for compaction, backups and ingestion bursts. Check peak RAM and disk
 usage during ingestion, queries and compaction before relying on that budget.
 
-1. Put this directory in a private shared folder on the NAS. Keep the file
-   layout intact. Copy `.env.example` to `.env` and set `LOG_HOST` to a stable
-   NAS label and `LOG_ENVIRONMENT` to a short name such as `production`. Leave
-   Grafana on loopback and syslog disabled while setting up the stack.
-2. As an administrator, create the Grafana bootstrap password file:
+### 1. Copy the project folder
 
-   ```sh
-   mkdir -m 0700 secrets
-   (umask 077; openssl rand -hex 32 > secrets/grafana-admin-password)
-   chmod 0444 secrets/grafana-admin-password
-   ```
+Copy the contents of this directory into a private NAS folder such as
+`/volume1/docker/centralized-logging`. Keep the subfolders and filenames intact.
+The project reads `loki.yaml`, `docker-logs.cfg`, `alloy/`, and `grafana/`
+from that folder when the containers start.
 
-   The parent directory must be private on the NAS, including its DSM ACLs.
-   Grafana's container user (UID 472) needs to read the mounted file. Project
-   configuration files must be readable by their container users, with write
-   access limited to administrators. Retrieve the generated password privately.
-3. In **Container Manager → Project → Create**, choose a separate project name
-   such as `dagsverk-logging`, select this directory, and use its
-   `compose.yaml`. The other files must be present next to it on the NAS.
-   Start the project. For the equivalent SSH workflow, run
-   `sudo docker compose config --quiet` and `sudo docker compose up -d` from
-   this directory. Use the same project name in both interfaces.
-4. Reach Grafana through a private HTTPS reverse proxy or an SSH tunnel to the
-   NAS's loopback port. Sign in as `admin` with the generated password.
-   Add individual accounts and assign Viewer access for log consumers.
-   Grafana reads the bootstrap password only when it creates its initial
-   admin account. Change an existing password through Grafana.
+### 2. Create the settings and password
+
+For a fresh installation, open an administrative SSH session on the NAS and
+run these commands once.
+
+```sh
+sudo -i
+cd /volume1/docker/centralized-logging
+cp .env.example .env
+mkdir -m 0700 secrets &&
+  (umask 077; openssl rand -hex 32 > secrets/grafana-admin-password) &&
+  chmod 0444 secrets/grafana-admin-password
+```
+
+Use your actual NAS folder in the `cd` command. In `.env`, set `LOG_HOST`
+to a stable name for the NAS. Keep the `secrets/` directory private, including
+its DSM ACL. Grafana's container user (UID 472) needs to read the mounted file.
+Treat its contents as the initial Grafana admin password.
+
+### 3. Create the Container Manager project
+
+Open **Container Manager → Project → Create**.
+
+- **Project name** — `centralized-logging`
+- **Path** — the NAS folder where you copied the project
+- **Source** — upload `compose.yaml` from your copy of the folder
+
+Leave the Web Station portal disabled and start the project. Expect four
+services named `grafana`, `loki`, `alloy` and `docker-logs`. The wizard takes
+one Compose file. Loki and Grafana read their configuration YAMLs from the
+folder automatically. [Synology project wizard](https://kb.synology.com/en-global/DSM/help/ContainerManager/docker_project)
+
+To start the project from SSH, run these commands in the same folder.
+
+```sh
+sudo docker compose -f compose.yaml config --quiet
+sudo docker compose -f compose.yaml up -d
+```
+
+If you already created the stack as `dagsverk-logging`, keep that project
+name in Container Manager and set `COMPOSE_PROJECT_NAME=dagsverk-logging` in
+its `.env` for CLI commands. Docker uses the project name to locate the
+existing volumes and starting with a different name creates separate volumes.
+
+### 4. Sign in to Grafana
+
+With the default loopback binding, open an SSH tunnel from your computer.
+
+```sh
+ssh -N -L 3000:127.0.0.1:3000 your-dsm-user@nas-address
+```
+
+While the tunnel is open, visit [http://localhost:3000](http://localhost:3000)
+and sign in as `admin` with the password in `secrets/grafana-admin-password`.
+Grafana reads the bootstrap password when it creates its initial admin
+account. Manage passwords and Viewer access in Grafana after the first login.
+To use a private HTTPS address instead, see the access settings below.
 
 ### Restrict access
 
@@ -76,62 +116,12 @@ is compromised. If your security model forbids that access, use a separate
 collector with access only to dedicated app log files, or forward selected
 logs via syslog and omit the Docker collector and proxy.
 
-## Collect inputs
+## Connect log sources
 
-### Dagsverk
-
-The **DSM package** inherits the NAS logging driver. Check whether Docker can
-read the package's output before enabling Alloy collection:
-
-```sh
-sudo docker inspect -f '{{.HostConfig.LogConfig.Type}}' timekeeper-server
-sudo docker logs --tail 20 timekeeper-server
-```
-
-If Docker returns recent application logs, set
-`DAGSVERK_COLLECT_DSM_PACKAGE=true` in the logging project's `.env` and
-recreate Alloy. This follows the exact `timekeeper-server` container name
-through package replacements. If the driver only makes logs available in
-Container Manager, use its Log tab for this package. The standalone Compose
-deployment below provides Docker-readable logs for automatic collection.
-DSM's installer and service-management messages are separate.
-[Synology package logging](../../../docs/operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
-
-For the **standalone Dagsverk Compose deployment**, from `server/deploy` use
-the normal deployment files and append the log labels override:
-
-```sh
-docker compose -f compose.yaml -f logging/dagsverk.compose.yaml up -d
-```
-
-Include this override on future Compose updates so the labels persist. Set
-`DAGSVERK_LOG_ENVIRONMENT` for the application there if it differs from
-`production`. The override sets both the JSON environment and the indexed
-label on the two API replicas. For custom Docker deployments set the labels
-and the environment variable yourself.
-
-The Dagsverk image enables structured logging by default. Each application
-line has `timestamp` (UTC), `level`, `loggerName`, `message`, `service_name`,
-`environment`, and `version`. Existing request diagnostics include the
-generated `request_id` in the message. Failures include a fixed error code,
-exception category and where available SQL state and compiled stack locations.
-Exception messages and raw SQL from handled API and day-boundary failures
-are excluded. Access logging is off by default. Leave payload, HTTP wire and
-SQL debugging disabled so upstream frameworks do not emit sensitive material.
-Review each additional input before onboarding it. Preboot diagnostics emitted
-by the container's shell wrapper may be plain text.
-
-A **bare JVM** deployment can set `DAGSVERK_LOG_JSON=true` and
-`DAGSVERK_LOG_ENVIRONMENT=production` in its service manager. Send its console
-output to the service manager's journal or to a dedicated, access-controlled
-rotating logfile. A host-local Alloy can follow that file with
-[`loki.source.file`](https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.file/)
-and forward it over the protected remote path described below.
-
-### Other containers
+### Docker containers
 
 Recreate each selected container with these labels and a bounded
-`json-file` logging driver (for example `max-size: 10m`, `max-file: '3'`):
+`json-file` logging driver (for example `max-size: 10m`, `max-file: '3'`).
 
 ```yaml
 labels:
@@ -148,8 +138,9 @@ labels. Each producer is responsible for the content of its log lines.
 
 ### Optional DSM and external syslog
 
-From an administrative SSH session, bring up the **same project** with the
-syslog override. Use both files on subsequent updates while syslog is enabled:
+From an administrative SSH session in the logging folder, add the syslog
+override to the same project. Use both files for subsequent CLI updates
+while syslog is enabled.
 
 ```sh
 sudo docker compose -f compose.yaml -f compose.syslog.yaml up -d
@@ -178,51 +169,37 @@ label. This project ships with no published push endpoint or OTLP receiver.
 
 ## Search and verify
 
-Open **Dashboards → Dagsverk operations**. Set the service and environment
-filters and time range. The panels display log volume, errors per second,
-severity over time and recent errors. Use the Explore link for detail and
-**Drilldown → Logs** to browse by service and detected level. Grafana provisions
-Loki as the default data source. The default Logs Drilldown plugin may require
-access to Grafana's plugin catalog when it is first installed.
+Open **Explore** in Grafana and select **Loki**. Use
+**Drilldown → Logs** to browse by service and detected level. A fresh stack
+shows results after a source has been enabled and emitted logs. The Logs
+Drilldown plugin may need access to Grafana's plugin catalog at first start.
 
 ```logql
-{service_name="dagsverk"} | json | level="ERROR"
-{service_name="dagsverk", environment="production"} |= "request_id="
 {service_name="fixture"} |= "logging-probe"
 {service_name="syslog"} |= "logging-probe"
 ```
 
-For an acceptance run on the target NAS:
+Run these checks on the target NAS.
 
-1. Start the stack, check the four services, and verify only the intended
-   Grafana listener is reachable. Enable and verify syslog separately if
-   wanted. Create a test container with the opt-in labels above and
+1. Start the stack, check the four services and verify the Grafana listener
+   is reachable only where intended. Test syslog separately if enabled.
+2. Create a test container with the opt-in labels above and
    `logs.service_name: fixture`. Print a unique marker to stdout. Verify it
    appears in Grafana and that a marker from a matching unlabelled container
-   does not appear. Inspect Docker's logging driver and rotation options.
-2. On a disposable Dagsverk instance with a synthetic token, temporarily
-   replace the configured token registry with malformed JSON and request
-   `/api/v1/me` using that token. Verify the HTTP 503 and search for
-   `API failure` in recent errors. Confirm the log shows the phase or origin
-   and stack locations and contains neither the synthetic token nor the
-   malformed input. Restore the valid registry and confirm the request succeeds.
-3. Stop Alloy and Loki and make normal Dagsverk requests. Start the logging
-   services, verify fresh markers are ingested and restart the project.
-   Verify historical results, dashboard and Grafana accounts still exist.
+   is absent. Inspect Docker's logging driver and rotation options.
+3. Restart the project. Verify Grafana login, historical results and fresh
+   ingestion.
 4. Confirm compactor activity and `LOG_RETENTION` on the target NAS. For an
    accelerated retention exercise on a disposable project set `24h` (the
    minimum), write a synthetic entry older than 24 hours and one current
    entry into different streams, and verify only the older one expires
    after compaction and the deletion delay. Observe RAM and volume growth
-   with realistic log traffic and dashboard queries before setting capacity.
+   with realistic log traffic and queries before setting capacity.
 
 Docker retains only its configured local files and Alloy retries pushes for a
-finite period. Reconnecting to Docker can replay recent lines, so dashboard
-counts can include duplicates. Dagsverk uses a bounded, asynchronous console
-queue that can drop lines under local logging pressure. During outages, older
-Docker logs can rotate away, Alloy can exhaust retries and UDP messages can be
-lost. Dagsverk has no dependency on Grafana, Loki or Alloy at startup or in the
-request path.
+finite period. Reconnecting to Docker can replay recent lines. During outages,
+older Docker logs can rotate away, Alloy can exhaust retries, and UDP messages
+can be lost.
 
 ## Maintain and recover
 
