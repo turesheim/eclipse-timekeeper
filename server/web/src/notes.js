@@ -7,7 +7,7 @@ import {MarkdownField} from './markdown-field.js';
 import {icon,iconButton} from './icons.js';
 import {relativeNotePath,rasterType,notesEntryVisible} from './notes-links.js';
 import {vaultEditorResources} from './vault-editor-resources.js';
-import {imagePreview} from './image-preview.js';
+import {imagePreview,journalAttachmentName} from './image-preview.js';
 import {noteTitle} from './note-title.js';
 import {dateTimeFormat} from './formatters.js';
 import {SidebarActions} from './sidebar-actions.js';
@@ -395,7 +395,7 @@ export class NotesView {
     const session=this.session,current=this.generation,parent=this.note.path.split('/').slice(0,-1).join('/'),name=file.name,path=(parent?parent+'/':'')+name;
     if(['DAY','WEEK','EVENT'].includes(this.note.kind)){
       if(file.size>5_000_000||image&&!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type))throw new Error();
-      const suffix=(name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin').toLowerCase(),filename=crypto.randomUUID()+'.'+suffix,bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+      const suffix=(name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin').toLowerCase(),filename=journalAttachmentName(file,suffix),bytes=new Uint8Array(await file.arrayBuffer());let binary='';
       for(let offset=0;offset<bytes.length;offset+=8192)binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
       if(session!==this.session||current!==this.generation)throw new Error();
       await session.request('/journal-assets/'+filename,{method:'PUT',noneMatch:'*',body:{data:btoa(binary)},emptyResponse:true,timeout:60000});

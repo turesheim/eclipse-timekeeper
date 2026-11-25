@@ -413,6 +413,22 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(drawioPngInfo(new Uint8Array(await bytes(api,asset.id)))?.description).toBe('Revised release flow');
   });
 
+  test('keeps the draw.io suffix for unnamed journal diagrams',async({page,request})=>{
+    const {api,put}=await fresh(page,request),date='2026-11-16';
+    await put('journal/'+date+'.md','Diagram in Today.\n');
+    await page.locator('[data-tab=today]').click();
+    await page.locator('#today-date').fill(date);
+    const root=page.locator('#today-note-editor');
+    await expect(root.locator('.ProseMirror')).toBeVisible();
+    await clickNoteAction(page,root,'Insert draw.io diagram');
+    const box=dialog(page);
+    await box.getByRole('button',{name:'Save diagram',exact:true}).click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const note=await(await api('GET','/day-entries/'+date)).json();
+    expect(note.body).toMatch(/assets\/[0-9a-f-]{36}\.drawio\.png/);
+  });
+
   test('creates a portable editable PNG and inserts it at the captured source cursor',async({page,request})=>{
     const {api,put}=await fresh(page,request);
     const note=await put('Blank.md','Before\n\nAfter\n');

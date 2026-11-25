@@ -98,6 +98,7 @@ export class DrawioTools {
   sync(){
     const current=this.current();if(this.dialog.open&&!same(this.bound,current))this.dialog.close();
     const f=this.field;
+    if(this.sourceImages?.generation!==f.generation)this.sourceImages=null;
     set(this.group,'hidden',!current?.session);
     set(this.insert,'hidden',!this.editorEndpoint);
     set(this.insert,'disabled',f.readOnly||f.loading||!f.onUpload||!f.resources.canReplaceAsset?.());
@@ -136,7 +137,7 @@ export class DrawioTools {
         parser??=import('./assets/milkdown/markdown-preview.js');
         const {markdownImages}=await parser;
         if(!valid())return;
-        this.sourceImages={body,images:markdownImages(body,{ranges:true})};
+        this.sourceImages={body,generation,images:markdownImages(body,{ranges:true})};
       }
       const reference=this.sourceImages.images.find(image=>image.start<=position&&position<=image.end
         &&pngReference(image.reference.split('|')[0])&&(image.kind==='wiki'||f.resources.allowsAsset?.(image.reference)));
@@ -377,6 +378,12 @@ export class DrawioTools {
           if(success)this.dialog.close();else this.failure(new Error(f.status.textContent||t('markdown.upload_failed')));
         }
         return;
+      }
+      if(!editor&&this.info.description&&!this.fileInfo.description){
+        const bytes=withDrawioDescription(this.bytes,this.info.description);
+        if(!bytes)throw new Error(t('markdown.asset_too_large'));
+        this.bytes=bytes;
+        this.file=new File([bytes],this.file.name,{type:'image/png'});
       }
       await this.replace(cycle);
     }catch(error){if(this.active(cycle)&&error.name!=='AbortError')this.failure(error);}

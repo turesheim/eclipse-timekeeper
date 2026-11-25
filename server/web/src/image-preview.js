@@ -30,6 +30,10 @@ export function imagePreview({alt,load,active=()=>true,onError}){
   }catch(error){if(!disposed&&active()&&cycle===generation)onError?.(error,dom);}};void read();
   return {dom,observeDiagram(callback){onDiagram=callback;},ignoreMutation:()=>true,destroy(){disposed=true;previews.delete(preview);++generation;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
 }
+export function journalAttachmentName(file,extension){
+  const suffix=extension==='png'&&/\.drawio\.png$/i.test(file.name)?'drawio.png':extension;
+  return crypto.randomUUID()+'.'+suffix;
+}
 export const journalAssetPath=reference=>typeof reference==='string'&&reference.startsWith('assets/')&&!!relativeNotePath('note.md',reference)?.startsWith('assets/');
 export function journalImageResources(session){
   return {canonicalAsset:async reference=>{if(!journalAssetPath(reference))throw new Error('Invalid image');const info=(await session().request('/notes')).data;return info.settings.assetsFolder+'/'+reference.slice(7);},allowsAsset:journalAssetPath,allowsLink:()=>false,image:(reference,alt)=>{
