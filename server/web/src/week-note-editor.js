@@ -16,9 +16,17 @@ export function isoWeekStart(week){
   return addDays(monday(year+'-01-04'),(Number(number)-1)*7);
 }
 
+export async function savedWeeks(session,first,last){
+  const range=new URLSearchParams({fromWeek:isoWeek(first),toWeek:isoWeek(last)});
+  const {data}=await session.request('/week-notes?'+range);
+  return new Set(data.items.filter(note=>note.hasBody).map(note=>note.week));
+}
+
 export class WeekNoteEditor extends JournalNoteEditor {
-  constructor(root,callbacks,phone,actions){
-    super(root,callbacks,'today-week-note','weekly-journal',{inline:true,journalCard:true,mainActions:actions});
+  constructor(root,callbacks,{phone,actions,inline=true}={}){
+    const prefix=inline?'today':'track';
+    super(root,callbacks,prefix+'-week-note',inline?'weekly-journal':'track-weekly-journal',{inline,journalCard:inline,mainActions:actions});
+    if(!inline)return;
     this.title.classList.add('visually-hidden');
     buildCompactActions(this.markdown,phone,actions);
     this.dialog.addEventListener('keydown',event=>{
@@ -26,5 +34,5 @@ export class WeekNoteEditor extends JournalNoteEditor {
       event.preventDefault();void this.close();
     });
   }
-  open(week,session,writable){return super.open({week,originSelector:`[data-week="${week}"]`,path:'/week-notes/'+week,title:t('today.week_note',{week}),deleteConfirm:t('week_notes.delete_confirm',{week})},session,writable);}
+  open(week,session,writable){return super.open({week,originSelector:this.inline?`[data-week="${week}"]`:`[data-track-week-note="${week}"]`,path:'/week-notes/'+week,title:t('today.week_note',{week}),deleteConfirm:t('week_notes.delete_confirm',{week})},session,writable);}
 }

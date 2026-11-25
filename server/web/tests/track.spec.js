@@ -1,4 +1,5 @@
 import {tooltipFor} from './tooltips.js';
+import {clickNoteAction} from './editor-interactions.js';
 import {resolvedLength} from './style-metrics.js';
 import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
@@ -16,6 +17,84 @@ async function signIn(page,credential=token) {
   await expect(page.locator('#status')).toHaveAttribute('data-state','ready');
   await expect(page.locator('#status')).toHaveText((await page.locator('html').getAttribute('lang'))==='nb-NO'?'Oppdatert':'Up to date');
 }
+test('Calendar links saved ISO week notes across years and restores focus on close',async({browser,request})=>{
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,locale:'en-US',viewport:{width:1440,height:1000},hasTouch:true,ignoreHTTPSErrors:true});
+  const page=await context.newPage(),week='2026-W53',path='/week-notes/'+week;
+  const store=async body=>{
+    const current=await api(request,'GET',path);
+    await api(request,'PUT',path,{body},{'If-Match':current.headers().etag});
+  };
+  try{
+    await signIn(page);
+    await page.locator('[data-tab=track]').click();
+    const month=page.getByLabel('Month',{exact:true});
+    await month.fill('2026-12');
+    const rows=page.locator('.track-month tbody tr');
+    const cell=page.locator('[data-track-week="2026-W53"]');
+    const link=cell.getByRole('button',{name:'Week note 2026-W53'});
+    const dialog=page.getByRole('dialog',{name:'Week note 2026-W53'});
+    await expect(rows.locator('[scope=row]')).toHaveText(['49','50','51','52','53']);
+    await expect(cell).toHaveText('53');
+    await expect(link).toHaveCount(0);
+
+    await store('# Release handover\n');
+    await page.locator('#refresh').click();
+    await expect(link).toBeVisible();
+    await expect(cell.locator('..').locator('td').first()).toHaveAttribute('data-track-date','2026-12-28');
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(dialog.getByRole('heading',{name:'Release handover'})).toBeVisible();
+    await dialog.getByRole('button',{name:'Markdown source',exact:true}).click();
+    await dialog.locator('#track-weekly-journal-body').fill('# Updated from Calendar\n');
+    await dialog.getByRole('button',{name:'Close',exact:true}).click();
+    await expect(dialog).toBeHidden();
+    await expect(link).toBeFocused();
+    expect((await(await api(request,'GET',path)).json()).body).toBe('# Updated from Calendar\n');
+
+    await month.fill('2027-01');
+    await expect(rows.locator('[scope=row]')).toHaveText(['53','1','2','3','4']);
+    await page.setViewportSize({width:390,height:844});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await expect(link).toBeVisible();
+    const target=await link.boundingBox();
+    expect(target.width).toBeGreaterThanOrEqual(24);
+    expect(target.height).toBeGreaterThanOrEqual(24);
+    await link.tap();
+    await expect(dialog.getByRole('heading',{name:'Updated from Calendar'})).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(link).toBeFocused();
+
+    await page.setViewportSize({width:1440,height:1000});
+    await page.locator('[data-tab=today]').click();
+    await page.locator('#today-date').fill('2027-01-03');
+    await page.locator('#today-month-grid [data-week="2026-W53"]').click();
+    const today=page.locator('#today-week-note-editor');
+    await expect(today.getByRole('heading',{name:'Updated from Calendar'})).toBeVisible();
+    await today.getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('[data-tab=track]').click();
+    await expect(month).toHaveValue('2027-01');
+
+    await store('');
+    await page.locator('#refresh').click();
+    await expect(link).toHaveCount(0);
+    await expect(cell).toHaveText('53');
+    await store('Draft to delete.');
+    await page.locator('#refresh').click();
+    await link.click();
+    await expect(dialog.locator('.ProseMirror')).toContainText('Draft to delete.');
+    page.once('dialog',prompt=>prompt.accept());
+    await clickNoteAction(page,dialog,'Delete note');
+    await expect(dialog).toBeHidden();
+    await expect(link).toHaveCount(0);
+    await expect(month).toBeFocused();
+  }finally{
+    await context.close();
+    const current=await api(request,'GET',path);
+    const note=await current.json();
+    if(note.version&&!note.deleted)await api(request,'DELETE',path,undefined,{'If-Match':current.headers().etag});
+  }
+});
 test('Track shows exact client session hours, local dates and independent activities',async({browser,request})=> {
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB',ignoreHTTPSErrors:true}),page=await context.newPage();
   const original=await (await api(request,'GET','/me')).json(),records=[];
@@ -39,7 +118,7 @@ test('Track shows exact client session hours, local dates and independent activi
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('27h 0m');
     await expect(page.locator(`#track-clients [data-track-client="${b.id}"]`)).toContainText('3h 0m');
     await expect(page.locator('#track-clients [data-track-client]')).toHaveCount(2);
-    await expect(page.locator('.track-month thead th')).toHaveCount(7);await expect(page.locator('.track-month tbody tr')).toHaveCount(5);
+    await expect(page.locator('.track-month thead th')).toHaveCount(8);await expect(page.locator('.track-month tbody tr')).toHaveCount(5);
     await expect(page.locator('.track-month tbody td').first()).toHaveAttribute('data-track-date','2025-09-29');
     const day=page.locator('[data-track-date="2025-10-26"]');await expect(day.locator('[data-track-daily-client]')).toHaveCount(2);await expect(day.locator(`[data-track-daily-client="${a.id}"]`)).toContainText('26h 0m');await expect(day.locator(`[data-track-daily-client="${b.id}"]`)).toContainText('2h 0m');await expect(day).not.toContainText('Clock change');
     await expect(page.locator('[data-track-date="2025-10-01"]')).toContainText('1h 0m');
@@ -84,7 +163,7 @@ test('Track shows exact client session hours, local dates and independent activi
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await expect(day.locator(`[data-track-daily-client="${a.id}"] .track-client-day-time-short`)).toHaveText('26h');await expect(day.locator(`[data-track-daily-client="${a.id}"]`)).toHaveAccessibleName(new RegExp('26h 0m'));await expect(day.locator('.track-client-day-time-short').first()).toBeVisible();
     const mobile=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
-    await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.locator('#track-panel .track-toolbar').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));await captureScreenshot(page,{path:'test-results/track-mobile.png',fullPage:true});
+    await expect(page.locator('.track-month thead th')).toHaveCount(8);await page.locator('#track-panel .track-toolbar').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));await captureScreenshot(page,{path:'test-results/track-mobile.png',fullPage:true});
     await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator('#track-calendar button[data-track-daily-client]')).toHaveCount(0);await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toContainText('1h 0m');

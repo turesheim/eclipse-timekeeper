@@ -412,6 +412,9 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-clients .track-client { margin-bottom: 0; }
 .track-month { width: 100%; table-layout: fixed; border-collapse: collapse; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .track-month th { text-align: center; padding: .65rem .25rem; color: var(--muted); font-size: var(--font-month-weekday); }
+.track-month .track-week-heading { width: 2rem; }
+.track-month .track-week-number { padding: .65rem 0 0; vertical-align: top; }
+.track-week-note.btn { min-width: 24px; min-height: 24px; padding: 0; font-size: inherit; color: var(--bs-link-color); }
 .track-day { height: 8rem; vertical-align: top; border: 1px solid var(--line); padding: .35rem; }
 .track-outside { background: var(--bs-tertiary-bg); color: var(--muted); }
 .track-date-row { display: flex; align-items: center; gap: .2rem; min-width: 0; min-height: 2.75rem; margin-bottom: .25rem; }
