@@ -234,7 +234,7 @@ subfolder. No external image URL is fetched automatically.
 
 ### Draw.io diagrams
 
-When an administrator configures a [draw.io editor host](SERVER.md#drawio-editor),
+When an administrator configures a [draw.io editor host](../operations/SERVER.md#drawio-editor),
 choose **Note tools → New diagram** to draw in Dagsverk. Enter a filename and
 description, then choose **Save diagram** to insert the image at your cursor.
 Notes use the supplied filename with the `.drawio.png` extension. Journal

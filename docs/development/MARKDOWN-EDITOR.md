@@ -6,7 +6,7 @@ area, formatting mode, uploads and revision comparison. Hosts supply resource
 resolution and guarded save operations; they retain ownership of the day label,
 ETag, unsaved state and dismissal decisions.
 
-The [user guide](../operations/MARKDOWN-EDITOR.md) defines the supported dialect
+The [user guide](../user/MARKDOWN-EDITOR.md) defines the supported dialect
 and interactions. The original Milkdown decision is recorded in issue #393;
 the separate About prototype and its scratchpad controls have been retired.
 

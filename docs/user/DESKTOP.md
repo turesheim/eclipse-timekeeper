@@ -14,7 +14,7 @@ Open your Dagsverk server's `/web/` address in a browser and sign in.
 - **Activities** shows time totals for tasks and projects. Start a timer or add
   time manually, including time without a task.
 - **Notes** opens your notebook. Use the folder navigator to find notes and the
-  [Markdown editor](../operations/MARKDOWN-EDITOR.md) to write them.
+  [Markdown editor](MARKDOWN-EDITOR.md) to write them.
 
 Open **My Account** to set your time zone and manage clients, projects and labels.
 See the [account and data guides](README.md#account-and-data) for sign-in,

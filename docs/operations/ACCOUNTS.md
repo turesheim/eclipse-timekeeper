@@ -200,7 +200,7 @@ no legacy user-management API alias.
 **My Account → Your data** downloads a complete private JSON/CSV archive and
 reviews a restore into the signed-in account. Work and selected preferences can
 be restored; account identity, roles and credentials remain under the target
-account's control. See [account downloads and restores](ACCOUNT-DATA.md).
+account's control. See [account downloads and restores](../user/ACCOUNT-DATA.md).
 
 Personal settings support `/web/#account/profile`, `/web/#account/password`,
 `/web/#account/passkeys`, `/web/#account/tokens`, `/web/#account/data` and `/web/#account/import`.
