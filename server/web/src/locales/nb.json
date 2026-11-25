@@ -1997,6 +1997,7 @@
   "drawio.invalid_name": "Skriv inn et filnavn uten mappesti.",
   "drawio.loading_editor": "Åpner diagramredigering …",
   "drawio.editor_unavailable": "Diagramredigeringen er utilgjengelig. Du kan fortsatt importere, laste ned eller erstatte en PNG-fil manuelt.",
+  "drawio.editor_not_configured": "En serveradministrator må konfigurere draw.io-redigering. Du kan fortsatt laste ned eller erstatte denne PNG-filen.",
   "drawio.export_failed": "Kunne ikke eksportere en redigerbar PNG-fil. Diagrammet er fortsatt åpent.",
   "drawio.save": "Lagre diagram",
   "drawio.saving": "Lagrer diagram …",

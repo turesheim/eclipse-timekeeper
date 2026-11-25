@@ -15,6 +15,8 @@ export function buildExperience(field){
   buildActionsMenu(f);
   f.retryButton=action('ui.retry',()=>void f.retryUpload?.());f.retryButton.hidden=true;f.status.after(f.retryButton);
   f.resourceTools=el('div');f.resourceTools.setAttribute('role','group');f.resourceTools.setAttribute('aria-label',t('markdown.note_tools'));f.addActionsGroup(f.resourceTools);
+  f.insertImageAction=action('markdown.insert_image',()=>f.imagePicker.click(),'image');
+  f.resourceTools.append(f.insertImageAction);
   f.assetDialog=el('dialog');f.assetDialog.className='app-dialog markdown-asset-dialog';f.assetDialog.setAttribute('aria-label',t('markdown.existing_asset'));
   const assetHeading=el('h2',t('markdown.existing_asset')),assetSearch=el('input');assetSearch.type='search';assetSearch.className='form-control';assetSearch.setAttribute('aria-label',t('notes.search'));const assetList=el('div');assetList.className='markdown-asset-list';const closeAsset=action('ui.close',()=>f.assetDialog.close());f.assetDialog.append(assetHeading,assetSearch,assetList,closeAsset);f.root.append(f.assetDialog);
   let assetGeneration=0;
@@ -96,6 +98,7 @@ export function buildExperience(field){
     f.imageProperties.disabled=f.readOnly||!f.editor?.imageDetails();
     f.historyButton.disabled=!f.resources?.revisions;
     f.assetPicker.disabled=f.readOnly||!f.resources?.complete;
+    f.insertImageAction.disabled=f.loading;
     f.syncActions();
     for(const button of f.tools.children){const name=button.dataset.command;if(name)button.setAttribute('aria-pressed',String(!!f.editor?.active(name)));}
     const tableKeys=!!f.editor?.context().table&&!f.readOnly&&!f.loading;

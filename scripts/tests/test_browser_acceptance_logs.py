@@ -83,8 +83,8 @@ class BrowserAcceptanceLogsTest(unittest.TestCase):
             root=Path(temporary);output=root/'output'
             args=SimpleNamespace(
                 distribution=root/'server.zip',java='java',browser='chromium',
-                https=False,mail=False,passkeys=False,restore=False,
-                spec=None,shard=None,grep=None,drawio_root=None,
+                https=True,mail=False,passkeys=False,restore=False,
+                spec=None,shard=None,grep=None,drawio_root=root/'drawio',drawio_host=True,
             )
             calls=[]
             def run(command,timeout):
@@ -95,7 +95,13 @@ class BrowserAcceptanceLogsTest(unittest.TestCase):
                 return SimpleNamespace(returncode=0 if len(calls)==1 else 1)
             with patch.object(browser_acceptance,'spec_batches',return_value=[['first.spec.js'],['second.spec.js']]),patch.object(browser_acceptance.subprocess,'run',side_effect=run):
                 with self.assertRaisesRegex(RuntimeError,'fixture 2 failed'):browser_acceptance.run_batches(args,output,'digest')
-            self.assertEqual(2,len(calls));self.assertEqual(['--spec','first.spec.js'],calls[0][-2:]);self.assertEqual(['--spec','second.spec.js'],calls[1][-2:])
+            self.assertEqual(2,len(calls))
+            for command,spec in zip(calls,['first.spec.js','second.spec.js'],strict=True):
+                index=command.index('--spec')
+                self.assertEqual(
+                    ['--spec',spec,'--drawio-root',str(args.drawio_root.resolve()),'--drawio-host'],
+                    command[index:],
+                )
             receipt=json.loads((output/'acceptance.json').read_text())
             self.assertFalse(receipt['passed']);self.assertEqual(1,len(receipt['batches']))
             self.assertTrue((output/'batch-1.png').exists());self.assertTrue((output/'batch-2.png').exists())

@@ -21,6 +21,8 @@ export function buildActionsMenu(field){
   f.closeActions=()=>{if(menu.matches(':popover-open'))menu.hidePopover();};
   f.syncActions=()=>{
     f.syncCompactActions?.();
+    f.drawio?.syncSelection();
+    if(f.insertImageAction)f.insertImageAction.hidden=!f.onUpload||f.readOnly||!f.rich.hidden&&!f.toolbar.hidden;
     for(const button of menu.querySelectorAll('button'))if(!bound.has(button)){
       bound.add(button);const label=button.getAttribute('aria-label')||button.title;
       if(label){const text=document.createElement('span');text.textContent=label;button.append(text);}
