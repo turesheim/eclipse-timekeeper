@@ -1,12 +1,13 @@
 # Set up shared logging on Synology
 
-This Container Manager project runs Grafana, Loki and Grafana Alloy for any
-service on your NAS. Alloy collects selected Docker and syslog inputs, Loki
-stores them, and Grafana provides Explore and Logs Drilldown. You can start
-with an empty stack and connect services as you need them.
+This stack lives under `extras/` because centralized logging is an optional
+add-on for Dagsverk on Synology. It runs as a separate Container Manager
+project with its own lifecycle and can collect logs from any service on the
+NAS. Alloy collects selected Docker and syslog inputs, Loki stores them,
+and Grafana provides Explore and Logs Drilldown.
 
 To connect Dagsverk to an existing stack, see
-[Send Dagsverk logs to Grafana](../DAGSVERK-LOGGING.md).
+[Send Dagsverk logs to Grafana](../../server/deploy/DAGSVERK-LOGGING.md).
 
 ## Install
 
@@ -21,8 +22,9 @@ usage during ingestion, queries and compaction before relying on that budget.
 
 ### 1. Copy the project folder
 
-Copy the contents of this directory into a private NAS folder such as
-`/volume1/docker/centralized-logging`. Keep the subfolders and filenames intact.
+Copy the contents of `extras/centralised-synology-logging/` into a private
+NAS folder such as `/volume1/docker/centralized-logging`. Keep the subfolders
+and filenames intact.
 The project reads `loki.yaml`, `docker-logs.cfg`, `alloy/`, and `grafana/`
 from that folder when the containers start.
 
@@ -64,6 +66,9 @@ To start the project from SSH, run these commands in the same folder.
 sudo docker compose -f compose.yaml config --quiet
 sudo docker compose -f compose.yaml up -d
 ```
+
+When updating an existing installation, copy the new files into its
+existing NAS folder and keep its `.env` and password file.
 
 If you already created the stack as `dagsverk-logging`, keep that project
 name in Container Manager and set `COMPOSE_PROJECT_NAME=dagsverk-logging` in

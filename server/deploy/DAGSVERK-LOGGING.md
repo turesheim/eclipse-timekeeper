@@ -2,7 +2,7 @@
 
 Dagsverk containers write logs to Docker. These steps connect Dagsverk to
 an existing Grafana, Loki and Alloy stack. If you need a stack,
-[set up shared logging on Synology](logging/README.md) first.
+[set up shared logging on Synology](../../extras/centralised-synology-logging/README.md) first.
 
 ## Synology package
 
@@ -35,7 +35,8 @@ Use the usual Dagsverk Compose files and append the log labels override. Run
 the command from `server/deploy`.
 
 ```sh
-docker compose -f compose.yaml -f logging/dagsverk.compose.yaml up -d
+docker compose -f compose.yaml \
+  -f ../../extras/centralised-synology-logging/dagsverk.compose.yaml up -d
 ```
 
 Include this override on future Compose updates so the labels persist. Set
@@ -51,7 +52,7 @@ A **bare JVM** deployment can set `DAGSVERK_LOG_JSON=true` and
 output to the service manager's journal or to a dedicated, access-controlled
 rotating logfile. A host-local Alloy can follow that file with
 [`loki.source.file`](https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.file/)
-and forward it over the [protected remote path](logging/README.md#optional-dsm-and-external-syslog).
+and forward it over the [protected remote path](../../extras/centralised-synology-logging/README.md#optional-dsm-and-external-syslog).
 
 ## Log format
 
