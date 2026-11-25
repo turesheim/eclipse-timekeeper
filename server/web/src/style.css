@@ -273,6 +273,7 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
   .today-month { --today-calendar-cell-height: 2rem; }
   .today-month-heading button { width: 2.25rem; height: 2.25rem; min-height: 2.25rem; }
 }
+.today-group-heading { margin: .6rem 0 0; color: var(--muted); font-size: var(--today-sidebar-heading-font-size); }
 .today-list { list-style: none; padding: 0; margin: .5rem 0 0; }
 .today-list > li { min-width: 0; }
 .today-list .hint { margin: 0; font-size: var(--font-today-hint); }
