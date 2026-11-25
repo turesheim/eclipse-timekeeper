@@ -132,7 +132,9 @@ def main():
             client.assertIn(b'id="login-form"', response.read())
             client.assertIn("frame-ancestors 'none'", response.headers.get('Content-Security-Policy', ''))
         for member in ('api-1', 'api-2'):
-            for asset in ('', 'app.js', 'api.js', 'model.js', 'style.css', 'favicon.svg'):
+            for asset in ('', 'app.js', 'api.js', 'model.js', 'style.css', 'favicon.svg',
+                          'desktop-guide.js', 'guide/user/DESKTOP.md',
+                          'guide/assets/screenshots/desktop-guide-navigation.png'):
                 compose('exec', '-T', member, 'curl', '-fsS', '-o', '/dev/null',
                         'http://localhost:8080/web/' + asset)
             identity = json.loads(compose('exec', '-T', member, 'curl', '-fsS', '-H', '@-',

@@ -15,6 +15,8 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /source
 COPY server server
 COPY common common
+COPY docs/user/DESKTOP.md docs/user/DESKTOP.md
+COPY docs/assets/screenshots/desktop-guide-navigation.png docs/assets/screenshots/desktop-guide-navigation.png
 ARG TIMEKEEPER_BUILD_COMMIT=unknown
 ARG TIMEKEEPER_BUILD_DIRTY=unknown
 ARG DAGSVERK_BUILD_COMMIT=${TIMEKEEPER_BUILD_COMMIT}
