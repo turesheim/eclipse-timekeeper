@@ -30,7 +30,7 @@ public class ProblemMapper implements ExceptionMapper<Exception> {
         String requestId=routing==null?null:routing.get(RequestTimings.PROPERTY);
         if(requestId==null)requestId="none";
         if(error instanceof ApiFailure failure && failure.cursorConflict!=null)failure.cursorConflict.log(requestId);
-        if(status>=500)LOG.warnf("API failure %s request_id=%s",diagnostic(code,error),requestId);
+        if(status>=500)LOG.errorf("API failure %s request_id=%s",diagnostic(code,error),requestId);
         var problem=JsonValues.object(); problem.put("type","urn:timekeeper:problem:"+code.toLowerCase(Locale.ROOT).replace('_','-'));
         problem.put("title",code.replace('_',' ')); problem.put("status",status); problem.put("code",code);
         var response=Response.status(status).type("application/problem+json").entity(problem).header("Cache-Control","no-store");
@@ -41,12 +41,20 @@ public class ProblemMapper implements ExceptionMapper<Exception> {
     /** Fixed public codes and compiled locations only; exception messages can contain private SQL. */
     static String diagnostic(String code,Throwable error) {
         String state="unknown",source="unknown",category="unknown";
+        var frames=new java.util.LinkedHashSet<String>();
         for(int depth=0;error!=null&&depth<8;depth++,error=error.getCause()) {
             String name=error.getClass().getSimpleName();if(name.matches("[A-Za-z0-9_$]{1,100}"))category=name;
             if(error instanceof java.sql.SQLException sql&&sql.getSQLState()!=null&&sql.getSQLState().matches("[A-Z0-9]{5}"))state=sql.getSQLState();
             if(error.getStackTrace().length>0){var frame=error.getStackTrace()[0];String location=frame.getClassName()+"."+frame.getMethodName();
                 if(location.startsWith("net.resheim.timekeeper.server.")&&location.matches("[A-Za-z0-9_.$]{1,240}"))source=location;}
+            for(var frame:error.getStackTrace()) {
+                if(frames.size()>=8)break;
+                String location=frame.getClassName()+"."+frame.getMethodName();
+                if(location.startsWith("net.resheim.timekeeper.server.")&&location.matches("[A-Za-z0-9_.$<>]{1,240}"))
+                    frames.add(location+":"+frame.getLineNumber());
+            }
         }
-        return "code="+(code!=null&&code.matches("[A-Z][A-Z0-9_]{0,79}")?code:"unknown")+" category="+category+" sql_state="+state+" source="+source;
+        return "code="+(code!=null&&code.matches("[A-Z][A-Z0-9_]{0,79}")?code:"unknown")+" category="+category+" sql_state="+state+" source="+source
+                +(frames.isEmpty()?"":" stack="+String.join(",",frames));
     }
 }

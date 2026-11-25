@@ -12,7 +12,10 @@ class EnvironmentAliasesTest {
             var values=new Properties();try(var input=Files.newInputStream(Path.of(file))){values.load(input);}
             for(String key:values.stringPropertyNames()){
                 String expression=values.getProperty(key);if(!expression.startsWith("${DAGSVERK_"))continue;
-                String name=expression.substring(2,expression.indexOf(':')),legacy="TIMEKEEPER_"+name.substring(9);
+                String name=expression.substring(2,expression.indexOf(':'));
+                // Logging was introduced after the environment variable migration.
+                if(name.equals("DAGSVERK_LOG_JSON")||name.equals("DAGSVERK_LOG_ENVIRONMENT"))continue;
+                String legacy="TIMEKEEPER_"+name.substring(9);
                 for(var environment:List.of(Map.of(legacy,"old-private-value"),Map.of(legacy,"old-private-value",name,"new-private-value"))){
                     var config=new SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new PropertiesConfigSource(Map.of(key,expression),"application",100),new EnvConfigSource(environment,300),new DagsverkEnvironmentConfigSource(environment)).build();
                     assertEquals(environment.containsKey(name)?"new-private-value":"old-private-value",config.getValue(key,String.class),key);

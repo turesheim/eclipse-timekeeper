@@ -35,6 +35,7 @@
     <dependency><groupId>org.apache.httpcomponents.client5</groupId><artifactId>httpclient5</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-service</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-logging-json</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-mailer</artifactId></dependency>
     <dependency><groupId>io.vertx</groupId><artifactId>vertx-mail-client</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-h2</artifactId></dependency>
