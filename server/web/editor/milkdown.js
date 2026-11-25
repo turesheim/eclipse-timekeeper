@@ -216,7 +216,10 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         if(event.key==='Escape'){escape();return true;}return false;
       },
       nodeViews:{...dialect.nodeViews,list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:code.nodeView,mermaid_diagram:mermaidBlock,plantuml_diagram:plantumlBlock,image:node=>{
-        if(resources)return resources.image(node.attrs.src,node.attrs.alt||'');
+        if(resources){
+          const preview=resources.image(node.attrs.src,node.attrs.alt||'');
+          return resources.decorateDiagram?.(preview,{kind:'relative',reference:node.attrs.src})||preview;
+        }
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
         else dom.textContent=node.attrs.alt||'';

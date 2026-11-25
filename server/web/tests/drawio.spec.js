@@ -331,6 +331,88 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(await bytes(api,asset.id)).toEqual(original);
   });
 
+  test('creates an unnamed drawing and reuses shared captions and PNGs across folders',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    await page.setViewportSize({width:1500,height:1000});
+    for(const path of ['Planning','Delivery'])await api('POST','/notes/folders',{path});
+    const first=await put('Planning/Diagram.md','First note.\n');
+    const second=await put('Delivery/Review.md','Second note.\n');
+    await page.locator('[data-tab=notes]').click();
+    const tree=page.locator('#notes-navigation');
+    await noteEntry(tree,'Planning').click();
+    let root=await open(page,'Planning/Diagram.md');
+    await root.locator('.ProseMirror p').click();
+    await page.keyboard.press('ControlOrMeta+End');
+    await clickNoteAction(page,root,'Insert draw.io diagram');
+    let box=dialog(page);
+    const save=box.getByRole('button',{name:'Save diagram',exact:true});
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const firstSource=(await bytes(api,first.id)).toString();
+    const filename=firstSource.match(/diagram-[0-9a-f-]{36}\.drawio\.png/)?.[0];
+    expect(filename).toBeTruthy();
+    const asset=(await(await api('GET','/notes/resolve?'+new URLSearchParams({path:'Planning/'+filename}))).json());
+    const originalBytes=await bytes(api,asset.id);
+    const {drawioPngInfo}=await import('../src/drawio-png.js');
+    expect(drawioPngInfo(new Uint8Array(originalBytes))?.editable).toBe(true);
+
+    const pencil=root.locator('.markdown-diagram-edit');
+    await expect(pencil).toHaveAccessibleName('Edit diagram');
+    await pencil.focus();
+    await page.keyboard.press('Enter');
+    box=dialog(page);
+    await expect(save).toBeEnabled();
+    await box.getByLabel('Diagram description').fill('Release flow');
+    await save.click();
+    await expect(box).toBeHidden();
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Release flow');
+
+    await noteEntry(tree,'Delivery').click();
+    root=await open(page,'Delivery/Review.md');
+    const source=await notesSource(page);
+    await source.evaluate(text=>{text.focus();text.setSelectionRange(text.value.length,text.value.length);});
+    await clickNoteAction(page,root,'Insert existing diagram');
+    box=dialog(page);
+    const search=box.getByRole('searchbox',{name:'Search diagrams'});
+    await search.fill(filename);
+    await expect(box.getByRole('button',{name:'Release flow',exact:true})).toBeVisible();
+    await search.fill('release flow');
+    await box.getByRole('button',{name:'Release flow',exact:true}).click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const secondSource=(await bytes(api,second.id)).toString();
+    expect(secondSource).toContain('../Planning/'+filename);
+
+    await source.evaluate((text,filename)=>{
+      const position=text.value.indexOf(filename)+1;
+      text.focus();text.setSelectionRange(position,position);
+    },filename);
+    const sourcePencil=root.locator('.diagram-source-edit');
+    await expect(sourcePencil).toBeVisible();
+    await source.press('Alt+Enter');
+    await expect(sourcePencil).toBeFocused();
+    await page.keyboard.press('Enter');
+    box=dialog(page);
+    await expect(save).toBeEnabled();
+    await box.getByLabel('Diagram description').fill('Revised release flow');
+    await save.click();
+    await expect(box).toBeHidden();
+    await root.getByRole('button',{name:'Formatted',exact:true}).click();
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Revised release flow');
+    expect((await bytes(api,second.id)).toString()).toBe(secondSource);
+
+    root=await open(page,'Planning/Diagram.md');
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Revised release flow');
+    expect((await bytes(api,first.id)).toString()).toBe(firstSource);
+    await (await notesSource(page)).fill('First note.\n');
+    await saveMarkdown(root);
+    root=await open(page,'Delivery/Review.md');
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Revised release flow');
+    expect(drawioPngInfo(new Uint8Array(await bytes(api,asset.id)))?.description).toBe('Revised release flow');
+  });
+
   test('creates a portable editable PNG and inserts it at the captured source cursor',async({page,request})=>{
     const {api,put}=await fresh(page,request);
     const note=await put('Blank.md','Before\n\nAfter\n');

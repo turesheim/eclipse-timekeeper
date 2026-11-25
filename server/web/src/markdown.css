@@ -247,6 +247,13 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .weather-location-results {list-style:none;padding:0;display:grid;gap:.5rem}
 .weather-location-results li {display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem}
 .weather-location-results .btn {text-align:start;overflow-wrap:anywhere;max-width:100%}
+.markdown-diagram {display:contents;}
+.markdown-diagram-ready {display:inline-block;position:relative;max-inline-size:100%;margin-block:.75rem;}
+.markdown-editor .ProseMirror .markdown-diagram-ready img {margin:0;}
+.markdown-diagram-caption {display:block;margin-block-start:.25rem;color:var(--bs-secondary-color);text-align:center;}
+.markdown-diagram-edit.btn {position:absolute;inset-block-start:.25rem;inset-inline-end:.25rem;padding:.2rem;min-width:24px;min-height:24px;}
+.diagram-source-edit.btn {position:fixed;z-index:1079;padding:.2rem;min-width:24px;min-height:24px;}
+.markdown-editor:not(.diagram-editable) .markdown-diagram-edit {display:none;}
 .drawio-dialog {width:min(38rem,calc(100vw - 2rem));}
 .drawio-heading {display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;}
 .drawio-dialog > .dialog-actions {flex-wrap:wrap;}

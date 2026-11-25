@@ -1,4 +1,5 @@
 import {t} from './i18n.js';
+import {iconButton} from './icons.js';
 import {splitMarkdown} from './markdown-document.js';
 import {drawioPngInfo,samePngBytes,withDrawioDescription} from './drawio-png.js';
 import {updateImagePreviews} from './image-preview.js';
@@ -23,9 +24,26 @@ export class DrawioTools {
     this.browse=button(t('drawio.files'),()=>void this.open('files'));
     this.insertExisting=button(t('drawio.insert_existing'),()=>void this.open('existing'));
     this.selectedEdit=button(t('drawio.edit'),editSelected);this.selectedEdit.hidden=true;
-    this.quickEdit=button(t('drawio.edit'),editSelected);this.quickEdit.hidden=true;
-    this.quickEdit.addEventListener('mousedown',event=>event.preventDefault());
-    field.toolbar.append(this.quickEdit);
+    this.sourceEdit=iconButton(button('',()=>{
+      if(this.sourceDiagram?.editable)void this.open('files',this.sourceDiagram.reference);
+    }),'pencil',t('drawio.edit'));
+    this.sourceEdit.classList.add('diagram-source-edit');
+    this.sourceEdit.setAttribute('aria-keyshortcuts','Alt+Enter');
+    this.sourceEdit.hidden=true;
+    field.text.after(this.sourceEdit);
+    const schedule=()=>{
+      if(this.sourceFrame)return;
+      this.sourceFrame=requestAnimationFrame(()=>{
+        this.sourceFrame=null;void this.syncSourceEdit();
+      });
+    };
+    for(const name of ['focus','blur','input','keyup','click','select','scroll'])field.text.addEventListener(name,schedule);
+    this.sourceEdit.addEventListener('blur',schedule);
+    document.addEventListener('selectionchange',()=>{if(document.activeElement===field.text)schedule();});
+    window.addEventListener('resize',schedule);
+    field.text.addEventListener('keydown',event=>{
+      if(event.altKey&&event.key==='Enter'&&!this.sourceEdit.hidden){event.preventDefault();this.sourceEdit.focus();}
+    });
     this.group.append(this.insert,this.insertExisting,this.selectedEdit,this.browse);field.addActionsGroup(this.group);
     this.dialog=node('dialog',undefined,'app-dialog drawio-dialog');this.heading=node('h2');this.heading.id='drawio-'+crypto.randomUUID();this.dialog.setAttribute('aria-labelledby',this.heading.id);
     this.resize=button(t('drawio.fill_window'),()=>{
@@ -86,7 +104,10 @@ export class DrawioTools {
     set(this.browse,'disabled',f.loading||!current?.session);
     set(this.insertExisting,'hidden',!f.resources.listDiagrams);
     set(this.insertExisting,'disabled',f.readOnly||f.loading||!f.resources.canReplaceAsset?.());
-    if(this.dialog.open)this.paint();f.syncActions();
+    f.root.classList.toggle('diagram-editable',!!this.editorEndpoint&&!f.readOnly&&!f.loading&&!!f.resources.canReplaceAsset?.());
+    if(this.dialog.open)this.paint();
+    if(f.text===document.activeElement||!this.sourceEdit.hidden)void this.syncSourceEdit();
+    f.syncActions();
   }
   selectedReference(){
     const image=this.field.editor?.imageDetails();
@@ -97,7 +118,64 @@ export class DrawioTools {
     const f=this.field;
     const selected=!f.readOnly&&!f.loading&&f.resources.canReplaceAsset?.()&&!!this.selectedReference();
     set(this.selectedEdit,'hidden',!selected);
-    set(this.quickEdit,'hidden',!selected);
+
+  }
+  async syncSourceEdit(){
+    const f=this.field,text=f.text,active=document.activeElement;
+    if(active===this.sourceEdit&&!f.readOnly&&!f.loading)return;
+    const body=text.value,position=text.selectionStart,generation=f.generation;
+    if(f.editor||f.readOnly||f.loading||!this.editorEndpoint||!f.resources.canReplaceAsset?.()
+        ||active!==text||position!==text.selectionEnd||!/\.png/i.test(body)){
+      this.sourceEdit.hidden=true;return;
+    }
+    const valid=()=>generation===f.generation&&document.activeElement===text&&!f.editor
+      &&!f.loading&&!f.readOnly&&text.value===body&&text.selectionStart===position&&text.selectionEnd===position;
+    try{
+      if(this.sourceImages?.body!==body){
+        this.sourceEdit.hidden=true;
+        parser??=import('./assets/milkdown/markdown-preview.js');
+        const {markdownImages}=await parser;
+        if(!valid())return;
+        this.sourceImages={body,images:markdownImages(body,{ranges:true})};
+      }
+      const reference=this.sourceImages.images.find(image=>image.start<=position&&position<=image.end
+        &&pngReference(image.reference.split('|')[0])&&(image.kind==='wiki'||f.resources.allowsAsset?.(image.reference)));
+      if(!reference){this.sourceEdit.hidden=true;return;}
+      const key=JSON.stringify([generation,reference.kind,reference.reference]);
+      if(this.sourceDiagram?.key!==key){
+        this.sourceEdit.hidden=true;
+        const candidate={key,reference};
+        this.sourceDiagram=candidate;
+        candidate.read=f.resources.readAsset(reference).then(async({blob})=>blob.size<=5_000_000
+          &&!!drawioPngInfo(new Uint8Array(await blob.arrayBuffer()))?.editable).catch(()=>false);
+      }
+      const candidate=this.sourceDiagram;
+      const editable=await candidate.read;
+      if(!valid()||candidate!==this.sourceDiagram)return;
+      candidate.editable=editable;
+      const rect=editable?f.caret.sourceRect(text):null;
+      this.sourceEdit.hidden=!rect||rect.top<Math.max(0,rect.box.top)||rect.top+rect.height>Math.min(innerHeight,rect.box.bottom);
+      if(!this.sourceEdit.hidden){
+        this.sourceEdit.style.left=Math.min(rect.box.right-38,innerWidth-38)+'px';
+        this.sourceEdit.style.top=rect.top+'px';
+      }
+    }catch{if(valid())this.sourceEdit.hidden=true;}
+  }
+  decoratePreview(preview,reference){
+    if(!preview?.observeDiagram||!pngReference(reference.reference.split('|')[0]))return preview;
+    const {dom:image}=preview,dom=node('span',undefined,'markdown-diagram');
+    const caption=node('span',undefined,'markdown-diagram-caption');
+    caption.hidden=true;
+    const edit=iconButton(button('',()=>void this.open('files',reference)),'pencil',t('drawio.edit'));
+    edit.className='btn btn-light icon-button markdown-diagram-edit';edit.hidden=true;
+    dom.contentEditable='false';dom.append(image,caption,edit);
+    preview.observeDiagram(info=>{
+      dom.classList.toggle('markdown-diagram-ready',!!info?.editable);
+      caption.textContent=info?.description||'';
+      caption.hidden=!info?.editable||!info.description;
+      edit.hidden=!info?.editable;
+    });
+    return {...preview,dom,stopEvent:event=>edit.contains(event.target)||!!preview.stopEvent?.(event)};
   }
   paint(){
     const f=this.field,writable=!f.readOnly&&f.resources.canReplaceAsset?.();
