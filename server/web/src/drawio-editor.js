@@ -28,7 +28,7 @@ function readPng(blob) {
 }
 
 export class DrawioEditor {
-  constructor(endpoint, signal) {
+  constructor(endpoint, signal, cancel) {
     const embedded = endpoint === embeddedPath;
     this.url = new URL(embedded ? endpoint : '/', embedded ? location.origin : endpoint);
     this.origin = embedded ? 'null' : endpoint;
@@ -36,6 +36,7 @@ export class DrawioEditor {
     // frame to the bundled editor document, and replies must come from this frame.
     this.targetOrigin = embedded ? '*' : endpoint;
     this.signal = signal;
+    this.cancel = cancel;
     this.frame = document.createElement('iframe');
     this.frame.title = t('drawio.editor');
     this.frame.referrerPolicy = 'no-referrer';
@@ -53,6 +54,15 @@ export class DrawioEditor {
     let message;
     try { message = JSON.parse(event.data); }
     catch { return; }
+    if (message?.event === 'shortcut' && message.command === 'cancel-diagram') {
+      this.cancel();
+      return;
+    }
+    if (message?.event === 'autosave') {
+      // Page selection and viewport changes may reserialize the XML without a model patch.
+      if (message.patch && Object.keys(message.patch).length) this.changed = true;
+      return;
+    }
     const pending = this.pending;
     if (!pending || message?.event !== pending.event) return;
     if (pending.request && message.message?.request !== pending.request) return;
@@ -81,11 +91,15 @@ export class DrawioEditor {
     const xml = blob ? await readPng(blob) : blank;
     const url = this.url;
     url.search = new URLSearchParams({
-      embed: '1', proto: 'json', ui: 'min', offline: '1', stealth: '1', pwa: '0', local: '1',
+      embed: '1', proto: 'json', configure: '1', ui: 'min', offline: '1', stealth: '1', pwa: '0', local: '1',
       noSaveBtn: '1', noExitBtn: '1', saveAndExit: '0',
     });
-    await this.waitFor('init', () => { this.frame.src = url.href; });
-    await this.waitFor('load', () => this.send({action: 'load', xml}));
+    await this.waitFor('configure', () => { this.frame.src = url.href; });
+    await this.waitFor('init', () => this.send({
+      action: 'configure',
+      config: {passThroughKeys: [{key: 'Escape', command: 'cancel-diagram'}]},
+    }));
+    await this.waitFor('load', () => this.send({action: 'load', xml, autosave: 1, diffSync: {patchOnly: true}}));
   }
 
   async exportPng() {

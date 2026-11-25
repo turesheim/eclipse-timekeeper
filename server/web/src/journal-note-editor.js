@@ -1,7 +1,7 @@
 import {DocumentAutosave,bindDocumentAutosave} from './document-autosave.js';
 import {noteRevisionResources} from './note-revisions.js';
 import {vaultEditorResources,vaultNoteNavigation} from './vault-editor-resources.js';
-import {journalImageResources} from './image-preview.js';
+import {journalAttachmentName,journalImageResources} from './image-preview.js';
 import {t} from './i18n.js';
 import {iconButton} from './icons.js';
 import {MarkdownField} from './markdown-field.js';
@@ -104,7 +104,7 @@ export class JournalNoteEditor {
   async uploadAsset(file,image){
     const session=this.session,generation=this.generation;if(!session||!this.writable||file.size>5_000_000)throw new Error(t('markdown.upload_failed'));
     const extensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp'},suffix=image?extensions[file.type]:(file.name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin');if(!suffix)throw new Error(t('markdown.upload_failed'));
-    const filename=crypto.randomUUID()+'.'+suffix.toLowerCase(),bytes=new Uint8Array(await file.arrayBuffer());
+    const filename=journalAttachmentName(file,suffix.toLowerCase()),bytes=new Uint8Array(await file.arrayBuffer());
     if(this.vault){
       const settings=await session.request('/notes');if(session!==this.session||generation!==this.generation)throw new Error(t('markdown.upload_failed'));
       const reply=await session.request('/notes/files?'+new URLSearchParams({path:settings.data.settings.assetsFolder+'/'+filename}),{method:'PUT',noneMatch:'*',rawBody:bytes});

@@ -28,6 +28,9 @@ database baseline.
   the unaffected published H2 2.4.240 runtime in the server and Eclipse client.
   Added deterministic chunk-reuse and journal forced-restart regression checks.
 
+- Made embedded draw.io diagrams easier to edit and reuse across notes, with
+  a resizable editor, shared captions and an existing diagram picker (#745).
+
 - Updated the build, target platform and runtime dependencies for Eclipse
   2026-09 and Java 21.
 - Moved the main navigation to a collapsible left sidebar on desktop, with

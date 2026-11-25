@@ -223,12 +223,16 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(viewport.y).toBe(0);
     await captureScreenshot(page,{path:test.info().outputPath('drawio-editor-phone.png')});
     await change(frame,'Saved detail','Discard this detail');
-    const cancel=box.getByRole('button',{name:'Cancel',exact:true});
-    page.once('dialog',prompt=>prompt.dismiss());
-    await cancel.press('Escape');
-    await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
-    page.once('dialog',prompt=>prompt.accept());
-    await cancel.press('Escape');
+    await box.locator('iframe').focus();
+    for(const discard of [false,true]){
+      const confirmation=page.waitForEvent('dialog',{timeout:5000});
+      const press=page.keyboard.press('Escape');
+      const prompt=await confirmation;
+      expect(prompt.type()).toBe('confirm');
+      await (discard?prompt.accept():prompt.dismiss());
+      await press;
+      if(!discard)await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
+    }
     await expect(box.locator('iframe')).toHaveCount(0);
     await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeFocused();
     expect(await bytes(api,asset.id)).toEqual(saved);
@@ -287,6 +291,147 @@ test.describe('self-hosted draw.io editor',()=>{
     await expect(box.locator('iframe')).toHaveCount(0);
     expect(await downloaded(page,box,'fallback-original.png')).toEqual(original);
     await choose(box);
+  });
+
+  test('resizes the same drawing and only prompts for changes when canceling',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    const asset=await put('system.drawio.png',original);
+    await put('Diagram.md','![System overview](system.drawio.png)\n');
+    await page.setViewportSize({width:1500,height:1000});
+    const root=await open(page,'Diagram.md');
+    let box=await manage(page,root),frame=await edit(box);
+    await frame.getByText('Details',{exact:true}).click();
+    await expect(frame.getByText('Stage B',{exact:true})).toBeVisible();
+    const sameFrame=await box.locator('iframe').elementHandle();
+    const initial=await box.boundingBox();
+    await box.getByRole('button',{name:'Fill window',exact:true}).click();
+    expect((await box.boundingBox()).width).toBe(1500);
+    await box.getByRole('button',{name:'Restore dialog size',exact:true}).click();
+    expect((await box.boundingBox()).width).toBe(initial.width);
+    expect(await sameFrame.evaluate(element=>element.isConnected)).toBe(true);
+    await expect(frame.getByText('Stage B',{exact:true})).toBeVisible();
+
+    const prompts=[];
+    page.on('dialog',async prompt=>{prompts.push(prompt.message());await prompt.dismiss();});
+    await box.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(box).toBeHidden();
+    expect(prompts).toEqual([]);
+    await clickNoteAction(page,root,'Insert draw.io diagram');
+    box=dialog(page);
+    await expect(box.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
+    await expect(box.locator('iframe')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(box).toBeHidden();
+    expect(prompts).toEqual([]);
+
+    box=await manage(page,root);frame=await edit(box);
+    await box.getByLabel('Diagram description').fill('Draft caption');
+    await box.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(box.getByLabel('Diagram description')).toHaveValue('Draft caption');
+    expect(prompts).toHaveLength(1);
+    page.removeAllListeners('dialog');
+    page.once('dialog',prompt=>prompt.accept());
+    await box.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(box.locator('iframe')).toHaveCount(0);
+    expect(await bytes(api,asset.id)).toEqual(original);
+  });
+
+  test('creates an unnamed drawing and reuses shared captions and PNGs across folders',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    await page.setViewportSize({width:1500,height:1000});
+    for(const path of ['Planning','Delivery'])await api('POST','/notes/folders',{path});
+    const first=await put('Planning/Diagram.md','First note.\n');
+    const second=await put('Delivery/Review.md','Second note.\n');
+    await page.locator('[data-tab=notes]').click();
+    const tree=page.locator('#notes-navigation');
+    await noteEntry(tree,'Planning').click();
+    let root=await open(page,'Planning/Diagram.md');
+    await root.locator('.ProseMirror p').click();
+    await page.keyboard.press('ControlOrMeta+End');
+    await clickNoteAction(page,root,'Insert draw.io diagram');
+    let box=dialog(page);
+    const save=box.getByRole('button',{name:'Save diagram',exact:true});
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const firstSource=(await bytes(api,first.id)).toString();
+    const filename=firstSource.match(/diagram-[0-9a-f-]{36}\.drawio\.png/)?.[0];
+    expect(filename).toBeTruthy();
+    const asset=(await(await api('GET','/notes/resolve?'+new URLSearchParams({path:'Planning/'+filename}))).json());
+    const originalBytes=await bytes(api,asset.id);
+    const {drawioPngInfo}=await import('../src/drawio-png.js');
+    expect(drawioPngInfo(new Uint8Array(originalBytes))?.editable).toBe(true);
+
+    const pencil=root.locator('.markdown-diagram-edit');
+    await expect(pencil).toHaveAccessibleName('Edit diagram');
+    await pencil.focus();
+    await page.keyboard.press('Enter');
+    box=dialog(page);
+    await expect(save).toBeEnabled();
+    await box.getByLabel('Diagram description').fill('Release flow');
+    await save.click();
+    await expect(box).toBeHidden();
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Release flow');
+
+    await noteEntry(tree,'Delivery').click();
+    root=await open(page,'Delivery/Review.md');
+    const source=await notesSource(page);
+    await source.evaluate(text=>{text.focus();text.setSelectionRange(text.value.length,text.value.length);});
+    await clickNoteAction(page,root,'Insert existing diagram');
+    box=dialog(page);
+    const search=box.getByRole('searchbox',{name:'Search diagrams'});
+    await search.fill(filename);
+    await expect(box.getByRole('button',{name:'Release flow',exact:true})).toBeVisible();
+    await search.fill('release flow');
+    await box.getByRole('button',{name:'Release flow',exact:true}).click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const secondSource=(await bytes(api,second.id)).toString();
+    expect(secondSource).toContain('../Planning/'+filename);
+
+    await source.evaluate((text,filename)=>{
+      const position=text.value.indexOf(filename)+1;
+      text.focus();text.setSelectionRange(position,position);
+    },filename);
+    const sourcePencil=root.locator('.diagram-source-edit');
+    await expect(sourcePencil).toBeVisible();
+    await source.press('Alt+Enter');
+    await expect(sourcePencil).toBeFocused();
+    await page.keyboard.press('Enter');
+    box=dialog(page);
+    await expect(save).toBeEnabled();
+    await box.getByLabel('Diagram description').fill('Revised release flow');
+    await save.click();
+    await expect(box).toBeHidden();
+    await root.getByRole('button',{name:'Formatted',exact:true}).click();
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Revised release flow');
+    expect((await bytes(api,second.id)).toString()).toBe(secondSource);
+
+    root=await open(page,'Planning/Diagram.md');
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Revised release flow');
+    expect((await bytes(api,first.id)).toString()).toBe(firstSource);
+    await (await notesSource(page)).fill('First note.\n');
+    await saveMarkdown(root);
+    root=await open(page,'Delivery/Review.md');
+    await expect(root.locator('.markdown-diagram-caption')).toHaveText('Revised release flow');
+    expect(drawioPngInfo(new Uint8Array(await bytes(api,asset.id)))?.description).toBe('Revised release flow');
+  });
+
+  test('keeps the draw.io suffix for unnamed journal diagrams',async({page,request})=>{
+    const {api,put}=await fresh(page,request),date='2026-11-16';
+    await put('journal/'+date+'.md','Diagram in Today.\n');
+    await page.locator('[data-tab=today]').click();
+    await page.locator('#today-date').fill(date);
+    const root=page.locator('#today-note-editor');
+    await expect(root.locator('.ProseMirror')).toBeVisible();
+    await clickNoteAction(page,root,'Insert draw.io diagram');
+    const box=dialog(page);
+    await box.getByRole('button',{name:'Save diagram',exact:true}).click();
+    await expect(box).toBeHidden();
+    await saveMarkdown(root);
+    const note=await(await api('GET','/day-entries/'+date)).json();
+    expect(note.body).toMatch(/assets\/[0-9a-f-]{36}\.drawio\.png/);
   });
 
   test('creates a portable editable PNG and inserts it at the captured source cursor',async({page,request})=>{

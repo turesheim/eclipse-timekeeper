@@ -21,14 +21,15 @@ export function noteTaskLines(source){
 }
 const tags={strong:'strong',emphasis:'em',delete:'del',highlight:'mark',subscript:'sub',superscript:'sup',paragraph:'p',blockquote:'blockquote',listItem:'li',table:'table',tableRow:'tr',tableCell:'td'};
 /** References in prose only; code, HTML and escaped examples remain inert. */
-export function markdownImages(source){
+export function markdownImages(source,{ranges=false}={}){
   const tree=parser.runSync(parser.parse(source)),images=[],definitions=new Map(tree.children.filter(node=>node.type==='definition').map(node=>[node.identifier,node.url]));
+  const add=(image,start,end)=>images.push(ranges?{...image,start,end}:image);
   const visit=node=>{
     if(['code','inlineCode','html','link','linkReference','definition'].includes(node.type))return;
-    if(node.type==='image'||node.type==='imageReference'){const reference=node.url||definitions.get(node.identifier);if(reference)images.push({reference,kind:'relative',alt:node.alt||''});return;}
-    if(node.type==='text'&&node.position){const offset=node.position.start.offset,raw=source.slice(offset,node.position.end.offset);for(const match of raw.matchAll(/!\[\[([^\]\r\n]+)\]\]/g)){if(escapedBracket(source,offset+match.index))continue;const ref=wikiReference(match[1],true);if(ref)images.push({reference:match[1],kind:'wiki',alt:ref.label||ref.path.split('/').at(-1)});}}
+    if(node.type==='image'||node.type==='imageReference'){const reference=node.url||definitions.get(node.identifier);if(reference)add({reference,kind:'relative',alt:node.alt||''},node.position.start.offset,node.position.end.offset);return;}
+    if(node.type==='text'&&node.position){const offset=node.position.start.offset,raw=source.slice(offset,node.position.end.offset);for(const match of raw.matchAll(/!\[\[([^\]\r\n]+)\]\]/g)){if(escapedBracket(source,offset+match.index))continue;const ref=wikiReference(match[1],true);if(ref)add({reference:match[1],kind:'wiki',alt:ref.label||ref.path.split('/').at(-1)},offset+match.index,offset+match.index+match[0].length);}}
     for(const child of node.children||[])visit(child);
-  };visit(tree);return [...new Map(images.map(value=>[value.kind+'\0'+value.reference,value])).values()];
+  };visit(tree);return ranges?images:[...new Map(images.map(value=>[value.kind+'\0'+value.reference,value])).values()];
 }
 /** Read-only task presentation; images require an explicit authenticated resolver. */
 export function renderMarkdown(source,{inline=false,links=true,image}={}){

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {deflateSync} from 'node:zlib';
-import {drawioPngInfo,samePngBytes} from '../src/drawio-png.js';
+import {drawioPngInfo,samePngBytes,withDrawioDescription} from '../src/drawio-png.js';
 import {markdownImages} from '../editor/markdown-preview.js';
 
 const original=new Uint8Array(await readFile(new URL('./fixtures/drawio/two-pages.drawio.png',import.meta.url)));
@@ -22,6 +22,14 @@ test('legacy compressed and international text metadata remain opaque and intact
   for(const [type,data] of [['zTXt',Buffer.concat([Buffer.from('mxfile\0\0'),deflateSync(xml)])],['iTXt',Buffer.concat([Buffer.from('mxfile\0\0\0\0\0'),xml])],['iTXt',Buffer.concat([Buffer.from('mxfile\0\x01\0\0\0'),deflateSync(xml)])]]){
     const bytes=withText(type,data),before=bytes.slice();assert.equal(drawioPngInfo(bytes).editable,true);assert.deepEqual(bytes,before);
   }
+});
+test('shared UTF-8 descriptions can be updated or cleared without changing editable PNG data',()=>{
+  const caption='  Økonomi 🤝 北京  ';
+  const withCaption=withDrawioDescription(original,caption);
+  assert.deepEqual(drawioPngInfo(withCaption),{...drawioPngInfo(original),description:caption.trim()});
+  const revised=withDrawioDescription(withCaption,'Updated caption');
+  assert.equal(drawioPngInfo(revised).description,'Updated caption');
+  assert.deepEqual(withDrawioDescription(revised,''),original);
 });
 test('diagram management finds prose image references and excludes escaped or literal examples',()=>{
   const source='![Overview](diagrams/system.drawio.png)\n\n![Reference][png]\n\n[png]: ../Images/second.png\n\n![[Images/wiki.png|200]]\n\n\\![[escaped.png]]\n\n`![inline](code.png)`\n\n```md\n![[fenced.png]]\n```\n\n<div>![html](html.png)</div>\n';

@@ -3,7 +3,7 @@ import {noteIcon} from './note-presentation.js';
 import {DocumentAutosave,bindDocumentAutosave} from './document-autosave.js';
 import {noteRevisionResources} from './note-revisions.js';
 import {vaultEditorResources} from './vault-editor-resources.js';
-import {journalImageResources} from './image-preview.js';
+import {journalAttachmentName,journalImageResources} from './image-preview.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {icon,iconButton} from './icons.js';
@@ -64,7 +64,7 @@ export class TrackDayNotes {
     if(!editor||!this.writable||file.size>5_000_000||image&&!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type))throw new Error('Invalid attachment');
     const imageExtensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp'};
     const extension=image?imageExtensions[file.type]:(file.name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin').toLowerCase();
-    const filename=crypto.randomUUID()+'.'+extension;
+    const filename=journalAttachmentName(file,extension);
     const bytes=new Uint8Array(await file.arrayBuffer());
     if(this.editor!==editor)throw new Error('Editor closed');
     let binary='';for(let offset=0;offset<bytes.length;offset+=8192)binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));

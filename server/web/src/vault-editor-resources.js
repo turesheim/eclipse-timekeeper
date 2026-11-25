@@ -1,5 +1,6 @@
 import {wikiReference,wikiCandidates,wikiCreationPath} from './wiki-links.js';
 import {imagePreview} from './image-preview.js';
+import {drawioPngInfo} from './drawio-png.js';
 import {relativeNotePath} from './notes-links.js';
 import {t} from './i18n.js';
 import {noteTitle} from './note-title.js';
@@ -104,6 +105,27 @@ export function vaultEditorResources(session,origin=()=>'',open,{canCreate=()=>f
   const previewImage=(load,alt)=>{const current=session();if(current)currentSession();const cycle=generation;return imagePreview({alt,active:()=>!!current&&current===session()&&cycle===generation,load:async()=>{const entry=await load();if(current!==session()||cycle!==generation)throw new Error(t('notes.invalid_link'));return {blob:(await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream'})).data,session:current,id:entry.id};},onError:(error,dom)=>{dom.alt=alt+' · '+error.message;dom.title=error.message;}});};
   return {
     assetIdentity:()=>({session:session(),origin:JSON.stringify(origin())}),canReplaceAsset:canCreate,
+    listDiagrams:async({signal}={})=>{
+      const current=currentSession(),source=JSON.stringify(origin());
+      const rows=(await catalog('.png')).filter(entry=>['ASSET','BINARY'].includes(entry.kind)&&!entry.deleted&&/\.png$/i.test(entry.path));
+      const diagrams=[];
+      for(let offset=0;offset<rows.length;offset+=4){
+        signal?.throwIfAborted();
+        if(current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
+        await Promise.all(rows.slice(offset,offset+4).map(async entry=>{
+          try{
+            const {data:blob}=await current.request('/notes/entries/'+entry.id+'/content',{binary:'application/octet-stream',signal});
+            if(blob.size>5_000_000)return;
+            const info=drawioPngInfo(new Uint8Array(await blob.arrayBuffer()));
+            if(info?.editable)diagrams.push({entry,description:info.description});
+          }catch(error){
+            if(error.status!==404)throw error;
+          }
+        }));
+      }
+      if(current!==session()||source!==JSON.stringify(origin()))throw new Error(t('notes.invalid_link'));
+      return diagrams.sort((a,b)=>(a.description||a.entry.path).localeCompare(b.description||b.entry.path));
+    },
     readAsset:async(reference,{signal}={})=>{
       const current=currentSession(),source=JSON.stringify(origin()),active=()=>current===session()&&source===JSON.stringify(origin());
       const entry=reference.kind==='wiki'?await resolveWiki(reference.reference):await (assetResolver||resolveRelative)(reference.reference,current);if(!active()||entry.deleted||!['ASSET','BINARY'].includes(entry.kind))throw new Error(t('notes.invalid_link'));

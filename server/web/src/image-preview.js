@@ -1,4 +1,5 @@
 import {relativeNotePath,rasterType} from './notes-links.js';
+import {drawioPngInfo} from './drawio-png.js';
 
 const previews=new Set(),versions=new WeakMap();let epoch=0;
 /** Update references to the same owned attachment without changing Markdown. */
@@ -9,13 +10,16 @@ export function updateImagePreviews(session,id,blob){
 
 /** Authenticated raster bytes only; never expose credentials in an image URL. */
 export function imagePreview({alt,load,active=()=>true,onError}){
-  const dom=document.createElement('img');dom.alt=alt;dom.loading='lazy';let disposed=false,url,generation=0;
+  const dom=document.createElement('img');dom.alt=alt;dom.loading='lazy';let disposed=false,url,generation=0,onDiagram;
   const preview={identity:null,present:blob=>present(blob,++generation)};previews.add(preview);
   const present=async(blob,cycle)=>{try{
     const type=rasterType(new Uint8Array(await blob.slice(0,12).arrayBuffer()));
     if(!type)throw new Error('Unsupported image');
+    const diagram=onDiagram&&type==='image/png'&&blob.size<=5_000_000
+      ?drawioPngInfo(new Uint8Array(await blob.arrayBuffer())):null;
     if(disposed||!active()||cycle!==generation)return;
-    const previous=url;url=URL.createObjectURL(blob.slice(0,blob.size,type));dom.src=url;dom.alt=alt;dom.removeAttribute('title');if(previous)URL.revokeObjectURL(previous);
+    const previous=url;url=URL.createObjectURL(blob.slice(0,blob.size,type));dom.src=url;dom.alt=diagram?.description||alt;dom.removeAttribute('title');if(previous)URL.revokeObjectURL(previous);
+    onDiagram?.(diagram);
   }catch(error){if(!disposed&&active()&&cycle===generation)onError?.(error,dom);}};
   const read=async()=>{const cycle=++generation,started=epoch;try{
     const loaded=await load();if(disposed||!active()||cycle!==generation)return;
@@ -24,7 +28,11 @@ export function imagePreview({alt,load,active=()=>true,onError}){
     if(preview.identity&&(versions.get(loaded.session)?.get(loaded.id)||0)>started)return read();
     await present(blob,cycle);
   }catch(error){if(!disposed&&active()&&cycle===generation)onError?.(error,dom);}};void read();
-  return {dom,ignoreMutation:()=>true,destroy(){disposed=true;previews.delete(preview);++generation;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
+  return {dom,observeDiagram(callback){onDiagram=callback;},ignoreMutation:()=>true,destroy(){disposed=true;previews.delete(preview);++generation;if(url)URL.revokeObjectURL(url);dom.removeAttribute('src');}};
+}
+export function journalAttachmentName(file,extension){
+  const suffix=extension==='png'&&/\.drawio\.png$/i.test(file.name)?'drawio.png':extension;
+  return crypto.randomUUID()+'.'+suffix;
 }
 export const journalAssetPath=reference=>typeof reference==='string'&&reference.startsWith('assets/')&&!!relativeNotePath('note.md',reference)?.startsWith('assets/');
 export function journalImageResources(session){
