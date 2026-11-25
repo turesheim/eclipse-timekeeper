@@ -5,6 +5,7 @@ public final class ApiFailure extends RuntimeException {
     public final int status;
     public final String code;
     public boolean invalidToken;
+    RevisionDiagnostics.CursorConflict cursorConflict;
     public ApiFailure(int status, String code) { this(status,code,null); }
     public ApiFailure(int status, String code, Throwable cause) { super(code,cause); this.status = status; this.code = code; }
     public static ApiFailure unauthorized(boolean invalid) { var failure=new ApiFailure(401,"UNAUTHENTICATED");failure.invalidToken=invalid;return failure; }

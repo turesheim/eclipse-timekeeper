@@ -23,6 +23,24 @@ async function openNote(page){
   await navigateView(page,'notes');const navigation=page.locator('#notes-navigation');await navigation.getByRole('button',{name:'Refresh',exact:true}).click();await expect(navigation.locator('[role=tree]')).toHaveAttribute('aria-busy','false');await noteEntry(navigation,'Notes').click();await noteEntry(navigation,'Notes/Draft.md').click();await expect(page.locator('#notes-formatted .ProseMirror')).toBeVisible();await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
 }
 
+test('expired workspace cursors leave a useful status and recover on the next refresh',async({page,request})=>{
+  await setup(page,request);
+  const requestId=randomUUID(),pattern='**/api/v1/tasks?*';
+  await page.route(pattern,route=>route.fulfill({
+    status:409,
+    json:{code:'CURSOR_EXPIRED'},
+    headers:{'X-Timekeeper-Request-Id':requestId}
+  }));
+  const diagnostic=page.waitForEvent('console',{predicate:message=>message.text().includes('Dagsverk workspace synchronization exhausted its retries')});
+  await page.locator('#refresh').click();
+  await diagnostic;
+  await expect(page.locator('#status')).toHaveText('Records are changing too quickly to load a consistent view. Try Refresh.');
+  await expect(page.locator('#workspace')).toBeVisible();
+  await page.unroute(pattern);
+  await page.locator('#refresh').click();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+});
+
 test('background synchronization preserves typing and defers inactive work views until they are opened',async({page,request})=>{
   const {api}=await setup(page,request);await api('POST','/clients',{name:'Seed client',color:'#305070'});await navigateView(page,'clients');await expect(page.locator('#clients')).toContainText('Seed client');await navigateView(page,'track');await expect(page.locator('#track-calendar')).not.toBeEmpty();await openNote(page);
   await page.evaluate(()=>{

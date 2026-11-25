@@ -21,6 +21,7 @@ public class RequestTimings implements ContainerRequestFilter, ContainerResponse
     private static final Logger LOG=Logger.getLogger(RequestTimings.class);
     @Inject jakarta.inject.Provider<io.vertx.core.Vertx> vertx;
     @Context ResourceInfo resource;
+    @Context io.vertx.ext.web.RoutingContext routing;
     @ConfigProperty(name="timekeeper.diagnostics.slow-request-ms",defaultValue="1000") long slowMillis;
     private record Timing(String id,String method,String route,long start,long allowance,long timer,AtomicBoolean finished) {}
     @Override public void filter(ContainerRequestContext request) {
@@ -35,6 +36,7 @@ public class RequestTimings implements ContainerRequestFilter, ContainerResponse
             if(!finished.get())LOG.warnf("API request still running request_id=%s method=%s route=%s elapsed_ms=%d",id,method,template,(System.nanoTime()-start)/1_000_000);
         });
         request.setProperty(PROPERTY,new Timing(id,method,route,start,allowance,timer,finished));
+        if(routing!=null)routing.put(PROPERTY,id);
     }
     @Override public void filter(ContainerRequestContext request,ContainerResponseContext response) {
         if(!(request.getProperty(PROPERTY) instanceof Timing timing))return;
@@ -49,8 +51,18 @@ public class RequestTimings implements ContainerRequestFilter, ContainerResponse
             return;
         }
         long elapsed=(System.nanoTime()-timing.start())/1_000_000;
+        String code=problemCode(response);
         if(status>=500 || elapsed>=timing.allowance()+Math.max(0,slowMillis))
-            LOG.warnf("API request completed request_id=%s method=%s route=%s status=%d elapsed_ms=%d",timing.id(),timing.method(),timing.route(),status,elapsed);
+            LOG.warnf("API request completed request_id=%s method=%s route=%s status=%d elapsed_ms=%d code=%s",timing.id(),timing.method(),timing.route(),status,elapsed,code);
+        else if(status==401 && !timing.route().equals("/api/v1/auth/session"))
+            LOG.infof("API request unauthorized request_id=%s method=%s route=%s status=%d code=%s",timing.id(),timing.method(),timing.route(),status,code);
+    }
+    private static String problemCode(ContainerResponseContext response) {
+        if(response.getEntity() instanceof com.fasterxml.jackson.databind.JsonNode problem && response.getStatus()>=400) {
+            String code=problem.path("code").asText("");
+            if(code.matches("[A-Z][A-Z0-9_]{0,79}"))return code;
+        }
+        return "none";
     }
     static String route(ResourceInfo resource) {
         if(resource.getResourceClass()==null || resource.getResourceMethod()==null)return "";

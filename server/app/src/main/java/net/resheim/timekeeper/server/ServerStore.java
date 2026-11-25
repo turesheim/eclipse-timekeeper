@@ -73,7 +73,7 @@ public class ServerStore {
     private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
     private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
     private final ThreadLocal<Boolean> noteTaskSync = new ThreadLocal<>();
-    record Context(String owner, Connection connection, Instant now, boolean readOnly) { }
+    record Context(String owner, Connection connection, Instant now, boolean readOnly, RevisionDiagnostics.Write diagnostics) { }
     Connection currentConnection(){var current=context.get();return current==null?null:current.connection();}
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
@@ -188,11 +188,16 @@ public class ServerStore {
                     byte[] secret=new byte[32];new java.security.SecureRandom().nextBytes(secret);insert.setString(2,java.util.HexFormat.of().formatHex(secret));
                     try { created=insert.executeUpdate()!=0; } catch (SQLException e) { if (!"23505".equals(e.getSQLState())) throw e; }
                 }
-                try (var lock = connection.prepareStatement("SELECT revision FROM tk_owner WHERE id=? FOR UPDATE")) {
-                    lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
+                RevisionDiagnostics.Write diagnostics;
+                try (var lock = connection.prepareStatement("SELECT revision,cursor_secret FROM tk_owner WHERE id=? FOR UPDATE")) {
+                    lock.setString(1,owner);
+                    try (var rows = lock.executeQuery()) {
+                        if (!rows.next()) throw new SQLException("Missing owner");
+                        diagnostics = new RevisionDiagnostics.Write(rows.getLong(1),rows.getString(2));
+                    }
                 }
                 locked=System.nanoTime();phase="work";
-                context.set(new Context(owner,connection,clock.now(),false));
+                context.set(new Context(owner,connection,clock.now(),false,diagnostics));
                 changedTasks.set(new HashMap<>());
                 AccountStore.ensureAccount(connection,owner);
                 try(var initialized=statement("SELECT initialized FROM tk_account WHERE owner_id=?",owner);var rows=initialized.executeQuery()) {
@@ -207,7 +212,10 @@ public class ServerStore {
                     else providerObservation(()->{TaskProviderIntents.changed(this,task.getKey());return null;});
                 }
                 worked=System.nanoTime();phase="commit";
-                connection.commit();outcome="committed";partitionDates.put(owner,date);return result;
+                long finalRevision=diagnostics.changed&&RevisionDiagnostics.recordsWrites()?revision():diagnostics.before;
+                connection.commit();outcome="committed";partitionDates.put(owner,date);
+                diagnostics.committed(finalRevision);
+                return result;
             } catch (Throwable e) {
                 if(e instanceof ApiFailure failure && failure.status>=500)outcome="server-error";
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
@@ -229,7 +237,7 @@ public class ServerStore {
         if(context.get()!=null)throw new IllegalStateException("Read snapshots must not nest inside owner transactions");
         try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)){
             connection.setReadOnly(true);connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setAutoCommit(false);
-            context.set(new Context(owner,connection,clock.now(),true));
+            context.set(new Context(owner,connection,clock.now(),true,null));
             try{
                 try(var query=statement("SELECT id FROM tk_owner WHERE id=?",owner);var rows=query.executeQuery()){if(!rows.next())throw ApiFailure.notFound();}
                 return work.get();
@@ -260,7 +268,7 @@ public class ServerStore {
                 if(initialized) {
                     connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setReadOnly(true);
                     T result=null;boolean prepared;
-                    context.set(new Context(identity.owner(),connection,clock.now(),true));
+                    context.set(new Context(identity.owner(),connection,clock.now(),true,null));
                     try{prepared=ready.getAsBoolean();if(prepared)result=asPrincipal(identity,work);}finally{context.remove();}
                     connection.commit();connection.setReadOnly(false);connection.setTransactionIsolation(isolation);
                     // A revoked credential or disabled account must not receive the result.
@@ -719,6 +727,7 @@ public class ServerStore {
         if (sequence>9007199254740991L) throw new IllegalStateException("Sequence exhausted");
         update("UPDATE tk_owner SET revision=? WHERE id=?",sequence,owner());
         update("INSERT INTO tk_change(owner_id,sequence,entity_type,entity_id,change_type,occurred_at) VALUES(?,?,?,?,?,?)",owner(),sequence,type,id,change,timestamp(now()));
+        context.get().diagnostics().changed=true;
         if(type.equals("TASK"))changedTasks.get().merge(id,!observingProvider(),Boolean::logicalOr);
     }
     private boolean postgres() { return DatabaseConfiguration.postgres(jdbcUrl); }
