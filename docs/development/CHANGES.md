@@ -32,6 +32,7 @@ database baseline.
   search, sync status and the account menu in a bottom bar (#713).
 - Showed events by day and tasks by deadline while editing a weekly note in
   Today, with the daily work-session list hidden (#738).
+- Matched Today’s spacing below the active tracking card to Calendar (#744).
 - Kept phone journal formatting applied to the selected text when opening Note tools.
 - Added activity-based tracking with editable start and end times, improved
   refresh behavior and high-resolution display assets.
