@@ -14,7 +14,20 @@ with synthetic data and its JSON console enabled.
 | Bounded Docker rotation | Docker reported `json-file` with `max-size=10m` and `max-file=3` on the Dagsverk fixture. |
 | Collector outage | Dagsverk readiness and its authentication status endpoint both returned HTTP 200 after Alloy and Loki stopped. |
 
-Representative log volume, retention expiry, DSM Log Center forwarding and
+## Retention expiry
+
+A separate Docker fixture ran the pinned Loki 3.7.10 image with the
+repository's TSDB and filesystem configuration. It used a 24-hour retention
+window, a five-second compaction interval and a one-second deletion delay.
+The fixture allowed queries of older entries still held by the ingester and
+flushed both entries before restarting Loki to recover the TSDB index.
+
+A current entry and a 72-hour-old entry were both queryable after the flush.
+After the restart, the old entry returned zero results and its chunk file
+was gone. The recent entry returned one result and its chunk file remained.
+The retention sweeper reported processing two marker files.
+
+Representative log volume, retention expiry on the NAS, DSM Log Center forwarding and
 the Container Manager installation, restart and access controls still need
 verification on a supported Synology NAS. See the [target NAS checks in the
 operator guide](../../extras/centralised-synology-logging/README.md#search-and-verify).
