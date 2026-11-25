@@ -13,6 +13,7 @@ import net.resheim.eclipse.timekeeper.domain.TimekeeperException;
 public class ProblemMapper implements ExceptionMapper<Exception> {
     private static final org.jboss.logging.Logger LOG=org.jboss.logging.Logger.getLogger(ProblemMapper.class);
     @Context UriInfo uri;
+    @Context io.vertx.ext.web.RoutingContext routing;
     @Override public Response toResponse(Exception error) {
         int status=503; String code="UNAVAILABLE";
         if (error instanceof ApiFailure failure) { status=failure.status; code=failure.code; }
@@ -26,7 +27,10 @@ public class ProblemMapper implements ExceptionMapper<Exception> {
             status=web.getResponse().getStatus();
             code=switch(status) { case 400->"BAD_REQUEST"; case 404->"NOT_FOUND"; case 413->"PAYLOAD_TOO_LARGE"; case 415->"UNSUPPORTED_MEDIA_TYPE"; default->"UNAVAILABLE"; };
         } else if (error instanceof com.fasterxml.jackson.core.JsonProcessingException) { status=400; code="BAD_REQUEST"; }
-        if(status>=500)LOG.errorf("API failure %s",diagnostic(code,error));
+        String requestId=routing==null?null:routing.get(RequestTimings.PROPERTY);
+        if(requestId==null)requestId="none";
+        if(error instanceof ApiFailure failure && failure.cursorConflict!=null)failure.cursorConflict.log(requestId);
+        if(status>=500)LOG.errorf("API failure %s request_id=%s",diagnostic(code,error),requestId);
         var problem=JsonValues.object(); problem.put("type","urn:timekeeper:problem:"+code.toLowerCase(Locale.ROOT).replace('_','-'));
         problem.put("title",code.replace('_',' ')); problem.put("status",status); problem.put("code",code);
         var response=Response.status(status).type("application/problem+json").entity(problem).header("Cache-Control","no-store");

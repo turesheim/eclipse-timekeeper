@@ -156,6 +156,27 @@ function snapshotReply(url,reportRevision=1){
   if(path.endsWith('/report'))return reply({revision:1,session:{id:'session-a'}});
   return reply({items:path==='/api/v1/work-sessions'?[{id:'session-a',start:'2026-05-04T08:00:00Z'}]:[],revision:1,nextCursor:null});
 }
+test('exhausted cursor retries log only safe codes and request IDs',async t=>{
+  const warning=t.mock.method(console,'warn',()=>{});
+  const id='aaaaaaaa-bbbb-4ccc-8ddd-000000000001';
+  let failures=0;
+  const api=new Api('token',async url=>{
+    if(url.startsWith('/api/v1/tasks?')){
+      failures++;
+      const response=reply({code:'CURSOR_EXPIRED',detail:'private diagnostic input'},undefined,409);
+      response.headers.set('X-Timekeeper-Request-Id',failures===2?'invalid-private-header':id);
+      return response;
+    }
+    return snapshotReply(url);
+  });
+  await assert.rejects(api.snapshot(snapshotDates),error=>error.code==='CURSOR_EXPIRED'&&error.message.includes('changing too quickly'));
+  assert.equal(failures,3);
+  assert.deepEqual(warning.mock.calls.map(call=>call.arguments),[
+    ['Dagsverk workspace synchronization exhausted its retries',{conflicts:[
+      {code:'CURSOR_EXPIRED',requestId:id},{code:'CURSOR_EXPIRED'},{code:'CURSOR_EXPIRED',requestId:id}
+    ]}]
+  ]);
+});
 test('snapshot reads overlap after owner binding and still confirm revisions and the selected session',async()=>{
   let release;const gate=new Promise(resolve=>{release=resolve;}),paths=new Set();let ready=false;
   const api=new Api('token',async(url,options)=>{

@@ -1,4 +1,7 @@
 {
+  "guide.title": "User guide",
+  "guide.loading": "Loading the user guide…",
+  "guide.failed": "The user guide could not be loaded. Reopen it to try again.",
   "locale.language": "Language and region",
   "locale.browser": "Use browser language",
   "locale.save": "Save language",

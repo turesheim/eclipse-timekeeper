@@ -144,6 +144,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .workspace-nav .nav-link { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: var(--control-target-size); min-width: 0; padding: .5rem .25rem; border-radius: var(--bs-border-radius); font-weight: 600; transition: none; }
 .workspace-nav .nav-link:not(.active):hover { background: #e4ede7; }
 .workspace-nav .nav-link[aria-current] { background: var(--accent); color: #fff; }
+#workspace:not([data-navigation=side]) #desktop-guide-open { display: none; }
 .workspace-nav { padding-inline-end: max(env(safe-area-inset-right, 0px), .25rem); }
 @media(max-width: 1023px) { .workspace-nav .nav-label { display: none; } }
 

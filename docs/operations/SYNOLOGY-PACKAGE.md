@@ -148,8 +148,26 @@ and commit time. Database errors also report a SQL-state code, without the
 underlying statement or exception message. These diagnostics exclude
 credentials, query strings, record IDs, account IDs, SQL and request contents.
 The `X-Timekeeper-Request-Id` response header links a browser Network entry to its
-server log line. Server timings measure REST handling; network latency and proxy
-or HTTP-worker queuing before REST handling can add further time.
+server log line. Fast expired cursors log `code=CURSOR_EXPIRED`, even when
+earlier pages returned HTTP 200. On retry exhaustion the browser console lists
+the conflict codes and available request IDs.
+
+Match `Pagination cursor expired` with `Account revision committed` by their
+`stream` value. This server-side reference is derived from the cursor key. It
+identifies the same revision stream across replicas and restarts with the
+same key. Find committed revision ranges that overlap the interval between
+`cursor_revision` and `current_revision`. The commit's `source` identifies the
+server entry point, such as an API resource, task-provider refresh, or day
+boundary maintenance. High-frequency commits from one source indicate which
+integration or background job to investigate before retrying the workspace.
+A 401 on a protected route is logged separately from workspace conflicts.
+Revision diagnostics log one row per revision-changing transaction at INFO;
+rolled-back writes do not produce committed ranges. For very busy installations,
+set the log level of the `net.resheim.timekeeper.server.RevisionDiagnostics`
+category to WARN to retain cursor conflicts and suppress the commit rows.
+
+Server timings measure REST handling. Network latency and proxy or HTTP-worker
+queuing before REST handling can add further time.
 
 The defaults are controlled by `timekeeper.diagnostics.slow-request-ms` and
 `timekeeper.diagnostics.slow-transaction-ms` (both `1000`). Setting a threshold to

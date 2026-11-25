@@ -16,29 +16,35 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class Pages {
     @Inject ServerStore store;
-    private byte[] signature(String payload) {
-        try { Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(store.cursorSecret(),"HmacSHA256"));return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)); }
+    private byte[] signature(String payload,byte[] key) {
+        try { Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)); }
         catch(Exception e) { throw new IllegalStateException(e); }
     }
     private String encode(JsonNode cursor) {
         String payload=JsonValues.canonical(cursor).toString(); var encoder=Base64.getUrlEncoder().withoutPadding();
-        return encoder.encodeToString(payload.getBytes(StandardCharsets.UTF_8))+"."+encoder.encodeToString(signature(payload));
+        return encoder.encodeToString(payload.getBytes(StandardCharsets.UTF_8))+"."+encoder.encodeToString(signature(payload,store.cursorSecret()));
     }
-    private JsonNode decode(String cursor) {
+    private JsonNode decode(String cursor,byte[] key) {
         try {
             if(cursor.length()>4096) throw ApiFailure.badRequest();String[] parts=cursor.split("\\.",-1);
             if(parts.length!=2) throw ApiFailure.badRequest(); var decoder=Base64.getUrlDecoder();
             String payload=new String(decoder.decode(parts[0]),StandardCharsets.UTF_8);
-            if(!MessageDigest.isEqual(signature(payload),decoder.decode(parts[1]))) throw ApiFailure.badRequest();
+            if(!MessageDigest.isEqual(signature(payload,key),decoder.decode(parts[1]))) throw ApiFailure.badRequest();
             return JsonValues.MAPPER.readTree(payload);
         } catch(Exception e) { throw ApiFailure.badRequest(); }
     }
     public ObjectNode page(String type,List<JsonNode> values,JsonNode filters,int limit,String cursor) {
         long revision=store.revision();int offset=0;
         if(cursor!=null) {
-            JsonNode previous=decode(cursor);
+            byte[] key=store.cursorSecret();
+            JsonNode previous=decode(cursor,key);
             if(!previous.path("owner").asText().equals(store.owner()) || !previous.path("type").asText().equals(type) || !previous.path("filters").equals(filters)) throw ApiFailure.badRequest();
-            if(previous.path("revision").asLong(-1)!=revision) throw new ApiFailure(409,"CURSOR_EXPIRED");
+            long cursorRevision=previous.path("revision").asLong(-1);
+            if(cursorRevision!=revision) {
+                var failure=new ApiFailure(409,"CURSOR_EXPIRED");
+                failure.cursorConflict=RevisionDiagnostics.cursorConflict(key,type,cursorRevision,revision);
+                throw failure;
+            }
             String id=previous.path("lastId").asText();
             int index=-1;for(int i=0;i<values.size();i++) if(values.get(i).get("id").asText().equals(id)) { index=i;break; }
             if(index<0) throw ApiFailure.badRequest();offset=index+1;

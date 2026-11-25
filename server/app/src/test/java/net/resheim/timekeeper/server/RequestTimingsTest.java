@@ -66,6 +66,45 @@ class RequestTimingsTest {
             } finally {release.countDown();blocker.get(5,java.util.concurrent.TimeUnit.SECONDS);}
         } finally {requestLog.removeHandler(capture);databaseLog.removeHandler(capture);}
     }
+    @Test void expiredCursorCorrelatesWithTheCommittedWriter() {
+        var messages=new CopyOnWriteArrayList<String>();
+        var capture=new Handler(){
+            public void publish(LogRecord record){messages.add(record instanceof org.jboss.logmanager.ExtLogRecord value?value.getFormattedMessage():record.getMessage());}
+            public void flush(){}public void close(){}
+        };
+        Logger diagnostics=Logger.getLogger(RevisionDiagnostics.class.getName());
+        diagnostics.addHandler(capture);
+        try {
+            var first=given().header("Authorization","Bearer test-a").queryParam("limit",1).get("/api/v1/labels");
+            first.then().statusCode(200);
+            String cursor=first.jsonPath().getString("nextCursor");
+            assertNotNull(cursor);
+            long revision=first.jsonPath().getLong("revision");
+            assertThrows(IllegalStateException.class,()->store.transaction("a",()->{
+                store.change("LABEL","UPDATED","private-rolled-back-entity");
+                throw new IllegalStateException();
+            }));
+            assertTrue(messages.isEmpty());
+            var created=given().header("Authorization","Bearer test-a").contentType("application/json")
+                    .body("{\"name\":\"Private diagnostic label\",\"color\":\"#19ABCD\"}").post("/api/v1/labels");
+            created.then().statusCode(201);
+            var conflict=given().header("Authorization","Bearer test-a").queryParam("limit",1)
+                    .queryParam("cursor",cursor).get("/api/v1/labels");
+            conflict.then().statusCode(409);
+            assertEquals("CURSOR_EXPIRED",conflict.jsonPath().getString("code"));
+            String request=conflict.header(RequestTimings.HEADER);
+            var write=messages.stream().filter(message->message.startsWith("Account revision committed")).findFirst().orElseThrow();
+            var expired=messages.stream().filter(message->message.startsWith("Pagination cursor expired")).findFirst().orElseThrow();
+            String stream=write.split("stream=")[1].split(" ")[0];
+            assertTrue(stream.matches("[a-f0-9]{24}"));
+            assertTrue(write.contains("previous_revision="+revision+" current_revision="+(revision+1)));
+            assertTrue(write.contains("TimekeeperResource"));
+            assertTrue(expired.contains("request_id="+request+" code=CURSOR_EXPIRED stream="+stream+" collection=LABEL"));
+            assertTrue(expired.contains("cursor_revision="+revision+" current_revision="+(revision+1)));
+            assertFalse(messages.stream().anyMatch(message->message.contains(cursor)||message.contains("Private diagnostic label")
+                    ||message.contains(created.jsonPath().getString("id"))));
+        } finally {diagnostics.removeHandler(capture);}
+    }
     private static io.restassured.response.Response writeProfile(String etag) {
         return given().header("Authorization","Bearer test-a").header("If-Match",etag)
                 .contentType("application/json").body("{\"zoneId\":\"UTC\"}").put("/api/v1/me");

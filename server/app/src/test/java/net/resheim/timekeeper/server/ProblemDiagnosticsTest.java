@@ -36,7 +36,11 @@ class ProblemDiagnosticsTest {
             var response=given().header("Authorization","Bearer test-a").get("/api/v1/me");
             assertEquals(503,response.statusCode());assertEquals("UNAVAILABLE",response.jsonPath().getString("code"));assertFalse(response.asString().contains(secret));
             assertTrue(messages.stream().anyMatch(message->message.contains("Token registry load failed code=TOKEN_REGISTRY_UNAVAILABLE")&&message.contains("category=JsonParseException")));
-            assertTrue(messages.stream().anyMatch(message->message.contains("API failure code=UNAVAILABLE")&&message.contains("source=net.resheim.timekeeper.server.TokenRegistry.authenticate")));
+            String requestId=response.header(RequestTimings.HEADER);
+            assertNotNull(requestId);
+            assertTrue(messages.stream().anyMatch(message->message.contains("API failure code=UNAVAILABLE")
+                    &&message.contains("source=net.resheim.timekeeper.server.TokenRegistry.authenticate")
+                    &&message.contains("request_id="+requestId)));
             assertTrue(messages.stream().anyMatch(message->message.contains("stack=")&&message.contains("TokenRegistry.authenticate:")));
             assertTrue(levels.contains(org.jboss.logmanager.Level.ERROR));
             assertFalse(messages.stream().anyMatch(message->message.contains(secret)||message.contains(file.toString())||message.contains("Bearer")));assertTrue(thrown.isEmpty());

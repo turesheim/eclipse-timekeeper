@@ -1,6 +1,7 @@
-# Operations and user guides
+# Server administration guides
 
 Choose the deployment guide first, then the account or feature guide you need.
+For browser and Eclipse workflows, see the [end-user documentation](../user/README.md).
 
 | Area | Guides |
 | --- | --- |

@@ -113,6 +113,7 @@ const messages = {
   NOT_FOUND: "ui.this_record_no_longer_exists_your_draft_is_kept",
   UNAVAILABLE: "ui.the_server_could_not_be_reached_reconnecting",
   BUSY: "ui.records_are_changing_too_quickly_to_load_a_consistent_view_try_refresh",
+  CURSOR_EXPIRED: "ui.records_are_changing_too_quickly_to_load_a_consistent_view_try_refresh",
   IMPORT_SOURCE_CHANGED: "ui.an_entry_with_this_source_id_changed_exclude_it_or_resolve_the_source_change_before_c",
   IMPORT_DUPLICATE_REVIEW_REQUIRED: "ui.review_matching_entries_and_choose_whether_to_reuse_them_or_create_distinct_activitie",
   IMPORT_UNDO_REVIEW_REQUIRED: "ui.review_the_edited_or_referenced_records_before_continuing_undo",
@@ -165,7 +166,12 @@ export class Api {
       const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, ...(keepalive?{keepalive:true}:{}), redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
       if (binary && response.ok && (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase()!==binaryType) throw new ApiError('UNAVAILABLE');
       const data = response.status === 204 || emptyResponse && response.ok ? null : binary && response.ok ? await response.blob() : await response.json();
-      if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
+      if (!response.ok) {
+        const error=new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
+        const requestId=response.headers.get('X-Timekeeper-Request-Id');
+        if(requestId&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(requestId))error.requestId=requestId;
+        throw error;
+      }
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
       const owner = decodeOwner(response.headers.get('X-Timekeeper-Owner'));
       if (this.#owner !== null && owner !== this.#owner) throw new ApiError('OWNER_CHANGED', 401);
@@ -227,7 +233,7 @@ export class Api {
     return {...snapshot,report:activity.data,workSessionReport:workSession?.data??null};
   }
   async snapshot(range, selectedSession = null, {timeout = 30000, signal} = {}) {
-    const started=performance.now();let attempts=0;
+    const started=performance.now(),conflicts=[];let attempts=0;
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
         const remaining=timeout-(performance.now()-started);if(remaining<=0||signal?.aborted)throw new ApiError('UNAVAILABLE');
@@ -250,7 +256,14 @@ export class Api {
           const workSessionReport=sessionReport?.data??null;
           if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version || focusAreas.data.version !== confirmedFocus.data.version) throw new ApiError('BUSY');
           return { profile, focusAreas, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
-        } catch (error) {if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error;}
+        } catch (error) {
+          if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code)) throw error;
+          conflicts.push({code:error.code,...(error.requestId?{requestId:error.requestId}:{})});
+          if(attempt===2){
+            console.warn('Dagsverk workspace synchronization exhausted its retries',{conflicts});
+            throw error;
+          }
+        }
         finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);controller.abort();}
       }
     } finally {
