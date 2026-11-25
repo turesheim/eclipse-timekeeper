@@ -53,6 +53,10 @@ export class DrawioEditor {
     let message;
     try { message = JSON.parse(event.data); }
     catch { return; }
+    if (message?.event === 'autosave' && typeof message.xml === 'string') {
+      this.changed = true;
+      return;
+    }
     const pending = this.pending;
     if (!pending || message?.event !== pending.event) return;
     if (pending.request && message.message?.request !== pending.request) return;
@@ -85,7 +89,7 @@ export class DrawioEditor {
       noSaveBtn: '1', noExitBtn: '1', saveAndExit: '0',
     });
     await this.waitFor('init', () => { this.frame.src = url.href; });
-    await this.waitFor('load', () => this.send({action: 'load', xml}));
+    await this.waitFor('load', () => this.send({action: 'load', xml, autosave: 1}));
   }
 
   async exportPng() {

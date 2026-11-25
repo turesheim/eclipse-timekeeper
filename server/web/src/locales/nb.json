@@ -1997,6 +1997,8 @@
   "clients.retire_help": "Behold eksisterende data og skjul kunden når du velger kunde for nye oppføringer. Bruk Vis avsluttede kunder for å aktivere kunden igjen.",
   "drawio.new": "Nytt diagram",
   "drawio.edit": "Rediger diagram",
+  "drawio.fill_window": "Fyll vinduet",
+  "drawio.restore_size": "Gjenopprett dialogstørrelsen",
   "drawio.editor": "Draw.io-redigering",
   "drawio.name": "Filnavn",
   "drawio.invalid_name": "Skriv inn et filnavn uten mappesti.",

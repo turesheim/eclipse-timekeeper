@@ -289,6 +289,48 @@ test.describe('self-hosted draw.io editor',()=>{
     await choose(box);
   });
 
+  test('resizes the same drawing and only prompts for changes when canceling',async({page,request})=>{
+    const {api,put}=await fresh(page,request);
+    const asset=await put('system.drawio.png',original);
+    await put('Diagram.md','![System overview](system.drawio.png)\n');
+    await page.setViewportSize({width:1500,height:1000});
+    const root=await open(page,'Diagram.md');
+    let box=await manage(page,root),frame=await edit(box);
+    await frame.getByText('Details',{exact:true}).click();
+    await expect(frame.getByText('Stage B',{exact:true})).toBeVisible();
+    const sameFrame=await box.locator('iframe').elementHandle();
+    const initial=await box.boundingBox();
+    await box.getByRole('button',{name:'Fill window',exact:true}).click();
+    expect((await box.boundingBox()).width).toBe(1500);
+    await box.getByRole('button',{name:'Restore dialog size',exact:true}).click();
+    expect((await box.boundingBox()).width).toBe(initial.width);
+    expect(await sameFrame.evaluate(element=>element.isConnected)).toBe(true);
+    await expect(frame.getByText('Stage B',{exact:true})).toBeVisible();
+
+    const prompts=[];
+    page.on('dialog',async prompt=>{prompts.push(prompt.message());await prompt.dismiss();});
+    await box.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(box).toBeHidden();
+    expect(prompts).toEqual([]);
+    await clickNoteAction(page,root,'Insert draw.io diagram');
+    box=dialog(page);
+    await expect(box.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
+    await box.getByRole('button',{name:'Cancel',exact:true}).press('Escape');
+    await expect(box).toBeHidden();
+    expect(prompts).toEqual([]);
+
+    box=await manage(page,root);frame=await edit(box);
+    await box.getByLabel('Diagram description').fill('Draft caption');
+    await box.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(box.getByLabel('Diagram description')).toHaveValue('Draft caption');
+    expect(prompts).toHaveLength(1);
+    page.removeAllListeners('dialog');
+    page.once('dialog',prompt=>prompt.accept());
+    await box.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(box.locator('iframe')).toHaveCount(0);
+    expect(await bytes(api,asset.id)).toEqual(original);
+  });
+
   test('creates a portable editable PNG and inserts it at the captured source cursor',async({page,request})=>{
     const {api,put}=await fresh(page,request);
     const note=await put('Blank.md','Before\n\nAfter\n');

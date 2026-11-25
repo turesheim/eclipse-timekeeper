@@ -1997,6 +1997,8 @@
   "clients.retire_help": "Keep existing records and hide this client from new assignment choices. Use Show retired clients to restore it.",
   "drawio.new": "New diagram",
   "drawio.edit": "Edit diagram",
+  "drawio.fill_window": "Fill window",
+  "drawio.restore_size": "Restore dialog size",
   "drawio.editor": "Draw.io editor",
   "drawio.name": "Filename",
   "drawio.invalid_name": "Enter a filename without a folder path.",
