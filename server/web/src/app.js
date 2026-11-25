@@ -33,10 +33,12 @@ import {focusedSnapshot,focusedCurrentSession,focusIncludesActivity} from './foc
 import {renderFocusSettings} from './focus-settings.js';
 import {dailyNoteDate,dailyNoteHref,dailyNoteDateFromSearch,dayNoteNavigation} from './journal-links.js';
 import {openAbout} from './about.js';
+import {desktopGuide} from './desktop-guide.js';
 import {renderMarkdown} from './assets/milkdown/markdown-preview.js';
 
 const $ = (id) => document.getElementById(id);
 accountMenu($('account-menu'));
+const closeDesktopGuide = desktopGuide($('desktop-guide-open'), $('desktop-guide'));
 $('about-open').addEventListener('click', () => openAbout($('server-info'),snapshot?.profile.data.holidayCountry));
 $('about-close').addEventListener('click', () => $('server-info').close());
 $('server-info').addEventListener('close', () => {if (!$('session').hidden) $('account-menu').querySelector('summary').focus();});
@@ -296,7 +298,7 @@ const auth = authentication({
     refreshController?.abort();refreshController = null;refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;updateNoteClientDirectory(null);configureSnippets(null);focusId = '';$('focus-select').replaceChildren();delete $('focus-select').dataset.choices;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    ++calendarNavigation;calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();showRetiredClients.checked=false;canWrite = false;
+    ++calendarNavigation;closeDesktopGuide();calendar.reset();track.reset();today.reset();notes.reset();recentNotes.reset();noteSearch.reset();notePopup.reset();calendarSearchPopup.reset();calendarSearchWorkspace.reset();tasks.reset();collapsed.clear();expandedClients.clear();legacyRenderKeys.clear();showRetiredClients.checked=false;canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
