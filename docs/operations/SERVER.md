@@ -105,7 +105,7 @@ That host must allow the Dagsverk origin in its `frame-ancestors` response heade
 See the [draw.io self-hosting guide](https://github.com/jgraph/drawio/wiki/Self-Hosting).
 
 Omit the setting to use manual PNG import, download, and replacement. See
-[editing diagrams in Dagsverk](MARKDOWN-EDITOR.md#drawio-diagrams).
+[editing diagrams in Dagsverk](../user/MARKDOWN-EDITOR.md#drawio-diagrams).
 
 ## Data and operational behavior
 

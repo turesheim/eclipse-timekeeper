@@ -80,10 +80,10 @@ def package(output, tag, commit):
               'docs/operations/SHARED-SIGN-IN.md': 'SHARED-SIGN-IN.md',
               'docs/operations/CONNECT-SERVICE.md': 'CONNECT-SERVICE.md',
               'docs/operations/CONFIGURATION.md': 'CONFIGURATION.md',
-              'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
+              'docs/user/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
               'docs/operations/INSTANCE-BACKUP.md': 'INSTANCE-BACKUP.md',
           'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
-              'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
+              'docs/user/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/operations/NOTES-WEBDAV.md': 'NOTES-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
               'docs/operations/WEB-CLIENT.md': 'WEB-CLIENT.md'}
