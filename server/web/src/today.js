@@ -330,14 +330,14 @@ export class TodayView {
     root.replaceChildren();
     if(failures.length){const warning=node('div',undefined,'alert alert-warning');warning.setAttribute('role','status');warning.append(...failures.map(value=>calendarSourceFailure(value,t('calendar.error.'+value.lastError))));root.append(warning);}
     else if(this.eventWarning)root.append(node('p',t('calendar.refresh_errors'),'alert alert-warning'));
-    const ordered=visible.filter(value=>!value.undated)
+    const ordered=visible.filter(value=>!week||!value.undated)
       .sort((a,b)=>Number(b.allDay)-Number(a.allDay)||(a.start||'').localeCompare(b.start||''));
     let hasEvents=false;
     const days=monthCalendar(first.slice(0,7),zone).days.filter(day=>day.date>=first&&day.date<end);
     for(const day of days){
       const events=ordered.filter(value=>value.allDay?value.firstDate<=day.date&&day.date<value.endDate:
         day.from<day.to&&instantNanos(value.start)<day.to&&
-        (value.start===value.end?instantNanos(value.end)>=day.from:instantNanos(value.end)>day.from));
+        (!week||value.start===value.end?instantNanos(value.end)>=day.from:instantNanos(value.end)>day.from));
       if(!events.length)continue;
       hasEvents=true;
       const list=node('ul',undefined,'today-list');
