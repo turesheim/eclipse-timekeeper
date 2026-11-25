@@ -26,6 +26,35 @@ async function taskAction(root,paragraph,label='Edit task details'){
 async function edit(root,paragraph){await(await taskAction(root,paragraph)).click();const dialog=root.locator('.note-task-dialog');await expect(dialog).toBeVisible();await expect(dialog.getByLabel('Priority',{exact:true})).toBeEnabled();return dialog;}
 const tasks=async api=>(await(await api('GET','/tasks?limit=500')).json()).items;
 
+test('journal task details show editable daily and weekly schedule defaults',async({page,request})=>{
+  const api=await setup(page,request),date='2026-12-31',week='2026-W53';
+  const dailyNote=await api('GET','/day-notes/'+date),weeklyNote=await api('GET','/week-notes/'+week);
+  await api('PUT','/day-notes/'+date,{body:'- [ ] Daily review\n'},{'If-Match':dailyNote.headers().etag});
+  await api('PUT','/week-notes/'+week,{body:'- [ ] Weekly review\n'},{'If-Match':weeklyNote.headers().etag});
+  await page.locator('#refresh').click();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('#today-date').fill(date);
+
+  const daily=page.locator('#today-note-editor');
+  let dialog=await edit(daily,daily.locator('li p'));
+  await expect(dialog.getByLabel('Scheduled day',{exact:true})).toHaveValue(date);
+  await expect(dialog.getByLabel('Due',{exact:true})).toHaveValue(date);
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+
+  await page.locator('#today-month-grid [data-week="'+week+'"]').click();
+  const weekly=page.locator('#today-week-note-editor');
+  dialog=await edit(weekly,weekly.locator('li p'));
+  await expect(dialog.getByLabel('Scheduled day',{exact:true})).toHaveValue('2026-12-28');
+  await expect(dialog.getByLabel('Due',{exact:true})).toHaveValue('2027-01-03');
+  await dialog.getByLabel('Scheduled day',{exact:true}).fill('2026-12-30');
+  await dialog.getByLabel('Due',{exact:true}).fill('2027-01-05');
+  await dialog.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(dialog).toBeHidden();
+  expect((await tasks(api)).find(task=>task.summary==='Weekly review')).toMatchObject({
+    scheduledDate:'2026-12-30',due:{kind:'DATE',date:'2027-01-05'}
+  });
+});
+
 test('weekly notes support nested task details, client-only assignment and keyboard dismissal',async({page,request})=>{
   const api=await setup(page,request),client=await(await api('POST','/clients',{name:'Weekly client',color:'#176653'})).json();await page.locator('#today-date').fill('2026-11-04');const weekButton=page.locator('#today-month-grid [data-week]').first(),week=await weekButton.getAttribute('data-week'),previous=await api('GET','/week-notes/'+week);
   await api('PUT','/week-notes/'+week,{body:'- [ ] Weekly task\n'},{'If-Match':previous.headers().etag});await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');await weekButton.click();const root=page.locator('#today-week-note-editor'),dialog=await edit(root,root.locator('li p'));

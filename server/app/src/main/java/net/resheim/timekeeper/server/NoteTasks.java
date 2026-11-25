@@ -2,6 +2,8 @@ package net.resheim.timekeeper.server;
 
 import static net.resheim.timekeeper.server.JsonValues.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -33,6 +35,22 @@ final class NoteTasks {
     private Task planning(Task task,boolean checked,java.time.Instant importedAt){
         if(completed(task)==checked&&(importedAt==null||!checked||task.planning().completedAt().equals(Optional.of(importedAt))))return task;
         return store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),new TaskPlanning(checked?TaskStatus.COMPLETED:TaskStatus.NOT_STARTED,task.planning().scheduledDate(),checked?Optional.of(importedAt==null?store.now():importedAt):Optional.empty())));
+    }
+    private Task create(VaultSources.Ref ref,String text,boolean checked,Instant importedAt){
+        LocalDate scheduled=null,due=null;
+        if(ref.type().equals(DayNotes.TYPE)){
+            scheduled=due=DayNotes.date(ref.key());
+        }else if(ref.type().equals(WeekNotes.TYPE)){
+            scheduled=WeekNotes.week(ref.key()).monday();
+            due=scheduled.plusDays(6);
+            // Task dates use four-digit years. The last supported day is still within this ISO week.
+            if(due.getYear()>9999)due=LocalDate.of(9999,12,31);
+        }
+        var planning=new TaskPlanning(checked?TaskStatus.COMPLETED:TaskStatus.NOT_STARTED,Optional.ofNullable(scheduled),
+                checked?Optional.of(importedAt==null?store.now():importedAt):Optional.empty());
+        var timing=new TaskTiming(Optional.empty(),Optional.ofNullable(due).map(TaskMoment::dateOnly));
+        return store.service().createTask(new CreateTask(Optional.empty(),Optional.empty(),summary(text),Optional.empty(),
+                Set.of(),planning,TaskChecklist.empty(),timing,TaskImportance.ordinary()));
     }
     /** Invoked after a successful canonical Markdown write, including DAV/import writers. */
     void source(VaultSources.Ref ref,byte[] bytes){
@@ -71,7 +89,7 @@ final class NoteTasks {
             // Deleting a normal task is deliberate. Unrelated prose edits must
             // not resurrect it; editing its checkbox/title can create a new task.
             boolean created=false;
-            if(task==null&&(edited||policy!=null||current.marker()==requested)&&policy!=NoteTaskImport.IGNORE){task=store.service().createTask(new CreateTask(Optional.empty(),summary(current.summary()),Optional.empty()));task=planning(task,policy==NoteTaskImport.COMPLETED||current.checked(),importedAt);taskId=task.id().value();created=true;}
+            if(task==null&&(edited||policy!=null||current.marker()==requested)&&policy!=NoteTaskImport.IGNORE){task=create(ref,current.summary(),policy==NoteTaskImport.COMPLETED||current.checked(),importedAt);taskId=task.id().value();created=true;}
             else if(task!=null){
                 if(before!=null&&!current.summary().equals(before.path("summary").asText())&&!task.summary().equals(summary(current.summary())))task=store.service().updateTask(new UpdateTask(task.id(),task.version(),task.projectId(),task.parentTaskId(),summary(current.summary()),task.url()));
                 if(policy==NoteTaskImport.COMPLETED)task=planning(task,true,importedAt);

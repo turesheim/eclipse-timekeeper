@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static io.restassured.RestAssured.given;
 import static net.resheim.timekeeper.server.JsonValues.*;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.*;
 import io.quarkus.test.junit.*;
 import jakarta.inject.Inject;
@@ -77,6 +78,42 @@ class NoteTasksTest {
         store.transaction("tasks-native",()->{
             var notes=new DayNotes(store);var day=DayNotes.date("2026-11-09");notes.saveContent(day,etag(notes.getContent(day)),object().put("body","- [ ] Daily task\n"));var task=store.service().tasks().getFirst();completed(task,true);assertEquals("- [x] Daily task\n",notes.getContent(day).path("body").asText());
             var weeks=new WeekNotes(store);var week=WeekNotes.week("2026-W46");weeks.saveDocument(week,etag(weeks.get(week)),bytes("- [x] Weekly task\n"));assertEquals(2,store.service().tasks().size());assertFalse(new VaultState(store,limits).get().path("initialized").asBoolean());return null;
+        });
+    }
+    @Test void journalTaskDatesAreSetAtCreationAndManualEditsSurviveSourceChanges(){
+        store.transaction("journal-task-dates",()->{
+            var day=LocalDate.parse("2026-12-31");
+            var daily=new DayNotes(store);
+            daily.saveContent(day,etag(daily.getContent(day)),object().put("body","- [ ] Daily task\n"));
+            var task=store.service().tasks().getFirst();
+            assertEquals(Optional.of(day),task.planning().scheduledDate());
+            assertEquals(Optional.of(TaskMoment.dateOnly(day)),task.timing().due());
+            assertTrue(task.timing().start().isEmpty());
+
+            var weekly=new WeekNotes(store);
+            var week=WeekNotes.week("2026-W53");
+            weekly.saveDocument(week,etag(weekly.get(week)),bytes("- [x] Weekly task\n"));
+            var weeklyTask=store.service().tasks().stream().filter(item->item.summary().equals("Weekly task")).findFirst().orElseThrow();
+            assertEquals(TaskStatus.COMPLETED,weeklyTask.planning().status());
+            assertEquals(Optional.of(LocalDate.parse("2026-12-28")),weeklyTask.planning().scheduledDate());
+            assertEquals(Optional.of(TaskMoment.dateOnly(LocalDate.parse("2027-01-03"))),weeklyTask.timing().due());
+
+            var changed=store.service().updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),
+                    new TaskPlanning(TaskStatus.NOT_STARTED,Optional.of(day.plusDays(3)),Optional.empty())));
+            var timing=new TaskTiming(Optional.empty(),Optional.of(TaskMoment.dateOnly(day.plusDays(7))));
+            store.service().updateTaskTiming(new UpdateTaskTiming(changed.id(),changed.version(),timing));
+            daily.saveContent(day,etag(daily.getContent(day)),object().put("body","- [x] Renamed daily task\n"));
+            var saved=store.service().task(task.id()).orElseThrow();
+            assertEquals("Renamed daily task",saved.summary());
+            assertEquals(TaskStatus.COMPLETED,saved.planning().status());
+            assertEquals(Optional.of(day.plusDays(3)),saved.planning().scheduledDate());
+            assertEquals(timing,saved.timing());
+
+            vault().put(new VaultPath("Ordinary.md"),null,true,bytes("- [ ] Undated task\n"));
+            var undated=store.service().tasks().stream().filter(item->item.summary().equals("Undated task")).findFirst().orElseThrow();
+            assertTrue(undated.planning().scheduledDate().isEmpty());
+            assertTrue(undated.timing().due().isEmpty());
+            return null;
         });
     }
     @Test void binaryFilesAndNonCheckboxExamplesNeverCreateTasks(){

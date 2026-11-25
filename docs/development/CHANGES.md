@@ -37,6 +37,8 @@ database baseline.
   versioned database baseline.
 - Made Timekeeper tasks provider-independent UUID aggregates with optional,
   uniquely constrained external task references.
+- Scheduled new daily journal tasks on the note date with a same-day deadline.
+  New weekly journal tasks are scheduled for Monday and due Sunday (#736).
 - Added automatic synchronization with selected Google Tasks lists, with
   read-only access or opt-in two-way editing for supported fields (#621).
 - Added explicit activity owner identities, UTC instant persistence and
