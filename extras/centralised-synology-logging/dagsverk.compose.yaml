@@ -1,4 +1,4 @@
-# Append to the Dagsverk application Compose files, not to this logging project.
+# Append this overlay to the Dagsverk application Compose files.
 x-dagsverk-logs: &dagsverk-logs
   labels:
     logs.collect: 'true'

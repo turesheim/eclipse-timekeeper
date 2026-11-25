@@ -16,5 +16,5 @@ recover the service instead of leaving a live, unhealthy JVM.
 allow disk space for ZIP preparation. The entrypoint creates the directory with
 private permissions and passes it as `java.io.tmpdir`.
 
-- [Set up shared logging on Synology](logging/README.md) with Grafana, Loki and Alloy.
+- [Set up shared logging on Synology](../../extras/centralised-synology-logging/README.md) with Grafana, Loki and Alloy.
 - [Send Dagsverk logs to Grafana](DAGSVERK-LOGGING.md) from a package, Compose or JVM deployment.

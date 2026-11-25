@@ -92,6 +92,11 @@ sign in with your account. For access from other devices, configure HTTPS using
 [Tailscale](docs/operations/TAILSCALE.md) or the reverse-proxy instructions in the
 [deployment and backup guide](docs/operations/DEPLOYMENT.md).
 
+When running Dagsverk on Synology, you can add shared logging with Grafana,
+Loki and Alloy. The stack is an independent Container Manager project
+under `extras/` and can collect logs from other NAS services.
+[Set up shared logging on Synology](extras/centralised-synology-logging/README.md) · [Send Dagsverk logs to Grafana](server/deploy/DAGSVERK-LOGGING.md)
+
 ## Install the Eclipse plugins
 
 Timekeeper 2.0 requires **Eclipse 2026-09 (4.41) and Java 21**. The project website
