@@ -132,11 +132,29 @@ dialog.journal-dialog { overflow: auto; }
 .markdown-actions-menu .dropdown-item > .icon { flex: none; }
 .markdown-actions-group + .markdown-actions-group { border-block-start: 1px solid var(--bs-border-color); margin-block-start: .25rem; padding-block-start: .25rem; }
 .today-main-actions .markdown-actions-trigger { min-width: var(--control-target-size); min-height: var(--control-target-size); }
-.markdown-callout { border-inline-start: .25rem solid var(--bs-info); background: var(--bs-info-bg-subtle); padding: .5rem .75rem; margin-block: .75rem; }
-.markdown-callout > div:first-child { display: flex; gap: .5rem; align-items: center; }
-.markdown-callout > div:first-child button { display: inline-flex; align-items: center; gap: .4rem; min-width: 0; min-height: 2.75rem; border: 0; background: transparent; color: var(--bs-info-text-emphasis); font-weight: 700; text-align: start; }
-.markdown-callout > div:first-child button span:last-child { overflow-wrap: anywhere; }
+.markdown-callout {
+  --callout-tone: var(--accent);
+  border-inline-start: .25rem solid var(--callout-tone);
+  background: color-mix(in srgb, var(--callout-tone) 12%, var(--bs-body-bg));
+  padding: .5rem .75rem;
+  margin-block: .75rem;
+}
+.markdown-callout:is([data-callout-type=tip], [data-callout-type=success]) { --callout-tone: var(--bs-teal); }
+.markdown-callout:is([data-callout-type=info], [data-callout-type=question], [data-callout-type=todo]) { --callout-tone: var(--bs-blue); }
+.markdown-callout:is([data-callout-type=important], [data-callout-type=example]) { --callout-tone: var(--bs-purple); }
+.markdown-callout[data-callout-type=warning] { --callout-tone: var(--bs-warning); }
+.markdown-callout:is([data-callout-type=caution], [data-callout-type=danger], [data-callout-type=failure], [data-callout-type=bug]) { --callout-tone: var(--bs-danger); }
+.markdown-callout > div:first-child { display: flex; gap: .25rem; align-items: center; }
+.markdown-callout > div:first-child button {
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--callout-tone) 45%, var(--bs-body-color));
+}
 .markdown-callout input { flex: 1; min-width: 0; background: transparent; color: inherit; border: 0; font-weight: 600; }
+.markdown-callout input::placeholder { color: inherit; opacity: 1; }
 [data-footnote-reference] { color: var(--bs-link-color); cursor: pointer; }
 [data-footnote-definition] { border-block-start: 1px solid var(--bs-border-color); padding-inline-start: .75rem; font-size: var(--font-markdown-footnote); }
 [data-footnote-definition]::before { content: attr(data-footnote-definition) ". "; color: var(--bs-secondary-color); }

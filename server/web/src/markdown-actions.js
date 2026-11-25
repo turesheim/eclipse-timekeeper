@@ -33,10 +33,14 @@ export function buildActionsMenu(field){
     trigger.disabled=f.loading||!choices().length;if(trigger.disabled)f.closeActions();
   };
   f.addActionsGroup=group=>{group.className='markdown-actions-group';menu.append(group);f.syncActions();};
-  const open=(last=false,fromPointer=false)=>{f.prepareCompactActions?.(fromPointer);f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
-  trigger.addEventListener('mousedown',event=>event.preventDefault());trigger.addEventListener('click',event=>menu.matches(':popover-open')?f.closeActions():open(false,event.detail>0));
+  const open=(last=false)=>{f.prepareCompactActions?.();f.syncActions();if(trigger.disabled)return;f.closeBlockMenu();f.closeListMenu();if(!menu.matches(':popover-open'))menu.showPopover();position();const items=choices();items[last?items.length-1:0]?.focus();};
+  trigger.addEventListener('mousedown',event=>event.preventDefault());trigger.addEventListener('click',()=>menu.matches(':popover-open')?f.closeActions():open());
   trigger.addEventListener('pointerdown',()=>{if(!menu.matches(':popover-open'))f.captureCompactSelection?.();});
-  trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
+  trigger.addEventListener('pointercancel',()=>f.discardCompactPress?.());
+  trigger.addEventListener('keydown',event=>{
+    if(['Enter',' ','ArrowDown','ArrowUp'].includes(event.key))f.discardCompactPress?.();
+    if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}
+  });
   menu.addEventListener('beforetoggle',event=>{
     const opened=event.newState==='open',listen=opened?'addEventListener':'removeEventListener';
     trigger.setAttribute('aria-expanded',String(opened));
@@ -87,11 +91,11 @@ export function buildCompactActions(f,media,host){
     release(pressed);
     pressed=capture();
   };
-  f.prepareCompactActions=fromPointer=>{
+  f.discardCompactPress=()=>{release(pressed);pressed=null;};
+  f.prepareCompactActions=()=>{
     if(!media.matches)return;
     release(selection);
-    selection=fromPointer&&pressed?pressed:capture();
-    if(pressed!==selection)release(pressed);
+    selection=pressed??capture();
     pressed=null;
   };
   f.actionsMenu.addEventListener('toggle',event=>{
@@ -107,7 +111,7 @@ export function buildCompactActions(f,media,host){
     const {actionsTrigger:trigger,actionsMenu:menu,toolbar}=f;
     const focused=trigger===document.activeElement||menu.contains(document.activeElement);
     f.closeActions();f.closeBlockMenu();f.closeListMenu();f.closeCalloutMenu();
-    release(pressed);pressed=null;
+    f.discardCompactPress();
     toolbar.hidden=media.matches;
     (media.matches?host:toolbar).append(trigger);
     f.syncActions();

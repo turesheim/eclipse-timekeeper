@@ -286,6 +286,10 @@ test('Today phone journal applies native and menu formatting and reopens in rich
       const alpha=document.querySelector('#today-note-editor .ProseMirror strong').firstChild;
       getSelection().setBaseAndExtent(alpha,0,alpha,alpha.length);
     },{once:true}));
+    // A click synthesized after a touch press can have a zero click count.
+    await trigger.evaluate(button=>button.addEventListener('click',event=>{
+      Object.defineProperty(event,'detail',{value:0});
+    },{capture:true,once:true}));
     await trigger.tap();await journal.getByRole('menuitem',{name:'Italic',exact:true}).tap();
     await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
     await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toMatch(/\*\*Alpha\*\* [*_]Beta[*_] [*_]Gamma[*_]/);

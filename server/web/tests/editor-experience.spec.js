@@ -225,27 +225,51 @@ test('the formatting toolbar inserts editable Obsidian callouts',async({page})=>
   await expect(style).toBeHidden();
 });
 
-test('admonition headers show type icons and localized labels while preserving authored titles',async({page})=>{
+test('admonitions show custom titles or localized fallback headings with type icons',async({page})=>{
   const markdown='> [!warning]- Read carefully\n> Existing body.\n\n> [!custom-type] Personal heading\n> Custom body.\n\n> [!FAQ]\n> A question.\n';
   for(const [locale,type,question] of [['en-GB','Warning','Question'],['nb-NO','Advarsel','Spørsmål']]){
     await page.setViewportSize({width:390,height:844});
     await field(page,markdown,true,[],locale);
     const callouts=page.locator('#experience-formatted .markdown-callout');
     const fold=callouts.first().getByRole('button',{name:new RegExp(type)});
-    await expect(fold).toHaveText(type);
+    await expect(fold).toHaveText('');
     await expect(fold.locator('.bi-exclamation-triangle')).toHaveAttribute('aria-hidden','true');
     await expect(callouts.first().locator('input')).toHaveValue('Read carefully');
     await expect(callouts.first().locator('p')).toBeHidden();
     await fold.press('Enter');
     await expect(callouts.first().locator('p')).toHaveText('Existing body.');
     const unknown=callouts.nth(1).getByRole('button',{name:/custom-type/});
-    await expect(unknown).toHaveText('custom-type');
+    await expect(unknown).toHaveText('');
     await expect(unknown.locator('.bi-chat-left-text')).toHaveAttribute('aria-hidden','true');
     await expect(callouts.nth(1).locator('input')).toHaveValue('Personal heading');
     const alias=callouts.nth(2).getByRole('button',{name:new RegExp(question)});
-    await expect(alias).toHaveText(question);
+    await expect(alias).toHaveText('');
+    await expect(callouts.nth(2).locator('input')).toHaveAttribute('placeholder',question);
+    await expect(callouts.nth(2).locator('input')).toHaveValue('');
     await expect(alias.locator('.bi-question-circle')).toBeVisible();
     expect(await page.evaluate(()=>globalThis.field.value())).toBe(markdown);
+    const heading=callouts.first().locator('input');
+    await heading.fill('');await heading.press('Tab');
+    await expect(heading).toHaveAttribute('placeholder',type);
+    await expect(heading).toHaveValue('');
+    expect(await page.evaluate(()=>globalThis.field.value())).toContain('> [!warning]-\n> Existing body.');
+  }
+});
+
+test('admonition colors distinguish types in both Dagsverk themes',async({page})=>{
+  await field(page,['NOTE','TIP','INFO','IMPORTANT','WARNING','CAUTION'].map(type=>'> [!'+type+']\n> Body.').join('\n\n'));
+  const callouts=page.locator('#experience-formatted .markdown-callout');
+  let light;
+  for(const theme of ['timekeeper','timekeeper-dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);
+    await expect(callouts).toHaveCount(6);
+    const backgrounds=await callouts.evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).backgroundColor));
+    expect(new Set(backgrounds).size).toBe(6);
+    if(light)expect(backgrounds).not.toEqual(light);
+    else light=backgrounds;
+    expect(await callouts.first().evaluate(node=>getComputedStyle(node).borderInlineStartColor)).toBe(await page.locator('html').evaluate(root=>{
+      const probe=document.createElement('span');probe.style.color='var(--accent)';root.append(probe);const color=getComputedStyle(probe).color;probe.remove();return color;
+    }));
   }
 });
 
