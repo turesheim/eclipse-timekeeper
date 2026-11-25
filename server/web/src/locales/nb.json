@@ -814,6 +814,7 @@
   "import.state.UNDONE_PARTIAL": "DELVIS ANGRET",
   "import.state.IMPORTED": "IMPORTERT",
   "import.state.BLOCKED": "BLOKKERT",
+  "holidays.weekly_rest": "Ukentlig fridag",
   "holidays.title": "Helligdager",
   "holidays.license": "Data og lisens for date-holidays",
   "holidays.data": "Data:",

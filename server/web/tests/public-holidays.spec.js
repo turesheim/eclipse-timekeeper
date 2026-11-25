@@ -48,6 +48,37 @@ async function seed(api) {
 }
 const holiday=(page,date)=>page.locator(`[data-track-holiday-date="${date}"]`);
 
+test('Today joins holidays and labels while Track and Calendar tint weekly rest days',async({browser,request})=>{
+  const user=await fresh(request),session=await context(browser),page=await session.newPage();
+  try {
+    await signIn(page,user);
+    const api=await ownApi(page);
+    await preference(api,{holidayCountry:'NO'});
+    for(const [date,text] of [['2026-05-17','National celebration'],['2026-05-18','Local day label']]){
+      const initial=await api('GET','/day-labels/'+date);
+      await api('PUT','/day-labels/'+date,{text},{'If-Match':initial.headers().etag});
+    }
+    await page.reload();await trackingReady(page);
+    await page.locator('[data-tab=today]').click();
+    await page.locator('#today-date').fill('2026-05-17');
+    const day=date=>page.locator('#today-month-grid [data-date="'+date+'"]');
+    const both=day('2026-05-17'),label=day('2026-05-18'),ordinary=day('2026-05-16');
+    await expect(both).toHaveAccessibleName(/Grunnlovsdagen.*National celebration/);
+    await expect(both).toHaveAttribute('aria-pressed','true');
+    await expect(both).toHaveCSS('background-image',/linear-gradient/);
+    await expect(label).toHaveClass(/labeled/);
+    await expect(label).not.toHaveClass(/holiday/);
+    await expect(ordinary).not.toHaveClass(/holiday|labeled/);
+    await expect(day('2026-05-10')).toHaveAccessibleName(/Ukentlig fridag/);
+    await expect(day('2026-05-14')).toHaveAccessibleName(/Kristi himmelfartsdag/);
+    await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');
+    await expect(page.locator('[data-track-date="2026-05-10"]')).toHaveClass(/weekly-holiday/);
+    await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-10');
+    await expect(page.locator('.calendar-day[data-date="2026-05-10"]')).toHaveClass(/weekly-holiday/);
+    await expect(page.locator('.calendar-heading[data-date="2026-05-10"]')).toHaveClass(/weekly-holiday/);
+  } finally {await session.close();}
+});
+
 test('public holiday highlights stay subtle and consistent in Track and Calendar in every theme',async({browser,request})=>{
   test.setTimeout(90000);
   const user=await fresh(request),session=await context(browser),page=await session.newPage();

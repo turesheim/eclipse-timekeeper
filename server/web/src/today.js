@@ -12,6 +12,7 @@ import {calendarTodo,calendarItemStatus,calendarItemWhen} from './calendar-item.
 import {EventNoteEditor,eventNoteButton,eventNoteIndicator} from './event-note-editor.js';
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
+import {publicHolidayCalendar,selectedHolidayCountry,weeklyHoliday} from './holidays.js';
 import {addDays,dateInZone,instantNanos,instantText,nanosText,taskPresentation} from './model.js';
 import {clientColors} from './calendar-model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
@@ -64,7 +65,7 @@ export class TodayView {
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
     this.eventNoteEditor=new EventNoteEditor(root,{...callbacks,onNotesChanged:()=>{void this.loadEvents();callbacks.onNotesChanged();}},'today');
-    this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();this.noteDates=new Set();this.noteWeeks=new Set();this.noteGeneration=0;this.monthNoteKey=null;
+    this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();this.noteDates=new Set();this.dayLabels=new Map();this.noteWeeks=new Set();this.noteGeneration=0;this.monthNoteKey=null;
     this.picker=node('dialog',undefined,'app-dialog shadow-lg');this.picker.id='today-session-picker';
     const pickerTitle=node('h2',t('ui.choose_work_session'));pickerTitle.id='today-session-picker-title';this.picker.setAttribute('aria-labelledby',pickerTitle.id);
     this.pickerContext=node('p');this.choices=node('div',undefined,'d-grid gap-2');
@@ -96,7 +97,7 @@ export class TodayView {
     for(const target of [root.querySelector('.today-toolbar'),byId('work-session'),byId('workspace-navigation'),document.querySelector('.app-header'),document.querySelector('.tracking'),byId('today-contents')])if(target)this.layoutObserver.observe(target);
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;++this.journalNavigation;this.visible=false;this.journalViewport.reset();this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.grid.replaceChildren();this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){clearInterval(this.eventTimer);this.eventTimer=null;this.eventWarning=false;this.eventFailures=[];this.eventsLoaded=false;this.eventRenderKey=null;++this.generation;++this.noteGeneration;++this.journalNavigation;this.visible=false;this.journalViewport.reset();this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.monthGridKey=null;this.monthHolidays=null;this.grid.replaceChildren();this.noteDates.clear();this.dayLabels?.clear();this.noteWeeks.clear();this.daySessions.clear();this.plannedRows?.clear();this.closePicker();this.closeEvent();this.weekEditor.reset();this.eventNoteEditor.reset();this.journal.reset();this.contents.reset();this.sidebarActions.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   pollEvents(){if(!this.eventTimer&&this.scope&&this.visible)this.eventTimer=setInterval(()=>void this.loadEvents(true),30000);}
   show(){this.visible=true;this.contents.show();this.pollEvents();this.sizeEditor();if(this.data){if(this.connected&&this.journal.editor?.date===this.date)void this.journal.refreshClean();this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.contents.hide();clearInterval(this.eventTimer);this.eventTimer=null;this.visible=false;this.journalViewport.reset();++this.generation;++this.noteGeneration;++this.journalNavigation;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.eventNoteEditor.close();}
@@ -171,7 +172,7 @@ export class TodayView {
     const zone=this.data.profile.data.zoneId,key=JSON.stringify([this.month,zone,getLocale()]),rebuild=key!==this.monthGridKey;
     const focus=this.grid.contains(document.activeElement)?{date:document.activeElement.dataset.date,week:document.activeElement.dataset.week}:null;
     if(rebuild){
-      this.monthGridKey=key;const calendar=monthCalendar(this.month,zone);
+      this.monthGridKey=key;const calendar=this.monthCalendar=monthCalendar(this.month,zone);
       this.monthTitle.textContent=dateTimeFormat(getLocale(),{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(this.month+'-15T12:00:00Z'));
       this.grid.replaceChildren();this.grid.append(node('span',t('today.week_short'),'today-weekday'));
       for(let day=0;day<7;day++)this.grid.append(node('span',dateTimeFormat(getLocale(),{weekday:'narrow',timeZone:'UTC'}).format(new Date(calendar.days[day].date+'T12:00:00Z')),'today-weekday'));
@@ -179,27 +180,56 @@ export class TodayView {
         const day=calendar.days[index];
         if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',Number(week.slice(-2))+' · '+t('today.week_note',{week}));pick.title=t('today.week_note',{week});pick.addEventListener('click',()=>void this.openWeek(week));this.grid.append(pick);}
         const pick=node('button',String(Number(day.date.slice(-2))),'btn today-month-day');pick.type='button';pick.dataset.date=day.date;pick.classList.toggle('outside',!day.inMonth);
-        pick.setAttribute('aria-label',dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z')));pick.addEventListener('click',()=>this.select(day.date));this.grid.append(pick);
+        pick.dataset.fullDate=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z'));pick.addEventListener('click',()=>this.select(day.date));this.grid.append(pick);
       }
     }
+    this.loadMonthHolidays();
     // Note refreshes update decorations without disconnecting a pressed or focused button.
     const week=this.weekEditor.opened?this.weekEditor.context.week:null;
     const today=dateInZone(Date.now(),zone),dot=(pick,present)=>{const previous=pick.querySelector('.today-month-dot');if(present&&!previous)pick.append(node('span',undefined,'today-month-dot'));else if(!present&&previous)previous.remove();};
-    for(const pick of this.grid.querySelectorAll('[data-date]')){const date=pick.dataset.date;pick.classList.toggle('selected',!week&&date===this.date);pick.classList.toggle('current',date===today);pick.setAttribute('aria-pressed',String(!week&&date===this.date));dot(pick,this.noteDates.has(date));}
+    for(const pick of this.grid.querySelectorAll('[data-date]')){
+      const date=pick.dataset.date,label=this.dayLabels.get(date),holidays=this.monthHolidays.data?.days.get(date);
+      const restDay=weeklyHoliday(date,getLocale());
+      const names=holidays?.map(holiday=>holiday.name).join(' · ');
+      pick.classList.toggle('selected',!week&&date===this.date);
+      pick.classList.toggle('current',date===today);
+      pick.classList.toggle('holiday',!!holidays||restDay);
+      pick.classList.toggle('labeled',!!label);
+      pick.setAttribute('aria-pressed',String(!week&&date===this.date));
+      const details=[names??(restDay?t('holidays.weekly_rest'):null),label].filter(Boolean);
+      pick.title=details.join(' · ');
+      pick.setAttribute('aria-label',[pick.dataset.fullDate,...details].join(' · '));
+      dot(pick,this.noteDates.has(date));
+    }
     for(const pick of this.grid.querySelectorAll('[data-week]')){
       pick.setAttribute('aria-pressed',String(pick.dataset.week===week));dot(pick,this.noteWeeks.has(pick.dataset.week));
     }
     if(rebuild&&focus){const selector=focus.date?`[data-date="${focus.date}"]`:focus.week?`[data-week="${focus.week}"]`:null;if(selector)this.grid.querySelector(selector)?.focus({preventScroll:true});}
   }
+  loadMonthHolidays(){
+    const locale=getLocale(),country=selectedHolidayCountry(this.data.profile.data.holidayCountry);
+    const key=JSON.stringify([this.monthGridKey,country]);
+    if(this.monthHolidays?.key===key)return;
+    const pending=this.monthHolidays={key,data:null};
+    if(!country)return;
+    void publicHolidayCalendar(this.monthCalendar,locale,country).then(data=>{
+      if(this.monthHolidays!==pending)return;
+      pending.data=data;
+      if(this.visible)this.paintMonth();
+    }).catch(()=>{
+      if(this.monthHolidays===pending)this.monthHolidays=null;
+    });
+  }
   async loadMonthNotes(){
     if(!this.visible||!this.scope||!this.data||!this.month)return;
     const key=this.month+'|'+this.data.revision;if(key===this.monthNoteKey)return;
-    this.monthNoteKey=key;this.noteDates.clear();this.noteWeeks.clear();this.paintMonth();
+    this.monthNoteKey=key;this.noteDates.clear();this.dayLabels.clear();this.noteWeeks.clear();this.paintMonth();
     const generation=++this.noteGeneration,scope=this.scope,calendar=monthCalendar(this.month,this.data.profile.data.zoneId);
     const first=calendar.days[0].date,last=calendar.days.at(-1).date;
     try{
       const [reply,weeks]=await Promise.all([scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})),scope.request('/week-notes?'+new URLSearchParams({fromWeek:isoWeek(first),toWeek:isoWeek(last)}))]);
       if(generation!==this.noteGeneration||scope!==this.scope)return;
+      this.dayLabels=new Map(reply.data.items.filter(note=>note.text).map(note=>[note.date,note.text]));
       this.noteDates=new Set(reply.data.items.filter(note=>note.hasBody).map(note=>note.date));this.noteWeeks=new Set(weeks.data.items.filter(note=>note.hasBody).map(note=>note.week));this.paintMonth();
     }catch(error){
       if(generation!==this.noteGeneration||scope!==this.scope)return;

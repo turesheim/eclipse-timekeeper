@@ -62,8 +62,8 @@
   & .client-color::before { border-color: var(--line); }
   & .project-icon-option:has(:checked) { background: var(--theme-group); }
   & .app-dialog::backdrop { background: rgb(0 0 0 / .6); }
-  & .calendar-heading.today:not(.public-holiday) { background: var(--theme-group); }
-  & .calendar-day.weekend:not(.public-holiday) { background: var(--theme-soft); }
+  & .calendar-heading.today:not(.public-holiday,.weekly-holiday) { background: var(--theme-group); }
+  & .calendar-day.weekend:not(.public-holiday,.weekly-holiday) { background: var(--theme-soft); }
   & .calendar-slot { border-color: color-mix(in srgb, var(--line) 40%, var(--bs-body-bg)); }
   & .calendar-slot.hour { border-color: var(--line); }
   & .calendar-slot.unavailable { background: repeating-linear-gradient(135deg, var(--theme-soft), var(--theme-soft) 4px, var(--line) 4px, var(--line) 5px); }

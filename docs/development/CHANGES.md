@@ -8,6 +8,10 @@ database baseline.
 
 ### Highlights
 
+- Highlighted public holidays and labeled days in the Today date navigator,
+  with a split background when both apply, and marked weekly rest days in
+  Today, Track and Calendar (#733).
+
 - Added correlated revision and request diagnostics for workspace sync failures.
 
 - Bundled an optional draw.io editor for Compose and Synology. Edit and save
