@@ -41,6 +41,24 @@ test('expired workspace cursors leave a useful status and recover on the next re
   await expect(page.locator('#status')).toHaveText('Up to date');
 });
 
+test('an expired cursor during session restore keeps account settings accessible',async({page,request})=>{
+  await setup(page,request);
+  const pattern='**/api/v1/tasks?*';
+  await page.route(pattern,route=>route.fulfill({status:409,json:{code:'CURSOR_EXPIRED'}}));
+  await page.reload();
+  await expect(page.locator('#status')).toHaveText('Records are changing too quickly to load a consistent view. Try Refresh.');
+  await expect(page.locator('#login')).toBeHidden();
+  await page.locator('#account-menu summary').click();
+  await page.locator('#account-menu a[href^="#account"]').first().click();
+  await page.locator('#account-navigation a[href="#account/task-providers"]').click();
+  await expect(page.getByRole('heading',{name:'Internet accounts'})).toBeVisible();
+
+  await page.unroute(pattern);
+  await page.goto('/web/#tracking');
+  await page.locator('#refresh').click();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+});
+
 test('background synchronization preserves typing and defers inactive work views until they are opened',async({page,request})=>{
   const {api}=await setup(page,request);await api('POST','/clients',{name:'Seed client',color:'#305070'});await navigateView(page,'clients');await expect(page.locator('#clients')).toContainText('Seed client');await navigateView(page,'track');await expect(page.locator('#track-calendar')).not.toBeEmpty();await openNote(page);
   await page.evaluate(()=>{

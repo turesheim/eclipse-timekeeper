@@ -283,7 +283,14 @@ const auth = authentication({
     today.initialize(dailyNoteDateFromSearch(location.search)||dateInZone(Date.now(),profile.zoneId));
     await tab('today');
     $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;$('sync-status').hidden = false;
-    await refresh();startWatch(session);
+    try {
+      await refresh();
+    } catch (error) {
+      // A consistency conflict can block workspace data while account settings remain usable.
+      if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code)) throw error;
+      return;
+    }
+    startWatch(session);
   },
   updateAccount(account) {accountName = account.displayName;},
   refreshProfile: (profile) => {
