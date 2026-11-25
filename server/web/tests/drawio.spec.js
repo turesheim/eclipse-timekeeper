@@ -223,12 +223,16 @@ test.describe('self-hosted draw.io editor',()=>{
     expect(viewport.y).toBe(0);
     await captureScreenshot(page,{path:test.info().outputPath('drawio-editor-phone.png')});
     await change(frame,'Saved detail','Discard this detail');
-    page.once('dialog',prompt=>prompt.dismiss());
     await box.locator('iframe').focus();
-    await page.keyboard.press('Escape');
-    await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
-    page.once('dialog',prompt=>prompt.accept());
-    await page.keyboard.press('Escape');
+    for(const discard of [false,true]){
+      const confirmation=page.waitForEvent('dialog',{timeout:5000});
+      const press=page.keyboard.press('Escape');
+      const prompt=await confirmation;
+      expect(prompt.type()).toBe('confirm');
+      await (discard?prompt.accept():prompt.dismiss());
+      await press;
+      if(!discard)await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
+    }
     await expect(box.locator('iframe')).toHaveCount(0);
     await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeFocused();
     expect(await bytes(api,asset.id)).toEqual(saved);
