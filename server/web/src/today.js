@@ -19,7 +19,7 @@ import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
 import {iconButton,isProjectIcon,projectIcon} from './icons.js';
 import {TrackDayNotes} from './track-day-notes.js';
 import {TodayJournalViewport} from './today-journal-viewport.js';
-import {WeekNoteEditor,isoWeek,isoWeekStart} from './week-note-editor.js';
+import {WeekNoteEditor,isoWeek,isoWeekStart,savedWeeks} from './week-note-editor.js';
 import {workSummaryCard} from './work-summary-card.js';
 import {taskMomentDate} from './tasks-model.js';
 
@@ -61,7 +61,7 @@ export class TodayView {
         const week=this.weekEditor.context.week,origin=this.grid.querySelector(`[data-week="${week}"]`);
         (origin?.getClientRects().length?origin:this.weekShortcut.getClientRects().length?this.weekShortcut:this.dateInput).focus({preventScroll:true});
       },
-    },phone,this.weekActions);
+    },{phone,actions:this.weekActions});
     this.journalViewport.watch(this.weekEditor.markdown);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
@@ -228,10 +228,10 @@ export class TodayView {
     const generation=++this.noteGeneration,scope=this.scope,calendar=monthCalendar(this.month,this.data.profile.data.zoneId);
     const first=calendar.days[0].date,last=calendar.days.at(-1).date;
     try{
-      const [reply,weeks]=await Promise.all([scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})),scope.request('/week-notes?'+new URLSearchParams({fromWeek:isoWeek(first),toWeek:isoWeek(last)}))]);
+      const [reply,weeks]=await Promise.all([scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})),savedWeeks(scope,first,last)]);
       if(generation!==this.noteGeneration||scope!==this.scope)return;
       this.dayLabels=new Map(reply.data.items.filter(note=>note.text).map(note=>[note.date,note.text]));
-      this.noteDates=new Set(reply.data.items.filter(note=>note.hasBody).map(note=>note.date));this.noteWeeks=new Set(weeks.data.items.filter(note=>note.hasBody).map(note=>note.week));this.paintMonth();
+      this.noteDates=new Set(reply.data.items.filter(note=>note.hasBody).map(note=>note.date));this.noteWeeks=weeks;this.paintMonth();
     }catch(error){
       if(generation!==this.noteGeneration||scope!==this.scope)return;
       if(error.status===401)this.callbacks.onUnauthorized(error);

@@ -93,7 +93,7 @@ document.addEventListener(tagNavigation,async event=>{
 });
 document.addEventListener(vaultNoteNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,detail=event.detail;
-  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
+  if(!session||!await navigationGuards(detail.guards,session)||!await notes.canLeave()||!await track.canLeaveWeekNote()||!await today.canLeaveJournal()||!await notePopup.canLeave()||!await canLeaveSearchEvents()||session!==api)return;
   detail.leave.forEach(leave=>leave());
   if(detail.popup){calendarSearchPopup.close(true);await notePopup.openEntry(detail.entry,session,connected&&canWrite,detail);return;}
   if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}

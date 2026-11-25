@@ -30,6 +30,9 @@ database baseline.
   2026-09 and Java 21.
 - Moved the main navigation to a collapsible left sidebar on desktop, with
   search, sync status and the account menu in a bottom bar (#713).
+- Added ISO week numbers to the monthly Calendar, with direct access to saved
+  weekly journal notes (#743).
+
 - Showed events by day and tasks by deadline while editing a weekly note in
   Today, with the daily work-session list hidden (#738).
 - Kept phone journal formatting applied to the selected text when opening Note tools.

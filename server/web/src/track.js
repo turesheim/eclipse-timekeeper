@@ -8,6 +8,7 @@ import {dateNavigation} from './date-navigation.js';
 import {TrackHolidays} from './track-holidays.js';
 import {weeklyHoliday} from './holidays.js';
 import {TrackDayNotes} from './track-day-notes.js';
+import {isoWeek,savedWeeks,WeekNoteEditor} from './week-note-editor.js';
 import {workSummaryCard} from './work-summary-card.js';
 import {richTooltip} from './tooltips.js';
 import {workSessionsTooltip} from './tooltip-content.js';
@@ -24,6 +25,12 @@ export class MonthTrack {
     this.grid = root.querySelector('#track-calendar');this.totals = root.querySelector('#track-clients');
     this.holidays=new TrackHolidays(root,this.grid,this.input);
     this.notes=new TrackDayNotes(root,this.grid,this.input,callbacks);
+    this.weekEditor=new WeekNoteEditor(root,{
+      onUnauthorized:callbacks.onUnauthorized,onNotesChanged:callbacks.onChanged
+    },{inline:false});
+    this.weekEditor.dialog.addEventListener('close',()=>{
+      if(!this.root.hidden&&this.snapshot&&!this.weekEditor.opened)this.focusWeek(this.weekEditor.context.week);
+    });
     this.monthPicker = new MonthPicker(root, () => this.currentMonth(), (month) => this.select(month));
     for (const [id, glyph, label, offset] of [['track-previous', 'left', i18nText("ui.previous_month"), -1], ['track-next', 'right', i18nText("ui.next_month"), 1]]) {
       const button = root.querySelector('#' + id);iconButton(button, glyph, label);
@@ -60,11 +67,53 @@ export class MonthTrack {
   }
   setWritable(writable) {
     this.writable = writable;this.notes.setWritable(writable);
+    this.weekEditor.writable=writable;this.weekEditor.controls();
     for (const button of this.grid.querySelectorAll('button[data-track-daily-client]')) button.disabled = !writable;
     if (!writable) this.closePicker();
   }
   show() {this.paint(true);}
-  hide() {this.notes.hide();this.closePicker();this.holidays.hide();this.monthPicker.close();}
+  hide() {this.notes.hide();void this.weekEditor.close(true);this.closePicker();this.holidays.hide();this.monthPicker.close();}
+  canLeaveWeekNote() {return this.weekEditor.canLeave();}
+  focusWeek(week) {
+    (this.grid.querySelector(`[data-track-week-note="${week}"]`)||this.input).focus({preventScroll:true});
+  }
+  paintWeekNotes(weeks) {
+    for(const cell of this.grid.querySelectorAll('[data-track-week]')){
+      const week=cell.dataset.trackWeek,number=String(Number(week.slice(-2)));
+      if(!weeks?.has(week)){
+        if(cell.firstElementChild===document.activeElement)this.input.focus({preventScroll:true});
+        cell.textContent=number;
+        continue;
+      }
+      if(cell.firstElementChild)continue;
+      const button=node('button',number,'btn btn-link track-week-note');
+      button.type='button';button.dataset.trackWeekNote=week;
+      button.setAttribute('aria-label',i18nText('today.week_note',{week}));
+      button.setAttribute('aria-haspopup','dialog');
+      button.addEventListener('click',()=>void this.weekEditor.open(week,this.session,this.writable));
+      cell.replaceChildren(button);
+    }
+  }
+  updateWeekNotes() {
+    const session=this.session,calendar=this.calendar,revision=this.snapshot.revision;
+    const previous=this.weekNotes;
+    const sameMonth=previous?.session===session&&previous?.calendar===calendar;
+    if(sameMonth&&previous.revision===revision){
+      this.paintWeekNotes(previous.weeks);return;
+    }
+    const current=this.weekNotes={session,calendar,revision,weeks:sameMonth?previous.weeks:null};
+    this.paintWeekNotes(current.weeks);
+    if(!session)return;
+    void savedWeeks(session,calendar.days[0].date,calendar.days.at(-1).date).then(weeks=>{
+      if(this.weekNotes!==current||this.session!==session)return;
+      current.weeks=weeks;
+      if(!this.root.hidden)this.paintWeekNotes(weeks);
+    }).catch(error=>{
+      if(this.weekNotes!==current||this.session!==session)return;
+      this.weekNotes=null;
+      if(error.status===401)this.callbacks.onUnauthorized(error);
+    });
+  }
   closePicker() {this.picking = null;if (this.picker.open) this.picker.close();this.choices.replaceChildren();}
   sessions(date, clientId) {
     const ids = new Set(this.days?.find((day) => day.date === date)?.clients.get(clientId)?.sessionIds || []);
@@ -99,7 +148,7 @@ export class MonthTrack {
     if (focused) ([...this.choices.children].find((choice) => choice.dataset.trackSessionChoice === focused) || this.choices.firstElementChild)?.focus();
   }
   reset() {
-    this.notes.reset();this.session=null;
+    this.notes.reset();this.weekEditor.reset();this.weekNotes=null;this.session=null;
     this.holidays.reset();
     this.monthPicker.close();
     this.closePicker();this.days = null;this.sessionsById?.clear();this.writable = false;this.pickerOrigin = null;this.pickerContext.textContent = '';
@@ -123,6 +172,7 @@ export class MonthTrack {
       const active = document.activeElement,focused = active?.dataset.trackDailyClient && this.grid.contains(active) ? { date: active.closest('[data-track-date]').dataset.trackDate, client: active.dataset.trackDailyClient } : null;
       const noteFocused=this.grid.contains(active)?active?.dataset.trackNoteDate:null;
       const holidayFocused=this.grid.contains(active)?active?.dataset.trackHolidayDate:null;
+      const weekFocused=this.grid.contains(active)?active?.dataset.trackWeekNote:null;
       this.layout = layout;this.date = today;this.input.value = month;
       const title = dateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(month + '-15T12:00:00Z'));
       this.root.querySelector('#track-title').textContent = title.charAt(0).toLocaleUpperCase(getLocale()) + title.slice(1);
@@ -130,6 +180,8 @@ export class MonthTrack {
       const holidayCells=new Map();
       const table = node('table', undefined, 'track-month'),head = node('thead'),row = node('tr'),body = node('tbody');
       table.setAttribute('aria-label', i18nText("ui.work_hours_by_client_and_day"));
+      const weekHeading=node('th',i18nText('today.week_short'),'track-week-heading');
+      weekHeading.scope='col';row.append(weekHeading);
       for (let index = 0; index < 7; index++) {
         const date = new Date(Date.UTC(2024, 0, 1 + index)),th = node('th', dateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(date));
         th.scope = 'col';th.title = dateTimeFormat(getLocale(), { weekday: 'long', timeZone: 'UTC' }).format(date);row.append(th);
@@ -139,7 +191,12 @@ export class MonthTrack {
       const projectsById = new Map(this.snapshot.projects.map((project) => [project.id, project]));
       let week;
       for (const [index, day] of result.days.entries()) {
-        if (index % 7 === 0) {week = node('tr');body.append(week);}
+        if (index % 7 === 0) {
+          week=node('tr');
+          const number=node('th',undefined,'track-week-number');
+          number.scope='row';number.dataset.trackWeek=isoWeek(day.date);
+          week.append(number);body.append(week);
+        }
         const cell = node('td', undefined, day.inMonth ? 'track-day' : "track-day track-outside");cell.dataset.trackDate = day.date;
         cell.classList.toggle('weekly-holiday',weeklyHoliday(day.date,getLocale()));
         holidayCells.set(day.date,cell);
@@ -180,6 +237,8 @@ export class MonthTrack {
       if (focused) this.dailyTimes.get(focused.date + '/' + focused.client)?.summary.focus();
       this.notes.update(this.calendar,holidayCells,this.session,this.snapshot.revision,this.writable,noteFocused,this.snapshot.profile.data);
       this.holidays.update(this.calendar,holidayCells,holidayFocused,this.snapshot.profile.data.holidayCountry);
+      this.updateWeekNotes();
+      if(weekFocused)this.focusWeek(weekFocused);
       this.paintPicker();
     }
     this.root.querySelector('#track-total').textContent = this.format(result.total);
