@@ -78,6 +78,7 @@
         <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities" data-i18n-aria-label="ui.activities" data-i18n-title="ui.activities"><span class="icon bi bi-hourglass-split" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.activities">Activities</span></span></button>
         <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks" data-i18n-aria-label="ui.tasks" data-i18n-title="ui.tasks"><span class="icon bi bi-list-task" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.tasks">Tasks</span></span></button>
         <button class="nav-link" data-tab="notes" aria-label="Notes" title="Notes" data-i18n-aria-label="notes.title" data-i18n-title="notes.title"><span class="icon bi bi-journals" aria-hidden="true"></span><span class="nav-label"><span data-i18n="notes.title">Notes</span></span></button>
+        <button class="nav-link" id="desktop-guide-open" type="button" aria-haspopup="dialog" aria-label="User guide" title="User guide" data-i18n-aria-label="guide.title" data-i18n-title="guide.title"><span class="icon bi bi-book" aria-hidden="true"></span><span class="nav-label" data-i18n="guide.title">User guide</span></button>
         </div><button type="button" id="workspace-nav-toggle" class="btn btn-outline-secondary" aria-controls="workspace-view-links" aria-expanded="false" hidden></button></div>
       </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
@@ -162,6 +163,14 @@
     <div id="account-projects-home" hidden><section id="projects-panel" aria-labelledby="account-projects-title" hidden=""><div class="toolbar"><h2 id="account-projects-title"><span data-i18n="ui.projects">Projects</span></h2><button class="btn btn-primary" id="add-project"><span data-i18n="ui.new_project">New project</span></button></div><div id="projects" class="card table-wrap"></div></section></div>
     <div id="account-labels-home" hidden><section id="labels-panel" aria-labelledby="account-labels-title" hidden=""><div class="toolbar"><h2 id="account-labels-title"><span data-i18n="ui.labels">Labels</span></h2><button class="btn btn-primary" id="add-label"><span data-i18n="ui.new_label">New label</span></button></div><div id="labels" class="card table-wrap"></div></section></div>
   </main>
+  <dialog class="app-dialog journal-dialog journal-document-dialog shadow-lg" id="desktop-guide" aria-labelledby="desktop-guide-title">
+    <div class="week-note-heading">
+      <h2 id="desktop-guide-title" data-i18n="guide.title">User guide</h2>
+      <button class="btn btn-outline-secondary" id="desktop-guide-close" type="button" autofocus data-i18n="ui.close">Close</button>
+    </div>
+    <p id="desktop-guide-status" class="hint" role="status"></p>
+    <div id="desktop-guide-content" class="journal-document-content" lang="en" hidden></div>
+  </dialog>
   <dialog class="app-dialog server-info shadow-lg" id="server-info" aria-labelledby="about-title">
     <h2 id="about-title" tabindex="-1"><span data-i18n="ui.about_timekeeper">About Dagsverk</span></h2>
     <p id="about-copyright">Copyright © 2014–2026 Torkild U. Resheim</p>

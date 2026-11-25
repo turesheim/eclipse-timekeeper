@@ -1,4 +1,7 @@
 {
+  "guide.title": "Brukerhåndbok",
+  "guide.loading": "Laster brukerhåndboken…",
+  "guide.failed": "Brukerhåndboken kunne ikke lastes. Åpne den på nytt for å prøve igjen.",
   "locale.language": "Språk og region",
   "locale.browser": "Bruk nettleserens språk",
   "locale.save": "Lagre språk",

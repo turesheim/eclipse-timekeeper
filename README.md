@@ -16,9 +16,11 @@ storage or connect to the same server account as the browser.
 through the testing update site and GitHub Actions artifacts described below.
 
 [Project website](https://turesheim.github.io/eclipse-timekeeper/) ·
-[Web client guide](docs/development/WEB-CLIENT.md) ·
-[Eclipse user guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Timekeeper-2.0-User-Guide) ·
 [Documentation index](docs/README.md)
+
+- **End users:** [Desktop browser](docs/user/DESKTOP.md) · [Mobile browser](docs/user/MOBILE.md) · [Eclipse](docs/user/eclipse/README.md) · [Account and data guides](docs/user/README.md)
+- **Developers:** [Development documentation](docs/development/README.md)
+- **Server administrators:** [Server administration documentation](docs/operations/README.md)
 
 The product is gradually adopting the Dagsverk name. Existing Eclipse installation
 names, package IDs, configuration variables and download URLs retain Timekeeper
@@ -127,7 +129,7 @@ for release channels and installing a downloaded p2 archive.
 | [common](common/README.md) | Shared Java domain, service API, HTTP client and OpenAPI contract |
 | [eclipse](eclipse/README.md) | Eclipse plugins, features, p2 repository, targets and installed tests |
 | [server](server/README.md) | Quarkus server, Docker deployment and bundled [web client](server/web/README.md) |
-| [docs](docs/README.md) | Architecture, operations, development guides and verification evidence |
+| [docs](docs/README.md) | User, developer and server administrator guides |
 | `scripts/` | Repository-wide release and publication tools |
 
 Development uses **JDK 21, Python 3.13 and Node.js 24**. Follow the

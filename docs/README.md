@@ -4,28 +4,19 @@ Dagsverk tracks work sessions and activities in a browser or Eclipse. Start with
 the guide for your task; implementation contracts and dated test reports are
 separate references.
 
-## Install and use
+## End users
 
-| Task | Guide |
-| --- | --- |
-| Install the Synology package | [Package Center installation and recovery](operations/SYNOLOGY-PACKAGE.md) |
-| Run locally with Docker | [Local Docker setup](operations/LOCAL-DOCKER.md) |
-| Run the standalone Java server | [Server setup](operations/SERVER.md) |
-| Deploy PostgreSQL and server replicas | [Compose deployment](operations/DEPLOYMENT.md) |
-| Use the browser client | [Web client guide](operations/WEB-CLIENT.md) |
-| Connect Eclipse | [Eclipse backend selection](operations/ECLIPSE-CLIENT.md) |
-| Create accounts, passkeys or API tokens | [Accounts and recovery](operations/ACCOUNTS.md) |
-| Enable Google/Microsoft access as an administrator | [App registration and direct/managed OAuth modes](operations/SHARED-SIGN-IN.md) |
-| Connect your own Google/Microsoft account or a calendar feed | [Internet accounts and subscriptions](operations/TASK-PROVIDERS.md) |
-| Back up or restore an installation | [Full-instance backup and restore](operations/INSTANCE-BACKUP.md) |
-| Transfer one account | [Personal account archives](operations/ACCOUNT-DATA.md) |
+- [Desktop browser](user/DESKTOP.md)
+- [Mobile browser](user/MOBILE.md)
+- [Eclipse](user/eclipse/README.md)
+- [Account and data guides](user/README.md#account-and-data)
 
-See [all operational guides](operations/README.md) for Notes, WebDAV, Toggl import,
-Tailscale, diagnostics and configuration names. Eclipse installation, tracking
-and Mylyn workflows are also covered in the
-[Eclipse user guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Timekeeper-2.0-User-Guide).
+## Server administrators
 
-## Develop and maintain
+Start with the [server administration guides](operations/README.md) for
+deployment, accounts, configuration and recovery.
+
+## Developers
 
 Start with [repository setup and build commands](development/REPOSITORY.md).
 The [development index](development/README.md) links component guides, browser and
