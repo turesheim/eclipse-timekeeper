@@ -468,7 +468,30 @@ final class TaskProviderWrites {
         row.set("result",chosen.original().deepCopy());if(!row.path("action").asText().equals("MOVE"))row.put("externalId",chosen.id());row.put("providerEtag",chosen.source().path("remoteEtag").asText()).put("acknowledgedAt",scan.path("startedAt").asText()).put("generation",connections().required(connection).path("generation").asText()).put("state","ACK");
         if(row.path("action").asText().equals("MOVE"))linkMoved(row);else linkCreated(row);var saved=owned(connection,id);if(saved.path("state").asText().equals("DONE")){saved.put("state","RECONCILED");saved=connections().save(KIND,saved);}return visible(saved);
     }
-    static boolean queued(ServerStore store,UUID connection){for(var value:store.list(KIND))if(value.path("connectionId").asText().equals(connection.toString())&&(Set.of("QUEUED","CHECKING").contains(value.path("state").asText())||value.path("checkRequested").asBoolean()))return true;return false;}
+    static boolean hasRunnableWork(ServerStore store,UUID connection,JsonNode auth){
+        if(!TaskProviderConnections.services(auth).path("tasks").asBoolean()||auth.path("selected").isEmpty())return false;
+        var selected=new HashSet<String>();
+        auth.path("selected").forEach(list->selected.add(list.asText()));
+        var readable=new HashSet<String>();
+        var writable=new HashSet<String>();
+        for(var list:store.list("TASK_LIST")){
+            String remote=list.path("remoteListId").asText();
+            if(!list.path("connectionId").asText().equals(connection.toString())||!selected.contains(remote)
+                    ||!TaskProviderScans.approved(auth,remote)||!list.path("present").asBoolean()||!list.path("readable").asBoolean())continue;
+            String id=list.path("id").asText();
+            readable.add(id);
+            if(list.path("writable").asBoolean())writable.add(id);
+        }
+        boolean canWrite=TaskProviderConnections.writable(auth,store.find("TASK_CONNECTION",connection).orElseThrow());
+        for(var row:store.list(KIND)){
+            String list=row.path("listId").asText(),state=row.path("state").asText();
+            if(!row.path("connectionId").asText().equals(connection.toString())||!readable.contains(list))continue;
+            if(canWrite&&writable.contains(list)&&Set.of("QUEUED","CHECKING").contains(state))return true;
+            if(!row.path("checkRequested").asBoolean()||!Set.of("UNKNOWN","ACK_REVIEW").contains(state))continue;
+            if(!needsIdentity(row)||!row.path("action").asText().equals("MOVE")||readable.contains(row.path("targetListId").asText()))return true;
+        }
+        return false;
+    }
     static int exceptions(ServerStore store,UUID connection){int count=0;for(var row:store.list(KIND))if(row.path("connectionId").asText().equals(connection.toString())&&Set.of("UNKNOWN","ACK_REVIEW","CONFLICT").contains(row.path("state").asText()))count++;return count;}
     static int pending(ServerStore store,UUID connection){int count=0;for(var value:store.list(KIND))if(value.path("connectionId").asText().equals(connection.toString())&&!DONE.contains(value.path("state").asText()))count++;return count;}
     private boolean freshScan(TaskProviderConnections.Claim claim,JsonNode row){

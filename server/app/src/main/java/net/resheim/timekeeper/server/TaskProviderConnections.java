@@ -266,14 +266,29 @@ final class TaskProviderConnections {
         boolean blocked=error!=null&&Set.of("TASK_PROVIDER_RECONNECT_REQUIRED","TASK_PROVIDER_OFFLINE_ACCESS_REQUIRED","TASK_PROVIDER_PERMISSION_REQUIRED","TASK_PROVIDER_ACCOUNT_CHANGED","TASK_PROVIDER_CONFIGURATION_CHANGED").contains(error);
         int next=value.path("roundIndex").asInt()+1;boolean more=!blocked&&!claim.catalogOnly()&&next<value.path("selected").size();
         value.put("roundIndex",more?next:0).put("roundActive",more).put("blocked",blocked).putNull("lease").putNull("leaseUntil");
-        boolean queued=TaskProviderWrites.queued(store,claim.id())||value.path("intentRevision").asLong()>value.path("roundIntentRevision").asLong()||services(value).path("calendars").asBoolean()&&value.path("calendarPending").asBoolean();if(!more)value.put("requested",!blocked&&queued);
+        Instant now=store.now();
+        boolean hasCalendars=services(value).path("calendars").asBoolean()&&!value.path("calendarSelected").isEmpty();
+        Instant calendarRetry=hasCalendars&&value.hasNonNull("calendarRetryUntil")?Instant.parse(value.path("calendarRetryUntil").asText()):null;
+        boolean calendarWaiting=calendarRetry!=null&&calendarRetry.isAfter(now);
+        boolean newIntent=value.path("intentRevision").asLong()>value.path("roundIntentRevision").asLong();
+        boolean calendarPending=hasCalendars&&!calendarWaiting&&value.path("calendarPending").asBoolean();
+        if(!more)value.put("requested",!blocked&&(newIntent||calendarPending||TaskProviderWrites.hasRunnableWork(store,claim.id(),value)));
         if(outcome!=null&&outcome.path("awaitingImport").asBoolean())value.put("roundPreview",true);
         if(!more&&errors.isEmpty()&&!value.path("roundPreview").asBoolean()&&(!value.path("automatic").asBoolean()||TaskProviderWrites.pending(store,claim.id())==0))value.put("lastSuccess",store.now().toString());
         String first=errors.isEmpty()?null:errors.elements().next().asText();if(first==null)value.putNull("lastError");else value.put("lastError",first);
         if(retryAfter>0)value.put("retryUntil",store.now().plusSeconds(retryAfter).toString());else if(errors.isEmpty())value.remove("retryUntil");
         if(blocked)value.putNull("nextRefresh");
-        else value.put("nextRefresh",store.now().plusSeconds(Math.max(Math.max(0,retryAfter),more?0:!errors.isEmpty()?60:queued?0:value.path("automatic").asBoolean()?45+Math.floorMod(claim.id().hashCode(),15):900)).toString());
-        if(!blocked&&!more&&services(value).path("calendars").asBoolean()&&value.hasNonNull("calendarRetryUntil")&&Instant.parse(value.path("calendarRetryUntil").asText()).isBefore(Instant.parse(value.path("nextRefresh").asText())))value.set("nextRefresh",value.get("calendarRetryUntil"));
+        else {
+            // Persisted writes can remain queued without progress. Only new edits or
+            // an unfinished calendar scan shorten the regular polling interval.
+            int delay=more?0:!errors.isEmpty()?60:newIntent?0:calendarPending?30:value.path("automatic").asBoolean()?45+Math.floorMod(claim.id().hashCode(),15):900;
+            Instant nextRefresh=now.plusSeconds(Math.max(retryAfter,delay));
+            if(!more&&calendarWaiting&&calendarRetry.isBefore(nextRefresh)){
+                Instant earliest=now.plusSeconds(Math.max(retryAfter,30));
+                nextRefresh=calendarRetry.isBefore(earliest)?earliest:calendarRetry;
+            }
+            value.put("nextRefresh",nextRefresh.toString());
+        }
         save(AUTH,value);return more;
     }
     private boolean enabled(){
