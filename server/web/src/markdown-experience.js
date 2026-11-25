@@ -116,6 +116,7 @@ export function buildExperience(field){
       button.addEventListener('click',()=>{if(!valid())return;f.dismissSuggestions();run();});suggestions.append(button);
     };
     const {wiki,slash,emoji}=state;
+    suggestions.classList.toggle('markdown-emoji-suggestions',!!emoji);
     if(emoji)for(const {name,emoji:character}of emojiSuggestions(emoji.query))add(character+' :'+name+':',()=>f.editor.insertEmoji(emoji,name));
     if(slash)for(const name of ['heading','list','ordered','tasks','quote','code_block','table','hr'])if(t('markdown.'+name).toLocaleLowerCase().includes(slash.query.toLocaleLowerCase()))add(t('markdown.'+name),()=>f.editor.replaceSlash(name));
     if(wiki&&f.resources?.complete)void f.resources.complete(wiki.query,{assetsOnly:wiki.embed}).then(entries=>{
