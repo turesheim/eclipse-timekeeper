@@ -12,6 +12,8 @@ database baseline.
   with a split background when both apply, and marked weekly rest days in
   Today, Track and Calendar (#733).
 
+- Matched emoji completion proposals to the Markdown editor body font (#746).
+
 - Added correlated revision and request diagnostics for workspace sync failures.
 
 - Added optional centralized logging on Synology using Grafana, Loki and Alloy.

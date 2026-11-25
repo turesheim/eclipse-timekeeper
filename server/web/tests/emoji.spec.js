@@ -14,7 +14,17 @@ test('typing an emoji name offers keyboard completion and the closed shortcode s
   await openEditorFixture(page);await page.evaluate(async()=>{fixtureField.setValue('Hello ');await fixtureField.showFormatted(false);});
   const rich=page.locator('.ProseMirror');await rich.click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type(':rocket:');await expect(rich.locator('[data-emoji=rocket]')).toHaveText('🚀');expect(await page.evaluate(()=>fixtureField.value())).toContain(':rocket:');
   await page.keyboard.press('ControlOrMeta+z');await expect(rich.locator('[data-emoji=rocket]')).toHaveCount(0);await page.keyboard.press('ControlOrMeta+Shift+z');await expect(rich.locator('[data-emoji=rocket]')).toBeVisible();
-  await page.keyboard.type(' :smi');const options=page.getByRole('listbox',{name:'Editor suggestions'});await expect(options).toBeVisible();await rich.press('ArrowDown');await page.keyboard.press('Enter');await expect(rich.locator('[data-emoji]')).toHaveCount(2);
+  await page.keyboard.type(' :smi');
+  const options=page.getByRole('listbox',{name:'Editor suggestions'});
+  const proposal=options.getByRole('option').first();
+  const bodyFont=await rich.locator('p').first().evaluate(paragraph=>{
+    const {fontFamily,fontSize,fontWeight}=getComputedStyle(paragraph);
+    return {fontFamily,fontSize,fontWeight};
+  });
+  await expect(proposal).toHaveCSS('font-family',bodyFont.fontFamily);
+  await expect(proposal).toHaveCSS('font-size',bodyFont.fontSize);
+  await expect(proposal).toHaveCSS('font-weight',bodyFont.fontWeight);
+  await rich.press('ArrowDown');await page.keyboard.press('Enter');await expect(rich.locator('[data-emoji]')).toHaveCount(2);
   const before=await page.evaluate(()=>fixtureField.value());await page.evaluate(()=>fixtureField.setReadOnly(true));await rich.press('End');await page.keyboard.type(':heart:');expect(await page.evaluate(()=>fixtureField.value())).toBe(before);
 });
 
