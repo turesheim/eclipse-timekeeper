@@ -16,6 +16,46 @@ async function api(request,method,path,data,headers={}){
   expect(response.ok(),`${method} ${path}: ${response.status()}`).toBe(true);return response;
 }
 
+test('weekly notes show events by day and tasks by deadline, then restore the daily sidebar',async({page,request})=>{
+  const first='2026-12-28',last='2027-01-03',end='2027-01-04';
+  const profile=await api(request,'GET','/me');
+  await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
+  const source=await(await api(request,'POST','/clients',{name:'Weekly agenda '+randomUUID().slice(0,8),color:'#176653'})).json();
+  const subscriptionId=randomUUID();
+  const event=(key,title,firstDate,endDate)=>({key,subscriptionId,title,allDay:true,firstDate,endDate,clientId:source.id,clientName:source.name,activityIds:[]});
+  const events=[event('weekly-monday','Monday meeting',first,'2026-12-29'),event('weekly-sunday','Sunday review',last,end)];
+  await page.route('**/api/v1/calendar-events?**',async route=>{
+    const response=await route.fetch(),body=await response.json(),query=new URL(route.request().url()).searchParams;
+    await route.fulfill({response,json:{...body,items:events.filter(event=>event.firstDate<query.get('toDate')&&event.endDate>query.get('fromDate'))}});
+  });
+  for(const [summary,date] of [['Monday deadline',first],['Sunday deadline',last],['Next week deadline',end]]){
+    const created=await api(request,'POST','/tasks',{summary,projectId:null,parentTaskId:null,url:null});
+    const {id}=await created.json();
+    await api(request,'PUT','/tasks/'+id+'/timing',{start:null,due:{kind:'DATE',date}},{'If-Match':created.headers().etag});
+  }
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
+  await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('#today-date').fill(first);
+  const eventsRoot=page.locator('#today-events'),tasks=page.locator('#today-planned-tasks'),sessions=page.locator('#today-sessions');
+  await expect(eventsRoot).toContainText('Monday meeting');
+  await expect(eventsRoot).not.toContainText('Sunday review');
+  await expect(sessions).toBeVisible();
+
+  await page.locator('#today-month-grid [data-week="2026-W53"]').click();
+  await expect(page.locator('#today-week-note-editor')).toBeVisible();
+  await expect(sessions).toBeHidden();
+  await expect(eventsRoot.getByRole('heading',{level:4})).toHaveText([/Monday.*28/,/Sunday.*3/]);
+  await expect(eventsRoot.locator('ul')).toHaveText([/Monday meeting/,/Sunday review/]);
+  await expect(tasks.getByRole('heading',{level:4})).toHaveText([/Monday.*28/,/Sunday.*3/]);
+  await expect(tasks.locator('ul')).toHaveText([/Monday deadline/,/Sunday deadline/]);
+  await expect(tasks).not.toContainText('Next week deadline');
+  await page.locator('#today-week-note-editor').getByRole('button',{name:'Close',exact:true}).click();
+  await expect(sessions).toBeVisible();
+  await expect(eventsRoot).toContainText('Monday meeting');
+  await expect(eventsRoot).not.toContainText('Sunday review');
+  await expect(tasks).not.toContainText('Sunday deadline');
+});
+
 test('Today sidebars resize with pointer and keyboard while preserving the journal and mobile layout',async({page,request})=>{
   const date='2026-09-14',original=(await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body,draft='# Sidebar layout\n\nSidebar resize draft '+randomUUID();
   try{
