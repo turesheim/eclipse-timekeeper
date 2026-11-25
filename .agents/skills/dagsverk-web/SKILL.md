@@ -15,6 +15,10 @@ Read root-relative `server/web/README.md` and the applicable sections of
 - Reuse established components, account navigation and dialog/focus behavior.
   Check keyboard operation, accessible names, narrow screens and affected
   light/dark themes. Use browser inspection/screenshots for layout changes.
+- For UI-affecting PRs, follow the screenshot requirement in
+  [dagsverk-change](../dagsverk-change/SKILL.md). Use the web guide's
+  `captureScreenshot` helper with matching viewport, theme and locale for
+  comparable states.
 - Update both `src/locales/en.json` and `nb.json`, preserving interpolation
   variables and stable translation keys. Run
   `npm run vendor:i18n --prefix server/web` after catalog changes. Never patch
