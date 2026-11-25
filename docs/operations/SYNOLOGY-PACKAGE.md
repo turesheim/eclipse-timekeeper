@@ -14,7 +14,7 @@ their own RAM. If you apply a container memory limit, leave headroom above the
 heap. Do not carry forward an older `JAVA_OPTS` override such as `-Xmx384m`.
 Private archive preparation uses `/state/server/tmp` on the persistent state
 volume, with additional disk space required for ZIP output. It does not use the
-container's RAM-backed `/tmp`. See [account-data exports](ACCOUNT-DATA.md).
+container's RAM-backed `/tmp`. See [account-data exports](../user/ACCOUNT-DATA.md).
 
 The current scope of #297 is a downloadable SPK installed through **Package
 Center → Manual Install**, with NAS lifecycle tests and migration/recovery

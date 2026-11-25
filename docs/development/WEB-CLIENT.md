@@ -164,14 +164,14 @@ zone. Keep report windows owner-bound and reject late results after sign-out.
 
 Preview, apply and Undo use bounded, owner-bound operations and durable receipts.
 Keep uncertain outcomes visible rather than resubmitting automatically. User
-steps belong in [Toggl import](../operations/TOGGL-IMPORT.md); wire semantics belong
+steps belong in [Toggl import](../user/TOGGL-IMPORT.md); wire semantics belong
 in [API v1](../architecture/API-V1.md).
 
 ## Account data portability
 
 Account archives and full-instance backups have different authority and contents.
 Reuse archive review and fresh-ID import; never accept source IDs as current local
-authority. See [personal archives](../operations/ACCOUNT-DATA.md) and
+authority. See [personal archives](../user/ACCOUNT-DATA.md) and
 [instance backup implementation](../architecture/INSTANCE-BACKUP.md).
 
 ## Undo work-session changes

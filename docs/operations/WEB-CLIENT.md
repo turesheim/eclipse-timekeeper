@@ -97,7 +97,7 @@ journal; Week and calendar details can open related notes. These views share the
 same stored document. Opening calendar details alone does not create a note.
 
 The editor supports formatted and source views, links, lists, code and diagrams.
-See the [Markdown editor guide](MARKDOWN-EDITOR.md) for shortcuts and supported
+See the [Markdown editor guide](../user/MARKDOWN-EDITOR.md) for shortcuts and supported
 syntax. **Open in workspace** saves pending edits before opening the document in
 Today or Notes. A failed or conflicting save keeps the draft available for review.
 
@@ -138,9 +138,9 @@ users' work records. See [accounts and recovery](ACCOUNTS.md).
 
 ## Import, export and recovery
 
-Use [Toggl Track import](TOGGL-IMPORT.md) to review time entries before applying
+Use [Toggl Track import](../user/TOGGL-IMPORT.md) to review time entries before applying
 an import and to inspect its history or Undo actions. Use
-[personal account archives](ACCOUNT-DATA.md) to review and transfer one account's
+[personal account archives](../user/ACCOUNT-DATA.md) to review and transfer one account's
 work. Imports allocate new identities; they do not overwrite a different account.
 
 An account archive is not an installation backup. Administrators use

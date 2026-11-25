@@ -6,10 +6,13 @@
 
 See the [detailed web client guide](../operations/WEB-CLIENT.md) for more workflows.
 
+## Notes and journals
+
+- [Write journals and notes in the Markdown editor](MARKDOWN-EDITOR.md).
+
 ## Account and data
 
 - [Sign in and manage your account](../operations/ACCOUNTS.md#browser-sessions-and-account-management), including [recovery email addresses](../operations/ACCOUNTS.md#recovery-email-addresses) and [passkeys](../operations/ACCOUNTS.md#passkeys).
 - [Connect calendars and tasks through Internet Accounts](../operations/TASK-PROVIDERS.md).
-- [Write journals and notes in the Markdown editor](../operations/MARKDOWN-EDITOR.md).
-- [Import Toggl Track history and undo an import](../operations/TOGGL-IMPORT.md).
-- [Download, review or restore your own account data](../operations/ACCOUNT-DATA.md).
+- [Import Toggl Track history and undo an import](TOGGL-IMPORT.md).
+- [Download, review or restore your own account data](ACCOUNT-DATA.md).

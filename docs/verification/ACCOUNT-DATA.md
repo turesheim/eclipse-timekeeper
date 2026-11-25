@@ -47,7 +47,7 @@ python server/scripts/archive_replica_acceptance.py \
 The container workflow uploads receipts with source/image identity and asserted
 checks. Packaged browser receipts identify the distribution digest and source.
 Traces and videos containing credentials are disabled. See the
-[user guide](../operations/ACCOUNT-DATA.md) and
+[user guide](../user/ACCOUNT-DATA.md) and
 [desktop/mobile review screenshots](../development/WEB-CLIENT.md#account-data-portability).
 
 ## Separate preparation and download (#469)

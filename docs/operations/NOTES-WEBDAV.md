@@ -140,7 +140,7 @@ render in formatted mode. Missing or ambiguous targets are reported instead of
 selecting an arbitrary file. Unknown extensions remain editable source fragments.
 Dagsverk imports note files and attachments without requiring the application
 that created them. It does not execute third-party note plugins. See the
-[shared editor guide](MARKDOWN-EDITOR.md) for the supported dialect and controls.
+[shared editor guide](../user/MARKDOWN-EDITOR.md) for the supported dialect and controls.
 Standard relative Markdown links navigate within the collection. Verified raster
 images use authenticated previews, both inline in formatted Markdown and in the
 content pane when selected in the navigation tree; other attachments can be downloaded.
@@ -164,7 +164,7 @@ each missing or invalid coordinate defaults to the center. Missing, ambiguous,
 unsupported or remote images leave no banner. Import the referenced images with
 the notes, retaining their folder paths. Prose edits preserve the original YAML;
 daily note tools can change the banner image and crop in Dagsverk. See
-[note banners and daily weather](MARKDOWN-EDITOR.md#note-banners-and-daily-weather).
+[note banners and daily weather](../user/MARKDOWN-EDITOR.md#note-banners-and-daily-weather).
 Custom field names and banner icons are not supported. Running Obsidian or its
 plugins is not required to import, edit or display these notes in Dagsverk.
 

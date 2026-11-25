@@ -77,7 +77,7 @@ not introduced; it would require an explicit privacy/retention design.
   serialization 59 ms, cached reads below 1 ms, input-to-next-frame p95 41.1 ms
   on the same 53,089-byte fixture and browser/platform named above.
 
-The user guide is [Shared Markdown editor](../operations/MARKDOWN-EDITOR.md).
+The user guide is [Shared Markdown editor](../user/MARKDOWN-EDITOR.md).
 It defines the supported dialect, normalization boundaries, shortcuts, storage,
 save/recovery behavior and limitations. API/data-model documents cover revisions.
 

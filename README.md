@@ -48,10 +48,10 @@ are tracked independently of work sessions; their time overlap provides context.
 - **Toggl Track import** maps source clients and projects to new or existing
   records and supports undoing a whole import. Prefer the Legacy CSV export
   because it includes client names. Duration is calculated from Start/End times;
-  the exported Duration column is ignored. See the [import guide](docs/operations/TOGGL-IMPORT.md).
+  the exported Duration column is ignored. See the [import guide](docs/user/TOGGL-IMPORT.md).
 - **My Account** manages your profile, time zone, password, passkeys, recovery
   email addresses and personal API tokens. Download or restore your work through
-  [Your data](docs/operations/ACCOUNT-DATA.md).
+  [Your data](docs/user/ACCOUNT-DATA.md).
 
 Each server account's records and preferences are private to that account.
 Administrators manage account access without access to other users' work records. See [accounts and recovery](docs/operations/ACCOUNTS.md).

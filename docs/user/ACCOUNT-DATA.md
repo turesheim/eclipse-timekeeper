@@ -39,7 +39,7 @@ using them are stopped.
 
 The supported server requires at least **2 GiB of Java heap**, plus memory for
 the JVM outside its heap and for the database/OS. See the
-[server memory requirements](SERVER.md#configure-and-run). Raising heap size does
+[server memory requirements](../operations/SERVER.md#configure-and-run). Raising heap size does
 not replace streaming: total archive size can be larger than the available heap.
 
 The private ZIP contains:
@@ -80,7 +80,7 @@ older transfer endpoint's 10,000-record/20 MiB limits do not truncate this downl
 CSV cells are quoted and potential spreadsheet formulas receive an apostrophe;
 JSON retains the original values. The ZIP is unencrypted; keep it on private
 encrypted storage and protect its backups. See [journal storage and key
-management](JOURNAL-STORAGE.md) for database, temporary-file and backup protection.
+management](../operations/JOURNAL-STORAGE.md) for database, temporary-file and backup protection.
 
 ## Review and restore
 
@@ -141,8 +141,8 @@ explicitly. At most three uploads and 2 GiB of declared upload data can be
 pending for one account. Read-only sessions can download their account and cannot
 stage or restore an archive.
 
-Use [protected deployment backups](DEPLOYMENT.md) or the
-[Synology backup workflow](SYNOLOGY-PACKAGE.md) for disaster recovery, including
+Use [protected deployment backups](../operations/DEPLOYMENT.md) or the
+[Synology backup workflow](../operations/SYNOLOGY-PACKAGE.md) for disaster recovery, including
 account credentials and service configuration. For Toggl CSV, use the separate
 [Toggl Track import](TOGGL-IMPORT.md).
 
@@ -150,7 +150,7 @@ Day-label/note diagnostic history is included as private `ARCHIVE_AUDIT`
 evidence in `importHistory`, with `data.kind: DAY_NOTE_HISTORY`, without bodies or authentication secrets. Restoring
 an archive keeps source evidence as inert audit copies and records new local
 restore events. Supplied event identities or client claims are never installed
-as locally authenticated history. See [API diagnostics](API-DIAGNOSTICS.md) for
+as locally authenticated history. See [API diagnostics](../operations/API-DIAGNOSTICS.md) for
 retention, legacy gaps and inspecting source versus local evidence.
 
 ### Notes and vaults in archive v4
@@ -162,4 +162,4 @@ canonical journals/assets retain the existing portable framing. Versions v1–v3
 remain readable. A restore rebuilds account-private derived indexes and enforces
 the destination quotas. It requires a pristine general Notes collection and
 refuses an implicit collection merge. Day labels remain separate. See
-[Notes recovery limits and transition](NOTES-WEBDAV.md).
+[Notes recovery limits and transition](../operations/NOTES-WEBDAV.md).

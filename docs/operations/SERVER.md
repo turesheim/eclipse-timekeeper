@@ -107,7 +107,7 @@ See the [draw.io self-hosting guide](https://github.com/jgraph/drawio/wiki/Self-
 
 Standalone installations without editor assets or a configured host support
 manual PNG import, download, and replacement. See
-[editing diagrams in Dagsverk](MARKDOWN-EDITOR.md#drawio-diagrams).
+[editing diagrams in Dagsverk](../user/MARKDOWN-EDITOR.md#drawio-diagrams).
 
 ## Data and operational behavior
 
