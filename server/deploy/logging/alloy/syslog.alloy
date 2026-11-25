@@ -1,0 +1,16 @@
+loki.source.syslog "dsm" {
+  listener {
+    address                = "0.0.0.0:1514"
+    protocol               = "udp"
+    syslog_format          = "rfc5424"
+    use_incoming_timestamp = true
+    use_rfc5424_message    = true
+    labels = {
+      service_name = "syslog",
+      environment  = sys.env("LOG_ENVIRONMENT"),
+      host         = sys.env("LOG_HOST"),
+    }
+  }
+
+  forward_to = [loki.write.local.receiver]
+}

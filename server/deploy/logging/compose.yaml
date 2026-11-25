@@ -1,0 +1,112 @@
+name: dagsverk-logging
+
+x-service: &service
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+x-log-environment: &log-environment
+  LOG_HOST: ${LOG_HOST:-nas}
+  LOG_ENVIRONMENT: ${LOG_ENVIRONMENT:-production}
+
+services:
+  alloy:
+    <<: *service
+    image: grafana/alloy:v1.22.0
+    user: '473:473'
+    command: [run, --storage.path=/var/lib/alloy, --server.http.listen-addr=127.0.0.1:12345, /etc/alloy/inputs]
+    environment:
+      <<: *log-environment
+      DAGSVERK_COLLECT_DSM_PACKAGE: ${DAGSVERK_COLLECT_DSM_PACKAGE:-false}
+    volumes:
+      - ./alloy/docker.alloy:/etc/alloy/inputs/docker.alloy:ro
+      - alloy-data:/var/lib/alloy
+    networks: [engine, logs]
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/12345
+          printf 'GET /-/ready HTTP/1.0\r\n\r\n' >&3
+          read -r status <&3
+          [[ $$status == "HTTP/1.0 200 "* ]]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  docker-logs:
+    <<: *service
+    image: haproxy:3.2.15-alpine
+    user: '0:0'
+    read_only: true
+    volumes:
+      - ./docker-logs.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [engine]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:2375/_ping']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  loki:
+    <<: *service
+    image: grafana/loki:3.7.10
+    command: [-config.file=/etc/loki/loki.yaml, -config.expand-env=true]
+    environment:
+      LOG_RETENTION: ${LOG_RETENTION:-720h}
+    volumes:
+      - ./loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    networks: [logs]
+    healthcheck:
+      test: [CMD, /usr/bin/loki, -health, '-health.url=http://127.0.0.1:3100/ready']
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  grafana:
+    <<: *service
+    image: grafana/grafana:13.3.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_PORT:-3000}/}
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+    secrets: [grafana_admin_password]
+    ports:
+      - '${GRAFANA_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000/tcp'
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/dagsverk-dashboards:ro
+    networks: [frontend, logs]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:3000/api/health']
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+networks:
+  engine: {internal: true}
+  logs: {internal: true}
+  frontend: {}
+
+volumes:
+  alloy-data: {}
+  loki-data: {}
+  grafana-data: {}
+
+secrets:
+  grafana_admin_password:
+    file: ./secrets/grafana-admin-password

@@ -1,0 +1,189 @@
+{
+  "uid": "dagsverk-operations",
+  "title": "Dagsverk operations",
+  "schemaVersion": 39,
+  "timezone": "utc",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "links": [
+    {
+      "title": "Explore Loki",
+      "type": "link",
+      "url": "/explore"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "dagsverk-loki"
+        },
+        "refresh": 1,
+        "definition": "label_values(service_name)",
+        "query": "label_values(service_name)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": {
+          "text": "dagsverk",
+          "value": "dagsverk"
+        }
+      },
+      {
+        "name": "environment",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "dagsverk-loki"
+        },
+        "refresh": 1,
+        "definition": "label_values(environment)",
+        "query": "label_values(environment)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log volume",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "dagsverk-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "dagsverk-loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"${service:regex}\", environment=~\"${environment:regex}\"}[$__auto]))",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "Lines per interval"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      }
+    },
+    {
+      "id": 2,
+      "title": "Error rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "dagsverk-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "dagsverk-loki"
+          },
+          "expr": "sum(rate({service_name=~\"${service:regex}\", environment=~\"${environment:regex}\"} | json severity=\"level\" | __error__=\"\" | severity=~\"ERROR|FATAL\"[$__auto])) or vector(0)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "Errors per second"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      }
+    },
+    {
+      "id": 3,
+      "title": "Severity distribution",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "dagsverk-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "dagsverk-loki"
+          },
+          "expr": "sum by (severity) (count_over_time({service_name=~\"${service:regex}\", environment=~\"${environment:regex}\"} | json severity=\"level\" | __error__=\"\" | severity!=\"\"[$__auto]))",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "{{severity}}"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "fillOpacity": 25
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Recent errors",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "dagsverk-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "dagsverk-loki"
+          },
+          "expr": "{service_name=~\"${service:regex}\", environment=~\"${environment:regex}\"} | json severity=\"level\" | __error__=\"\" | severity=~\"ERROR|FATAL\"",
+          "queryType": "range",
+          "editorMode": "code"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

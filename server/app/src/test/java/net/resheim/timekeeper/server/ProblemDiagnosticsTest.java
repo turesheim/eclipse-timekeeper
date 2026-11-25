@@ -28,8 +28,8 @@ class ProblemDiagnosticsTest {
     @Test void authenticationFailureReportsSafeCategoriesAndRecoversWithoutExposingRegistryContents() throws Exception {
         var actual=(TokenRegistry)io.quarkus.arc.ClientProxy.unwrap(registry);String previous=actual.tokensFile,secret="private-token-and-journal-text";
         var file=Files.createTempFile("invalid-registry-",".json");Files.writeString(file,"{"+secret);
-        var messages=new CopyOnWriteArrayList<String>();var thrown=new CopyOnWriteArrayList<Throwable>();
-        var capture=new Handler(){public void publish(LogRecord record){messages.add(record instanceof org.jboss.logmanager.ExtLogRecord value?value.getFormattedMessage():record.getMessage());if(record.getThrown()!=null)thrown.add(record.getThrown());}public void flush(){}public void close(){}};
+        var messages=new CopyOnWriteArrayList<String>();var thrown=new CopyOnWriteArrayList<Throwable>();var levels=new CopyOnWriteArrayList<Level>();
+        var capture=new Handler(){public void publish(LogRecord record){messages.add(record instanceof org.jboss.logmanager.ExtLogRecord value?value.getFormattedMessage():record.getMessage());levels.add(record.getLevel());if(record.getThrown()!=null)thrown.add(record.getThrown());}public void flush(){}public void close(){}};
         Logger problem=Logger.getLogger(ProblemMapper.class.getName()),tokens=Logger.getLogger(TokenRegistry.class.getName());problem.addHandler(capture);tokens.addHandler(capture);
         try {
             actual.tokensFile=file.toString();
@@ -37,6 +37,8 @@ class ProblemDiagnosticsTest {
             assertEquals(503,response.statusCode());assertEquals("UNAVAILABLE",response.jsonPath().getString("code"));assertFalse(response.asString().contains(secret));
             assertTrue(messages.stream().anyMatch(message->message.contains("Token registry load failed code=TOKEN_REGISTRY_UNAVAILABLE")&&message.contains("category=JsonParseException")));
             assertTrue(messages.stream().anyMatch(message->message.contains("API failure code=UNAVAILABLE")&&message.contains("source=net.resheim.timekeeper.server.TokenRegistry.authenticate")));
+            assertTrue(messages.stream().anyMatch(message->message.contains("stack=")&&message.contains("TokenRegistry.authenticate:")));
+            assertTrue(levels.contains(org.jboss.logmanager.Level.ERROR));
             assertFalse(messages.stream().anyMatch(message->message.contains(secret)||message.contains(file.toString())||message.contains("Bearer")));assertTrue(thrown.isEmpty());
             actual.tokensFile=previous;assertEquals(200,given().header("Authorization","Bearer test-a").get("/api/v1/me").statusCode());
         }finally{actual.tokensFile=previous;problem.removeHandler(capture);tokens.removeHandler(capture);Files.deleteIfExists(file);}

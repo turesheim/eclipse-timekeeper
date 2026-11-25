@@ -105,6 +105,11 @@ public class ServerStore {
             maintenance.scheduleWithFixedDelay(this::maintainDays,1,1,java.util.concurrent.TimeUnit.SECONDS);
         }catch(Exception|Error failure){closeSchemaSession();throw failure;}
     }
+    private static void logBoundaryFailure(Exception failure) {
+        TIMINGS.warnf("Could not maintain daily activity boundaries %s",
+                ProblemMapper.diagnostic("DAY_BOUNDARY_MAINTENANCE_FAILED",failure));
+    }
+
     private void initializeSchema(Connection connection) throws Exception {
         ServerSchema.initializeOrValidate(connection,allowSchemaUpgrade);
         restoreFence.initialize(connection);
@@ -145,9 +150,9 @@ public class ServerStore {
             for(var entry:owners.entrySet()) if(!partitionDate(entry.getValue(),now).equals(partitionDates.get(entry.getKey())))
                 transaction(entry.getKey(),()->null);
         } catch(ApiFailure failure) {
-            if(!InstanceRestoreFence.expected(failure))System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Could not maintain daily activity boundaries",failure);
+            if(!InstanceRestoreFence.expected(failure))logBoundaryFailure(failure);
         } catch(RuntimeException | SQLException failure) {
-            System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Could not maintain daily activity boundaries",failure);
+            logBoundaryFailure(failure);
         }
     }
     void initializeConfiguredOwners() {

@@ -15,3 +15,6 @@ recover the service instead of leaving a live, unhealthy JVM.
 `TMPDIR=/instance/tmp` puts Java temporary files on the private state volume;
 allow disk space for ZIP preparation. The entrypoint creates the directory with
 private permissions and passes it as `java.io.tmpdir`.
+
+The optional [Synology logging project](logging/README.md) collects selected
+Docker and DSM logs in Grafana independently of the application deployment.

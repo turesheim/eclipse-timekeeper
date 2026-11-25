@@ -1,0 +1,70 @@
+discovery.docker "local" {
+  host = "http://docker-logs:2375"
+  refresh_interval = "10s"
+}
+
+discovery.relabel "opt_in" {
+  targets = discovery.docker.local.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/timekeeper-server"
+    target_label  = "__tmp_dagsverk_package"
+    replacement   = sys.env("DAGSVERK_COLLECT_DSM_PACKAGE")
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_logs_collect", "__tmp_dagsverk_package"]
+    regex         = "true;.*|.*;true"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_logs_service_name"]
+    regex         = "([a-z][a-z0-9_-]{0,47})"
+    target_label  = "service_name"
+  }
+
+  rule {
+    source_labels = ["__tmp_dagsverk_package"]
+    regex         = "true"
+    target_label  = "service_name"
+    replacement   = "dagsverk"
+  }
+
+  rule {
+    source_labels = ["service_name"]
+    regex         = ".+"
+    action        = "keep"
+  }
+
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("LOG_ENVIRONMENT")
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_logs_environment"]
+    regex         = "([a-z][a-z0-9_-]{0,31})"
+    target_label  = "environment"
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = sys.env("LOG_HOST")
+  }
+}
+
+loki.source.docker "local" {
+  host       = "http://docker-logs:2375"
+  targets    = discovery.relabel.opt_in.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url               = "http://loki:3100/loki/api/v1/push"
+    max_backoff_period = "30s"
+    max_backoff_retries = 10
+  }
+}

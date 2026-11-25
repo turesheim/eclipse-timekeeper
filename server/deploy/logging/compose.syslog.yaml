@@ -1,0 +1,11 @@
+# Load explicitly after compose.yaml to enable syslog (RFC 5424 over UDP).
+services:
+  alloy:
+    ports:
+      - '${SYSLOG_BIND_ADDRESS:-127.0.0.1}:${SYSLOG_PORT:-1514}:1514/udp'
+    networks: [engine, logs, syslog-ingress]
+    volumes:
+      - ./alloy/syslog.alloy:/etc/alloy/inputs/syslog.alloy:ro
+
+networks:
+  syslog-ingress: {}

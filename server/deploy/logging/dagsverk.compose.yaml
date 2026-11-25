@@ -1,0 +1,12 @@
+# Append to the Dagsverk application Compose files, not to this logging project.
+x-dagsverk-logs: &dagsverk-logs
+  labels:
+    logs.collect: 'true'
+    logs.service_name: dagsverk
+    logs.environment: ${DAGSVERK_LOG_ENVIRONMENT:-production}
+  environment:
+    DAGSVERK_LOG_ENVIRONMENT: ${DAGSVERK_LOG_ENVIRONMENT:-production}
+
+services:
+  api-1: *dagsverk-logs
+  api-2: *dagsverk-logs
