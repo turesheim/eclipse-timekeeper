@@ -8,6 +8,8 @@ database baseline.
 
 ### Highlights
 
+- Added correlated revision and request diagnostics for workspace sync failures.
+
 - Bundled an optional draw.io editor for Compose and Synology. Edit and save
   multi-page diagrams from the vault, with editable PNGs that remain portable
   through WebDAV and account archives (#708).
