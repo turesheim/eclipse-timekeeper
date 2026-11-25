@@ -19,7 +19,7 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
-/** The bundled editor uses its own HTTP listener behind the editor's HTTPS reverse proxy. */
+/** Serves the pinned draw.io assets, either in an opaque iframe or on a dedicated host. */
 @ApplicationScoped
 class BundledDrawio {
     @Inject Vertx vertx;
@@ -30,7 +30,17 @@ class BundledDrawio {
     String bind;
     @ConfigProperty(name = "timekeeper.web.drawio-root", defaultValue = "/opt/drawio")
     String root;
+    static final String PATH = "/drawio/";
+    static final String ENTRY = PATH + "index.html";
     private HttpServer server;
+
+    Path assets() {
+        return Path.of(root).toAbsolutePath();
+    }
+
+    boolean available() {
+        return Files.isRegularFile(assets().resolve("index.html"));
+    }
 
     void start(@Observes StartupEvent event) throws Exception {
         if (port == 0) return;
@@ -39,26 +49,37 @@ class BundledDrawio {
         if (parent == null || editor == null || URI.create(parent).getHost().equals(URI.create(editor).getHost())) {
             throw new IllegalArgumentException("Bundled draw.io requires separate HTTPS origins for Dagsverk and draw.io");
         }
-        Path assets = Path.of(root).toAbsolutePath();
-        if (!Files.isRegularFile(assets.resolve("index.html"))) {
+        Path assets = assets();
+        if (!available()) {
             throw new IllegalStateException("Bundled draw.io assets are missing from " + assets);
         }
-        server = vertx.createHttpServer().requestHandler(routes(vertx, assets, parent))
+        server = vertx.createHttpServer().requestHandler(routes(assets, parent, false))
                 .listen(port, bind).toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
     }
 
-    static Router routes(Vertx vertx, Path assets, String parent) {
+    Router routes(Path assets, String parent, boolean embedded) {
         Router router = Router.router(vertx);
         router.route().handler(context -> {
+            // WebKit treats connections from a sandboxed document as cross-origin even for 'self'.
+            String app = embedded ? web.appOrigin(context) : null;
+            String source = embedded ? (app == null ? "'none'" : app + PATH) : "'self'";
             context.response()
-                    .putHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; "
-                            + "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-                            + "font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; "
-                            + "worker-src 'self' blob:; manifest-src 'self'; base-uri 'none'; form-action 'none'; "
-                            + "frame-ancestors " + parent)
+                    .putHeader("Content-Security-Policy", "default-src 'none'; script-src " + source
+                            + "; style-src " + source + " 'unsafe-inline'; img-src " + source + " data: blob:"
+                            + "; font-src " + source + " data:; media-src " + source + " data: blob:"
+                            + "; connect-src " + source + "; worker-src " + source + " blob:; manifest-src " + source
+                            + "; base-uri 'none'; form-action 'none'; "
+                            + "frame-ancestors " + parent + (embedded ? "; sandbox allow-scripts" : ""))
                     .putHeader("Referrer-Policy", "no-referrer")
                     .putHeader("X-Content-Type-Options", "nosniff");
+            if (embedded) {
+                // Only the bundled files are readable by the opaque frame. Do not grant credentialed CORS.
+                context.response().putHeader("Access-Control-Allow-Origin", "null");
+            }
             String path = context.normalizedPath().toUpperCase(Locale.ROOT);
+            if (embedded && path.startsWith(PATH.toUpperCase(Locale.ROOT))) {
+                path = path.substring(PATH.length() - 1);
+            }
             if (path.equals("/WEB-INF") || path.startsWith("/WEB-INF/")
                     || path.equals("/META-INF") || path.startsWith("/META-INF/")) {
                 context.response().setStatusCode(404).end();

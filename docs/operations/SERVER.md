@@ -71,12 +71,13 @@ is for tests, not durable deployment.
 ## Draw.io editor
 
 The server image includes the public assets from the pinned [draw.io 32.6.10
-release](https://github.com/jgraph/drawio/releases/tag/v32.6.10). The optional
-static listener serves those assets with a browser policy that restricts framing
-to the configured Dagsverk HTTPS origin. Dagsverk opens the editor in offline
-mode and saves the resulting PNG to the account vault.
+release](https://github.com/jgraph/drawio/releases/tag/v32.6.10). Dagsverk
+serves these assets at `/drawio/` and opens them in an isolated frame using
+the existing Dagsverk URL. The editor works offline and saves its PNG to the
+account vault. Reverse proxies that allow only selected paths must also
+forward `/drawio/` to Dagsverk.
 
-Use a dedicated HTTPS hostname for draw.io, separate from the Dagsverk hostname.
+For an optional dedicated editor host, use a separate HTTPS hostname.
 Point that hostname's reverse proxy to the editor's loopback HTTP port. Use
 origins without a path or trailing slash. Both hostnames can use the same proxy.
 
@@ -104,7 +105,8 @@ server can still point `DAGSVERK_DRAWIO_ORIGIN` to a separate static host.
 That host must allow the Dagsverk origin in its `frame-ancestors` response header.
 See the [draw.io self-hosting guide](https://github.com/jgraph/drawio/wiki/Self-Hosting).
 
-Omit the setting to use manual PNG import, download, and replacement. See
+Standalone installations without editor assets or a configured host support
+manual PNG import, download, and replacement. See
 [editing diagrams in Dagsverk](MARKDOWN-EDITOR.md#drawio-diagrams).
 
 ## Data and operational behavior

@@ -2,13 +2,15 @@ import {t} from './i18n.js';
 
 const blank = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
 const pngPrefix = 'data:image/png;base64,';
+const embeddedPath = '/drawio/index.html';
 let configured;
 
-export function drawioOrigin() {
+export function drawioEndpoint() {
   configured ??= fetch('/web/drawio-origin', {redirect: 'error'}).then(async response => {
     if (!response.ok) return null;
     const value = await response.text();
     if (!value) return null;
+    if (value === embeddedPath) return value;
     const url = new URL(value);
     // Cookies are shared by different ports on the same hostname.
     return url.protocol === 'https:' && value === url.origin && url.hostname !== location.hostname ? value : null;
@@ -26,13 +28,18 @@ function readPng(blob) {
 }
 
 export class DrawioEditor {
-  constructor(origin, signal) {
-    this.origin = origin;
+  constructor(endpoint, signal) {
+    const embedded = endpoint === embeddedPath;
+    this.url = new URL(embedded ? endpoint : '/', embedded ? location.origin : endpoint);
+    this.origin = embedded ? 'null' : endpoint;
+    // An opaque origin has no exact postMessage target. The parent CSP limits the
+    // frame to the bundled editor document, and replies must come from this frame.
+    this.targetOrigin = embedded ? '*' : endpoint;
     this.signal = signal;
     this.frame = document.createElement('iframe');
     this.frame.title = t('drawio.editor');
     this.frame.referrerPolicy = 'no-referrer';
-    this.frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    this.frame.setAttribute('sandbox', embedded ? 'allow-scripts' : 'allow-scripts allow-same-origin');
     window.addEventListener('message', event => this.receive(event), {signal});
     signal.addEventListener('abort', () => {
       this.pending?.finish(new DOMException('', 'AbortError'));
@@ -67,14 +74,14 @@ export class DrawioEditor {
   }
 
   send(message) {
-    this.frame.contentWindow.postMessage(JSON.stringify(message), this.origin);
+    this.frame.contentWindow.postMessage(JSON.stringify(message), this.targetOrigin);
   }
 
   async load(blob) {
     const xml = blob ? await readPng(blob) : blank;
-    const url = new URL('/', this.origin);
+    const url = this.url;
     url.search = new URLSearchParams({
-      embed: '1', proto: 'json', ui: 'min', offline: '1', stealth: '1', pwa: '0',
+      embed: '1', proto: 'json', ui: 'min', offline: '1', stealth: '1', pwa: '0', local: '1',
       noSaveBtn: '1', noExitBtn: '1', saveAndExit: '0',
     });
     await this.waitFor('init', () => { this.frame.src = url.href; });

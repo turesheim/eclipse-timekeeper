@@ -304,8 +304,10 @@ for stable publication.
 
 ## Bundled draw.io editor
 
-The server image carries a static copy of draw.io. To enable it, configure a
-separate HTTPS hostname and add the settings below to the retained file
+The server image includes draw.io. Open it from **Note tools → Insert draw.io
+diagram** over your existing Dagsverk connection.
+
+To use an optional dedicated hostname, add these settings to the retained file
 `/var/packages/timekeeper/var/server/config/drawio.properties`.
 
 ```properties

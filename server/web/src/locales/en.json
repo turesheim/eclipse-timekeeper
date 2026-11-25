@@ -1997,6 +1997,7 @@
   "drawio.invalid_name": "Enter a filename without a folder path.",
   "drawio.loading_editor": "Opening the diagram editor…",
   "drawio.editor_unavailable": "The diagram editor is unavailable. You can still import, download, or replace a PNG manually.",
+  "drawio.editor_not_configured": "A server administrator needs to configure the draw.io editor. You can still download or replace this PNG.",
   "drawio.export_failed": "Could not export an editable PNG. Your diagram is still open.",
   "drawio.save": "Save diagram",
   "drawio.saving": "Saving diagram…",
