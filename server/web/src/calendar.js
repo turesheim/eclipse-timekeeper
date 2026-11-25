@@ -11,7 +11,7 @@ import { iconButton } from './icons.js';
 import {dateNavigation} from './date-navigation.js';
 import {CalendarSubscriptions,styleCalendarEvent} from './calendar-subscriptions.js';
 import {TrackDayNotes} from './track-day-notes.js';
-import {publicHolidayCalendar,holidayRegion,selectedHolidayCountry} from './holidays.js';
+import {publicHolidayCalendar,holidayRegion,selectedHolidayCountry,weeklyHoliday} from './holidays.js';
 
 const ROW_HEIGHT = 16;
 function node(tag, text, className) {
@@ -112,6 +112,7 @@ export class WeekCalendar {
     this.noteCells=new Map();
     for (const day of calendar.days) {
       const heading = node('div', undefined, `calendar-heading${day.date === today ? ' today' : ''}`);
+      heading.classList.toggle('weekly-holiday',weeklyHoliday(day.date,getLocale()));
       heading.dataset.date=day.date;heading.dataset.weekDate=day.date;this.noteCells.set(day.date,heading);
       const title = dateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
       const pick = button(title, () => {
@@ -133,6 +134,7 @@ export class WeekCalendar {
     for (const day of calendar.days) {
       const weekend = [0, 6].includes(new Date(`${day.date}T12:00:00Z`).getUTCDay());
       const column = node('div', undefined, `calendar-day${weekend ? ' weekend' : ''}`);column.dataset.date = day.date;
+      column.classList.toggle('weekly-holiday',weeklyHoliday(day.date,getLocale()));
       column.tabIndex = day.skipped ? -1 : 0;column.setAttribute('role', 'group');column.setAttribute('aria-label', `${day.date}, ${zone}`);
       calendar.rows.forEach((key, row) => {
         const slot = node('div', undefined, `calendar-slot${day.byRow.has(row) ? '' : ' unavailable'}${key.split('/')[0].endsWith(':00') ? ' hour' : ''}`);

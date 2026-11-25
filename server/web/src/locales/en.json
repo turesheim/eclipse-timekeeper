@@ -814,6 +814,7 @@
   "import.state.UNDONE_PARTIAL": "UNDONE_PARTIAL",
   "import.state.IMPORTED": "IMPORTED",
   "import.state.BLOCKED": "BLOCKED",
+  "holidays.weekly_rest": "Weekly rest day",
   "holidays.title": "Public holidays",
   "holidays.license": "date-holidays data and license",
   "holidays.data": "Data:",

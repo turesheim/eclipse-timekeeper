@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {holidayRegion,publicHolidayCalendar,selectedHolidayCountry} from '../src/holidays.js';
+import {holidayRegion,publicHolidayCalendar,selectedHolidayCountry,weeklyHoliday} from '../src/holidays.js';
 import {monthCalendar,monthSessions} from '../src/month-model.js';
 import {calendarWeek} from '../src/calendar-model.js';
 
@@ -61,4 +61,10 @@ test('an explicit holiday country is independent of interface language and brows
   assert.equal(english.country,'NO');assert.equal(english.days.get('2026-05-17')[0].name,'Constitution Day');
   const norwegian=await publicHolidayCalendar(monthCalendar('2026-07','UTC'),'nb-NO','US');
   assert.equal(norwegian.country,'US');assert.ok(norwegian.days.has('2026-07-04'));
+});
+
+test('weekly rest days use civil dates and keep ordinary Norwegian Saturdays and Mondays distinct',()=>{
+  assert.equal(weeklyHoliday('2026-05-09','nb-NO'),false);
+  assert.equal(weeklyHoliday('2026-05-10','nb-NO'),true);
+  assert.equal(weeklyHoliday('2026-05-11','nb-NO'),false);
 });

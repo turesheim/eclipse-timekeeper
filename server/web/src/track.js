@@ -6,6 +6,7 @@ import { iconButton, projectIcon, isProjectIcon } from './icons.js';
 import { MonthPicker } from './month-picker.js';
 import {dateNavigation} from './date-navigation.js';
 import {TrackHolidays} from './track-holidays.js';
+import {weeklyHoliday} from './holidays.js';
 import {TrackDayNotes} from './track-day-notes.js';
 import {workSummaryCard} from './work-summary-card.js';
 import {richTooltip} from './tooltips.js';
@@ -140,6 +141,7 @@ export class MonthTrack {
       for (const [index, day] of result.days.entries()) {
         if (index % 7 === 0) {week = node('tr');body.append(week);}
         const cell = node('td', undefined, day.inMonth ? 'track-day' : "track-day track-outside");cell.dataset.trackDate = day.date;
+        cell.classList.toggle('weekly-holiday',weeklyHoliday(day.date,getLocale()));
         holidayCells.set(day.date,cell);
         const date = node('time', String(Number(day.date.slice(-2))), 'track-date');date.dateTime = day.date;
         date.title = dateTimeFormat(getLocale(), { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'));

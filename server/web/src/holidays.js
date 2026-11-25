@@ -40,6 +40,13 @@ export function selectedHolidayCountry(preference,languages=globalThis.navigator
   if(preference==='none')return null;
   return supported.has(preference)?preference:holidayRegion(languages[0] || 'en-GB');
 }
+// Treat regional Sunday or Monday rest days separately from named public holidays.
+export function weeklyHoliday(date,locale) {
+  const region=new Intl.Locale(locale);
+  const weekend=region.getWeekInfo?.().weekend ?? region.weekInfo?.weekend ?? [7];
+  const day=new Date(date+'T12:00:00Z').getUTCDay();
+  return (day===0||day===1)&&weekend.includes(day||7);
+}
 export {countries};
 export async function publicHolidayCalendar(calendar,locale,country=holidayRegion(locale)) {
   const days=new Map();
