@@ -28,6 +28,9 @@ database baseline.
   the unaffected published H2 2.4.240 runtime in the server and Eclipse client.
   Added deterministic chunk-reuse and journal forced-restart regression checks.
 
+- Unified image, diagram, vault asset and file insertion in the shared note
+  editor, and opened embedded diagram editing directly from the pencil (#751).
+
 - Made embedded draw.io diagrams easier to edit and reuse across notes, with
   a resizable editor, shared captions and an existing diagram picker (#745).
 

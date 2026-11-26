@@ -6,7 +6,7 @@ import {promisify} from 'node:util';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {noteEntry} from './note-entry.js';
-import {notesSource,clickNoteAction,saveMarkdown} from './editor-interactions.js';
+import {notesSource,clickInsertAction,clickNoteAction,saveMarkdown} from './editor-interactions.js';
 import {searchNotes} from './notes-search.js';
 import {captureScreenshot} from './screenshots.js';
 
@@ -31,15 +31,18 @@ async function open(page,path){
 }
 async function insert(page,root,name='system.drawio.png'){
   await expect(root.locator('.ProseMirror')).toBeVisible();
-  const picker=page.waitForEvent('filechooser',{timeout:12000}),toolbar=root.getByRole('button',{name:'Insert image',exact:true});
-  if(await toolbar.isVisible())await toolbar.click();else await clickNoteAction(page,root,'Insert image');
+  const picker=page.waitForEvent('filechooser',{timeout:12000});
+  await clickInsertAction(page,root,'Insert image');
   await (await picker).setFiles({name,mimeType:'image/png',buffer:original});
   const image=root.getByRole('img',{name,exact:true});
   await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(186);
   return image;
 }
 async function manage(page,root,label='System overview'){
-  await clickNoteAction(page,root,'Draw.io diagrams');const box=dialog(page);await box.getByRole('button',{name:label,exact:true}).click();await expect(box.getByRole('button',{name:'Download original PNG',exact:true})).toBeEnabled();return box;
+  const image=root.getByRole('img',{name:new RegExp('^'+label.replaceAll('.','\\.'))});
+  await image.click();
+  await clickNoteAction(page,root,'Diagram file');
+  const box=dialog(page);await expect(box.getByRole('button',{name:'Download original PNG',exact:true})).toBeEnabled();return box;
 }
 async function choose(box,bytes=revised){await box.getByLabel('Draw.io PNG file',{exact:true}).setInputFiles({name:'revised.drawio.png',mimeType:'image/png',buffer:bytes});await expect(box.getByRole('button',{name:'Replace PNG',exact:true})).toBeEnabled();}
 async function downloaded(page,box,name){const waiting=page.waitForEvent('download');await box.getByRole('button',{name:'Download original PNG',exact:true}).click();const file=await waiting,path=test.info().outputPath(name);await file.saveAs(path);return readFile(path);}
@@ -51,7 +54,7 @@ test('editable PNG insertion, original download and replacement preserve portabl
   const textarea=await notesSource(page);
   await textarea.evaluate(input=>{input.focus();input.setSelectionRange(input.value.length,input.value.length);});
   const picker=page.waitForEvent('filechooser');
-  await clickNoteAction(page,root,'Insert image');
+  await clickInsertAction(page,root,'Insert image');
   await (await picker).setFiles({name:'system.drawio.png',mimeType:'image/png',buffer:original});
   await expect(textarea).toHaveValue(/!\[system.drawio.png\]\(system.drawio.png\)/);
   await saveMarkdown(root);const source=(await bytes(api,entry.id)).toString('utf8');expect(source).toContain('![system.drawio.png](system.drawio.png)');expect(source.startsWith('\uFEFF---\r\ncustom: exact\r\n---\r\n')).toBe(true);
@@ -92,7 +95,7 @@ test('stale, rejected and lost replacement replies retain the file and never rep
 test('read-only sessions download while foreign accounts cannot read or replace PNGs',async({page,request,browser})=>{
   const owner=await fresh(page,request),asset=await owner.put('system.drawio.png',original);await owner.put('Diagram.md','![System overview](system.drawio.png)\n');const token=(await(await owner.api('POST','/auth/tokens',{name:'Read-only diagrams',permissions:['read'],expiresAt:null})).json()).token;
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});try{
-    const read=await context.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');const root=await open(read,'Diagram.md'),box=await manage(read,root);expect(await downloaded(read,box,'readonly-original.png')).toEqual(original);await expect(box.getByLabel('Draw.io PNG file',{exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Replace PNG',exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeHidden();await box.getByRole('button',{name:'Cancel',exact:true}).click();await clickNoteAction(read,root,'Draw.io diagrams');await dialog(read).getByRole('button',{name:'Cancel',exact:true}).click();
+    const read=await context.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');const root=await open(read,'Diagram.md'),box=await manage(read,root);expect(await downloaded(read,box,'readonly-original.png')).toEqual(original);await expect(box.getByLabel('Draw.io PNG file',{exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Replace PNG',exact:true})).toBeHidden();await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeHidden();await box.getByRole('button',{name:'Cancel',exact:true}).click();await expect(root.getByRole('button',{name:'Insert options',exact:true})).toBeHidden();await manage(read,root);await dialog(read).getByRole('button',{name:'Cancel',exact:true}).click();
   }finally{await context.close();}
   const other=await fresh(page,request);expect((await other.raw('GET','/notes/entries/'+asset.id+'/content')).status()).toBe(404);expect((await other.raw('PUT','/notes/entries/'+asset.id+'/content',revised,{'If-Match':'*','Content-Type':'application/octet-stream'})).status()).toBe(404);
 });
@@ -161,6 +164,81 @@ test.describe('self-hosted draw.io editor',()=>{
     await editor.fill(newLabel);
     await editor.press('ControlOrMeta+Enter');
   }
+
+  test('the pencil reveals on hover and focus and opens the editor during a slow or failed load',async({page,request})=>{
+    const {put}=await fresh(page,request);
+    const asset=await put('system.drawio.png',original);
+    const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+    await put('pixel.png',pixel);
+    await put('Diagram.md','![System overview](system.drawio.png)\n\n![Pixel](pixel.png)\n');
+    const root=await open(page,'Diagram.md');
+    const image=root.getByRole('img',{name:'System overview',exact:true});
+    const pencil=root.locator('.markdown-diagram-ready').getByRole('button',{name:'Edit diagram',exact:true});
+    await expect(pencil).toHaveCSS('opacity','0');
+    await image.hover();
+    await expect(pencil).toHaveCSS('opacity','1');
+    await root.getByRole('img',{name:'Pixel',exact:true}).hover();
+    await expect(pencil).toHaveCSS('opacity','0');
+    await expect(root.locator('.markdown-diagram:not(.markdown-diagram-ready) .markdown-diagram-edit')).toBeHidden();
+    await pencil.focus();
+    await expect(pencil).toHaveCSS('opacity','1');
+
+    const assetUrl='**/api/v1/notes/entries/'+asset.id+'/content';
+    let releaseRead;
+    const delayed=new Promise(resolve=>{releaseRead=resolve;});
+    await page.route(assetUrl,async route=>{await delayed;await route.continue();},{times:1});
+    await page.keyboard.press('Enter');
+    const editor=page.getByRole('dialog',{name:'Edit diagram',exact:true});
+    await expect(editor).toHaveClass(/drawio-editor-dialog/);
+    await expect(editor.getByRole('status')).toContainText('Opening the diagram editor');
+    await expect(page.getByRole('dialog',{name:'Diagram file',exact:true})).toBeHidden();
+    releaseRead();
+    await expect(editor.frameLocator('iframe').getByText('Stage A',{exact:true})).toBeVisible();
+    await editor.getByRole('button',{name:'Cancel',exact:true}).click();
+
+    await page.route(assetUrl,route=>route.fulfill({status:404,contentType:'application/json',body:'{}'}),{times:1});
+    await image.hover();
+    await pencil.click();
+    await expect(editor.getByRole('alert')).toBeVisible();
+    await expect(editor.locator('iframe')).toHaveCount(0);
+    await expect(page.getByRole('dialog',{name:'Diagram file',exact:true})).toBeHidden();
+  });
+
+  test('Insert options work in Markdown and keep each file picker at its opening cursor',async({page,request})=>{
+    const {put}=await fresh(page,request);
+    await put('Insertion.md','Before insertion\n\nAfter insertion\n');
+    const root=await open(page,'Insertion.md'),source=await notesSource(page);
+    const caret=async()=>source.evaluate(text=>{text.focus();const at=text.value.indexOf('After insertion');text.setSelectionRange(at,at);});
+    const move=async()=>source.evaluate(text=>text.setSelectionRange(0,0));
+    await caret();
+    const trigger=root.getByRole('button',{name:'Insert options',exact:true});
+    await trigger.press('ArrowDown');
+    const menu=page.getByRole('menu',{name:'Insert options',exact:true});
+    const items=menu.getByRole('menuitem');
+    await expect(items).toHaveText(['Insert image','Insert diagram (draw.io)','Insert asset','Import diagram (draw.io)','Attach file']);
+    await expect(items.first()).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(items.last()).toBeFocused();
+    const attachment=page.waitForEvent('filechooser');
+    await page.keyboard.press('Enter');
+    await move();
+    await (await attachment).setFiles({name:'agenda.txt',mimeType:'text/plain',buffer:Buffer.from('Agenda')});
+    await expect(source).toHaveValue(/^Before insertion\n\n\[agenda.txt\]\(agenda.txt\)After insertion/);
+
+    await caret();
+    const imported=page.waitForEvent('filechooser');
+    await clickInsertAction(page,root,'Import diagram (draw.io)');
+    await move();
+    await (await imported).setFiles({name:'process.drawio.png',mimeType:'image/png',buffer:original});
+    await expect(source).toHaveValue(/\[agenda.txt\]\(agenda.txt\)!\[process.drawio.png\]\(process.drawio.png\)After insertion/);
+
+    await caret();
+    const image=page.waitForEvent('filechooser');
+    await clickInsertAction(page,root,'Insert image');
+    await move();
+    await (await image).setFiles({name:'illustration.png',mimeType:'image/png',buffer:original});
+    await expect(source).toHaveValue(/!\[illustration.png\]\(illustration.png\)After insertion/);
+  });
 
   test('edits both pages, retains the preview and Markdown path, and reopens from saved bytes',async({page,request})=>{
     const {api,put}=await fresh(page,request);
@@ -234,7 +312,7 @@ test.describe('self-hosted draw.io editor',()=>{
       if(!discard)await expect(frame.getByText('Discard this detail',{exact:true})).toBeVisible();
     }
     await expect(box.locator('iframe')).toHaveCount(0);
-    await expect(box.getByRole('button',{name:'Edit diagram',exact:true})).toBeFocused();
+    await expect(box).toBeHidden();
     expect(await bytes(api,asset.id)).toEqual(saved);
   });
 
@@ -289,6 +367,7 @@ test.describe('self-hosted draw.io editor',()=>{
     await box.getByRole('button',{name:'Edit diagram',exact:true}).click();
     await expect(box.getByRole('alert')).toContainText('editor is unavailable',{timeout:20_000});
     await expect(box.locator('iframe')).toHaveCount(0);
+    await box.getByRole('button',{name:'Diagram file',exact:true}).click();
     expect(await downloaded(page,box,'fallback-original.png')).toEqual(original);
     await choose(box);
   });
@@ -316,7 +395,7 @@ test.describe('self-hosted draw.io editor',()=>{
     await box.getByRole('button',{name:'Cancel',exact:true}).click();
     await expect(box).toBeHidden();
     expect(prompts).toEqual([]);
-    await clickNoteAction(page,root,'Insert draw.io diagram');
+    await clickInsertAction(page,root,'Insert diagram (draw.io)');
     box=dialog(page);
     await expect(box.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
     await expect(box.locator('iframe')).toBeFocused();
@@ -348,7 +427,7 @@ test.describe('self-hosted draw.io editor',()=>{
     let root=await open(page,'Planning/Diagram.md');
     await root.locator('.ProseMirror p').click();
     await page.keyboard.press('ControlOrMeta+End');
-    await clickNoteAction(page,root,'Insert draw.io diagram');
+    await clickInsertAction(page,root,'Insert diagram (draw.io)');
     let box=dialog(page);
     const save=box.getByRole('button',{name:'Save diagram',exact:true});
     await expect(save).toBeEnabled();
@@ -378,13 +457,13 @@ test.describe('self-hosted draw.io editor',()=>{
     root=await open(page,'Delivery/Review.md');
     const source=await notesSource(page);
     await source.evaluate(text=>{text.focus();text.setSelectionRange(text.value.length,text.value.length);});
-    await clickNoteAction(page,root,'Insert existing diagram');
-    box=dialog(page);
-    const search=box.getByRole('searchbox',{name:'Search diagrams'});
+    await clickInsertAction(page,root,'Insert asset');
+    box=page.getByRole('dialog',{name:'Insert asset',exact:true});
+    const search=box.getByRole('searchbox');
     await search.fill(filename);
-    await expect(box.getByRole('button',{name:'Release flow',exact:true})).toBeVisible();
+    await expect(box.getByRole('button',{name:/^Release flow/})).toBeVisible();
     await search.fill('release flow');
-    await box.getByRole('button',{name:'Release flow',exact:true}).click();
+    await box.getByRole('button',{name:/^Release flow/}).click();
     await expect(box).toBeHidden();
     await saveMarkdown(root);
     const secondSource=(await bytes(api,second.id)).toString();
@@ -425,7 +504,7 @@ test.describe('self-hosted draw.io editor',()=>{
     await page.locator('#today-date').fill(date);
     const root=page.locator('#today-note-editor');
     await expect(root.locator('.ProseMirror')).toBeVisible();
-    await clickNoteAction(page,root,'Insert draw.io diagram');
+    await clickInsertAction(page,root,'Insert diagram (draw.io)');
     const box=dialog(page);
     await box.getByRole('button',{name:'Save diagram',exact:true}).click();
     await expect(box).toBeHidden();
@@ -440,7 +519,7 @@ test.describe('self-hosted draw.io editor',()=>{
     const root=await open(page,'Blank.md'),source=await notesSource(page);
     // Use the cursor between the two paragraphs.
     await source.evaluate(node=>{node.focus();node.setSelectionRange(7,7);});
-    await clickNoteAction(page,root,'Insert draw.io diagram');
+    await clickInsertAction(page,root,'Insert diagram (draw.io)');
     const box=dialog(page),save=box.getByRole('button',{name:'Save diagram',exact:true});
     await expect(save).toBeEnabled();
     await expect(box.getByRole('heading',{name:'New diagram'})).toBeVisible();

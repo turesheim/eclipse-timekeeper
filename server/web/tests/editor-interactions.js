@@ -13,6 +13,14 @@ export async function clickNoteAction(page,scope,name){
   }
   await(await noteActions(page,scope)).getByRole('menuitem',{name,exact:true}).click();
 }
+export async function clickInsertAction(page,scope,name){
+  if(name==='Insert image'){
+    await scope.getByRole('button',{name,exact:true}).click();
+    return;
+  }
+  await scope.getByRole('button',{name:'Insert options',exact:true}).click();
+  await page.getByRole('menu',{name:'Insert options',exact:true}).getByRole('menuitem',{name,exact:true}).click();
+}
 export async function notesSource(page){
   await page.locator('#notes-panel button[aria-controls="notes-body"]').click();
   const body=page.locator('#notes-body');await expect(body).toBeVisible();return body;
