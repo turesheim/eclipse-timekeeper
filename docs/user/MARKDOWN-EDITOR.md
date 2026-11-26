@@ -238,7 +238,8 @@ In either editor mode, open **Insert options** and choose **Insert diagram
 (draw.io)**. The [server image bundles the editor](../operations/SERVER.md#drawio-editor).
 Choose **Save diagram** to insert the drawing at the cursor. The description
 is optional and becomes the caption. If you leave the filename blank, Dagsverk
-generates an editable `.drawio.png` filename.
+generates an editable `.drawio.png` filename. Phones can preview, import and
+reuse diagrams. Use a tablet or computer to create or edit a drawing.
 
 In Formatted mode, hover over the diagram, focus its pencil with the keyboard,
 or tap the diagram to reveal **Edit diagram**. In Markdown mode, place the

@@ -35,15 +35,15 @@ export class MarkdownInsert {
     image.addEventListener('click',()=>{if(!image.disabled)choose(this.imagePicker,this.take());});
     this.entries=[
       ['markdown.insert_image','image',()=>!!field.onUpload,target=>choose(this.imagePicker,target)],
-      ['drawio.insert','diagram-2',()=>!!field.onUpload&&field.drawio?.canEdit(),target=>void field.drawio.open('new',null,target)],
+      ['drawio.insert','diagram-2',()=>!!field.onUpload&&field.drawio?.canEdit(),target=>void field.drawio.open('new',null,target),()=>!!field.drawio?.phone.matches],
       ['markdown.insert_asset','file-earmark-arrow-up',()=>!!field.resources?.complete,target=>this.openAssets(target)],
       ['drawio.import','diagram-3-fill',()=>!!field.onUpload&&!!field.drawio,target=>choose(this.diagramPicker,target)],
       ['markdown.attach_file','paperclip',()=>!!field.onUpload,target=>choose(this.attachmentPicker,target)]
-    ].map(([label,glyph,enabled,run])=>{
+    ].map(([label,glyph,enabled,run,hidden])=>{
       const button=node('button','dropdown-item');button.type='button';button.tabIndex=-1;
       button.setAttribute('role','menuitem');button.append(icon(glyph),node('span',null,t(label)));menu.append(button);
       button.addEventListener('click',()=>{if(button.disabled)return;const target=this.take();this.close();run(target);});
-      return {button,enabled};
+      return {button,enabled,hidden};
     });
     const options=()=>this.entries.map(entry=>entry.button).filter(button=>!button.disabled);
     const place=()=>{
@@ -93,7 +93,10 @@ export class MarkdownInsert {
     const blocked=f.readOnly||f.loading||f.bannerBusy||!!document.activeElement?.closest('.markdown-source-fragment');
     this.group.hidden=!f.onUpload&&!f.resources?.complete||f.readOnly;
     this.main.disabled=blocked||!f.onUpload;
-    for(const {button,enabled} of this.entries)button.disabled=blocked||!enabled();
+    for(const {button,enabled,hidden} of this.entries){
+      button.hidden=!!hidden?.();
+      button.disabled=blocked||button.hidden||!enabled();
+    }
     this.trigger.disabled=this.entries.every(({button})=>button.disabled);
     if(this.trigger.disabled)this.close();
   }

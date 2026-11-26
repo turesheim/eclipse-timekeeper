@@ -204,7 +204,7 @@ test.describe('self-hosted draw.io editor',()=>{
     await expect(page.getByRole('dialog',{name:'Diagram file',exact:true})).toBeHidden();
   });
 
-  test('tapping a diagram reveals its pencil and the Insert menu works on a narrow touch screen',async({browser,request})=>{
+  test('phones keep diagram import and reuse while larger touch screens can edit',async({browser,request})=>{
     const context=await browser.newContext({baseURL:base,ignoreHTTPSErrors:true,hasTouch:true,viewport:{width:390,height:844}});
     try{
       const page=await context.newPage();
@@ -215,15 +215,21 @@ test.describe('self-hosted draw.io editor',()=>{
       const journalActions=page.locator('#today-main-actions');
       await journalActions.getByRole('button',{name:'Insert options',exact:true}).tap();
       const menu=page.getByRole('menu',{name:'Insert options',exact:true});
-      await expect(menu.getByRole('menuitem')).toHaveCount(5);
-      await menu.getByRole('menuitem',{name:'Insert diagram (draw.io)',exact:true}).tap();
-      const blank=page.getByRole('dialog',{name:'New diagram',exact:true});
-      await expect(blank.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
-      await blank.getByRole('button',{name:'Cancel',exact:true}).tap();
+      await expect(menu.getByRole('menuitem')).toHaveText(['Insert image','Insert asset','Import diagram (draw.io)','Attach file']);
+      await page.keyboard.press('Escape');
 
       await page.setViewportSize({width:850,height:844});
       const root=await open(page,'Diagram.md');
       const pencil=root.locator('.markdown-diagram-edit');
+      await expect(pencil).toBeAttached();
+      await page.setViewportSize({width:850,height:390});
+      await expect(pencil).toBeHidden();
+      const source=await notesSource(page);
+      await source.evaluate(input=>{input.focus();input.setSelectionRange(4,4);});
+      await expect(root.locator('.diagram-source-edit')).toBeHidden();
+
+      await page.setViewportSize({width:850,height:844});
+      await root.getByRole('button',{name:'Formatted',exact:true}).tap();
       await expect(pencil).toHaveCSS('opacity','0');
       await root.getByRole('img',{name:'System overview',exact:true}).tap();
       await expect(pencil).toHaveCSS('opacity','1');

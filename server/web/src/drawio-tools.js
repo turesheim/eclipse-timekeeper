@@ -15,6 +15,8 @@ let parser;
 export class DrawioTools {
   constructor(field){
     this.field=field;this.generation=0;this.group=node('div');
+    this.phone=matchMedia('(pointer:coarse) and (max-width:650px), (pointer:coarse) and (max-height:500px)');
+    this.phone.addEventListener('change',()=>this.sync());
     this.fileAction=button(t('drawio.file'),()=>{
       const reference=this.selectedReference();
       if(reference)void this.open('file',reference);
@@ -97,13 +99,13 @@ export class DrawioTools {
     const f=this.field;
     if(this.sourceImages?.generation!==f.generation)this.sourceImages=null;
     set(this.group,'hidden',!current?.session);
-    f.root.classList.toggle('diagram-editable',!!this.editorEndpoint&&!f.readOnly&&!f.loading&&!!f.resources.canReplaceAsset?.());
+    f.root.classList.toggle('diagram-editable',!f.readOnly&&!f.loading&&this.canEdit());
     f.insertControl?.sync();
     if(this.dialog.open)this.paint();
     if(f.text===document.activeElement||!this.sourceEdit.hidden)void this.syncSourceEdit();
     f.syncActions();
   }
-  canEdit(){return !!this.editorEndpoint&&!!this.field.resources.canReplaceAsset?.();}
+  canEdit(){return !this.phone.matches&&!!this.editorEndpoint&&!!this.field.resources.canReplaceAsset?.();}
   selectedReference(){
     const image=this.field.editor?.imageDetails();
     if(!pngReference(image?.path)||!image.embed&&!this.field.resources.allowsAsset?.(image.path))return null;
@@ -115,9 +117,10 @@ export class DrawioTools {
   }
   async syncSourceEdit(){
     const f=this.field,text=f.text,active=document.activeElement;
+    if(this.phone.matches){this.sourceEdit.hidden=true;return;}
     if(active===this.sourceEdit&&!f.readOnly&&!f.loading)return;
     const body=text.value,position=text.selectionStart,generation=f.generation;
-    if(f.editor||f.readOnly||f.loading||!this.editorEndpoint||!f.resources.canReplaceAsset?.()
+    if(f.editor||f.readOnly||f.loading||!this.canEdit()
         ||active!==text||position!==text.selectionEnd||!/\.png/i.test(body)){
       this.sourceEdit.hidden=true;return;
     }
@@ -191,7 +194,7 @@ export class DrawioTools {
     this.preview.hidden=!this.url||!fileMode&&!this.reviewing;
     this.fileLabel.hidden=!fileMode||!writable;
     this.apply.hidden=!writable;
-    this.edit.hidden=!fileMode||!writable||!this.editorEndpoint||!this.info?.editable;
+    this.edit.hidden=!fileMode||!writable||!this.canEdit()||!this.info?.editable;
     this.edit.disabled=this.busy||this.stale||this.uncertain;
     this.manageFile.hidden=fileMode||creating||(!this.context&&this.busy);
     this.manageFile.disabled=this.busy||this.saving;
@@ -220,7 +223,7 @@ export class DrawioTools {
     this.dialog.close();
   }
   async openEditor(blob){
-    if(!this.editorEndpoint||this.editor||this.field.readOnly||this.busy||!this.field.resources.canReplaceAsset?.()
+    if(!this.canEdit()||this.editor||this.field.readOnly||this.busy
       ||this.mode!=='new'&&(!blob||!this.info?.editable))return;
     const cycle=this.generation;
     this.clearFile();this.editorAbort=new AbortController();
@@ -243,7 +246,7 @@ export class DrawioTools {
   async open(mode,reference=null,insertion=null){
     const f=this.field,current=this.current(),creating=mode==='new';
     if(!current?.session||this.dialog.open||f.loading||creating&&(!this.canEdit()||!f.canInsertAt(insertion))
-      ||mode==='edit'&&(f.readOnly||!f.resources.canReplaceAsset?.())){
+      ||mode==='edit'&&(f.readOnly||!this.canEdit())){
       f.releaseInsertion(insertion);return;
     }
     this.fileLabel.append(this.fileInput);this.bound=current;this.mode=mode;this.context=null;this.info=null;
@@ -256,7 +259,7 @@ export class DrawioTools {
     if(creating){await this.openEditor();return;}
     await this.loadAsset();
     if(!this.active(cycle)||mode!=='edit')return;
-    if(this.info?.editable&&this.editorEndpoint)await this.openEditor(this.context.blob);
+    if(this.info?.editable&&this.canEdit())await this.openEditor(this.context.blob);
     else if(!this.error.textContent||this.error.hidden){
       this.status.textContent='';this.failure(new Error(t('drawio.editor_unavailable')));
     }
@@ -278,7 +281,7 @@ export class DrawioTools {
       if(this.editor&&previous?.entry.id!==context.entry.id)throw new Error(t('drawio.asset_moved'));
       this.context=context;this.info=drawioPngInfo(bytes);this.stale=this.uncertain=false;
       this.reviewing=!!this.editor;this.savedName.textContent=context.entry.path;
-      this.status.textContent=this.info?.editable&&!this.editorEndpoint&&!this.field.readOnly
+      this.status.textContent=this.info?.editable&&!this.phone.matches&&!this.editorEndpoint&&!this.field.readOnly
         ?t('drawio.editor_not_configured'):this.editor?'':this.file?.name||'';
       this.clearPreview();
       if(this.info){this.url=URL.createObjectURL(context.blob.slice(0,context.blob.size,'image/png'));this.preview.src=this.url;}
