@@ -1,5 +1,5 @@
 import {clickNoteAction,noteActions} from './editor-interactions.js';
-import {saveMarkdown,nativeConfirmations} from './editor-interactions.js';
+import {clickInsertAction,saveMarkdown,nativeConfirmations} from './editor-interactions.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
@@ -156,11 +156,15 @@ test('journal images and file attachments survive editing and remain available o
     await signIn(page,await fresh(request));await month(page);await menu(page);
     await dialog(page).getByRole('button',{name:'Formatted'}).click();
     await expect(dialog(page).locator('.ProseMirror')).toBeVisible();
-    const upload=page.waitForResponse(response=>response.url().includes('/api/v1/journal-assets/')&&response.request().method()==='PUT');
-    await dialog(page).locator('input[type=file][accept]').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:png});
-    const uploaded=await upload;expect(uploaded.status()).toBe(201);
+    const [photo]=await Promise.all([page.waitForEvent('filechooser'),clickInsertAction(page,dialog(page),'Insert image')]);
+    const [uploaded]=await Promise.all([
+      page.waitForResponse(response=>response.url().includes('/api/v1/journal-assets/')&&response.request().method()==='PUT'),
+      photo.setFiles({name:'photo.png',mimeType:'image/png',buffer:png})
+    ]);
+    expect(uploaded.status()).toBe(201);
     const image=dialog(page).locator('.ProseMirror img[alt="photo.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
-    await dialog(page).locator('input[type=file]:not([accept])').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('attached text')});
+    const [fileChooser]=await Promise.all([page.waitForEvent('filechooser'),clickInsertAction(page,dialog(page),'Attach file')]);
+    await fileChooser.setFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('attached text')});
     await expect(dialog(page).locator('.ProseMirror a')).toContainText('notes.txt');
     await saveMarkdown(dialog(page),{close:true});await expect(dialog(page)).toBeHidden();
     const api=await apiFor(page),saved=await(await api('GET','/day-notes/2026-05-17')).json();
