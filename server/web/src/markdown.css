@@ -259,7 +259,9 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .markdown-diagram-edit.btn {position:absolute;inset-block-start:.25rem;inset-inline-end:.25rem;padding:.2rem;min-width:24px;min-height:24px;}
 .diagram-source-edit.btn {position:fixed;z-index:1079;padding:.2rem;min-width:24px;min-height:24px;}
 .markdown-diagram-edit {opacity:0;}
-.markdown-diagram:hover > .markdown-diagram-edit,
+@media (hover:hover) {
+  .markdown-diagram:hover > .markdown-diagram-edit {opacity:1;}
+}
 .markdown-diagram:focus-within > .markdown-diagram-edit,
 .markdown-diagram.diagram-tapped > .markdown-diagram-edit {opacity:1;}
 .markdown-editor:not(.diagram-editable) .markdown-diagram-edit {display:none;}

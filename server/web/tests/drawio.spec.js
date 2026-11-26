@@ -39,7 +39,7 @@ async function insert(page,root,name='system.drawio.png'){
   return image;
 }
 async function manage(page,root,label='System overview'){
-  const image=root.getByRole('img',{name:new RegExp('^'+label.replaceAll('.','\\.'))});
+  const image=root.getByRole('img',{name:new RegExp('^'+label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'))});
   await image.click();
   await clickNoteAction(page,root,'Diagram file');
   const box=dialog(page);await expect(box.getByRole('button',{name:'Download original PNG',exact:true})).toBeEnabled();return box;
@@ -202,6 +202,34 @@ test.describe('self-hosted draw.io editor',()=>{
     await expect(editor.getByRole('alert')).toBeVisible();
     await expect(editor.locator('iframe')).toHaveCount(0);
     await expect(page.getByRole('dialog',{name:'Diagram file',exact:true})).toBeHidden();
+  });
+
+  test('tapping a diagram reveals its pencil and the Insert menu works on a narrow touch screen',async({browser,request})=>{
+    const context=await browser.newContext({baseURL:base,ignoreHTTPSErrors:true,hasTouch:true,viewport:{width:390,height:844}});
+    try{
+      const page=await context.newPage();
+      const {put}=await fresh(page,request);
+      await put('process.drawio.png',original);
+      await put('Diagram.md','![System overview](process.drawio.png)\n');
+      await page.locator('[data-tab=today]').tap();
+      const journalActions=page.locator('#today-main-actions');
+      await journalActions.getByRole('button',{name:'Insert options',exact:true}).tap();
+      const menu=page.getByRole('menu',{name:'Insert options',exact:true});
+      await expect(menu.getByRole('menuitem')).toHaveCount(5);
+      await menu.getByRole('menuitem',{name:'Insert diagram (draw.io)',exact:true}).tap();
+      const blank=page.getByRole('dialog',{name:'New diagram',exact:true});
+      await expect(blank.getByRole('button',{name:'Save diagram',exact:true})).toBeEnabled();
+      await blank.getByRole('button',{name:'Cancel',exact:true}).tap();
+
+      await page.setViewportSize({width:850,height:844});
+      const root=await open(page,'Diagram.md');
+      const pencil=root.locator('.markdown-diagram-edit');
+      await expect(pencil).toHaveCSS('opacity','0');
+      await root.getByRole('img',{name:'System overview',exact:true}).tap();
+      await expect(pencil).toHaveCSS('opacity','1');
+      await pencil.tap();
+      await expect(page.getByRole('dialog',{name:'Edit diagram',exact:true}).frameLocator('iframe').getByText('Stage A',{exact:true})).toBeVisible();
+    }finally{await context.close();}
   });
 
   test('Insert options work in Markdown and keep each file picker at its opening cursor',async({page,request})=>{
