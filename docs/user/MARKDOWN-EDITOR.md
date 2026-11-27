@@ -234,36 +234,29 @@ subfolder. No external image URL is fetched automatically.
 
 ### Draw.io diagrams
 
-Choose **Note tools → Insert draw.io diagram** to open the drawing editor in
-a dialog. The [server image bundles the editor](../operations/SERVER.md#drawio-editor).
-When the drawing is ready, enter a filename and description, then choose
-**Save diagram** to insert the image at your cursor.
-Notes use the supplied filename with the `.drawio.png` extension. Journal
-uploads use the journal's existing asset naming and storage.
+In either editor mode, open **Insert options** and choose **Insert diagram
+(draw.io)**. The [server image bundles the editor](../operations/SERVER.md#drawio-editor).
+Choose **Save diagram** to insert the drawing at the cursor. The description
+is optional and becomes the caption. If you leave the filename blank, Dagsverk
+generates an editable `.drawio.png` filename. Phones can preview, import and
+reuse diagrams. Use a tablet or computer to create or edit a drawing.
 
-In Formatted mode, select an inserted diagram and choose **Edit diagram**.
-You can also select a diagram under **Note tools → Draw.io diagrams**.
-**Save diagram** replaces the attachment and refreshes its preview. The Markdown reference stays the same. If another
-client saved a newer copy, reload the saved preview and review it before
-retrying. If the result is uncertain, **Check saved result** compares the vault
-copy with the submitted PNG. The editor keeps the drawing open during recovery.
+In Formatted mode, hover over the diagram, focus its pencil with the keyboard,
+or tap the diagram to reveal **Edit diagram**. In Markdown mode, place the
+cursor in the diagram reference to reveal the same action. **Save diagram**
+updates every preview of the attachment and preserves the Markdown references.
 
-In draw.io, choose **File → Export As → PNG** and enable **Include a copy of
-my diagram**. Keep **All Pages** selected to retain the whole editable drawing;
-the preview itself shows the exported page. See the
-[draw.io export options](https://www.drawio.com/docs/manual/export/export-to-png/).
+Choose **Insert asset** to find and reuse a vault diagram by filename or
+description. To upload a local editable export, choose **Import diagram
+(draw.io)**. In draw.io, use **File → Export As → PNG**, enable **Include a copy
+of my diagram**, and keep **All Pages** selected to retain the whole editable
+drawing. The preview shows the exported page. [Draw.io export options](https://www.drawio.com/docs/manual/export/export-to-png/)
 
-Use **Insert image** to add the PNG. In Markdown source mode, find the same
-action under **Note tools**. Use **Image properties** to set alternative
-text. Dagsverk stores the original PNG, including its diagram data, subject
-to the usual 5 MB and account limits. Dagsverk previews it like other images.
-
-Use **Note tools → Draw.io diagrams** to select an image and **Download original
-PNG**. Open it in draw.io to recover its shapes and pages. Export a revised PNG
-with the same diagram-data options, choose it in Dagsverk and select **Replace
-PNG**. Replacement keeps the attachment path and note text intact, and updates
-references to that attachment. Read-only sessions can download the original.
-WebDAV and account archives preserve the original PNG bytes.
+Select a diagram in Formatted mode and choose **Note tools → Diagram file** to
+use **Download original PNG** or **Replace PNG**. You can also open **Diagram
+file** from an existing diagram’s editor. Replacement preserves the attachment
+path and note text. Read-only sessions can download the original. WebDAV and
+account archives preserve the PNG bytes.
 
 If another client changed the image, review and reload the saved file before
 retrying. If a response was lost, use **Check saved result** first. The chosen

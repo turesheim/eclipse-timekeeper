@@ -22,7 +22,6 @@ export function buildActionsMenu(field){
   f.syncActions=()=>{
     f.syncCompactActions?.();
     f.drawio?.syncSelection();
-    if(f.insertImageAction)f.insertImageAction.hidden=!f.onUpload||f.readOnly||!f.rich.hidden&&!f.toolbar.hidden;
     for(const button of menu.querySelectorAll('button'))if(!bound.has(button)){
       bound.add(button);const label=button.getAttribute('aria-label')||button.title;
       if(label){const text=document.createElement('span');text.textContent=label;button.append(text);}
@@ -115,7 +114,8 @@ export function buildCompactActions(f,media,host){
     f.closeActions();f.closeBlockMenu();f.closeListMenu();f.closeCalloutMenu();
     f.discardCompactPress();
     toolbar.hidden=media.matches;
-    (media.matches?host:toolbar).append(trigger);
+    f.insertControl.close();
+    (media.matches?host:toolbar).append(f.insertControl.group,trigger);
     f.syncActions();
     if(focused)trigger.focus({preventScroll:true});
   };

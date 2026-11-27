@@ -5,6 +5,7 @@ import {DrawioTools} from './drawio-tools.js';
 import {NoteTaskControls} from './note-task-controls.js';
 import {MarkdownCaret} from './markdown-caret.js';
 import {buildExperience} from './markdown-experience.js';
+import {MarkdownInsert} from './markdown-insert.js';
 import {t} from './i18n.js';
 import {splitMarkdown} from './markdown-document.js';
 import {MarkdownBanner} from './markdown-banner.js';
@@ -114,22 +115,12 @@ export class MarkdownField {
       const name=(event.shiftKey?move:insert)[key]||({Backspace:'delete_row',Delete:event.shiftKey?'delete_table':'delete_column',l:'align_left',c:'align_center',r:'align_right'})[key];
       if(!name)return;event.preventDefault();this.editor.command(name,undefined,false);
     });
-    this.image=iconButton(button(),'image',t('markdown.insert_image'));
-    this.attachment=iconButton(button(),'paperclip',t('markdown.attach_file'));
-    this.imagePicker=node('input');this.imagePicker.type='file';this.imagePicker.accept='image/png,image/jpeg,image/gif,image/webp';this.imagePicker.hidden=true;
-    this.attachmentPicker=node('input');this.attachmentPicker.type='file';this.attachmentPicker.hidden=true;
-    this.image.addEventListener('click',()=>this.imagePicker.click());
-    this.attachment.addEventListener('click',()=>this.attachmentPicker.click());
-    this.imagePicker.addEventListener('change',()=>void this.upload(this.imagePicker,true));
-    this.attachmentPicker.addEventListener('change',()=>void this.upload(this.attachmentPicker,false));
-    const codeBlock=this.tools.querySelector('[data-command="code_block"]');
-    this.tools.insertBefore(this.image,codeBlock);this.tools.insertBefore(this.attachment,codeBlock);
     this.rich=node('div',undefined,'journal-formatted');this.rich.id=prefix+'-formatted';
     this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'visually-hidden');label.htmlFor=prefix+'-body';
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-description',t('markdown.tab_help'));this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'btn-toolbar align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.toolbar.append(this.modes,this.tools);
-    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.toolbar,this.status,this.rich,this.plain,this.metadata,this.imagePicker,this.attachmentPicker,this.blockMenu,this.listMenu,this.calloutMenu);
+    this.banner=new MarkdownBanner();root.append(this.banner.dom,this.toolbar,this.status,this.rich,this.plain,this.metadata,this.blockMenu,this.listMenu,this.calloutMenu);
     this.toolbar.addEventListener('keydown',event=>this.historyShortcut(event));
     this.rich.addEventListener('timekeeper:markdown-link-error',event=>this.status.textContent=event.detail);
     this.rich.addEventListener('focusin',()=>this.controls());this.rich.addEventListener('focusout',()=>queueMicrotask(()=>{
@@ -140,6 +131,7 @@ export class MarkdownField {
     this.text.addEventListener('keydown',event=>{if(this.expandSourceSnippet(event))return;if(event.key==='Escape'){this.escapeTab=true;return;}if(event.key==='Tab'&&this.escapeTab){this.escapeTab=false;return;}this.escapeTab=false;if(event.key==='Tab'&&!this.readOnly){event.preventDefault();this.text.setRangeText('  ',this.text.selectionStart,this.text.selectionEnd,'end');this.text.dispatchEvent(new Event('input'));}});
     for(const name of ['paste','drop'])this.text.addEventListener(name,event=>{const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])];if(files.length&&!this.readOnly&&this.onUpload){event.preventDefault();void this.uploadFiles(files);}});
     if(resources?.bookmark)this.bookmark=new NoteBookmark(root,resources.bookmark);
+    this.insertControl=new MarkdownInsert(this);
     buildExperience(this);dailyBannerTools(this);if(resources?.noteClient)this.client=new NoteClient(this,resources.noteClient);this.caret=new MarkdownCaret(this);if(resources?.readAsset)this.drawio=new DrawioTools(this);if(resources?.readTaskSource)this.taskControls=new NoteTaskControls(this);
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
@@ -186,9 +178,17 @@ export class MarkdownField {
     const follow=this.text.selectionStart===from&&this.text.selectionEnd===to;this.text.setRangeText(text,from,to,'preserve');const end=from+text.length;if(follow)this.text.setSelectionRange(end,end);this.onChange();return end;
   }
   rawBody(){return this.text.value===this.displayedBody?this.raw:this.text.value;}
-  async upload(picker,image){
-    const file=picker.files?.[0];picker.value='';if(file)await this.uploadFiles([file],this.editor?.bookmark(),image);
+  captureInsertion(){
+    const editor=this.editor;
+    if(editor&&this.rich.contains(document.activeElement))editor.syncSelection();
+    return {generation:this.generation,editor,bookmark:editor?.bookmark(),body:this.text.value,
+      selection:{start:this.text.selectionStart,end:this.text.selectionEnd}};
   }
+  canInsertAt(target){
+    return !!target&&!this.readOnly&&!this.loading&&!this.bannerBusy&&target.generation===this.generation
+      &&target.editor===this.editor&&(!!target.editor||target.body===this.text.value);
+  }
+  releaseInsertion(target){if(target?.bookmark)target.editor.release(target.bookmark);}
   async uploadFiles(files,target,forceImage,{label:labelOverride,retry=true,selection}={}){
     if(!this.onUpload||this.readOnly||this.loading)return;
     const remaining=[...files];
@@ -206,7 +206,7 @@ export class MarkdownField {
         remaining.shift();
       }
       editor?.release(target);this.retryUpload=null;this.status.textContent='';return true;
-    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');if(retry){this.retryUpload=()=>this.uploadFiles(remaining,target,forceImage,{label:labelOverride});this.retryButton.hidden=false;}}return false;}
+    }catch(error){if(generation===this.generation){this.status.textContent=error.message||t('markdown.upload_failed');if(retry){this.retryUpload=()=>this.uploadFiles(remaining,target,forceImage,{label:labelOverride,selection:{start,end}});this.retryButton.hidden=false;}}return false;}
     finally{if(generation===this.generation){this.status.removeAttribute('aria-busy');this.loading=false;this.controls();}}
   }
 
@@ -291,10 +291,10 @@ export class MarkdownField {
   closeListMenu(){if(this.listMenu.matches(':popover-open'))this.listMenu.hidePopover();}
   controls(){
     this.editor?.setReadOnly(this.readOnly||this.bannerBusy);this.syncDailyBanner?.();
-    this.caret?.update();this.bookmark?.sync();this.client?.sync();this.drawio?.sync();this.taskControls?.sync();
+    this.insertControl?.sync();this.caret?.update();this.bookmark?.sync();this.client?.sync();this.drawio?.sync();this.taskControls?.sync();
     if(this.retryButton)this.retryButton.disabled=this.readOnly||this.loading;this.updateExperience?.();this.text.readOnly=this.readOnly||this.loading;
     const fragmentFocus=this.rich.contains(document.activeElement)&&!!document.activeElement?.closest?.('.markdown-source-fragment');
-    for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus||(!this.onUpload&&(action===this.image||action===this.attachment));
+    for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||fragmentFocus;
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
     for(const choice of this.listMenu.children)choice.disabled=this.readOnly||this.loading||fragmentFocus;
     if(this.readOnly||this.loading||this.rich.hidden||fragmentFocus){this.closeBlockMenu();this.closeListMenu();this.closeCalloutMenu();}
@@ -314,10 +314,10 @@ export class MarkdownField {
     this.dailyBannerDialog?.close();this.drawio?.dialog.close();
     this.banner.clear();
     this.resetCompletions?.();
-    this.closeActions?.();
+    this.closeActions?.();this.insertControl?.reset();
     this.caret?.clear();
     this.sourcePosition=null;
-    this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.assetDialog?.close();this.imageDialog?.close();
+    this.restoreGeneration=(this.restoreGeneration||0)+1;this.historyDialog?.close();this.imageDialog?.close();
     this.suspended?.editor.destroy().catch(()=>{});this.suspended=null;this.text.hidden=false;this.retryUpload=null;if(this.retryButton)this.retryButton.hidden=true;
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
     this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.bannerBusy=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();

@@ -106,9 +106,10 @@ dialog.journal-dialog { overflow: auto; }
 }
 .markdown-editor button[aria-pressed=true] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
 @media(max-width:600px) {
-  .markdown-editor .markdown-toolbar { display: grid; grid-template-columns: 1fr auto; overflow: visible; }
+  .markdown-editor .markdown-toolbar { display: grid; grid-template-columns: minmax(0,1fr) auto auto; overflow: visible; }
   .markdown-editor .markdown-modes { grid-column: 1; grid-row: 1; }
-  .markdown-editor .markdown-actions-trigger { grid-column: 2; grid-row: 1; justify-self: end; }
+  .markdown-editor .markdown-toolbar > .markdown-insert { grid-column: 2; grid-row: 1; justify-self: end; }
+  .markdown-editor .markdown-actions-trigger { grid-column: 3; grid-row: 1; justify-self: end; }
   .markdown-editor .markdown-tools { grid-column: 1 / -1; grid-row: 2; }
 }
 /* The compact code badge leaves the existing theme surface unchanged. */
@@ -258,13 +259,17 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .markdown-diagram-caption {display:block;margin-block-start:.25rem;color:var(--bs-secondary-color);text-align:center;}
 .markdown-diagram-edit.btn {position:absolute;inset-block-start:.25rem;inset-inline-end:.25rem;padding:.2rem;min-width:24px;min-height:24px;}
 .diagram-source-edit.btn {position:fixed;z-index:1079;padding:.2rem;min-width:24px;min-height:24px;}
+.markdown-diagram-edit {opacity:0;}
+@media (hover:hover) {
+  .markdown-diagram:hover > .markdown-diagram-edit {opacity:1;}
+}
+.markdown-diagram:focus-within > .markdown-diagram-edit,
+.markdown-diagram.diagram-tapped > .markdown-diagram-edit {opacity:1;}
 .markdown-editor:not(.diagram-editable) .markdown-diagram-edit {display:none;}
 .drawio-dialog {width:min(38rem,calc(100vw - 2rem));}
 .drawio-heading {display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;}
 .drawio-dialog > .dialog-actions {flex-wrap:wrap;}
 .drawio-dialog .form-label {display:block;margin-block:.75rem;}
-.drawio-files {list-style:none;padding:0;display:grid;gap:.35rem;max-height:12rem;overflow:auto;}
-.drawio-files button {width:100%;overflow-wrap:anywhere;}
 .drawio-filename {overflow-wrap:anywhere;font-size:.875rem;}
 .drawio-file-preview {display:block;max-width:100%;max-height:16rem;object-fit:contain;margin:1rem auto;background:#fff;}
 .drawio-editor-dialog[open] {
@@ -278,6 +283,7 @@ dialog.journal-document-dialog > .journal-document-content { min-height: min(12r
 .drawio-editor-dialog h2,.drawio-editor-dialog p,.drawio-editor-dialog .form-label {margin:0;}
 .drawio-editor-dialog p:empty {display:none;}
 .drawio-stage {flex:1 0 12rem;display:flex;}
+.drawio-empty-stage {flex:1;background:var(--bs-tertiary-bg);border-radius:var(--bs-border-radius);}
 .drawio-stage iframe {border:0;width:100%;background:#fff;}
 .drawio-editor-dialog .drawio-file-preview {max-height:5rem;align-self:center;}
 .drawio-editor-dialog .drawio-details {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;}

@@ -1,7 +1,7 @@
 import {workspaceDockSelector} from './navigation.js';
 import {searchNotes} from './notes-search.js';
 import {saveMarkdown} from './editor-interactions.js';
-import {clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
+import {clickInsertAction,clickNoteAction,noteActions,notesSource} from './editor-interactions.js';
 import {noteEntry} from './note-entry.js';
 import {readFile,writeFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
@@ -308,7 +308,7 @@ test('uploaded images appear immediately and remain visible after saving and reo
   await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();
   await page.locator('#notes-formatted [role=textbox]').click();await page.keyboard.press('End');await page.keyboard.press('Enter');
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
-  await page.locator('.notes-markdown input[type=file][accept]').setInputFiles({name:'uploaded pixel.png',mimeType:'image/png',buffer:png});
+  await page.locator('.notes-markdown input[type=file][accept^="image/png"]').setInputFiles({name:'uploaded pixel.png',mimeType:'image/png',buffer:png});
   const image=page.locator('#notes-formatted img[alt="uploaded pixel.png"]');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.naturalWidth)).toBe(1);
   await saveMarkdown(page.locator('#notes-panel'));
   await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');
@@ -500,7 +500,7 @@ test('existing assets and image properties keep portable paths across Notes and 
   await api('PUT','/notes/files?path=Notes%2FAssets.md',Buffer.from('Assets.\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.locator('#notes-panel').getByRole('button',{name:'Refresh',exact:true}).first().click();await noteEntry(page.locator('#notes-navigation'),'Notes').click();await noteEntry(page.locator('#notes-navigation'),'Notes/Assets.md').click();
   await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await page.locator('#notes-formatted p').click();await page.keyboard.press(process.platform==='darwin'?'Meta+ArrowRight':'End');
-  await clickNoteAction(page,page.locator('#notes-panel'),'Existing vault asset');const picker=page.getByRole('dialog',{name:'Existing vault asset',exact:true});await picker.getByRole('button',{name:'Notes/pixel.png',exact:true}).click();
+  await clickInsertAction(page,page.locator('#notes-panel'),'Insert asset');const picker=page.getByRole('dialog',{name:'Insert asset',exact:true});await picker.getByRole('button',{name:'Notes/pixel.png',exact:true}).click();
   const image=page.locator('#notes-formatted img[data-wiki-embed]');await expect.poll(()=>image.evaluate(node=>node.naturalWidth)).toBe(1);await image.click();await clickNoteAction(page,page.locator('#notes-panel'),'Image properties');const properties=page.getByRole('dialog',{name:'Image properties',exact:true});await properties.getByLabel('Width in pixels',{exact:true}).fill('48');await properties.getByRole('button',{name:'Save',exact:true}).click();
   await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();expect(await page.locator('#notes-body').inputValue()).toContain('![[Notes/pixel.png|48]]');
   const save=page.locator('.notes-footer > [role=status]');await saveMarkdown(page.locator('#notes-panel'));await expect(save).toHaveText('Saved');

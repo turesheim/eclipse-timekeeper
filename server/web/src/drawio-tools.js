@@ -1,6 +1,5 @@
 import {t} from './i18n.js';
 import {iconButton} from './icons.js';
-import {splitMarkdown} from './markdown-document.js';
 import {drawioPngInfo,samePngBytes,withDrawioDescription} from './drawio-png.js';
 import {updateImagePreviews} from './image-preview.js';
 import {drawioEndpoint,DrawioEditor} from './drawio-editor.js';
@@ -16,16 +15,15 @@ let parser;
 export class DrawioTools {
   constructor(field){
     this.field=field;this.generation=0;this.group=node('div');
-    const editSelected=()=>{
+    this.phone=matchMedia('(pointer:coarse) and (max-width:650px), (pointer:coarse) and (max-height:500px)');
+    this.phone.addEventListener('change',()=>this.sync());
+    this.fileAction=button(t('drawio.file'),()=>{
       const reference=this.selectedReference();
-      if(reference)void this.open('files',reference);
-    };
-    this.insert=button(t('drawio.insert'),()=>void this.open('new'));this.insert.hidden=true;
-    this.browse=button(t('drawio.files'),()=>void this.open('files'));
-    this.insertExisting=button(t('drawio.insert_existing'),()=>void this.open('existing'));
-    this.selectedEdit=button(t('drawio.edit'),editSelected);this.selectedEdit.hidden=true;
+      if(reference)void this.open('file',reference);
+    });
+    this.fileAction.hidden=true;
     this.sourceEdit=iconButton(button('',()=>{
-      if(this.sourceDiagram?.editable)void this.open('files',this.sourceDiagram.reference);
+      if(this.sourceDiagram?.editable)void this.open('edit',this.sourceDiagram.reference);
     }),'pencil',t('drawio.edit'));
     this.sourceEdit.classList.add('diagram-source-edit');
     this.sourceEdit.setAttribute('aria-keyshortcuts','Alt+Enter');
@@ -44,7 +42,7 @@ export class DrawioTools {
     field.text.addEventListener('keydown',event=>{
       if(event.altKey&&event.key==='Enter'&&!this.sourceEdit.hidden){event.preventDefault();this.sourceEdit.focus();}
     });
-    this.group.append(this.insert,this.insertExisting,this.selectedEdit,this.browse);field.addActionsGroup(this.group);
+    this.group.append(this.fileAction);field.addActionsGroup(this.group);
     this.dialog=node('dialog',undefined,'app-dialog drawio-dialog');this.heading=node('h2');this.heading.id='drawio-'+crypto.randomUUID();this.dialog.setAttribute('aria-labelledby',this.heading.id);
     this.resize=button(t('drawio.fill_window'),()=>{
       this.dialog.classList.toggle('drawio-fill-window');
@@ -52,18 +50,21 @@ export class DrawioTools {
     });
     const headingRow=node('div',undefined,'drawio-heading');
     headingRow.append(this.heading,this.resize);
-    this.help=node('p',t('drawio.help'),'hint');const guide=node('a',t('drawio.help_link'));guide.href='https://www.drawio.com/docs/manual/export/export-to-png/';guide.target='_blank';guide.rel='noopener noreferrer';
-    this.searchLabel=node('label',t('drawio.search'),'form-label');
-    this.search=node('input',undefined,'form-control');this.search.type='search';
-    this.searchLabel.append(this.search);this.search.addEventListener('input',()=>this.paintDiagrams());
-    this.list=node('ul',undefined,'drawio-files');this.savedName=node('p','','drawio-filename');this.preview=node('img',undefined,'drawio-file-preview');this.preview.alt=t('drawio.preview');this.preview.hidden=true;
+    this.savedName=node('p','','drawio-filename');this.preview=node('img',undefined,'drawio-file-preview');this.preview.alt=t('drawio.preview');this.preview.hidden=true;
     this.fileLabel=node('label',t('drawio.file_label'),'form-label');this.fileInput=node('input',undefined,'form-control');this.fileInput.type='file';this.fileInput.accept='.png,image/png';this.fileInput.setAttribute('aria-label',t('drawio.file_label'));this.fileInput.addEventListener('change',()=>void this.selectFile());
     this.altLabel=node('label',t('drawio.alt'),'form-label');this.alt=node('input',undefined,'form-control');this.alt.maxLength=255;this.alt.setAttribute('aria-label',t('drawio.alt'));this.altLabel.append(this.alt);
     this.nameLabel=node('label',t('drawio.name'),'form-label');this.name=node('input',undefined,'form-control');this.name.maxLength=200;this.nameLabel.append(this.name);
     this.stage=node('div',undefined,'drawio-stage');this.stage.hidden=true;
+    this.emptyStage=node('div',undefined,'drawio-empty-stage');this.stage.append(this.emptyStage);
     this.status=node('p','','hint');this.status.setAttribute('role','status');this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.download=button(t('drawio.download'),()=>this.downloadFile());
-    this.edit=button(t('drawio.edit'),()=>void this.openEditor(this.context?.blob));
+    this.edit=button(t('drawio.edit'),()=>{this.mode='edit';void this.openEditor(this.context?.blob);});
+    this.manageFile=button(t('drawio.file'),()=>{
+      if(this.editor?.changed||this.editorReady&&this.alt.value.trim()!==this.originalDescription){
+        if(!confirm(t('drawio.discard_edit')))return;
+      }
+      this.stopEditor();this.mode='file';this.status.textContent='';this.paint();
+    });
     this.reload=button(t('drawio.reload'),()=>{
       if(confirm(t(this.editor?'drawio.reload_edit_confirm':'drawio.reload_confirm')))void this.loadAsset();
     });
@@ -71,11 +72,9 @@ export class DrawioTools {
     this.cancel=button(t('ui.cancel'),()=>this.cancelDialog());
     this.apply=button(t('drawio.save'),()=>void this.commit());this.apply.className='btn btn-primary';
     const actions=node('div',undefined,'dialog-actions');
-    actions.append(this.download,this.edit,this.reload,this.check,this.cancel,this.apply);
-    this.manual=node('div');this.manual.append(this.help,guide,this.searchLabel,this.list,this.savedName);
-    this.exportGuide=guide;
+    actions.append(this.download,this.edit,this.manageFile,this.reload,this.check,this.cancel,this.apply);
     this.details=node('div',undefined,'drawio-details');this.details.append(this.nameLabel,this.altLabel);
-    this.dialog.append(headingRow,this.manual,this.preview,this.fileLabel,this.stage,this.details,this.status,this.error,actions);
+    this.dialog.append(headingRow,this.savedName,this.preview,this.fileLabel,this.stage,this.details,this.status,this.error,actions);
     field.root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{
       event.stopPropagation();event.preventDefault();this.cancelDialog();
@@ -83,9 +82,9 @@ export class DrawioTools {
     this.dialog.addEventListener('close',()=>{
       if(this.dialog.open)return;
       this.stopEditor();this.abort?.abort();++this.generation;
-      this.fileInput.remove();this.bookmarkEditor?.release(this.bookmark);
-      this.bookmark=null;this.bookmarkEditor=null;this.clearFile();this.context=null;this.reference=null;
-      this.diagrams=null;this.list.replaceChildren();this.error.textContent='';this.status.textContent='';this.savedName.textContent='';
+      this.fileInput.remove();field.releaseInsertion(this.insertion);
+      this.insertion=null;this.clearFile();this.context=null;this.reference=null;
+      this.error.textContent='';this.status.textContent='';this.savedName.textContent='';
       this.clearPreview();this.busy=this.saving=false;
       if(same(this.bound,this.current())&&field.root.getClientRects().length)field.focus();
       this.bound=null;
@@ -100,16 +99,13 @@ export class DrawioTools {
     const f=this.field;
     if(this.sourceImages?.generation!==f.generation)this.sourceImages=null;
     set(this.group,'hidden',!current?.session);
-    set(this.insert,'hidden',!this.editorEndpoint);
-    set(this.insert,'disabled',f.readOnly||f.loading||!f.onUpload||!f.resources.canReplaceAsset?.());
-    set(this.browse,'disabled',f.loading||!current?.session);
-    set(this.insertExisting,'hidden',!f.resources.listDiagrams);
-    set(this.insertExisting,'disabled',f.readOnly||f.loading||!f.resources.canReplaceAsset?.());
-    f.root.classList.toggle('diagram-editable',!!this.editorEndpoint&&!f.readOnly&&!f.loading&&!!f.resources.canReplaceAsset?.());
+    f.root.classList.toggle('diagram-editable',!f.readOnly&&!f.loading&&this.canEdit());
+    f.insertControl?.sync();
     if(this.dialog.open)this.paint();
     if(f.text===document.activeElement||!this.sourceEdit.hidden)void this.syncSourceEdit();
     f.syncActions();
   }
+  canEdit(){return !this.phone.matches&&!!this.editorEndpoint&&!!this.field.resources.canReplaceAsset?.();}
   selectedReference(){
     const image=this.field.editor?.imageDetails();
     if(!pngReference(image?.path)||!image.embed&&!this.field.resources.allowsAsset?.(image.path))return null;
@@ -117,15 +113,14 @@ export class DrawioTools {
   }
   syncSelection(){
     const f=this.field;
-    const selected=!f.readOnly&&!f.loading&&f.resources.canReplaceAsset?.()&&!!this.selectedReference();
-    set(this.selectedEdit,'hidden',!selected);
-
+    set(this.fileAction,'hidden',f.loading||!this.selectedReference());
   }
   async syncSourceEdit(){
     const f=this.field,text=f.text,active=document.activeElement;
+    if(this.phone.matches){this.sourceEdit.hidden=true;return;}
     if(active===this.sourceEdit&&!f.readOnly&&!f.loading)return;
     const body=text.value,position=text.selectionStart,generation=f.generation;
-    if(f.editor||f.readOnly||f.loading||!this.editorEndpoint||!f.resources.canReplaceAsset?.()
+    if(f.editor||f.readOnly||f.loading||!this.canEdit()
         ||active!==text||position!==text.selectionEnd||!/\.png/i.test(body)){
       this.sourceEdit.hidden=true;return;
     }
@@ -167,9 +162,15 @@ export class DrawioTools {
     const {dom:image}=preview,dom=node('span',undefined,'markdown-diagram');
     const caption=node('span',undefined,'markdown-diagram-caption');
     caption.hidden=true;
-    const edit=iconButton(button('',()=>void this.open('files',reference)),'pencil',t('drawio.edit'));
+    const edit=iconButton(button('',()=>void this.open('edit',reference)),'pencil',t('drawio.edit'));
     edit.className='btn btn-light icon-button markdown-diagram-edit';edit.hidden=true;
     dom.contentEditable='false';dom.append(image,caption,edit);
+    image.addEventListener('pointerup',event=>{
+      if(event.pointerType==='touch'&&!edit.hidden)dom.classList.toggle('diagram-tapped');
+    });
+    dom.addEventListener('focusout',event=>{
+      if(!dom.contains(event.relatedTarget))dom.classList.remove('diagram-tapped');
+    });
     preview.observeDiagram(info=>{
       dom.classList.toggle('markdown-diagram-ready',!!info?.editable);
       caption.textContent=info?.description||'';
@@ -180,28 +181,29 @@ export class DrawioTools {
   }
   paint(){
     const f=this.field,writable=!f.readOnly&&f.resources.canReplaceAsset?.();
-    const creating=this.mode==='new',inserting=this.mode==='existing',editing=!!this.editor;
-    this.dialog.classList.toggle('drawio-editor-dialog',editing);
-    this.resize.hidden=!editing;
+    const creating=this.mode==='new',editing=!!this.editor,fileMode=this.mode==='file';
+    this.dialog.classList.toggle('drawio-editor-dialog',!fileMode);
+    this.resize.hidden=fileMode;
     set(this.resize,'textContent',t(this.dialog.classList.contains('drawio-fill-window')?'drawio.restore_size':'drawio.fill_window'));
-    set(this.heading,'textContent',t(creating?'drawio.new':inserting?'drawio.insert_existing':editing||this.direct?'drawio.edit':'drawio.files'));
-    set(this.apply,'textContent',t(editing?'drawio.save':'drawio.replace'));
-    this.stage.hidden=!editing;this.stage.inert=!!this.saving;this.manual.hidden=editing||creating;
-    this.help.hidden=this.exportGuide.hidden=inserting;this.searchLabel.hidden=!inserting;
-    this.details.hidden=!editing;this.nameLabel.hidden=!creating;this.list.hidden=this.direct;
-    this.preview.hidden=!this.url||editing&&!this.reviewing;
-    this.fileLabel.hidden=editing||creating||inserting||!writable;
-    this.apply.hidden=inserting||!writable||creating&&!editing;
-    this.edit.hidden=editing||creating||!writable||!this.editorEndpoint||!this.info?.editable;
+    set(this.heading,'textContent',t(creating?'drawio.new':fileMode?'drawio.file':'drawio.edit'));
+    set(this.apply,'textContent',t(fileMode?'drawio.replace':'drawio.save'));
+    this.stage.hidden=fileMode;this.stage.inert=!!this.saving;
+    this.emptyStage.hidden=fileMode||editing;
+    this.details.hidden=!editing;this.nameLabel.hidden=!creating;
+    this.savedName.hidden=!fileMode;
+    this.preview.hidden=!this.url||!fileMode&&!this.reviewing;
+    this.fileLabel.hidden=!fileMode||!writable;
+    this.apply.hidden=!writable;
+    this.edit.hidden=!fileMode||!writable||!this.canEdit()||!this.info?.editable;
     this.edit.disabled=this.busy||this.stale||this.uncertain;
+    this.manageFile.hidden=fileMode||creating||(!this.context&&this.busy);
+    this.manageFile.disabled=this.busy||this.saving;
     this.fileInput.disabled=this.busy||!writable;this.name.disabled=this.alt.disabled=this.busy;
     this.apply.disabled=this.busy||f.loading||!writable||this.stale||this.uncertain
-      ||(editing?!this.editorReady||!creating&&!this.info?.editable:!this.fileInfo?.editable||!this.info?.editable);
-    this.download.hidden=editing||creating||inserting;
-    this.download.disabled=this.busy||!this.context?.blob;
+      ||(fileMode?!this.fileInfo?.editable||!this.info?.editable:!this.editorReady||!creating&&!this.info?.editable);
+    this.download.hidden=!fileMode;this.download.disabled=this.busy||!this.context?.blob;
     this.cancel.disabled=!!this.saving;this.reload.hidden=!this.stale;this.check.hidden=!this.uncertain;
     this.reload.disabled=this.check.disabled=this.busy;
-    for(const pick of this.list.querySelectorAll('button'))pick.disabled=this.busy;
     this.dialog.setAttribute('aria-busy',String(!!this.busy));
   }
   failure(error){this.error.textContent=error.message;this.error.hidden=false;}
@@ -218,12 +220,10 @@ export class DrawioTools {
     if(this.saving)return;
     const dirty=this.editor?.changed||this.editorReady&&this.alt.value.trim()!==this.originalDescription;
     if(dirty&&!confirm(t('drawio.discard_edit')))return;
-    if(!dirty||!this.editor||this.mode==='new'||this.direct||this.uncertain||this.stale){this.dialog.close();return;}
-    this.stopEditor();this.clearFile();this.busy=false;this.status.textContent='';this.paint();
-    (this.stale?this.reload:this.uncertain?this.check:this.edit).focus();
+    this.dialog.close();
   }
   async openEditor(blob){
-    if(!this.editorEndpoint||this.editor||this.field.readOnly||this.busy||!this.field.resources.canReplaceAsset?.()
+    if(!this.canEdit()||this.editor||this.field.readOnly||this.busy
       ||this.mode!=='new'&&(!blob||!this.info?.editable))return;
     const cycle=this.generation;
     this.clearFile();this.editorAbort=new AbortController();
@@ -243,77 +243,26 @@ export class DrawioTools {
       this.busy=false;this.paint();this.cancel.focus();
     }
   }
-  async open(mode,reference=null){
+  async open(mode,reference=null,insertion=null){
     const f=this.field,current=this.current(),creating=mode==='new';
-    if(!current?.session||this.dialog.open||f.loading||creating&&this.insert.disabled
-      ||reference&&(f.readOnly||!f.resources.canReplaceAsset?.()))return;
+    if(!current?.session||this.dialog.open||f.loading||creating&&(!this.canEdit()||!f.canInsertAt(insertion))
+      ||mode==='edit'&&(f.readOnly||!this.canEdit())){
+      f.releaseInsertion(insertion);return;
+    }
     this.fileLabel.append(this.fileInput);this.bound=current;this.mode=mode;this.context=null;this.info=null;
-    this.direct=!!reference;this.reference=reference;
-    this.stale=this.uncertain=false;this.clearFile();this.alt.value='';this.name.value='';
-    this.error.hidden=true;this.status.textContent='';this.savedName.textContent='';this.clearPreview();this.list.replaceChildren();
+    this.reference=reference;this.insertion=insertion;
+    this.stale=this.uncertain=false;this.clearFile();this.alt.value='';this.name.value='';this.clearPreview();
+    this.error.hidden=true;this.savedName.textContent='';
+    this.status.textContent=t(mode==='edit'?'drawio.loading_editor':'drawio.loading');
     this.abort=new AbortController();const cycle=++this.generation;
-    this.bookmarkEditor=creating||mode==='existing'?f.editor:null;
-    this.bookmark=this.bookmarkEditor?.bookmark();
-    this.selection={start:f.text.selectionStart,end:f.text.selectionEnd};
-    this.dialog.showModal();this.paint();
-    if(creating){void this.openEditor();return;}
-    if(mode==='existing'){void this.loadDiagrams(cycle);return;}
-    if(reference){
-      await this.loadAsset();
-      if(this.active(cycle))void this.openEditor(this.context?.blob);
-      return;
+    this.paint();this.dialog.showModal();this.cancel.focus();
+    if(creating){await this.openEditor();return;}
+    await this.loadAsset();
+    if(!this.active(cycle)||mode!=='edit')return;
+    if(this.info?.editable&&this.canEdit())await this.openEditor(this.context.blob);
+    else if(!this.error.textContent||this.error.hidden){
+      this.status.textContent='';this.failure(new Error(t('drawio.editor_unavailable')));
     }
-    this.busy=true;this.status.textContent=t('drawio.loading');this.paint();
-    try{
-      const source=splitMarkdown(this.field.value()).body;parser??=import('./assets/milkdown/markdown-preview.js');const images=(await parser).markdownImages(source);
-      if(!this.active(cycle))return;
-      const references=images.filter(value=>pngReference(value.reference.split('|')[0])&&(value.kind==='wiki'||this.field.resources.allowsAsset?.(value.reference)));
-      for(const value of references){const item=node('li'),pick=button(value.alt||value.reference,()=>{this.reference=value;this.clearFile();void this.loadAsset();});pick.classList.add('text-start');item.append(pick);this.list.append(item);}
-      this.status.textContent=references.length?'':t('drawio.no_diagrams');
-    }catch(error){if(this.active(cycle))this.failure(error);}
-    finally{if(this.active(cycle)){this.busy=false;this.paint();this.list.querySelector('button')?.focus();}}
-  }
-  async loadDiagrams(cycle){
-    this.diagrams=null;this.search.value='';
-    this.busy=true;this.status.textContent=t('drawio.loading');this.paint();
-    this.search.focus();
-    try{
-      const diagrams=await this.field.resources.listDiagrams({signal:this.abort.signal});
-      if(this.active(cycle)){this.diagrams=diagrams;this.paintDiagrams();}
-    }catch(error){if(this.active(cycle)&&error.name!=='AbortError'){this.status.textContent='';this.failure(error);}}
-    finally{if(this.active(cycle)){this.busy=false;this.paint();}}
-  }
-  paintDiagrams(){
-    if(!this.diagrams)return;
-    const query=this.search.value.trim().normalize('NFC').toLocaleLowerCase();
-    this.list.replaceChildren();
-    for(const {entry,description} of this.diagrams){
-      if(![entry.path,description].some(text=>text.normalize('NFC').toLocaleLowerCase().includes(query)))continue;
-      const label=description||entry.path.split('/').at(-1);
-      const item=node('li'),pick=button(label,()=>void this.insertReference(entry,label));
-      pick.classList.add('text-start');item.append(pick);
-      if(description)item.append(node('div',entry.path,'drawio-filename hint'));
-      this.list.append(item);
-    }
-    this.status.textContent=this.list.children.length?'':t('drawio.no_matches');
-  }
-  async insertReference(entry,label){
-    const f=this.field,cycle=this.generation;
-    if(!this.active(cycle)||this.busy||f.readOnly)return;
-    this.busy=true;this.error.hidden=true;this.paint();
-    try{
-      const path=await f.resources.assetReference(entry);
-      if(!this.active(cycle)||f.readOnly)return;
-      const safeLabel=label.replace(/[\[\]\\\r\n]/g,' ').trim();
-      if(this.bookmarkEditor){
-        if(!this.bookmarkEditor.insertAt(this.bookmark,'image',{path,label:safeLabel}))throw new Error(t('markdown.upload_failed'));
-      }else{
-        const {start,end}=this.selection;
-        f.insertSource(`![${safeLabel}](<${path}>)`,start,end);
-      }
-      this.dialog.close();
-    }catch(error){if(this.active(cycle))this.failure(error);}
-    finally{if(this.active(cycle)){this.busy=false;this.paint();}}
   }
   async selectFile(){
     const file=this.fileInput.files?.[0],cycle=this.generation;this.file=file;this.fileInfo=null;this.bytes=null;this.error.hidden=true;if(!file){this.paint();return;}
@@ -326,13 +275,13 @@ export class DrawioTools {
     finally{if(this.active(cycle)){this.busy=false;this.paint();}}
   }
   async loadAsset(){
-    if(!this.reference||this.busy)return;const cycle=this.generation,previous=this.context;this.busy=true;this.error.hidden=true;this.status.textContent=t('drawio.loading');this.paint();
+    if(!this.reference||this.busy)return;const cycle=this.generation,previous=this.context;this.busy=true;this.error.hidden=true;this.status.textContent=t(this.mode==='edit'?'drawio.loading_editor':'drawio.loading');this.paint();
     try{
       const context=await this.field.resources.readAsset(this.reference,{signal:this.abort.signal}),bytes=new Uint8Array(await context.blob.arrayBuffer());if(!this.active(cycle))return;
       if(this.editor&&previous?.entry.id!==context.entry.id)throw new Error(t('drawio.asset_moved'));
       this.context=context;this.info=drawioPngInfo(bytes);this.stale=this.uncertain=false;
       this.reviewing=!!this.editor;this.savedName.textContent=context.entry.path;
-      this.status.textContent=this.info?.editable&&!this.editorEndpoint&&!this.field.readOnly
+      this.status.textContent=this.info?.editable&&!this.phone.matches&&!this.editorEndpoint&&!this.field.readOnly
         ?t('drawio.editor_not_configured'):this.editor?'':this.file?.name||'';
       this.clearPreview();
       if(this.info){this.url=URL.createObjectURL(context.blob.slice(0,context.blob.size,'image/png'));this.preview.src=this.url;}
@@ -373,7 +322,8 @@ export class DrawioTools {
         this.bytes=bytes;this.fileInfo=info;this.file=new File([bytes],name??this.context.entry.path.split('/').at(-1),{type:'image/png'});
       }
       if(creating){
-        const success=await f.uploadFiles([this.file],this.bookmark,true,{label:this.alt.value.trim()||name,retry:false,selection:this.selection});
+        if(!f.canInsertAt(this.insertion))throw new Error(t('markdown.upload_failed'));
+        const success=await f.uploadFiles([this.file],this.insertion.bookmark,true,{label:this.alt.value.trim()||name,retry:false,selection:this.insertion.selection});
         if(this.active(cycle)){
           if(success)this.dialog.close();else this.failure(new Error(f.status.textContent||t('markdown.upload_failed')));
         }
