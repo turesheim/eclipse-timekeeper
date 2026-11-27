@@ -1,6 +1,6 @@
 ---
 name: dagsverk-change
-description: Implement a feature or fix a defect in Dagsverk with observable acceptance criteria and verification. Use for code changes across this repository; use dagsverk-review for a review-only request.
+description: Implement a feature or fix a defect in Dagsverk with observable acceptance criteria and verification. Use for code changes and pull request creation in this repository; use dagsverk-review for a review-only request.
 ---
 
 # Dagsverk changes
@@ -20,6 +20,13 @@ Paths in this skill are relative to the repository root.
   Preserve technical identifiers during the Dagsverk naming transition.
 - Implement the smallest coherent change. Cover meaningful changed behavior
   and regressions; reuse existing acceptance fixtures and synthetic accounts.
+- Add a `Co-authored-by: Agent Name <agent-email>` trailer after a blank line
+  in each new commit the AI agent contributes to. Use the agent's configured
+  or documented attribution identity. For Codex, default to
+  `Co-authored-by: Codex <noreply@openai.com>`. Preserve existing co-authors
+  and keep the trailer in any squash commit message you prepare.
+- Verify the attribution in the commit messages before opening a PR, including
+  drafts.
 - Every PR that affects the UI must include screenshots in its description.
   For each affected client, capture comparable views or states from the PR
   base and proposed change using the same synthetic data and display settings.
