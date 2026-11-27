@@ -29,6 +29,12 @@ class ChangesTest(unittest.TestCase):
         for key in ("code", "server", "web", "api", "eclipse", "remote_eclipse", "containers"):
             self.assertFalse(selected[key], key)
 
+    def test_agent_markdown_does_not_build_the_public_website(self):
+        paths = [".agents/skills/dagsverk-change/SKILL.md", "AGENTS.md"]
+        self.assertFalse(self.select(paths)["site"])
+        self.assertFalse(self.select(paths, {"before": "abc"}, "push", "refs/heads/main")["site"])
+        self.assertTrue(self.select(paths + ["docs/user/README.md"])["site"])
+
     def select(self, paths, event=None, name='pull_request', ref='refs/pull/1/merge'):
         event = event or {'pull_request': {'base': {'sha': 'abc'}}}
         with patch.object(ci.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, ('\0'.join(paths)+'\0').encode(), b'')):
