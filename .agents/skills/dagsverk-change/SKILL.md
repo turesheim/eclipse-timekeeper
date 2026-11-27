@@ -20,13 +20,13 @@ Paths in this skill are relative to the repository root.
   Preserve technical identifiers during the Dagsverk naming transition.
 - Implement the smallest coherent change. Cover meaningful changed behavior
   and regressions; reuse existing acceptance fixtures and synthetic accounts.
-- When opening a PR, including a draft, end its description with
-  `Co-authored-by: Agent Name <agent-email>` for the AI agent in use. Use its
-  configured or documented attribution email. For Codex, default to
-  `Co-authored-by: Codex <noreply@openai.com>`. If the email is unknown, use
-  `Co-authored-by: Agent Name` in the PR description.
-- Add the full trailer to new commits the agent contributes to and preserve it
-  in any squash commit message you prepare. Preserve existing co-authors.
+- Add a `Co-authored-by: Agent Name <agent-email>` trailer after a blank line
+  in each new commit the AI agent contributes to. Use the agent's configured
+  or documented attribution identity. For Codex, default to
+  `Co-authored-by: Codex <noreply@openai.com>`. Preserve existing co-authors
+  and keep the trailer in any squash commit message you prepare.
+- Verify the attribution in the commit messages before opening a PR, including
+  drafts.
 - Every PR that affects the UI must include screenshots in its description.
   For each affected client, capture comparable views or states from the PR
   base and proposed change using the same synthetic data and display settings.
