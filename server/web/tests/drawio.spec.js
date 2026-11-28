@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID,createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
@@ -102,7 +103,7 @@ test('read-only sessions download while foreign accounts cannot read or replace 
 
 test('shared daily, weekly and saved event notes insert and replace the same editable PNG flow',async({page,request})=>{
   test.setTimeout(120000);const {api,raw,put}=await fresh(page,request),day='2026-11-16';await put('journal/'+day+'.md','---\nbanner: "Keep imported setting"\n---\nDaily diagram\n');await put('journal/2026-W47.md','Weekly diagram\n');
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const daily=page.locator('#today-note-editor');await expect(daily.locator('.ProseMirror')).toBeVisible();await insert(page,daily,'daily.png');await saveMarkdown(daily);expect((await(await api('GET','/day-entries/'+day)).json()).body).toContain('![daily.png](assets/');
+  await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);const daily=page.locator('#today-note-editor');await expect(daily.locator('.ProseMirror')).toBeVisible();await insert(page,daily,'daily.png');await saveMarkdown(daily);expect((await(await api('GET','/day-entries/'+day)).json()).body).toContain('![daily.png](assets/');
   await page.locator('#today-month-grid [data-week="2026-W47"]').click();const weekly=page.locator('#today-week-note-editor');await expect(weekly.locator('.ProseMirror')).toBeVisible();await insert(page,weekly,'weekly.png');await saveMarkdown(weekly);let box=await manage(page,weekly,'weekly.png');const beforePreview=await weekly.locator('.ProseMirror img[alt="weekly.png"]').getAttribute('src');await choose(box);await box.getByRole('button',{name:'Replace PNG',exact:true}).click();await expect(box).toBeHidden();await expect(weekly.locator('.ProseMirror img[alt="weekly.png"]')).not.toHaveAttribute('src',beforePreview);await expect(weekly).toBeVisible();await weekly.getByRole('button',{name:'Close',exact:true}).click();
   const title='Diagram planning',body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Dagsverk//Diagram fixture//EN','BEGIN:VEVENT','UID:diagram-event','DTSTAMP:20260101T000000Z','DTSTART:20261116T100000Z','DTEND:20261116T110000Z','SUMMARY:'+title,'END:VEVENT','END:VCALENDAR',''].join('\r\n'),feed=await request.post(process.env.TIMEKEEPER_WEB_CALENDAR_FIXTURE+'/feeds',{data:{body}}),client=await(await api('POST','/clients',{name:'Diagram calendar',color:'#305070'})).json(),subscription=await(await api('POST','/calendar-subscriptions',{name:'Diagram calendar',clientId:client.id,url:(await feed.json()).url,visible:true,includeEvents:true,includeTodos:false})).json();
   let event;await expect.poll(async()=>{event=(await(await api('GET','/calendar-events?fromDate='+day+'&toDate=2026-11-17')).json()).items.find(item=>item.subscriptionId===subscription.id);return event?.title;},{timeout:30000}).toBe(title);const path='/event-notes/'+subscription.id+'/'+event.key,before=await api('GET',path);await api('PUT',path,{fromDate:day,toDate:'2026-11-17',body:'Event diagram bridge\n'},{'If-Match':before.headers().etag});
@@ -535,7 +536,7 @@ test.describe('self-hosted draw.io editor',()=>{
     const {api,put}=await fresh(page,request),date='2026-11-16';
     await put('journal/'+date+'.md','Diagram in Today.\n');
     await page.locator('[data-tab=today]').click();
-    await page.locator('#today-date').fill(date);
+    await chooseTodayDate(page,date);
     const root=page.locator('#today-note-editor');
     await expect(root.locator('.ProseMirror')).toBeVisible();
     await clickInsertAction(page,root,'Insert diagram (draw.io)');

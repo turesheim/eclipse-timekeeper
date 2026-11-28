@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {tooltipFor} from './tooltips.js';
 import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
@@ -60,7 +61,7 @@ test('Today joins holidays and labels while Track and Calendar tint weekly rest 
     }
     await page.reload();await trackingReady(page);
     await page.locator('[data-tab=today]').click();
-    await page.locator('#today-date').fill('2026-05-17');
+    await chooseTodayDate(page,'2026-05-17');
     const day=date=>page.locator('#today-month-grid [data-date="'+date+'"]');
     const both=day('2026-05-17'),label=day('2026-05-18'),ordinary=day('2026-05-16');
     await expect(both).toHaveAccessibleName(/Grunnlovsdagen.*National celebration/);

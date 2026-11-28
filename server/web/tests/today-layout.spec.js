@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {workspaceDockSelector} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -40,9 +41,13 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
   const date='2026-07-09',path='/day-notes/'+date+'/content',original=await api(request,'GET',path),body=(await original.json()).body;
   const markdown='# Plan\n\n'+('A paragraph about the work.\n\n'.repeat(30))+'## Next steps\n\n### Decisions\n\n'+('More context.\n\n'.repeat(30))+'## Next steps\n';
   await api(request,'PUT',path,{body:markdown},{'If-Match':original.headers().etag});
+  const profile=await api(request,'GET','/me'),{zoneId,locale:accountLocale}=await profile.json();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale,viewport:{width:1440,height:1000}}),page=await context.newPage();
   try{
-    await signIn(page);await page.locator('#today-date').fill(date);
+    // The account preference takes precedence over the browser language.
+    if(accountLocale!==null)await api(request,'PUT','/me',{zoneId,locale:null},{'If-Match':profile.headers().etag});
+    await signIn(page);await expect(page.locator('html')).toHaveAttribute('lang',locale);
+    await chooseTodayDate(page,date);
     const contents=page.locator('#today-contents'),choices=contents.locator('ol button'),field=page.locator('#today-note-editor');
     await expect(contents.getByRole('heading',{name:locale==='nb-NO'?'Innholdsfortegnelse':'Table of contents',exact:true})).toBeVisible();
     await expect(choices).toHaveText(['Plan','Next steps','Decisions','Next steps']);
@@ -55,7 +60,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
     expect((await api(request,'GET',path)).headers().etag).toBe(saved.headers().etag);
     const readerContext=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale,viewport:{width:1440,height:1000}});
     try{
-      const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await reader.locator('#today-date').fill(date);
+      const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await chooseTodayDate(reader,date);
       await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
       await expect(reader.locator('#today-contents-list button')).toHaveCount(4);await reader.locator('#today-contents-list button').last().click();
       await expect(reader.locator('#today-note-editor .ProseMirror h2').last()).toBeInViewport();
@@ -75,7 +80,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
         if(width===1440){
           await expect(page.locator('.today-sidebar')).toBeVisible();await expect(contents).toBeVisible();
           const left=await page.locator('.today-sidebar').boundingBox(),main=await page.locator('.today-main').boundingBox(),right=await contents.boundingBox(),toolbar=await page.locator('.today-toolbar').boundingBox();
-          expect(left.x+left.width).toBeLessThan(main.x);expect(right.x).toBeGreaterThanOrEqual(main.x+main.width);expect(Math.abs(left.y-main.y)).toBeLessThan(1);expect(Math.abs(right.y-toolbar.y)).toBeLessThan(1);
+          expect(left.x+left.width).toBeLessThan(main.x);expect(right.x).toBeGreaterThanOrEqual(main.x+main.width);expect(Math.abs(left.y-right.y)).toBeLessThan(1);expect(Math.abs(right.y-toolbar.y)).toBeLessThan(1);
         }else if(width===768){
           const toggle=page.locator('#today-main-actions-toggle-right-sidebar');await expect(toggle).toHaveAttribute('aria-expanded','false');
           await toggle.click();await expect(choices.last()).toBeVisible();
@@ -90,7 +95,15 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
         await captureScreenshot(page,{path:`test-results/today-three-columns-${locale}-${theme}-${width}.png`});
       }
     }
-  }finally{await context.close();const current=await api(request,'GET',path);await api(request,'PUT',path,{body},{'If-Match':current.headers().etag});}
+  }finally{
+    await context.close();
+    if(accountLocale!==null){
+      const current=await api(request,'GET','/me');
+      await api(request,'PUT','/me',{zoneId,locale:accountLocale},{'If-Match':current.headers().etag});
+    }
+    const current=await api(request,'GET',path);
+    await api(request,'PUT',path,{body},{'If-Match':current.headers().etag});
+  }
 });
 
 test('Today main actions reuse revisions, client association and confirmed deletion while other editors keep Note tools',async({page,request,browser})=>{
@@ -98,7 +111,7 @@ test('Today main actions reuse revisions, client association and confirmed delet
   await api(request,'PUT',path,{body:'# Action note\n\nKeep this content.'},{'If-Match':original.headers().etag});
   const client=await(await api(request,'POST','/clients',{name:'Main actions '+randomUUID().slice(0,6),color:'#176653'})).json();
   try{
-    await signIn(page);await page.locator('#today-date').fill(date);const actions=page.getByRole('group',{name:'Main actions',exact:true});
+    await signIn(page);await chooseTodayDate(page,date);const actions=page.getByRole('group',{name:'Main actions',exact:true});
     await expect(actions.getByRole('button')).toHaveCount(5);
     for(const name of ['Note revisions','Associate with client or project','Delete note'])await expect(page.locator('#today-note-editor .markdown-actions-menu').getByRole('menuitem',{name,exact:true,includeHidden:true})).toHaveCount(0);
     const history=actions.getByRole('button',{name:'Note revisions',exact:true});await history.focus();await history.press('Enter');await expect(page.getByRole('dialog',{name:'Note revisions',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(history).toBeFocused();
@@ -118,7 +131,7 @@ test('Today main actions reuse revisions, client association and confirmed delet
     await expect.poll(async()=>(await(await api(request,'GET',path)).json()).body).toContain('Saved from main actions.');
     const readerContext=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
     try{
-      const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await reader.locator('#today-date').fill(date);
+      const reader=await readerContext.newPage();await signIn(reader,process.env.TIMEKEEPER_WEB_READ_TOKEN);await chooseTodayDate(reader,date);
       await reader.locator('#today-contents-list button').click();await expect(reader.locator('#today-note-editor .ProseMirror')).toHaveAttribute('contenteditable','false');
       for(const name of ['Associate with client or project','Delete note'])await expect(reader.locator('#today-main-actions').getByRole('button',{name,exact:true})).toBeDisabled();
       await expect(reader.locator('#today-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeEnabled();

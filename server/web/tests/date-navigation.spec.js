@@ -9,9 +9,8 @@ for(const locale of ['en-GB','nb-NO'])test(`date controls share selection, navig
   expect((await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,email:username+'@example.invalid',displayName:username,administrator:false}})).status()).toBe(201);
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(username);await page.locator('#password').fill(password);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');
   const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),profile=await api.get('/api/v1/me');
-  expect((await api.put('/api/v1/me',{headers:{'X-CSRF-Token':identity.csrf,'If-Match':profile.headers().etag},data:{zoneId:'Europe/Oslo',locale}})).ok()).toBe(true);await page.reload();await expect(page.locator('#today-date')).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
+  expect((await api.put('/api/v1/me',{headers:{'X-CSRF-Token':identity.csrf,'If-Match':profile.headers().etag},data:{zoneId:'Europe/Oslo',locale}})).ok()).toBe(true);await page.reload();await expect(page.locator('html')).toHaveAttribute('lang',locale);
   const cases=[
-    ['today','#today-panel','today-date','today-previous','today-next','2026-12-31','2026-12-30','2027-01-01'],
     ['track','#track-panel','track-month','track-previous','track-next','2026-12','2026-11','2027-01'],
     ['calendar','#calendar-panel','calendar-date','calendar-previous','calendar-next','2026-12-31','2026-12-21','2027-01-04'],
     ['week','#week-toolbar','week-date','week-previous','week-next','2026-12-31','2026-12-21','2027-01-04'],

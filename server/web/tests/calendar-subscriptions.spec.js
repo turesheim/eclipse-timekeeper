@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {appendEditorText,clickNoteAction} from './editor-interactions.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {captureScreenshot} from './screenshots.js';
@@ -154,7 +155,7 @@ test('meeting links render with provider icons in event dialogs and tooltips wit
     }
     await captureScreenshot(page,{path:'test-results/calendar-meeting-links-mobile.png'});await details.getByRole('button',{name:'Close',exact:true}).click();await page.setViewportSize({width:1280,height:900});
     await planned(page,subscription).filter({hasText:'Other video call'}).click();await expect(details.locator('[data-meeting-provider=video] .bi-camera-video')).toHaveCount(1);await expect(details.locator('[data-meeting-provider=teams]')).toHaveCount(0);await expect(details.getByRole('link',{name:'https://teams.microsoft.com.evil.example.test/join',exact:true})).toBeVisible();await details.getByRole('button',{name:'Close',exact:true}).click();
-    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');await page.locator('#today-events button').filter({has:page.locator('strong',{hasText:/^Video call$/})}).click();const today=page.locator('#today-event-details');await assertLinks(today);await captureScreenshot(page,{path:'test-results/today-meeting-links.png'});
+    await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-05-04');await page.locator('#today-events button').filter({has:page.locator('strong',{hasText:/^Video call$/})}).click();const today=page.locator('#today-event-details');await assertLinks(today);await captureScreenshot(page,{path:'test-results/today-meeting-links.png'});
     await context.route('https://meet.google.com/**',route=>route.fulfill({contentType:'text/html',body:'Meeting fixture'}));const opened=page.waitForEvent('popup');await today.locator('[data-meeting-provider=google-meet]').click();const popup=await opened;await popup.waitForLoadState();expect(await popup.evaluate(()=>window.opener)).toBeNull();await expect(popup.locator('body')).toHaveText('Meeting fixture');await popup.close();
     expect(await page.evaluate(()=>!!window.calendarInjection)).toBe(false);expect(loads).toEqual([]);
   }finally{await context.close();}
@@ -254,7 +255,7 @@ test('calendar failures identify the source and offer provider status from setti
     await calendar(page);const feed=await provider(request,[meeting],{status:503}),subscription=await subscribe(page,client,feed);
     await page.route('**/api/v1/calendar-subscriptions',async route=>{if(route.request().method()!=='GET')return route.continue();const response=await route.fetch(),data=await response.json();for(const item of data.items)if(item.id===subscription.id)item.origin='outlook.office365.com';await route.fulfill({response,json:data});});
     await manage(page);const settings=page.locator('#calendar-subscription-list .calendar-source-failure');await expect(settings).toContainText('Team planning (Microsoft)');await expect(settings.getByRole('link',{name:'Microsoft service status',exact:true})).toHaveAttribute('href','https://status.cloud.microsoft/');
-    await tracking(page);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');const today=page.locator('#today-events .calendar-source-failure');await expect(today).toContainText('Team planning (Microsoft)');await expect(today.getByRole('link')).toHaveAttribute('rel','noopener noreferrer');
+    await tracking(page);await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-05-04');const today=page.locator('#today-events .calendar-source-failure');await expect(today).toContainText('Team planning (Microsoft)');await expect(today.getByRole('link')).toHaveAttribute('rel','noopener noreferrer');
     await calendar(page);const warning=page.locator('#calendar-source-warnings');await expect(warning).toContainText('Team planning (Microsoft)');await expect(warning.getByRole('link')).toHaveAttribute('href','https://status.cloud.microsoft/');await expect(warning).not.toContainText(feed.url);
   }finally{await context.close();}
 });
@@ -337,7 +338,7 @@ test('calendar event notes share the guarded editor in Week and Today and round-
     expect((await new AxeBuilder({page}).include('#week-event-note-editor').analyze()).violations).toEqual([]);
     await editor.getByRole('button',{name:'Close',exact:true}).click();await details.getByRole('button',{name:'Close',exact:true}).click();
     await expect(planned(page,subscription).locator('.bi-journal-text')).toHaveCount(1);
-    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-05-04');
     const today=page.locator('#today-events [data-today-event="'+event.key+'"]');await expect(today.locator('.bi-journal-text')).toHaveCount(1);await today.click();
     await page.locator('#today-event-details').getByRole('button',{name:'Open event note',exact:true}).click();
     const todayEditor=page.locator('#today-event-note-editor');await expect(todayEditor).toBeVisible();await expect(todayEditor.locator('.markdown-banner')).toBeVisible();await todayEditor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(todayEditor.locator('.markdown-banner')).toBeHidden();await expect(todayEditor.locator('textarea')).toHaveValue(markdown);
@@ -362,7 +363,7 @@ test('subscribed calendar to-dos show due dates and completion in Week and Today
     await expect(page.locator('.calendar-all-day-event').filter({hasText:'Someday task'})).toContainText('No date');
     await expect(planned(page,subscription)).toContainText('To-do · Completed');
     await planned(page,subscription).click();const details=page.locator('#calendar-event-details');await expect(details).toContainText('read-only');await expect(details.getByRole('button',{name:'Create activity',exact:true})).toBeHidden();await details.getByRole('button',{name:'Close',exact:true}).click();
-    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-05-04');
     const events=page.locator('#today-events');await expect(events.locator('[data-today-event]')).toHaveCount(3);await expect(events).toContainText('Submit report');await expect(events).toContainText('To-do · Completed');await expect(events).toContainText('14:00');await expect(events).toContainText('No date');
     await events.getByRole('button').filter({hasText:'Submit report'}).click();await expect(page.locator('#today-event-details')).toContainText('Read-only calendar task');await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
     expect((await(await api('GET',reportPath)).json()).total).toBe(before);
@@ -386,7 +387,7 @@ test('Today keeps unchanged calendar cards and typing responsive during backgrou
       if(gate){held=true;await gate;}
       await route.fulfill({json:snapshot,headers:{'X-Timekeeper-Owner':reply.headers()['x-timekeeper-owner']}});++reads;
     });
-    await page.locator('#today-date').fill(date);
+    await chooseTodayDate(page,date);
     const events=page.locator('#today-events'),card=events.locator('[data-today-event]');await expect(card).toHaveText(/Stable meeting/);
     await card.focus();
     await events.evaluate(root=>{window.calendarCard=root.querySelector('button');window.calendarMutations=0;new MutationObserver(records=>window.calendarMutations+=records.length).observe(root,{subtree:true,childList:true,characterData:true});});
@@ -448,7 +449,7 @@ test('Today periodically reloads calendar items and shows subscription errors wi
   const {page,api,context,client}=await setup(browser,request);
   try{
     await calendar(page);const feed=await provider(request),subscription=await subscribe(page,client,feed);await expect(planned(page,subscription)).toHaveCount(1);
-    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-05-04');
+    await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-05-04');
     await expect(page.locator('#today-events')).toContainText('Planned meeting');
     // Simulate a newly refreshed server snapshot without emitting a domain change.
     const snapshotReply=await api('GET','/calendar-events?fromDate=2026-05-04&toDate=2026-05-05'),snapshot=await snapshotReply.json();

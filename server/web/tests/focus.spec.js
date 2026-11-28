@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {navigateView} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -50,7 +51,7 @@ test('focus areas filter every client view, totals and separately loaded calenda
   for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   const accessibility=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(accessibility.violations.map(value=>value.id)).toEqual([]);
   await page.setViewportSize({width:1440,height:1000});await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
-  await page.locator('#today-date').fill('2025-05-17');await selectFocus(page,'Work');
+  await chooseTodayDate(page,'2025-05-17');await selectFocus(page,'Work');
   await expect(page.locator('#today-sessions')).toContainText(clients[0].name);await expect(page.locator('#today-sessions')).not.toContainText(clients[1].name);
   await expect(page.locator('#today-events')).toContainText(clients[0].name+' meeting');await expect(page.locator('#today-events')).not.toContainText(clients[1].name);
   for(const [tab,root] of [['clients','#clients'],['projects','#projects']]){await navigateView(page,tab);await expect(page.locator(root)).toContainText(clients[0].name);await expect(page.locator(root)).toContainText(clients[1].name);}

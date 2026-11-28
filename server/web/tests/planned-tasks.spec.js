@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
@@ -23,7 +24,7 @@ async function setup(page,request){
   };
   return {api,asset,create};
 }
-async function today(page){await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);}
+async function today(page){await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await chooseTodayDate(page,date);}
 const card=(page,id)=>page.locator('[data-today-task="'+id+'"]');
 
 for(const format of ['TEXT','HTML'])test('planned task details show safe links and private images from '+format,async({page,request})=>{
@@ -69,7 +70,7 @@ test('read-only planned details allow private images while write actions stay di
   const {api,create}=await setup(page,request),task=await create('Read-only review','TEXT','![Overview](Images/overview.png)'),token=await(await api('POST','/auth/tokens',{name:'Planned viewer',permissions:['read'],expiresAt:null})).json();
   const viewer=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true}),read=await viewer.newPage();
   try{
-    await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');await read.locator('#today-date').fill(date);await card(read,task.id).click();
+    await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');await chooseTodayDate(read,date);await card(read,task.id).click();
     const popup=read.locator('#task-details');await expect(popup.getByRole('img',{name:'Overview',exact:true})).toHaveAttribute('src',/^blob:/);for(const name of ['Edit task','Delete task','Start tracking'])await expect(popup.getByRole('button',{name,exact:true})).toBeDisabled();
   }finally{await viewer.close();}
 });

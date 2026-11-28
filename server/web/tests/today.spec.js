@@ -1,3 +1,4 @@
+import {calendarDay,chooseTodayDate,selectedJournal} from './today-calendar.js';
 import {browserRequest} from './browser-request.js';
 import {workspaceDockSelector} from './navigation.js';
 import {clickNoteAction} from './editor-interactions.js';
@@ -88,7 +89,7 @@ test('weekly notes show events by day and tasks by deadline, then restore the da
   }
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
   await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.locator('#today-date').fill(first);
+  await chooseTodayDate(page,first);
   const eventsRoot=page.locator('#today-events'),tasks=page.locator('#today-planned-tasks'),sessions=page.locator('#today-sessions');
   await expect(eventsRoot).toContainText('Monday meeting');
   await expect(eventsRoot).not.toContainText('Sunday review');
@@ -112,7 +113,7 @@ test('weekly notes show events by day and tasks by deadline, then restore the da
 test('Today sidebars resize with pointer and keyboard while preserving the journal and mobile layout',async({page,request})=>{
   const date='2026-09-14',original=(await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body,draft='# Sidebar layout\n\nSidebar resize draft '+randomUUID();
   try{
-    await page.setViewportSize({width:1440,height:1000});await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);
+    await page.setViewportSize({width:1440,height:1000});await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#status')).toHaveText('Up to date');await chooseTodayDate(page,date);
     const resize=page.getByRole('separator',{name:'Resize Today sidebar',exact:true}),sidebar=page.locator('#today-sidebar'),journal=page.locator('#today-note-editor');await expect(resize).toBeVisible();await expect(resize).toHaveAttribute('aria-orientation','vertical');
     await journal.getByRole('button',{name:'Markdown source',exact:true}).click();const body=page.locator('#today-journal-body');await body.fill(draft);
     const start=await resize.boundingBox(),initial=(await sidebar.boundingBox()).width;await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2+100,start.y+start.height/2,{steps:4});await page.mouse.up();
@@ -128,11 +129,11 @@ test('Today sidebars resize with pointer and keyboard while preserving the journ
     await expect(body).toHaveValue(draft);await expect.poll(async()=>(await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body).toBe(draft);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/today-sidebar-wide.png'});
     await right.focus();await page.setViewportSize({width:1000,height:844});await expect(right).toBeHidden();await expect(rightToggle).toBeFocused();await page.setViewportSize({width:1440,height:1000});await expect(right).toBeVisible();
-    await resize.focus();await page.setViewportSize({width:1000,height:844});await expect(resize).toBeHidden();await expect(page.locator('#today-date')).toBeFocused();
+    await resize.focus();await page.setViewportSize({width:1000,height:844});await expect(resize).toBeHidden();await expect(page.locator('#today-title')).toBeFocused();
     const leftToggle=page.locator('#today-main-actions-toggle-left-sidebar');
     await leftToggle.click();await expect(sidebar).toBeHidden();await leftToggle.focus();
     await page.setViewportSize({width:390,height:844});
-    await expect(resize).toBeHidden();await expect(leftToggle).toBeHidden();await expect(page.locator('#today-date')).toBeFocused();
+    await expect(resize).toBeHidden();await expect(leftToggle).toBeHidden();await expect(page.locator('#today-title')).toBeFocused();
     await expect(sidebar).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(body).toHaveValue(draft);await captureScreenshot(page,{path:'test-results/today-sidebar-mobile.png',fullPage:true});
     await page.setViewportSize({width:1000,height:844});await expect(leftToggle).toBeVisible();await expect(sidebar).toBeHidden();
     await page.setViewportSize({width:1440,height:1000});await expect(resize).toBeVisible();await expect.poll(async()=>(await sidebar.boundingBox()).width).toBeCloseTo(480,0);
@@ -161,11 +162,9 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     await expect(page.locator('[data-tab=today]')).toHaveAttribute('aria-current','page');await expect(page.locator('#today-panel')).toBeVisible();
-    await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor')).toBeVisible();
+    await chooseTodayDate(page,date);await expect(page.locator('#today-note-editor')).toBeVisible();
     await expect(page.locator('#today-title')).toContainText('Saturday');await expect(page.locator('#today-title')).toContainText('2025');
     await expect(page.locator('#today-zone')).toHaveCount(0);
-    expect((await page.locator('.today-date-navigation .date-navigation-field').boundingBox()).width).toBeLessThan(180);
-    expect(await page.locator('.today-toolbar').evaluate(toolbar=>{const heading=toolbar.querySelector('.track-heading').getBoundingClientRect(),controls=toolbar.querySelector('.track-controls').getBoundingClientRect();return Math.abs(heading.y+heading.height/2-controls.y-controls.height/2);})).toBeLessThan(2);
     await expect(page.locator('#today-note-title')).toHaveClass(/visually-hidden/);
     const gridSizes=await page.locator('#today-month-grid').evaluate(grid=>[...new Set([...grid.children].map(child=>getComputedStyle(child).fontSize))]);
     expect(gridSizes).toEqual([await resolvedLength(page,'--font-today-calendar')]);
@@ -182,10 +181,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     const toolbar=page.locator('#today-note-editor').getByRole('toolbar',{name:'Formatting',exact:true});
     await expect(toolbar).toHaveClass(/btn-toolbar/);for(const name of ['Editing mode','Formatting'])await expect(toolbar.getByRole('group',{name,exact:true})).toHaveCount(1);await expect(toolbar.getByRole('button',{name:'Note tools',exact:true})).toHaveCount(1);await expect(toolbar.getByRole('separator')).toHaveCount(0);
     await expect(page.locator('#today-journal-formatted')).toHaveCSS('border-top-width','0px');
-    await expect(page.locator('#today-date-choose')).toHaveAccessibleName('Choose date');
-    await expect(page.locator('#today-previous')).toHaveAccessibleName('Previous day');
     await expect(page.locator('#today-current')).toHaveAccessibleName('Today');
-    await expect(page.locator('#today-next')).toHaveAccessibleName('Next day');
     await expect(page.locator('#today-sessions [data-today-client]')).toHaveCount(1);
     await expect(page.locator('#today-sessions')).toContainText(client.name);await expect(page.locator('#today-sessions')).toContainText('2h 15m');
     await page.locator('#today-sessions [data-today-client]').click();
@@ -229,7 +225,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
       await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-05');
       const calendarCard=page.locator(`[data-track-date="${date}"] [data-track-daily-client="${client.id}"]`);await expect(calendarCard).toBeAttached();
       const calendarStyle=await cardStyle(calendarCard);expect(sessionStyle).toEqual(calendarStyle);expect(eventStyle).toEqual(calendarStyle);
-      await page.locator('[data-tab=today]').click();await expect(page.locator('#today-date')).toHaveValue(date);
+      await page.locator('[data-tab=today]').click();await expect(selectedJournal(page)).toHaveAttribute('data-date',date);
     }
     for(const width of [1440,768]){
       await page.setViewportSize({width,height:1200});
@@ -262,7 +258,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await captureScreenshot(page,{path:'test-results/today-weekly-inline-phone.png'});
     await weekly.getByRole('button',{name:'Close',exact:true}).click();
     await expect(weekly).toBeHidden();await expect(daily).toBeVisible();
-    const shortcut=page.locator('.today-week-shortcut');
+    const shortcut=page.locator('#today-month-grid [data-week="2025-W20"]');
     await expect(shortcut).toBeFocused();await shortcut.press('Enter');
     await expect(weekly).toBeVisible();await expect(daily).toBeHidden();
     await page.setViewportSize({width:1440,height:1200});
@@ -288,15 +284,15 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect((await(await api(request,'GET','/day-labels/'+date)).json()).text).toBe('Sidebar label');
     expect((await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body).toContain('Plan the release.');
     await page.locator('#today-note-text').fill('Unsaved change');
-    await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
+    await calendarDay(page,next).click();await expect(selectedJournal(page)).toHaveAttribute('data-date',next);
     expect((await(await api(request,'GET','/day-labels/'+date)).json()).text).toBe('Unsaved change');
     await expect(page.locator('#today-title')).toContainText('Sunday');
-    await page.locator('#today-previous').click();await expect(page.locator('#today-date')).toHaveValue(date);
-    await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
+    await calendarDay(page,date).click();await expect(selectedJournal(page)).toHaveAttribute('data-date',date);
+    await calendarDay(page,next).click();await expect(selectedJournal(page)).toHaveAttribute('data-date',next);
     await expect(page.locator('#today-sessions')).toContainText('No work sessions');
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
     await expect(page.locator('#today-events')).toContainText('No calendar events');
-    await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
+    await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(selectedJournal(page)).toHaveAttribute('data-date',date);
     await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
     await page.evaluate(()=>window.scrollTo(0,50));
     await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo(0,0));
@@ -308,14 +304,13 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size',await resolvedLength(page,'--font-calendar-card-mobile'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
-    const datePicker=page.getByLabel('Date',{exact:true});
-    await datePicker.fill(next);
+    await calendarDay(page,next).click();
     await expect(page.locator('#today-title')).toContainText('Sunday');
     await expect(page.locator('#today-note-text')).toHaveValue('');
     await expect(page.locator('#today-sessions')).toContainText('No work sessions');
     await expect(page.locator('#today-events')).toContainText('No calendar events');
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
-    await datePicker.fill(date);
+    await chooseTodayDate(page,date);
     await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
     await page.setViewportSize({width:1440,height:1200});
     await page.locator('#today-month-grid [data-week="2025-W20"]').click();
@@ -345,8 +340,7 @@ test('Today phone journal applies native and menu formatting and reopens in rich
     const page=await context.newPage();
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
     await expect(page.locator('#status')).toHaveText('Up to date');
-    const datePicker=page.getByLabel('Date',{exact:true});
-    await datePicker.fill(date);
+    await chooseTodayDate(page,date);
     const journal=page.locator('#today-note-editor'),rich=journal.locator('.ProseMirror'),paragraph=rich.locator('p');
     const trigger=page.locator('#today-main-actions').getByRole('button',{name:'Note tools',exact:true});
     await expect(paragraph).toHaveText('Alpha Beta Gamma');await expect(rich).toBeEditable();
@@ -391,8 +385,8 @@ test('Today phone journal applies native and menu formatting and reopens in rich
     await captureScreenshot(page,{path:'test-results/today-phone-note-tools.png'});
     await journal.getByRole('menuitem',{name:'Markdown source',exact:true}).tap();
     await expect(journal.locator('#today-journal-body')).toHaveValue(/\*\*Alpha\*\*/);
-    await datePicker.fill('2025-04-15');await expect(rich).toBeEditable();await expect(rich).not.toContainText('Alpha');
-    await datePicker.fill(date);await expect(rich.locator('strong')).toHaveText('Alpha');await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
+    await calendarDay(page,'2025-04-15').tap();await expect(rich).toBeEditable();await expect(rich).not.toContainText('Alpha');
+    await chooseTodayDate(page,date);await expect(rich.locator('strong')).toHaveText('Alpha');await expect(rich.locator('em')).toHaveText(['Beta','Gamma']);
   }finally{
     await context.close();
     const current=await api(request,'GET',path);await api(request,'PUT',path,{body:originalBody},{'If-Match':current.headers().etag});
@@ -438,7 +432,7 @@ test('Today phone keeps the journal caret and actions above a keyboard-sized vie
     });
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
     await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByLabel('Date',{exact:true}).fill(date);
+    await chooseTodayDate(page,date);
     const journal=page.locator('#today-note-editor'),rich=journal.locator('.ProseMirror');
     const navigation=page.locator('#workspace-navigation'),lastSummary=page.locator('#today-planned-tasks').locator('..');
     await expect(rich.locator('p').last()).toHaveText('Paragraph 100: a long daily journal.');
@@ -495,7 +489,7 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
   await api(request,'PUT','/day-notes/'+date,{text:'',body},{'If-Match':existing.headers().etag});
   try {
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);await page.locator('#login-form button[type=submit]').click();
-    await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await page.getByLabel('Date',{exact:true}).fill(date);
+    await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=today]').click();await chooseTodayDate(page,date);
     for(const [width,height] of [[1440,1000],[1440,720],[390,844]]) {
       await page.setViewportSize({width,height});await page.evaluate(()=>window.scrollTo(0,0));
       if(width===1440)await expect.poll(()=>page.evaluate(()=>Math.max(0,document.documentElement.scrollHeight-innerHeight)),{message:'Today fits after the viewport resize is laid out'}).toBeLessThanOrEqual(1);
@@ -517,7 +511,7 @@ test('Today editor stays above navigation with long Markdown in either mode',asy
   }
 });
 
-for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and grouped date controls in ${locale}`,async({browser,request})=>{
+for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns the mini calendar and journal actions in ${locale}`,async({browser,request})=>{
   const original=await(await api(request,'GET','/me')).json();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale}),page=await context.newPage();
   let running;
@@ -528,10 +522,11 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
     // The journal appears before the initial account snapshot finishes docking
     // the work-session card. Measure layout after that publication settles.
     await expect(page.locator('#status')).toHaveAttribute('data-state','ready');await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');
-    await page.locator('#today-date').fill('2026-10-26');
-    await expect(page.locator('#today-date')).toHaveAccessibleName(locale==='nb-NO'?'Dato':'Date');await expect(page.locator('label[for="today-date"]')).toHaveClass(/visually-hidden/);
-    const navigator=page.getByRole('toolbar',{name:locale==='nb-NO'?'Datonavigasjon':'Date navigation',exact:true});
-    await expect(navigator.getByRole('group')).toHaveCount(1);await expect(navigator.getByRole('button')).toHaveCount(3);await expect(navigator.locator('.btn-group')).toHaveCount(1);
+    await chooseTodayDate(page,'2026-10-26');
+    const calendar=page.locator('.today-month'),todayButton=calendar.locator('#today-current');
+    await expect(todayButton).toHaveAccessibleName(locale==='nb-NO'?'I dag':'Today');
+    await expect(calendar.locator('#today-month-previous')).toHaveAccessibleName(locale==='nb-NO'?'Forrige måned':'Previous month');
+    await expect(calendar.locator('#today-month-next')).toHaveAccessibleName(locale==='nb-NO'?'Neste måned':'Next month');
     const originalBrand=await page.evaluate(()=>document.documentElement.style.getPropertyValue('--font-brand'));
     const check=async(width,font,heading=null,brand=originalBrand)=>{
       if(page.viewportSize()?.width!==width||page.viewportSize()?.height!==1000)await page.setViewportSize({width,height:1000});
@@ -541,36 +536,29 @@ for(const locale of ['en-GB','nb-NO'])test(`Today layout aligns its sidebar and 
       // Font-only changes must redock both columns without a synthetic resize.
       await expect.poll(()=>page.evaluate(({gap,dockSelector})=>{const editor=document.querySelector('#today-note-editor').getBoundingClientRect(),dock=document.querySelector(dockSelector).getBoundingClientRect();return Math.abs(dock.top-editor.bottom-gap);},{gap,dockSelector:workspaceDockSelector})).toBeLessThan(2);
       const geometry=await page.evaluate(dockSelector=>{
-        const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),controls=rect('.today-date-navigation'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect(dockSelector),main=rect('.today-main'),session=rect('#work-session');
-        return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,headerBottom:toolbar.bottom,headerRight:toolbar.right,actionsLeft:rect('#today-main-actions').left,contentsTop:rect('#today-contents').top,editorTop:editor.top,sidebarRight:sidebar.right,controlsRight:controls.right,controlsTop:controls.top,controlsCenter:controls.top+controls.height/2,titleTop:title.top,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,columnGap:parseFloat(getComputedStyle(document.querySelector('.today-toolbar')).columnGap),overflow:document.documentElement.scrollWidth>innerWidth};
+        const rect=selector=>document.querySelector(selector).getBoundingClientRect(),toolbar=rect('.today-toolbar'),title=rect('#today-title'),sidebar=rect('.today-sidebar'),editor=rect('#today-note-editor'),dock=rect(dockSelector),main=rect('.today-main'),session=rect('#work-session'),actions=rect('#today-main-actions');
+        return {sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,headerTop:toolbar.top,actionsTop:actions.top,actionsCenter:actions.top+actions.height/2,contentsTop:rect('#today-contents').top,calendarTop:rect('.today-month').top,editorTop:editor.top,sidebarRight:sidebar.right,titleBottom:title.bottom,titleCenterY:title.top+title.height/2,titleCenterX:title.left+title.width/2,mainLeft:main.left,mainRight:main.right,editorBottom:editor.bottom,dockTop:dock.top,sessionBottom:session.bottom,overflow:document.documentElement.scrollWidth>innerWidth};
       },workspaceDockSelector);
       expect(geometry.overflow,`${locale}: viewport ${width}px, base font ${font}px, heading ${heading||'default'}, brand ${brand||'default'}`).toBe(false);
+      await expect(calendar).toBeVisible();
       if(width>650){
-        expect(Math.abs(geometry.titleCenterX-(geometry.controlsRight+geometry.actionsLeft)/2)).toBeLessThan(2);
-        if(width>767)expect(Math.abs(geometry.titleCenterY-geometry.controlsCenter)).toBeLessThan(2);
-        else expect(Math.abs(geometry.titleTop-geometry.controlsTop)).toBeLessThan(2);
+        expect(Math.abs(geometry.titleCenterY-geometry.actionsCenter)).toBeLessThan(2);
       }else{
-        expect(geometry.titleBottom).toBeLessThanOrEqual(geometry.controlsTop+1);
         expect(Math.abs(geometry.titleCenterX-(geometry.mainLeft+geometry.mainRight)/2)).toBeLessThan(2);
-        await expect(navigator).toBeHidden();
-        await expect(page.locator('#today-date')).toHaveAttribute('type','date');
-        await expect(page.locator('label[for="today-date"]')).not.toHaveClass(/visually-hidden/);
-        expect((await page.locator('#today-date').boundingBox()).height).toBeGreaterThanOrEqual(44);
-        for(const selector of ['#today-date-choose','.today-month','#today-contents','.today-main-actions .sidebar-actions'])await expect(page.locator(selector)).toBeHidden();
+        for(const selector of ['#today-contents','.today-main-actions .sidebar-actions'])await expect(page.locator(selector)).toBeHidden();
         const label=await page.locator('#today-day-label').boundingBox();
-        expect(label.y).toBeGreaterThan(geometry.controlsTop);
-        expect(label.y+label.height).toBeLessThanOrEqual(geometry.editorTop);
+        expect(label.y).toBeGreaterThanOrEqual(geometry.titleBottom);
+        expect(label.y+label.height).toBeLessThanOrEqual(geometry.actionsTop);
         for(const id of ['today-sessions','today-events','today-planned-tasks'])await expect(page.locator('#'+id).locator('..')).toBeVisible();
       }
       if(width>1050){
-        expect(Math.abs(geometry.sidebarTop-geometry.editorTop)).toBeLessThan(1);
+        expect(Math.abs(geometry.calendarTop-geometry.contentsTop)).toBeLessThan(1);
         expect(Math.abs(geometry.contentsTop-geometry.headerTop)).toBeLessThan(1);
         expect(geometry.sidebarRight).toBeLessThanOrEqual(geometry.mainLeft);
-        expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.headerBottom);
         expect(geometry.headerTop-geometry.sessionBottom).toBeGreaterThanOrEqual(0);expect(geometry.headerTop-geometry.sessionBottom).toBeLessThanOrEqual(gap+1);
         expect(geometry.sidebarBottom).toBeLessThanOrEqual(geometry.dockTop-gap+1);
       }else expect(geometry.sidebarTop).toBeGreaterThanOrEqual(geometry.editorBottom);
-      for(const button of await navigator.getByRole('button').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);}
+      for(const button of await calendar.locator('.today-month-heading button,.today-month-current').all()){const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);}
     };
     for(const [width,font,heading,brand]of [[1440,14],[1146,14],[1051,14],[1050,14],[768,18],[651,14],[650,14],[440,14],[390,14],[320,14],[1051,14],[1051,14,'3rem'],[320,20],[320,20,null,'2rem']])await check(width,font,heading,brand);
     running=await(await api(request,'POST','/work-sessions',{summary:'Running session with a deliberately long title to exercise wrapping',start:new Date(Date.now()-3600000).toISOString(),end:null})).json();

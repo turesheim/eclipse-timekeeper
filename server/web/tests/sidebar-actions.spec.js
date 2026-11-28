@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {workspaceDockSelector} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -35,7 +36,7 @@ for(const locale of ['en-GB','nb-NO'])test(`Main actions independently toggle To
   await api(request,'PUT',path,{body:'# Sidebar heading\n\nKeep the journal visible.\n\n## Next heading\n'},{'If-Match':original.headers().etag});
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale,viewport:{width:1440,height:1000}}),page=await context.newPage();
   try{
-    await signIn(page);await page.locator('#today-date').fill(date);await expect(page.locator('#today-contents-list button')).toHaveCount(2);
+    await signIn(page);await chooseTodayDate(page,date);await expect(page.locator('#today-contents-list button')).toHaveCount(2);
     const left=page.locator('#today-sidebar'),right=page.locator('#today-contents'),resize=page.locator('.today-resize'),editor=page.locator('#today-note-editor'),source=page.locator('#today-journal-body');
     const toggles={left:page.locator('#today-main-actions-toggle-left-sidebar'),right:page.locator('#today-main-actions-toggle-right-sidebar')};
     await expect(toggles.left).toHaveAttribute('aria-controls','today-sidebar');await expect(toggles.right).toHaveAttribute('aria-controls','today-contents');
