@@ -115,7 +115,7 @@ export function buildCompactActions(f,media,host){
     f.discardCompactPress();
     toolbar.hidden=media.matches;
     f.insertControl.close();
-    (media.matches?host:toolbar).append(f.insertControl.group,trigger);
+    (media.matches?host:toolbar).append(f.insertControl.trigger,trigger);
     f.syncActions();
     if(focused)trigger.focus({preventScroll:true});
   };

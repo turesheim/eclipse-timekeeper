@@ -28,7 +28,13 @@ test('Notes opens formatted with main document actions and a compact keyboard-ac
  const panel=page.locator('#notes-panel'),toolbar=panel.locator('.markdown-toolbar'),trigger=toolbar.getByRole('button',{name:'Insert options',exact:true});
  await expect(panel.locator('.ProseMirror')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toHaveAttribute('aria-pressed','true');await expect(panel.locator('#notes-body')).toBeHidden();await expect(panel.getByRole('button',{name:'Save',exact:true})).toHaveCount(0);
  await expect(toolbar.getByRole('button',{name:'Undo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('button',{name:'Redo',exact:true})).toHaveCount(0);await expect(toolbar.getByRole('menuitem')).toHaveCount(0);
+ await expect(toolbar.getByRole('button',{name:'Insert image',exact:true})).toHaveCount(0);
  await expect(trigger).toBeEnabled();
+ await trigger.locator('.bi-image').click();
+ const insertMenu=page.getByRole('menu',{name:'Insert options',exact:true});
+ await expect(insertMenu.getByRole('menuitem',{name:'Insert image',exact:true})).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(trigger).toBeFocused();
  for(const [width,buttonSize]of [[1440,14],[1440,18],[320,14]]){
   await test.step(`Insert menu at ${width}px with ${buttonSize}px buttons`,async()=>{
   await page.setViewportSize({width,height:900});await page.evaluate(size=>document.documentElement.style.setProperty('--font-button',size+'px'),buttonSize);await page.mouse.move(0,0);await trigger.focus();await trigger.press('ArrowDown');const menu=page.getByRole('menu',{name:'Insert options',exact:true});await expect(menu.getByRole('menuitem',{name:'Insert image',exact:true})).toBeFocused();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Rename or move',exact:true})).toBeInViewport();await expect(page.locator('#notes-main-actions').getByRole('button',{name:'Note revisions',exact:true})).toBeInViewport();await expect(menu.getByRole('menuitem',{name:'Insert asset',exact:true})).toBeEnabled();await expect(menu.getByRole('menuitem',{name:'Rename or move',exact:true})).toHaveCount(0);
