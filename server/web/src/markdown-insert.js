@@ -9,11 +9,10 @@ const raster=/\.(png|jpe?g|gif|webp)$/i;
 export class MarkdownInsert {
   constructor(field){
     this.field=field;
-    this.group=node('div','btn-group markdown-insert');
-    const image=iconButton(node('button','btn btn-outline-secondary'),'image',t('markdown.insert_image'));
-    const trigger=iconButton(node('button','btn btn-outline-secondary'),'down',t('markdown.insert_options'));
-    image.type=trigger.type='button';
-    this.main=image;this.trigger=trigger;this.group.append(image,trigger);field.toolbar.append(this.group);
+    const trigger=this.trigger=iconButton(node('button','markdown-insert'),'image',t('markdown.insert_options'));
+    trigger.type='button';
+    trigger.append(icon('down'));
+    field.toolbar.append(trigger);
     const menu=this.menu=node('div','dropdown-menu markdown-actions-menu shadow');
     menu.id='markdown-insert-'+crypto.randomUUID();menu.popover='auto';
     menu.setAttribute('role','menu');menu.setAttribute('aria-label',t('markdown.insert_options'));
@@ -32,7 +31,6 @@ export class MarkdownInsert {
       input.addEventListener('cancel',()=>this.releaseFile());
     }
     const choose=(input,target)=>{this.releaseFile();this.fileTarget=target;input.click();};
-    image.addEventListener('click',()=>{if(!image.disabled)choose(this.imagePicker,this.take());});
     this.entries=[
       ['markdown.insert_image','image',()=>!!field.onUpload,target=>choose(this.imagePicker,target)],
       ['drawio.insert','diagram-2',()=>!!field.onUpload&&field.drawio?.canEdit(),target=>void field.drawio.open('new',null,target),()=>!!field.drawio?.phone.matches],
@@ -50,7 +48,7 @@ export class MarkdownInsert {
       if(!menu.matches(':popover-open'))return;
       const viewport=window.visualViewport,left=viewport?.offsetLeft??0,top=viewport?.offsetTop??0;
       const right=left+(viewport?.width??innerWidth),bottom=top+(viewport?.height??innerHeight);
-      const rect=this.group.getBoundingClientRect();
+      const rect=trigger.getBoundingClientRect();
       menu.style.left=Math.max(left+8,Math.min(rect.left,right-menu.offsetWidth-8))+'px';
       menu.style.top=Math.max(top+8,Math.min(rect.bottom+4+menu.offsetHeight<=bottom-8?rect.bottom+4:rect.top-menu.offsetHeight-4,bottom-menu.offsetHeight-8))+'px';
     };
@@ -61,11 +59,11 @@ export class MarkdownInsert {
       if(!menu.matches(':popover-open'))menu.showPopover();
       place();const items=options();items[last?items.length-1:0]?.focus();
     };
-    this.group.addEventListener('pointerdown',()=>{if(!menu.matches(':popover-open')){
+    trigger.addEventListener('pointerdown',()=>{if(!menu.matches(':popover-open')){
       field.releaseInsertion(this.target);this.target=field.captureInsertion();
     }});
-    this.group.addEventListener('pointercancel',()=>{field.releaseInsertion(this.target);this.target=null;});
-    this.group.addEventListener('mousedown',event=>event.preventDefault());
+    trigger.addEventListener('pointercancel',()=>{field.releaseInsertion(this.target);this.target=null;});
+    trigger.addEventListener('mousedown',event=>event.preventDefault());
     trigger.addEventListener('click',()=>menu.matches(':popover-open')?this.close():open());
     trigger.addEventListener('keydown',event=>{
       if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}
@@ -91,8 +89,7 @@ export class MarkdownInsert {
   sync(){
     const f=this.field;
     const blocked=f.readOnly||f.loading||f.bannerBusy||!!document.activeElement?.closest('.markdown-source-fragment');
-    this.group.hidden=!f.onUpload&&!f.resources?.complete||f.readOnly;
-    this.main.disabled=blocked||!f.onUpload;
+    this.trigger.hidden=!f.onUpload&&!f.resources?.complete||f.readOnly;
     for(const {button,enabled,hidden} of this.entries){
       button.hidden=!!hidden?.();
       button.disabled=blocked||button.hidden||!enabled();
