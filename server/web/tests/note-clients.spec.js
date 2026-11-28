@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -60,7 +61,7 @@ test('client choice includes clients outside the focus filter and preserves note
 });
 
 test('empty daily and weekly pages and an ordinary note popup share independent client metadata',async({page,request})=>{
-  const {api,alpha,beta,entry}=await setup(page,request),day='2026-11-19';await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const today=page.locator('#today-note-editor');await expect(today.locator('.ProseMirror')).toBeVisible();
+  const {api,alpha,beta,entry}=await setup(page,request),day='2026-11-19';await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);const today=page.locator('#today-note-editor');await expect(today.locator('.ProseMirror')).toBeVisible();
   await choose(page,today,alpha.id);await expect(today.locator('.note-client-label')).toHaveText(alpha.name);const daily=await(await api('GET','/day-notes/'+day+'/content')).json();expect(daily.version).toBe(0);expect(daily.body).toBe('');
   await page.locator('#today-month-grid [data-week]').first().click();const weekly=page.locator('#today-week-note-editor');await expect(weekly).toBeVisible();await choose(page,weekly,beta.id);await expect(weekly.locator('.note-client-label')).toHaveText(beta.name);await weekly.getByRole('button',{name:'Close',exact:true}).click();
   const recent=page.locator('#today-recent-notes [data-recent-note="'+entry.id+'"]');await expect(recent.locator('.today-recent-note-label')).toHaveText('Client');await recent.click();const popup=page.locator('#note-popup-editor');await expect(popup).toBeVisible();await expect(popup.locator('#note-popup-title')).toHaveText('Client');await choose(page,popup,beta.id);await expect(popup.locator('.note-client-label')).toHaveText(beta.name);await popup.getByRole('button',{name:'Close',exact:true}).click();

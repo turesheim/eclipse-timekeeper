@@ -99,7 +99,7 @@ document.addEventListener(vaultNoteNavigation,async event=>{
   if(detail.maximize){noteSearch.hide(false);today.closeEvent();calendar.subscriptions.details.close();}
   if(detail.maximize&&detail.entry.kind==='DAY'){
     const date=dailyNoteDate(detail.entry.sourceKey);if(!date)return;
-    if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}return;
+    if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-title').focus({preventScroll:true});}return;
   }
   if(await tab('notes')===false||session!==api)return;if(detail.searchFolder){await notes.revealFolder(detail.entry);return;}await notes.select(detail.entry.id,!!detail.maximize);
   if(detail.heading)await notes.markdown.showFormatted(false);notes.markdown.scrollToHeading?.(detail.heading);
@@ -129,7 +129,7 @@ document.addEventListener(dayNoteNavigation,async event=>{
   event.preventDefault();++calendarNavigation;const session=api,date=dailyNoteDate(event.detail?.date);if(!date||!session||!snapshot)return;
   if(!await navigationGuards(event.detail.guards,session)||!await notes.canLeave()||!await canLeaveSearchEvents()||!today.isDayOpen(date)&&!await today.canLeaveJournal()||session!==api)return;
   event.detail.leave.forEach(leave=>leave());today.closeEvent();calendar.subscriptions.details.close();
-  if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-date').focus({preventScroll:true});}
+  if(await today.select(date,{confirmed:true})){await tab('today');await today.journal.reloadEditor();history.replaceState(history.state,'',dailyNoteHref(date));$('today-title').focus({preventScroll:true});}
 });
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),

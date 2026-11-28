@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {clickNoteAction} from './editor-interactions.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
@@ -8,7 +9,7 @@ for(const view of ['today','track','week'])for(const mode of ['Formatted','Markd
  let current=await read();expect(current.ok()).toBe(true);
  const saved=await request.put('/api/v1/day-notes/'+date,{headers:{...headers,'If-Match':current.headers().etag},data:{text:label,body:'# Body to clear\n\nParagraph.\n'}});expect(saved.ok()).toBe(true);
  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
- if(view==='today')await page.locator('#today-date').fill(date);
+ if(view==='today')await chooseTodayDate(page,date);
  else if(view==='week'){await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(date);await page.locator('[data-week-note-date="'+date+'"]').click();}
  else{await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(page.locator('[data-track-note-date="'+date+'"]')).toBeEnabled();await page.locator('[data-track-note-date="'+date+'"]').click();}
  const editor=page.locator('#'+view+'-note-editor'),field=page.locator('#'+view+'-note-text');await expect(field).toHaveValue(label);

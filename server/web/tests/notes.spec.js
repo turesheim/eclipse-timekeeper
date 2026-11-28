@@ -1,3 +1,4 @@
+import {browseTodayMonth,calendarDay,chooseTodayDate} from './today-calendar.js';
 import {workspaceDockSelector} from './navigation.js';
 import {searchNotes} from './notes-search.js';
 import {saveMarkdown} from './editor-interactions.js';
@@ -124,7 +125,10 @@ test('clicking a hashtag searches exact private tags and retains the current Not
 test('a Today hashtag opens Notes tag search using the current private journal',async({page,request})=>{
   const api=await setup(page,request),day='2026-11-03',entry=await api('GET','/day-notes/'+day+'/content');await api('PUT','/day-notes/'+day+'/content',{body:'A #OpenShift journal entry.'},{'If-Match':entry.headers().etag});
   await expect.poll(async()=>{const response=await browserRequest(page).get('/api/v1/notes/search?'+new URLSearchParams({q:'tag:#openshift'}));return response.status();},{timeout:30000}).toBe(200);
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const tag=page.locator('#today-journal-formatted [data-hashtag="#openshift"]');await expect(tag).toHaveText('#OpenShift');await tag.focus();await tag.press('Enter');
+  await page.locator('[data-tab=today]').click();await browseTodayMonth(page,day.slice(0,7));await calendarDay(page,day).click();
+  const journal=page.locator('#today-journal-formatted'),tag=journal.locator('[data-hashtag="#openshift"]');
+  await expect(tag).toHaveText('#OpenShift');await journal.locator('.ProseMirror').focus();
+  await page.keyboard.press('Tab');await expect(tag).toBeFocused();await page.keyboard.press('Enter');
   await expect(page.locator('#workspace')).toHaveAttribute('data-view','today');await expect(page.locator('#notes-search-query')).toHaveValue('tag:#openshift');
   await expect(page.locator('#notes-search-results [data-search-note]')).toHaveCount(1);await page.locator('#notes-search-panel').getByRole('button',{name:'Close',exact:true}).click();
   await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-11');await page.locator('[data-track-note-date="'+day+'"]').click();const dialog=page.locator('#track-note-editor');await expect(dialog).toBeVisible();
@@ -154,7 +158,7 @@ test('Notes account imports a vault with review, guarded conflicts and exact fil
     for(const [path,bytes]of [['journal/'+day+'.md',body],['journal/assets/pixel.png',png],['Notes/Keep.md','Server original'],['Notes/Race.md','Concurrent server file']]){const entry=await(await api('GET','/notes/resolve?'+new URLSearchParams({path}))).json();expect(Buffer.from(await(await api('GET','/notes/entries/'+entry.id+'/content')).body()).equals(Buffer.from(bytes))).toBe(true);}
     expect((await(await api('GET','/day-labels/'+day)).json()).text).toBe('Independent label');expect((await(await api('GET','/week-notes/2026-W45')).json()).body).toBe('# Week\r\n');
     await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#notes-panel')).toBeVisible();await expect(page.locator('#notes-document-title')).toBeVisible();
-    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);const editor=page.locator('#today-note-editor');
+    await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);const editor=page.locator('#today-note-editor');
     await expect(editor.locator('.markdown-banner')).toBeVisible();await expect(editor.locator('.markdown-banner img')).toHaveCSS('object-position','25% 75%');await expect(editor.locator('.ProseMirror h1')).toHaveText('Imported æ');
     await appendEditorText(editor.locator('.ProseMirror h1'),' Reviewed.');
     await editor.locator('.ProseMirror').press('ControlOrMeta+s');
@@ -214,7 +218,7 @@ test('autosave status follows actual edits and undo across Notes, Today and week
   await expect(page.locator('#notes-panel .markdown-outline')).toHaveCount(0);await expect(page.getByText('Formatting may normalize Markdown.',{exact:true})).toHaveCount(0);
   await appendEditorText(page.locator('#notes-formatted p'),' Edited.');await expect(save).toHaveText('Unsaved changes');await page.keyboard.press('ControlOrMeta+z');await expect(save).toHaveText('Saved');
   await appendEditorText(page.locator('#notes-formatted p'),' Saved edit.');await saveMarkdown(page.locator('#notes-panel'));await expect(save).toHaveText('Saved');
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-04');const daily=page.locator('#today-note-editor'),dailySave=daily.locator('.dialog-actions > [role=status]');await expect(daily.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');await expect(dailySave).toHaveText('Saved');
+  await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-11-04');const daily=page.locator('#today-note-editor'),dailySave=daily.locator('.dialog-actions > [role=status]');await expect(daily.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');await expect(dailySave).toHaveText('Saved');
   await appendEditorText(daily.locator('.ProseMirror p').first(),'Day draft');await expect(dailySave).toHaveText('Unsaved changes');await page.keyboard.press('ControlOrMeta+z');await expect(dailySave).toHaveText('Saved');
   await page.locator('#today-note-text').fill('Label only');await expect(dailySave).toHaveText('Unsaved changes');await page.locator('#today-note-text').fill('');await expect(dailySave).toHaveText('Saved');
   await page.locator('#today-month-grid [data-week]').first().click();const weekly=page.locator('#today-week-note-editor'),weeklySave=weekly.locator('.dialog-actions > [role=status]');await expect(weekly.locator('.ProseMirror')).toHaveAttribute('contenteditable','true');await expect(weeklySave).toHaveText('Saved');
@@ -233,7 +237,7 @@ test('ordinary typed characters can be backspaced in Notes and Today WYSIWYG',as
   }
   await check(page.locator('#notes-formatted .ProseMirror'));await page.locator('#notes-panel').getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#notes-panel .markdown-source-tools')).toHaveCount(0);await page.locator('#notes-panel').getByRole('button',{name:'Formatted',exact:true}).click();await check(page.locator('#notes-formatted .ProseMirror'));await expect(page.locator('.notes-footer > [role=status]')).toHaveText('Saved');
   const day='2026-11-03',entry=await api('GET','/day-notes/'+day+'/content');await api('PUT','/day-notes/'+day+'/content',{body:'Keep this paragraph.\n\n- [ ] Keep this task\n'},{'If-Match':entry.headers().etag});
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);await expect(page.locator('#today-journal-formatted .ProseMirror li p')).toHaveText('Keep this task');await check(page.locator('#today-journal-formatted .ProseMirror'));await expect(page.locator('#today-note-editor').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);expect(errors).toEqual([]);
+  await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);await expect(page.locator('#today-journal-formatted .ProseMirror li p')).toHaveText('Keep this task');await check(page.locator('#today-journal-formatted .ProseMirror'));await expect(page.locator('#today-note-editor').getByRole('button',{name:'Save',exact:true})).toHaveCount(0);expect(errors).toEqual([]);
 });
 test('Notes preserves exact source, keeps drafts across tabs and rejects stale saves',async({page,request})=>{
   const api=await setup(page,request);const path='Notes/Exact.md',original='---\r\nunknown: [x, true]\r\n---\r\n[[Other note]]  \r\n![[image.png]]\r\n';
@@ -359,7 +363,7 @@ test('Notes can hide the configured journal without losing drafts or journal acc
   await page.evaluate(()=>location.hash='#account/notes');await expect(page.locator('#account-navigation a[href=\"#account/notes\"]')).toHaveAttribute('aria-current','page');await expect(page.getByLabel('Hide journal folder',{exact:true})).toBeChecked();
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
   await noteEntry(page.locator('#notes-navigation'),'Private').click();await expect(noteEntry(page.locator('#notes-navigation'),'Private/Journal')).toHaveCount(0);
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);await expect(page.locator('#today-journal-formatted')).toContainText('Private unsaved draft');
+  await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);await expect(page.locator('#today-journal-formatted')).toContainText('Private unsaved draft');
   await page.locator('[data-tab=notes]').click();await page.evaluate(()=>location.hash='#account/notes');await expect(page.locator('#account-navigation a[href=\"#account/notes\"]')).toHaveAttribute('aria-current','page');await page.getByLabel('Hide journal folder',{exact:true}).uncheck();
   await page.locator('#account-content').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Notes settings saved.');await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
   await expect(noteEntry(page.locator('#notes-navigation'),'Private/Journal')).toBeVisible();
@@ -539,7 +543,7 @@ test('note images avoid unrelated catalog reads and concurrent journal images sh
 });
 
 test('opening a weekly note survives a metadata refresh between pointer down and pointer up',async({page,request})=>{
-  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2026-11-04');
+  const api=await setup(page,request);await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2026-11-04');
   const weekButton=page.locator('#today-month-grid [data-week]').first(),week=await weekButton.getAttribute('data-week');
   const previous=await api('GET','/week-notes/'+week);let release,fetched;
   const gate=new Promise(resolve=>{release=resolve;}),arrived=new Promise(resolve=>{fetched=resolve;});
@@ -763,7 +767,7 @@ test('bookmarks persist in Notes without changing a rejected body draft, bytes o
 });
 
 test('Today bookmarks an empty day and Calendar shows its bookmark without creating a note',async({page,request})=>{
-  const api=await setup(page,request),day='2026-11-08';await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);
+  const api=await setup(page,request),day='2026-11-08';await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);
   const button=page.locator('#today-note-editor .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('border-top-width','0px');expect(Math.abs((await button.boundingBox()).y-(await page.locator('#today-note-editor').boundingBox()).y)).toBeLessThanOrEqual(1.5);await button.focus();await button.press('Enter');await expect(button).toHaveAttribute('aria-pressed','true');
   const original=await(await api('GET','/day-notes/'+day+'/content')).json();expect(original.body).toBe('');expect(original.version).toBe(0);const summary=await(await api('GET','/day-notes?'+new URLSearchParams({fromDate:day,toDate:day}))).json();expect(summary.items.find(item=>item.date===day).bookmarked).toBe(true);
   await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(day);const calendarButton=page.locator('[data-week-note-date="'+day+'"]');await expect(calendarButton.locator('.bi-journal-bookmark')).toBeVisible();
@@ -782,7 +786,7 @@ test('a stale bookmark write reloads metadata and preserves the note draft',asyn
 test('touch users can add a bookmark on a narrow Today editor without hover',async({page,request,browser})=>{
   await setup(page,request);const phone=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,storageState:await page.context().storageState(),viewport:{width:390,height:844},hasTouch:true,isMobile:true});
   try{
-    const mobile=await phone.newPage();await mobile.goto('/web/');await expect(mobile.locator('#status')).toHaveText('Up to date');await mobile.locator('[data-tab=today]').click();await mobile.locator('#today-date').fill('2026-11-10');const button=mobile.locator('#today-note-editor .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('opacity','1');await button.tap();await expect(button).toHaveAttribute('aria-pressed','true');await captureScreenshot(mobile,{path:test.info().outputPath('bookmark-touch-phone.png')});
+    const mobile=await phone.newPage();await mobile.goto('/web/');await expect(mobile.locator('#status')).toHaveText('Up to date');await mobile.locator('[data-tab=today]').click();await chooseTodayDate(mobile,'2026-11-10');const button=mobile.locator('#today-note-editor .note-bookmark');await expect(button).toBeEnabled();await expect(button).toHaveCSS('opacity','1');await button.tap();await expect(button).toHaveAttribute('aria-pressed','true');await captureScreenshot(mobile,{path:test.info().outputPath('bookmark-touch-phone.png')});
   }finally{await phone.close();}
 });
 
@@ -824,7 +828,7 @@ test('Notes autosaves generated wikilink closers without escaping and opens the 
 
 test('Today autosaves generated wikilink closers and offers to create the linked journal document',async({page,request})=>{
   const api=await setup(page,request),day='2026-11-14',settings=(await(await api('GET','/notes')).json()).settings;
-  await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill(day);
+  await page.locator('[data-tab=today]').click();await chooseTodayDate(page,day);
   const rich=page.locator('#today-journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.click();await page.keyboard.type('[[New journal document');
   await expect.poll(async()=>(await(await api('GET','/day-notes/'+day+'/content')).json()).body.trim()).toBe('[[New journal document]]');
   await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');const link=rich.locator('[data-wiki-reference="New journal document"]');await expect(link).toBeVisible();

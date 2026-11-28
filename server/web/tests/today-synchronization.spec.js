@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
@@ -23,7 +24,7 @@ async function setup(page,request,large=false){
   }
   const entry=await(await api('GET','/day-entries/'+date)).json();
   await api('POST','/day-entries/'+date,{text:'Original label',labelVersion:entry.labelVersion,body,noteVersion:entry.version},{'Idempotency-Key':randomUUID()});
-  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#today-date').fill(date);
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await chooseTodayDate(page,date);
   await expect(page.locator('#today-note-text')).toHaveValue('Original label');await expect(page.locator('#today-journal-formatted .ProseMirror')).toContainText('Paragraph 399:');
   // Establish the baseline after the separate automatic metadata write.
   await expect(page.locator('#today-note-editor .markdown-banner img')).toHaveAttribute('src',/^blob:/);
@@ -154,7 +155,7 @@ test('Today recovery never enables drafting or writes for a read-only account',a
   const {api}=await setup(page,request),token=await(await api('POST','/auth/tokens',{name:'Today read-only synchronization',permissions:['read'],expiresAt:null})).json();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true}),reader=await context.newPage(),gate=holdSnapshots(reader);let writes=0;
   try{
-    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#status')).toHaveText('Up to date');await reader.locator('#today-date').fill(date);
+    await reader.goto('/web/');await reader.locator('#auth-mode').selectOption('token');await reader.locator('#token').fill(token.token);await reader.locator('#login-form button[type=submit]').click();await expect(reader.locator('#status')).toHaveText('Up to date');await chooseTodayDate(reader,date);
     const rich=await editor(reader,'formatted');await expect(rich).toContainText('Paragraph 399:');await expect(rich).not.toBeEditable();
     reader.on('request',request=>{if(!['GET','HEAD'].includes(request.method()))writes++;});await gate.install();await recover(reader,gate);
     await expect(rich).not.toBeEditable();await expect(reader.locator('#today-note-text')).not.toBeEditable();await rich.focus();await reader.keyboard.insertText('Forbidden draft');

@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -33,7 +34,7 @@ test('journal task details show editable daily and weekly schedule defaults',asy
   await api('PUT','/week-notes/'+week,{body:'- [ ] Weekly review\n'},{'If-Match':weeklyNote.headers().etag});
   await page.locator('#refresh').click();
   await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.locator('#today-date').fill(date);
+  await chooseTodayDate(page,date);
 
   const daily=page.locator('#today-note-editor');
   let dialog=await edit(daily,daily.locator('li p'));
@@ -56,7 +57,7 @@ test('journal task details show editable daily and weekly schedule defaults',asy
 });
 
 test('weekly notes support nested task details, client-only assignment and keyboard dismissal',async({page,request})=>{
-  const api=await setup(page,request),client=await(await api('POST','/clients',{name:'Weekly client',color:'#176653'})).json();await page.locator('#today-date').fill('2026-11-04');const weekButton=page.locator('#today-month-grid [data-week]').first(),week=await weekButton.getAttribute('data-week'),previous=await api('GET','/week-notes/'+week);
+  const api=await setup(page,request),client=await(await api('POST','/clients',{name:'Weekly client',color:'#176653'})).json();await chooseTodayDate(page,'2026-11-04');const weekButton=page.locator('#today-month-grid [data-week]').first(),week=await weekButton.getAttribute('data-week'),previous=await api('GET','/week-notes/'+week);
   await api('PUT','/week-notes/'+week,{body:'- [ ] Weekly task\n'},{'If-Match':previous.headers().etag});await page.locator('#refresh').click();await expect(page.locator('#status')).toHaveText('Up to date');await weekButton.click();const root=page.locator('#today-week-note-editor'),dialog=await edit(root,root.locator('li p'));
   await dialog.getByLabel('Client',{exact:true}).selectOption(client.id);await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toBeHidden();expect((await tasks(api))[0].clientId).toBe(client.id);await expect(root).toBeVisible();
   await edit(root,root.locator('li p'));await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(root).toBeVisible();await expect(root.locator('.ProseMirror')).toBeFocused();await root.getByRole('button',{name:'Close',exact:true}).click();
@@ -115,7 +116,7 @@ test('an uncertain task save is read back without repeating the write',async({pa
 });
 
 for(const locale of ['en-GB','nb-NO'])test('daily task dialog fits both themes and narrow screens in '+locale,async({page,request})=>{
-  const api=await setup(page,request,locale),nb=locale==='nb-NO';await put(api,'journal/2026-11-02.md','- [ ] Daily task\n');await page.locator('#today-date').fill('2026-11-02');const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror li p')).toBeVisible();await caret(root.locator('li p'));await root.getByRole('button',{name:nb?'Rediger oppgavedetaljer':'Edit task details',exact:true}).click();const dialog=root.locator('.note-task-dialog');await expect(dialog.locator('select[name=priority]')).toBeEnabled();
+  const api=await setup(page,request,locale),nb=locale==='nb-NO';await put(api,'journal/2026-11-02.md','- [ ] Daily task\n');await chooseTodayDate(page,'2026-11-02');const root=page.locator('#today-note-editor');await expect(root.locator('.ProseMirror li p')).toBeVisible();await caret(root.locator('li p'));await root.getByRole('button',{name:nb?'Rediger oppgavedetaljer':'Edit task details',exact:true}).click();const dialog=root.locator('.note-task-dialog');await expect(dialog.locator('select[name=priority]')).toBeEnabled();
   for(const width of [1200,320])for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('.note-task-dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);}
   await captureScreenshot(page,{path:'test-results/note-task-'+locale+'-320.png'});await dialog.getByRole('button',{name:nb?'Avbryt':'Cancel',exact:true}).click();await expect(dialog).toBeHidden();
   for(const width of [1200,320])for(const theme of ['timekeeper','timekeeper-dark']){await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=theme==='timekeeper'?'light':'dark';},theme);await taskAction(root,root.locator('li p'),nb?'Rediger oppgavedetaljer':'Edit task details');await captureScreenshot(page,{path:`test-results/note-task-action-${locale}-${theme}-${width}.png`});}

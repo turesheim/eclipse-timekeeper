@@ -8,6 +8,9 @@ database baseline.
 
 ### Highlights
 
+- Consolidated date navigation in Today’s mini calendar, with a Today button
+  and access to daily and weekly journals on desktop and phones (#753).
+
 - Highlighted public holidays and labeled days in the Today date navigator,
   with a split background when both apply, and marked weekly rest days in
   Today, Track and Calendar (#733).

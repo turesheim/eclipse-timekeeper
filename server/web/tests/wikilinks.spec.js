@@ -1,3 +1,4 @@
+import {chooseTodayDate,selectedJournal} from './today-calendar.js';
 import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -39,16 +40,16 @@ test('journal links protect inline, weekly and modal drafts before navigation',a
   });
   try{
     await test.step('Clean links open the requested day',async()=>{
-      await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
-      await dateLink(rich(page),'2026-10-26').click();await expect(page.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
+      await chooseTodayDate(page,'2026-10-30');await expect(dateLink(rich(page),'2026-10-29')).toHaveCount(0);
+      await dateLink(rich(page),'2026-10-26').click();await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-10-26');await expect(rich(page)).toContainText('Target day');await expect(page).toHaveURL(/\?day=2026-10-26$/);
     });
-    await page.locator('#today-date').fill('2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await appendEditorText(rich(page).locator('p').last(),' Inline draft');
-    await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');await expect(page.locator('#today-date')).toHaveValue('2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toContain('Inline draft');
+    await chooseTodayDate(page,'2026-10-30');await expect(dateLink(rich(page),'2026-10-26')).toBeVisible();await appendEditorText(rich(page).locator('p').last(),' Inline draft');
+    await dateLink(rich(page),'2026-10-26').focus();await page.keyboard.press('Enter');await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-10-26');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toContain('Inline draft');
     await page.locator('#today-month-grid button[data-week="2026-W44"]').click();const weekly=page.locator('#today-week-note-editor');await expect(dateLink(weekly,'2026-10-30')).toBeVisible();await appendEditorText(weekly.locator('[role=textbox] p').last(),' Week draft');
-    await dateLink(weekly,'2026-10-30').click();await expect(weekly).toBeHidden();await expect(page.locator('#today-date')).toHaveValue('2026-10-30');expect((await(await api('GET','/week-notes/2026-W44')).json()).body).toContain('Week draft');
-    await page.locator('#today-date').fill('2026-10-26');await expect(rich(page)).toContainText('Target day');await appendEditorText(rich(page).locator('h1'),' Hidden draft');
+    await dateLink(weekly,'2026-10-30').click();await expect(weekly).toBeHidden();await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-10-30');expect((await(await api('GET','/week-notes/2026-W44')).json()).body).toContain('Week draft');
+    await chooseTodayDate(page,'2026-10-26');await expect(rich(page)).toContainText('Target day');await appendEditorText(rich(page).locator('h1'),' Hidden draft');
     await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-10');await page.locator('button[data-track-note-date="2026-10-30"]').click();const daily=page.locator('#track-note-editor');await expect(dateLink(daily,'2026-10-27')).toBeVisible();await appendEditorText(daily.locator('[role=textbox] p').last(),' Modal draft');
-    await dateLink(daily,'2026-10-27').click();await expect(daily).toBeHidden();await expect(page.locator('#today-panel')).toBeVisible();await expect(page.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(page)).toContainText('Other day');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toContain('Modal draft');expect((await(await api('GET','/day-notes/2026-10-26/content')).json()).body).toContain('Hidden draft');expect(errors).toEqual([]);
+    await dateLink(daily,'2026-10-27').click();await expect(daily).toBeHidden();await expect(page.locator('#today-panel')).toBeVisible();await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-10-27');await expect(rich(page)).toContainText('Other day');expect((await(await api('GET','/day-notes/2026-10-30/content')).json()).body).toContain('Modal draft');expect((await(await api('GET','/day-notes/2026-10-26/content')).json()).body).toContain('Hidden draft');expect(errors).toEqual([]);
   }finally{confirmations.dispose();}
 });
 
@@ -56,10 +57,10 @@ test('read-only daily links and modifier clicks open the requested date without 
   const {api,save}=await fresh(page,request);await save('2026-10-26','[[2026-10-27]]\n');await save('2026-10-27','# Read target\n');const token=await(await api('POST','/auth/tokens',{name:'Wikilink reader',permissions:['read'],expiresAt:null})).json();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:process.env.TIMEKEEPER_WEB_URL.startsWith('https:')});
   try{
-    const read=await context.newPage();await read.goto('/web/?day=2026-10-26');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');await expect(read.locator('#today-date')).toHaveValue('2026-10-26');await expect(rich(read)).toHaveAttribute('aria-readonly','true');
+    const read=await context.newPage();await read.goto('/web/?day=2026-10-26');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#status')).toHaveText('Up to date');await expect(selectedJournal(read)).toHaveAttribute('data-date','2026-10-26');await expect(rich(read)).toHaveAttribute('aria-readonly','true');
     const writes=[];context.on('request',r=>{if(['POST','PUT','DELETE','PATCH'].includes(r.method()))writes.push(new URL(r.url()).pathname);});
-    const opened=context.waitForEvent('page');await dateLink(rich(read),'2026-10-27').click({modifiers:['ControlOrMeta']});const second=await opened;await expect(second.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(second)).toContainText('Read target');await expect(read.locator('#today-date')).toHaveValue('2026-10-26');
-    await dateLink(rich(read),'2026-10-27').focus();await read.keyboard.press('Enter');await expect(read.locator('#today-date')).toHaveValue('2026-10-27');
-    await read.locator('#today-date').fill('2026-10-26');await expect(dateLink(rich(read),'2026-10-27')).toBeVisible();await dateLink(rich(read),'2026-10-27').click();await expect(read.locator('#today-date')).toHaveValue('2026-10-27');await expect(rich(read)).toContainText('Read target');expect(writes).toEqual([]);
+    const opened=context.waitForEvent('page');await dateLink(rich(read),'2026-10-27').click({modifiers:['ControlOrMeta']});const second=await opened;await expect(selectedJournal(second)).toHaveAttribute('data-date','2026-10-27');await expect(rich(second)).toContainText('Read target');await expect(selectedJournal(read)).toHaveAttribute('data-date','2026-10-26');
+    await dateLink(rich(read),'2026-10-27').focus();await read.keyboard.press('Enter');await expect(selectedJournal(read)).toHaveAttribute('data-date','2026-10-27');
+    await chooseTodayDate(read,'2026-10-26');await expect(dateLink(rich(read),'2026-10-27')).toBeVisible();await dateLink(rich(read),'2026-10-27').click();await expect(selectedJournal(read)).toHaveAttribute('data-date','2026-10-27');await expect(rich(read)).toContainText('Read target');expect(writes).toEqual([]);
   }finally{await context.close();}
 });

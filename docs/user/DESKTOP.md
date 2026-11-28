@@ -4,8 +4,10 @@ Open your Dagsverk server's `/web/` address in a browser and sign in.
 
 ## Browser workspace
 
-- **Today** opens your daily journal. The day overview lists work sessions,
-  calendar events and scheduled tasks. Use the table of contents to jump between
+- **Today** opens your daily journal. Use the mini calendar to browse months,
+  open a daily or weekly journal, or return to the current day with **Today**.
+  The day overview lists work sessions, calendar events and scheduled tasks.
+  Use the table of contents to jump between
   journal headings, or drag the sidebar separators to resize the panels.
 - **Calendar** shows monthly work-session totals by client and day. Select a
   daily entry to open its sessions.

@@ -51,7 +51,7 @@ export class JournalNoteEditor {
       if(!origin.getClientRects().length){
         const pane=origin.closest('[hidden][id]');
         origin=pane?root.querySelector('.sidebar-actions button[aria-controls="'+CSS.escape(pane.id)+'"]'):null;
-        if(!origin?.getClientRects().length&&pane?.id==='today-contents')origin=root.querySelector('#today-date');
+        if(!origin?.getClientRects().length&&pane?.id==='today-contents')origin=root.querySelector('#today-title');
       }
       if(origin?.getClientRects().length)origin.focus();
     });

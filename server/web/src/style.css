@@ -201,15 +201,15 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
 }
 #workspace[data-navigation=side] .nav-label { overflow-wrap: anywhere; }
 #workspace-nav-toggle { align-self: flex-start; flex-shrink: 0; }
-.toolbar { --toolbar-top-spacing: .5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-block: var(--toolbar-top-spacing) 1rem; }
+.toolbar, .today-layout { --toolbar-top-spacing: .5rem; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-block: var(--toolbar-top-spacing) 1rem; }
 .toolbar h2, .toolbar .hint { margin-bottom: .25rem; }
 .toolbar label { margin-block: 0; }
 .toolbar > * { min-width: 0; }
-.today-toolbar { display: grid; grid-template-columns: max-content minmax(0,1fr) auto; grid-column: 1 / 4; grid-row: 1; align-items: center; gap: .75rem; margin: 0 0 .75rem; }
-.tracking[data-active=true] ~ #today-panel .today-toolbar { margin-block-start: var(--toolbar-top-spacing); }
-.today-toolbar .track-heading { grid-column: 2; grid-row: 1; }
+.today-toolbar { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-column: 3; grid-row: 1; align-items: center; gap: .75rem; margin: 0 0 .75rem; }
+.tracking[data-active=true] ~ #today-panel .today-layout { margin-block-start: var(--toolbar-top-spacing); }
+.today-toolbar .track-heading { grid-column: 1; grid-row: 1; align-self: center; }
 .today-toolbar h2 { margin: 0; }
-.today-toolbar .today-date-navigation { grid-column: 1; grid-row: 1; display: flex; align-items: center; flex-wrap: nowrap; gap: .5rem; min-width: 0; }
 .date-navigation { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; min-width: 0; }
 .date-navigation-field { width: calc(10ch + 4.25rem + 2px); max-width: 100%; flex: none; }
 .date-navigation-month { width: calc(7ch + 4.25rem + 2px); }
@@ -219,10 +219,10 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
 .today-layout.sidebar-left-collapsed { --today-left-track: 0px; --today-separator-track: 0px; }
 .today-layout.sidebar-right-collapsed { --today-right-track: 0px; --today-right-separator-track: 0px; }
 .today-main { grid-column: 3; grid-row: 2; }
-.today-sidebar { grid-column: 1; grid-row: 2; }
+.today-sidebar { grid-column: 1; grid-row: 1 / 3; }
 .sidebar-resize { cursor: col-resize; touch-action: none; }
 .sidebar-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.today-resize { grid-column: 2; grid-row: 2; align-self: stretch; }
+.today-resize { grid-column: 2; grid-row: 1 / 3; align-self: stretch; }
 .today-contents-resize { grid-column: 4; grid-row: 1 / 3; align-self: stretch; }
 .today-main, .today-journal, .today-sidebar { min-width: 0; }
 .today-journal { display: flex; flex-direction: column; }
@@ -230,10 +230,9 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
 @media(min-width: 1051px) { .today-sidebar { max-height: calc(var(--today-sidebar-height, 100dvh) - var(--workspace-content-gap)); overflow-y: auto; } }
 .today-sidebar { --today-sidebar-heading-font-size: var(--font-today-sidebar-heading); --today-calendar-font-size: var(--font-today-calendar); }
 .today-sidebar, .today-calendar { display: grid; gap: .75rem; }
-.today-main-actions { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; grid-column: 3; grid-row: 1; }
+.today-main-actions { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; grid-column: 2; grid-row: 1; align-self: center; }
 .sidebar-actions { padding-inline-end: .5rem; margin-inline-end: .15rem; border-inline-end: 1px solid var(--line); }
 .today-document-actions, .today-client-action { display: contents; }
-.today-week-shortcut { display: none; }
 .today-contents { display: flex; flex-direction: column; gap: .75rem; min-width: 0; overscroll-behavior: contain; position: absolute; inset-block-start: 0; inset-inline-end: 0; width: var(--today-contents-width,16rem); grid-column: auto; grid-row: auto; }
 .today-contents > *, .notes-contents > * { flex-shrink: 0; }
 .note-contents { min-width: 0; min-height: 0; padding: .65rem; }
@@ -250,7 +249,9 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
 .today-summary { padding: .85rem; }
 .today-month { --today-calendar-cell-height: 1.5rem; padding: .65rem; }
 .today-month-heading { display: flex; align-items: center; justify-content: space-between; gap: .35rem; margin-bottom: .25rem; }
+.today-month-current { align-self: center; margin-block-start: .4rem; }
 .today-month-heading h3, .today-summary h3 { margin: 0; font-size: var(--today-sidebar-heading-font-size); }
+.today-month-heading h3 { text-align: center; }
 .today-month-heading button { width: 1.75rem; height: 1.75rem; min-height: 1.75rem; padding: .25rem; font-size: var(--font-today-month-button); }
 .week-note-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
 .week-note-heading h2 { margin: 0; }
@@ -271,8 +272,9 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
 .today-month-day.selected:is(.holiday,.labeled) { color: var(--bs-body-color); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .today-month-dot { position: absolute; inset: auto calc(50% - .1rem) .08rem; width: .2rem; height: .2rem; border-radius: 50%; background: currentColor; }
 @media (any-pointer: coarse) {
-  .today-month { --today-calendar-cell-height: 2rem; }
-  .today-month-heading button { width: 2.25rem; height: 2.25rem; min-height: 2.25rem; }
+  .today-month { --today-calendar-cell-height: 2.5rem; }
+  .today-month-current { min-height: var(--control-target-size); }
+  .today-month-heading button { width: var(--control-target-size); height: var(--control-target-size); min-height: var(--control-target-size); }
 }
 .today-group-heading { margin: .6rem 0 0; color: var(--muted); font-size: var(--today-sidebar-heading-font-size); }
 .today-list { list-style: none; padding: 0; margin: .5rem 0 0; }
@@ -294,15 +296,8 @@ body:has(#workspace[data-navigation=side]:not([hidden])) .account-menu-items {
   .today-layout .today-main { grid-row: 2; }
   .today-layout .today-sidebar { grid-row: 3; grid-template-columns: minmax(0,1fr); }
   .today-toolbar { grid-template-columns: minmax(0,1fr); }
-  .today-toolbar .track-heading { grid-column: 1; grid-row: 1; }
-  .today-toolbar .today-date-navigation { grid-column: 1; grid-row: 2; }
-  .today-date-navigation .date-navigation-field { width: auto; flex: 1; }
-  .today-date-navigation .today-week-shortcut { display: inline-flex; }
-  #today-date { min-height: var(--control-target-size); border-radius: var(--bs-border-radius); font-size: max(16px, var(--font-input)); appearance: auto; }
-  .today-date-navigation input::-webkit-calendar-picker-indicator { display: revert; }
-  .today-date-navigation > .btn-toolbar, #today-date-choose, .today-calendar { display: none; }
-  .today-toolbar .today-day-label { grid-column: 1; grid-row: 3; }
-  .today-main-actions { grid-column: 1; grid-row: 4; }
+  .today-toolbar .today-day-label { grid-column: 1; grid-row: 2; }
+  .today-main-actions { grid-column: 1; grid-row: 3; }
   #today-panel[data-journal-keyboard] {
     /* Main already reserves the dock height. Add the remaining keyboard space. */
     padding-block-end: max(0px, calc(var(--today-keyboard-inset) - var(--workspace-nav-height)));

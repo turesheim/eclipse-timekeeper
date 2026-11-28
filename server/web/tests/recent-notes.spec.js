@@ -1,3 +1,4 @@
+import {chooseTodayDate,selectedJournal} from './today-calendar.js';
 import {saveMarkdown} from './editor-interactions.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -133,10 +134,10 @@ test('Recent notes uses account days, includes journals and protects drafts when
   const recent=page.locator('#today-recent-notes');await expect(recent.locator('[data-recent-note]')).toHaveCount(20);
   expect(await recent.evaluate(node=>node.parentElement.parentElement.id)).toBe('today-contents');
   await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);await expect(recent).not.toContainText('Too old');await expect(recent).toContainText('Private');await expect(recent.locator(`[data-recent-note="${todayJournal.id}"]`)).toHaveCount(0);await expect(recent.locator('.hint')).toHaveCount(0);
-  await page.locator('#today-date').fill('2020-01-02');await expect(page.locator('#today-title')).toContainText('2020');await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
+  const priorDay=ago(14).slice(0,10);await chooseTodayDate(page,priorDay);await expect(selectedJournal(page)).toHaveAttribute('data-date',priorDay);await expect(recent.locator('[data-recent-note]')).toHaveCount(23);
   expect((await new AxeBuilder({page}).include('.today-sidebar').analyze()).violations).toEqual([]);
   await page.locator('#today-journal').getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#today-journal-body').fill('Keep my unsaved Today draft');
-  await recent.locator(`[data-recent-note="${first.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText('Current00');await expect(page.locator('#today-panel')).toBeVisible();await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Current00');expect((await(await api('GET','/day-entries/2020-01-02')).json()).body).toBe('Keep my unsaved Today draft');
+  await recent.locator(`[data-recent-note="${first.id}"]`).click();await expect(page.locator('#note-popup-title')).toHaveText('Current00');await expect(page.locator('#today-panel')).toBeVisible();await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();await expect(page.locator('#notes-document-title')).toHaveText('Current00');expect((await(await api('GET','/day-entries/'+priorDay)).json()).body).toBe('Keep my unsaved Today draft');
   await page.evaluate(()=>location.hash='#account/notes');const settings=page.locator('#account-content section').filter({has:page.getByRole('heading',{name:'Notes settings',exact:true})});
   const days=settings.getByLabel('Recent notes: number of days',{exact:true});await expect(days).toHaveValue('7');await days.fill('1');await settings.getByRole('button',{name:'Save',exact:true}).click();await expect(settings).toContainText('Notes settings saved.');
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=today]').click();await expect(recent.locator('[data-recent-note]')).toHaveCount(20);await recent.getByRole('button',{name:'More notes',exact:true}).click();await expect(recent.locator('[data-recent-note]')).toHaveCount(23);await expect(recent).not.toContainText('Five days ago');
@@ -155,7 +156,7 @@ test('Recent notes identifies ordinary, event and daily or weekly journal notes 
   const cases=[[ordinary,'file-earmark-text','Ordinary note','Vanlig notat','document'],[event,'calendar-event','Event note','Hendelsesnotat','Team planning'],[day,'journal-text','Journal note','Dagboknotat','2020-01-02'],[week,'journal-text','Journal note','Dagboknotat','2020-W01']];
   for(const [entry,glyph,label,,title] of cases){
     const button=recent.locator(`[data-recent-note="${entry.id}"]`);await expect(button).toHaveAccessibleName(new RegExp('^'+label+': '));await expect(button.locator(`.icon.bi-${glyph}`)).toHaveAttribute('aria-hidden','true');
-    await expect(button.locator('.today-recent-note-label')).toHaveText(title.split('/').at(-1));await button.click();await expect(page.locator('#note-popup-title')).toHaveText(title);await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();if(entry.kind==='DAY'){await expect(page.locator('#today-date')).toHaveValue(entry.sourceKey);await expect(page.locator('#today-journal-formatted')).toContainText('Daily journal body');
+    await expect(button.locator('.today-recent-note-label')).toHaveText(title.split('/').at(-1));await button.click();await expect(page.locator('#note-popup-title')).toHaveText(title);await page.locator('#note-popup-editor').getByRole('button',{name:'Open in workspace',exact:true}).click();if(entry.kind==='DAY'){await expect(selectedJournal(page)).toHaveAttribute('data-date',entry.sourceKey);await expect(page.locator('#today-journal-formatted')).toContainText('Daily journal body');
       // Visiting this plain imported day note captures its automatic banner.
       // Wait for the saved image and metadata refresh before measuring recent rows.
       await expect(page.locator('#today-note-editor .markdown-banner img')).toHaveAttribute('src',/^blob:/);await expect(recent).toHaveAttribute('aria-busy','false');
@@ -294,11 +295,11 @@ test('journal popups retain custom asset paths and maximize saved daily and week
   await api('PUT','/notes/files?'+new URLSearchParams({path:'journal/'+week+'.md'}),Buffer.from('# Weekly\n'),{'Content-Type':'application/octet-stream','If-None-Match':'*'});
   await page.reload();await page.locator(`#today-recent-notes [data-recent-note="${daily.id}"]`).click();const popup=page.locator('#note-popup-editor');await expect.poll(()=>popup.locator('img[alt="Legacy"]').evaluate(node=>node.naturalWidth)).toBe(1);
   await popup.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#note-popup-body').fill(body+'Changed from recent popup.\n');await popup.getByRole('button',{name:'Open in workspace',exact:true}).click();
-  await expect(page.locator('#today-date')).toHaveValue(day);await expect(page.locator('#today-journal-formatted')).toContainText('Changed from recent popup.');
+  await expect(selectedJournal(page)).toHaveAttribute('data-date',day);await expect(page.locator('#today-journal-formatted')).toContainText('Changed from recent popup.');
   await page.locator(`#today-panel [data-week="${week}"]`).click();const weekly=page.locator('#today-week-note-editor');await weekly.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#weekly-journal-body').fill('# Weekly\n\nChanged from weekly popup.\n');await weekly.getByRole('button',{name:'Open in workspace',exact:true}).click();
   await expect(weekly).not.toBeVisible();await expect(page.locator('#notes-panel')).toBeVisible();await expect(page.locator('#notes-formatted')).toContainText('Changed from weekly popup.');expect((await(await api('GET','/week-notes/'+week)).json()).body).toContain('Changed from weekly popup.');
   await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2020-01');await page.locator(`[data-track-note-date="${day}"]`).click();const nativeDay=page.locator('#track-note-editor');await nativeDay.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill(body+'Changed from daily popup.\n');await nativeDay.getByRole('button',{name:'Open in workspace',exact:true}).click();
-  await expect(nativeDay).not.toBeVisible();await expect(page.locator('#today-date')).toHaveValue(day);await expect(page.locator('#today-journal-formatted')).toContainText('Changed from daily popup.');
+  await expect(nativeDay).not.toBeVisible();await expect(selectedJournal(page)).toHaveAttribute('data-date',day);await expect(page.locator('#today-journal-formatted')).toContainText('Changed from daily popup.');
 });
 
 test('note popup clears the previous account title and body when authentication ends',async({page,request})=>{

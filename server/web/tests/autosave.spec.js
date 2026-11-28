@@ -1,3 +1,4 @@
+import {calendarDay,selectedJournal} from './today-calendar.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {browserRequest} from './browser-request.js';
@@ -80,8 +81,8 @@ test('checking an unknown daily-note save retains edits made while its first wri
   await page.route(path,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;if(writes===1){await route.fetch();await gate;await route.abort('connectionfailed');}else await route.continue();});
   try{
     await page.locator('#today-journal-body').fill('First body');await expect.poll(()=>writes).toBe(1);await expect(page.locator('#today-journal-body')).toBeEditable();await page.locator('#today-journal-body').fill('Newest body');release();await expect(daily.getByRole('alert')).toContainText('could not be confirmed');
-    await page.setViewportSize({width:440,height:956});const datePicker=page.getByLabel('Date',{exact:true});
-    await datePicker.fill('2026-11-03');await expect(datePicker).toHaveValue('2026-11-02');
+    await page.setViewportSize({width:440,height:956});
+    await calendarDay(page,'2026-11-03').click();await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-11-02');
     await expect(page.locator('#today-journal-body')).toHaveValue('Newest body');
     await daily.getByRole('button',{name:'Check saved result',exact:true}).click();await expect(page.locator('#today-journal-body')).toHaveValue('Newest body');await expect.poll(async()=>(await(await api('GET','/day-entries/2026-11-02')).json()).body).toBe('Newest body');expect(writes).toBe(2);
   }finally{release();await page.unrouteAll({behavior:'wait'});}
@@ -92,7 +93,7 @@ test('daily and weekly notes autosave on edits and close with Delete note below 
   await page.route(path,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}if(++writes===1)await gate;await route.continue();});
   try{
     await page.locator('#today-journal-body').fill('# Daily :rocket:\n');await expect.poll(()=>writes).toBe(1);await page.locator('#today-note-text').fill('Independent label');
-    await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue('2026-11-02');release();await expect(page.locator('#today-date')).toHaveValue('2026-11-03');
+    await calendarDay(page,'2026-11-03').click();await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-11-02');release();await expect(selectedJournal(page)).toHaveAttribute('data-date','2026-11-03');
     const saved=await(await api('GET','/day-entries/2026-11-02')).json();expect(saved.body).toBe('# Daily :rocket:\n');expect(saved.text).toBe('Independent label');expect(writes).toBe(2);
   }finally{release();await page.unrouteAll({behavior:'wait'});}
   await page.locator('[data-week="2026-W45"]').click();const weekly=page.locator('#today-week-note-editor');await expect(weekly).toBeVisible();await weekly.getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#weekly-journal-body').fill('# Weekly :smile:\n');await page.keyboard.press('Escape');await expect(weekly).toBeHidden();expect((await(await api('GET','/week-notes/2026-W45')).json()).body).toBe('# Weekly :smile:\n');

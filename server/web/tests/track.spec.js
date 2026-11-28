@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {tooltipFor} from './tooltips.js';
 import {clickNoteAction} from './editor-interactions.js';
 import {resolvedLength} from './style-metrics.js';
@@ -67,7 +68,7 @@ test('Calendar links saved ISO week notes across years and restores focus on clo
 
     await page.setViewportSize({width:1440,height:1000});
     await page.locator('[data-tab=today]').click();
-    await page.locator('#today-date').fill('2027-01-03');
+    await chooseTodayDate(page,'2027-01-03');
     await page.locator('#today-month-grid [data-week="2026-W53"]').click();
     const today=page.locator('#today-week-note-editor');
     await expect(today.getByRole('heading',{name:'Updated from Calendar'})).toBeVisible();
@@ -268,7 +269,7 @@ test('Calendar and Today work summaries share bold titles, regular times and a f
     }
     await captureScreenshot(page,{path:'test-results/calendar-summary-height-mobile.png',fullPage:true});
     await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/calendar-summary-formatting-desktop.png',fullPage:true});
-    await page.locator('[data-tab=today]').click();await page.locator('#today-date').fill('2025-10-15');
+    await page.locator('[data-tab=today]').click();await chooseTodayDate(page,'2025-10-15');
     const today=page.locator(`[data-today-client="${client.id}"]`);await expect(today).toBeVisible();
     expect((await today.boundingBox()).height).toBe(parseFloat(await resolvedLength(page,'--calendar-work-card-height')));
     await expect(today.locator('.calendar-summary-title')).toHaveCSS('font-weight','700');

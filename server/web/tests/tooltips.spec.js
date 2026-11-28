@@ -1,3 +1,4 @@
+import {chooseTodayDate} from './today-calendar.js';
 import {navigateView} from './navigation.js';
 import {openEditorFixture} from './editor-fixture.js';
 import {test,expect} from '@playwright/test';
@@ -25,7 +26,7 @@ test('one rich tooltip covers each composite, preserves literal data and support
     const client=await create('clients',{name:'Tooltip '+randomUUID().slice(0,8)+' <img src=x onerror=alert(1)>',color:'#176653'});
     const project=await create('projects',{clientId:client.id,name:'Review <b>literal project</b>',icon:'code'});
     for(const [summary,start,end] of [['First <script>unsafe()</script>','08:00','09:00'],['Second session','10:00','11:30']])await create('work-sessions',{clientId:client.id,projectId:project.id,summary,start:`2025-10-20T${start}:00Z`,end:`2025-10-20T${end}:00Z`});
-    await signIn(page);await page.locator('#today-date').fill('2025-10-20');
+    await signIn(page);await chooseTodayDate(page,'2025-10-20');
     const card=page.locator(`[data-today-client="${client.id}"]`),tip=await tooltipFor(card);
     await expect(tip.locator('.tooltip-session')).toHaveCount(2);await expect(tip).toContainText('2 work sessions');await expect(tip).toContainText('2h 30m');
     await expect(tip).toContainText(client.name);await expect(tip).toContainText(project.name);await expect(tip).toContainText('<script>unsafe()</script>');
@@ -56,14 +57,14 @@ test('one rich tooltip covers each composite, preserves literal data and support
 
 test('shared hints update dynamically and clear when leaving the weekly journal or signing out',async({page})=>{
   await signIn(page);
-  const next=page.locator('#today-next');await expect(await tooltipFor(next)).toContainText('Next day');
+  const next=page.locator('#today-month-next');await expect(await tooltipFor(next)).toContainText('Next month');
   // UI modules update native title properties after rendering. Their values
   // must remain literal text, and long help must scroll without stealing clicks.
   await next.evaluate(node=>{node.title='Updated <em>hint</em>\n'+('A detailed explanation\n').repeat(80);});
   const updated=await tooltipFor(next);await expect(updated).toContainText('Updated <em>hint</em>');await expect(updated.locator('em')).toHaveCount(0);
   const box=await updated.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.wheel(0,240);
   await expect.poll(()=>updated.locator('.tooltip-inner').evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
-  await next.evaluate(node=>{node.title='Next day';});await expect(updated).toContainText('Next day');
+  await next.evaluate(node=>{node.title='Next month';});await expect(updated).toContainText('Next month');
   await page.locator('#today-month-grid [data-week]').first().click();const dialog=page.locator('#today-week-note-editor');await expect(dialog).toBeVisible();
   const close=dialog.getByRole('button',{name:'Close',exact:true}),tip=await tooltipFor(close);
   await expect(tip).toContainText('Close');expect(await tip.evaluate(node=>node.parentElement===document.body)).toBe(true);
