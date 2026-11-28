@@ -35,6 +35,26 @@ class ChangesTest(unittest.TestCase):
         self.assertFalse(self.select(paths, {"before": "abc"}, "push", "refs/heads/main")["site"])
         self.assertTrue(self.select(paths + ["docs/user/README.md"])["site"])
 
+    def test_selector_only_changes_keep_tooling_validation_without_product_builds(self):
+        paths = ["scripts/ci_changes.py", "scripts/tests/test_ci_changes.py"]
+        agent_skill = ".agents/skills/dagsverk-change/SKILL.md"
+        checks = ("code", "full", "server", "web", "api", "eclipse",
+                  "remote_eclipse", "containers", "site")
+        for name, event, ref in (
+            ("pull_request", None, "refs/pull/1/merge"),
+            ("push", {"before": "abc"}, "refs/heads/main"),
+        ):
+            for changed in (paths[:1], paths[1:], paths + [agent_skill]):
+                selected = self.select(changed, event, name, ref)
+                self.assertFalse(any(selected[key] for key in checks), selected)
+
+        for product in ("server/web/src/style.css", "server/app/pom.xml",
+                        "common/api/openapi.yaml", ".github/workflows/build.yml", "docs/user/README.md"):
+            self.assertEqual(self.select([product]), self.select(paths + [product]))
+
+        event = {"pull_request": {"base": {"sha": "abc"}, "labels": [{"name": "ci:full"}]}}
+        self.assertTrue(self.select(paths, event)["full"])
+
     def select(self, paths, event=None, name='pull_request', ref='refs/pull/1/merge'):
         event = event or {'pull_request': {'base': {'sha': 'abc'}}}
         with patch.object(ci.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, ('\0'.join(paths)+'\0').encode(), b'')):
@@ -67,7 +87,7 @@ class ChangesTest(unittest.TestCase):
                      'server/app/src/test/java/net/SchemaTest.java', 'server/app/src/main/resources/application.properties',
                      'server/app/pom.xml', 'server/Dockerfile', 'server/synology/INFO',
                      'server/web/package-lock.json', 'server/web/src/api.js', '.github/workflows/build.yml',
-                     'scripts/ci_changes.py', 'eclipse/default.target', 'common/api/openapi.yaml', 'unknown/file'):
+                     'scripts/ci_result.py', 'eclipse/default.target', 'common/api/openapi.yaml', 'unknown/file'):
             with self.subTest(path=path):
                 self.assertTrue(self.select([path])['full'])
 
@@ -78,7 +98,7 @@ class ChangesTest(unittest.TestCase):
                      'server/core-domain/pom.xml', 'server/web/package-lock.json',
                      'server/web/src/api.js', 'server/synology/INFO',
                      '.github/workflows/build.yml', '.github/workflows/server-containers.yml',
-                     'scripts/ci_changes.py', 'scripts/tests/test_browser_tls_fixture.py'):
+                     'scripts/ci_result.py', 'scripts/tests/test_browser_tls_fixture.py'):
             with self.subTest(path=path):
                 for name, event, ref in (('pull_request', None, 'refs/pull/1/merge'),
                                          ('push', {'before': 'abc'}, 'refs/heads/main')):
