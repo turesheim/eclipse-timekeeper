@@ -19,8 +19,14 @@ def agent_tooling(path):
     }
 
 
+# The publication-tooling job always runs the selector's regression tests.
+# Workflow files and other CI tooling still participate in product selection.
+CI_SELECTOR_PATHS = {"scripts/ci_changes.py", "scripts/tests/test_ci_changes.py"}
+
+
 def product_paths(paths):
-    return [p for p in paths if not documentation(p) and not agent_tooling(p)]
+    return [p for p in paths
+            if p not in CI_SELECTOR_PATHS and not documentation(p) and not agent_tooling(p)]
 
 
 def validation_jobs(paths):
@@ -126,7 +132,7 @@ def select_jobs(event, event_name, ref, head):
         'web_full': code and (full or backend or not specs),
         'containers': full and event_name != 'push',
         'container_full': full or backend,
-        'site': full or any(documentation(p) for p in (paths or [])),
+        'site': full or any(documentation(p) and not agent_tooling(p) for p in (paths or [])),
         'browser_specs': specs,
         'browser_matrix': browser_matrix(specs),
     }
