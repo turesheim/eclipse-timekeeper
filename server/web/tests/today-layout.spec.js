@@ -41,9 +41,13 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
   const date='2026-07-09',path='/day-notes/'+date+'/content',original=await api(request,'GET',path),body=(await original.json()).body;
   const markdown='# Plan\n\n'+('A paragraph about the work.\n\n'.repeat(30))+'## Next steps\n\n### Decisions\n\n'+('More context.\n\n'.repeat(30))+'## Next steps\n';
   await api(request,'PUT',path,{body:markdown},{'If-Match':original.headers().etag});
+  const profile=await api(request,'GET','/me'),{zoneId,locale:accountLocale}=await profile.json();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true,locale,viewport:{width:1440,height:1000}}),page=await context.newPage();
   try{
-    await signIn(page);await chooseTodayDate(page,date);
+    // The account preference takes precedence over the browser language.
+    if(accountLocale!==null)await api(request,'PUT','/me',{zoneId,locale:null},{'If-Match':profile.headers().etag});
+    await signIn(page);await expect(page.locator('html')).toHaveAttribute('lang',locale);
+    await chooseTodayDate(page,date);
     const contents=page.locator('#today-contents'),choices=contents.locator('ol button'),field=page.locator('#today-note-editor');
     await expect(contents.getByRole('heading',{name:locale==='nb-NO'?'Innholdsfortegnelse':'Table of contents',exact:true})).toBeVisible();
     await expect(choices).toHaveText(['Plan','Next steps','Decisions','Next steps']);
@@ -91,7 +95,15 @@ for(const locale of ['en-GB','nb-NO'])test(`Today places its overview left and a
         await captureScreenshot(page,{path:`test-results/today-three-columns-${locale}-${theme}-${width}.png`});
       }
     }
-  }finally{await context.close();const current=await api(request,'GET',path);await api(request,'PUT',path,{body},{'If-Match':current.headers().etag});}
+  }finally{
+    await context.close();
+    if(accountLocale!==null){
+      const current=await api(request,'GET','/me');
+      await api(request,'PUT','/me',{zoneId,locale:accountLocale},{'If-Match':current.headers().etag});
+    }
+    const current=await api(request,'GET',path);
+    await api(request,'PUT',path,{body},{'If-Match':current.headers().etag});
+  }
 });
 
 test('Today main actions reuse revisions, client association and confirmed deletion while other editors keep Note tools',async({page,request,browser})=>{
